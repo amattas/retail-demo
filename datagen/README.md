@@ -50,13 +50,13 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 
 ## 🆕 Latest Enhancements
 
-### 🚚 Omnichannel Fulfillment Simulation **NEW**
-- Added a self-contained module at `retail_datagen/omnichannel` that exposes hook functions (`prepare`, `emit_supply`, `quote`, `allocate`, `realize`, `perturb`) for omnichannel routing.
-- Entities such as `Node`, `InventorySnapshot`, `InboundShipment`, `QuoteBundle`, and `Allocation` are defined as dataclasses to keep schemas discoverable and type-safe.
-- Configuration is driven by `OmniConfig`; a ready-to-edit template is available at `templates/omnichannel_config.yaml`.
-- Helper utilities implement the deterministic router reference (distance, ETA, cost models, ATP checks) with unit tests under `tests/unit/test_omnichannel_helpers.py`.
-- Sample CSV outputs for a one-day slice live in `static/omnichannel_sample/` and can be inspected or fed into downstream tooling.
-- Use `python -m retail_datagen.omnichannel.metrics static/omnichannel_sample` to validate SLA, mode mix, and inventory accuracy against spec targets.
+### 🛍️ Online Orders Integration — Unified
+- Online orders are now a first-class fact table (`online_orders`) integrated into the core generator and streamer.
+- Inventory impacts from online orders are applied to existing tables: `store_inventory_txn` and `dc_inventory_txn` with `Source=ONLINE`.
+- Seasonal/holiday patterns affect online order rates in both historical and streaming modes.
+- Uses the same synthetic customers and products as the rest of the system.
+
+Note: The legacy `retail_datagen/omnichannel` module and `static/omnichannel_sample/` are deprecated and retained only for reference. New work should target the unified generator and streaming paths.
 
 ### 📊 **Enhanced Progress Display for Historical Generation** ⭐ **NEW**
 - **Table Completion Counter**: Real-time display showing "X/8 tables complete" during generation

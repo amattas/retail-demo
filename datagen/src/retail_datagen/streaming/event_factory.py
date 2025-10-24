@@ -20,6 +20,7 @@ from ..shared.models import (
     Store,
     TenderType,
 )
+from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from .schemas import (
     AdImpressionPayload,
     BLEPingDetectedPayload,
@@ -28,6 +29,9 @@ from .schemas import (
     EventEnvelope,
     EventType,
     InventoryUpdatedPayload,
+    OnlineOrderCreatedPayload,
+    OnlineOrderPickedPayload,
+    OnlineOrderShippedPayload,
     PaymentProcessedPayload,
     PromotionAppliedPayload,
     ReceiptCreatedPayload,
@@ -110,6 +114,7 @@ class EventFactory:
 
         self.rng = random.Random(seed)
         self.state = EventGenerationState()
+        self.temporal_patterns = CompositeTemporalPatterns(seed)
 
         # Initialize store operating hours (7 AM - 10 PM)
         for store_id in self.stores.keys():
@@ -165,13 +170,21 @@ class EventFactory:
         hour = current_time.hour
         day_of_week = current_time.weekday()  # 0=Monday, 6=Sunday
 
-        # Business hours factor (more activity 9 AM - 8 PM)
-        if 9 <= hour <= 20:
-            business_factor = 1.0
-        elif 7 <= hour < 9 or 20 < hour <= 22:
-            business_factor = 0.6
+        # Business hours factor (more activity 9 AM - 8 PM). Online orders allowed 24/7 with evening bias.
+        if event_type == EventType.ONLINE_ORDER_CREATED:
+            if 18 <= hour <= 23:
+                business_factor = 1.0
+            elif 0 <= hour < 7 or 12 <= hour < 18:
+                business_factor = 0.7
+            else:
+                business_factor = 0.5
         else:
-            business_factor = 0.1
+            if 9 <= hour <= 20:
+                business_factor = 1.0
+            elif 7 <= hour < 9 or 20 < hour <= 22:
+                business_factor = 0.6
+            else:
+                business_factor = 0.1
 
         # Weekend factor (slightly less activity on weekends)
         weekend_factor = 0.8 if day_of_week >= 5 else 1.0
@@ -186,10 +199,23 @@ class EventFactory:
             EventType.TRUCK_ARRIVED: 0.05,
             EventType.STORE_OPENED: 0.01,
             EventType.STORE_CLOSED: 0.01,
+            EventType.ONLINE_ORDER_CREATED: 0.12,
         }
 
         base_prob = base_probabilities.get(event_type, 0.05)
         final_prob = base_prob * business_factor * weekend_factor
+
+        # Apply seasonal patterns to demand-like events (bounded)
+        if event_type in {
+            EventType.RECEIPT_CREATED,
+            EventType.CUSTOMER_ENTERED,
+            EventType.BLE_PING_DETECTED,
+            EventType.AD_IMPRESSION,
+            EventType.ONLINE_ORDER_CREATED,
+        }:
+            seasonal_mult = self.temporal_patterns.get_overall_multiplier(current_time)
+            seasonal_mult = max(0.6, min(seasonal_mult, 1.8))
+            final_prob *= seasonal_mult
 
         return self.rng.random() < final_prob
 
@@ -276,6 +302,14 @@ class EventFactory:
                 payload, correlation_id, partition_key = (
                     self._generate_promotion_applied(timestamp)
                 )
+            elif event_type == EventType.ONLINE_ORDER_CREATED:
+                payload, correlation_id, partition_key = (
+                    self._generate_online_order_created(timestamp)
+                )
+            elif event_type == EventType.ONLINE_ORDER_CREATED:
+                payload, correlation_id, partition_key = (
+                    self._generate_online_order_created(timestamp)
+                )
 
             if payload is None:
                 return None
@@ -325,6 +359,7 @@ class EventFactory:
                 EventType.TRUCK_ARRIVED: 0.02,
                 EventType.STOCKOUT_DETECTED: 0.02,
                 EventType.REORDER_TRIGGERED: 0.01,
+                EventType.ONLINE_ORDER_CREATED: 0.08,
             }
 
         events = []
@@ -345,6 +380,71 @@ class EventFactory:
                 event = self.generate_event(event_type, event_timestamp)
                 if event:
                     events.append(event)
+                    # If online order created, also emit follow-up events
+                    if event.event_type == EventType.ONLINE_ORDER_CREATED:
+                        try:
+                            pl = event.payload
+                            node_type = pl.get("node_type")
+                            node_id = pl.get("node_id")
+                            product_id = self.rng.choice(list(self.products.keys()))
+                            qty_delta = -self.rng.randint(1, 3)
+                            inv_payload = InventoryUpdatedPayload(
+                                store_id=node_id if node_type == "STORE" else None,
+                                dc_id=node_id if node_type == "DC" else None,
+                                product_id=product_id,
+                                quantity_delta=qty_delta,
+                                reason=InventoryReason.SALE.value,
+                                source="ONLINE",
+                            )
+                            inv_envelope = EventEnvelope(
+                                event_type=EventType.INVENTORY_UPDATED,
+                                payload=inv_payload.model_dump(),
+                                trace_id=self.generate_trace_id(event_timestamp),
+                                ingest_timestamp=event_timestamp,
+                                partition_key=f"{node_type.lower()}_{node_id}",
+                                correlation_id=event.trace_id,
+                            )
+                            events.append(inv_envelope)
+
+                            # Order picked event (slightly later)
+                            picked_payload = OnlineOrderPickedPayload(
+                                order_id=pl.get("order_id"),
+                                node_type=node_type,
+                                node_id=node_id,
+                                fulfillment_mode=pl.get("fulfillment_mode"),
+                                picked_time=event_timestamp + timedelta(seconds=self.rng.randint(60, 900)),
+                            )
+                            events.append(
+                                EventEnvelope(
+                                    event_type=EventType.ONLINE_ORDER_PICKED,
+                                    payload=picked_payload.model_dump(),
+                                    trace_id=self.generate_trace_id(event_timestamp),
+                                    ingest_timestamp=event_timestamp,
+                                    partition_key=f"{node_type.lower()}_{node_id}",
+                                    correlation_id=event.trace_id,
+                                )
+                            )
+
+                            # Order shipped event (after pick)
+                            shipped_payload = OnlineOrderShippedPayload(
+                                order_id=pl.get("order_id"),
+                                node_type=node_type,
+                                node_id=node_id,
+                                fulfillment_mode=pl.get("fulfillment_mode"),
+                                shipped_time=event_timestamp + timedelta(seconds=self.rng.randint(900, 3600)),
+                            )
+                            events.append(
+                                EventEnvelope(
+                                    event_type=EventType.ONLINE_ORDER_SHIPPED,
+                                    payload=shipped_payload.model_dump(),
+                                    trace_id=self.generate_trace_id(event_timestamp),
+                                    ingest_timestamp=event_timestamp,
+                                    partition_key=f"{node_type.lower()}_{node_id}",
+                                    correlation_id=event.trace_id,
+                                )
+                            )
+                        except Exception:
+                            pass
 
         return events
 
@@ -898,6 +998,47 @@ class EventFactory:
         )
 
         return payload, receipt_id, f"store_{receipt_info['store_id']}"
+
+    def _generate_online_order_created(
+        self, timestamp: datetime
+    ) -> tuple[OnlineOrderCreatedPayload, str, str]:
+        """Generate an online order created event with fulfillment details."""
+        customer_id = self.rng.choice(list(self.customers.keys()))
+        mode = self.rng.choices(
+            ["SHIP_FROM_STORE", "SHIP_FROM_DC", "BOPIS"], weights=[0.55, 0.35, 0.10]
+        )[0]
+
+        if mode in ("SHIP_FROM_STORE", "BOPIS"):
+            node_type = "STORE"
+            node_id = self.rng.choice(list(self.stores.keys()))
+        else:
+            node_type = "DC"
+            node_id = self.rng.choice(list(self.dcs.keys()))
+
+        item_count = max(1, int(self.rng.gauss(3.5, 1.8)))
+        subtotal = self.rng.uniform(15.0, 220.0)
+        tax = round(subtotal * 0.08, 2)
+        total = subtotal + tax
+        tender_type = self.rng.choice(list(TenderType)).value
+
+        order_id = f"ONL_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
+        trace_id = self.generate_trace_id(timestamp)
+
+        payload = OnlineOrderCreatedPayload(
+            order_id=order_id,
+            customer_id=customer_id,
+            fulfillment_mode=mode,
+            node_type=node_type,
+            node_id=node_id,
+            item_count=item_count,
+            subtotal=subtotal,
+            tax=tax,
+            total=total,
+            tender_type=tender_type,
+        )
+
+        partition_key = f"{node_type.lower()}_{node_id}"
+        return payload, trace_id, partition_key
 
     def _generate_stockout_detected(
         self, timestamp: datetime

@@ -75,7 +75,7 @@ class FactDataGenerator:
     and cross-fact coordination while maintaining business rule compliance.
     """
 
-    # Define the 8 core fact tables that are always generated
+    # Define the core fact tables that are always generated
     FACT_TABLES = [
         "dc_inventory_txn",
         "truck_moves",
@@ -85,6 +85,8 @@ class FactDataGenerator:
         "receipt_lines",
         "foot_traffic",
         "ble_pings",
+        # Omnichannel extension integrated into core facts
+        "online_orders",
     ]
 
     def __init__(self, config: RetailConfig):
@@ -354,6 +356,7 @@ class FactDataGenerator:
             "ble_pings": 0,
             "marketing": 0,
             "supply_chain_disruption": 0,
+            "online_orders": 0,
         }
 
         # NEW: Add table progress tracking
@@ -374,6 +377,7 @@ class FactDataGenerator:
             "store_inventory_txn": total_days * len(self.stores) * 20,  # ~20 txns per store per day
             "marketing": total_days * 10,  # ~10 campaigns per day
             "supply_chain_disruption": total_days * 2,  # ~2 disruptions per day
+            "online_orders": total_days * max(0, int(self.config.volume.online_orders_per_day)),
         }
 
         progress_reporter = ProgressReporter(total_days, "Generating historical data")
@@ -548,6 +552,7 @@ class FactDataGenerator:
             "ble_pings": [],
             "marketing": [],
             "supply_chain_disruption": [],
+            "online_orders": [],
         }
 
         # Update available products for this date
@@ -617,7 +622,15 @@ class FactDataGenerator:
         )
         daily_facts["store_inventory_txn"].extend(delivery_transactions)
 
-        # 6. Generate supply chain disruptions
+        # 6. Generate online orders and integrate inventory effects
+        online_orders, online_store_txn, online_dc_txn = self._generate_online_orders(
+            date
+        )
+        daily_facts["online_orders"].extend(online_orders)
+        daily_facts["store_inventory_txn"].extend(online_store_txn)
+        daily_facts["dc_inventory_txn"].extend(online_dc_txn)
+
+        # 7. Generate supply chain disruptions
         disruption_events = self.inventory_flow_sim.simulate_supply_chain_disruptions(
             date
         )
@@ -638,6 +651,121 @@ class FactDataGenerator:
             )
 
         return daily_facts
+
+    def _generate_online_orders(self, date: datetime) -> tuple[list[dict], list[dict], list[dict]]:
+        """Generate online orders for the given date and corresponding inventory effects.
+
+        Returns:
+            (orders, store_inventory_txn, dc_inventory_txn)
+        """
+        orders: list[dict] = []
+        store_txn: list[dict] = []
+        dc_txn: list[dict] = []
+
+        base_per_day = max(0, int(self.config.volume.online_orders_per_day))
+        if base_per_day == 0 or not self.customers:
+            return orders, store_txn, dc_txn
+
+        # Seasonality/holiday multiplier, not bounded by store hours
+        seasonal_mult = self.temporal_patterns.seasonal.get_seasonal_multiplier(date)
+        # Smooth out extremes
+        seasonal_mult = max(0.5, min(seasonal_mult, 2.5))
+        total_orders = max(0, int(base_per_day * seasonal_mult))
+
+        # Convenience
+        rng = self._rng
+        # InventoryReason and TenderType already imported from shared.models at module level
+
+        for i in range(total_orders):
+            # Random event time during the day
+            hour = rng.randint(0, 23)
+            minute = rng.randint(0, 59)
+            second = rng.randint(0, 59)
+            event_ts = datetime(
+                date.year, date.month, date.day, hour, minute, second
+            )
+
+            customer = rng.choice(self.customers)
+
+            # Generate a small basket using the same simulator
+            basket = self.customer_journey_sim.generate_shopping_basket(customer.ID)
+
+            # Choose fulfillment mode and node
+            mode = rng.choices(
+                ["SHIP_FROM_STORE", "SHIP_FROM_DC", "BOPIS"],
+                weights=[0.55, 0.35, 0.10],
+            )[0]
+
+            if mode in ("SHIP_FROM_STORE", "BOPIS") and self.stores:
+                node_type = "STORE"
+                store = rng.choice(self.stores)
+                node_id = store.ID
+            else:
+                node_type = "DC"
+                dc = rng.choice(self.distribution_centers) if self.distribution_centers else None
+                if not dc:
+                    # Fallback to store if no DCs
+                    node_type = "STORE"
+                    store = rng.choice(self.stores)
+                    node_id = store.ID
+                else:
+                    node_id = dc.ID
+
+            # Tally totals similar to receipts
+            subtotal = basket.estimated_total
+            tax_rate = Decimal("0.08")
+            tax = subtotal * tax_rate
+            total = subtotal + tax
+
+            order_id = (
+                f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100,999)}"
+            )
+            trace_id = self._generate_trace_id()
+
+            orders.append(
+                {
+                    "TraceId": trace_id,
+                    "EventTS": event_ts,
+                    "OrderId": order_id,
+                    "CustomerID": customer.ID,
+                    "FulfillmentMode": mode,
+                    "FulfillmentNodeType": node_type,
+                    "FulfillmentNodeID": node_id,
+                    "Subtotal": str(subtotal),
+                    "Tax": str(tax),
+                    "Total": str(total),
+                    "TenderType": TenderType.CREDIT_CARD.value,
+                }
+            )
+
+            # Create inventory effects: decrement stock at node
+            for product, qty in basket.items:
+                if node_type == "STORE":
+                    store_txn.append(
+                        {
+                            "TraceId": trace_id,
+                            "EventTS": event_ts,
+                            "StoreID": node_id,
+                            "ProductID": product.ID,
+                            "QtyDelta": -qty,
+                            "Reason": InventoryReason.SALE.value,
+                            "Source": "ONLINE",
+                        }
+                    )
+                else:  # DC
+                    dc_txn.append(
+                        {
+                            "TraceId": trace_id,
+                            "EventTS": event_ts,
+                            "DCID": node_id,
+                            "ProductID": product.ID,
+                            "QtyDelta": -qty,
+                            "Reason": InventoryReason.SALE.value,
+                            "Source": "ONLINE",
+                        }
+                    )
+
+        return orders, store_txn, dc_txn
 
     def _generate_dc_inventory_transactions(
         self, date: datetime, multiplier: float

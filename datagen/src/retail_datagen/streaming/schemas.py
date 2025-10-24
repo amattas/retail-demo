@@ -40,6 +40,11 @@ class EventType(str, Enum):
     AD_IMPRESSION = "ad_impression"
     PROMOTION_APPLIED = "promotion_applied"
 
+    # Omnichannel / Online
+    ONLINE_ORDER_CREATED = "online_order_created"
+    ONLINE_ORDER_PICKED = "online_order_picked"
+    ONLINE_ORDER_SHIPPED = "online_order_shipped"
+
 
 class EventEnvelope(BaseModel):
     """
@@ -235,3 +240,38 @@ class PaymentProcessedPayload(BaseModel):
     transaction_id: str = Field(..., min_length=1)
     processing_time: datetime
     status: str = Field(default="APPROVED")  # APPROVED, DECLINED, PENDING
+
+
+class OnlineOrderCreatedPayload(BaseModel):
+    """Payload for online_order_created events."""
+
+    order_id: str = Field(..., min_length=1)
+    customer_id: int = Field(..., gt=0)
+    fulfillment_mode: str = Field(..., min_length=1)  # SHIP_FROM_STORE / SHIP_FROM_DC / BOPIS
+    node_type: str = Field(..., min_length=1)  # STORE or DC
+    node_id: int = Field(..., gt=0)
+    item_count: int = Field(..., gt=0)
+    subtotal: float = Field(..., ge=0)
+    tax: float = Field(..., ge=0)
+    total: float = Field(..., ge=0)
+    tender_type: str = Field(..., min_length=1)
+
+
+class OnlineOrderPickedPayload(BaseModel):
+    """Payload for online_order_picked events."""
+
+    order_id: str = Field(..., min_length=1)
+    node_type: str = Field(..., min_length=1)
+    node_id: int = Field(..., gt=0)
+    fulfillment_mode: str = Field(..., min_length=1)
+    picked_time: datetime
+
+
+class OnlineOrderShippedPayload(BaseModel):
+    """Payload for online_order_shipped events."""
+
+    order_id: str = Field(..., min_length=1)
+    node_type: str = Field(..., min_length=1)
+    node_id: int = Field(..., gt=0)
+    fulfillment_mode: str = Field(..., min_length=1)
+    shipped_time: datetime

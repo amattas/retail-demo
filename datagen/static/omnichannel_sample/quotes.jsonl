@@ -1,2 +1,0 @@
-{"order_id":"O-10001","generated_at":"2025-09-10T10:05:02Z","candidates":[{"node_id":"store_0001","mode":"SHIP_FROM_STORE","eta":"2025-09-11T18:00:00Z","fill_rate":1.0,"total_cost":12.4}],"recommendation":{"node_id":"store_0001","mode":"SHIP_FROM_STORE"}}
-{"order_id":"O-10002","generated_at":"2025-09-10T11:15:03Z","candidates":[{"node_id":"store_0002","mode":"BOPIS","eta":"2025-09-10T14:00:00Z","fill_rate":1.0,"total_cost":5.8}],"recommendation":{"node_id":"store_0002","mode":"BOPIS"}}

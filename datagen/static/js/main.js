@@ -21,7 +21,8 @@ class RetailDataGenerator {
             'receipt_lines',
             'foot_traffic',
             'ble_pings',
-            'marketing'
+            'marketing',
+            'online_orders'
         ];
         this._lastCountRefresh = {};
         this._tableCountVersions = {};
@@ -207,6 +208,9 @@ class RetailDataGenerator {
                 document.getElementById('dcs').value = config.volume.dcs || 12;
                 document.getElementById('customersPerDay').value = config.volume.customers_per_day || 20000;
                 document.getElementById('itemsPerTicket').value = config.volume.items_per_ticket_mean || 4.2;
+                if (document.getElementById('onlineOrdersPerDay')) {
+                    document.getElementById('onlineOrdersPerDay').value = config.volume.online_orders_per_day || 2500;
+                }
             }
             
             if (config.realtime) {
@@ -598,7 +602,8 @@ class RetailDataGenerator {
                 { name: 'truck_moves', displayName: 'Truck Moves', icon: 'fas fa-truck-moving', type: 'Historical Data' },
                 { name: 'foot_traffic', displayName: 'Foot Traffic', icon: 'fas fa-walking', type: 'Historical Data' },
                 { name: 'ble_pings', displayName: 'BLE Pings', icon: 'fas fa-wifi', type: 'Historical Data' },
-                { name: 'marketing', displayName: 'Marketing', icon: 'fas fa-bullhorn', type: 'Historical Data' }
+                { name: 'marketing', displayName: 'Marketing', icon: 'fas fa-bullhorn', type: 'Historical Data' },
+                { name: 'online_orders', displayName: 'Online Orders', icon: 'fas fa-shopping-bag', type: 'Historical Data' }
             ];
 
             // Try to use cached data first (fast path)
@@ -1364,7 +1369,8 @@ class RetailDataGenerator {
                 total_customers: parseInt(document.getElementById('totalCustomers').value),
                 total_products: parseInt(document.getElementById('totalProducts').value),
                 customers_per_day: parseInt(document.getElementById('customersPerDay').value),
-                items_per_ticket_mean: parseFloat(document.getElementById('itemsPerTicket').value)
+                items_per_ticket_mean: parseFloat(document.getElementById('itemsPerTicket').value),
+                online_orders_per_day: parseInt(document.getElementById('onlineOrdersPerDay').value)
             },
             realtime: {
                 emit_interval_ms: parseInt(document.getElementById('emitInterval').value),

@@ -247,7 +247,7 @@
                 </button>
             </div>
 
-            <div class="card">
+                <div class="card">
                 <h3>Available Fact Tables</h3>
                 <div class="table-grid">
                     <div class="table-item" data-table="dc_inventory_txn">
@@ -311,6 +311,14 @@
                         <div>
                             <span>Marketing</span>
                             <small class="table-count" id="count-marketing"></small>
+                        </div>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
+                    </div>
+                    <div class="table-item" data-table="online_orders">
+                        <i class="fas fa-shopping-bag"></i>
+                        <div>
+                            <span>Online Orders</span>
+                            <small class="table-count" id="count-online_orders"></small>
                         </div>
                         <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
@@ -477,6 +485,10 @@
                         <div class="form-group">
                             <label for="itemsPerTicket">Items per Ticket (avg)</label>
                             <input type="number" id="itemsPerTicket" name="itemsPerTicket" step="0.1" value="4.2">
+                        </div>
+                        <div class="form-group">
+                            <label for="onlineOrdersPerDay">Online Orders per Day</label>
+                            <input type="number" id="onlineOrdersPerDay" name="onlineOrdersPerDay" value="2500">
                         </div>
                     </div>
                 </div>

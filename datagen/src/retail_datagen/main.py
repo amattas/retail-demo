@@ -459,14 +459,15 @@ async def reset_config():
     """Reset configuration to default values."""
     try:
         # Load default configuration
-        default_config = RetailConfig(
-            seed=42,
-            volume={
-                "stores": 250,
-                "dcs": 12,
-                "customers_per_day": 20000,
-                "items_per_ticket_mean": 4.2,
-            },
+            default_config = RetailConfig(
+                seed=42,
+                volume={
+                    "stores": 250,
+                    "dcs": 12,
+                    "customers_per_day": 20000,
+                    "items_per_ticket_mean": 4.2,
+                    "online_orders_per_day": 2500,
+                },
             realtime={
                 "emit_interval_ms": 500,
                 "burst": 100,

@@ -64,6 +64,7 @@ FACT_TABLES = [
     "foot_traffic",
     "ble_pings",
     "marketing",
+    "online_orders",
 ]
 
 

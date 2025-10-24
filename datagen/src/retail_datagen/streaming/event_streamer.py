@@ -239,6 +239,47 @@ class EventStreamer:
         # Metrics collector
         self.metrics = metrics_collector
 
+        # Daily target tracking for event pacing
+        self._daily_targets: dict[EventType, int] = {}
+        self._daily_counts: dict[EventType, int] = {}
+        self._current_day: str | None = None
+
+    def _compute_daily_targets(self):
+        """Compute rough daily targets for key event types based on config and master sizes."""
+        stores = len(self._stores) if self._stores else 1
+        dcs = len(self._distribution_centers) if self._distribution_centers else 1
+        cpd = getattr(self.config.volume, "customers_per_day", 20000) or 20000
+        ood = getattr(self.config.volume, "online_orders_per_day", 2500) or 2500
+        targets = {
+            EventType.RECEIPT_CREATED: cpd,
+            EventType.CUSTOMER_ENTERED: stores * 100,
+            EventType.BLE_PING_DETECTED: stores * 500,
+            EventType.INVENTORY_UPDATED: stores * 20 + dcs * 50,
+            EventType.TRUCK_ARRIVED: 10,
+            EventType.AD_IMPRESSION: 10000,  # marketing can be high volume
+            EventType.ONLINE_ORDER_CREATED: ood,
+        }
+        self._daily_targets = targets
+        self._daily_counts = {et: 0 for et in targets.keys()}
+        self._current_day = datetime.now(UTC).strftime("%Y-%m-%d")
+
+    def _reset_daily_if_needed(self, ts: datetime):
+        day = ts.strftime("%Y-%m-%d")
+        if self._current_day != day:
+            self._compute_daily_targets()
+
+    def _build_event_weights(self, ts: datetime) -> dict[EventType, float]:
+        """Build event weights biased by remaining quota for the current day."""
+        self._reset_daily_if_needed(ts)
+        weights: dict[EventType, float] = {}
+        # Base tiny weight for all known types to keep variety
+        base = 0.01
+        for et, target in self._daily_targets.items():
+            remaining = max(target - self._daily_counts.get(et, 0), 0)
+            # Weight proportional to remaining, with base floor
+            weights[et] = base + remaining / max(target, 1)
+        return weights
+
     def set_allowed_event_types(self, event_type_names: list[str] | None):
         """Optionally restrict emitted events to a subset of EventType names."""
         if not event_type_names:
@@ -346,6 +387,9 @@ class EventStreamer:
                 ),
                 seed=self.config.seed,
             )
+
+            # Compute daily targets for pacing after data load
+            self._compute_daily_targets()
 
             self.log.info(
                 "Event streaming engine initialized successfully",
@@ -800,18 +844,27 @@ class EventStreamer:
         Returns:
             List of generated events
         """
-        # If allowed types present, build a uniform weight map restricted to allowed types
+        # Build weights based on daily targets
+        all_weights = self._build_event_weights(timestamp)
         if self._allowed_event_types:
-            weights = {et: 1.0 for et in self._allowed_event_types}
-            return self._event_factory.generate_mixed_events(
-                count=self.streaming_config.burst,
-                timestamp=timestamp,
-                event_weights=weights,
-            )
+            weights = {et: w for et, w in all_weights.items() if et in self._allowed_event_types}
+            if not weights:
+                weights = {et: 1.0 for et in self._allowed_event_types}
+        else:
+            weights = all_weights
 
-        return self._event_factory.generate_mixed_events(
-            count=self.streaming_config.burst, timestamp=timestamp
+        events = self._event_factory.generate_mixed_events(
+            count=self.streaming_config.burst,
+            timestamp=timestamp,
+            event_weights=weights,
         )
+
+        # Update daily counts for pacing
+        for ev in events:
+            if ev.event_type in self._daily_targets:
+                self._daily_counts[ev.event_type] = self._daily_counts.get(ev.event_type, 0) + 1
+
+        return events
 
     async def _flush_event_buffer(self):
         """Flush events from buffer to Azure Event Hub."""

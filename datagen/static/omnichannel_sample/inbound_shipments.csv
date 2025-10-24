@@ -1,3 +1,0 @@
-shipment_id,dest_node_id,sku,qty,eta_start,eta_end,source_node_id
-SHP-001,store_0001,SKU-100,12,2025-09-11T00:00:00Z,2025-09-12T12:00:00Z,dc_000
-SHP-002,store_0002,SKU-100,10,2025-09-11T00:00:00Z,2025-09-13T00:00:00Z,dc_000

@@ -1,4 +1,0 @@
-node_id,type,timezone,lat,lon,capabilities_ship,capabilities_bopis,capabilities_curbside,accuracy_score,picks_per_hour
-store_0001,STORE,America/Chicago,41.881,-87.627,True,True,True,0.94,55
-store_0002,STORE,America/Chicago,41.900,-87.650,True,True,True,0.91,48
-dc_000,DC,America/Chicago,41.780,-87.650,True,False,False,0.99,140

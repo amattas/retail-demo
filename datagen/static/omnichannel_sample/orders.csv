@@ -1,3 +1,0 @@
-order_id,created_at,ship_to_postal,ship_to_lat,ship_to_lon,promise_by,mode_allow,allow_split,max_nodes
-O-10001,2025-09-10T10:05:00Z,60601,41.885,-87.621,2025-09-12T23:59:59Z,"SHIP_FROM_STORE|SHIP_FROM_DC",true,2
-O-10002,2025-09-10T11:15:00Z,60605,41.867,-87.623,2025-09-12T23:59:59Z,"SHIP_FROM_STORE|BOPIS",false,1

@@ -45,6 +45,13 @@ class VolumeConfig(BaseModel):
         ..., gt=0.0, description="Average number of items per customer receipt"
     )
 
+    # Omnichannel / Online orders volume
+    online_orders_per_day: int = Field(
+        2500,
+        ge=0,
+        description="Average number of online orders per day across the network",
+    )
+
     # Inventory configuration parameters
     dc_initial_inventory_min: int = Field(
         500, gt=0, description="Minimum initial inventory per product at DCs"
