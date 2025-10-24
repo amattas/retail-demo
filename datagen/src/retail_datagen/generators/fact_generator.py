@@ -272,6 +272,21 @@ class FactDataGenerator:
     ) -> None:
         self._table_progress_callback = callback
 
+    def set_progress_callback(
+        self,
+        callback: Callable[[int, str, dict], None] | None,
+    ) -> None:
+        """
+        Set the day-based progress callback for historical generation.
+
+        The callback will be invoked with progress updates during generation.
+        Matches the pattern used by MasterDataGenerator for consistency.
+
+        Args:
+            callback: Progress callback function(day_num, message, **kwargs), or None to clear
+        """
+        self._progress_callback = callback
+
     def _emit_table_progress(
         self,
         table_name: str,

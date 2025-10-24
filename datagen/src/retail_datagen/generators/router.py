@@ -11,6 +11,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -498,6 +499,8 @@ async def generate_historical_data(
 
             # Also wire a master-style per-table progress callback for consistent UI updates
             per_table_progress: dict[str, float] = {table: 0.0 for table in tables_to_generate}
+            # Thread lock to protect shared state in parallel mode
+            progress_lock = Lock()
 
             def per_table_callback(
                 table_name: str,
@@ -505,36 +508,42 @@ async def generate_historical_data(
                 detail_message: str | None,
                 table_counts: dict[str, int] | None = None,
             ) -> None:
-                if table_name not in per_table_progress or table_name not in FACT_TABLES:
+                if table_name not in FACT_TABLES:
                     return
 
-                per_table_progress[table_name] = max(0.0, min(1.0, progress_value))
+                # Protect all dict operations with lock for thread safety in parallel mode
+                with progress_lock:
+                    if table_name not in per_table_progress:
+                        return
 
-                tables_completed = [
-                    t for t, v in per_table_progress.items() if v >= 1.0
-                ]
-                tables_in_progress = [
-                    t for t, v in per_table_progress.items() if 0.0 < v < 1.0
-                ]
-                tables_remaining = [
-                    t for t, v in per_table_progress.items() if v == 0.0
-                ]
+                    per_table_progress[table_name] = max(0.0, min(1.0, progress_value))
 
-                overall_progress = (
-                    sum(per_table_progress.values()) / len(per_table_progress)
-                    if per_table_progress else progress_value
-                )
+                    tables_completed = [
+                        t for t, v in per_table_progress.items() if v >= 1.0
+                    ]
+                    tables_in_progress = [
+                        t for t, v in per_table_progress.items() if 0.0 < v < 1.0
+                    ]
+                    tables_remaining = [
+                        t for t, v in per_table_progress.items() if v == 0.0
+                    ]
 
-                update_task_progress(
-                    task_id,
-                    overall_progress,
-                    detail_message or f"Generating {table_name.replace('_',' ')}",
-                    table_progress=per_table_progress.copy(),
-                    tables_completed=tables_completed,
-                    tables_in_progress=tables_in_progress,
-                    tables_remaining=tables_remaining,
-                    table_counts=table_counts,
-                )
+                    overall_progress = (
+                        sum(per_table_progress.values()) / len(per_table_progress)
+                        if per_table_progress else progress_value
+                    )
+
+                    # Call update while holding lock (brief operation, acceptable)
+                    update_task_progress(
+                        task_id,
+                        overall_progress,
+                        detail_message or f"Generating {table_name.replace('_',' ')}",
+                        table_progress=dict(per_table_progress),  # Pass copy while locked
+                        tables_completed=list(tables_completed),  # Pass copy while locked
+                        tables_in_progress=list(tables_in_progress),
+                        tables_remaining=list(tables_remaining),
+                        table_counts=table_counts,
+                    )
 
             # Register both callbacks on the generator (per-table and day-based)
             try:
@@ -545,9 +554,10 @@ async def generate_historical_data(
 
             # Keep day-based progress updates as well for overall progress and ETA
             try:
-                fact_generator._progress_callback = progress_callback
+                fact_generator.set_progress_callback(progress_callback)
             except Exception:
-                pass
+                # Backwards compatibility: fallback to direct assignment
+                fact_generator._progress_callback = progress_callback
 
             # Emit an initialization update so the UI shows immediate activity
             try:
