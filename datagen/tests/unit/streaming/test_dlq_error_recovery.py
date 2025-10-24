@@ -126,7 +126,7 @@ def mock_config():
     """Create a mock RetailConfig for testing."""
     config_dict = {
         "seed": 42,
-        "volume": {"stores": 2, "dcs": 1, "total_customers": 10, "customers_per_day": 5},
+        "volume": {"stores": 2, "dcs": 1, "total_customers": 10, "customers_per_day": 5, "items_per_ticket_mean": 4.2},
         "paths": {
             "dict": "data/dictionaries",
             "master": "data/master",

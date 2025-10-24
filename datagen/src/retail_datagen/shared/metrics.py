@@ -1,104 +1,141 @@
 """Prometheus metrics for streaming system."""
 import time
 
-from prometheus_client import Counter, Gauge, Histogram, Summary
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, Summary
+
+
+def _get_or_create_metric(metric_class, name: str, doc: str, labelnames=None, **kwargs):
+    """Get existing metric or create new one to avoid duplication errors in tests."""
+    # Check if already exists
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, "_name") and collector._name == name:
+            return collector
+    # Create new
+    try:
+        if labelnames is not None:
+            kwargs["labelnames"] = labelnames
+        return metric_class(name, doc, registry=REGISTRY, **kwargs)
+    except ValueError as e:
+        if "Duplicated timeseries" in str(e):
+            # Race condition - try to find it again
+            for collector in list(REGISTRY._collector_to_names.keys()):
+                if hasattr(collector, "_name") and collector._name == name:
+                    return collector
+        raise
+
 
 # Event metrics
-events_generated_total = Counter(
+events_generated_total = _get_or_create_metric(
+    Counter,
     "streaming_events_generated_total",
     "Total number of events generated",
     ["event_type"],
 )
 
-events_sent_total = Counter(
+events_sent_total = _get_or_create_metric(
+    Counter,
     "streaming_events_sent_total",
     "Total number of events successfully sent to Event Hub",
     ["event_type"],
 )
 
-events_failed_total = Counter(
+events_failed_total = _get_or_create_metric(
+    Counter,
     "streaming_events_failed_total",
     "Total number of events that failed to send",
     ["event_type", "error_type"],
 )
 
 # Batch metrics
-batches_sent_total = Counter(
-    "streaming_batches_sent_total", "Total number of batches sent to Event Hub"
+batches_sent_total = _get_or_create_metric(
+    Counter,
+    "streaming_batches_sent_total",
+    "Total number of batches sent to Event Hub",
 )
 
-batches_failed_total = Counter(
+batches_failed_total = _get_or_create_metric(
+    Counter,
     "streaming_batches_failed_total",
     "Total number of batches that failed to send",
     ["error_type"],
 )
 
-batch_size_bytes = Histogram(
+batch_size_bytes = _get_or_create_metric(
+    Histogram,
     "streaming_batch_size_bytes",
     "Size of event batches in bytes",
-    buckets=[1024, 10240, 51200, 102400, 256000, 512000, 1048576],  # 1KB to 1MB
+    buckets=[1024, 10240, 51200, 102400, 256000, 512000, 1048576],
 )
 
-batch_send_duration_seconds = Histogram(
+batch_send_duration_seconds = _get_or_create_metric(
+    Histogram,
     "streaming_batch_send_duration_seconds",
     "Time taken to send a batch to Event Hub",
     buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
 )
 
 # Streaming state metrics
-streaming_active = Gauge(
-    "streaming_active", "Whether streaming is currently active (1) or not (0)"
+streaming_active = _get_or_create_metric(
+    Gauge, "streaming_active", "Whether streaming is currently active (1) or not (0)"
 )
 
-streaming_paused = Gauge(
-    "streaming_paused", "Whether streaming is currently paused (1) or not (0)"
+streaming_paused = _get_or_create_metric(
+    Gauge, "streaming_paused", "Whether streaming is currently paused (1) or not (0)"
 )
 
 # Circuit breaker metrics
-circuit_breaker_state = Gauge(
-    "circuit_breaker_state", "Circuit breaker state (0=closed, 1=open, 2=half-open)"
+circuit_breaker_state = _get_or_create_metric(
+    Gauge,
+    "circuit_breaker_state",
+    "Circuit breaker state (0=closed, 1=open, 2=half-open)",
 )
 
-circuit_breaker_failures = Counter(
-    "circuit_breaker_failures_total", "Total number of circuit breaker failures"
+circuit_breaker_failures = _get_or_create_metric(
+    Counter, "circuit_breaker_failures_total", "Total number of circuit breaker failures"
 )
 
-circuit_breaker_trips = Counter(
-    "circuit_breaker_trips_total", "Total number of times circuit breaker has opened"
+circuit_breaker_trips = _get_or_create_metric(
+    Counter,
+    "circuit_breaker_trips_total",
+    "Total number of times circuit breaker has opened",
 )
 
 # Dead letter queue metrics
-dlq_size = Gauge("dlq_size", "Current number of events in dead letter queue")
+dlq_size = _get_or_create_metric(
+    Gauge, "dlq_size", "Current number of events in dead letter queue"
+)
 
-dlq_events_added_total = Counter(
-    "dlq_events_added_total", "Total number of events added to DLQ"
+dlq_events_added_total = _get_or_create_metric(
+    Counter, "dlq_events_added_total", "Total number of events added to DLQ"
 )
 
 # Connection metrics
-eventhub_connected = Gauge(
-    "eventhub_connected", "Whether connected to Event Hub (1) or not (0)"
+eventhub_connected = _get_or_create_metric(
+    Gauge, "eventhub_connected", "Whether connected to Event Hub (1) or not (0)"
 )
 
-eventhub_connection_failures_total = Counter(
-    "eventhub_connection_failures_total", "Total number of Event Hub connection failures"
+eventhub_connection_failures_total = _get_or_create_metric(
+    Counter,
+    "eventhub_connection_failures_total",
+    "Total number of Event Hub connection failures",
 )
 
 # Performance metrics
-event_generation_duration_seconds = Summary(
-    "event_generation_duration_seconds", "Time taken to generate events"
+event_generation_duration_seconds = _get_or_create_metric(
+    Summary, "event_generation_duration_seconds", "Time taken to generate events"
 )
 
-streaming_uptime_seconds = Gauge(
-    "streaming_uptime_seconds", "How long streaming has been active (seconds)"
+streaming_uptime_seconds = _get_or_create_metric(
+    Gauge, "streaming_uptime_seconds", "How long streaming has been active (seconds)"
 )
 
 # Throughput metrics
-events_per_second = Gauge(
-    "streaming_events_per_second", "Current event generation rate (events/sec)"
+events_per_second = _get_or_create_metric(
+    Gauge, "streaming_events_per_second", "Current event generation rate (events/sec)"
 )
 
-bytes_per_second = Gauge(
-    "streaming_bytes_per_second", "Current throughput in bytes/sec"
+bytes_per_second = _get_or_create_metric(
+    Gauge, "streaming_bytes_per_second", "Current throughput in bytes/sec"
 )
 
 

@@ -357,6 +357,14 @@ class DCInventoryTransaction(BaseModel):
     QtyDelta: int = Field(..., description="Quantity change (positive or negative)")
     Reason: InventoryReason = Field(..., description="Reason for inventory change")
 
+    @field_validator("QtyDelta")
+    @classmethod
+    def validate_qty_delta_not_zero(cls, v: int) -> int:
+        """Validate that quantity delta is not zero."""
+        if v == 0:
+            raise ValueError("QtyDelta cannot be zero - must be a net positive or negative change")
+        return v
+
 
 class TruckMove(BaseModel):
     """Truck movement fact."""

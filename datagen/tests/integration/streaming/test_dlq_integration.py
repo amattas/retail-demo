@@ -180,7 +180,7 @@ async def test_dlq_integration_max_retries_enforcement(test_config):
             # Should still be retrying
             assert result["total_attempted"] == 1
             assert result["failed"] == 1
-            assert entry.retry_count == i + 1 for entry in streamer._dlq
+            assert all(entry.retry_count == i + 1 for entry in streamer._dlq)
         else:
             # Max retries exceeded, should not retry
             assert result["total_attempted"] == 1

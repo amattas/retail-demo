@@ -18,7 +18,9 @@ from pydantic import ValidationError
 
 # Import will be available after implementation
 from retail_datagen.shared.models import (
+    BLEPing,
     Customer,
+    DCInventoryTransaction,
     DistributionCenter,
     FirstNameDict,
     GeographyDict,
@@ -28,7 +30,10 @@ from retail_datagen.shared.models import (
     ProductCompanyDict,
     ProductDict,
     ProductMaster,
+    Receipt,
+    ReceiptLine,
     Store,
+    TruckMove,
 )
 
 
@@ -344,7 +349,7 @@ class TestFactModels:
 
     def test_dc_inventory_transaction_invalid_qty_delta_zero(self):
         """Test that zero quantity delta is invalid."""
-        {
+        invalid_txn = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "DCID": 1,
@@ -353,7 +358,7 @@ class TestFactModels:
             "Reason": "INBOUND_SHIPMENT",
         }
         with pytest.raises(ValidationError):
-            pass  # DCInventoryTransaction(**invalid_txn)
+            DCInventoryTransaction(**invalid_txn)
 
     def test_truck_move_valid(self):
         """Test valid truck move record."""
@@ -372,7 +377,7 @@ class TestFactModels:
 
     def test_truck_move_invalid_status(self):
         """Test that invalid truck status is rejected."""
-        {
+        invalid_move = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "TruckId": "TRK001",
@@ -384,7 +389,7 @@ class TestFactModels:
             "ETD": datetime.now(),
         }
         with pytest.raises(ValidationError):
-            pass  # TruckMove(**invalid_move)
+            TruckMove(**invalid_move)
 
     def test_store_inventory_transaction_valid(self):
         """Test valid store inventory transaction."""
@@ -416,7 +421,7 @@ class TestFactModels:
 
     def test_receipt_invalid_total_calculation(self):
         """Test that invalid total calculation is rejected."""
-        {
+        invalid_receipt = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "StoreID": 1,
@@ -428,7 +433,7 @@ class TestFactModels:
             "TenderType": "CREDIT_CARD",
         }
         with pytest.raises(ValidationError):
-            pass  # Receipt(**invalid_receipt)
+            Receipt(**invalid_receipt)
 
     def test_receipt_line_valid(self):
         """Test valid receipt line record."""
@@ -447,7 +452,7 @@ class TestFactModels:
 
     def test_receipt_line_invalid_ext_price_calculation(self):
         """Test that invalid extended price calculation is rejected."""
-        {
+        invalid_line = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "ReceiptId": "RCP001",
@@ -459,7 +464,7 @@ class TestFactModels:
             "PromoCode": None,
         }
         with pytest.raises(ValidationError):
-            pass  # ReceiptLine(**invalid_line)
+            ReceiptLine(**invalid_line)
 
     def test_foot_traffic_valid(self):
         """Test valid foot traffic record."""
@@ -489,7 +494,7 @@ class TestFactModels:
 
     def test_ble_ping_invalid_rssi_range(self):
         """Test that invalid RSSI range is rejected."""
-        {
+        invalid_ping = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "StoreID": 1,
@@ -499,7 +504,7 @@ class TestFactModels:
             "Zone": "ELECTRONICS",
         }
         with pytest.raises(ValidationError):
-            pass  # BLEPing(**invalid_ping)
+            BLEPing(**invalid_ping)
 
     def test_marketing_valid(self):
         """Test valid marketing record."""

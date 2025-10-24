@@ -17,4 +17,4 @@ fi
 
 # Launch the server with auto-reload
 echo "Launching server at http://localhost:8000 (with auto-reload)"
-exec $PYTHON_PATH -m uvicorn src.retail_datagen.main:app --host 0.0.0.0 --port 8000 --reload
+exec $PYTHON_PATH -m uvicorn retail_datagen.main:app --app-dir src --host 0.0.0.0 --port 8000 --reload

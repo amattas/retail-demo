@@ -201,7 +201,7 @@ class PromotionAppliedPayload(BaseModel):
     promo_code: str = Field(..., min_length=1)
     discount_amount: float = Field(..., gt=0)
     discount_type: str = Field(..., min_length=1)  # "percentage" or "fixed"
-    product_ids: list[int] = Field(..., min_items=1)
+    product_ids: list[int] = Field(..., min_length=1)
 
 
 class StockoutDetectedPayload(BaseModel):

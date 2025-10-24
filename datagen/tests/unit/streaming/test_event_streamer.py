@@ -252,7 +252,7 @@ class TestEventStreamerInitialization:
         assert streamer._is_shutdown is False
         assert isinstance(streamer._statistics, StreamingStatistics)
         assert streamer._event_buffer == []
-        assert streamer._dead_letter_queue == []
+        assert streamer._dlq == []
 
         # Synchronization primitives
         assert streamer._buffer_lock is not None
@@ -779,7 +779,7 @@ class TestDeadLetterQueue:
             await streamer.start(duration=timedelta(milliseconds=300))
 
             # DLQ should not exceed max size
-            assert len(streamer._dead_letter_queue) <= 20
+            assert len(streamer._dlq) <= 20
 
     @pytest.mark.asyncio
     async def test_dlq_disabled(
@@ -823,7 +823,7 @@ class TestDeadLetterQueue:
             await streamer.start(duration=timedelta(milliseconds=300))
 
             # DLQ should remain empty
-            assert len(streamer._dead_letter_queue) == 0
+            assert len(streamer._dlq) == 0
 
 
 # ============================================================================

@@ -646,3 +646,40 @@ class DictionaryLoader:
             }
 
         return summary
+
+    # Convenience methods for common dictionary access patterns
+    def load_geographies(self) -> list[GeographyDict]:
+        """Load and return geography dictionary data."""
+        if not self.is_loaded("geographies"):
+            self.load_dictionary("geographies")
+        return self.get_data("geographies")
+
+    def load_first_names(self) -> list[FirstNameDict]:
+        """Load and return first names dictionary data."""
+        if not self.is_loaded("first_names"):
+            self.load_dictionary("first_names")
+        return self.get_data("first_names")
+
+    def load_last_names(self) -> list[LastNameDict]:
+        """Load and return last names dictionary data."""
+        if not self.is_loaded("last_names"):
+            self.load_dictionary("last_names")
+        return self.get_data("last_names")
+
+    def load_products(self) -> list[ProductDict]:
+        """Load and return products dictionary data."""
+        if not self.is_loaded("products"):
+            self.load_dictionary("products")
+        return self.get_data("products")
+
+    def load_product_brands(self) -> list[ProductBrandDict]:
+        """Load and return product brands dictionary data."""
+        if not self.is_loaded("product_brands"):
+            self.load_dictionary("product_brands")
+        return self.get_data("product_brands")
+
+    def load_product_companies(self) -> list[ProductCompanyDict]:
+        """Load and return product companies dictionary data."""
+        if not self.is_loaded("product_companies"):
+            self.load_dictionary("product_companies")
+        return self.get_data("product_companies")

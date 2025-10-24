@@ -4,9 +4,39 @@ Pytest configuration and fixtures for retail data generator tests.
 Provides common test fixtures, sample data, and test utilities.
 """
 
+# CRITICAL: Mock Prometheus BEFORE any imports to prevent registry conflicts
+import sys
+from unittest.mock import MagicMock
+
+# Create mock prometheus_client module
+mock_prometheus = MagicMock()
+
+def _create_mock_metric(*args, **kwargs):
+    """Create a mock metric with all necessary methods."""
+    mock = MagicMock()
+    mock.labels = MagicMock(return_value=mock)
+    mock.inc = MagicMock()
+    mock.dec = MagicMock()
+    mock.set = MagicMock()
+    mock.observe = MagicMock()
+    mock.time = MagicMock(return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock()))
+    # Add _name attribute for compatibility
+    mock._name = args[0] if args else "mock_metric"
+    return mock
+
+mock_prometheus.Counter = MagicMock(side_effect=_create_mock_metric)
+mock_prometheus.Gauge = MagicMock(side_effect=_create_mock_metric)
+mock_prometheus.Histogram = MagicMock(side_effect=_create_mock_metric)
+mock_prometheus.Summary = MagicMock(side_effect=_create_mock_metric)
+mock_prometheus.REGISTRY = MagicMock()
+mock_prometheus.REGISTRY._collector_to_names = {}
+
+# Install mock before any other imports
+sys.modules['prometheus_client'] = mock_prometheus
+
+# Now safe to import other modules
 import json
 import os
-import sys
 import tempfile
 from datetime import datetime, timedelta
 from decimal import Decimal

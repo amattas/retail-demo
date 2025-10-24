@@ -42,12 +42,15 @@ class TestParallelGenerationFix(unittest.TestCase):
                 "trucks": 2,
                 "total_customers": 10,
                 "customers_per_day": 2,
+                "items_per_ticket_mean": 4.2,
             },
             paths={
                 "dict": "data/dictionaries",
                 "master": "data/master",
                 "facts": "data/facts",
             },
+            realtime={"emit_interval_ms": 500, "burst": 100, "azure_connection_string": ""},
+            stream={"hub": "test-hub"},
         )
 
         # Create mock executor instance

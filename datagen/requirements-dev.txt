@@ -4,6 +4,7 @@ pytest>=7.4.0
 pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
 hypothesis>=6.88.0
+httpx>=0.24.0
 ruff>=0.1.0
 mypy>=1.7.0
 
