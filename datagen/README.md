@@ -50,6 +50,14 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 
 ## 🆕 Latest Enhancements
 
+### 🚚 Omnichannel Fulfillment Simulation **NEW**
+- Added a self-contained module at `retail_datagen/omnichannel` that exposes hook functions (`prepare`, `emit_supply`, `quote`, `allocate`, `realize`, `perturb`) for omnichannel routing.
+- Entities such as `Node`, `InventorySnapshot`, `InboundShipment`, `QuoteBundle`, and `Allocation` are defined as dataclasses to keep schemas discoverable and type-safe.
+- Configuration is driven by `OmniConfig`; a ready-to-edit template is available at `templates/omnichannel_config.yaml`.
+- Helper utilities implement the deterministic router reference (distance, ETA, cost models, ATP checks) with unit tests under `tests/unit/test_omnichannel_helpers.py`.
+- Sample CSV outputs for a one-day slice live in `static/omnichannel_sample/` and can be inspected or fed into downstream tooling.
+- Use `python -m retail_datagen.omnichannel.metrics static/omnichannel_sample` to validate SLA, mode mix, and inventory accuracy against spec targets.
+
 ### 📊 **Enhanced Progress Display for Historical Generation** ⭐ **NEW**
 - **Table Completion Counter**: Real-time display showing "X/8 tables complete" during generation
 - **ETA Estimation**: Intelligent time-remaining calculation based on progress history (e.g., "~2 minutes")
@@ -114,6 +122,13 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 - **Data Preview**: Enhanced table preview system for all master data including trucks
 
 For implementation details and full data contracts, see `AGENTS.md`.
+
+### Running the Omnichannel Module
+1. Load configuration data (JSON or YAML) and call `retail_datagen.omnichannel.prepare(config, rng, catalogs)` to create an `OmniState`.
+2. On each inventory cadence invoke `emit_supply(now, state)` to generate `inventory_snapshots`, `inbound_shipments`, and capacity/hour records.
+3. When your existing order generator emits an order, call `quote(order, now, state)` to obtain ranked candidates plus a decision trail, then choose a candidate and reserve via `allocate`.
+4. Call `realize(allocation, clock, state)` to simulate pick/ship or pickup readiness events. Apply observational noise with `perturb` if you need “observed” rather than “ground-truth” outputs.
+5. Run `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q datagen/tests/unit/test_omnichannel_helpers.py` to validate helper invariants.
 
 ## Architecture
 
