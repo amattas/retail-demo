@@ -118,8 +118,6 @@ async def generate_all_master_data(
                 return eta_seconds, rate
 
             total_tables = len(tables_to_generate)
-            tables_remaining_list = list(tables_to_generate)
-
             if total_tables == 0:
                 update_task_progress(
                     task_id,
@@ -138,6 +136,32 @@ async def generate_all_master_data(
                 }
 
             table_progress = {table: 0.0 for table in tables_to_generate}
+            requested_tables = set(tables_to_generate)
+
+            # Short-circuit when everything already exists and regeneration not forced
+            if not request.force_regenerate:
+                missing_tables: list[str] = []
+                for table in tables_to_generate:
+                    output_path = Path(config.paths.master) / f"{table}.csv"
+                    if not output_path.exists():
+                        missing_tables.append(table)
+
+                if not missing_tables:
+                    update_task_progress(
+                        task_id,
+                        1.0,
+                        "All requested master tables already generated",
+                        tables_completed=list(tables_to_generate),
+                        tables_in_progress=[],
+                        tables_remaining=[],
+                        estimated_seconds_remaining=0.0,
+                        progress_rate=None,
+                    )
+                    return {
+                        "tables_generated": list(tables_to_generate),
+                        "total_tables": total_tables,
+                        "skipped_existing": True,
+                    }
 
             def master_progress_callback(
                 table_name: str,
@@ -189,98 +213,26 @@ async def generate_all_master_data(
                 "Starting master data generation",
                 tables_completed=[],
                 tables_in_progress=list(tables_to_generate),
-                tables_remaining=tables_remaining_list.copy(),
+                tables_remaining=list(tables_to_generate),
                 estimated_seconds_remaining=None,
                 progress_rate=None,
                 table_progress=table_progress.copy(),
             )
 
-            completed_tables: list[str] = []
+            # Run full generation once (progress callback handles per-table reporting)
+            await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
 
-            for index, table_name in enumerate(tables_to_generate):
-                remaining_tables = list(tables_to_generate[index + 1 :])
-                progress_before = index / total_tables if total_tables else 0.0
-                eta_before, rate_before = compute_timing_metrics(progress_before)
+            for table in table_progress:
+                table_progress[table] = max(table_progress[table], 1.0)
 
-                if table_name in table_progress:
-                    table_progress[table_name] = max(table_progress[table_name], 0.05)
-
-                update_task_progress(
-                    task_id,
-                    progress_before,
-                    f"Generating {table_name}",
-                    tables_completed=completed_tables.copy(),
-                    tables_in_progress=[table_name],
-                    tables_remaining=remaining_tables,
-                    current_table=table_name,
-                    estimated_seconds_remaining=eta_before,
-                    progress_rate=rate_before,
-                    table_progress=table_progress.copy(),
-                )
-
-                output_path = Path(config.paths.master) / f"{table_name}.csv"
-                if output_path.exists() and not request.force_regenerate:
-                    logger.info(f"Skipping {table_name} - already exists")
-                    completed_tables.append(table_name)
-                    if table_name in table_progress:
-                        table_progress[table_name] = 1.0
-                    overall_progress = (
-                        sum(table_progress.values()) / total_tables if total_tables else 1.0
-                    )
-                    eta_after, rate_after = compute_timing_metrics(overall_progress)
-                    update_task_progress(
-                        task_id,
-                        overall_progress,
-                        f"Skipping {table_name} (already exists)",
-                        tables_completed=completed_tables.copy(),
-                        tables_in_progress=[],
-                        tables_remaining=remaining_tables,
-                        estimated_seconds_remaining=eta_after,
-                        progress_rate=rate_after,
-                        table_progress=table_progress.copy(),
-                    )
-                    continue
-
-                if table_name == "geographies_master":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-                elif table_name == "stores":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-                elif table_name == "distribution_centers":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-                elif table_name == "trucks":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-                elif table_name == "customers":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-                elif table_name == "products_master":
-                    await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
-
-                completed_tables.append(table_name)
-                if table_name in table_progress:
-                    table_progress[table_name] = 1.0
-                overall_progress = (
-                    sum(table_progress.values()) / total_tables if total_tables else 1.0
-                )
-                eta_after, rate_after = compute_timing_metrics(overall_progress)
-
-                update_task_progress(
-                    task_id,
-                    overall_progress,
-                    f"Completed {table_name} ({len(completed_tables)}/{total_tables})",
-                    tables_completed=completed_tables.copy(),
-                    tables_in_progress=[],
-                    tables_remaining=remaining_tables,
-                    estimated_seconds_remaining=eta_after,
-                    progress_rate=rate_after,
-                    table_progress=table_progress.copy(),
-                )
-                logger.info(f"Generated {table_name}")
+            completed_tables = list(table_progress.keys())
 
             final_eta, final_rate = compute_timing_metrics(1.0)
             update_task_progress(
                 task_id,
                 1.0,
                 "Master data generation completed",
-                tables_completed=completed_tables.copy(),
+                tables_completed=completed_tables,
                 tables_in_progress=[],
                 tables_remaining=[],
                 estimated_seconds_remaining=final_eta,
@@ -291,7 +243,7 @@ async def generate_all_master_data(
             return {
                 "tables_generated": completed_tables,
                 "total_tables": total_tables,
-                "skipped_existing": not request.force_regenerate,
+                "skipped_existing": False,
             }
 
         except Exception as e:
@@ -348,12 +300,13 @@ async def get_master_generation_status(
         estimated_completion=task_status.get("estimated_completion"),
         error_message=task_status.get("error"),
         table_progress=task_status.get("table_progress"),
-        tables_completed=task_status.get("tables_completed", []),
-        tables_remaining=task_status.get("tables_remaining", []),
+        tables_completed=task_status.get("tables_completed") or [],
+        tables_remaining=task_status.get("tables_remaining") or [],
         tables_in_progress=task_status.get("tables_in_progress"),
         estimated_seconds_remaining=task_status.get("estimated_seconds_remaining"),
         progress_rate=task_status.get("progress_rate"),
         last_update_timestamp=task_status.get("last_update_timestamp"),
+        table_counts=task_status.get("table_counts"),
     )
 
     # Add completed tables from result if available and not already set

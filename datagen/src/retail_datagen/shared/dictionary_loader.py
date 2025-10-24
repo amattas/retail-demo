@@ -269,6 +269,7 @@ class DictionaryLoader:
                     encoding=encoding,
                     skipinitialspace=True,
                     na_filter=False,  # Don't convert empty strings to NaN
+                    dtype=str,  # Preserve leading zeros and avoid implicit numeric coercion
                 )
 
                 # Remove any completely empty rows

@@ -183,5 +183,25 @@ def test_task_status_endpoint_not_found(client):
     assert "not found" in error_text
 
 
+def test_master_generation_status_includes_table_counts(client):
+    """Ensure master generation status response exposes table_counts for UI progress."""
+    operation_id = "master_generation_status_test"
+    counts = {"customers": 3200, "stores": 5}
+
+    _task_status[operation_id] = TaskStatus(
+        status="running",
+        progress=0.5,
+        message="Generating customers",
+        started_at=datetime.now(),
+        table_counts=counts,
+    )
+
+    response = client.get(f"/api/generate/master/status?operation_id={operation_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["table_counts"] == counts
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

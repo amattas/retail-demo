@@ -24,6 +24,8 @@ class RetailDataGenerator {
             'marketing'
         ];
         this._lastCountRefresh = {};
+        this._tableCountVersions = {};
+        this._countVersionSeq = 0;
         this.init();
     }
 
@@ -45,7 +47,7 @@ class RetailDataGenerator {
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 const tabName = e.currentTarget.dataset.tab;
-                this.switchTab(tabName);
+                void this.switchTab(tabName);
             });
         });
 
@@ -196,84 +198,115 @@ class RetailDataGenerator {
                 element.classList.add('no-data');
             });
 
-            // Try to get cached counts first (fast path)
+            let storeCount = null;
+            let customerCount = null;
+            let productCount = null;
+            let receiptCount = null;
+
+            // Try to get cached counts first
             try {
                 const cacheResponse = await fetch('/api/dashboard/counts');
                 if (cacheResponse.ok) {
                     const cachedData = await cacheResponse.json();
-
-                    // Update stat cards from cache
                     if (cachedData.master_tables) {
-                        const storeCount = this.resolveCountValue(cachedData.master_tables['stores']);
-                        const customerCount = this.resolveCountValue(cachedData.master_tables['customers']);
-                        const productCount = this.resolveCountValue(cachedData.master_tables['products_master']);
-
-                        if (storeCount !== null) {
-                            const element = document.getElementById('storeCount');
-                            element.textContent = storeCount.toLocaleString();
-                            element.classList.remove('no-data');
-                        }
-                        if (customerCount !== null) {
-                            const element = document.getElementById('customerCount');
-                            element.textContent = customerCount.toLocaleString();
-                            element.classList.remove('no-data');
-                        }
-                        if (productCount !== null) {
-                            const element = document.getElementById('productCount');
-                            element.textContent = productCount.toLocaleString();
-                            element.classList.remove('no-data');
-                        }
+                        storeCount = this.resolveCountValue(cachedData.master_tables['stores']);
+                        customerCount = this.resolveCountValue(cachedData.master_tables['customers']);
+                        productCount = this.resolveCountValue(cachedData.master_tables['products_master']);
                     }
-
-                    // Update transaction count from cache
                     if (cachedData.fact_tables) {
-                        const receiptCount = this.resolveCountValue(cachedData.fact_tables['receipts']);
-                        if (receiptCount !== null) {
-                            const transactionElement = document.getElementById('transactionCount');
-                            transactionElement.textContent = receiptCount.toLocaleString();
-                            transactionElement.classList.remove('no-data');
-                        }
+                        receiptCount = this.resolveCountValue(cachedData.fact_tables['receipts']);
                     }
-            }
+                }
             } catch (err) {
-                console.log('No cached data available, using direct queries');
+                console.log('Dashboard cache not available, will backfill counts directly');
+            }
 
-                // Fallback to direct queries if cache is not available
-                const masterTables = ['stores', 'customers', 'products_master'];
+            // Backfill any missing master counts directly
+            const masterFallbacks = [
+                { key: 'stores', elementId: 'storeCount' },
+                { key: 'customers', elementId: 'customerCount' },
+                { key: 'products_master', elementId: 'productCount' },
+            ];
 
-                for (const table of masterTables) {
-                    try {
-                        const response = await fetch(`/api/master/${table}`);
-                        if (response.ok) {
-                            const result = await response.json();
-                            const count = result.row_count || 0;
+            for (const { key, elementId } of masterFallbacks) {
+                const currentValue =
+                    key === 'stores' ? storeCount :
+                    key === 'customers' ? customerCount :
+                    key === 'products_master' ? productCount :
+                    null;
 
-                            let elementId;
-                            switch (table) {
+                if (currentValue !== null) {
+                    continue;
+                }
+
+                try {
+                    const response = await fetch(`/api/master/${key}`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        const count = typeof result.row_count === 'number' ? result.row_count : null;
+                        if (count !== null) {
+                            switch (key) {
                                 case 'stores':
-                                    elementId = 'storeCount';
+                                    storeCount = count;
                                     break;
                                 case 'customers':
-                                    elementId = 'customerCount';
+                                    customerCount = count;
                                     break;
                                 case 'products_master':
-                                    elementId = 'productCount';
+                                    productCount = count;
+                                    break;
+                                default:
                                     break;
                             }
 
-                            if (elementId && count > 0) {
-                                const element = document.getElementById(elementId);
-                                element.textContent = count.toLocaleString();
-                                element.classList.remove('no-data');
-                            }
+                            const element = document.getElementById(elementId);
+                            element.textContent = count.toLocaleString();
+                            element.classList.remove('no-data');
                         }
-                    } catch (err) {
-                        console.log(`Table ${table} not generated yet`);
                     }
+                } catch (err) {
+                    console.warn(`Failed to backfill ${key} count:`, err);
                 }
             }
 
-            // Update all tables summary
+            // Backfill receipts if needed
+            if (receiptCount === null) {
+                try {
+                    const response = await fetch('/api/facts/receipts');
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (typeof result.total_records === 'number') {
+                            receiptCount = result.total_records;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Failed to backfill receipts count:', err);
+                }
+            }
+
+            // Apply counts to stat cards
+            if (typeof storeCount === 'number') {
+                const element = document.getElementById('storeCount');
+                element.textContent = storeCount.toLocaleString();
+                element.classList.remove('no-data');
+            }
+            if (typeof customerCount === 'number') {
+                const element = document.getElementById('customerCount');
+                element.textContent = customerCount.toLocaleString();
+                element.classList.remove('no-data');
+            }
+            if (typeof productCount === 'number') {
+                const element = document.getElementById('productCount');
+                element.textContent = productCount.toLocaleString();
+                element.classList.remove('no-data');
+            }
+            if (typeof receiptCount === 'number') {
+                const transactionElement = document.getElementById('transactionCount');
+                transactionElement.textContent = receiptCount.toLocaleString();
+                transactionElement.classList.remove('no-data');
+            }
+
+            // Update full tables summary once counts have been refreshed
             await this.updateAllTablesData();
 
         } catch (error) {
@@ -314,7 +347,13 @@ class RetailDataGenerator {
     clearTableStatuses(tables) {
         tables.forEach(table => {
             this.updateTableStatus(table, null);
-            this.setTableCount(table, null);
+            delete this._tableCountVersions[table];
+            this.setTableCount(
+                table,
+                null,
+                '0 records',
+                { updateVersionOnFallback: true }
+            );
         });
     }
 
@@ -335,6 +374,11 @@ class RetailDataGenerator {
         this.clearTableStatuses(this.masterTableNames);
     }
 
+    _nextCountVersion() {
+        this._countVersionSeq = (this._countVersionSeq || 0) + 1;
+        return this._countVersionSeq;
+    }
+
     resolveCountValue(entry) {
         if (typeof entry === 'number') {
             return entry;
@@ -353,15 +397,27 @@ class RetailDataGenerator {
         return null;
     }
 
-    setTableCount(tableName, value, fallbackText = null) {
+    setTableCount(tableName, value, fallbackText = null, options = {}) {
+        const {
+            version = this._nextCountVersion(),
+            allowOverwrite = false,
+            updateVersionOnFallback = false,
+        } = options;
+
         const countEl = document.getElementById(`count-${tableName}`);
         if (!countEl) return;
         const item = document.querySelector(`.table-item[data-table="${tableName}"]`);
+        const lastVersion = this._tableCountVersions[tableName] ?? -Infinity;
+
+        if (!allowOverwrite && version < lastVersion) {
+            return;
+        }
 
         if (typeof value === 'number') {
             countEl.dataset.countValue = String(value);
             countEl.textContent = `${value.toLocaleString()} records`;
             countEl.classList.remove('no-data');
+            this._tableCountVersions[tableName] = version;
             return;
         }
 
@@ -376,6 +432,9 @@ class RetailDataGenerator {
             } else {
                 countEl.classList.remove('no-data');
             }
+            if (updateVersionOnFallback) {
+                this._tableCountVersions[tableName] = version;
+            }
             return;
         }
 
@@ -384,6 +443,9 @@ class RetailDataGenerator {
             if (!Number.isNaN(cached)) {
                 countEl.textContent = `${cached.toLocaleString()} records`;
                 countEl.classList.remove('no-data');
+                if (updateVersionOnFallback) {
+                    this._tableCountVersions[tableName] = version;
+                }
                 return;
             }
         }
@@ -391,22 +453,39 @@ class RetailDataGenerator {
         countEl.textContent = '0 records';
         delete countEl.dataset.countValue;
         countEl.classList.add('no-data');
+        if (updateVersionOnFallback) {
+            this._tableCountVersions[tableName] = version;
+        }
+    }
+
+    async ensureTableCount(tableName) {
+        const countEl = document.getElementById(`count-${tableName}`);
+        const current = countEl ? Number(countEl.dataset.countValue) : NaN;
+        if (Number.isNaN(current) || current <= 0) {
+            await this.refreshTableCount(tableName);
+        }
     }
 
     async refreshTableCount(tableName) {
         try {
+            const requestVersion = this._nextCountVersion();
             if (this.masterTableNames.includes(tableName)) {
                 const response = await fetch(`/api/master/${tableName}?limit=1`);
                 if (!response.ok) {
                     if (response.status === 404) {
-                        this.setTableCount(tableName, null, '0 records');
+                        this.setTableCount(
+                            tableName,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
                     }
                     return;
                 }
                 const result = await response.json();
                 const count = typeof result.row_count === 'number' ? result.row_count : null;
                 if (count !== null) {
-                    this.setTableCount(tableName, count);
+                    this.setTableCount(tableName, count, null, { version: requestVersion });
                 }
                 return;
             }
@@ -415,14 +494,19 @@ class RetailDataGenerator {
                 const response = await fetch(`/api/facts/${tableName}`);
                 if (!response.ok) {
                     if (response.status === 404) {
-                        this.setTableCount(tableName, null, '0 records');
+                        this.setTableCount(
+                            tableName,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
                     }
                     return;
                 }
                 const result = await response.json();
                 const count = typeof result.total_records === 'number' ? result.total_records : null;
                 if (count !== null) {
-                    this.setTableCount(tableName, count);
+                    this.setTableCount(tableName, count, null, { version: requestVersion });
                 }
             }
         } catch (error) {
@@ -487,6 +571,23 @@ class RetailDataGenerator {
                             count: count !== null ? count : 0,
                             status: count !== null ? 'Generated' : 'Not Generated'
                         });
+                    }
+
+                    // Backfill missing master table counts directly if cache empty
+                    const missingMasterTables = allTables.filter(
+                        table => table.type === 'Master Data' && table.status !== 'Generated'
+                    );
+                    for (const table of missingMasterTables) {
+                        try {
+                            const response = await fetch(`/api/master/${table.name}`);
+                            if (response.ok) {
+                                const result = await response.json();
+                                table.count = result.row_count || 0;
+                                table.status = result.row_count ? 'Generated' : 'Not Generated';
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to backfill count for ${table.name}:`, err);
+                        }
                     }
 
                     // Process fact tables from cache
@@ -620,6 +721,7 @@ class RetailDataGenerator {
 
     async updateTableCounts() {
         try {
+            const requestVersion = this._nextCountVersion();
             // Fetch cached counts
             const response = await fetch('/api/dashboard/counts');
             if (!response.ok) return;
@@ -633,14 +735,18 @@ class RetailDataGenerator {
             for (const [tableName, tableInfo] of Object.entries(data.master_tables || {})) {
                 const value = this.resolveCountValue(tableInfo);
                 if (value !== null) {
-                    const existing = Number(document.getElementById(`count-${tableName}`)?.dataset.countValue);
-                    if (value > 0 || Number.isNaN(existing) || existing <= 0) {
-                        this.setTableCount(tableName, value);
-                    }
+                    this.setTableCount(tableName, value, null, { version: requestVersion });
                     updatedMasters.add(tableName);
                 } else {
-                    if (!updatedMasters.has(tableName)) {
-                        this.setTableCount(tableName, null, '0 records');
+                    const countEl = document.getElementById(`count-${tableName}`);
+                    const existing = countEl ? Number(countEl.dataset.countValue) : NaN;
+                    if (!updatedMasters.has(tableName) && (Number.isNaN(existing) || existing <= 0)) {
+                        this.setTableCount(
+                            tableName,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
                     }
                 }
             }
@@ -649,14 +755,18 @@ class RetailDataGenerator {
             for (const [tableName, tableInfo] of Object.entries(data.fact_tables || {})) {
                 const value = this.resolveCountValue(tableInfo);
                 if (value !== null) {
-                    const existing = Number(document.getElementById(`count-${tableName}`)?.dataset.countValue);
-                    if (value > 0 || Number.isNaN(existing) || existing <= 0) {
-                        this.setTableCount(tableName, value);
-                    }
+                    this.setTableCount(tableName, value, null, { version: requestVersion });
                     updatedFacts.add(tableName);
                 } else {
-                    if (!updatedFacts.has(tableName)) {
-                        this.setTableCount(tableName, null, '0 records');
+                    const countEl = document.getElementById(`count-${tableName}`);
+                    const existing = countEl ? Number(countEl.dataset.countValue) : NaN;
+                    if (!updatedFacts.has(tableName) && (Number.isNaN(existing) || existing <= 0)) {
+                        this.setTableCount(
+                            tableName,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
                     }
                 }
             }
@@ -664,13 +774,31 @@ class RetailDataGenerator {
             // Ensure tables without entries show zero
             this.masterTableNames.forEach(name => {
                 if (!updatedMasters.has(name)) {
-                    this.setTableCount(name, null, '0 records');
+                    const countEl = document.getElementById(`count-${name}`);
+                    const existing = countEl ? Number(countEl.dataset.countValue) : NaN;
+                    if (Number.isNaN(existing) || existing <= 0) {
+                        this.setTableCount(
+                            name,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
+                    }
                 }
             });
 
             this.factTableNames.forEach(name => {
                 if (!updatedFacts.has(name)) {
-                    this.setTableCount(name, null, '0 records');
+                    const countEl = document.getElementById(`count-${name}`);
+                    const existing = countEl ? Number(countEl.dataset.countValue) : NaN;
+                    if (Number.isNaN(existing) || existing <= 0) {
+                        this.setTableCount(
+                            name,
+                            null,
+                            '0 records',
+                            { version: requestVersion, updateVersionOnFallback: true }
+                        );
+                    }
                 }
             });
         } catch (error) {
@@ -735,7 +863,7 @@ class RetailDataGenerator {
 
     async reconnectToHistoricalTask(taskId) {
         // First, switch to the historical tab so button is visible
-        this.switchTab('historical');
+        await this.switchTab('historical');
 
         // Wait for DOM to update
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -798,7 +926,7 @@ class RetailDataGenerator {
         }
     }
 
-    switchTab(tabName) {
+    async switchTab(tabName) {
         // Hide all tabs
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.remove('active');
@@ -818,11 +946,15 @@ class RetailDataGenerator {
 
         // Load tab-specific data
         if (tabName === 'streaming') {
-            this.updateStreamingStatus();
+            await this.updateStreamingStatus();
         } else if (tabName === 'dashboard') {
-            this.updateDashboardStats();
-        } else if (tabName === 'master' || tabName === 'historical') {
-            this.updateTableCounts();
+            await this.updateDashboardStats();
+        } else if (tabName === 'master-data') {
+            await this.updateTableCounts();
+            await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
+            await this.updateAllTablesData();
+        } else if (tabName === 'historical') {
+            await this.updateTableCounts();
         }
     }
 
@@ -866,6 +998,7 @@ class RetailDataGenerator {
             this.showNotification('Master data generation completed successfully!', 'success');
             await this.updateDashboardStats();
             await this.updateTableCounts();
+            await this.updateAllTablesData();
             
         } catch (error) {
             console.error('Master data generation failed:', error);
@@ -1001,6 +1134,7 @@ class RetailDataGenerator {
             await this.loadGenerationState();
             await this.updateDashboardStats();
             await this.updateTableCounts();
+            await this.updateAllTablesData();
 
         } catch (error) {
             console.error('Historical data generation failed:', error);
@@ -1481,7 +1615,8 @@ class RetailDataGenerator {
                     if (status.table_counts) {
                         Object.entries(status.table_counts).forEach(([table, count]) => {
                             if (typeof count === 'number') {
-                                this.setTableCount(table, count);
+                                const version = this._nextCountVersion();
+                                this.setTableCount(table, count, null, { version });
                             }
                         });
                     }
@@ -1778,12 +1913,20 @@ class RetailDataGenerator {
             const result = await response.json();
             
             this.showNotification(result.message, 'success');
+            this.hideProgress('masterDataProgress');
+            this.hideProgress('historicalProgress');
+            this._tableCountVersions = {};
+            this._countVersionSeq = 0;
+            this._lastCountRefresh = {};
+            this.clearMasterTableStatuses();
+            this.clearHistoricalTableStatuses();
 
             // Refresh the UI state
             await this.loadGenerationState();
             await this.updateDashboardStats();
             await this.updateTableCounts();
-            
+            await this.updateAllTablesData();
+
         } catch (error) {
             console.error('Data clearing failed:', error);
             this.showNotification(`Failed to clear data: ${error.message}`, 'error');
@@ -1936,7 +2079,7 @@ class RetailDataGenerator {
 let app;
 
 function switchTab(tabName) {
-    app.switchTab(tabName);
+    void app.switchTab(tabName);
 }
 
 function generateMasterData() {
