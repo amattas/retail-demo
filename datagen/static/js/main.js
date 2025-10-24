@@ -1080,7 +1080,7 @@ class RetailDataGenerator {
 
             // Only include dates if manually specified
             if (startDate && endDate) {
-                if (new Date(startDate) >= new Date(endDate)) {
+                if (new Date(startDate) > new Date(endDate)) {
                     this.showNotification('Start date must be before end date', 'error');
                     return;
                 }
@@ -1146,7 +1146,14 @@ class RetailDataGenerator {
             }
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                let msg = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const err = await response.json();
+                    if (err && (err.detail || err.message)) {
+                        msg = err.detail || err.message;
+                    }
+                } catch (_) { /* ignore */ }
+                throw new Error(msg);
             }
 
             const result = await response.json();

@@ -459,25 +459,36 @@ async def generate_historical_data(
                 if total_days > 0 and current_day == 0:
                     progress = max(progress, 0.01)
 
-                tables_in_progress_override = (
-                    tables_in_progress
-                    if tables_in_progress is not None
-                    else list(tables_to_generate)
-                )
+                # Filter table_progress to only known UI fact tables
+                filtered_table_progress = None
+                if table_progress is not None:
+                    filtered_table_progress = {
+                        name: value for name, value in table_progress.items() if name in FACT_TABLES
+                    }
+
+                # Derive sensible defaults based on filtered_table_progress if not provided
+                if tables_in_progress is not None:
+                    tables_in_progress_override = [
+                        t for t in tables_in_progress if t in FACT_TABLES
+                    ]
+                else:
+                    tables_in_progress_override = [
+                        table for table, value in (filtered_table_progress or {}).items() if 0.0 < value < 1.0
+                    ]
                 tables_remaining_override = (
-                    tables_remaining
+                    [t for t in (tables_remaining or []) if t in FACT_TABLES]
                     if tables_remaining is not None
-                    else [table for table, value in (table_progress or {}).items() if value == 0.0]
+                    else [table for table, value in (filtered_table_progress or {}).items() if value == 0.0]
                 )
 
                 update_task_progress(
                     task_id,
                     progress,
                     message,
-                    table_progress=table_progress,
+                    table_progress=filtered_table_progress,
                     current_table=current_table,
-                    tables_completed=tables_completed,
-                    tables_failed=tables_failed,
+                    tables_completed=[t for t in (tables_completed or []) if t in FACT_TABLES] if tables_completed is not None else [],
+                    tables_failed=[t for t in (tables_failed or []) if t in FACT_TABLES] if tables_failed is not None else [],
                     tables_in_progress=tables_in_progress_override,
                     tables_remaining=tables_remaining_override,
                     estimated_seconds_remaining=estimated_seconds_remaining,
@@ -485,14 +496,64 @@ async def generate_historical_data(
                     table_counts=table_counts,
                 )
 
-            # Set the progress callback on the generator
-            fact_generator._progress_callback = progress_callback
+            # Also wire a master-style per-table progress callback for consistent UI updates
+            per_table_progress: dict[str, float] = {table: 0.0 for table in tables_to_generate}
+
+            def per_table_callback(
+                table_name: str,
+                progress_value: float,
+                detail_message: str | None,
+                table_counts: dict[str, int] | None = None,
+            ) -> None:
+                if table_name not in per_table_progress or table_name not in FACT_TABLES:
+                    return
+
+                per_table_progress[table_name] = max(0.0, min(1.0, progress_value))
+
+                tables_completed = [
+                    t for t, v in per_table_progress.items() if v >= 1.0
+                ]
+                tables_in_progress = [
+                    t for t, v in per_table_progress.items() if 0.0 < v < 1.0
+                ]
+                tables_remaining = [
+                    t for t, v in per_table_progress.items() if v == 0.0
+                ]
+
+                overall_progress = (
+                    sum(per_table_progress.values()) / len(per_table_progress)
+                    if per_table_progress else progress_value
+                )
+
+                update_task_progress(
+                    task_id,
+                    overall_progress,
+                    detail_message or f"Generating {table_name.replace('_',' ')}",
+                    table_progress=per_table_progress.copy(),
+                    tables_completed=tables_completed,
+                    tables_in_progress=tables_in_progress,
+                    tables_remaining=tables_remaining,
+                    table_counts=table_counts,
+                )
+
+            # Register both callbacks on the generator (per-table and day-based)
+            try:
+                fact_generator.set_table_progress_callback(per_table_callback)
+            except Exception:
+                # Backwards compatibility: if method missing, skip
+                pass
+
+            # Keep day-based progress updates as well for overall progress and ETA
+            try:
+                fact_generator._progress_callback = progress_callback
+            except Exception:
+                pass
 
             # Emit an initialization update so the UI shows immediate activity
             try:
                 progress_callback(
                     0,
-                    "Loading master data for historical generation",
+                    "Preparing historical data generation",
                     table_progress={table: 0.0 for table in tables_to_generate},
                     tables_completed=[],
                     tables_in_progress=None,

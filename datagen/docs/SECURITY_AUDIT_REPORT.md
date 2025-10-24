@@ -157,29 +157,18 @@
 
 **Function: `async clearAllData()`**
 
-Protection layers:
-1. **First confirmation:**
+Protection:
+1. **Confirmation dialog:**
    ```javascript
-   confirm('⚠️ DANGER: This will permanently delete ALL generated data!...')
+   confirm('⚠️ This will permanently delete ALL generated data... Proceed?')
    ```
 
-2. **Second confirmation:**
-   ```javascript
-   confirm('🚨 FINAL WARNING: You are about to DELETE ALL DATA!...')
-   ```
-
-3. **Text verification:**
-   ```javascript
-   prompt('Type "DELETE" to confirm data deletion:')
-   if (confirmText !== 'DELETE') { return; }
-   ```
-
-4. **HTTP DELETE request:**
+2. **HTTP DELETE request:**
    ```javascript
    fetch('/api/generation/clear', { method: 'DELETE' })
    ```
 
-✅ **Excellent:** Four independent safeguards prevent accidental deletion
+✅ Simplified flow (single confirm) per product decision. Accidental deletion risk is mitigated by clear warning text and danger styling.
 
 ### 4. XSS Vulnerability Assessment
 
@@ -239,13 +228,9 @@ Could move to addEventListener for separation of concerns, but current approach 
 
 - [x] Verify delete button is visible in Configuration tab
 - [x] Verify delete button has red/danger styling
-- [x] Verify clicking button shows first confirmation dialog
-- [x] Verify canceling first dialog prevents deletion
-- [x] Verify accepting first dialog shows second confirmation
-- [x] Verify canceling second dialog prevents deletion
-- [x] Verify accepting second dialog shows text prompt
-- [x] Verify typing wrong text (not "DELETE") prevents deletion
-- [x] Verify typing "DELETE" correctly triggers API call
+- [x] Verify clicking button shows confirmation dialog
+- [x] Verify canceling confirmation prevents deletion
+- [x] Verify accepting confirmation triggers API call
 - [x] Verify HTTP DELETE method is used
 - [x] Verify success notification appears after deletion
 - [x] Verify dashboard updates after deletion
@@ -294,31 +279,10 @@ The delete button refactoring has been implemented correctly with:
 
 **Expected:** No data deleted, no API call made
 
-### Test Case 2: Double Confirmation Protection
+### Test Case 2: Successful Deletion
 **Steps:**
 1. Click "Delete All Data" button
-2. Click "OK" on first dialog
-3. See final warning
-4. Click "Cancel"
-
-**Expected:** No data deleted, no API call made
-
-### Test Case 3: Text Verification Protection
-**Steps:**
-1. Click "Delete All Data" button
-2. Click "OK" on both dialogs
-3. Type "delete" (lowercase) instead of "DELETE"
-4. Submit
-
-**Expected:** Operation cancelled, no data deleted
-
-### Test Case 4: Successful Deletion
-**Steps:**
-1. Click "Delete All Data" button
-2. Click "OK" on first dialog
-3. Click "OK" on second dialog
-4. Type "DELETE" (exact match)
-5. Submit
+2. Click "OK" on confirmation
 
 **Expected:** HTTP DELETE request sent, success notification shown, data cleared
 

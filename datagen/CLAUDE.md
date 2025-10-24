@@ -222,7 +222,7 @@ src/retail_datagen/
 - **Important**: Stores only generated in states with DCs (geographic constraint)
 
 **3. Fact Data Generation (`generators/fact_generator.py`)**
-- `FactDataGenerator`: Creates 8 fact tables with realistic patterns
+- `FactDataGenerator`: Creates 9 fact tables with realistic patterns (includes `online_orders`)
 - Loads master data from existing CSVs
 - Uses `CompositeTemporalPatterns` for seasonality/dayparts
 - Coordinates across simulators: `CustomerJourneySimulator`, `InventoryFlowSimulator`, `MarketingCampaignSimulator`
@@ -235,6 +235,7 @@ src/retail_datagen/
 - Requires historical data to exist first (state-aware)
 - Continues from last generated timestamp
 - Event envelope format defined in `streaming/schemas.py`
+- Online order lifecycle events: `online_order_created`, `online_order_picked`, `online_order_shipped` (with corresponding inventory updates)
 - Azure Event Hub integration via `azure_client.py`
 - Built-in circuit breaker, retry logic, dead letter queue
 

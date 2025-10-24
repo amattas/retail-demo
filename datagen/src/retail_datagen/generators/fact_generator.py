@@ -122,8 +122,10 @@ class FactDataGenerator:
         # Generate unique trace IDs
         self._trace_counter = 1
 
-        # Progress callback for API integration
+        # Progress callback for API integration (day-based throttled status)
         self._progress_callback = None
+        # Per-table (master-style) progress callback
+        self._table_progress_callback: Callable[[str, float, str | None, dict | None], None] | None = None
 
         # Progress throttling for API updates (prevent flooding)
         self._last_progress_update_time = 0.0
@@ -262,6 +264,28 @@ class FactDataGenerator:
             return remaining_progress / progress_rate
 
         return None
+
+    # Per-table progress (master-style), similar to MasterDataGenerator
+    def set_table_progress_callback(
+        self,
+        callback: Callable[[str, float, str | None, dict | None], None] | None,
+    ) -> None:
+        self._table_progress_callback = callback
+
+    def _emit_table_progress(
+        self,
+        table_name: str,
+        progress: float,
+        message: str | None = None,
+        table_counts: dict | None = None,
+    ) -> None:
+        if not self._table_progress_callback:
+            return
+        try:
+            clamped = max(0.0, min(1.0, progress))
+            self._table_progress_callback(table_name, clamped, message, table_counts)
+        except Exception:
+            pass
 
     def _update_table_states(self, table_progress: dict[str, float]) -> None:
         """
@@ -453,6 +477,15 @@ class FactDataGenerator:
                     expected = expected_records.get(fact_type, 1)
                     # Calculate actual progress (0.0 to 1.0), never exceed 1.0
                     table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
+
+                # Emit per-table progress (master-style)
+                for fact_type, prog in table_progress.items():
+                    self._emit_table_progress(
+                        fact_type,
+                        prog,
+                        f"Generating {fact_type.replace('_',' ')}",
+                        None,
+                    )
 
                 # Update table states based on progress
                 self._update_table_states(table_progress)
@@ -1397,6 +1430,15 @@ class FactDataGenerator:
             ]
 
             tables_completed_count = len(tables_completed)
+
+        # Emit per-table progress (master-style) outside the lock
+        for table, prog in table_progress.items():
+            self._emit_table_progress(
+                table,
+                prog,
+                f"Generating {table.replace('_',' ')}",
+                None,
+            )
 
         # Create progress message OUTSIDE the lock
         message = (

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Historical Fact Data Generation System creates realistic retail transaction data for analytics and testing purposes. It generates all fact tables specified in AGENTS.md with proper temporal patterns, business logic coordination, and partitioned output.
+The Historical Fact Data Generation System creates realistic retail transaction data for analytics and testing purposes. It generates all fact tables specified in AGENTS.md with proper temporal patterns, business logic coordination, and partitioned output, including unified online orders.
 
 ## 🎯 Key Features
 
@@ -14,6 +14,7 @@ The Historical Fact Data Generation System creates realistic retail transaction 
 - **Foot Traffic**: Sensor data with zone-based movement patterns
 - **BLE Pings**: Beacon interactions with realistic RSSI values
 - **Marketing**: Multi-channel campaigns with targeting and cost tracking
+- **Online Orders**: Unified online order facts with inventory impacts on stores/DCs
 
 ### ✅ **Realistic Temporal Patterns**
 - **Seasonal Effects**: Holiday spikes, back-to-school, weather impacts
@@ -113,7 +114,8 @@ print(f"Generated {summary.total_records} records in {summary.generation_time_se
     "stores": 250,
     "dcs": 12,
     "customers_per_day": 20000,
-    "items_per_ticket_mean": 4.2
+    "items_per_ticket_mean": 4.2,
+    "online_orders_per_day": 2500
   },
   "realtime": {
     "emit_interval_ms": 500,
@@ -149,7 +151,8 @@ data/facts/
 ├── dc_inventory_txn/
 ├── foot_traffic/
 ├── ble_pings/
-└── marketing/
+├── marketing/
+└── online_orders/
 ```
 
 ## 📊 Generated Fact Tables

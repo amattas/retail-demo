@@ -428,6 +428,7 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
             "foot_traffic",
             "ble_pings",
             "marketing",
+            "online_orders",
         ]
     else:
         raise ValueError(f"Invalid table type: {table_type}")
@@ -444,7 +445,8 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
 
 def validate_date_range(start_date: datetime, end_date: datetime) -> None:
     """Validate that date range is reasonable."""
-    if start_date >= end_date:
+    # Allow single-day ranges (start == end). Only error if start is after end.
+    if start_date > end_date:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Start date must be before end date",
