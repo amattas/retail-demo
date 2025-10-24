@@ -17,8 +17,9 @@ from decimal import Decimal
 from multiprocessing import cpu_count
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 
+import pandas as pd
 from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
 from retail_datagen.generators.utils import DataFrameExporter, ProgressReporter
 from retail_datagen.shared.cache import CacheManager
@@ -53,6 +54,17 @@ class FactGenerationSummary:
     validation_results: dict[str, Any]
     generation_time_seconds: float
     partitions_created: int
+
+
+@dataclass(frozen=True)
+class MasterTableSpec:
+    """Configuration describing how to load a master table."""
+
+    attr_name: str
+    filename: str
+    model_cls: type[Any]
+    dtype: dict[str, Any] | None = None
+    row_adapter: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
 class FactDataGenerator:
@@ -122,6 +134,98 @@ class FactDataGenerator:
 
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
+    @staticmethod
+    def _normalize_geography_row(row: dict[str, Any]) -> dict[str, Any]:
+        """Ensure geography rows preserve ZipCode formatting."""
+
+        zip_code = row.get("ZipCode", "")
+        return {**row, "ZipCode": str(zip_code)}
+
+    @staticmethod
+    def _to_decimal(value: Any) -> Decimal:
+        """Convert a value into a Decimal instance."""
+
+        if isinstance(value, Decimal):
+            return value
+        return Decimal(str(value))
+
+    @staticmethod
+    def _to_bool(value: Any) -> bool:
+        """Convert truthy strings and numerics to bool safely."""
+
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes", "y", "t"}
+        return bool(value)
+
+    @classmethod
+    def _normalize_product_row(cls, row: dict[str, Any]) -> dict[str, Any]:
+        """Perform type conversions for product master rows."""
+
+        launch_date = row.get("LaunchDate")
+        if isinstance(launch_date, datetime):
+            parsed_launch_date = launch_date
+        else:
+            parsed_launch_date = datetime.fromisoformat(str(launch_date))
+
+        return {
+            **row,
+            "Cost": cls._to_decimal(row.get("Cost")),
+            "MSRP": cls._to_decimal(row.get("MSRP")),
+            "SalePrice": cls._to_decimal(row.get("SalePrice")),
+            "RequiresRefrigeration": cls._to_bool(
+                row.get("RequiresRefrigeration", False)
+            ),
+            "LaunchDate": parsed_launch_date,
+        }
+
+    def _master_table_specs(self) -> list[MasterTableSpec]:
+        """Return specifications for all master tables that need loading."""
+
+        return [
+            MasterTableSpec(
+                attr_name="geographies",
+                filename="geographies_master.csv",
+                model_cls=GeographyMaster,
+                dtype={"ZipCode": str},
+                row_adapter=self._normalize_geography_row,
+            ),
+            MasterTableSpec(
+                attr_name="stores",
+                filename="stores.csv",
+                model_cls=Store,
+            ),
+            MasterTableSpec(
+                attr_name="distribution_centers",
+                filename="distribution_centers.csv",
+                model_cls=DistributionCenter,
+            ),
+            MasterTableSpec(
+                attr_name="customers",
+                filename="customers.csv",
+                model_cls=Customer,
+            ),
+            MasterTableSpec(
+                attr_name="products",
+                filename="products_master.csv",
+                model_cls=ProductMaster,
+                row_adapter=self._normalize_product_row,
+            ),
+        ]
+
+    def _load_master_table(
+        self, master_path: Path, spec: MasterTableSpec
+    ) -> list[Any]:
+        """Load a master table based on the supplied specification."""
+
+        dataframe = pd.read_csv(master_path / spec.filename, dtype=spec.dtype)
+        records: list[Any] = []
+        for _, row in dataframe.iterrows():
+            row_dict = row.to_dict()
+            if spec.row_adapter:
+                row_dict = spec.row_adapter(row_dict)
+            records.append(spec.model_cls(**row_dict))
+        return records
+
     def _reset_table_states(self) -> None:
         """Reset table states to 'not_started' for all tables."""
         self._table_states = {table: "not_started" for table in self.FACT_TABLES}
@@ -181,54 +285,11 @@ class FactDataGenerator:
 
         master_path = Path(self.config.paths.master)
 
-        # Load master data files
-        import pandas as pd
-
-        # Load geographies - explicitly set ZipCode as string type
-        geo_df = pd.read_csv(
-            master_path / "geographies_master.csv", dtype={"ZipCode": str}
-        )
-        # Ensure ZipCode is string (pandas sometimes ignores dtype for numeric-looking strings)
-        geo_df["ZipCode"] = geo_df["ZipCode"].astype(str)
-        self.geographies = [
-            GeographyMaster(**row.to_dict()) for _, row in geo_df.iterrows()
-        ]
-
-        # Load stores
-        stores_df = pd.read_csv(master_path / "stores.csv")
-        self.stores = [Store(**row.to_dict()) for _, row in stores_df.iterrows()]
-
-        # Load distribution centers
-        dcs_df = pd.read_csv(master_path / "distribution_centers.csv")
-        self.distribution_centers = [
-            DistributionCenter(**row.to_dict()) for _, row in dcs_df.iterrows()
-        ]
-
-        # Load customers
-        customers_df = pd.read_csv(master_path / "customers.csv")
-        self.customers = [
-            Customer(**row.to_dict()) for _, row in customers_df.iterrows()
-        ]
-
-        # Load products
-        products_df = pd.read_csv(master_path / "products_master.csv")
-        self.products = [
-            ProductMaster(
-                ID=row["ID"],
-                ProductName=row["ProductName"],
-                Brand=row["Brand"],
-                Company=row["Company"],
-                Department=row["Department"],
-                Category=row["Category"],
-                Subcategory=row["Subcategory"],
-                Cost=Decimal(str(row["Cost"])),
-                MSRP=Decimal(str(row["MSRP"])),
-                SalePrice=Decimal(str(row["SalePrice"])),
-                RequiresRefrigeration=bool(row["RequiresRefrigeration"]),
-                LaunchDate=datetime.fromisoformat(row["LaunchDate"]),
-            )
-            for _, row in products_df.iterrows()
-        ]
+        loaded_counts: dict[str, int] = {}
+        for spec in self._master_table_specs():
+            records = self._load_master_table(master_path, spec)
+            setattr(self, spec.attr_name, records)
+            loaded_counts[spec.attr_name] = len(records)
 
         # Initialize simulators with loaded data
         self.customer_journey_sim = CustomerJourneySimulator(
@@ -247,9 +308,12 @@ class FactDataGenerator:
         )
 
         print(
-            f"Loaded master data: {len(self.geographies)} geographies, "
-            f"{len(self.stores)} stores, {len(self.distribution_centers)} DCs, "
-            f"{len(self.customers)} customers, {len(self.products)} products"
+            "Loaded master data: "
+            f"{loaded_counts.get('geographies', 0)} geographies, "
+            f"{loaded_counts.get('stores', 0)} stores, "
+            f"{loaded_counts.get('distribution_centers', 0)} DCs, "
+            f"{loaded_counts.get('customers', 0)} customers, "
+            f"{loaded_counts.get('products', 0)} products"
         )
 
     def generate_historical_data(
