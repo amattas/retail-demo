@@ -8,7 +8,7 @@ A comprehensive demonstration showcasing Microsoft Fabric's Real-Time Intelligen
 
 This demo **will illustrate** how Microsoft Fabric's Real-Time Intelligence features enable retailers to make data-driven decisions at the speed of business. By combining streaming data ingestion, real-time analytics, and AI-powered insights, retailers can optimize operations, enhance customer experiences, and drive competitive advantage.
 
-**Current Status**: The Python-based data generator is under active development. The Microsoft Fabric Real-Time Intelligence components are planned for future implementation.
+**Current Status**: The Python-based data generator is under active development. Fabric scaffolding is now in place under `fabric/` with specs for Eventstream, KQL DB, Querysets, Rules, Dashboards, Lakehouse, Pipelines, Notebooks, and a Semantic Model. See the Docs site under `docs/` (MkDocs) for architecture and plans.
 
 ## Key Scenarios (Planned)
 
@@ -62,14 +62,16 @@ Planned features:
 - Real-time streaming to Azure Event Hubs
 
 ### Microsoft Fabric Components
-*[In Development]*
-
-The demo will leverage the following Fabric Real-Time Intelligence capabilities:
-- **Eventstreams**: Ingest and route real-time retail events
-- **KQL Database**: Store and query streaming data with sub-second latency
-- **Real-Time Dashboards**: Interactive visualizations for live monitoring
-- **Data Activator**: Automated triggers and alerts for business events
-- **AI Services**: Copilot integration for natural language insights
+Scaffolded in `fabric/` with build specs:
+- **Eventstream**: Ingest and route real-time retail events from Azure Event Hubs → KQL DB + Lakehouse Bronze
+- **KQL Database**: Hot-path tables, ingestion mappings, materialized views
+- **Querysets**: Curated KQL queries for dashboards and investigations
+- **Real-Time Rules**: Alerts/actions for stockouts, reorders, dwell breaches
+- **Dashboards**: Real-time operational views over KQL + historical overlays
+- **Lakehouse**: Bronze/Silver/Gold medallion layers and transforms
+- **Pipelines**: Orchestration for medallion and maintenance
+- **Notebooks**: Transformations, ML, and exploratory analysis
+- **Semantic Model**: Power BI model (hybrid KQL + Lakehouse)
 
 ## Getting Started
 
@@ -94,6 +96,10 @@ pip install -e .
 # Configure your environment
 cp .env.example .env
 # Edit .env with your Azure credentials
+
+# Optional: local docs preview (requires mkdocs)
+# pip install mkdocs mkdocs-material
+# mkdocs serve
 ```
 
 ### Running the Data Generator
@@ -127,21 +133,27 @@ retail-demo/
 │   │   ├── config/            # Configuration management
 │   │   └── shared/            # Shared utilities
 │   └── tests/                 # Comprehensive test suite
-└── fabric/                    # [Coming Soon] Fabric artifacts
-    ├── eventstreams/          # Eventstream definitions
-    ├── kql/                   # KQL queries and databases
+└── fabric/                    # Fabric artifacts and specs
+    ├── eventstream/           # Eventstream definitions and mappings
+    ├── kql_database/          # KQL DB tables, policies, views
+    ├── querysets/             # Curated KQL queries
+    ├── rules/                 # Real-time alerts/actions
     ├── dashboards/            # Real-time dashboards
-    └── notebooks/             # Data processing notebooks
+    ├── lakehouse/             # Medallion structures and transforms
+    ├── pipelines/             # Orchestration and maintenance
+    ├── notebooks/             # Transform and analysis notebooks
+    └── semantic_model/        # Power BI hybrid model
 ```
 
 ## Development Status
 
-- 🚧 **Data Generator**: In development
-- 📋 **Fabric Eventstreams**: Planned
-- 📋 **KQL Database Schema**: Planned
-- 📋 **Real-Time Dashboards**: Planned
-- 📋 **Data Activator Rules**: Planned
-- 📋 **AI Copilot Integration**: Planned
+- 🚧 Data Generator: in development (`datagen/`)
+- ✅ Fabric scaffolding/specs: added (`fabric/*`)
+- 📋 Eventstream → KQL/Lakehouse wiring: next
+- 📋 KQL DB tables/mappings/materialized views: next
+- 📋 Dashboards + Querysets: next
+- 📋 Real-time rules (alerts/actions): next
+- 📋 AI Copilot integration: planned
 
 ## Use Cases by Industry Segment (Planned)
 
@@ -181,6 +193,7 @@ This is a demonstration project currently in active development. Contributions, 
 - [Real-Time Intelligence Overview](https://learn.microsoft.com/fabric/real-time-intelligence/)
 - [KQL Query Language Reference](https://learn.microsoft.com/azure/data-explorer/kusto/query/)
 - [Eventstreams Documentation](https://learn.microsoft.com/fabric/real-time-intelligence/event-streams/)
+ - [MkDocs](https://www.mkdocs.org/)
 
 ## Contact
 

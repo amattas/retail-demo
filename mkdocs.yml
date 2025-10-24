@@ -1,0 +1,17 @@
+site_name: Retail Fabric RTI Demo
+site_description: Microsoft Fabric Real-Time Intelligence demo for retail
+repo_url: https://github.com/yourusername/retail-demo
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.expand
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Data Schema: data-schema.md
+  - Fabric Assets: fabric-assets.md
+  - Use Cases: use-cases.md
+  - Setup: setup.md
+  - Roadmap: roadmap.md
+docs_dir: docs
