@@ -31,11 +31,33 @@ class RetailDataGenerator {
 
     async init() {
         this.setupEventListeners();
+
+        // Determine initial tab before any loading to avoid flicker
+        let initialTab = 'dashboard';
+        try {
+            const saved = localStorage.getItem('activeTab');
+            const validTabs = new Set(['dashboard','master-data','historical','streaming','config']);
+            if (saved && validTabs.has(saved)) initialTab = saved;
+        } catch (_) { /* ignore */ }
+
+        // Activate the initial tab immediately
+        await this.switchTab(initialTab);
+
+        // Then perform initialization tasks
         await this.checkSystemHealth();
         await this.loadConfiguration();
         await this.loadGenerationState();
-        await this.updateDashboardStats();
         await this.updateTableCounts();
+        if (initialTab === 'dashboard') {
+            await this.updateDashboardStats();
+        } else if (initialTab === 'master-data') {
+            await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
+            await this.updateAllTablesData();
+        } else if (initialTab === 'historical') {
+            // already updated counts above
+        } else if (initialTab === 'streaming') {
+            await this.updateStreamingStatus();
+        }
         this.setDefaultDates();
 
         // Check for active tasks and reconnect if needed
@@ -58,6 +80,26 @@ class RetailDataGenerator {
                 this.closePreview();
             }
         });
+
+        // Clickable cards: event delegation so clicks on any child trigger preview
+        const masterGrid = document.querySelector('#master-data .table-grid');
+        if (masterGrid) {
+            masterGrid.addEventListener('click', (e) => {
+                const item = e.target.closest('.table-item');
+                if (!item || !masterGrid.contains(item)) return;
+                const table = item.dataset.table;
+                if (table) this.previewTable(table, 'Master Data');
+            });
+        }
+        const histGrid = document.querySelector('#historical .table-grid');
+        if (histGrid) {
+            histGrid.addEventListener('click', (e) => {
+                const item = e.target.closest('.table-item');
+                if (!item || !histGrid.contains(item)) return;
+                const table = item.dataset.table;
+                if (table) this.previewTable(table, 'Historical Data');
+            });
+        }
     }
 
     async checkSystemHealth() {
@@ -65,19 +107,21 @@ class RetailDataGenerator {
             const response = await fetch('/health');
             const health = await response.json();
             
-            const indicator = document.getElementById('statusIndicator');
+            const statusEl = document.getElementById('statusText');
+            statusEl.classList.remove('online','offline');
             if (health.status === 'healthy') {
-                indicator.className = 'status-indicator online';
-                indicator.innerHTML = '<i class="fas fa-circle"></i><span>System Online</span>';
+                statusEl.classList.add('online');
+                statusEl.innerHTML = '<span class="status-dot" aria-hidden="true"></span><span>System Online</span>';
             } else {
-                indicator.className = 'status-indicator offline';
-                indicator.innerHTML = '<i class="fas fa-circle"></i><span>System Issues</span>';
+                statusEl.classList.add('offline');
+                statusEl.innerHTML = '<span class="status-x" aria-hidden="true">×</span><span>System Issues</span>';
             }
         } catch (error) {
             console.error('Health check failed:', error);
-            const indicator = document.getElementById('statusIndicator');
-            indicator.className = 'status-indicator offline';
-            indicator.innerHTML = '<i class="fas fa-circle"></i><span>Connection Failed</span>';
+            const statusEl = document.getElementById('statusText');
+            statusEl.classList.remove('online');
+            statusEl.classList.add('offline');
+            statusEl.innerHTML = '<span class="status-x" aria-hidden="true">×</span><span>Connection Failed</span>';
         }
     }
 
@@ -943,6 +987,7 @@ class RetailDataGenerator {
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         
         this.currentTab = tabName;
+        try { localStorage.setItem('activeTab', tabName); } catch (_) {}
 
         // Load tab-specific data
         if (tabName === 'streaming') {
@@ -968,8 +1013,6 @@ class RetailDataGenerator {
     }
 
     async generateMasterData() {
-        const forceRegenerate = document.getElementById('forceRegenerate').checked;
-
         // Reset table indicators before starting
         this.clearMasterTableStatuses();
         
@@ -981,9 +1024,7 @@ class RetailDataGenerator {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    force_regenerate: forceRegenerate
-                })
+                body: JSON.stringify({})
             });
             
             if (!response.ok) {
@@ -1869,35 +1910,15 @@ class RetailDataGenerator {
     }
 
     async clearAllData() {
-        // Show confirmation dialog
+        // Single confirmation dialog
         const confirmed = confirm(
-            '⚠️ DANGER: This will permanently delete ALL generated data!\n\n' +
-            'This includes:\n' +
-            '• All master data (stores, customers, products)\n' +
-            '• All historical fact data\n' +
+            '⚠️ This will permanently delete ALL generated data, including:\n' +
+            '• Master data (stores, customers, products)\n' +
+            '• Historical fact data\n' +
             '• Generation state tracking\n\n' +
-            'This action cannot be undone. Are you sure you want to continue?'
+            'This action cannot be undone. Proceed?'
         );
-        
-        if (!confirmed) {
-            return;
-        }
-        
-        // Double confirmation for extra safety
-        const doubleConfirmed = confirm(
-            '🚨 FINAL WARNING: You are about to DELETE ALL DATA!\n\n' +
-            'Type "DELETE" in the next prompt to confirm.'
-        );
-        
-        if (!doubleConfirmed) {
-            return;
-        }
-        
-        const confirmText = prompt('Type "DELETE" to confirm data deletion:');
-        if (confirmText !== 'DELETE') {
-            this.showNotification('Data deletion cancelled - confirmation text did not match', 'info');
-            return;
-        }
+        if (!confirmed) return;
         
         try {
             this.showNotification('Clearing all data...', 'info');
@@ -2231,13 +2252,13 @@ tableStyles.textContent = `
 }
 
 .status-success {
-    background-color: #d4edda;
-    color: #155724;
+    background-color: #EAE4FF; /* light lavender */
+    color: #5B2ECC;           /* rich purple text */
 }
 
 .status-pending {
-    background-color: #fff3cd;
-    color: #856404;
+    background-color: #F1F3F5; /* light gray */
+    color: #6C757D;            /* gray text */
 }
 
 .loading-text {

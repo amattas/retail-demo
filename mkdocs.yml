@@ -3,9 +3,39 @@ site_description: Microsoft Fabric Real-Time Intelligence demo for retail
 repo_url: https://github.com/yourusername/retail-demo
 theme:
   name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Lato
+    code: Roboto Mono
   features:
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
     - navigation.expand
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+extra_css:
+  - stylesheets/extra.css
 nav:
   - Home: index.md
   - Architecture: architecture.md

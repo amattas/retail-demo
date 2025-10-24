@@ -11,44 +11,70 @@
     <div class="container">
         <!-- Header -->
         <header class="header">
+            <div class="header-topbar" role="status" aria-live="polite">
+                <div class="topbar-inner">
+                    <span id="statusText" class="status-text online">
+                        <span class="status-dot online" aria-hidden="true"></span>
+                        <span>System Online</span>
+                    </span>
+                    <span class="topbar-sep" aria-hidden="true"></span>
+                    <a class="topbar-link" href="https://amattas.github.io/retail-demo/" target="_blank" rel="noopener">Documentation</a>
+                </div>
+            </div>
             <div class="header-content">
                 <div class="logo">
                     <i class="fas fa-shopping-cart"></i>
                     <h1>Retail Data Generator</h1>
                 </div>
-                <div class="status-indicator" id="statusIndicator">
-                    <i class="fas fa-circle"></i>
-                    <span>System Ready</span>
-                </div>
+                <nav class="nav-tabs">
+                    <button class="nav-tab" data-tab="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Dashboard
+                    </button>
+                    <button class="nav-tab" data-tab="master-data">
+                        <i class="fas fa-database"></i>
+                        Master Data
+                    </button>
+                    <button class="nav-tab" data-tab="historical">
+                        <i class="fas fa-chart-line"></i>
+                        Historical
+                    </button>
+                    <button class="nav-tab" data-tab="streaming">
+                        <i class="fas fa-stream"></i>
+                        Real-Time
+                    </button>
+                    <button class="nav-tab" data-tab="config">
+                        <i class="fas fa-cog"></i>
+                        Config
+                    </button>
+                </nav>
+                <div class="header-actions"></div>
             </div>
+            <!-- Decorative SVG wave at the bottom of the header -->
+            <svg
+              class="header-wave"
+              viewBox="0 0 1440 400"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#3776FF"/>
+                  <stop offset="100%" stop-color="#8F42EC"/>
+                </linearGradient>
+              </defs>
+              <path
+                d="M0,0 H1440 V266 C 1120,315 560,200 0,266 Z"
+                fill="url(#headerGradient)"
+              />
+            </svg>
         </header>
 
-        <!-- Main Navigation -->
-        <nav class="nav-tabs">
-            <button class="nav-tab active" data-tab="dashboard">
-                <i class="fas fa-tachometer-alt"></i>
-                Dashboard
-            </button>
-            <button class="nav-tab" data-tab="master-data">
-                <i class="fas fa-database"></i>
-                Master Data
-            </button>
-            <button class="nav-tab" data-tab="historical">
-                <i class="fas fa-chart-line"></i>
-                Historical Data
-            </button>
-            <button class="nav-tab" data-tab="streaming">
-                <i class="fas fa-stream"></i>
-                Real-Time Stream
-            </button>
-            <button class="nav-tab" data-tab="config">
-                <i class="fas fa-cog"></i>
-                Configuration
-            </button>
-        </nav>
+        
 
         <!-- Dashboard Tab -->
-        <div id="dashboard" class="tab-content active">
+        <div id="dashboard" class="tab-content">
             <div class="welcome-section">
                 <h2>Welcome to Retail Data Generator</h2>
                 <p>Generate synthetic but realistic retail data for analytics POCs. Create master data, simulate historical transactions, and stream real-time events to Azure Event Hub.</p>
@@ -119,7 +145,7 @@
                             <span>Geographies</span>
                             <small class="table-count" id="count-geographies_master"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('geographies_master')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="stores">
                         <i class="fas fa-store"></i>
@@ -127,7 +153,7 @@
                             <span>Stores</span>
                             <small class="table-count" id="count-stores"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('stores')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="distribution_centers">
                         <i class="fas fa-warehouse"></i>
@@ -135,7 +161,7 @@
                             <span>Distribution Centers</span>
                             <small class="table-count" id="count-distribution_centers"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('distribution_centers')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="trucks">
                         <i class="fas fa-truck"></i>
@@ -143,7 +169,7 @@
                             <span>Trucks</span>
                             <small class="table-count" id="count-trucks"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('trucks')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="customers">
                         <i class="fas fa-users"></i>
@@ -151,7 +177,7 @@
                             <span>Customers</span>
                             <small class="table-count" id="count-customers"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('customers')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="products_master">
                         <i class="fas fa-box"></i>
@@ -159,19 +185,13 @@
                             <span>Products</span>
                             <small class="table-count" id="count-products_master"></small>
                         </div>
-                        <button class="btn-small" onclick="previewTable('products_master')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                 </div>
             </div>
 
             <div class="card">
-                <h3>Generation Options</h3>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="forceRegenerate"> Force Regenerate (overwrite existing data)
-                    </label>
-                </div>
-                
+                <h3>Generate Master Data</h3>
                 <button class="btn primary large" onclick="generateMasterData()">
                     <i class="fas fa-play"></i>
                     Generate All Master Data
@@ -236,7 +256,7 @@
                             <span>DC Inventory</span>
                             <small class="table-count" id="count-dc_inventory_txn"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('dc_inventory_txn', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="truck_moves">
                         <i class="fas fa-truck-moving"></i>
@@ -244,7 +264,7 @@
                             <span>Truck Moves</span>
                             <small class="table-count" id="count-truck_moves"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('truck_moves', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="store_inventory_txn">
                         <i class="fas fa-boxes"></i>
@@ -252,7 +272,7 @@
                             <span>Store Inventory</span>
                             <small class="table-count" id="count-store_inventory_txn"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('store_inventory_txn', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="receipts">
                         <i class="fas fa-receipt"></i>
@@ -260,7 +280,7 @@
                             <span>Receipts</span>
                             <small class="table-count" id="count-receipts"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('receipts', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="receipt_lines">
                         <i class="fas fa-list"></i>
@@ -268,7 +288,7 @@
                             <span>Receipt Lines</span>
                             <small class="table-count" id="count-receipt_lines"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('receipt_lines', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="foot_traffic">
                         <i class="fas fa-walking"></i>
@@ -276,7 +296,7 @@
                             <span>Foot Traffic</span>
                             <small class="table-count" id="count-foot_traffic"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('foot_traffic', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="ble_pings">
                         <i class="fas fa-wifi"></i>
@@ -284,7 +304,7 @@
                             <span>BLE Pings</span>
                             <small class="table-count" id="count-ble_pings"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('ble_pings', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                     <div class="table-item" data-table="marketing">
                         <i class="fas fa-bullhorn"></i>
@@ -292,7 +312,7 @@
                             <span>Marketing</span>
                             <small class="table-count" id="count-marketing"></small>
                         </div>
-                        <button class="btn-small" onclick="app.previewTable('marketing', 'Historical Data')">Preview</button>
+                        <i class="fas fa-eye preview-icon" title="Preview"></i>
                     </div>
                 </div>
             </div>
@@ -538,5 +558,20 @@
     </div>
 
     <script src="/static/js/main.js?v=20250911b"></script>
+    <script>
+        // Minimal header scroll behavior for subtle shadow
+        (function() {
+            const header = document.querySelector('.header');
+            let last = 0;
+            function onScroll() {
+                const y = window.scrollY || window.pageYOffset;
+                if (y > 8 && last <= 8) header.classList.add('scrolled');
+                if (y <= 8 && last > 8) header.classList.remove('scrolled');
+                last = y;
+            }
+            document.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
 </body>
 </html>
