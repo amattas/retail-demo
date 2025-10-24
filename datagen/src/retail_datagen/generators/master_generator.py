@@ -15,6 +15,7 @@ from typing import Any, Callable
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.cache import CacheManager
+from retail_datagen.shared.dictionary_loader import DictionaryLoader
 from retail_datagen.shared.models import (
     Customer,
     DCInventorySnapshot,
@@ -38,7 +39,6 @@ from retail_datagen.shared.validators import (
 from .utils import (
     AddressGenerator,
     DataFrameExporter,
-    DictionaryLoader,
     GeographicDistribution,
     IdentifierGenerator,
     ProgressReporter,

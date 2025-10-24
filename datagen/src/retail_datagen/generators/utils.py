@@ -2,8 +2,8 @@
 Utility classes and functions for data generation.
 
 This module provides common utilities for synthetic data generation including
-dictionary loading, address generation, identifier generation, and geographic
-distribution management.
+address generation, identifier generation, and geographic distribution
+management.
 """
 
 import csv
@@ -15,163 +15,8 @@ from typing import Any
 
 import pandas as pd
 
-from retail_datagen.shared.models import (
-    FirstNameDict,
-    GeographyDict,
-    LastNameDict,
-    ProductBrandDict,
-    ProductCompanyDict,
-    ProductDict,
-)
+from retail_datagen.shared.models import GeographyDict
 from retail_datagen.shared.validators import SyntheticDataValidator
-
-
-class DictionaryLoader:
-    """Loads dictionary CSV files and provides data access methods."""
-
-    def __init__(self, dictionary_path: str):
-        """
-        Initialize dictionary loader.
-
-        Args:
-            dictionary_path: Path to directory containing dictionary CSV files
-        """
-        self.dictionary_path = Path(dictionary_path)
-        self._cache: dict[str, list[dict[str, Any]]] = {}
-
-        if not self.dictionary_path.exists():
-            raise FileNotFoundError(
-                f"Dictionary path does not exist: {dictionary_path}"
-            )
-
-    def load_geographies(self) -> list[GeographyDict]:
-        """Load geography dictionary data."""
-        return self._load_csv_as_models("geographies.csv", GeographyDict)
-
-    def load_first_names(self) -> list[FirstNameDict]:
-        """Load first names dictionary data."""
-        return self._load_csv_as_models("first_names.csv", FirstNameDict)
-
-    def load_last_names(self) -> list[LastNameDict]:
-        """Load last names dictionary data."""
-        return self._load_csv_as_models("last_names.csv", LastNameDict)
-
-    def load_product_companies(self) -> list[ProductCompanyDict]:
-        """Load product companies dictionary data."""
-        return self._load_csv_as_models("product_companies.csv", ProductCompanyDict)
-
-    def load_product_brands(self) -> list[ProductBrandDict]:
-        """Load product brands dictionary data."""
-        return self._load_csv_as_models("product_brands.csv", ProductBrandDict)
-
-    def load_products(self) -> list[ProductDict]:
-        """Load products dictionary data."""
-        return self._load_csv_as_models("products.csv", ProductDict)
-
-    def _load_csv_as_models(self, filename: str, model_class):
-        """
-        Load CSV file and convert to Pydantic models.
-
-        Args:
-            filename: Name of CSV file to load
-            model_class: Pydantic model class to instantiate
-
-        Returns:
-            List of model instances
-
-        Raises:
-            FileNotFoundError: If CSV file doesn't exist
-            ValidationError: If data doesn't match model schema
-        """
-        file_path = self.dictionary_path / filename
-        if not file_path.exists():
-            raise FileNotFoundError(f"Dictionary file not found: {file_path}")
-
-        # Check cache first
-        cache_key = str(file_path)
-        if cache_key in self._cache:
-            return [model_class(**row) for row in self._cache[cache_key]]
-
-        # Load from CSV
-        data = []
-        with file_path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                data.append(row)
-
-        # Normalize brand schema and values if needed
-        if filename == "product_brands.csv":
-            # Known categories (align with companies and product taxonomies)
-            known_categories = {
-                "Food",
-                "Retail",
-                "Electronics",
-                "Clothing",
-                "Health",
-                "Pet",
-                "Automotive",
-                "Office",
-                "Sports",
-                "Home",
-            }
-
-            # Build company->category map from product_companies for correction
-            company_category: dict[str, str] = {}
-            try:
-                comp_path = self.dictionary_path / "product_companies.csv"
-                if comp_path.exists():
-                    with comp_path.open("r", encoding="utf-8") as cf:
-                        comp_reader = csv.DictReader(cf)
-                        for crow in comp_reader:
-                            cname = (crow.get("Company") or "").strip()
-                            ccat = (crow.get("Category") or "").strip()
-                            if cname and ccat:
-                                company_category[cname] = ccat
-            except Exception:
-                # Non-fatal: continue without map
-                company_category = {}
-
-            normalized = []
-            for row in data:
-                brand = (row.get("Brand") or "").strip()
-                company = row.get("Company") if "Company" in row else None
-                category = row.get("Category") if "Category" in row else None
-
-                company = (company or "").strip()
-                category = (category or "").strip()
-
-                # Case 1: Older 2-column format was read under 3-column header:
-                # Company contains a category like 'Food' and Category is empty -> shift it
-                if category == "" and company in known_categories:
-                    category = company
-                    company = ""
-
-                # Case 2: Misfiled company in Category column -> move to Company and derive Category
-                if (not company) and category in company_category:
-                    company = category
-                    category = company_category.get(company, category)
-
-                # Case 3: Ensure minimal required fields
-                row = {"Brand": brand, "Company": company, "Category": category}
-                normalized.append(row)
-
-            data = normalized
-
-        # Cache the raw data
-        self._cache[cache_key] = data
-
-        # Return as model instances
-        return [model_class(**row) for row in data]
-
-    def get_raw_data(self, filename: str) -> list[dict[str, Any]]:
-        """Get raw dictionary data without model validation."""
-        file_path = self.dictionary_path / filename
-        cache_key = str(file_path)
-
-        if cache_key not in self._cache:
-            self._load_csv_as_models(filename, dict)  # Load into cache
-
-        return self._cache[cache_key]
 
 
 class AddressGenerator:
