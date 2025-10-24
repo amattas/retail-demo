@@ -56,7 +56,7 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 - Seasonal/holiday patterns affect online order rates in both historical and streaming modes.
 - Uses the same synthetic customers and products as the rest of the system.
 
-Note: The legacy `retail_datagen/omnichannel` module and `static/omnichannel_sample/` are deprecated and retained only for reference. New work should target the unified generator and streaming paths.
+**Note on Legacy Code**: The `retail_datagen/omnichannel` module represents an earlier implementation approach and is deprecated. Online orders are now fully integrated into the core `fact_generator.py` and `event_streamer.py` modules. All new development should use the unified generator and streaming paths.
 
 ### 📊 **Enhanced Progress Display for Historical Generation** ⭐ **NEW**
 - **Table Completion Counter**: Real-time display showing "X/8 tables complete" during generation
@@ -123,12 +123,11 @@ Note: The legacy `retail_datagen/omnichannel` module and `static/omnichannel_sam
 
 For implementation details and full data contracts, see `AGENTS.md`.
 
-### Running the Omnichannel Module
-1. Load configuration data (JSON or YAML) and call `retail_datagen.omnichannel.prepare(config, rng, catalogs)` to create an `OmniState`.
-2. On each inventory cadence invoke `emit_supply(now, state)` to generate `inventory_snapshots`, `inbound_shipments`, and capacity/hour records.
-3. When your existing order generator emits an order, call `quote(order, now, state)` to obtain ranked candidates plus a decision trail, then choose a candidate and reserve via `allocate`.
-4. Call `realize(allocation, clock, state)` to simulate pick/ship or pickup readiness events. Apply observational noise with `perturb` if you need “observed” rather than “ground-truth” outputs.
-5. Run `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q datagen/tests/unit/test_omnichannel_helpers.py` to validate helper invariants.
+### Online Orders (Unified)
+- Configure daily volume via `volume.online_orders_per_day` in `config.json` or the UI.
+- Historical: generated in `facts/online_orders/dt=YYYY-MM-DD/online_orders_YYYYMMDD.csv` and inventory effects applied to `store_inventory_txn`/`dc_inventory_txn` with `Source=ONLINE`.
+- Streaming: emits `online_order_created` followed by `online_order_picked` and `online_order_shipped`, plus an `inventory_updated` SALE for the fulfillment node.
+- Seasonality/Holidays: applied to online orders in both historical and streaming modes.
 
 ## Architecture
 

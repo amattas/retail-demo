@@ -42,6 +42,7 @@ nav:
   - Data Schema: data-schema.md
   - Fabric Assets: fabric-assets.md
   - Use Cases: use-cases.md
+  - AI Integration: ai-integration.md
   - Setup: setup.md
   - Roadmap: roadmap.md
 docs_dir: docs

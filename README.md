@@ -147,13 +147,35 @@ retail-demo/
 
 ## Development Status
 
-- 🚧 Data Generator: in development (`datagen/`)
-- ✅ Fabric scaffolding/specs: added (`fabric/*`)
-- 📋 Eventstream → KQL/Lakehouse wiring: next
-- 📋 KQL DB tables/mappings/materialized views: next
-- 📋 Dashboards + Querysets: next
-- 📋 Real-time rules (alerts/actions): next
-- 📋 AI Copilot integration: planned
+### ✅ PHASE 1: COMPLETE (Oct 2024)
+
+**Data Generator** (datagen/):
+- ✅ Master data generation (stores, customers, products, DCs, trucks)
+- ✅ Historical fact generation (9 fact tables with temporal patterns)
+- ✅ Real-time streaming to Azure Event Hubs (15+ event types)
+- ✅ Online orders integration (historical + streaming lifecycle)
+- ✅ FastAPI web interface with progress tracking
+- ✅ Marketing attribution and customer session orchestration
+- ✅ Supply chain simulation (DC → Truck → Store flows)
+
+**Project Scaffolding**:
+- ✅ Fabric asset folders with build specs (`fabric/*`)
+- ✅ MkDocs documentation site
+- ✅ Data contracts and schemas defined
+
+### 📋 PHASE 2-5: PLANNED (Dec 2024 - Apr 2025)
+
+See [docs/roadmap.md](docs/roadmap.md) for detailed timeline.
+
+**Next Up** (Phase 2 - Target: Dec 2024):
+- Eventstream → KQL database + Lakehouse Bronze wiring
+- KQL table definitions and ingestion mappings
+- End-to-end data flow validation
+
+**Future Phases**:
+- Phase 3 (Jan 2025): Real-Time Dashboards, Querysets, Materialized Views
+- Phase 4 (Feb 2025): Lakehouse Silver/Gold medallion, Semantic Model, Copilot enablement
+- Phase 5 (Mar-Apr 2025): Real-time alerts/actions, AI models, CPG supplier portal
 
 ## Use Cases by Industry Segment (Planned)
 

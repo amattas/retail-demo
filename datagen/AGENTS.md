@@ -41,6 +41,7 @@ Pricing invariants: Cost < SalePrice ≤ MSRP; Cost is 50–85% of SalePrice.
 - `foot_traffic`: `TraceId, EventTS, StoreID, SensorId, Zone, Dwell, Count`
 - `ble_pings`: `TraceId, EventTS, StoreID, BeaconId, CustomerBLEId, RSSI, Zone`
 - `marketing`: `TraceId, EventTS, Channel, CampaignId, CreativeId, CustomerAdId, ImpressionId, Cost, Device`
+- `online_orders`: `TraceId, EventTS, OrderId, CustomerID, FulfillmentMode, FulfillmentNodeType, FulfillmentNodeID, Subtotal, Tax, Total, TenderType`
 
 ### Real-Time Event Envelope
 ```
@@ -57,12 +58,20 @@ Pricing invariants: Cost < SalePrice ≤ MSRP; Cost is 50–85% of SalePrice.
 ```
 
 Event types are defined in `retail_datagen.streaming.schemas.EventType`.
+Key types include:
+- `receipt_created`, `receipt_line_added`, `payment_processed`
+- `inventory_updated`, `stockout_detected`, `reorder_triggered`
+- `customer_entered`, `customer_zone_changed`, `ble_ping_detected`
+- `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`
+- `ad_impression`, `promotion_applied`
+- `online_order_created`, `online_order_picked`, `online_order_shipped`
 
 ## Configuration
 `RetailConfig` in `retail_datagen.config.models`.
 - Paths: prefer `paths.dictionaries`, `paths.master`, `paths.facts` (alias `dict` accepted).
 - Historical: `historical.start_date`.
 - Realtime: burst, interval, batch, retry, circuit breaker, buffer.
+- Volume: `online_orders_per_day` controls the scale of online orders (historical and streaming pacing).
 
 ## Safety Rules
 - No real names or brands; see `SyntheticDataValidator` blocklist.
@@ -121,3 +130,14 @@ All enhanced fields are backward compatible (optional with `None` defaults).
 - Keep README high-level; deep spec stays here.
 - See `CHANGELOG.md` for release notes and version history.
 - Progress reporting tests: `tests/unit/test_progress_reporting.py`, `tests/integration/test_progress_integration.py`
+
+### ETA Calculation Algorithm
+
+The progress ETA calculation (`fact_generator.py:238-266`) uses a rolling history approach:
+
+1. **History Tracking**: Maintains `_progress_history` list of `(timestamp, progress)` tuples
+2. **Rate Calculation**: `progress_rate = (newest_progress - oldest_progress) / time_elapsed`
+3. **ETA Formula**: `estimated_seconds = (1.0 - current_progress) / progress_rate`
+4. **Safety**: Returns `None` if insufficient history (<2 entries) or invalid rates (≤0)
+
+This provides a simple but effective linear projection based on recent progress velocity. For production, consider exponential smoothing for more stable estimates with variable workloads.
