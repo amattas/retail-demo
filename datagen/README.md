@@ -469,7 +469,7 @@ The `examples/` directory contains runnable examples and demo scripts to explore
 - `examples/example_streaming_usage.py` - Minimal example showing how to initialize `EventStreamer`, produce events, and report statistics
 
 #### Dictionary and Generation Demos
-- `examples/demo_dictionary_loader.py` - Demonstrates `DictionaryLoader` features
+- Use `retail_datagen.shared.dictionary_loader.DictionaryLoader` for validated dictionary ingestion with caching
 - `examples/demo_fact_generation.py` - Shows fact generation usage
 - `examples/verify_fact_generation.py` - Verifies fact generation outputs
 

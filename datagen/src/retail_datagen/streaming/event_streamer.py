@@ -7,7 +7,6 @@ error handling, and performance optimization.
 """
 
 import asyncio
-import logging
 import signal
 import threading
 import time
@@ -16,6 +15,7 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from functools import wraps
 from typing import Any
 
 from ..config.models import RetailConfig
@@ -27,7 +27,28 @@ from .errors import ErrorSeverity, classify_error
 from .event_factory import EventFactory
 from .schemas import EventEnvelope, EventType
 
-logger = logging.getLogger(__name__)
+
+def event_generation_pipeline(method: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to measure and post-process event generation."""
+
+    @wraps(method)
+    async def wrapper(self: "EventStreamer", *args: Any, **kwargs: Any):
+        try:
+            with event_generation_duration_seconds.time():
+                events: list[EventEnvelope] = await method(self, *args, **kwargs)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            self.log.error(
+                "Error generating event burst",
+                session_id=self._session_id,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            return []
+
+        self._process_generated_events(events)
+        return events
+
+    return wrapper
 
 
 @dataclass
@@ -249,7 +270,11 @@ class EventStreamer:
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
-        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+        self.log.info(
+            "Received shutdown signal",
+            session_id=self._session_id,
+            signal=signum,
+        )
         asyncio.create_task(self.stop())
 
     async def initialize(self) -> bool:
@@ -277,13 +302,20 @@ class EventStreamer:
 
                 # Test connection
                 if not await self._azure_client.connect():
-                    logger.error("Failed to connect to Azure Event Hub")
+                    self.log.error(
+                        "Failed to connect to Azure Event Hub",
+                        session_id=self._session_id,
+                    )
                     return False
 
-                logger.info("Azure Event Hub client initialized and connected")
+                self.log.info(
+                    "Azure Event Hub client initialized and connected",
+                    session_id=self._session_id,
+                )
             else:
-                logger.warning(
-                    "No Azure connection string provided - events will be generated but not sent"
+                self.log.warning(
+                    "No Azure connection string provided - events will be generated but not sent",
+                    session_id=self._session_id,
                 )
                 # Create mock client for testing
                 self._azure_client = AzureEventHubClient(
@@ -315,11 +347,19 @@ class EventStreamer:
                 seed=self.config.seed,
             )
 
-            logger.info("Event streaming engine initialized successfully")
+            self.log.info(
+                "Event streaming engine initialized successfully",
+                session_id=self._session_id,
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Failed to initialize streaming engine: {e}")
+            self.log.error(
+                "Failed to initialize streaming engine",
+                session_id=self._session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return False
 
     async def _ensure_master_data_loaded(self):
@@ -327,7 +367,10 @@ class EventStreamer:
         if not all(
             [self._stores, self._customers, self._products, self._distribution_centers]
         ):
-            logger.info("Loading master data for streaming...")
+            self.log.info(
+                "Loading master data for streaming",
+                session_id=self._session_id,
+            )
 
             # Try to load from generated master CSVs
             try:
@@ -395,7 +438,12 @@ class EventStreamer:
                         ]
 
             except Exception as e:
-                logger.warning(f"Failed to load master CSVs: {e}")
+                self.log.warning(
+                    "Failed to load master CSVs",
+                    session_id=self._session_id,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
 
             # Fallback to minimal in-memory data for dev use
             if not self._stores:
@@ -492,11 +540,16 @@ class EventStreamer:
             bool: True if streaming started successfully, False otherwise
         """
         if self._is_streaming:
-            logger.warning("Streaming is already active")
+            self.log.warning(
+                "Streaming is already active", session_id=self._session_id
+            )
             return False
 
         if not await self.initialize():
-            logger.error("Failed to initialize streaming engine")
+            self.log.error(
+                "Failed to initialize streaming engine",
+                session_id=self._session_id,
+            )
             return False
 
         self._is_streaming = True
@@ -507,7 +560,14 @@ class EventStreamer:
         # Record streaming start in metrics
         self.metrics.start_streaming()
 
-        logger.info(f"Starting event streaming (duration: {duration or 'indefinite'})")
+        self.log.info(
+            "Starting streaming session",
+            session_id=self._session_id,
+            duration=str(duration) if duration else "indefinite",
+            emit_interval_ms=self.streaming_config.emit_interval_ms,
+            burst_size=self.streaming_config.burst,
+            start_time=start_time.isoformat(),
+        )
 
         try:
             # Start monitoring task
@@ -525,11 +585,19 @@ class EventStreamer:
             # Wait for streaming to complete
             await self._streaming_task
 
-            logger.info("Event streaming completed successfully")
+            self.log.info(
+                "Event streaming completed successfully",
+                session_id=self._session_id,
+            )
             return True
 
-        except Exception as e:
-            logger.error(f"Error during streaming: {e}")
+        except Exception as exc:
+            self.log.error(
+                "Error during streaming",
+                session_id=self._session_id,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             return False
         finally:
             await self._cleanup()
@@ -542,10 +610,12 @@ class EventStreamer:
             bool: True if stopped successfully, False otherwise
         """
         if not self._is_streaming:
-            logger.info("Streaming is not active")
+            self.log.info(
+                "Streaming is not active", session_id=self._session_id
+            )
             return True
 
-        logger.info("Stopping event streaming...")
+        self.log.info("Stopping event streaming", session_id=self._session_id)
         self._is_shutdown = True
 
         try:
@@ -579,16 +649,25 @@ class EventStreamer:
             # Record streaming stop in metrics
             self.metrics.stop_streaming()
 
-            logger.info("Event streaming stopped successfully")
+            self.log.info(
+                "Event streaming stopped successfully",
+                session_id=self._session_id,
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Error stopping streaming: {e}")
+            self.log.error(
+                "Error stopping streaming",
+                session_id=self._session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return False
 
     async def _streaming_loop(self, start_time: datetime, end_time: datetime | None):
         """Main streaming loop that generates and sends events."""
         next_burst_time = start_time
+        batch_count = 0
 
         while not self._is_shutdown:
             # Wait if paused
@@ -602,16 +681,41 @@ class EventStreamer:
 
             # Check if we've reached the end time
             if end_time and current_time >= end_time:
-                logger.info("Streaming duration completed")
+                self.log.info(
+                    "Streaming duration completed", session_id=self._session_id
+                )
                 break
 
             # Check if it's time for the next burst
             if current_time >= next_burst_time:
                 try:
+                    batch_id = self.log.generate_correlation_id()
+                    self.log.debug(
+                        "Generating event batch",
+                        batch_id=batch_id,
+                        batch_number=batch_count,
+                        target_size=self.streaming_config.burst,
+                        session_id=self._session_id,
+                    )
+
                     # Generate event burst
                     events = await self._generate_event_burst(current_time)
 
                     if events:
+                        # Enrich events with correlation and session identifiers
+                        for event in events:
+                            if not event.correlation_id:
+                                event.correlation_id = batch_id
+                            event.session_id = self._session_id
+
+                        self.log.info(
+                            "Event batch generated",
+                            batch_id=batch_id,
+                            event_count=len(events),
+                            event_types=[str(e.event_type) for e in events[:5]],
+                            session_id=self._session_id,
+                        )
+
                         # Buffer events
                         async with self._buffer_lock:
                             self._event_buffer.extend(events)
@@ -635,24 +739,57 @@ class EventStreamer:
                     next_burst_time = current_time + timedelta(
                         milliseconds=self.streaming_config.emit_interval_ms
                     )
+                    batch_count += 1
 
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {e}")
+                except Exception as exc:
+                    self.log.error(
+                        "Streaming loop error",
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                        batch_number=batch_count,
+                        session_id=self._session_id,
+                    )
                     async with self._stats_lock:
                         self._statistics.error_counts["streaming_loop_errors"] += 1
 
                     # Call error hooks
-                    for hook in self._error_hooks:
-                        try:
-                            hook(e, "streaming_loop")
-                        except Exception:
-                            pass
+                    self._run_hooks_once(self._error_hooks, exc, "streaming_loop")
 
             # Sleep for a short interval to avoid busy waiting
             await asyncio.sleep(0.1)
 
         self._is_streaming = False
 
+    def _process_generated_events(self, events: list[EventEnvelope]) -> None:
+        """Record metrics and run hooks for generated events."""
+        if not events:
+            return
+
+        for event in events:
+            self.metrics.record_event_generated(event.event_type)
+
+        self._run_event_hooks(events, self._event_generated_hooks)
+
+    @staticmethod
+    def _run_hooks_once(hooks: list[Callable[..., None]], *args: Any) -> None:
+        for hook in hooks:
+            try:
+                hook(*args)
+            except Exception:
+                pass
+
+    def _run_event_hooks(
+        self,
+        events: list[EventEnvelope],
+        hooks: list[Callable[[EventEnvelope], None]],
+    ) -> None:
+        if not events or not hooks:
+            return
+
+        for event in events:
+            self._run_hooks_once(hooks, event)
+
+    @event_generation_pipeline
     async def _generate_event_burst(self, timestamp: datetime) -> list[EventEnvelope]:
         """
         Generate a burst of mixed events.
@@ -663,39 +800,18 @@ class EventStreamer:
         Returns:
             List of generated events
         """
-        try:
-            # Time the event generation and record metric
-            with event_generation_duration_seconds.time():
-                # If allowed types present, build a uniform weight map restricted to allowed types
-                if self._allowed_event_types:
-                    weights = {et: 1.0 for et in self._allowed_event_types}
-                    events = self._event_factory.generate_mixed_events(
-                        count=self.streaming_config.burst,
-                        timestamp=timestamp,
-                        event_weights=weights,
-                    )
-                else:
-                    events = self._event_factory.generate_mixed_events(
-                        count=self.streaming_config.burst, timestamp=timestamp
-                    )
+        # If allowed types present, build a uniform weight map restricted to allowed types
+        if self._allowed_event_types:
+            weights = {et: 1.0 for et in self._allowed_event_types}
+            return self._event_factory.generate_mixed_events(
+                count=self.streaming_config.burst,
+                timestamp=timestamp,
+                event_weights=weights,
+            )
 
-            # Record event generation metrics
-            for event in events:
-                self.metrics.record_event_generated(event.event_type)
-
-            # Call event generated hooks
-            for event in events:
-                for hook in self._event_generated_hooks:
-                    try:
-                        hook(event)
-                    except Exception:
-                        pass
-
-            return events
-
-        except Exception as e:
-            logger.error(f"Error generating event burst: {e}")
-            return []
+        return self._event_factory.generate_mixed_events(
+            count=self.streaming_config.burst, timestamp=timestamp
+        )
 
     async def _flush_event_buffer(self):
         """Flush events from buffer to Azure Event Hub."""
@@ -705,6 +821,15 @@ class EventStreamer:
         async with self._buffer_lock:
             events_to_send = self._event_buffer.copy()
             self._event_buffer.clear()
+
+        batch_id = events_to_send[0].correlation_id if events_to_send else "unknown"
+
+        self.log.debug(
+            "Flushing event buffer",
+            batch_id=batch_id,
+            event_count=len(events_to_send),
+            session_id=self._session_id,
+        )
 
         try:
             # Track batch send timing
@@ -729,6 +854,14 @@ class EventStreamer:
                     self.metrics.record_batch_sent(estimated_bytes, batch_duration)
                     for event in events_to_send:
                         self.metrics.record_event_sent(event.event_type)
+
+                    self.log.info(
+                        "Event batch sent",
+                        batch_id=batch_id,
+                        event_count=len(events_to_send),
+                        duration_seconds=batch_duration,
+                        session_id=self._session_id,
+                    )
                 else:
                     # Send failed - record metrics
                     self.metrics.record_batch_failed("send_failed")
@@ -740,21 +873,19 @@ class EventStreamer:
                         events_to_send, Exception("Send failed")
                     )
 
+                    self.log.warning(
+                        "Event batch send failed",
+                        batch_id=batch_id,
+                        event_count=len(events_to_send),
+                        session_id=self._session_id,
+                    )
+
             # Call batch sent hooks
             if success:
-                for hook in self._batch_sent_hooks:
-                    try:
-                        hook(events_to_send)
-                    except Exception:
-                        pass
+                self._run_hooks_once(self._batch_sent_hooks, events_to_send)
 
                 # Call individual event sent hooks
-                for event in events_to_send:
-                    for hook in self._event_sent_hooks:
-                        try:
-                            hook(event)
-                        except Exception:
-                            pass
+                self._run_event_hooks(events_to_send, self._event_sent_hooks)
 
         except Exception as e:
             # Record metrics for exception
@@ -768,10 +899,22 @@ class EventStreamer:
             async with self._stats_lock:
                 self._statistics.error_counts["flush_errors"] += 1
 
+            self.log.error(
+                "Error flushing event buffer",
+                batch_id=batch_id,
+                error=str(e),
+                error_type=error_type,
+                session_id=self._session_id,
+            )
+
     async def _flush_remaining_events(self):
         """Flush any remaining events in buffer during shutdown."""
         if self._event_buffer:
-            logger.info(f"Flushing {len(self._event_buffer)} remaining events...")
+            self.log.info(
+                "Flushing remaining events",
+                event_count=len(self._event_buffer),
+                session_id=self._session_id,
+            )
             await self._flush_event_buffer()
 
     async def _monitoring_loop(self):
@@ -780,7 +923,7 @@ class EventStreamer:
             try:
                 # Update Prometheus metrics
                 self.metrics.update_uptime()
-                self.metrics.update_dlq_size(len(self._dead_letter_queue))
+                self.metrics.update_dlq_size(len(self._dlq))
 
                 # Update performance metrics
                 async with self._stats_lock:
@@ -802,24 +945,35 @@ class EventStreamer:
                     and self._statistics.events_generated > 0
                 ):
                     stats = await self.get_statistics()
-                    logger.info(
-                        f"Streaming stats: {stats['events_generated']} generated, "
-                        f"{stats['events_sent_successfully']} sent, "
-                        f"{stats['events_per_second']:.2f} events/sec"
+                    self.log.info(
+                        "Streaming stats",
+                        session_id=self._session_id,
+                        events_generated=stats["events_generated"],
+                        events_sent=stats["events_sent_successfully"],
+                        events_per_second=stats["events_per_second"],
                     )
 
                 # Perform health check
                 if self._azure_client:
                     health = await self._azure_client.health_check()
                     if not health.get("healthy", False):
-                        logger.warning(f"Event Hub health check failed: {health}")
+                        self.log.warning(
+                            "Event Hub health check failed",
+                            session_id=self._session_id,
+                            health=health,
+                        )
                         async with self._stats_lock:
                             self._statistics.connection_failures += 1
 
                 await asyncio.sleep(self.streaming_config.monitoring_interval)
 
-            except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
+            except Exception as exc:
+                self.log.error(
+                    "Error in monitoring loop",
+                    session_id=self._session_id,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 await asyncio.sleep(self.streaming_config.monitoring_interval)
 
     async def _cleanup(self):
@@ -874,7 +1028,7 @@ class EventStreamer:
             # Record pause in metrics
             self.metrics.pause_streaming()
 
-            logger.info("Streaming paused")
+            self.log.info("Streaming paused", session_id=self._session_id)
 
             return {
                 "success": True,
@@ -928,7 +1082,11 @@ class EventStreamer:
             # Record resume in metrics
             self.metrics.resume_streaming()
 
-            logger.info(f"Streaming resumed after {pause_duration:.2f}s pause")
+            self.log.info(
+                "Streaming resumed",
+                session_id=self._session_id,
+                pause_duration_seconds=pause_duration,
+            )
 
             return {
                 "success": True,
@@ -956,14 +1114,14 @@ class EventStreamer:
         # Classify error
         error = classify_error(exception)
 
-        logger.error(
-            f"Event send failed: {error.message}",
-            extra={
-                "severity": error.severity.value,
-                "category": error.category.value,
-                "retryable": error.retryable,
-                "event_count": len(events),
-            },
+        self.log.error(
+            "Event send failed",
+            session_id=self._session_id,
+            error_message=error.message,
+            severity=error.severity.value,
+            category=error.category.value,
+            retryable=error.retryable,
+            event_count=len(events),
         )
 
         # Update statistics
@@ -989,11 +1147,20 @@ class EventStreamer:
                 if len(self._dlq) > self._dlq_max_size:
                     removed = len(self._dlq) - self._dlq_max_size
                     self._dlq = self._dlq[-self._dlq_max_size :]
-                    logger.warning(f"DLQ size exceeded, removed {removed} oldest entries")
+                    self.log.warning(
+                        "DLQ size exceeded",
+                        session_id=self._session_id,
+                        removed=removed,
+                        dlq_size=len(self._dlq),
+                        max_size=self._dlq_max_size,
+                    )
 
         # Stop streaming if critical error
         if error.severity == ErrorSeverity.CRITICAL:
-            logger.critical("Critical error detected, stopping streaming")
+            self.log.critical(
+                "Critical error detected, stopping streaming",
+                session_id=self._session_id,
+            )
             await self.stop()
 
     async def retry_dlq_events(self, max_retries: int | None = None) -> dict:
@@ -1043,7 +1210,11 @@ class EventStreamer:
 
                     if result:
                         succeeded += 1
-                        logger.info(f"DLQ event retry succeeded: {entry.event.trace_id}")
+                        self.log.info(
+                            "DLQ event retry succeeded",
+                            session_id=self._session_id,
+                            trace_id=entry.event.trace_id,
+                        )
                     else:
                         # Update retry count and re-add to DLQ
                         entry.retry_count += 1
@@ -1100,11 +1271,17 @@ class EventStreamer:
             await asyncio.sleep(retry_interval)
 
             if self._dlq_retry_enabled and self._dlq:
-                logger.info(f"Auto-retrying {len(self._dlq)} DLQ events")
+                self.log.info(
+                    "Auto-retrying DLQ events",
+                    session_id=self._session_id,
+                    dlq_size=len(self._dlq),
+                )
                 result = await self.retry_dlq_events()
-                logger.info(
-                    f"DLQ retry complete: {result['succeeded']} succeeded, "
-                    f"{result['failed']} failed"
+                self.log.info(
+                    "DLQ retry complete",
+                    session_id=self._session_id,
+                    succeeded=result["succeeded"],
+                    failed=result["failed"],
                 )
 
     # Public API methods

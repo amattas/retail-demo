@@ -109,18 +109,6 @@ _rate_limit_storage: dict[str, list] = defaultdict(list)
 security = HTTPBearer(auto_error=False)
 
 
-class RateLimitError(Exception):
-    """Exception raised when rate limit is exceeded."""
-
-    pass
-
-
-class AuthenticationError(Exception):
-    """Exception raised when authentication fails."""
-
-    pass
-
-
 # ================================
 # CONFIGURATION DEPENDENCIES
 # ================================

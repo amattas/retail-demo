@@ -5,6 +5,8 @@ This module contains the data generation engines for creating master data,
 historical fact data, and real-time event streams as specified in AGENTS.md.
 """
 
+from retail_datagen.shared.dictionary_loader import DictionaryLoader
+
 from .fact_generator import FactDataGenerator
 from .master_generator import MasterDataGenerator
 from .retail_patterns import (
@@ -21,7 +23,6 @@ from .seasonal_patterns import (
 )
 from .utils import (
     AddressGenerator,
-    DictionaryLoader,
     GeographicDistribution,
     IdentifierGenerator,
     SyntheticNameGenerator,
