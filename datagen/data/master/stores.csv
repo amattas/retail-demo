@@ -1,0 +1,215 @@
+"ID","StoreNumber","Address","GeographyID"
+1,"S000001","84810 NE Main Ave, Burlingame, CA 94010",78
+2,"S000002","89696 Franklin Pl, Marysville, CA 95901",54
+3,"S000003","5165 W Madison St, Tracy, CA 95376",15
+4,"S000004","74563 SE Franklin Ln, Santa Rosa, CA 95401",90
+5,"S000005","1851 Summit Ct, Ivoryton, CT 06443",64
+6,"S000006","37421 NW Forest Ave, Yountville, CA 94599",87
+7,"S000007","48052 Pine Way, Cromwell, CT 06416",42
+8,"S000008","71284 SE Mill Cir, Fairfield, CA 94534",73
+9,"S000009","48400 Pine Sixth Ln, Union City, CA 94588",47
+10,"S000010","11458 Forest School Way, Rockfall, CT 06481",12
+11,"S000011","84320 River Dr, Middlefield, CT 06455",76
+12,"S000012","88841 S Second Rd, Napa, CA 94558",50
+13,"S000013","96568 SW Adams Rd, Pleasanton, CA 94566",13
+14,"S000014","29785 Cedar Sixth St, Durham, CT 06420",32
+15,"S000015","42347 Washington Ct, Watertown, NY 13601",3
+16,"S000016","28869 Jackson Way, Old Saybrook, CT 06477",88
+17,"S000017","19726 W Liberty Church Cir, Old Lyme, CT 06371",65
+18,"S000018","57155 Sixth Blvd, Los Altos Hills, CA 94022",41
+19,"S000019","67784 Cherry First Blvd, Old Saybrook, CT 06475",93
+20,"S000020","90192 Forest Cir, Chester, CT 06410",80
+21,"S000021","62348 Maple Cherry Rd, Hamburg, CT 06040",35
+22,"S000022","99419 NW Summit Blvd, East Haddam, CT 06423",77
+23,"S000023","60470 NE Third Highland Ave, Durham, CT 06422",20
+24,"S000024","82959 W Second Rd, Pescadero, CA 94060",18
+25,"S000025","70514 Sunrise St, Fremont, CA 94536",79
+26,"S000026","15662 Hill Park St, New Haven, CT 06511",52
+27,"S000027","32571 Birch Sunrise Ave, Moodus, CT 06469",57
+28,"S000028","70822 Sunset Rd, Linda, CA 95901",9
+29,"S000029","22643 SE Liberty Fourth Ln, Foster City, CA 94404",11
+30,"S000030","53296 Ridge Rd, Loma Mar, CA 94021",36
+31,"S000031","60177 W Oak Cir, Fairfield, CA 94533",21
+32,"S000032","73603 W Adams St, San Jose, CA 95101",30
+33,"S000033","31007 N Elm Highland Dr, Salinas, CA 93901",53
+34,"S000034","37500 Main Cir, Rockfall, CT 06482",61
+35,"S000035","76525 Spring Fourth Ave, Clinton, CT 06413",58
+36,"S000036","13704 Spring Way, Benicia, CA 94510",16
+37,"S000037","96561 S Lake Ave, Durham, CT 06422",20
+38,"S000038","33591 SW Third Ln, Campbell, CA 95008",29
+39,"S000039","61637 S Lincoln Ave, Seymour, CT 06483",4
+40,"S000040","7630 Maple Ave, San Mateo, CA 94401",46
+41,"S000041","99771 Sunrise Way, Watertown, NY 13601",3
+42,"S000042","29016 Second Forest St, Watertown, NY 13601",3
+43,"S000043","52173 SW Lincoln Way, Watertown, NY 13601",3
+44,"S000044","21289 W Franklin Liberty St, Watertown, NY 13601",3
+45,"S000045","99038 Sunset Rd, Watertown, NY 13601",3
+46,"S000046","70615 S Elm Madison Ave, Seymour, CT 06483",4
+47,"S000047","89501 Washington Dr, Seymour, CT 06483",4
+48,"S000048","76880 Spring Cir, Seymour, CT 06483",4
+49,"S000049","75085 Fifth Valley Dr, Seymour, CT 06483",4
+50,"S000050","35814 Hill Way, Linda, CA 95901",9
+51,"S000051","42441 Maple Creek Cir, Linda, CA 95901",9
+52,"S000052","74792 Fifth Rd, Linda, CA 95901",9
+53,"S000053","35760 NW Park Meadow Ln, Linda, CA 95901",9
+54,"S000054","21676 Hill Cir, Foster City, CA 94404",11
+55,"S000055","86717 Lincoln Ln, Foster City, CA 94404",11
+56,"S000056","87951 E Willow Rd, Foster City, CA 94404",11
+57,"S000057","21374 W Fifth Adams Ln, Foster City, CA 94404",11
+58,"S000058","67244 Cedar Birch Pl, Rockfall, CT 06481",12
+59,"S000059","37265 NW Adams Church Blvd, Rockfall, CT 06481",12
+60,"S000060","98154 Lincoln Maple Ave, Rockfall, CT 06481",12
+61,"S000061","10862 First Rd, Rockfall, CT 06481",12
+62,"S000062","5722 First Pl, Rockfall, CT 06481",12
+63,"S000063","17704 NW Pine River Dr, Pleasanton, CA 94566",13
+64,"S000064","90399 S Lincoln Pl, Pleasanton, CA 94566",13
+65,"S000065","82351 Park Second Blvd, Pleasanton, CA 94566",13
+66,"S000066","55040 NW Spring Park Ln, Pleasanton, CA 94566",13
+67,"S000067","21866 Pine Way, Pleasanton, CA 94566",13
+68,"S000068","30154 SW Sixth Dr, Tracy, CA 95376",15
+69,"S000069","4101 School Ave, Tracy, CA 95376",15
+70,"S000070","37585 Liberty Ct, Tracy, CA 95376",15
+71,"S000071","4617 NE Church St, Tracy, CA 95376",15
+72,"S000072","15208 Valley Pl, Tracy, CA 95376",15
+73,"S000073","80457 Washington Dr, Benicia, CA 94510",16
+74,"S000074","34386 SE Liberty Dr, Benicia, CA 94510",16
+75,"S000075","48739 Lake Jefferson Ct, Benicia, CA 94510",16
+76,"S000076","87951 Hill Highland Ln, Benicia, CA 94510",16
+77,"S000077","88410 Mill Rd, Pescadero, CA 94060",18
+78,"S000078","17683 SE Third Cir, Pescadero, CA 94060",18
+79,"S000079","75593 Maple Ln, Pescadero, CA 94060",18
+80,"S000080","38606 NW Ridge Dr, Pescadero, CA 94060",18
+81,"S000081","68000 Second Birch Ln, Durham, CT 06422",20
+82,"S000082","68561 Birch Dr, Durham, CT 06422",20
+83,"S000083","89184 First Oak St, Durham, CT 06422",20
+84,"S000084","33092 Elm Way, Durham, CT 06422",20
+85,"S000085","55321 Forest Way, Fairfield, CA 94533",21
+86,"S000086","53383 N Willow Summit Dr, Fairfield, CA 94533",21
+87,"S000087","24053 Creek St, Fairfield, CA 94533",21
+88,"S000088","74060 S Creek Rd, Fairfield, CA 94533",21
+89,"S000089","74259 Ridge Jefferson Rd, Durham, CT 06422",20
+90,"S000090","56933 Second Way, Durham, CT 06422",20
+91,"S000091","59991 W School Fairway Way, Durham, CT 06422",20
+92,"S000092","83149 SW Mill Dr, Durham, CT 06422",20
+93,"S000093","36614 Birch Main Blvd, Campbell, CA 95008",29
+94,"S000094","31311 Fifth Ave, Campbell, CA 95008",29
+95,"S000095","55377 Spring St, Campbell, CA 95008",29
+96,"S000096","28110 Franklin St, Campbell, CA 95008",29
+97,"S000097","76456 River Ln, San Jose, CA 95101",30
+98,"S000098","99759 Spring Liberty Rd, San Jose, CA 95101",30
+99,"S000099","80069 School Pl, San Jose, CA 95101",30
+100,"S000100","64654 NW Garden Blvd, San Jose, CA 95101",30
+101,"S000101","62261 Liberty Oak Pl, Durham, CT 06420",32
+102,"S000102","78580 Jackson Pl, Durham, CT 06420",32
+103,"S000103","18786 Church Pl, Durham, CT 06420",32
+104,"S000104","43906 NW Forest Ln, Durham, CT 06420",32
+105,"S000105","99567 Birch Way, Durham, CT 06420",32
+106,"S000106","3540 River Dr, Hamburg, CT 06040",35
+107,"S000107","86215 N Park Fourth St, Hamburg, CT 06040",35
+108,"S000108","82439 E Cherry Cir, Hamburg, CT 06040",35
+109,"S000109","29569 Meadow Blvd, Hamburg, CT 06040",35
+110,"S000110","80415 Cherry Second Ln, Loma Mar, CA 94021",36
+111,"S000111","15168 Washington Forest Pl, Loma Mar, CA 94021",36
+112,"S000112","94718 W Hill Cir, Loma Mar, CA 94021",36
+113,"S000113","16866 Pine Ct, Loma Mar, CA 94021",36
+114,"S000114","70827 Highland Ct, Los Altos Hills, CA 94022",41
+115,"S000115","2658 Willow Summit Ct, Los Altos Hills, CA 94022",41
+116,"S000116","84307 First Pl, Los Altos Hills, CA 94022",41
+117,"S000117","24086 School Jefferson Rd, Los Altos Hills, CA 94022",41
+118,"S000118","64372 Franklin School Ct, Los Altos Hills, CA 94022",41
+119,"S000119","33177 Ridge Dr, Cromwell, CT 06416",42
+120,"S000120","99366 Forest Ct, Cromwell, CT 06416",42
+121,"S000121","4761 Sunrise Dr, Cromwell, CT 06416",42
+122,"S000122","47507 Madison Ln, Cromwell, CT 06416",42
+123,"S000123","73848 W Spring Way, Cromwell, CT 06416",42
+124,"S000124","73768 Jackson Way, San Mateo, CA 94401",46
+125,"S000125","59743 Sixth Pl, San Mateo, CA 94401",46
+126,"S000126","91673 NW Fairway Ct, San Mateo, CA 94401",46
+127,"S000127","56771 River Way, San Mateo, CA 94401",46
+128,"S000128","36509 Fourth Ct, Union City, CA 94588",47
+129,"S000129","16670 Third Fourth Dr, Union City, CA 94588",47
+130,"S000130","97810 Fairway Madison Ln, Union City, CA 94588",47
+131,"S000131","14176 Meadow Blvd, Union City, CA 94588",47
+132,"S000132","40618 E Cedar Rd, Union City, CA 94588",47
+133,"S000133","39290 Sunrise Ave, Napa, CA 94558",50
+134,"S000134","2607 Ridge Ct, Napa, CA 94558",50
+135,"S000135","25164 Sunset Ave, Napa, CA 94558",50
+136,"S000136","9564 Adams St, Napa, CA 94558",50
+137,"S000137","20887 NE Park Ave, Napa, CA 94558",50
+138,"S000138","74147 Jefferson Dr, New Haven, CT 06511",52
+139,"S000139","69494 Hill Franklin Pl, New Haven, CT 06511",52
+140,"S000140","41026 Willow Dr, New Haven, CT 06511",52
+141,"S000141","82987 S Third Rd, New Haven, CT 06511",52
+142,"S000142","10838 SE Madison Way, Salinas, CA 93901",53
+143,"S000143","39175 NE Creek Elm Dr, Salinas, CA 93901",53
+144,"S000144","35675 Fourth Pl, Salinas, CA 93901",53
+145,"S000145","16043 School Blvd, Salinas, CA 93901",53
+146,"S000146","10359 NE Washington Ln, Marysville, CA 95901",54
+147,"S000147","58560 NE School Rd, Marysville, CA 95901",54
+148,"S000148","71776 Pine Pl, Marysville, CA 95901",54
+149,"S000149","97276 Birch Dr, Marysville, CA 95901",54
+150,"S000150","89381 Oak Ln, Marysville, CA 95901",54
+151,"S000151","76529 E Jackson Way, Moodus, CT 06469",57
+152,"S000152","37458 SE Sunrise Ave, Moodus, CT 06469",57
+153,"S000153","62605 Willow Blvd, Moodus, CT 06469",57
+154,"S000154","44228 Garden Rd, Moodus, CT 06469",57
+155,"S000155","5809 Valley Ave, Clinton, CT 06413",58
+156,"S000156","53976 Maple Liberty Way, Clinton, CT 06413",58
+157,"S000157","55165 NW Sunrise Way, Clinton, CT 06413",58
+158,"S000158","7764 E Ridge Sunrise Ave, Clinton, CT 06413",58
+159,"S000159","4783 Park Blvd, Rockfall, CT 06482",61
+160,"S000160","41730 Birch Dr, Rockfall, CT 06482",61
+161,"S000161","15871 First Way, Rockfall, CT 06482",61
+162,"S000162","94926 NE Sunset Way, Rockfall, CT 06482",61
+163,"S000163","32946 Fourth Cir, Ivoryton, CT 06443",64
+164,"S000164","67616 Elm Ln, Ivoryton, CT 06443",64
+165,"S000165","55387 School Maple Ln, Ivoryton, CT 06443",64
+166,"S000166","96164 SW Ridge Liberty Way, Ivoryton, CT 06443",64
+167,"S000167","46236 Forest Creek Ct, Ivoryton, CT 06443",64
+168,"S000168","25727 Forest Dr, Old Lyme, CT 06371",65
+169,"S000169","54841 SW Forest Forest Blvd, Old Lyme, CT 06371",65
+170,"S000170","65923 Franklin Ct, Old Lyme, CT 06371",65
+171,"S000171","14154 Fairway Way, Old Lyme, CT 06371",65
+172,"S000172","3011 Jackson Blvd, Old Lyme, CT 06371",65
+173,"S000173","10807 Lake Jefferson Pl, Fairfield, CA 94534",73
+174,"S000174","86175 NW Liberty Forest Ct, Fairfield, CA 94534",73
+175,"S000175","83155 Liberty Pine Cir, Fairfield, CA 94534",73
+176,"S000176","9968 NE Birch Summit Ave, Fairfield, CA 94534",73
+177,"S000177","84066 Second Ln, Fairfield, CA 94534",73
+178,"S000178","4794 N Meadow Pl, Middlefield, CT 06455",76
+179,"S000179","20080 SE Third Blvd, Middlefield, CT 06455",76
+180,"S000180","23946 SE Park Way, Middlefield, CT 06455",76
+181,"S000181","77435 SW Creek Ln, Middlefield, CT 06455",76
+182,"S000182","88404 SW Liberty Second Ave, Middlefield, CT 06455",76
+183,"S000183","58898 Hill Adams Pl, East Haddam, CT 06423",77
+184,"S000184","91480 NE Forest Way, East Haddam, CT 06423",77
+185,"S000185","14979 NW Mill St, East Haddam, CT 06423",77
+186,"S000186","87275 Cedar Cir, East Haddam, CT 06423",77
+187,"S000187","98671 Mill Sixth Cir, Burlingame, CA 94010",78
+188,"S000188","47179 W Main Ave, Burlingame, CA 94010",78
+189,"S000189","83242 Ridge St, Burlingame, CA 94010",78
+190,"S000190","76965 Mill Ct, Burlingame, CA 94010",78
+191,"S000191","98973 Liberty Ct, Burlingame, CA 94010",78
+192,"S000192","70579 Second Ln, Fremont, CA 94536",79
+193,"S000193","64156 Lake Ave, Fremont, CA 94536",79
+194,"S000194","62385 Sixth Pl, Fremont, CA 94536",79
+195,"S000195","74048 Maple Church Rd, Fremont, CA 94536",79
+196,"S000196","17199 Church Cir, Chester, CT 06410",80
+197,"S000197","50941 Willow Sixth Way, Chester, CT 06410",80
+198,"S000198","4280 Valley Jefferson Dr, Chester, CT 06410",80
+199,"S000199","85889 SW Hill Jackson Pl, Chester, CT 06410",80
+200,"S000200","16292 N Sunrise Ave, Yountville, CA 94599",87
+201,"S000201","13739 E Meadow Rd, Yountville, CA 94599",87
+202,"S000202","55935 Spring Jackson Ave, Yountville, CA 94599",87
+203,"S000203","65139 School Pine Ct, Yountville, CA 94599",87
+204,"S000204","29477 Meadow Willow Ct, Yountville, CA 94599",87
+205,"S000205","72364 Cedar Pl, Old Saybrook, CT 06477",88
+206,"S000206","37160 S Creek Birch Dr, Old Saybrook, CT 06477",88
+207,"S000207","85109 Cedar Lake Dr, Old Saybrook, CT 06477",88
+208,"S000208","17505 Lincoln Dr, Old Saybrook, CT 06477",88
+209,"S000209","77858 W First Cir, Old Saybrook, CT 06477",88
+210,"S000210","1371 E Liberty Church Blvd, Santa Rosa, CA 95401",90
+211,"S000211","15408 Maple Ct, Santa Rosa, CA 95401",90
+212,"S000212","32186 Church St, Santa Rosa, CA 95401",90
+213,"S000213","17614 Elm Way, Santa Rosa, CA 95401",90
+214,"S000214","59756 Willow Way, Santa Rosa, CA 95401",90

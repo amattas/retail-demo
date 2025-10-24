@@ -1,0 +1,55 @@
+{
+  "seed": 42,
+  "volume": {
+    "stores": 214,
+    "dcs": 8,
+    "refrigerated_trucks": 8,
+    "non_refrigerated_trucks": 12,
+    "total_geographies": 100,
+    "total_customers": 500000,
+    "total_products": 10000,
+    "customers_per_day": 2000,
+    "items_per_ticket_mean": 8.2,
+    "dc_initial_inventory_min": 500,
+    "dc_initial_inventory_max": 5000,
+    "store_initial_inventory_min": 20,
+    "store_initial_inventory_max": 200,
+    "dc_reorder_point_min": 50,
+    "dc_reorder_point_max": 500,
+    "store_reorder_point_min": 5,
+    "store_reorder_point_max": 50,
+    "supplier_refrigerated_trucks": 12,
+    "supplier_non_refrigerated_trucks": 18
+  },
+  "realtime": {
+    "emit_interval_ms": 500,
+    "burst": 100,
+    "azure_connection_string": "",
+    "max_batch_size": 256,
+    "batch_timeout_ms": 1000,
+    "retry_attempts": 3,
+    "backoff_multiplier": 2.0,
+    "circuit_breaker_enabled": true,
+    "monitoring_interval": 30,
+    "max_buffer_size": 10000,
+    "enable_dead_letter_queue": true,
+    "use_keyvault": false,
+    "keyvault_url": null,
+    "keyvault_secret_name": "eventhub-connection-string"
+  },
+  "paths": {
+    "dictionaries": "data/dictionaries",
+    "master": "data/master",
+    "facts": "data/facts"
+  },
+  "stream": {
+    "hub": "retail-events"
+  },
+  "historical": {
+    "start_date": "2024-01-01"
+  },
+  "performance": {
+    "max_cpu_percent": 100,
+    "max_workers": null
+  }
+}

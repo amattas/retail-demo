@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Data Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-shopping-cart"></i>
+                    <h1>Retail Data Generator</h1>
+                </div>
+                <div class="status-indicator" id="statusIndicator">
+                    <i class="fas fa-circle"></i>
+                    <span>System Ready</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Navigation -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </button>
+            <button class="nav-tab" data-tab="master-data">
+                <i class="fas fa-database"></i>
+                Master Data
+            </button>
+            <button class="nav-tab" data-tab="historical">
+                <i class="fas fa-chart-line"></i>
+                Historical Data
+            </button>
+            <button class="nav-tab" data-tab="streaming">
+                <i class="fas fa-stream"></i>
+                Real-Time Stream
+            </button>
+            <button class="nav-tab" data-tab="config">
+                <i class="fas fa-cog"></i>
+                Configuration
+            </button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="welcome-section">
+                <h2>Welcome to Retail Data Generator</h2>
+                <p>Generate synthetic but realistic retail data for analytics POCs. Create master data, simulate historical transactions, and stream real-time events to Azure Event Hub.</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="storeCount">0</h3>
+                        <p>Stores</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="customerCount">0</h3>
+                        <p>Customers</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="productCount">0</h3>
+                        <p>Products</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="transactionCount">0</h3>
+                        <p>Transactions</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="allTablesData">
+                <div class="tables-summary">
+                    <h3>All Tables & Records</h3>
+                    <div class="table-container">
+                        <p class="loading-text">Loading table data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Data Tab -->
+        <div id="master-data" class="tab-content">
+            <div class="section-header">
+                <h2>Master Data Generation</h2>
+                <p>Generate dimension tables from dictionary data</p>
+            </div>
+
+            <div class="card">
+                <h3>Available Tables</h3>
+                <div class="table-grid">
+                    <div class="table-item" data-table="geographies_master">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <div>
+                            <span>Geographies</span>
+                            <small class="table-count" id="count-geographies_master"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('geographies_master')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="stores">
+                        <i class="fas fa-store"></i>
+                        <div>
+                            <span>Stores</span>
+                            <small class="table-count" id="count-stores"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('stores')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="distribution_centers">
+                        <i class="fas fa-warehouse"></i>
+                        <div>
+                            <span>Distribution Centers</span>
+                            <small class="table-count" id="count-distribution_centers"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('distribution_centers')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="trucks">
+                        <i class="fas fa-truck"></i>
+                        <div>
+                            <span>Trucks</span>
+                            <small class="table-count" id="count-trucks"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('trucks')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="customers">
+                        <i class="fas fa-users"></i>
+                        <div>
+                            <span>Customers</span>
+                            <small class="table-count" id="count-customers"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('customers')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="products_master">
+                        <i class="fas fa-box"></i>
+                        <div>
+                            <span>Products</span>
+                            <small class="table-count" id="count-products_master"></small>
+                        </div>
+                        <button class="btn-small" onclick="previewTable('products_master')">Preview</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Generation Options</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="forceRegenerate"> Force Regenerate (overwrite existing data)
+                    </label>
+                </div>
+                
+                <button class="btn primary large" onclick="generateMasterData()">
+                    <i class="fas fa-play"></i>
+                    Generate All Master Data
+                </button>
+            </div>
+
+            <div id="masterDataProgress" class="progress-section" style="display: none;">
+                <h3>Generation Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="masterProgressFill"></div>
+                </div>
+                <div class="progress-text" id="masterProgressText">Initializing...</div>
+                <div id="masterTableProgressCounter" class="table-counter" style="display: none;"></div>
+                <div id="masterProgressETA" class="progress-eta" style="display: none;"></div>
+                <div id="masterProgressDetails" class="progress-details"></div>
+            </div>
+        </div>
+
+        <!-- Historical Data Tab -->
+        <div id="historical" class="tab-content">
+            <div class="section-header">
+                <h2>Historical Data Generation</h2>
+                <p>Generate fact tables with realistic retail patterns</p>
+            </div>
+
+            <div class="card">
+                <h3>Date Range (Optional)</h3>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 16px;">
+                    Leave dates blank to use intelligent date logic: 
+                    <br>• First run: uses configured start date to current date
+                    <br>• Subsequent runs: continues from last generated timestamp
+                </p>
+                <div class="date-inputs">
+                    <div class="form-group">
+                        <label for="startDate">Start Date (Manual Override)</label>
+                        <input type="date" id="startDate" name="startDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">End Date (Manual Override)</label>
+                        <input type="date" id="endDate" name="endDate">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="parallelGeneration" checked> Enable Parallel Generation
+                    </label>
+                </div>
+
+                <button class="btn primary large" onclick="generateHistoricalData()">
+                    <i class="fas fa-chart-bar"></i>
+                    Generate Historical Data
+                </button>
+            </div>
+
+            <div class="card">
+                <h3>Available Fact Tables</h3>
+                <div class="table-grid">
+                    <div class="table-item" data-table="dc_inventory_txn">
+                        <i class="fas fa-warehouse"></i>
+                        <div>
+                            <span>DC Inventory</span>
+                            <small class="table-count" id="count-dc_inventory_txn"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('dc_inventory_txn', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="truck_moves">
+                        <i class="fas fa-truck-moving"></i>
+                        <div>
+                            <span>Truck Moves</span>
+                            <small class="table-count" id="count-truck_moves"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('truck_moves', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="store_inventory_txn">
+                        <i class="fas fa-boxes"></i>
+                        <div>
+                            <span>Store Inventory</span>
+                            <small class="table-count" id="count-store_inventory_txn"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('store_inventory_txn', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="receipts">
+                        <i class="fas fa-receipt"></i>
+                        <div>
+                            <span>Receipts</span>
+                            <small class="table-count" id="count-receipts"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('receipts', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="receipt_lines">
+                        <i class="fas fa-list"></i>
+                        <div>
+                            <span>Receipt Lines</span>
+                            <small class="table-count" id="count-receipt_lines"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('receipt_lines', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="foot_traffic">
+                        <i class="fas fa-walking"></i>
+                        <div>
+                            <span>Foot Traffic</span>
+                            <small class="table-count" id="count-foot_traffic"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('foot_traffic', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="ble_pings">
+                        <i class="fas fa-wifi"></i>
+                        <div>
+                            <span>BLE Pings</span>
+                            <small class="table-count" id="count-ble_pings"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('ble_pings', 'Historical Data')">Preview</button>
+                    </div>
+                    <div class="table-item" data-table="marketing">
+                        <i class="fas fa-bullhorn"></i>
+                        <div>
+                            <span>Marketing</span>
+                            <small class="table-count" id="count-marketing"></small>
+                        </div>
+                        <button class="btn-small" onclick="app.previewTable('marketing', 'Historical Data')">Preview</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historicalProgress" class="progress-section" style="display: none;">
+                <h3>Generation Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="historicalProgressFill"></div>
+                </div>
+                <div class="progress-text" id="historicalProgressText">Initializing...</div>
+                <div id="tableProgressCounter" class="table-counter" style="display: none;"></div>
+                <div id="progressETA" class="progress-eta" style="display: none;"></div>
+                <div id="historicalProgressDetails" class="progress-details"></div>
+            </div>
+        </div>
+
+        <!-- Streaming Tab -->
+        <div id="streaming" class="tab-content">
+            <div class="section-header">
+                <h2>Real-Time Event Streaming</h2>
+                <p>Stream events to Azure Event Hub</p>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 16px 0; font-size: 0.9em;">
+                    <strong>Note:</strong> Historical data must be generated first before starting real-time streaming.
+                </div>
+            </div>
+
+            <div class="streaming-controls">
+                <div class="card">
+                    <h3>Stream Control</h3>
+                    <div class="stream-status" id="streamStatus">
+                        <i class="fas fa-stop-circle text-red"></i>
+                        <span>Stopped</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="streamDuration">Duration (minutes, blank for indefinite)</label>
+                        <input type="number" id="streamDuration" placeholder="Leave empty for indefinite">
+                    </div>
+
+                    <div class="stream-buttons">
+                        <button class="btn success" id="startStreamBtn" onclick="startStreaming()">
+                            <i class="fas fa-play"></i>
+                            Start Stream
+                        </button>
+                        <button class="btn danger" id="stopStreamBtn" onclick="stopStreaming()" disabled>
+                            <i class="fas fa-stop"></i>
+                            Stop Stream
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Stream Statistics</h3>
+                    <div class="stats-row">
+                        <div class="stat">
+                            <span class="stat-label">Events Sent</span>
+                            <span class="stat-value" id="eventsSent">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Events/Second</span>
+                            <span class="stat-value" id="eventsPerSecond">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Uptime</span>
+                            <span class="stat-value" id="uptime">00:00:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Supply Chain Disruptions</h3>
+                <div class="disruption-controls">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="disruptionType">Disruption Type</label>
+                            <select id="disruptionType" name="disruptionType">
+                                <option value="dc_outage">DC Outage</option>
+                                <option value="inventory_shortage">Inventory Shortage</option>
+                                <option value="truck_breakdown">Truck Breakdown</option>
+                                <option value="weather_delay">Weather Delay</option>
+                                <option value="supplier_delay">Supplier Delay</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="targetId">Target ID</label>
+                            <input type="number" id="targetId" name="targetId" min="1" placeholder="DC/Store/Truck ID">
+                        </div>
+                        <div class="form-group">
+                            <label for="duration">Duration (minutes)</label>
+                            <input type="number" id="duration" name="duration" min="1" max="1440" value="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="severity">Severity (0.1-1.0)</label>
+                            <input type="number" id="severity" name="severity" min="0.1" max="1.0" step="0.1" value="0.5">
+                        </div>
+                    </div>
+                    <div class="disruption-buttons">
+                        <button class="btn warning" onclick="createDisruption()">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Create Disruption
+                        </button>
+                        <button class="btn secondary" onclick="clearAllDisruptions()">
+                            <i class="fas fa-trash"></i>
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="activeDisruptions" class="disruptions-list">
+                    <div class="disruption-placeholder">No active disruptions</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Recent Events</h3>
+                <div class="event-log" id="eventLog">
+                    <div class="event-placeholder">No events yet. Start streaming to see real-time events.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Tab -->
+        <div id="config" class="tab-content">
+            <div class="section-header">
+                <h2>Configuration</h2>
+                <p>Manage system settings and parameters</p>
+            </div>
+
+            <div class="config-sections">
+                <div class="card">
+                    <h3>Volume Settings</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="stores">Number of Stores</label>
+                            <input type="number" id="stores" name="stores" value="250">
+                        </div>
+                        <div class="form-group">
+                            <label for="dcs">Distribution Centers</label>
+                            <input type="number" id="dcs" name="dcs" value="12">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="totalGeographies">Total Geographies</label>
+                            <input type="number" id="totalGeographies" name="totalGeographies" value="100" min="10" max="1000" step="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="totalCustomers">Total Customers</label>
+                            <input type="number" id="totalCustomers" name="totalCustomers" value="500000" min="1000" max="10000000" step="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="totalProducts">Total Products</label>
+                            <input type="number" id="totalProducts" name="totalProducts" value="10000" min="100" max="100000" step="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="customersPerDay">Customers per Day</label>
+                            <input type="number" id="customersPerDay" name="customersPerDay" value="20000">
+                        </div>
+                        <div class="form-group">
+                            <label for="itemsPerTicket">Items per Ticket (avg)</label>
+                            <input type="number" id="itemsPerTicket" name="itemsPerTicket" step="0.1" value="4.2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Real-time Settings</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="emitInterval">Emit Interval (ms)</label>
+                            <input type="number" id="emitInterval" name="emitInterval" value="500">
+                        </div>
+                        <div class="form-group">
+                            <label for="burstSize">Burst Size</label>
+                            <input type="number" id="burstSize" name="burstSize" value="100">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Azure Event Hub</h3>
+                    <div class="form-group">
+                        <label for="hubName">Hub Name</label>
+                        <input type="text" id="hubName" name="hubName" value="retail-events">
+                    </div>
+                    <div class="form-group">
+                        <label for="connectionString">Connection String</label>
+                        <input type="password" id="connectionString" name="connectionString" placeholder="Enter Azure Event Hub connection string">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Data Management</h3>
+                    <p style="color: #dc3545; font-weight: 500;">
+                        ⚠️ Danger Zone: The button below will permanently delete ALL generated data, including master data, historical data, and generation state. This action cannot be undone.
+                    </p>
+                    <button class="btn danger large" onclick="app.clearAllData()" style="margin-top: 16px;">
+                        <i class="fas fa-trash-alt"></i>
+                        Delete All Data
+                    </button>
+                </div>
+
+                <div class="config-actions">
+                    <button class="btn secondary" onclick="resetConfig()">
+                        <i class="fas fa-undo"></i>
+                        Reset to Defaults
+                    </button>
+                    <button class="btn secondary" onclick="testConfig()">
+                        <i class="fas fa-check-circle"></i>
+                        Test Configuration
+                    </button>
+                    <button class="btn primary" onclick="saveConfig()">
+                        <i class="fas fa-save"></i>
+                        Save Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for table preview -->
+        <div id="previewModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="previewTitle">Table Preview</h3>
+                    <span class="close" onclick="closePreview()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div id="previewContent">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <div class="loading-text">Processing...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js?v=20250911b"></script>
+</body>
+</html>

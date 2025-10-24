@@ -1,0 +1,580 @@
+City,State,Zip,District,Region
+Springfield,IL,62701,Central Illinois,Midwest
+Franklin,TN,37067,Middle Tennessee,Southeast
+Riverside,CA,92501,Inland Empire,West
+Arlington,TX,76001,North Texas,Southwest
+Madison,WI,53701,South Central Wisconsin,Midwest
+Fairfield,CT,06824,Fairfield County,Northeast
+Greenwood,SC,29646,Upstate South Carolina,Southeast
+Lakewood,CO,80226,Jefferson County,West
+Burlington,VT,05401,Chittenden County,Northeast
+Westfield,MA,01085,Pioneer Valley,Northeast
+Clearwater,FL,33755,Pinellas County,Southeast
+Newton,KS,67114,South Central Kansas,Midwest
+Ashland,OR,97520,Rogue Valley,West
+Chester,PA,19013,Delaware County,Northeast
+Richmond,VA,23219,Richmond Metro,Southeast
+Bloomington,IN,47401,South Central Indiana,Midwest
+Fairview,NJ,07022,Bergen County,Northeast
+Hillsboro,OR,97123,Washington County,West
+Georgetown,TX,78626,Williamson County,Southwest
+Lancaster,PA,17601,Lancaster County,Northeast
+Marietta,GA,30060,Cobb County,Southeast
+Plymouth,MN,55441,Hennepin County,Midwest
+Redwood City,CA,94061,San Mateo County,West
+Thornton,CO,80229,Adams County,West
+Bridgeport,CT,06604,Fairfield County,Northeast
+Columbia,SC,29201,Midlands South Carolina,Southeast
+Cedar Rapids,IA,52401,Linn County,Midwest
+Fremont,CA,94536,Alameda County,West
+Aurora,IL,60502,Kane County,Midwest
+Hampton,VA,23663,Hampton Roads,Southeast
+Mansfield,TX,76063,Tarrant County,Southwest
+Valdosta,GA,31601,South Georgia,Southeast
+Watertown,NY,13601,Jefferson County,Northeast
+Brookfield,WI,53005,Waukesha County,Midwest
+Huntsville,AL,35801,North Alabama,Southeast
+Glendale,AZ,85301,Maricopa County,Southwest
+Milford,CT,06460,New Haven County,Northeast
+Rockford,IL,61101,Winnebago County,Midwest
+Salem,OR,97301,Marion County,West
+Bristol,TN,37620,Northeast Tennessee,Southeast
+Concord,NH,03301,Merrimack County,Northeast
+Davenport,IA,52801,Scott County,Midwest
+Pasadena,CA,91101,Los Angeles County,West
+Longmont,CO,80501,Boulder County,West
+Norwalk,CT,06850,Fairfield County,Northeast
+Savannah,GA,31401,Coastal Georgia,Southeast
+Elkhart,IN,46514,Elkhart County,Midwest
+Reno,NV,89501,Washoe County,West
+Baytown,TX,77520,Harris County,Southwest
+Danbury,CT,06810,Fairfield County,Northeast
+Spartanburg,SC,29301,Upstate South Carolina,Southeast
+Kenosha,WI,53140,Kenosha County,Midwest
+Chico,CA,95926,Butte County,West
+Pueblo,CO,81001,Pueblo County,West
+Middletown,CT,06457,Middlesex County,Northeast
+Macon,GA,31201,Central Georgia,Southeast
+Ames,IA,50010,Story County,Midwest
+Stockton,CA,95202,San Joaquin County,West
+Tyler,TX,75701,East Texas,Southwest
+Nashua,NH,03060,Hillsborough County,Northeast
+Augusta,GA,30901,Central Savannah River,Southeast
+Racine,WI,53402,Racine County,Midwest
+Visalia,CA,93291,Tulare County,West
+Fort Collins,CO,80521,Larimer County,West
+Stamford,CT,06901,Fairfield County,Northeast
+Columbus,GA,31901,Muscogee County,Southeast
+Dubuque,IA,52001,Dubuque County,Midwest
+Modesto,CA,95350,Stanislaus County,West
+Lubbock,TX,79401,West Texas,Southwest
+Manchester,NH,03101,Hillsborough County,Northeast
+Albany,GA,31701,Southwest Georgia,Southeast
+La Crosse,WI,54601,La Crosse County,Midwest
+Salinas,CA,93901,Monterey County,West
+Boulder,CO,80301,Boulder County,West
+Hartford,CT,06101,Hartford County,Northeast
+Warner Robins,GA,31093,Central Georgia,Southeast
+Cedar Falls,IA,50613,Black Hawk County,Midwest
+Fresno,CA,93701,Fresno County,West
+Amarillo,TX,79101,Texas Panhandle,Southwest
+Concord,NH,03302,Merrimack County,Northeast
+Valdosta,GA,31602,South Georgia,Southeast
+Waterloo,IA,50701,Black Hawk County,Midwest
+Santa Rosa,CA,95401,Sonoma County,West
+Westminster,CO,80030,Adams County,West
+New Britain,CT,06050,Hartford County,Northeast
+Rome,GA,30161,Northwest Georgia,Southeast
+Mason City,IA,50401,Cerro Gordo County,Midwest
+Antioch,CA,94509,Contra Costa County,West
+Odessa,TX,79761,West Texas,Southwest
+Dover,NH,03820,Strafford County,Northeast
+Gainesville,GA,30501,North Georgia,Southeast
+Sioux City,IA,51101,Woodbury County,Midwest
+Concord,CA,94519,Contra Costa County,West
+Grand Junction,CO,81501,Mesa County,West
+Waterbury,CT,06701,New Haven County,Northeast
+Dalton,GA,30720,Northwest Georgia,Southeast
+Burlington,IA,52601,Des Moines County,Midwest
+Richmond,CA,94801,Contra Costa County,West
+Midland,TX,79701,West Texas,Southwest
+Keene,NH,03431,Cheshire County,Northeast
+Hinesville,GA,31313,Southeast Georgia,Southeast
+Fort Dodge,IA,50501,Webster County,Midwest
+Fairfield,CA,94533,Solano County,West
+Lakewood,CO,80215,Jefferson County,West
+Meriden,CT,06450,New Haven County,Northeast
+LaGrange,GA,30240,West Georgia,Southeast
+Ottumwa,IA,52501,Wapello County,Midwest
+Vallejo,CA,94590,Solano County,West
+Thornton,CO,80241,Adams County,West
+New Haven,CT,06511,New Haven County,Northeast
+Griffin,GA,30223,Central Georgia,Southeast
+Clinton,IA,52732,Clinton County,Midwest
+Petaluma,CA,94952,Sonoma County,West
+Arvada,CO,80001,Jefferson County,West
+Torrington,CT,06790,Litchfield County,Northeast
+Carrollton,GA,30117,West Georgia,Southeast
+Marshalltown,IA,50158,Marshall County,Midwest
+Napa,CA,94558,Napa County,West
+Englewood,CO,80110,Arapahoe County,West
+Shelton,CT,06484,Fairfield County,Northeast
+Douglas,GA,31533,South Georgia,Southeast
+Newton,IA,50208,Jasper County,Midwest
+San Rafael,CA,94901,Marin County,West
+Wheat Ridge,CO,80033,Jefferson County,West
+Ansonia,CT,06401,New Haven County,Northeast
+Statesboro,GA,30458,Southeast Georgia,Southeast
+Indianola,IA,50125,Warren County,Midwest
+Hayward,CA,94541,Alameda County,West
+Broomfield,CO,80020,Broomfield County,West
+Winsted,CT,06098,Litchfield County,Northeast
+Fitzgerald,GA,31750,South Georgia,Southeast
+Spencer,IA,51301,Clay County,Midwest
+Union City,CA,94587,Alameda County,West
+Louisville,CO,80027,Boulder County,West
+Willimantic,CT,06226,Windham County,Northeast
+Tifton,GA,31794,South Georgia,Southeast
+Storm Lake,IA,50588,Buena Vista County,Midwest
+Fremont,CA,94538,Alameda County,West
+Lafayette,CO,80026,Boulder County,West
+Plainville,CT,06062,Hartford County,Northeast
+Thomasville,GA,31792,South Georgia,Southeast
+Cherokee,IA,51012,Cherokee County,Midwest
+Newark,CA,94560,Alameda County,West
+Superior,CO,80027,Boulder County,West
+Seymour,CT,06483,New Haven County,Northeast
+Moultrie,GA,31768,South Georgia,Southeast
+Creston,IA,50801,Union County,Midwest
+Milpitas,CA,95035,Santa Clara County,West
+Northglenn,CO,80233,Adams County,West
+Cromwell,CT,06416,Middlesex County,Northeast
+Cairo,GA,39828,Southwest Georgia,Southeast
+Red Oak,IA,51566,Montgomery County,Midwest
+Mountain View,CA,94041,Santa Clara County,West
+Federal Heights,CO,80260,Adams County,West
+Old Saybrook,CT,06475,Middlesex County,Northeast
+Bainbridge,GA,39819,Southwest Georgia,Southeast
+Harlan,IA,51537,Shelby County,Midwest
+Sunnyvale,CA,94086,Santa Clara County,West
+Sheridan,CO,80110,Arapahoe County,West
+Clinton,CT,06413,Middlesex County,Northeast
+Americus,GA,31709,Southwest Georgia,Southeast
+Atlantic,IA,50022,Cass County,Midwest
+Cupertino,CA,95014,Santa Clara County,West
+Edgewater,CO,80214,Jefferson County,West
+Essex,CT,06426,Middlesex County,Northeast
+Cordele,GA,31015,South Georgia,Southeast
+Audubon,IA,50025,Audubon County,Midwest
+Los Altos,CA,94022,Santa Clara County,West
+Golden,CO,80401,Jefferson County,West
+Deep River,CT,06417,Middlesex County,Northeast
+Jesup,GA,31545,Southeast Georgia,Southeast
+Carroll,IA,51401,Carroll County,Midwest
+Palo Alto,CA,94301,Santa Clara County,West
+Morrison,CO,80465,Jefferson County,West
+East Hampton,CT,06424,Middlesex County,Northeast
+Waycross,GA,31501,Southeast Georgia,Southeast
+Denison,IA,51442,Crawford County,Midwest
+Redwood City,CA,94063,San Mateo County,West
+Lakeside,CO,80212,Jefferson County,West
+Haddam,CT,06438,Middlesex County,Northeast
+Blackshear,GA,31516,Southeast Georgia,Southeast
+Glenwood,IA,51534,Mills County,Midwest
+San Carlos,CA,94070,San Mateo County,West
+Deer Trail,CO,80105,Arapahoe County,West
+Killingworth,CT,06419,Middlesex County,Northeast
+Nahunta,GA,31553,Southeast Georgia,Southeast
+Clarinda,IA,51632,Page County,Midwest
+Belmont,CA,94002,San Mateo County,West
+Bennett,CO,80102,Arapahoe County,West
+East Haddam,CT,06423,Middlesex County,Northeast
+Folkston,GA,31537,Southeast Georgia,Southeast
+Shenandoah,IA,51601,Page County,Midwest
+Foster City,CA,94404,San Mateo County,West
+Bow Mar,CO,80123,Jefferson County,West
+Westbrook,CT,06498,Middlesex County,Northeast
+Homeland,GA,31537,Southeast Georgia,Southeast
+Sidney,IA,51652,Fremont County,Midwest
+San Mateo,CA,94401,San Mateo County,West
+Columbine,CO,80123,Jefferson County,West
+Portland,CT,06480,Middlesex County,Northeast
+Kingsland,GA,31548,Southeast Georgia,Southeast
+Tabor,IA,51653,Fremont County,Midwest
+Burlingame,CA,94010,San Mateo County,West
+Ken Caryl,CO,80127,Jefferson County,West
+Durham,CT,06422,Middlesex County,Northeast
+St. Marys,GA,31558,Southeast Georgia,Southeast
+Randolph,IA,51649,Fremont County,Midwest
+Millbrae,CA,94030,San Mateo County,West
+Littleton,CO,80120,Jefferson County,West
+Chester,CT,06412,Middlesex County,Northeast
+Woodbine,GA,31569,Southeast Georgia,Southeast
+Hamburg,IA,51640,Fremont County,Midwest
+Brisbane,CA,94005,San Mateo County,West
+Centennial,CO,80112,Arapahoe County,West
+Ivoryton,CT,06442,Middlesex County,Northeast
+Brunswick,GA,31520,Southeast Georgia,Southeast
+Farragut,IA,51639,Fremont County,Midwest
+Daly City,CA,94014,San Mateo County,West
+Highlands Ranch,CO,80129,Douglas County,West
+Moodus,CT,06469,Middlesex County,Northeast
+Jekyll Island,GA,31527,Southeast Georgia,Southeast
+Imogene,IA,51645,Fremont County,Midwest
+South San Francisco,CA,94080,San Mateo County,West
+Castle Pines,CO,80108,Douglas County,West
+Cobalt,CT,06414,Middlesex County,Northeast
+Sea Island,GA,31561,Southeast Georgia,Southeast
+Percival,IA,51648,Fremont County,Midwest
+Pacifica,CA,94044,San Mateo County,West
+Castle Rock,CO,80104,Douglas County,West
+East Berlin,CT,06023,Middlesex County,Northeast
+Little St. Simons,GA,31522,Southeast Georgia,Southeast
+Thurman,IA,51654,Fremont County,Midwest
+Half Moon Bay,CA,94019,San Mateo County,West
+Parker,CO,80134,Douglas County,West
+Middlefield,CT,06455,Middlesex County,Northeast
+St. Simons Island,GA,31522,Southeast Georgia,Southeast
+Riverton,IA,51650,Fremont County,Midwest
+El Granada,CA,94018,San Mateo County,West
+Lone Tree,CO,80124,Douglas County,West
+Rockfall,CT,06481,Middlesex County,Northeast
+Butler,GA,31006,Taylor County,Southeast
+Essex,IA,51638,Page County,Midwest
+Montara,CA,94037,San Mateo County,West
+Roxborough,CO,80125,Douglas County,West
+Higganum,CT,06441,Middlesex County,Northeast
+Ideal,GA,31041,Macon County,Southeast
+Blanchard,IA,51630,Page County,Midwest
+Moss Beach,CA,94038,San Mateo County,West
+The Pinery,CO,80126,Douglas County,West
+Middletown,CT,06459,Middlesex County,Northeast
+Oglethorpe,GA,31068,Macon County,Southeast
+Coin,IA,51636,Page County,Midwest
+Princeton,CA,94080,San Mateo County,West
+Stonegate,CO,80121,Douglas County,West
+Centerbrook,CT,06409,Middlesex County,Northeast
+Marshallville,GA,31057,Macon County,Southeast
+Yorktown,IA,51656,Page County,Midwest
+Moss Beach,CA,94039,San Mateo County,West
+Heritage Hills,CO,80124,Douglas County,West
+Westbrook,CT,06499,Middlesex County,Northeast
+Montezuma,GA,31063,Macon County,Southeast
+College Springs,IA,51637,Page County,Midwest
+Pescadero,CA,94060,San Mateo County,West
+Inverness,CO,80112,Douglas County,West
+East Hampton,CT,06425,Middlesex County,Northeast
+Reynolds,GA,31076,Taylor County,Southeast
+Braddyville,IA,51631,Page County,Midwest
+La Honda,CA,94020,San Mateo County,West
+Greenwood Village,CO,80111,Arapahoe County,West
+Hadlyme,CT,06439,Middlesex County,Northeast
+Rupert,GA,31081,Taylor County,Southeast
+Shambaugh,IA,51651,Page County,Midwest
+Loma Mar,CA,94021,San Mateo County,West
+Cherry Hills Village,CO,80113,Arapahoe County,West
+Lyme,CT,06371,New London County,Northeast
+Mauk,GA,31058,Taylor County,Southeast
+Northboro,IA,51647,Page County,Midwest
+Woodside,CA,94062,San Mateo County,West
+Glendale,CO,80246,Arapahoe County,West
+Hamburg,CT,06040,Middlesex County,Northeast
+Junction City,GA,31812,Talbot County,Southeast
+Hopkins,IA,51464,Nodaway County,Midwest
+Atherton,CA,94027,San Mateo County,West
+Bow Mar,CO,80123,Arapahoe County,West
+Haddam Neck,CT,06424,Middlesex County,Northeast
+Talbotton,GA,31827,Talbot County,Southeast
+Gravity,IA,50848,Taylor County,Midwest
+Portola Valley,CA,94028,San Mateo County,West
+Columbine Valley,CO,80123,Arapahoe County,West
+Chester,CT,06411,Middlesex County,Northeast
+Woodland,GA,31836,Talbot County,Southeast
+Sharpsburg,IA,50862,Taylor County,Midwest
+Menlo Park,CA,94025,San Mateo County,West
+Deer Trail,CO,80105,Douglas County,West
+Deep River,CT,06421,Middlesex County,Northeast
+Geneva,GA,31810,Talbot County,Southeast
+Clearfield,IA,50840,Taylor County,Midwest
+East Palo Alto,CA,94303,San Mateo County,West
+Franktown,CO,80116,Douglas County,West
+Durham,CT,06421,Middlesex County,Northeast
+Waverly Hall,GA,31831,Harris County,Southeast
+Lenox,IA,50851,Taylor County,Midwest
+Stanford,CA,94305,Santa Clara County,West
+Sedalia,CO,80135,Douglas County,West
+Centerbrook,CT,06404,Middlesex County,Northeast
+Pine Mountain,GA,31822,Harris County,Southeast
+New Market,IA,51646,Taylor County,Midwest
+Los Altos Hills,CA,94022,Santa Clara County,West
+Larkspur,CO,80118,Douglas County,West
+East Hampton,CT,06424,Middlesex County,Northeast
+Hamilton,GA,31811,Harris County,Southeast
+Bedford,IA,50833,Taylor County,Midwest
+Saratoga,CA,95070,Santa Clara County,West
+Palmer Lake,CO,80133,El Paso County,West
+Ivoryton,CT,06443,Middlesex County,Northeast
+Ellerslie,GA,31807,Harris County,Southeast
+Blockton,IA,50836,Taylor County,Midwest
+Monte Sereno,CA,95030,Santa Clara County,West
+Monument,CO,80132,El Paso County,West
+Westbrook,CT,06498,Middlesex County,Northeast
+Cataula,GA,31804,Harris County,Southeast
+Conway,IA,50839,Taylor County,Midwest
+Campbell,CA,95008,Santa Clara County,West
+Black Forest,CO,80908,El Paso County,West
+Portland,CT,06483,Middlesex County,Northeast
+Fortson,GA,31808,Harris County,Southeast
+Diagonal,IA,50845,Ringgold County,Midwest
+Los Gatos,CA,95030,Santa Clara County,West
+Colorado Springs,CO,80901,El Paso County,West
+Chester,CT,06410,Middlesex County,Northeast
+Midland,GA,31820,Muscogee County,Southeast
+Mount Ayr,IA,50854,Ringgold County,Midwest
+San Jose,CA,95101,Santa Clara County,West
+Fountain,CO,80817,El Paso County,West
+Deep River,CT,06419,Middlesex County,Northeast
+Manchester,GA,31816,Meriwether County,Southeast
+Tingley,IA,50863,Ringgold County,Midwest
+Santa Clara,CA,95050,Santa Clara County,West
+Security,CO,80911,El Paso County,West
+Durham,CT,06418,Middlesex County,Northeast
+Greenville,GA,30222,Meriwether County,Southeast
+Kellerton,IA,50849,Ringgold County,Midwest
+Milpitas,CA,95036,Santa Clara County,West
+Widefield,CO,80911,El Paso County,West
+East Haddam,CT,06421,Middlesex County,Northeast
+Gay,GA,30218,Meriwether County,Southeast
+Redding,IA,50860,Ringgold County,Midwest
+Fremont,CA,94539,Alameda County,West
+Stratmoor Hills,CO,80906,El Paso County,West
+Essex,CT,06427,Middlesex County,Northeast
+Luthersville,GA,30251,Meriwether County,Southeast
+Ellston,IA,50846,Ringgold County,Midwest
+Newark,CA,94561,Alameda County,West
+Cimarron Hills,CO,80915,El Paso County,West
+Haddam,CT,06440,Middlesex County,Northeast
+Woodbury,GA,30293,Meriwether County,Southeast
+Maloy,IA,50853,Ringgold County,Midwest
+Union City,CA,94588,Alameda County,West
+Gleneagle,CO,80921,El Paso County,West
+Higganum,CT,06440,Middlesex County,Northeast
+Warm Springs,GA,31830,Meriwether County,Southeast
+Benton,IA,50835,Ringgold County,Midwest
+Hayward,CA,94542,Alameda County,West
+Air Force Academy,CO,80840,El Paso County,West
+Killingworth,CT,06420,Middlesex County,Northeast
+Lone Oak,GA,31204,Meriwether County,Southeast
+Delphos,IA,50847,Ringgold County,Midwest
+San Leandro,CA,94577,Alameda County,West
+Manitou Springs,CO,80829,El Paso County,West
+Lyme,CT,06371,Middlesex County,Northeast
+Hogansville,GA,30230,Troup County,Southeast
+Arispe,IA,50831,Union County,Midwest
+Castro Valley,CA,94546,Alameda County,West
+Cascade,CO,80809,El Paso County,West
+Old Lyme,CT,06371,Middlesex County,Northeast
+LaGrange,GA,30241,Troup County,Southeast
+Afton,IA,50830,Union County,Midwest
+Dublin,CA,94568,Alameda County,West
+Chipita Park,CO,80809,El Paso County,West
+Old Saybrook,CT,06476,Middlesex County,Northeast
+West Point,GA,31833,Troup County,Southeast
+Thayer,IA,50864,Union County,Midwest
+Pleasanton,CA,94566,Alameda County,West
+Green Mountain Falls,CO,80819,El Paso County,West
+Portland,CT,06481,Middlesex County,Northeast
+Pine Mountain,GA,31823,Troup County,Southeast
+Shannon City,IA,50861,Union County,Midwest
+Livermore,CA,94550,Alameda County,West
+Woodland Park,CO,80863,Teller County,West
+Rockfall,CT,06481,Middlesex County,Northeast
+Lanett,AL,36863,Chambers County,Southeast
+Lorimor,IA,50149,Union County,Midwest
+Danville,CA,94526,Contra Costa County,West
+Victor,CO,80860,Teller County,West
+Westbrook,CT,06497,Middlesex County,Northeast
+Valley,AL,36854,Chambers County,Southeast
+Murray,IA,50174,Clarke County,Midwest
+San Ramon,CA,94582,Contra Costa County,West
+Cripple Creek,CO,80813,Teller County,West
+East Hampton,CT,06423,Middlesex County,Northeast
+Shawmut,AL,36876,Chambers County,Southeast
+Osceola,IA,50213,Clarke County,Midwest
+Walnut Creek,CA,94595,Contra Costa County,West
+Divide,CO,80814,Teller County,West
+Deep River,CT,06420,Middlesex County,Northeast
+LaFayette,AL,36862,Chambers County,Southeast
+Woodburn,IA,50275,Clarke County,Midwest
+Lafayette,CA,94549,Contra Costa County,West
+Florissant,CO,80816,Teller County,West
+Durham,CT,06420,Middlesex County,Northeast
+Cusseta,AL,36852,Chambers County,Midwest
+Truro,IA,50257,Madison County,Midwest
+Orinda,CA,94563,Contra Costa County,West
+Lake George,CO,80827,Park County,West
+Centerbrook,CT,06406,Middlesex County,Northeast
+Dadeville,AL,36853,Tallapoosa County,Southeast
+Winterset,IA,50273,Madison County,Midwest
+Moraga,CA,94556,Contra Costa County,West
+Fairplay,CO,80440,Park County,West
+Essex,CT,06428,Middlesex County,Northeast
+Alexander City,AL,35010,Tallapoosa County,Southeast
+Peru,IA,50222,Madison County,Midwest
+Martinez,CA,94553,Contra Costa County,West
+Alma,CO,80420,Park County,West
+Haddam,CT,06441,Middlesex County,Northeast
+Daviston,AL,36256,Tallapoosa County,Southeast
+Macksburg,IA,50155,Madison County,Midwest
+Benicia,CA,94510,Solano County,West
+Breckenridge,CO,80424,Summit County,West
+Higganum,CT,06441,Middlesex County,Northeast
+Equality,AL,36026,Elmore County,Southeast
+Bevington,IA,50033,Madison County,Midwest
+Vallejo,CA,94591,Solano County,West
+Frisco,CO,80443,Summit County,West
+Killingworth,CT,06421,Middlesex County,Northeast
+Wetumpka,AL,36092,Elmore County,Southeast
+Cumming,IA,50061,Warren County,Midwest
+Fairfield,CA,94534,Solano County,West
+Keystone,CO,80435,Summit County,West
+Lyme,CT,06370,Middlesex County,Northeast
+Millbrook,AL,36054,Elmore County,Southeast
+Hartford,IA,50118,Warren County,Midwest
+Suisun City,CA,94585,Solano County,West
+Silverthorne,CO,80498,Summit County,West
+Old Lyme,CT,06370,Middlesex County,Northeast
+Coosada,AL,36020,Elmore County,Southeast
+Indianola,IA,50126,Warren County,Midwest
+Dixon,CA,95620,Solano County,West
+Dillon,CO,80424,Summit County,West
+Old Saybrook,CT,06477,Middlesex County,Northeast
+Deatsville,AL,36022,Elmore County,Southeast
+Milo,IA,50166,Warren County,Midwest
+Rio Vista,CA,94571,Solano County,West
+Copper Mountain,CO,80443,Summit County,West
+Portland,CT,06482,Middlesex County,Northeast
+Marbury,AL,36051,Autauga County,Southeast
+Sandyville,IA,50252,Warren County,Midwest
+Vacaville,CA,95687,Solano County,West
+Vail,CO,81657,Eagle County,West
+Rockfall,CT,06482,Middlesex County,Northeast
+Prattville,AL,36066,Autauga County,Southeast
+Ackworth,IA,50001,Warren County,Midwest
+American Canyon,CA,94503,Napa County,West
+Avon,CO,81620,Eagle County,West
+Westbrook,CT,06496,Middlesex County,Northeast
+Autaugaville,AL,36003,Autauga County,Southeast
+Carlisle,IA,50047,Warren County,Midwest
+Calistoga,CA,94515,Napa County,West
+Beaver Creek,CO,81620,Eagle County,West
+East Hampton,CT,06422,Middlesex County,Northeast
+Billingsley,AL,36006,Autauga County,Southeast
+Norwalk,IA,50211,Warren County,Midwest
+St. Helena,CA,94574,Napa County,West
+Edwards,CO,81632,Eagle County,West
+Deep River,CT,06421,Middlesex County,Northeast
+Jones,AL,36749,Autauga County,Southeast
+Swan,IA,50252,Marion County,Midwest
+Yountville,CA,94599,Napa County,West
+Eagle,CO,81631,Eagle County,West
+Durham,CT,06421,Middlesex County,Northeast
+Vida,AL,36083,Autauga County,Southeast
+Knoxville,IA,50138,Marion County,Midwest
+Angwin,CA,94508,Napa County,West
+Gypsum,CO,81637,Eagle County,West
+Centerbrook,CT,06407,Middlesex County,Northeast
+Pine Level,AL,36065,Montgomery County,Southeast
+Pleasantville,IA,50225,Marion County,Midwest
+Deer Park,CA,94576,Napa County,West
+Minturn,CO,81645,Eagle County,West
+Essex,CT,06429,Middlesex County,Northeast
+Hope Hull,AL,36043,Montgomery County,Southeast
+Pella,IA,50219,Marion County,Midwest
+Pope Valley,CA,94567,Napa County,West
+Red Cliff,CO,81649,Eagle County,West
+Haddam,CT,06442,Middlesex County,Northeast
+Pike Road,AL,36064,Montgomery County,Southeast
+Bussey,IA,50044,Marion County,Midwest
+Rutherford,CA,94573,Napa County,West
+Glenwood Springs,CO,81601,Garfield County,West
+Higganum,CT,06442,Middlesex County,Northeast
+Mathews,AL,36052,Montgomery County,Southeast
+Tracy,IA,50256,Marion County,Midwest
+Oakville,CA,94562,Napa County,West
+Carbondale,CO,81623,Garfield County,West
+Killingworth,CT,06422,Middlesex County,Northeast
+Cecil,AL,36013,Montgomery County,Southeast
+Columbia,IA,50057,Marion County,Midwest
+Napa,CA,94559,Napa County,West
+New Castle,CO,81647,Garfield County,West
+Lyme,CT,06371,New London County,Northeast
+Shorter,AL,36075,Macon County,Southeast
+Hamilton,IA,50116,Marion County,Midwest
+Browns Valley,CA,95918,Yuba County,West
+Silt,CO,81652,Garfield County,West
+Old Lyme,CT,06371,New London County,Northeast
+Tuskegee,AL,36083,Macon County,Southeast
+Harvey,IA,50119,Marion County,Midwest
+Marysville,CA,95901,Yuba County,West
+Rifle,CO,81650,Garfield County,West
+Old Saybrook,CT,06478,Middlesex County,Northeast
+Tuskegee Institute,AL,36088,Macon County,Southeast
+Otley,IA,50214,Marion County,Midwest
+Wheatland,CA,95692,Yuba County,West
+Parachute,CO,81635,Garfield County,West
+Portland,CT,06484,Middlesex County,Northeast
+Notasulga,AL,36866,Macon County,Southeast
+Swan,IA,50254,Mahaska County,Midwest
+Linda,CA,95901,Yuba County,West
+Battlement Mesa,CO,81635,Garfield County,West
+Rockfall,CT,06484,Middlesex County,Northeast
+Franklin,AL,36444,Macon County,Southeast
+Leighton,IA,50143,Mahaska County,Midwest
+Olivehurst,CA,95961,Yuba County,West
+De Beque,CO,81630,Mesa County,West
+Westbrook,CT,06495,Middlesex County,Northeast
+Auburn,AL,36830,Lee County,Southeast
+Oskaloosa,IA,52577,Mahaska County,Midwest
+Smartsville,CA,95977,Yuba County,West
+Palisade,CO,81526,Mesa County,West
+East Hampton,CT,06421,Middlesex County,Northeast
+Opelika,AL,36801,Lee County,Southeast
+Rose Hill,IA,52586,Mahaska County,Midwest
+Challenge,CA,95925,Yuba County,West
+Clifton,CO,81520,Mesa County,West
+Deep River,CT,06422,Middlesex County,Northeast
+Smiths Station,AL,36877,Lee County,Southeast
+Fremont,IA,52561,Mahaska County,Midwest
+Camptonville,CA,95922,Yuba County,West
+Collbran,CO,81624,Mesa County,West
+Durham,CT,06422,Middlesex County,Northeast
+Salem,AL,36874,Lee County,Southeast
+University Park,IA,52595,Mahaska County,Midwest
+Dobbins,CA,95935,Yuba County,West
+Mesa,CO,81643,Mesa County,West
+Centerbrook,CT,06408,Middlesex County,Northeast
+Phenix City,AL,36867,Russell County,Southeast
+New Sharon,IA,50207,Mahaska County,Midwest
+Forbestown,CA,95941,Yuba County,West
+Molina,CO,81646,Mesa County,West
+Essex,CT,06430,Middlesex County,Northeast
+Ladonia,AL,36854,Russell County,Southeast
+Barnes City,IA,50027,Mahaska County,Midwest
+French Camp,CA,95231,San Joaquin County,West
+Gateway,CO,81522,Mesa County,West
+Haddam,CT,06443,Middlesex County,Northeast
+Seale,AL,36875,Russell County,Southeast
+Eddyville,IA,52553,Mahaska County,Midwest
+Lathrop,CA,95330,San Joaquin County,West
+Loma,CO,81524,Mesa County,West
+Higganum,CT,06443,Middlesex County,Northeast
+Hurtsboro,AL,36860,Russell County,Southeast
+What Cheer,IA,50268,Keokuk County,Midwest
+Manteca,CA,95336,San Joaquin County,West
+Mack,CO,81525,Mesa County,West
+Killingworth,CT,06423,Middlesex County,Northeast
+Cottonton,AL,36851,Russell County,Southeast
+Sigourney,IA,52591,Keokuk County,Midwest
+Tracy,CA,95376,San Joaquin County,West
+Westwater,CO,81527,Mesa County,West
