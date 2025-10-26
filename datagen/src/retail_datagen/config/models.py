@@ -52,6 +52,13 @@ class VolumeConfig(BaseModel):
         description="Average number of online orders per day across the network",
     )
 
+    # Marketing impressions per day (global cap)
+    marketing_impressions_per_day: int = Field(
+        10000,
+        ge=0,
+        description="Approximate cap for daily marketing impressions (for performance)",
+    )
+
     # Inventory configuration parameters
     dc_initial_inventory_min: int = Field(
         500, gt=0, description="Minimum initial inventory per product at DCs"

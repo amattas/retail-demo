@@ -467,6 +467,7 @@ async def reset_config():
                 "customers_per_day": 20000,
                 "items_per_ticket_mean": 4.2,
                 "online_orders_per_day": 2500,
+                "marketing_impressions_per_day": 10000,
             },
             realtime={
                 "emit_interval_ms": 500,

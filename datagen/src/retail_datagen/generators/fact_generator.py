@@ -127,6 +127,9 @@ class FactDataGenerator:
         # Per-table (master-style) progress callback
         self._table_progress_callback: Callable[[str, float, str | None, dict | None], None] | None = None
 
+        # Optional inclusion filter for which fact tables to generate
+        self._included_tables: set[str] | None = None
+
         # Progress throttling for API updates (prevent flooding)
         self._last_progress_update_time = 0.0
         self._progress_lock = Lock()
@@ -232,8 +235,20 @@ class FactDataGenerator:
 
     def _reset_table_states(self) -> None:
         """Reset table states to 'not_started' for all tables."""
-        self._table_states = {table: "not_started" for table in self.FACT_TABLES}
+        self._table_states = {table: "not_started" for table in self._active_fact_tables()}
         self._progress_history = []
+
+    def set_included_tables(self, tables: list[str] | None) -> None:
+        """Restrict generation to a subset of FACT_TABLES, or clear filter if None."""
+        if tables:
+            allow = set(self.FACT_TABLES)
+            self._included_tables = {t for t in tables if t in allow}
+        else:
+            self._included_tables = None
+        self._reset_table_states()
+
+    def _active_fact_tables(self) -> list[str]:
+        return [t for t in self.FACT_TABLES if (self._included_tables is None or t in self._included_tables)]
 
     def _calculate_eta(self, current_progress: float) -> float | None:
         """
@@ -383,41 +398,33 @@ class FactDataGenerator:
         if not self.stores:
             self.load_master_data()
 
-        # Initialize tracking
-        facts_generated = {
-            "dc_inventory_txn": 0,
-            "truck_moves": 0,
-            "truck_inventory": 0,
-            "store_inventory_txn": 0,
-            "receipts": 0,
-            "receipt_lines": 0,
-            "foot_traffic": 0,
-            "ble_pings": 0,
-            "marketing": 0,
-            "supply_chain_disruption": 0,
-            "online_orders": 0,
-        }
+        # Determine active tables
+        active_tables = self._active_fact_tables()
+
+        # Initialize tracking for active tables only
+        facts_generated = {t: 0 for t in active_tables}
 
         # NEW: Add table progress tracking
-        table_progress = {table: 0.0 for table in facts_generated.keys()}
+        table_progress = {table: 0.0 for table in active_tables}
 
         total_days = (end_date - start_date).days + 1
 
         # Calculate expected records per table for accurate progress tracking
         customers_per_day = self.config.volume.customers_per_day
-        expected_records = {
+        expected_records_all = {
             "receipts": total_days * customers_per_day,
-            "receipt_lines": total_days * customers_per_day * 3,  # ~3 items per receipt
-            "foot_traffic": total_days * len(self.stores) * 100,  # ~100 visits per store per day
-            "ble_pings": total_days * len(self.stores) * 500,  # ~500 pings per store per day
-            "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,  # ~50 txns per DC per day
-            "truck_moves": total_days * 10,  # ~10 moves total per day
-            "truck_inventory": total_days * 20,  # ~20 truck inventory events per day
-            "store_inventory_txn": total_days * len(self.stores) * 20,  # ~20 txns per store per day
-            "marketing": total_days * 10,  # ~10 campaigns per day
-            "supply_chain_disruption": total_days * 2,  # ~2 disruptions per day
+            "receipt_lines": total_days * customers_per_day * 3,
+            "foot_traffic": total_days * len(self.stores) * 100,
+            "ble_pings": total_days * len(self.stores) * 500,
+            "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
+            "truck_moves": total_days * 10,
+            "truck_inventory": total_days * 20,
+            "store_inventory_txn": total_days * len(self.stores) * 20,
+            "marketing": total_days * 10,
+            "supply_chain_disruption": total_days * 2,
             "online_orders": total_days * max(0, int(self.config.volume.online_orders_per_day)),
         }
+        expected_records = {k: v for k, v in expected_records_all.items() if k in active_tables}
 
         progress_reporter = ProgressReporter(total_days, "Generating historical data")
         partitions_created = 0
@@ -475,6 +482,30 @@ class FactDataGenerator:
             # SEQUENTIAL PROCESSING: Original loop (fallback)
             while current_date <= end_date:
                 day_counter += 1
+                # Emit hourly incremental (approximate) progress before heavy generation
+                # This mirrors master-style incremental updates for better UX
+                for hour in range(24):
+                    overall_fraction = ((day_counter - 1) + (hour + 1) / 24.0) / max(total_days, 1)
+                    # Build approximate per-table progress map based on overall_fraction
+                    hourly_table_progress = {table: overall_fraction for table in self.FACT_TABLES}
+                    # Update table states and emit per-table progress
+                    self._update_table_states(hourly_table_progress)
+                    for table, prog in hourly_table_progress.items():
+                        self._emit_table_progress(
+                            table,
+                            prog,
+                            f"Generating {current_date.strftime('%Y-%m-%d')} hour {hour+1}/24",
+                            None,
+                        )
+                    # Send throttled overall update (progress only; counts not yet known)
+                    self._send_throttled_progress_update(
+                        day_counter,
+                        f"Generating {current_date.strftime('%Y-%m-%d')} (hour {hour+1}/24)",
+                        total_days,
+                        table_progress=hourly_table_progress,
+                    )
+                    # Small sleep to allow UI pollers to observe progress; does not block event loop
+                    time.sleep(0.02)
 
                 daily_facts = self._generate_daily_facts(current_date)
 
@@ -515,7 +546,7 @@ class FactDataGenerator:
                 enhanced_message = (
                     f"Generating data for {current_date.strftime('%Y-%m-%d')} "
                     f"(day {day_counter}/{total_days}) "
-                    f"({tables_completed_count}/{len(self.FACT_TABLES)} tables complete)"
+                    f"({tables_completed_count}/{len(self._table_states)} tables complete)"
                 )
 
                 # Get table lists for detailed reporting
@@ -532,7 +563,7 @@ class FactDataGenerator:
                     if state == "not_started"
                 ]
 
-                # Update API progress with throttling
+                # Update API progress with throttling, include cumulative counts
                 self._send_throttled_progress_update(
                     day_counter,
                     enhanced_message,
@@ -541,6 +572,7 @@ class FactDataGenerator:
                     tables_completed=tables_completed,
                     tables_in_progress=tables_in_progress,
                     tables_remaining=tables_remaining,
+                    table_counts=facts_generated.copy(),
                 )
 
                 progress_reporter.update(1)
@@ -589,19 +621,8 @@ class FactDataGenerator:
         Returns:
             Dictionary of fact tables with their records
         """
-        daily_facts = {
-            "dc_inventory_txn": [],
-            "truck_moves": [],
-            "truck_inventory": [],
-            "store_inventory_txn": [],
-            "receipts": [],
-            "receipt_lines": [],
-            "foot_traffic": [],
-            "ble_pings": [],
-            "marketing": [],
-            "supply_chain_disruption": [],
-            "online_orders": [],
-        }
+        active_tables = self._active_fact_tables()
+        daily_facts = {t: [] for t in active_tables}
 
         # Update available products for this date
         available_products = self._get_available_products_for_date(date)
@@ -612,91 +633,90 @@ class FactDataGenerator:
         base_multiplier = self.temporal_patterns.get_overall_multiplier(date)
 
         # 1. Generate DC inventory transactions (supplier deliveries)
-        dc_transactions = self._generate_dc_inventory_transactions(
-            date, base_multiplier
-        )
-        daily_facts["dc_inventory_txn"].extend(dc_transactions)
+        if "dc_inventory_txn" in active_tables:
+            dc_transactions = self._generate_dc_inventory_transactions(date, base_multiplier)
+            daily_facts["dc_inventory_txn"].extend(dc_transactions)
 
         # 2. Generate marketing campaigns and impressions
         # Digital marketing runs 24/7 independently of store traffic/hours
         # Use constant multiplier of 1.0 for consistent digital ad delivery
-        marketing_records = self._generate_marketing_activity(date, 1.0)
-        if not marketing_records:
-            logger.debug(
-                f"No marketing records generated for {date.strftime('%Y-%m-%d')}"
-            )
-        else:
-            logger.debug(
-                f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}"
-            )
-        daily_facts["marketing"].extend(marketing_records)
+        if "marketing" in active_tables:
+            marketing_records = self._generate_marketing_activity(date, 1.0)
+            if marketing_records:
+                logger.debug(f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}")
+            daily_facts["marketing"].extend(marketing_records)
 
-        # 3. Generate store operations throughout the day
+        # 3. Generate store operations throughout the day (always generate hourly data)
         hourly_data = self._generate_hourly_store_activity(date, base_multiplier)
 
-        # Aggregate hourly data into daily facts
-        for hour_data in hourly_data:
+        # Export per-hour and aggregate into daily facts
+        for hour_idx, hour_data in enumerate(hourly_data):
+            hourly_subset = {t: (hour_data.get(t, []) if t in active_tables else []) for t in active_tables}
+            try:
+                self._export_hourly_facts(date, hour_idx, hourly_subset)
+            except Exception as e:
+                logger.error(f"Hourly export failed for {date} hour {hour_idx}: {e}")
             for fact_type, records in hour_data.items():
-                daily_facts[fact_type].extend(records)
+                if fact_type in active_tables:
+                    daily_facts[fact_type].extend(records)
 
         # 4. Generate truck movements (based on inventory needs)
-        truck_movements = self._generate_truck_movements(
-            date, daily_facts["store_inventory_txn"]
-        )
-        daily_facts["truck_moves"].extend(truck_movements)
+        if "truck_moves" in active_tables:
+            base_store_txn = daily_facts.get("store_inventory_txn", [])
+            truck_movements = self._generate_truck_movements(date, base_store_txn)
+            daily_facts["truck_moves"].extend(truck_movements)
 
         # 4a. Generate truck inventory tracking events
-        truck_inventory_events = self.inventory_flow_sim.track_truck_inventory_status(
-            date
-        )
-        for event in truck_inventory_events:
-            daily_facts["truck_inventory"].append(
-                {
-                    "TraceId": self._generate_trace_id(),
-                    "EventTS": self._randomize_time_within_day(event["EventTS"]),
-                    "TruckId": event["TruckId"],
-                    "ShipmentId": event["ShipmentId"],
-                    "ProductID": event["ProductID"],
-                    "Quantity": event["Quantity"],
-                    "Action": event["Action"],
-                    "LocationID": event["LocationID"],
-                    "LocationType": event["LocationType"],
-                }
-            )
+        if "truck_inventory" in active_tables:
+            truck_inventory_events = self.inventory_flow_sim.track_truck_inventory_status(date)
+            for event in truck_inventory_events:
+                daily_facts["truck_inventory"].append(
+                    {
+                        "TraceId": self._generate_trace_id(),
+                        "EventTS": self._randomize_time_within_day(event["EventTS"]),
+                        "TruckId": event["TruckId"],
+                        "ShipmentId": event["ShipmentId"],
+                        "ProductID": event["ProductID"],
+                        "Quantity": event["Quantity"],
+                        "Action": event["Action"],
+                        "LocationID": event["LocationID"],
+                        "LocationType": event["LocationType"],
+                    }
+                )
 
         # 5. Update inventory based on truck deliveries
-        delivery_transactions = self._process_truck_deliveries(
-            date, daily_facts["truck_moves"]
-        )
-        daily_facts["store_inventory_txn"].extend(delivery_transactions)
+        if "store_inventory_txn" in active_tables:
+            base_truck_moves = daily_facts.get("truck_moves", [])
+            delivery_transactions = self._process_truck_deliveries(date, base_truck_moves)
+            daily_facts["store_inventory_txn"].extend(delivery_transactions)
 
         # 6. Generate online orders and integrate inventory effects
-        online_orders, online_store_txn, online_dc_txn = self._generate_online_orders(
-            date
-        )
-        daily_facts["online_orders"].extend(online_orders)
-        daily_facts["store_inventory_txn"].extend(online_store_txn)
-        daily_facts["dc_inventory_txn"].extend(online_dc_txn)
+        if "online_orders" in active_tables:
+            online_orders, online_store_txn, online_dc_txn = self._generate_online_orders(date)
+            daily_facts["online_orders"].extend(online_orders)
+            if "store_inventory_txn" in active_tables:
+                daily_facts["store_inventory_txn"].extend(online_store_txn)
+            if "dc_inventory_txn" in active_tables:
+                daily_facts["dc_inventory_txn"].extend(online_dc_txn)
 
         # 7. Generate supply chain disruptions
-        disruption_events = self.inventory_flow_sim.simulate_supply_chain_disruptions(
-            date
-        )
-        for disruption in disruption_events:
-            daily_facts["supply_chain_disruption"].append(
-                {
-                    "TraceId": self._generate_trace_id(),
-                    "EventTS": self._randomize_time_within_day(disruption["EventTS"]),
-                    "DCID": disruption["DCID"],
-                    "Type": disruption["DisruptionType"].value,
-                    "Severity": disruption["Severity"].value,
-                    "Description": disruption["Description"],
-                    "StartTime": disruption["StartTime"],
-                    "EndTime": disruption["EndTime"],
-                    "ImpactPercentage": disruption["ImpactPercentage"],
-                    "AffectedProducts": disruption["AffectedProducts"],
-                }
-            )
+        if "supply_chain_disruption" in active_tables:
+            disruption_events = self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
+            for disruption in disruption_events:
+                daily_facts["supply_chain_disruption"].append(
+                    {
+                        "TraceId": self._generate_trace_id(),
+                        "EventTS": self._randomize_time_within_day(disruption["EventTS"]),
+                        "DCID": disruption["DCID"],
+                        "Type": disruption["DisruptionType"].value,
+                        "Severity": disruption["Severity"].value,
+                        "Description": disruption["Description"],
+                        "StartTime": disruption["StartTime"],
+                        "EndTime": disruption["EndTime"],
+                        "ImpactPercentage": disruption["ImpactPercentage"],
+                        "AffectedProducts": disruption["AffectedProducts"],
+                    }
+                )
 
         return daily_facts
 
@@ -851,10 +871,10 @@ class FactDataGenerator:
             )
             return []
 
-        # DEBUG: Log entry into marketing generation
-        logger.info(f"=== _generate_marketing_activity called for {date} ===")
-        logger.info(f"  Traffic multiplier: {multiplier}")
-        logger.info(f"  Current active campaigns: {len(self._active_campaigns)}")
+        # Lightweight trace (DEBUG to avoid perf impact)
+        logger.debug(
+            f"_generate_marketing_activity: date={date}, mult={multiplier}, active={len(self._active_campaigns)}"
+        )
 
         marketing_records = []
 
@@ -862,12 +882,12 @@ class FactDataGenerator:
         new_campaign_type = self.marketing_campaign_sim.should_start_campaign(
             date, multiplier
         )
-        logger.info(f"  should_start_campaign returned: {new_campaign_type}")
+        logger.debug(f"should_start_campaign returned: {new_campaign_type}")
         if new_campaign_type:
             campaign_id = self.marketing_campaign_sim.start_campaign(
                 new_campaign_type, date
             )
-            logger.info(f"  start_campaign returned: {campaign_id}")
+            logger.debug(f"start_campaign returned: {campaign_id}")
 
             # Validation: Ensure campaign was actually created in simulator
             if campaign_id in self.marketing_campaign_sim._active_campaigns:
@@ -880,20 +900,19 @@ class FactDataGenerator:
                     f"Started new {new_campaign_type} campaign: {campaign_id} "
                     f"(end_date: {campaign_info['end_date']})"
                 )
-                logger.info(
-                    f"  Campaign {campaign_id} added to tracking (total: {len(self._active_campaigns)})"
+                logger.debug(
+                    f"Campaign {campaign_id} added (total: {len(self._active_campaigns)})"
                 )
             else:
                 logger.error(f"Campaign {campaign_id} failed to create in simulator")
-                logger.info(
-                    f"  Simulator active campaigns: {list(self.marketing_campaign_sim._active_campaigns.keys())}"
+                logger.debug(
+                    f"Simulator active campaigns: {list(self.marketing_campaign_sim._active_campaigns.keys())}"
                 )
                 # Critical failure - don't continue processing this day
 
         # Debug: Log state before sync
         logger.debug(
-            f"Campaign tracking state: fact_gen has {len(self._active_campaigns)} "
-            f"campaigns, simulator has {len(self.marketing_campaign_sim._active_campaigns)}"
+            f"Campaigns: fact_gen={len(self._active_campaigns)} sim={len(self.marketing_campaign_sim._active_campaigns)}"
         )
 
         # Sync: Remove orphaned campaigns that exist in tracking but not in simulator
@@ -907,13 +926,16 @@ class FactDataGenerator:
             logger.debug(f"Removing orphaned campaign {campaign_id}")
             del self._active_campaigns[campaign_id]
 
-        logger.debug(
-            f"After sync: {len(self._active_campaigns)} campaigns in fact_gen tracking"
-        )
+        logger.debug(f"After sync: fact_gen campaigns={len(self._active_campaigns)}")
+
+        # Performance guard: cap total impressions/day (scaled by multiplier)
+        base_cap = getattr(self.config.volume, 'marketing_impressions_per_day', 10000) or 10000
+        daily_cap = max(1000, int(base_cap * max(0.5, min(multiplier, 2.0))))
+        emitted = 0
 
         # Generate impressions for active campaigns
         for campaign_id in list(self._active_campaigns.keys()):
-            logger.info(f"  Processing campaign {campaign_id}")
+            logger.debug(f"Processing campaign {campaign_id}")
 
             # Check if campaign has reached its end date
             campaign = self.marketing_campaign_sim._active_campaigns.get(campaign_id)
@@ -927,8 +949,8 @@ class FactDataGenerator:
                 del self._active_campaigns[campaign_id]
                 continue  # Skip this campaign entirely
 
-            logger.info(
-                f"    Campaign: {campaign.get('type', 'unknown')}, end_date: {campaign.get('end_date', 'unknown')}"
+            logger.debug(
+                f"Campaign: {campaign.get('type', 'unknown')} end={campaign.get('end_date', 'unknown')}"
             )
 
             if date > campaign["end_date"]:
@@ -938,17 +960,17 @@ class FactDataGenerator:
                 logger.info(f"    Campaign {campaign_id} DELETED (expired)")
                 continue
 
-            logger.info(
-                f"    Campaign {campaign_id} is active, generating impressions..."
-            )
+            logger.debug(f"Campaign {campaign_id} active, generating impressions...")
 
-            impressions = self.marketing_campaign_sim.generate_campaign_impressions(
-                campaign_id, date, multiplier
-            )
+            try:
+                impressions = self.marketing_campaign_sim.generate_campaign_impressions(
+                    campaign_id, date, multiplier
+                )
+            except Exception as e:
+                logger.error(f"generate_campaign_impressions failed for {campaign_id}: {e}")
+                impressions = []
 
-            logger.info(
-                f"    generate_campaign_impressions returned {len(impressions)} impressions"
-            )
+            logger.debug(f"impressions returned={len(impressions)}")
 
             if not impressions:
                 logger.warning(
@@ -973,13 +995,18 @@ class FactDataGenerator:
                         "Device": impression["Device"].value,
                     }
                 )
+                emitted += 1
+                if emitted >= daily_cap:
+                    logger.warning(
+                        f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                    )
+                    break
 
-            logger.info(
-                f"    Added {len(impressions)} marketing records from campaign {campaign_id}"
-            )
+            if emitted >= daily_cap:
+                break
 
-        logger.info(
-            f"=== _generate_marketing_activity complete: {len(marketing_records)} total records ==="
+        logger.debug(
+            f"_generate_marketing_activity complete: {len(marketing_records)} total"
         )
         return marketing_records
 
@@ -1362,6 +1389,33 @@ class FactDataGenerator:
 
         return partitions_created
 
+    def _export_hourly_facts(
+        self, date: datetime, hour: int, hourly_facts: dict[str, list[dict]]
+    ) -> int:
+        """Export hourly facts to partitioned CSV files.
+
+        Files are written under: facts/<table>/dt=YYYY-MM-DD/hr=HH/
+        """
+        facts_path = Path(self.config.paths.facts)
+        dt_part = f"dt={date.strftime('%Y-%m-%d')}"
+        hr_part = f"hr={hour:02d}"
+        partitions_created = 0
+
+        for fact_table, records in hourly_facts.items():
+            if not records:
+                continue
+
+            partition_path = facts_path / fact_table / dt_part / hr_part
+            partition_path.mkdir(parents=True, exist_ok=True)
+
+            file_path = partition_path / (
+                f"{fact_table}_{date.strftime('%Y%m%d')}_{hour:02d}_{self._rng.randint(1000,9999)}.csv"
+            )
+            DataFrameExporter.export_to_csv(records, file_path)
+            partitions_created += 1
+
+        return partitions_created
+
     def _generate_and_export_day(
         self, date: datetime, day_num: int, total_days: int, report_progress: bool = False
     ) -> tuple[dict[str, int], int]:
@@ -1422,8 +1476,9 @@ class FactDataGenerator:
         # Calculate table progress based on day completion
         progress = day_num / total_days if total_days > 0 else 0.0
 
-        # Create table progress dict (all tables progress together in parallel mode)
-        table_progress = {table: progress for table in self.FACT_TABLES}
+        # Create table progress dict (all active tables progress together in parallel mode)
+        active_tables = self._active_fact_tables()
+        table_progress = {table: progress for table in active_tables}
 
         # Thread-safe: all state updates within lock, then release before calling progress update
         with self._progress_lock:
@@ -1459,7 +1514,7 @@ class FactDataGenerator:
         message = (
             f"Generated data for {date.strftime('%Y-%m-%d')} "
             f"(day {day_num}/{total_days}, "
-            f"{tables_completed_count}/{len(self.FACT_TABLES)} tables complete)"
+            f"{tables_completed_count}/{len(active_tables)} tables complete)"
         )
 
         # Send throttled update OUTSIDE the lock (it will acquire its own lock)
@@ -1483,6 +1538,7 @@ class FactDataGenerator:
         tables_in_progress: list[str] | None = None,
         tables_remaining: list[str] | None = None,
         tables_failed: list[str] | None = None,
+        table_counts: dict[str, int] | None = None,
     ) -> None:
         """
         Send progress update to callback with throttling and ETA calculation.
@@ -1544,7 +1600,7 @@ class FactDataGenerator:
                 "tables_remaining": (tables_remaining or []).copy() if tables_remaining is not None else [],
                 "estimated_seconds_remaining": eta,
                 "progress_rate": progress_rate,
-                "table_counts": None,
+                "table_counts": table_counts,
             }
 
             filtered_kwargs = self._filter_progress_kwargs(callback_kwargs)

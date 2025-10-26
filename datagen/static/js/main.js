@@ -211,6 +211,9 @@ class RetailDataGenerator {
                 if (document.getElementById('onlineOrdersPerDay')) {
                     document.getElementById('onlineOrdersPerDay').value = config.volume.online_orders_per_day || 2500;
                 }
+                if (document.getElementById('marketingImpressionsPerDay')) {
+                    document.getElementById('marketingImpressionsPerDay').value = config.volume.marketing_impressions_per_day || 10000;
+                }
             }
             
             if (config.realtime) {
@@ -639,14 +642,24 @@ class RetailDataGenerator {
                         }
                     }
 
-                    // Process fact tables from cache
+                    // Process fact tables from cache, with on-demand summary fallback for counts
                     for (const table of factTables) {
-                        const count = this.resolveCountValue(cachedData.fact_tables?.[table.name]);
-                        allTables.push({
-                            ...table,
-                            count: count !== null ? count : 0,
-                            status: count !== null ? 'Generated' : 'Not Generated'
-                        });
+                        let count = this.resolveCountValue(cachedData.fact_tables?.[table.name]);
+                        let status = count !== null ? 'Generated' : 'Not Generated';
+                        // Fallback: query summary if cache missing
+                        if (count === null) {
+                            try {
+                                const summaryResp = await fetch(`/api/facts/${table.name}`);
+                                if (summaryResp.ok) {
+                                    const summary = await summaryResp.json();
+                                    count = summary.total_records || 0;
+                                    status = count > 0 ? 'Generated' : 'Not Generated';
+                                }
+                            } catch (e) {
+                                // Ignore, leave as 0
+                            }
+                        }
+                        allTables.push({ ...table, count: count || 0, status });
                     }
                 } else {
                     throw new Error('Cache not available');
@@ -690,17 +703,20 @@ class RetailDataGenerator {
 
                         for (const table of factTables) {
                             if (existingFactTables.includes(table.name)) {
-                                allTables.push({
-                                    ...table,
-                                    count: 'Generated',
-                                    status: 'Generated'
-                                });
+                                // Fetch summary to get actual count
+                                try {
+                                    const summaryResp = await fetch(`/api/facts/${table.name}`);
+                                    if (summaryResp.ok) {
+                                        const summary = await summaryResp.json();
+                                        allTables.push({ ...table, count: summary.total_records || 0, status: (summary.total_records || 0) > 0 ? 'Generated' : 'Not Generated' });
+                                    } else {
+                                        allTables.push({ ...table, count: 0, status: 'Generated' });
+                                    }
+                                } catch (e) {
+                                    allTables.push({ ...table, count: 0, status: 'Generated' });
+                                }
                             } else {
-                                allTables.push({
-                                    ...table,
-                                    count: 0,
-                                    status: 'Not Generated'
-                                });
+                                allTables.push({ ...table, count: 0, status: 'Not Generated' });
                             }
                         }
                     }
@@ -1078,6 +1094,8 @@ class RetailDataGenerator {
             // Create request body - dates are optional now for intelligent date logic
             const requestBody = { parallel: parallel };
 
+            // Always generate all fact tables; switches removed
+
             // Only include dates if manually specified
             if (startDate && endDate) {
                 if (new Date(startDate) > new Date(endDate)) {
@@ -1377,7 +1395,8 @@ class RetailDataGenerator {
                 total_products: parseInt(document.getElementById('totalProducts').value),
                 customers_per_day: parseInt(document.getElementById('customersPerDay').value),
                 items_per_ticket_mean: parseFloat(document.getElementById('itemsPerTicket').value),
-                online_orders_per_day: parseInt(document.getElementById('onlineOrdersPerDay').value)
+                online_orders_per_day: parseInt(document.getElementById('onlineOrdersPerDay').value),
+                marketing_impressions_per_day: parseInt(document.getElementById('marketingImpressionsPerDay').value)
             },
             realtime: {
                 emit_interval_ms: parseInt(document.getElementById('emitInterval').value),
@@ -1455,7 +1474,8 @@ class RetailDataGenerator {
                 total_customers: parseInt(document.getElementById('totalCustomers').value),
                 total_products: parseInt(document.getElementById('totalProducts').value),
                 customers_per_day: parseInt(document.getElementById('customersPerDay').value),
-                items_per_ticket_mean: parseFloat(document.getElementById('itemsPerTicket').value)
+                items_per_ticket_mean: parseFloat(document.getElementById('itemsPerTicket').value),
+                marketing_impressions_per_day: parseInt(document.getElementById('marketingImpressionsPerDay').value)
             },
             realtime: {
                 emit_interval_ms: parseInt(document.getElementById('emitInterval').value),
@@ -1584,7 +1604,25 @@ class RetailDataGenerator {
                 try {
                     const response = await fetch(statusUrl);
                     if (!response.ok) {
-                        console.error('Polling failed:', response.status);
+                        console.error('Polling failed:', response.status, response.statusText, 'url:', statusUrl);
+                        // Fallback for older endpoint if generic task endpoint not found
+                        if (response.status === 404 && statusUrl.includes('/api/tasks/')) {
+                            const operationId = statusUrl.split('/api/tasks/')[1]?.split('/status')[0];
+                            if (operationId) {
+                                const legacyUrl = `/api/generate/historical/status?operation_id=${operationId}`;
+                                console.warn('Retrying poll with legacy endpoint:', legacyUrl);
+                                const legacyResp = await fetch(legacyUrl);
+                                if (legacyResp.ok) {
+                                    const status = await legacyResp.json();
+                                    console.log('[Progress Poll] Legacy Status received:', status);
+                                    // Normalize legacy payload to current shape
+                                    status.progress = status.progress || 0;
+                                    proceedWithStatus(status);
+                                    setTimeout(poll, 500);
+                                    return;
+                                }
+                            }
+                        }
                         setTimeout(poll, 500);
                         return;
                     }
@@ -1592,103 +1630,107 @@ class RetailDataGenerator {
                     const status = await response.json();
                     console.log('[Progress Poll] Status received:', status);
 
-                    // Update progress bar
-                    const progressFill = document.getElementById(progressFillId);
-                    const progressText = document.getElementById(progressTextId);
-                    console.log('[Progress Poll] Elements found:', {
-                        progressFillId,
-                        progressFill: !!progressFill,
-                        progressTextId,
-                        progressText: !!progressText
-                    });
+                    const proceedWithStatus = (statusObj) => {
+                        // Update progress bar
+                        const progressFill = document.getElementById(progressFillId);
+                        const progressText = document.getElementById(progressTextId);
+                        console.log('[Progress Poll] Elements found:', {
+                            progressFillId,
+                            progressFill: !!progressFill,
+                            progressTextId,
+                            progressText: !!progressText
+                        });
 
-                    if (progressFill && progressText) {
-                        const progress = Math.round((status.progress || 0) * 100);
-                        console.log('[Progress Poll] Updating UI - Progress:', progress, 'Message:', status.message);
-                        progressFill.style.width = `${progress}%`;
-                        progressText.textContent = status.message || `${progress}%`;
-                    } else {
-                        console.error('[Progress Poll] Elements not found! Cannot update UI.');
-                    }
+                        if (progressFill && progressText) {
+                            const progress = Math.round((statusObj.progress || 0) * 100);
+                            console.log('[Progress Poll] Updating UI - Progress:', progress, 'Message:', statusObj.message);
+                            progressFill.style.width = `${progress}%`;
+                            progressText.textContent = statusObj.message || `${progress}%`;
+                        } else {
+                            console.error('[Progress Poll] Elements not found! Cannot update UI.');
+                        }
 
-                    // Update per-table status indicators
-                    if (status.table_progress) {
-                        for (const [tableName, tableProgress] of Object.entries(status.table_progress)) {
-                            if (tableProgress >= 1.0) {
-                                this.updateTableStatus(tableName, 'completed');
-                            } else if (tableProgress > 0) {
-                                this.updateTableStatus(tableName, 'processing');
+                        // Update per-table status indicators
+                        if (statusObj.table_progress) {
+                            for (const [tableName, tableProgress] of Object.entries(statusObj.table_progress)) {
+                                if (tableProgress >= 1.0) {
+                                    this.updateTableStatus(tableName, 'completed');
+                                } else if (tableProgress > 0) {
+                                    this.updateTableStatus(tableName, 'processing');
+                                }
                             }
                         }
-                    }
 
-                    if (status.tables_completed) {
-                        status.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
-                    }
+                        if (statusObj.tables_completed) {
+                            statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
+                        }
 
-                    if (status.tables_in_progress) {
-                        status.tables_in_progress.forEach(table => {
-                            const progressValue = status.table_progress?.[table];
-                            if (!progressValue || progressValue < 1.0) {
-                                this.updateTableStatus(table, 'processing');
-                            }
-                        });
-                    }
+                        if (statusObj.tables_in_progress) {
+                            statusObj.tables_in_progress.forEach(table => {
+                                const progressValue = statusObj.table_progress?.[table];
+                                if (!progressValue || progressValue < 1.0) {
+                                    this.updateTableStatus(table, 'processing');
+                                }
+                            });
+                        }
 
-                    if (status.tables_remaining) {
-                        status.tables_remaining.forEach(table => {
-                            if (!status.table_progress || !(table in status.table_progress)) {
-                                this.updateTableStatus(table, null);
-                            }
-                        });
-                    }
+                        if (statusObj.tables_remaining) {
+                            statusObj.tables_remaining.forEach(table => {
+                                if (!statusObj.table_progress || !(table in statusObj.table_progress)) {
+                                    this.updateTableStatus(table, null);
+                                }
+                            });
+                        }
 
-                    // Mark failed tables if any
-                    if (status.status === 'failed' && status.tables_failed) {
-                        status.tables_failed.forEach(table => this.updateTableStatus(table, 'failed'));
-                    }
+                        // Mark failed tables if any
+                        if (statusObj.status === 'failed' && statusObj.tables_failed) {
+                            statusObj.tables_failed.forEach(table => this.updateTableStatus(table, 'failed'));
+                        }
 
-                    if (isHistoricalProgress) {
-                        this.updateHistoricalProgress(status);
-                    } else if (isMasterProgress) {
-                        this.updateMasterProgress(status);
-                    }
-
-                    const tablesToRefresh = new Set();
-                    (status.tables_in_progress || []).forEach(table => tablesToRefresh.add(table));
-                    (status.tables_completed || []).forEach(table => tablesToRefresh.add(table));
-                    if (status.table_progress) {
-                        Object.entries(status.table_progress).forEach(([table, value]) => {
-                            if (value >= 0.99) {
-                                tablesToRefresh.add(table);
-                            }
-                        });
-                    }
-                    tablesToRefresh.forEach(table => this.maybeRefreshTableCount(table));
-
-                    if (status.table_counts) {
-                        Object.entries(status.table_counts).forEach(([table, count]) => {
-                            if (typeof count === 'number') {
-                                const version = this._nextCountVersion();
-                                this.setTableCount(table, count, null, { version });
-                            }
-                        });
-                    }
-
-                    // Check if done
-                    if (status.status === 'completed' || status.status === 'failed') {
                         if (isHistoricalProgress) {
-                            this.hideTableCounter('tableProgressCounter');
-                            this.hideETA('progressETA');
-                            this.clearProgressDetails('historicalProgressDetails');
+                            this.updateHistoricalProgress(statusObj);
                         } else if (isMasterProgress) {
-                            this.hideTableCounter('masterTableProgressCounter');
-                            this.hideETA('masterProgressETA');
-                            this.clearProgressDetails('masterProgressDetails');
+                            this.updateMasterProgress(statusObj);
                         }
-                        resolve(status);
-                        return;
-                    }
+
+                        const tablesToRefresh = new Set();
+                        (statusObj.tables_in_progress || []).forEach(table => tablesToRefresh.add(table));
+                        (statusObj.tables_completed || []).forEach(table => tablesToRefresh.add(table));
+                        if (statusObj.table_progress) {
+                            Object.entries(statusObj.table_progress).forEach(([table, value]) => {
+                                if (value >= 0.99) {
+                                    tablesToRefresh.add(table);
+                                }
+                            });
+                        }
+                        tablesToRefresh.forEach(table => this.maybeRefreshTableCount(table));
+
+                        if (statusObj.table_counts) {
+                            Object.entries(statusObj.table_counts).forEach(([table, count]) => {
+                                if (typeof count === 'number') {
+                                    const version = this._nextCountVersion();
+                                    this.setTableCount(table, count, null, { version });
+                                }
+                            });
+                        }
+
+                        // Check if done
+                        if (statusObj.status === 'completed' || statusObj.status === 'failed') {
+                            if (isHistoricalProgress) {
+                                this.hideTableCounter('tableProgressCounter');
+                                this.hideETA('progressETA');
+                                this.clearProgressDetails('historicalProgressDetails');
+                            } else if (isMasterProgress) {
+                                this.hideTableCounter('masterTableProgressCounter');
+                                this.hideETA('masterProgressETA');
+                                this.clearProgressDetails('masterProgressDetails');
+                            }
+                            resolve(statusObj);
+                            return;
+                        }
+                    };
+
+                    proceedWithStatus(status);
 
                     // Wait before next poll
                     setTimeout(poll, 500);

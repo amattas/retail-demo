@@ -550,11 +550,53 @@ body {
     font-size: 16px;
     position: relative;
     z-index: 1;
-    pointer-events: none; /* keep whole card clickable */
+    /* keep whole card clickable, but allow checkbox next to it to capture clicks */
 }
 
 .table-item:hover .preview-icon {
     color: var(--primary-blue);
+}
+
+/* Toggle switch styling for table generate checkbox */
+.table-item label.toggle {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 8px 0 8px;
+}
+
+.table-item .table-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: #e8ecf1;
+    border: 1px solid var(--border-color);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.table-item .table-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease;
+}
+
+.table-item .table-toggle:checked {
+    background: linear-gradient(120deg, var(--primary-blue), var(--accent-purple));
+    border-color: transparent;
+}
+
+.table-item .table-toggle:checked::after {
+    transform: translateX(16px);
 }
 
 .table-item.table-status-processing i {

@@ -426,7 +426,7 @@ async def generate_historical_data(
         )
         logger.info(f"Using intelligent date range: {start_date} to {end_date}")
 
-    tables_to_generate = request.tables or FACT_TABLES
+    tables_to_generate = FACT_TABLES
 
     # Validate table names
     for table in tables_to_generate:
@@ -473,14 +473,22 @@ async def generate_historical_data(
                         t for t in tables_in_progress if t in FACT_TABLES
                     ]
                 else:
-                    tables_in_progress_override = [
-                        table for table, value in (filtered_table_progress or {}).items() if 0.0 < value < 1.0
-                    ]
-                tables_remaining_override = (
-                    [t for t in (tables_remaining or []) if t in FACT_TABLES]
-                    if tables_remaining is not None
-                    else [table for table, value in (filtered_table_progress or {}).items() if value == 0.0]
-                )
+                    # If we don't yet have progress data, show all requested as in-progress (master-style UX)
+                    if not filtered_table_progress:
+                        tables_in_progress_override = list(tables_to_generate)
+                    else:
+                        tables_in_progress_override = [
+                            table for table, value in filtered_table_progress.items() if 0.0 < value < 1.0
+                        ]
+                if tables_remaining is not None:
+                    tables_remaining_override = [t for t in tables_remaining if t in FACT_TABLES]
+                else:
+                    if not filtered_table_progress:
+                        tables_remaining_override = list(tables_to_generate)
+                    else:
+                        tables_remaining_override = [
+                            table for table, value in filtered_table_progress.items() if value == 0.0
+                        ]
 
                 update_task_progress(
                     task_id,
@@ -572,12 +580,19 @@ async def generate_historical_data(
             except Exception as exc:
                 logger.debug(f"Unable to send initial progress update: {exc}")
 
+            # Ensure generator uses all fact tables (switches removed)
+            try:
+                fact_generator.set_included_tables(None)
+            except Exception:
+                pass
+
             # Generate historical data using the fact generator
+            # For consistent incremental progress (like master), run sequentially
             summary = await asyncio.to_thread(
                 fact_generator.generate_historical_data,
                 start_date,
                 end_date,
-                request.parallel  # ✅ WIRE UP THE CHECKBOX!
+                False  # force sequential for rich incremental progress
             )
 
             # Update generation state with the end timestamp
@@ -976,23 +991,27 @@ async def get_fact_table_summary(
             if partition_dir.is_dir() and partition_dir.name.startswith("dt="):
                 date_part = partition_dir.name[3:]  # Remove "dt=" prefix
 
-                # Look for CSV files in the partition directory
-                # Files are named like {table_name}_{YYYYMMDD}.csv
-                date_suffix = date_part.replace(
-                    "-", ""
-                )  # Convert 2025-08-14 to 20250814
-                csv_file = partition_dir / f"{table_name}_{date_suffix}.csv"
+                partition_records = 0
+                # Sum daily flat file if present
+                date_suffix = date_part.replace("-", "")
+                daily_file = partition_dir / f"{table_name}_{date_suffix}.csv"
+                candidate_files = []
+                if daily_file.exists():
+                    candidate_files.append(daily_file)
+                # Include any hourly files under hr=HH
+                for hr_dir in partition_dir.glob("hr=*"):
+                    if hr_dir.is_dir():
+                        candidate_files.extend(list(hr_dir.glob("*.csv")))
 
-                if csv_file.exists():
-                    partition_records = 0
-                    with open(csv_file, newline="", encoding="utf-8") as csvfile:
+                for csv_path in candidate_files:
+                    with open(csv_path, newline="", encoding="utf-8") as csvfile:
                         reader = csv.DictReader(csvfile)
                         if not columns and reader.fieldnames:
                             columns = reader.fieldnames
-
-                        for row in reader:
+                        for _ in reader:
                             partition_records += 1
 
+                if partition_records > 0:
                     total_records += partition_records
                     partitions.append({"date": date_part, "records": partition_records})
 
@@ -1116,18 +1135,24 @@ async def preview_fact_table(
         )
 
     date_suffix = date.replace("-", "")  # Convert 2025-08-14 to 20250814
-    file_path = (
-        Path(config.paths.facts)
-        / table_name
-        / f"dt={date}"
-        / f"{table_name}_{date_suffix}.csv"
-    )
+    base_dir = Path(config.paths.facts) / table_name / f"dt={date}"
+    if not base_dir.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Date partition dt={date} not found for {table_name}")
 
-    if not file_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Table {table_name} for date {date} not found. Generate it first.",
-        )
+    # Prefer latest hourly file; fallback to daily flat file
+    candidate = None
+    hourly_dirs = sorted((p for p in base_dir.glob("hr=*")), key=lambda p: p.name, reverse=True)
+    for hr in hourly_dirs:
+        files = sorted(hr.glob("*.csv"), reverse=True)
+        if files:
+            candidate = files[0]
+            break
+    if candidate is None:
+        daily_file = base_dir / f"{table_name}_{date_suffix}.csv"
+        if daily_file.exists():
+            candidate = daily_file
+    if candidate is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No files found for {table_name} on {date}")
 
     try:
         preview_rows = []

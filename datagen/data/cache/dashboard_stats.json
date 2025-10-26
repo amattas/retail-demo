@@ -4,39 +4,88 @@
       "table_name": "geographies_master",
       "count": 100,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.504705"
+      "last_updated": "2025-10-24T18:53:06.838935"
     },
     "stores": {
       "table_name": "stores",
       "count": 214,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.650895"
+      "last_updated": "2025-10-24T18:53:06.914564"
     },
     "distribution_centers": {
       "table_name": "distribution_centers",
       "count": 8,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.804918"
+      "last_updated": "2025-10-24T18:53:06.935267"
     },
     "trucks": {
       "table_name": "trucks",
       "count": 50,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.806587"
+      "last_updated": "2025-10-24T18:53:06.952206"
     },
     "customers": {
       "table_name": "customers",
       "count": 500000,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.815514"
+      "last_updated": "2025-10-24T18:53:06.966649"
     },
     "products_master": {
       "table_name": "products_master",
       "count": 10000,
       "table_type": "Master Data",
-      "last_updated": "2025-10-24T16:49:12.818927"
+      "last_updated": "2025-10-24T18:53:06.969907"
     }
   },
-  "fact_tables": {},
-  "last_updated": "2025-10-24T16:49:12.818929"
+  "fact_tables": {
+    "dc_inventory_txn": {
+      "table_name": "dc_inventory_txn",
+      "count": 92774,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:37.925123"
+    },
+    "truck_moves": {
+      "table_name": "truck_moves",
+      "count": 642,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:37.925604"
+    },
+    "store_inventory_txn": {
+      "table_name": "store_inventory_txn",
+      "count": 28136547,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:39.376795"
+    },
+    "receipts": {
+      "table_name": "receipts",
+      "count": 2281668,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:39.515234"
+    },
+    "receipt_lines": {
+      "table_name": "receipt_lines",
+      "count": 27776013,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:41.109713"
+    },
+    "foot_traffic": {
+      "table_name": "foot_traffic",
+      "count": 2729784,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:41.257244"
+    },
+    "ble_pings": {
+      "table_name": "ble_pings",
+      "count": 23959587,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:42.604205"
+    },
+    "online_orders": {
+      "table_name": "online_orders",
+      "count": 21000,
+      "table_type": "Historical Data",
+      "last_updated": "2025-10-24T21:14:42.606207"
+    }
+  },
+  "last_updated": "2025-10-24T21:14:42.606209"
 }
