@@ -58,7 +58,19 @@ MASTER_TABLES = [
 
 # Mapping of table names to SQLAlchemy models
 from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
+from ..db.models.facts import (
+    DCInventoryTransaction,
+    TruckMove,
+    StoreInventoryTransaction,
+    Receipt,
+    ReceiptLine,
+    FootTraffic,
+    BLEPing,
+    MarketingImpression,
+    OnlineOrder,
+)
 
+# Master table models
 MASTER_TABLE_MODELS = {
     "geographies_master": Geography,
     "stores": Store,
@@ -67,6 +79,22 @@ MASTER_TABLE_MODELS = {
     "customers": Customer,
     "products_master": Product,
 }
+
+# Fact table models
+FACT_TABLE_MODELS = {
+    "dc_inventory_txn": DCInventoryTransaction,
+    "truck_moves": TruckMove,
+    "store_inventory_txn": StoreInventoryTransaction,
+    "receipts": Receipt,
+    "receipt_lines": ReceiptLine,
+    "foot_traffic": FootTraffic,
+    "ble_pings": BLEPing,
+    "marketing": MarketingImpression,
+    "online_orders": OnlineOrder,
+}
+
+# Unified mapping of all tables
+ALL_TABLE_MODELS = {**MASTER_TABLE_MODELS, **FACT_TABLE_MODELS}
 
 FACT_TABLES = [
     "dc_inventory_txn",
@@ -917,10 +945,140 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
     return TableListResponse(tables=generated_tables, count=len(generated_tables))
 
 
+# ================================
+# UNIFIED DATA ENDPOINTS
+# ================================
+
+
+@router.get(
+    "/data/{table_name}/summary",
+    summary="Get table summary",
+    description="Get record counts and metadata for any table (master or fact)",
+)
+async def get_table_summary(table_name: str):
+    """Get summary information for any table from SQLite database."""
+
+    # Check if table exists in our models
+    model = ALL_TABLE_MODELS.get(table_name)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Table {table_name} not found.",
+        )
+
+    # Determine which session to use
+    is_master = table_name in MASTER_TABLE_MODELS
+
+    try:
+        from sqlalchemy import select, func, inspect
+        from ..db.session import get_master_session, get_fact_session
+
+        session_manager = get_master_session if is_master else get_fact_session
+
+        async with session_manager() as session:
+            # Get row count
+            result = await session.execute(select(func.count()).select_from(model))
+            total_records = result.scalar() or 0
+
+            # Get column names from the model
+            inspector = inspect(model)
+            columns = [col.key for col in inspector.columns]
+
+            return {
+                "table_name": table_name,
+                "total_records": total_records,
+                "columns": columns,
+                "table_type": "master" if is_master else "fact",
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to read table {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read table {table_name}: {str(e)}",
+        )
+
+
+@router.get(
+    "/data/{table_name}",
+    response_model=TablePreviewResponse,
+    summary="Preview table data",
+    description="Get a preview of any table (master or fact)",
+)
+async def preview_table(
+    table_name: str,
+    limit: int = Query(100, ge=1, le=1000, description="Number of rows to return"),
+):
+    """Preview any table from SQLite database."""
+
+    # Check if table exists in our models
+    model = ALL_TABLE_MODELS.get(table_name)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Table {table_name} not found.",
+        )
+
+    # Determine which session to use
+    is_master = table_name in MASTER_TABLE_MODELS
+
+    try:
+        from sqlalchemy import select, func, inspect
+        from ..db.session import get_master_session, get_fact_session
+
+        session_manager = get_master_session if is_master else get_fact_session
+
+        async with session_manager() as session:
+            # Get total row count
+            count_result = await session.execute(select(func.count()).select_from(model))
+            total_rows = count_result.scalar() or 0
+
+            # Get preview rows
+            result = await session.execute(select(model).limit(limit))
+            rows = result.scalars().all()
+
+            # Get column names from the model
+            inspector = inspect(model)
+            columns = [col.key for col in inspector.columns]
+
+            # Convert SQLAlchemy objects to dicts
+            preview_rows = []
+            for row in rows:
+                row_dict = {}
+                for col in columns:
+                    value = getattr(row, col, None)
+                    # Convert datetime and other types to string for JSON serialization
+                    if value is not None:
+                        row_dict[col] = str(value) if not isinstance(value, (str, int, float, bool)) else value
+                    else:
+                        row_dict[col] = None
+                preview_rows.append(row_dict)
+
+            return TablePreviewResponse(
+                table_name=table_name,
+                columns=columns,
+                row_count=total_rows,
+                preview_rows=preview_rows,
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to read table {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read table {table_name}: {str(e)}",
+        )
+
+
+# ================================
+# LEGACY ENDPOINTS (Deprecated - use /data/{table_name} instead)
+# ================================
+
+
 @router.get(
     "/master/{table_name}/summary",
     summary="Get master table summary",
     description="Get record counts and metadata for a master table",
+    deprecated=True,
 )
 async def get_master_table_summary(
     table_name: str, config: RetailConfig = Depends(get_config)
@@ -969,6 +1127,7 @@ async def get_master_table_summary(
     response_model=TablePreviewResponse,
     summary="Preview master data table",
     description="Get a preview of a master data table (first 100 rows)",
+    deprecated=True,
 )
 async def preview_master_table(
     table_name: str,
@@ -1036,6 +1195,7 @@ async def preview_master_table(
     "/facts/{table_name}",
     summary="Get fact table summary",
     description="Get record counts and metadata for a fact table across all partitions",
+    deprecated=True,
 )
 async def get_fact_table_summary(
     table_name: str, config: RetailConfig = Depends(get_config)
@@ -1108,6 +1268,7 @@ async def get_fact_table_summary(
     "/facts/{table_name}/recent",
     summary="Get recent fact table data summary",
     description="Get a summary of recent fact table data (most recent partition)",
+    deprecated=True,
 )
 async def get_recent_fact_data(
     table_name: str,
@@ -1185,6 +1346,7 @@ async def get_recent_fact_data(
     response_model=TablePreviewResponse,
     summary="Preview fact table for date",
     description="Get a preview of a fact table for a specific date",
+    deprecated=True,
 )
 async def preview_fact_table(
     table_name: str,
