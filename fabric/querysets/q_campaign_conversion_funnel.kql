@@ -1,0 +1,13 @@
+// Illustrative funnel: ad impressions joined to receipts on trace_id within 24h
+let window = 24h;
+ad_impression
+| where ingest_timestamp > ago(window)
+| summarize impressions = count() by campaign_id
+| join kind=leftouter (
+    receipt_created
+    | where ingest_timestamp > ago(window)
+    | summarize conversions = count(), revenue = sum(total) by campaign_id // requires same trace or enrichment
+  ) on campaign_id
+| extend conversion_rate = toreal(conversions) / toreal(impressions)
+| order by revenue desc
+

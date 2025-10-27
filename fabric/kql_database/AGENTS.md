@@ -19,6 +19,10 @@ Spec for KQL database objects fed by Eventstream.
 - `ad_impression`: channel:string, campaign_id:string, creative_id:string, customer_ad_id:string, impression_id:string, cost:real, device_type:string
 - `promotion_applied`: receipt_id:string, promo_code:string, discount_amount:real, discount_type:string, product_ids:dynamic
 
+- `online_order_created`: order_id:string, customer_id:int, fulfillment_mode:string, node_type:string, node_id:int, item_count:int, subtotal:real, tax:real, total:real, tender_type:string
+- `online_order_picked`: order_id:string, node_type:string, node_id:int, fulfillment_mode:string, picked_time:datetime
+- `online_order_shipped`: order_id:string, node_type:string, node_id:int, fulfillment_mode:string, shipped_time:datetime
+
 All tables include standard envelope columns: `event_type:string, trace_id:string, ingest_timestamp:datetime, source:string, correlation_id:string, partition_key:string, session_id:string, parent_event_id:string`.
 
 ## Policies
@@ -37,4 +41,3 @@ All tables include standard envelope columns: `event_type:string, trace_id:strin
 - Tables created and ingest mappings validated from Eventstream
 - Primary materialized views online and up-to-date
 - Querysets runnable with <2s response for key dashboards
-

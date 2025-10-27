@@ -1689,6 +1689,7 @@ class RetailDataGenerator {
 
                         if (isHistoricalProgress) {
                             this.updateHistoricalProgress(statusObj);
+                            this.updateHourlyProgress(statusObj);
                         } else if (isMasterProgress) {
                             this.updateMasterProgress(statusObj);
                         }
@@ -1720,6 +1721,7 @@ class RetailDataGenerator {
                                 this.hideTableCounter('tableProgressCounter');
                                 this.hideETA('progressETA');
                                 this.clearProgressDetails('historicalProgressDetails');
+                                this.hideHourlyProgress();
                             } else if (isMasterProgress) {
                                 this.hideTableCounter('masterTableProgressCounter');
                                 this.hideETA('masterProgressETA');
@@ -1821,6 +1823,59 @@ class RetailDataGenerator {
         detailsElement.innerHTML = sections.join('<br>');
     }
 
+    updateHourlyProgress(status) {
+        // Display current day and hour
+        if (status.current_day !== undefined && status.current_hour !== undefined) {
+            const hourDisplay = document.getElementById('currentHourDisplay');
+            if (hourDisplay) {
+                hourDisplay.textContent = `Day ${status.current_day}, Hour ${status.current_hour + 1}/24`;
+                hourDisplay.style.display = 'block';
+            }
+        }
+
+        // Display total hours completed
+        if (status.total_hours_completed !== undefined) {
+            const hoursDisplay = document.getElementById('totalHoursDisplay');
+            if (hoursDisplay) {
+                hoursDisplay.textContent = `${status.total_hours_completed} hours completed`;
+                hoursDisplay.style.display = 'block';
+            }
+        }
+
+        // Display per-table hourly progress
+        if (status.hourly_progress && Object.keys(status.hourly_progress).length > 0) {
+            const tableProgressContainer = document.getElementById('tableProgressContainer');
+            if (tableProgressContainer) {
+                let html = '<div class="table-progress-list">';
+                for (const [table, progress] of Object.entries(status.hourly_progress)) {
+                    const percentage = (progress * 100).toFixed(1);
+                    html += `
+                        <div class="table-progress-item">
+                            <span class="table-name">${this.formatTableName(table)}</span>
+                            <div class="table-progress-bar-container">
+                                <div class="table-progress-bar" style="width: ${percentage}%"></div>
+                            </div>
+                            <span class="table-percentage">${percentage}%</span>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                tableProgressContainer.innerHTML = html;
+                tableProgressContainer.style.display = 'block';
+            }
+        }
+    }
+
+    hideHourlyProgress() {
+        const hourDisplay = document.getElementById('currentHourDisplay');
+        const hoursDisplay = document.getElementById('totalHoursDisplay');
+        const tableProgressContainer = document.getElementById('tableProgressContainer');
+
+        if (hourDisplay) hourDisplay.style.display = 'none';
+        if (hoursDisplay) hoursDisplay.style.display = 'none';
+        if (tableProgressContainer) tableProgressContainer.style.display = 'none';
+    }
+
     clearProgressDetails(detailsId) {
         const detailsElement = document.getElementById(detailsId);
         if (detailsElement) {
@@ -1869,6 +1924,7 @@ class RetailDataGenerator {
             this.hideTableCounter('tableProgressCounter');
             this.hideETA('progressETA');
             this.clearProgressDetails('historicalProgressDetails');
+            this.hideHourlyProgress();
         } else {
             this.hideTableCounter();
             this.hideETA();
@@ -1887,6 +1943,7 @@ class RetailDataGenerator {
             this.hideTableCounter('tableProgressCounter');
             this.hideETA('progressETA');
             this.clearProgressDetails('historicalProgressDetails');
+            this.hideHourlyProgress();
         } else {
             this.hideTableCounter();
             this.hideETA();

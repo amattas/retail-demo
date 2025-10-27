@@ -9,6 +9,7 @@ business logic coordination, and partitioned output.
 import inspect
 import logging
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -42,6 +43,178 @@ from .retail_patterns import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class HourlyProgressTracker:
+    """
+    Thread-safe tracker for hourly progress across fact tables.
+
+    Tracks progress on a per-table, per-day, per-hour basis to enable fine-grained
+    progress reporting during historical data generation. Designed to work in both
+    sequential and parallel processing modes.
+
+    Thread-safety is achieved using a threading.Lock to protect all shared state.
+    """
+
+    def __init__(self, fact_tables: list[str]):
+        """
+        Initialize the hourly progress tracker.
+
+        Args:
+            fact_tables: List of fact table names to track
+        """
+        self._fact_tables = fact_tables
+        self._lock = Lock()
+
+        # Track completed hours per table: {table: {day: {hour: True}}}
+        self._progress_data: dict[str, dict[int, dict[int, bool]]] = {}
+
+        # Track current position for each table
+        self._current_day: dict[str, int] = {}
+        self._current_hour: dict[str, int] = {}
+
+        # Total days for progress calculation
+        self._total_days = 0
+
+        # Initialize tracking structures
+        for table in fact_tables:
+            self._progress_data[table] = {}
+            self._current_day[table] = 0
+            self._current_hour[table] = 0
+
+        logger.debug(f"HourlyProgressTracker initialized for {len(fact_tables)} tables")
+
+    def update_hourly_progress(self, table: str, day: int, hour: int, total_days: int) -> None:
+        """
+        Update progress for a specific table after completing an hour.
+
+        This method is thread-safe and can be called from parallel workers.
+
+        Args:
+            table: Name of the fact table
+            day: Day number (1-indexed)
+            hour: Hour of day (0-23)
+            total_days: Total number of days being generated
+        """
+        with self._lock:
+            # Validate inputs
+            if table not in self._fact_tables:
+                logger.warning(f"Attempted to update progress for unknown table: {table}")
+                return
+
+            if not (0 <= hour <= 23):
+                logger.warning(f"Invalid hour value: {hour} (must be 0-23)")
+                return
+
+            # Update total days if changed
+            self._total_days = total_days
+
+            # Initialize day structure if needed
+            if day not in self._progress_data[table]:
+                self._progress_data[table][day] = {}
+
+            # Mark hour as completed
+            self._progress_data[table][day][hour] = True
+
+            # Update current position
+            self._current_day[table] = day
+            self._current_hour[table] = hour
+
+            logger.debug(
+                f"Progress updated: {table} day {day} hour {hour} "
+                f"({self._count_completed_hours(table)}/({total_days}*24) hours)"
+            )
+
+    def get_current_progress(self) -> dict:
+        """
+        Get current progress state for all tables.
+
+        Returns:
+            Dictionary containing:
+            - overall_progress: float (0.0 to 1.0) - aggregate progress across all tables
+            - tables_in_progress: list[str] - tables currently being processed
+            - current_day: int - most recent day being processed
+            - current_hour: int - most recent hour being processed
+            - per_table_progress: dict[str, float] - progress for each table (0.0 to 1.0)
+            - completed_hours: dict[str, int] - number of completed hours per table
+        """
+        with self._lock:
+            # Calculate per-table progress
+            per_table_progress = {}
+            completed_hours_map = {}
+            tables_in_progress = []
+
+            total_hours_expected = self._total_days * 24 if self._total_days > 0 else 1
+
+            for table in self._fact_tables:
+                completed_hours = self._count_completed_hours(table)
+                completed_hours_map[table] = completed_hours
+
+                # Calculate progress as fraction of total hours
+                progress = completed_hours / total_hours_expected if total_hours_expected > 0 else 0.0
+                per_table_progress[table] = min(1.0, progress)
+
+                # Table is in progress if it has completed some hours but not all
+                if 0 < progress < 1.0:
+                    tables_in_progress.append(table)
+
+            # Calculate overall progress as average across all tables
+            overall_progress = sum(per_table_progress.values()) / len(self._fact_tables) if self._fact_tables else 0.0
+
+            # Find the most advanced position across all tables
+            max_day = max(self._current_day.values()) if self._current_day else 0
+            max_hour = max(self._current_hour.values()) if self._current_hour else 0
+
+            return {
+                "overall_progress": min(1.0, overall_progress),
+                "tables_in_progress": sorted(tables_in_progress),
+                "current_day": max_day,
+                "current_hour": max_hour,
+                "per_table_progress": per_table_progress,
+                "completed_hours": completed_hours_map,
+                "total_days": self._total_days,
+            }
+
+    def reset(self) -> None:
+        """
+        Reset all tracking state.
+
+        Called when starting a new generation run.
+        """
+        with self._lock:
+            self._progress_data = {}
+            self._current_day = {}
+            self._current_hour = {}
+            self._total_days = 0
+
+            # Reinitialize structures for each table
+            for table in self._fact_tables:
+                self._progress_data[table] = {}
+                self._current_day[table] = 0
+                self._current_hour[table] = 0
+
+            logger.debug("HourlyProgressTracker reset")
+
+    def _count_completed_hours(self, table: str) -> int:
+        """
+        Count total completed hours for a table.
+
+        Must be called with lock held.
+
+        Args:
+            table: Table name
+
+        Returns:
+            Total number of completed hours
+        """
+        if table not in self._progress_data:
+            return 0
+
+        total = 0
+        for day_hours in self._progress_data[table].values():
+            total += len(day_hours)
+
+        return total
 
 
 @dataclass
@@ -138,6 +311,10 @@ class FactDataGenerator:
         # Table state tracking for enhanced progress reporting
         self._table_states: dict[str, str] = {}
         self._reset_table_states()
+
+        # Initialize hourly progress tracker for granular progress reporting
+        self.hourly_tracker = HourlyProgressTracker(self.FACT_TABLES)
+        logger.info("Initialized HourlyProgressTracker for progress reporting")
 
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
@@ -394,6 +571,9 @@ class FactDataGenerator:
         # Reset table states for new generation run
         self._reset_table_states()
 
+        # Reset hourly progress tracker for new generation run
+        self.hourly_tracker.reset()
+
         # Ensure master data is loaded
         if not self.stores:
             self.load_master_data()
@@ -482,32 +662,9 @@ class FactDataGenerator:
             # SEQUENTIAL PROCESSING: Original loop (fallback)
             while current_date <= end_date:
                 day_counter += 1
-                # Emit hourly incremental (approximate) progress before heavy generation
-                # This mirrors master-style incremental updates for better UX
-                for hour in range(24):
-                    overall_fraction = ((day_counter - 1) + (hour + 1) / 24.0) / max(total_days, 1)
-                    # Build approximate per-table progress map based on overall_fraction
-                    hourly_table_progress = {table: overall_fraction for table in self.FACT_TABLES}
-                    # Update table states and emit per-table progress
-                    self._update_table_states(hourly_table_progress)
-                    for table, prog in hourly_table_progress.items():
-                        self._emit_table_progress(
-                            table,
-                            prog,
-                            f"Generating {current_date.strftime('%Y-%m-%d')} hour {hour+1}/24",
-                            None,
-                        )
-                    # Send throttled overall update (progress only; counts not yet known)
-                    self._send_throttled_progress_update(
-                        day_counter,
-                        f"Generating {current_date.strftime('%Y-%m-%d')} (hour {hour+1}/24)",
-                        total_days,
-                        table_progress=hourly_table_progress,
-                    )
-                    # Small sleep to allow UI pollers to observe progress; does not block event loop
-                    time.sleep(0.02)
 
-                daily_facts = self._generate_daily_facts(current_date)
+                # Generate daily facts (progress updates now happen during actual generation)
+                daily_facts = self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
 
                 # Export daily facts to partitioned files
                 partition_count = self._export_daily_facts(current_date, daily_facts)
@@ -611,17 +768,30 @@ class FactDataGenerator:
 
         return summary
 
-    def _generate_daily_facts(self, date: datetime) -> dict[str, list[dict]]:
+    def _generate_daily_facts(
+        self,
+        date: datetime,
+        active_tables: list[str],
+        day_index: int,
+        total_days: int
+    ) -> dict[str, list[dict]]:
         """
         Generate all fact data for a single day.
 
+        This method works in both sequential and parallel modes. In parallel mode,
+        multiple worker threads call this method simultaneously for different days.
+        Hourly progress updates are sent after each hour's data is exported, with
+        thread-safe locking to prevent race conditions.
+
         Args:
             date: Date to generate facts for
+            active_tables: List of fact tables to generate
+            day_index: Current day number (1-indexed)
+            total_days: Total number of days being generated
 
         Returns:
             Dictionary of fact tables with their records
         """
-        active_tables = self._active_fact_tables()
         daily_facts = {t: [] for t in active_tables}
 
         # Update available products for this date
@@ -646,6 +816,15 @@ class FactDataGenerator:
                 logger.debug(f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}")
             daily_facts["marketing"].extend(marketing_records)
 
+            # NEW: Update marketing progress (treated as completing all 24 hours at once)
+            for hour in range(24):
+                self.hourly_tracker.update_hourly_progress(
+                    table="marketing",
+                    day=day_index,
+                    hour=hour,
+                    total_days=total_days
+                )
+
         # 3. Generate store operations throughout the day (always generate hourly data)
         hourly_data = self._generate_hourly_store_activity(date, base_multiplier)
 
@@ -654,6 +833,38 @@ class FactDataGenerator:
             hourly_subset = {t: (hour_data.get(t, []) if t in active_tables else []) for t in active_tables}
             try:
                 self._export_hourly_facts(date, hour_idx, hourly_subset)
+
+                # NEW: Update hourly progress tracker after successful export
+                for table in active_tables:
+                    if table != "marketing":  # Marketing is daily, not hourly
+                        self.hourly_tracker.update_hourly_progress(
+                            table=table,
+                            day=day_index,
+                            hour=hour_idx,
+                            total_days=total_days
+                        )
+
+                # NEW: Send progress update after hourly exports complete (throttled)
+                if self._progress_callback:
+                    progress_data = self.hourly_tracker.get_current_progress()
+                    # Convert to table progress dict format expected by throttled update
+                    table_progress = progress_data.get('per_table_progress', {})
+
+                    # Log thread info for parallel mode debugging
+                    thread_name = threading.current_thread().name
+                    logger.debug(
+                        f"[{thread_name}] Sending hourly progress: day {day_index}/{total_days}, "
+                        f"hour {hour_idx + 1}/24"
+                    )
+
+                    # Send throttled progress update with hourly detail
+                    self._send_throttled_progress_update(
+                        day_counter=day_index,
+                        message=f"Generating {date.strftime('%Y-%m-%d')} (day {day_index}/{total_days}, hour {hour_idx + 1}/24)",
+                        total_days=total_days,
+                        table_progress=table_progress,
+                        tables_in_progress=progress_data.get('tables_in_progress', [])
+                    )
             except Exception as e:
                 logger.error(f"Hourly export failed for {date} hour {hour_idx}: {e}")
             for fact_type, records in hour_data.items():
@@ -1425,6 +1636,10 @@ class FactDataGenerator:
         This method is called by parallel threads. Thread-safe as each day
         writes to separate partition directories.
 
+        In parallel mode, this method enables hourly progress reporting from worker threads.
+        The hourly progress updates are sent from within _generate_daily_facts and are
+        thread-safe thanks to the _progress_lock protecting shared state.
+
         Args:
             date: Date to generate data for
             day_num: Day number (for logging)
@@ -1434,8 +1649,11 @@ class FactDataGenerator:
         Returns:
             Tuple of (daily_counts dict, partition_count)
         """
+        # Get active tables
+        active_tables = self._active_fact_tables()
+
         # Generate daily facts
-        daily_facts = self._generate_daily_facts(date)
+        daily_facts = self._generate_daily_facts(date, active_tables, day_num, total_days)
 
         # Export to CSV
         partition_count = self._export_daily_facts(date, daily_facts)
@@ -1560,7 +1778,8 @@ class FactDataGenerator:
             logger.warning(f"Progress callback is None! Cannot send update: {message}")
             return
 
-        logger.info(f"[PROGRESS] Callback exists, sending update: {message[:50]}")
+        thread_name = threading.current_thread().name
+        logger.info(f"[PROGRESS][{thread_name}] Callback exists, sending update: {message[:50]}")
         with self._progress_lock:
             current_time = time.time()
             progress = day_counter / total_days if total_days > 0 else 0.0
@@ -1569,7 +1788,7 @@ class FactDataGenerator:
             time_since_last = current_time - self._last_progress_update_time
             if time_since_last < 0.05:
                 logger.debug(
-                    f"Throttling progress update (too soon: {time_since_last*1000:.1f}ms < 50ms)"
+                    f"[{thread_name}] Throttling progress update (too soon: {time_since_last*1000:.1f}ms < 50ms)"
                 )
                 return
 
@@ -1591,6 +1810,9 @@ class FactDataGenerator:
             if tables_in_progress and len(tables_in_progress) > 0:
                 current_table = tables_in_progress[0]
 
+            # Get hourly progress data from tracker
+            hourly_progress_data = self.hourly_tracker.get_current_progress()
+
             callback_kwargs = {
                 "table_progress": table_progress.copy() if table_progress else None,
                 "current_table": current_table,
@@ -1601,6 +1823,11 @@ class FactDataGenerator:
                 "estimated_seconds_remaining": eta,
                 "progress_rate": progress_rate,
                 "table_counts": table_counts,
+                # NEW: Add hourly progress fields
+                "current_day": hourly_progress_data.get("current_day"),
+                "current_hour": hourly_progress_data.get("current_hour"),
+                "hourly_progress": hourly_progress_data.get("per_table_progress"),
+                "total_hours_completed": sum(hourly_progress_data.get("completed_hours", {}).values()),
             }
 
             filtered_kwargs = self._filter_progress_kwargs(callback_kwargs)

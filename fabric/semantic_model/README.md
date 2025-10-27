@@ -12,3 +12,6 @@ Entities:
 Measures:
 - Sales (min/hour/day), Units, Margin, DOS, Dwell, On-time %, ROAS
 
+Artifacts
+- TMDL model template: `model.tmdl` (uses DirectLake partitions over Gold tables; replace Lakehouse resource ID)
+- After import into Fabric, bind to the Lakehouse and refresh

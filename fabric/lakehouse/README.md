@@ -16,3 +16,9 @@ Gold:
 - Logistics dwell and SLA metrics
 - Marketing attribution and promo lift
 
+Artifacts
+- Silver DDL: `silver/ddl.sql`
+- Gold DDL: `gold/ddl.sql`
+- Notebook Bronze→Silver: `../notebooks/bronze_to_silver.py`
+- Notebook Silver→Gold: `../notebooks/silver_to_gold.py`
+- Pipelines (templates): `../pipelines/pl_bronze_to_silver.template.json`, `../pipelines/pl_silver_to_gold.template.json`

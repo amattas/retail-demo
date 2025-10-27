@@ -399,7 +399,18 @@ async def generate_historical_data(
     fact_generator: FactDataGenerator = Depends(get_fact_generator),
     config: RetailConfig = Depends(get_config),
 ):
-    """Generate historical fact data using intelligent date range logic."""
+    """
+    Generate historical fact data using intelligent date range logic.
+
+    Supports both sequential and parallel processing modes:
+    - Sequential: Processes one day at a time with deterministic ordering (default)
+    - Parallel: Processes multiple days concurrently for faster generation
+
+    Both modes provide rich hourly progress updates (24 updates per day per table).
+
+    The parallel mode can significantly reduce generation time for multi-day ranges
+    while maintaining data quality and progress visibility.
+    """
 
     # Debug logging - log the received request
     logger.info(f"Historical data request received: {request}")
@@ -586,13 +597,17 @@ async def generate_historical_data(
             except Exception:
                 pass
 
+            # Use user's parallel preference (both modes now support rich hourly progress)
+            use_parallel = request.parallel if request.parallel is not None else False
+            mode_str = "parallel" if use_parallel else "sequential"
+            logger.info(f"Starting historical generation from {start_date.date()} to {end_date.date()} in {mode_str} mode")
+
             # Generate historical data using the fact generator
-            # For consistent incremental progress (like master), run sequentially
             summary = await asyncio.to_thread(
                 fact_generator.generate_historical_data,
                 start_date,
                 end_date,
-                False  # force sequential for rich incremental progress
+                use_parallel
             )
 
             # Update generation state with the end timestamp

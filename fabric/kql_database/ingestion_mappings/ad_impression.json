@@ -1,0 +1,17 @@
+[
+  {"column":"channel","path":"$.payload.channel","datatype":"string"},
+  {"column":"campaign_id","path":"$.payload.campaign_id","datatype":"string"},
+  {"column":"creative_id","path":"$.payload.creative_id","datatype":"string"},
+  {"column":"customer_ad_id","path":"$.payload.customer_ad_id","datatype":"string"},
+  {"column":"impression_id","path":"$.payload.impression_id","datatype":"string"},
+  {"column":"cost","path":"$.payload.cost","datatype":"real"},
+  {"column":"device_type","path":"$.payload.device_type","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}]

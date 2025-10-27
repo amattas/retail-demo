@@ -1,0 +1,35 @@
+// Materialized views for hot KPIs (aligned to datagen payloads)
+
+.create-or-alter materialized-view with (backfill = false) mv_store_sales_minute on table receipt_created
+{
+    receipt_created
+    | where isnotnull(store_id) and isnotnull(total)
+    | summarize total_sales = sum(total), receipts = count(), avg_basket = avg(total)
+              by store_id, ts = bin(ingest_timestamp, 1m)
+}
+
+.create-or-alter materialized-view with (backfill = false) mv_top_products_15m on table receipt_line_added
+{
+    let window = 15m;
+    receipt_line_added
+    | where ingest_timestamp > ago(window)
+    | summarize revenue = sum(extended_price), units = sum(quantity) by product_id
+}
+
+.create-or-alter materialized-view with (backfill = false) mv_truck_sla on table truck_arrived
+{
+    truck_arrived
+    | project truck_id, dc_id, store_id, shipment_id, arrival_time, trace_id
+    | join kind=leftouter (
+        truck_departed
+        | project truck_id, dc_id, store_id, shipment_id, departure_time
+    ) on truck_id, dc_id, store_id, shipment_id
+    | extend dwell_seconds = iif(isnull(departure_time), real(null), toreal(datetime_diff('second', departure_time, arrival_time)))
+}
+
+.create-or-alter materialized-view with (backfill = false) mv_zone_dwell_minute on table customer_entered
+{
+    customer_entered
+    | summarize avg_dwell = avg(dwell_time), customers = sum(customer_count) by store_id, zone, ts = bin(ingest_timestamp, 1m)
+}
+

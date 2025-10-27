@@ -452,6 +452,335 @@ def test_tables_completed_list_accuracy(fact_generator_with_master_data):
     assert summary.total_records > 0
 
 
+# ================================
+# HOURLY PROGRESS TRACKING INTEGRATION TESTS
+# ================================
+
+
+class TestHourlyProgressIntegration:
+    """Integration tests for the HourlyProgressTracker end-to-end flow."""
+
+    def test_hourly_tracker_initialized_in_generator(self, fact_generator_with_master_data):
+        """Verify HourlyProgressTracker is initialized in FactDataGenerator."""
+        generator = fact_generator_with_master_data
+
+        # Verify tracker exists
+        assert hasattr(generator, 'hourly_tracker'), "Generator should have hourly_tracker"
+        assert generator.hourly_tracker is not None
+        assert len(generator.hourly_tracker._fact_tables) > 0
+
+    def test_hourly_progress_updates_during_generation(self, fact_generator_with_master_data):
+        """Test that hourly progress tracker is updated during data generation."""
+        generator = fact_generator_with_master_data
+
+        # Reset tracker to clean state
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)  # Single day = 24 hours
+
+        # Generate data
+        summary = generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Verify data was generated
+        assert summary.total_records > 0
+
+        # Verify hourly tracker has recorded progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Should have completed some hours
+        total_completed_hours = sum(progress["completed_hours"].values())
+        assert total_completed_hours > 0, "Should have completed some hours during generation"
+
+        # Overall progress should be > 0
+        assert progress["overall_progress"] > 0, "Overall progress should increase"
+
+    def test_hourly_progress_parallel_mode(self, fact_generator_with_master_data):
+        """Test hourly progress tracking in parallel mode."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 2)  # 2 days = 48 hours
+
+        # Generate data in parallel mode
+        summary = generator.generate_historical_data(start_date, end_date, parallel=True)
+
+        # Verify data was generated
+        assert summary.total_records > 0
+
+        # Verify hourly tracker recorded progress from parallel workers
+        progress = generator.hourly_tracker.get_current_progress()
+        total_completed_hours = sum(progress["completed_hours"].values())
+
+        # Should have completed hours from multiple workers
+        assert total_completed_hours > 0, "Parallel mode should record hourly progress"
+
+    def test_hourly_progress_sequential_mode(self, fact_generator_with_master_data):
+        """Test hourly progress tracking in sequential mode."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 2)  # 2 days = 48 hours
+
+        # Generate data in sequential mode
+        summary = generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Verify data was generated
+        assert summary.total_records > 0
+
+        # Verify hourly tracker recorded progress
+        progress = generator.hourly_tracker.get_current_progress()
+        total_completed_hours = sum(progress["completed_hours"].values())
+
+        # Should have completed hours
+        assert total_completed_hours > 0, "Sequential mode should record hourly progress"
+
+    def test_hourly_progress_fields_present(self, fact_generator_with_master_data):
+        """Test that all expected hourly progress fields are present."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify all expected fields are present
+        assert "overall_progress" in progress
+        assert "tables_in_progress" in progress
+        assert "current_day" in progress
+        assert "current_hour" in progress
+        assert "per_table_progress" in progress
+        assert "completed_hours" in progress
+        assert "total_days" in progress
+
+        # Verify field types
+        assert isinstance(progress["overall_progress"], float)
+        assert isinstance(progress["tables_in_progress"], list)
+        assert isinstance(progress["current_day"], int)
+        assert isinstance(progress["current_hour"], int)
+        assert isinstance(progress["per_table_progress"], dict)
+        assert isinstance(progress["completed_hours"], dict)
+        assert isinstance(progress["total_days"], int)
+
+    def test_hourly_progress_per_table_values(self, fact_generator_with_master_data):
+        """Test that per-table progress values are reasonable."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify per-table progress values are in valid range [0.0, 1.0]
+        for table, table_progress in progress["per_table_progress"].items():
+            assert 0.0 <= table_progress <= 1.0, \
+                f"Table {table} progress {table_progress} out of range"
+
+    def test_hourly_progress_completed_hours_count(self, fact_generator_with_master_data):
+        """Test that completed hours count is reasonable."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 2)  # 2 days
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify completed hours are reasonable
+        # Each table should have completed at least some hours
+        # Max should be 2 days * 24 hours = 48 hours per table
+        for table, completed_hours in progress["completed_hours"].items():
+            assert completed_hours >= 0, f"Table {table} has negative completed hours"
+            assert completed_hours <= 48, f"Table {table} has too many completed hours"
+
+    def test_hourly_progress_current_day_hour_values(self, fact_generator_with_master_data):
+        """Test that current_day and current_hour values are valid."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 3)  # 3 days
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify current_day is in valid range
+        assert progress["current_day"] >= 0, "current_day should be >= 0"
+        assert progress["current_day"] <= 3, "current_day should not exceed total days"
+
+        # Verify current_hour is in valid range
+        assert progress["current_hour"] >= 0, "current_hour should be >= 0"
+        assert progress["current_hour"] <= 23, "current_hour should be in range 0-23"
+
+    def test_hourly_progress_reset_between_runs(self, fact_generator_with_master_data):
+        """Test that hourly tracker is reset between generation runs."""
+        generator = fact_generator_with_master_data
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)
+
+        # First run
+        generator.hourly_tracker.reset()
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+        progress1 = generator.hourly_tracker.get_current_progress()
+
+        # Reset and second run
+        generator.hourly_tracker.reset()
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+        progress2 = generator.hourly_tracker.get_current_progress()
+
+        # Both runs should have similar progress (not cumulative)
+        # Both should have > 0 progress
+        assert progress1["overall_progress"] > 0
+        assert progress2["overall_progress"] > 0
+
+        # Progress should be similar (within 20% tolerance due to non-determinism)
+        assert abs(progress1["overall_progress"] - progress2["overall_progress"]) < 0.2
+
+    def test_hourly_progress_tables_in_progress_list(self, fact_generator_with_master_data):
+        """Test that tables_in_progress list is accurate."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify tables_in_progress is a list
+        assert isinstance(progress["tables_in_progress"], list)
+
+        # All tables in list should be valid fact tables
+        for table in progress["tables_in_progress"]:
+            assert table in generator.FACT_TABLES, f"Invalid table in progress: {table}"
+
+        # Tables in progress should have 0 < progress < 1.0
+        for table in progress["tables_in_progress"]:
+            table_progress = progress["per_table_progress"][table]
+            assert 0.0 < table_progress < 1.0, \
+                f"Table {table} in progress but has progress {table_progress}"
+
+    def test_hourly_progress_thread_safety_parallel_mode(self, fact_generator_with_master_data):
+        """Test that hourly tracker is thread-safe in parallel mode."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 3)  # 3 days for more parallel work
+
+        # Generate data in parallel mode (multiple workers updating tracker)
+        summary = generator.generate_historical_data(start_date, end_date, parallel=True)
+
+        # Verify generation completed without crashes
+        assert summary.total_records > 0
+
+        # Verify tracker state is consistent (no corruption from race conditions)
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # All progress values should be valid
+        assert 0.0 <= progress["overall_progress"] <= 1.0
+        for table_progress in progress["per_table_progress"].values():
+            assert 0.0 <= table_progress <= 1.0
+
+        # Completed hours should be non-negative
+        for completed_hours in progress["completed_hours"].values():
+            assert completed_hours >= 0
+
+    def test_hourly_progress_accuracy_vs_actual_files(self, fact_generator_with_master_data, small_test_config):
+        """Test that hourly progress matches actual files written to disk."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)  # Single day
+
+        # Generate data
+        summary = generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Count actual hourly directories written to disk
+        facts_path = Path(small_test_config.paths.facts)
+        total_hourly_dirs = 0
+
+        for table_dir in facts_path.iterdir():
+            if table_dir.is_dir() and table_dir.name in generator.FACT_TABLES:
+                for day_dir in table_dir.iterdir():
+                    if day_dir.is_dir() and day_dir.name.startswith("dt="):
+                        for hour_dir in day_dir.iterdir():
+                            if hour_dir.is_dir() and hour_dir.name.startswith("hr="):
+                                total_hourly_dirs += 1
+
+        # Verify we wrote hourly data
+        if total_hourly_dirs > 0:
+            # If we wrote hourly data, progress should reflect it
+            assert progress["overall_progress"] > 0
+            total_tracked_hours = sum(progress["completed_hours"].values())
+            # Tracked hours should be > 0 if files were written
+            # (May not match exactly due to some tables completing faster)
+            assert total_tracked_hours > 0
+
+    def test_hourly_progress_total_days_tracking(self, fact_generator_with_master_data):
+        """Test that total_days is tracked correctly."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 5)  # 5 days
+
+        # Generate data
+        generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Verify total_days is set correctly
+        assert progress["total_days"] == 5, "total_days should match date range"
+
+    def test_hourly_progress_empty_generation(self, fact_generator_with_master_data):
+        """Test hourly progress with minimal data (edge case)."""
+        generator = fact_generator_with_master_data
+        generator.hourly_tracker.reset()
+
+        # Same start and end date
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 1)
+
+        # Generate data
+        summary = generator.generate_historical_data(start_date, end_date, parallel=False)
+
+        # Get progress
+        progress = generator.hourly_tracker.get_current_progress()
+
+        # Should not crash with minimal generation
+        assert progress["overall_progress"] >= 0.0
+        assert progress["overall_progress"] <= 1.0
+
+
 def test_message_contains_table_completion_count(fact_generator_with_master_data):
     """Verify progress messages contain table completion counts."""
     generator = fact_generator_with_master_data

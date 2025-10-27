@@ -41,6 +41,10 @@ nav:
   - Architecture: architecture.md
   - Data Schema: data-schema.md
   - Fabric Assets: fabric-assets.md
+  - Deploy: deploy-fabric.md
+  - Lakehouse Schemas: lakehouse-schemas.md
+  - Data Validation: data-validation.md
+  - Demo Script: demo-script.md
   - Use Cases: use-cases.md
   - AI Integration: ai-integration.md
   - Setup: setup.md

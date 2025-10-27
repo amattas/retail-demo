@@ -1,0 +1,352 @@
+.set-or-replace cluster policy caching hot_cache_period = 7d, hot_ingest = true
+
+// Standard envelope columns for all tables
+// event_type:string, trace_id:string, ingest_timestamp:datetime, schema_version:string,
+// source:string, correlation_id:string, partition_key:string, session_id:string, parent_event_id:string
+
+// Transaction Events
+.create-merge table receipt_created (
+    store_id:long,
+    customer_id:long,
+    receipt_id:string,
+    subtotal:real,
+    tax:real,
+    total:real,
+    tender_type:string,
+    item_count:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table receipt_line_added (
+    receipt_id:string,
+    line_number:long,
+    product_id:long,
+    quantity:long,
+    unit_price:real,
+    extended_price:real,
+    promo_code:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table payment_processed (
+    receipt_id:string,
+    payment_method:string,
+    amount:real,
+    transaction_id:string,
+    processing_time:datetime,
+    status:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Inventory Events
+.create-merge table inventory_updated (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    quantity_delta:long,
+    reason:string,
+    source_override:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table stockout_detected (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    last_known_quantity:long,
+    detection_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table reorder_triggered (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    current_quantity:long,
+    reorder_quantity:long,
+    reorder_point:long,
+    priority:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Customer Events
+.create-merge table customer_entered (
+    store_id:long,
+    sensor_id:string,
+    zone:string,
+    customer_count:long,
+    dwell_time:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table customer_zone_changed (
+    store_id:long,
+    customer_ble_id:string,
+    from_zone:string,
+    to_zone:string,
+    timestamp:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table ble_ping_detected (
+    store_id:long,
+    beacon_id:string,
+    customer_ble_id:string,
+    rssi:long,
+    zone:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Operational Events
+.create-merge table truck_arrived (
+    truck_id:string,
+    dc_id:long,
+    store_id:long,
+    shipment_id:string,
+    arrival_time:datetime,
+    estimated_unload_duration:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table truck_departed (
+    truck_id:string,
+    dc_id:long,
+    store_id:long,
+    shipment_id:string,
+    departure_time:datetime,
+    actual_unload_duration:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table store_opened (
+    store_id:long,
+    operation_time:datetime,
+    operation_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table store_closed (
+    store_id:long,
+    operation_time:datetime,
+    operation_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Marketing Events
+.create-merge table ad_impression (
+    channel:string,
+    campaign_id:string,
+    creative_id:string,
+    customer_ad_id:string,
+    impression_id:string,
+    cost:real,
+    device_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table promotion_applied (
+    receipt_id:string,
+    promo_code:string,
+    discount_amount:real,
+    discount_type:string,
+    product_ids:dynamic,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Omnichannel / Online Orders
+.create-merge table online_order_created (
+    order_id:string,
+    customer_id:long,
+    fulfillment_mode:string,
+    node_type:string,
+    node_id:long,
+    item_count:long,
+    subtotal:real,
+    tax:real,
+    total:real,
+    tender_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table online_order_picked (
+    order_id:string,
+    node_type:string,
+    node_id:long,
+    fulfillment_mode:string,
+    picked_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table online_order_shipped (
+    order_id:string,
+    node_type:string,
+    node_id:long,
+    fulfillment_mode:string,
+    shipped_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Retention policy: 14 days default for hot tables
+.alter-merge table receipt_created policy retention softdelete = 14d
+.alter-merge table receipt_line_added policy retention softdelete = 14d
+.alter-merge table payment_processed policy retention softdelete = 14d
+.alter-merge table inventory_updated policy retention softdelete = 14d
+.alter-merge table stockout_detected policy retention softdelete = 14d
+.alter-merge table reorder_triggered policy retention softdelete = 14d
+.alter-merge table customer_entered policy retention softdelete = 14d
+.alter-merge table customer_zone_changed policy retention softdelete = 14d
+.alter-merge table ble_ping_detected policy retention softdelete = 14d
+.alter-merge table truck_arrived policy retention softdelete = 14d
+.alter-merge table truck_departed policy retention softdelete = 14d
+.alter-merge table store_opened policy retention softdelete = 14d
+.alter-merge table store_closed policy retention softdelete = 14d
+.alter-merge table ad_impression policy retention softdelete = 14d
+.alter-merge table promotion_applied policy retention softdelete = 14d
+.alter-merge table online_order_created policy retention softdelete = 14d
+.alter-merge table online_order_picked policy retention softdelete = 14d
+.alter-merge table online_order_shipped policy retention softdelete = 14d
+

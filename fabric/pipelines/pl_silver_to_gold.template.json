@@ -1,0 +1,27 @@
+{
+  "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
+  "name": "pl_silver_to_gold_aggregates",
+  "description": "Runs the Silver → Gold aggregates notebook on a schedule",
+  "activities": [
+    {
+      "name": "SilverToGoldNotebook",
+      "type": "Notebook",
+      "properties": {
+        "notebookResourceId": "<fabric-notebook-resource-id: silver_to_gold>",
+        "parameters": {},
+        "timeout": "00:30:00"
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "Every15Minutes",
+      "type": "Schedule",
+      "properties": {
+        "recurrence": "PT15M",
+        "startTime": "<utc-iso8601>"
+      }
+    }
+  ]
+}
+

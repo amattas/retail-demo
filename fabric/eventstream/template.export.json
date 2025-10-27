@@ -1,0 +1,40 @@
+{
+  "$schema": "https://fabric.microsoft.com/schemas/eventstream/2024-01-01-preview",
+  "name": "retail-eventstream",
+  "description": "Retail RTI Eventstream (template) — wire to Azure Event Hubs and route to KQL DB + Lakehouse",
+  "sources": [
+    {
+      "type": "azureEventHubs",
+      "name": "retail-events",
+      "properties": {
+        "eventHubName": "retail-events",
+        "connectionReference": "<key-vault-or-connection-ref>"
+      }
+    }
+  ],
+  "transformations": [],
+  "sinks": [
+    {
+      "type": "kqlDatabase",
+      "name": "hot-kql",
+      "properties": {
+        "databaseResourceId": "<fabric-kql-database-resource-id>",
+        "tableRouting": "perEventType",
+        "createTables": true
+      }
+    },
+    {
+      "type": "lakehouse",
+      "name": "bronze-lakehouse",
+      "properties": {
+        "lakehouseResourceId": "<fabric-lakehouse-resource-id>",
+        "folderPath": "/Tables/bronze/events",
+        "partitioning": [
+          { "key": "event_type", "source": "$.event_type" },
+          { "key": "date", "source": "$.ingest_timestamp", "format": "yyyy-MM-dd" }
+        ]
+      }
+    }
+  ]
+}
+

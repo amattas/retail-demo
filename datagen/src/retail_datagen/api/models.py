@@ -77,7 +77,13 @@ class HistoricalDataRequest(BaseModel):
         examples=[["receipts", "receipt_lines", "store_inventory_txn"]],
     )
     parallel: bool = Field(
-        True, description="Enable parallel processing for faster generation"
+        False,
+        description=(
+            "Enable parallel processing for faster generation. "
+            "Sequential mode (default) provides deterministic ordering; "
+            "parallel mode is faster for multi-day ranges. "
+            "Both modes support rich hourly progress updates."
+        )
     )
 
 
@@ -199,6 +205,28 @@ class GenerationStatusResponse(BaseModel):
         description="ISO-8601 timestamp of last progress update"
     )
 
+    # Hourly progress tracking fields (Phase 1B enhancements)
+    current_day: int | None = Field(
+        None,
+        ge=1,
+        description="Current day being processed (1-indexed, e.g., 1 = first day)"
+    )
+    current_hour: int | None = Field(
+        None,
+        ge=0,
+        le=23,
+        description="Current hour being processed (0-23, within the current day)"
+    )
+    hourly_progress: dict[str, float] | None = Field(
+        None,
+        description="Per-table hourly progress (0.0 to 1.0) for current hour"
+    )
+    total_hours_completed: int | None = Field(
+        None,
+        ge=0,
+        description="Total hours processed across all days so far"
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -224,7 +252,15 @@ class GenerationStatusResponse(BaseModel):
                 },
                 "estimated_seconds_remaining": 45.2,
                 "progress_rate": 0.01,
-                "last_update_timestamp": "2025-10-21T14:28:15.123Z"
+                "last_update_timestamp": "2025-10-21T14:28:15.123Z",
+                "current_day": 5,
+                "current_hour": 14,
+                "hourly_progress": {
+                    "receipts": 0.65,
+                    "receipt_lines": 0.43,
+                    "store_inventory_txn": 0.78
+                },
+                "total_hours_completed": 98
             }
         }
     )

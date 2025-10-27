@@ -1,0 +1,7 @@
+let window = 24h;
+mv_truck_sla
+| where isnotnull(arrival_time) and arrival_time > ago(window)
+| extend site = iif(isnotnull(store_id), strcat('Store-', tostring(store_id)), strcat('DC-', tostring(dc_id)))
+| summarize avg_dwell_min = avg(dwell_seconds) / 60.0, trucks = count() by site
+| order by avg_dwell_min desc
+

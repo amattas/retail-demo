@@ -1,0 +1,15 @@
+[
+  {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"promo_code","path":"$.payload.promo_code","datatype":"string"},
+  {"column":"discount_amount","path":"$.payload.discount_amount","datatype":"real"},
+  {"column":"discount_type","path":"$.payload.discount_type","datatype":"string"},
+  {"column":"product_ids","path":"$.payload.product_ids","datatype":"dynamic"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}]

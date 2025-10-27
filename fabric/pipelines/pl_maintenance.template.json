@@ -1,0 +1,27 @@
+{
+  "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
+  "name": "pl_lakehouse_maintenance",
+  "description": "Runs Lakehouse optimization (OPTIMIZE/VACUUM) daily",
+  "activities": [
+    {
+      "name": "MaintenanceNotebook",
+      "type": "Notebook",
+      "properties": {
+        "notebookResourceId": "<fabric-notebook-resource-id: maintenance_optimize>",
+        "parameters": {},
+        "timeout": "01:00:00"
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "name": "Daily3AMUTC",
+      "type": "Schedule",
+      "properties": {
+        "recurrence": "P1D",
+        "startTime": "<utc-iso8601-03:00>"
+      }
+    }
+  ]
+}
+

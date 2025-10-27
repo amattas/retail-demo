@@ -1,0 +1,118 @@
+model: RetailGold
+compatibilityLevel: 1603
+annotations:
+  - name: fabric.lakehouseResourceId
+    value: "<fabric-lakehouse-resource-id>"
+tables:
+  - name: gold_sales_minute_store
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/sales_minute_store
+    measures:
+      - name: Total Sales
+        expression: SUM('gold_sales_minute_store'[total_sales])
+      - name: Receipts
+        expression: SUM('gold_sales_minute_store'[receipts])
+      - name: Avg Basket
+        expression: DIVIDE([Total Sales], [Receipts])
+  - name: gold_top_products_15m
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/top_products_15m
+    measures:
+      - name: Revenue
+        expression: SUM('gold_top_products_15m'[revenue])
+      - name: Units
+        expression: SUM('gold_top_products_15m'[units])
+  - name: gold_inventory_position_current
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/inventory_position_current
+    measures:
+      - name: On Hand
+        expression: SUM('gold_inventory_position_current'[on_hand])
+  - name: gold_truck_dwell_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/truck_dwell_daily
+    measures:
+      - name: Avg Dwell (min)
+        expression: AVERAGE('gold_truck_dwell_daily'[avg_dwell_min])
+  - name: gold_campaign_revenue_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/campaign_revenue_daily
+    measures:
+      - name: Impressions
+        expression: SUM('gold_campaign_revenue_daily'[impressions])
+      - name: Conversions
+        expression: SUM('gold_campaign_revenue_daily'[conversions])
+      - name: Revenue
+        expression: SUM('gold_campaign_revenue_daily'[revenue])
+  - name: dim_stores
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/dim/stores
+  - name: dim_products
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/dim/products_master
+
+relationships:
+  - name: Sales_to_Stores
+    fromTable: gold_sales_minute_store
+    fromColumn: store_id
+    toTable: dim_stores
+    toColumn: ID
+    crossFilteringBehavior: OneDirection
+  - name: InvCurrent_to_Stores
+    fromTable: gold_inventory_position_current
+    fromColumn: store_id
+    toTable: dim_stores
+    toColumn: ID
+    crossFilteringBehavior: OneDirection
+  - name: TopProducts_to_Products
+    fromTable: gold_top_products_15m
+    fromColumn: product_id
+    toTable: dim_products
+    toColumn: ID
+    crossFilteringBehavior: OneDirection
+  - name: InvCurrent_to_Products
+    fromTable: gold_inventory_position_current
+    fromColumn: product_id
+    toTable: dim_products
+    toColumn: ID
+    crossFilteringBehavior: OneDirection
+
+perspectives:
+  - name: Operations
+    tables:
+      - gold_sales_minute_store
+      - gold_inventory_position_current
+      - dim_stores
+  - name: Merchandising
+    tables:
+      - gold_top_products_15m
+      - gold_inventory_position_current
+      - dim_products
+  - name: Logistics
+    tables:
+      - gold_truck_dwell_daily
+  - name: Marketing
+    tables:
+      - gold_campaign_revenue_daily
+
+measures:
+  - table: gold_campaign_revenue_daily
+    name: Conversion Rate
+    expression: DIVIDE(SUM('gold_campaign_revenue_daily'[conversions]), SUM('gold_campaign_revenue_daily'[impressions]))
+  - table: gold_sales_minute_store
+    name: Sales (Last 60m)
+    expression: CALCULATE([Total Sales], KEEPFILTERS(DATESINPERIOD('gold_sales_minute_store'[ts], MAX('gold_sales_minute_store'[ts]), -60, MINUTE)))

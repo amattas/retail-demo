@@ -12,3 +12,5 @@ Data Sources:
 - KQL DB materialized views (hot path)
 - Lakehouse Gold (historical overlays)
 
+Templates
+- Minimal Real-Time dashboard template: `retail-ops.template.json` (replace KQL DB resource ID after import)

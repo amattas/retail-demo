@@ -13,6 +13,7 @@ Authoritative spec for building the Fabric Eventstream that ingests Azure Event 
   - `customer_entered`, `customer_zone_changed`, `ble_ping_detected`
   - `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`
   - `ad_impression`, `promotion_applied`
+  - `online_order_created`, `online_order_picked`, `online_order_shipped`
 
 ## Mapping Rules
 - Parse common envelope fields: `event_type, trace_id, ingest_timestamp, schema_version, source, correlation_id, partition_key, session_id, parent_event_id`.
@@ -32,4 +33,3 @@ Authoritative spec for building the Fabric Eventstream that ingests Azure Event 
 - Events flow E2E with <2s end-to-end latency to KQL
 - Lakehouse bronze receives partitioned files per day/event_type
 - KQL ingest mappings validated for all event types
-

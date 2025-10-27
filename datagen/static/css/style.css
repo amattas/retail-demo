@@ -1143,6 +1143,73 @@ input[type="checkbox"] {
     letter-spacing: 0.5px;
 }
 
+/* Hourly progress displays */
+.hour-display {
+    font-size: 14px;
+    color: #0066cc;
+    padding: 5px 10px;
+    background: #e6f2ff;
+    border-radius: 4px;
+    display: inline-block;
+    font-weight: 700;
+    text-align: center;
+}
+
+.hours-display {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* Per-table progress bars */
+.table-progress-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.table-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.table-progress-item {
+    display: grid;
+    grid-template-columns: 150px 1fr 60px;
+    gap: 10px;
+    align-items: center;
+}
+
+.table-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+}
+
+.table-progress-bar-container {
+    height: 18px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.table-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+    transition: width 0.3s ease;
+}
+
+.table-percentage {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-align: right;
+}
+
 /* Utility Classes */
 .text-red { color: var(--danger-color); }
 .text-green { color: var(--success-color); }
@@ -1277,5 +1344,19 @@ input[type="checkbox"] {
 
     .table-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Responsive table progress */
+    .table-progress-item {
+        grid-template-columns: 100px 1fr 50px;
+        gap: 8px;
+    }
+
+    .table-name {
+        font-size: 11px;
+    }
+
+    .table-percentage {
+        font-size: 11px;
     }
 }

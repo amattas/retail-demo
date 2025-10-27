@@ -8,5 +8,4 @@ Highlights:
 - Real-Time Dashboards and Querysets
 - Lakehouse medallion layers for persistence and history
 
-See Architecture for the big picture and Fabric Assets for implementation details.
-
+See Architecture for the big picture and Fabric Assets for implementation details. Deployment steps are in `deploy-fabric.md` and a presenter guide is in `demo-script.md`.

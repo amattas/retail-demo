@@ -1,0 +1,45 @@
+{
+  "$schema": "https://fabric.microsoft.com/schemas/dashboard/2024-01-01-preview",
+  "name": "Retail Ops - Real-Time",
+  "description": "Minimal dashboard wired to KQL views/querysets",
+  "tiles": [
+    {
+      "title": "Sales/min by Store (1h)",
+      "type": "kql",
+      "dataset": {
+        "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>"
+      },
+      "query": "mv_store_sales_minute | where ts > ago(60m) | summarize total_sales=sum(total_sales) by store_id | top 10 by total_sales desc"
+    },
+    {
+      "title": "Tender Mix (15m)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "payment_processed | where ingest_timestamp > ago(15m) | summarize amount=sum(amount) by payment_method | order by amount desc"
+    },
+    {
+      "title": "Top Products (15m)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let window=15m; receipt_line_added | where ingest_timestamp > ago(window) | summarize revenue=sum(extended_price) by product_id | top 10 by revenue desc"
+    },
+    {
+      "title": "Open Stockouts (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "stockout_detected | where ingest_timestamp > ago(24h) | summarize count() by store_id | top 10 by count_ desc"
+    },
+    {
+      "title": "Zone Dwell Heatmap (30m)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "mv_zone_dwell_minute | where ts > ago(30m) | summarize customers=sum(customers) by zone | top 10 by customers desc"
+    },
+    {
+      "title": "Truck Dwell by Site (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "mv_truck_sla | where arrival_time > ago(24h) | extend site=iif(isnotnull(store_id), strcat('Store-', tostring(store_id)), strcat('DC-', tostring(dc_id))) | summarize avg_dwell_min=avg(dwell_seconds)/60.0 by site | top 10 by avg_dwell_min desc"
+    }
+  ]
+}

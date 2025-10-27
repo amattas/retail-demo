@@ -1,0 +1,15 @@
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"beacon_id","path":"$.payload.beacon_id","datatype":"string"},
+  {"column":"customer_ble_id","path":"$.payload.customer_ble_id","datatype":"string"},
+  {"column":"rssi","path":"$.payload.rssi","datatype":"long"},
+  {"column":"zone","path":"$.payload.zone","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}]
