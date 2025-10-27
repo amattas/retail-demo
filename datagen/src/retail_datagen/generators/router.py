@@ -56,6 +56,18 @@ MASTER_TABLES = [
     "products_master",
 ]
 
+# Mapping of table names to SQLAlchemy models
+from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
+
+MASTER_TABLE_MODELS = {
+    "geographies_master": Geography,
+    "stores": Store,
+    "distribution_centers": DistributionCenter,
+    "trucks": Truck,
+    "customers": Customer,
+    "products_master": Product,
+}
+
 FACT_TABLES = [
     "dc_inventory_txn",
     "truck_moves",
@@ -913,36 +925,39 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
 async def get_master_table_summary(
     table_name: str, config: RetailConfig = Depends(get_config)
 ):
-    """Get summary information for a master table."""
+    """Get summary information for a master table from SQLite database."""
 
     validate_table_name(table_name, "master")
 
-    file_path = Path(config.paths.master) / f"{table_name}.csv"
-
-    if not file_path.exists():
+    # Get the SQLAlchemy model for this table
+    model = MASTER_TABLE_MODELS.get(table_name)
+    if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Table {table_name} not found. Generate it first.",
+            detail=f"Table {table_name} not found.",
         )
 
     try:
-        total_records = 0
-        columns = []
+        from sqlalchemy import select, func, inspect
+        from ..db.session import get_master_session
 
-        with open(file_path, newline="", encoding="utf-8") as csvfile:
-            reader = csv.DictReader(csvfile)
-            columns = reader.fieldnames or []
+        async with get_master_session() as session:
+            # Get row count
+            result = await session.execute(select(func.count()).select_from(model))
+            total_records = result.scalar() or 0
 
-            for row in reader:
-                total_records += 1
+            # Get column names from the model
+            inspector = inspect(model)
+            columns = [col.key for col in inspector.columns]
 
-        return {
-            "table_name": table_name,
-            "total_records": total_records,
-            "columns": columns,
-        }
+            return {
+                "table_name": table_name,
+                "total_records": total_records,
+                "columns": columns,
+            }
 
     except Exception as e:
+        logger.error(f"Failed to read table {table_name}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to read table {table_name}: {str(e)}",
@@ -960,40 +975,57 @@ async def preview_master_table(
     limit: int = Query(100, ge=1, le=1000, description="Number of rows to return"),
     config: RetailConfig = Depends(get_config),
 ):
-    """Preview a master data table."""
+    """Preview a master data table from SQLite database."""
 
     validate_table_name(table_name, "master")
 
-    file_path = Path(config.paths.master) / f"{table_name}.csv"
-
-    if not file_path.exists():
+    # Get the SQLAlchemy model for this table
+    model = MASTER_TABLE_MODELS.get(table_name)
+    if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Table {table_name} not found. Generate it first.",
+            detail=f"Table {table_name} not found.",
         )
 
     try:
-        preview_rows = []
-        columns = []
-        total_rows = 0
+        from sqlalchemy import select, func, inspect
+        from ..db.session import get_master_session
 
-        with open(file_path, newline="", encoding="utf-8") as csvfile:
-            reader = csv.DictReader(csvfile)
-            columns = reader.fieldnames or []
+        async with get_master_session() as session:
+            # Get total row count
+            count_result = await session.execute(select(func.count()).select_from(model))
+            total_rows = count_result.scalar() or 0
 
-            for i, row in enumerate(reader):
-                if i < limit:
-                    preview_rows.append(row)
-                total_rows = i + 1
+            # Get preview rows
+            result = await session.execute(select(model).limit(limit))
+            rows = result.scalars().all()
 
-        return TablePreviewResponse(
-            table_name=table_name,
-            columns=columns,
-            row_count=total_rows,
-            preview_rows=preview_rows,
-        )
+            # Get column names from the model
+            inspector = inspect(model)
+            columns = [col.key for col in inspector.columns]
+
+            # Convert SQLAlchemy objects to dicts
+            preview_rows = []
+            for row in rows:
+                row_dict = {}
+                for col in columns:
+                    value = getattr(row, col, None)
+                    # Convert datetime and other types to string for JSON serialization
+                    if value is not None:
+                        row_dict[col] = str(value) if not isinstance(value, (str, int, float, bool)) else value
+                    else:
+                        row_dict[col] = None
+                preview_rows.append(row_dict)
+
+            return TablePreviewResponse(
+                table_name=table_name,
+                columns=columns,
+                row_count=total_rows,
+                preview_rows=preview_rows,
+            )
 
     except Exception as e:
+        logger.error(f"Failed to read table {table_name}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to read table {table_name}: {str(e)}",
