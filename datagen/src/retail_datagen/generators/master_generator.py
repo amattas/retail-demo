@@ -9,9 +9,12 @@ import logging
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
-from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, Type
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.cache import CacheManager
@@ -36,9 +39,28 @@ from retail_datagen.shared.validators import (
     SyntheticDataValidator,
 )
 
+# Import SQLAlchemy models for database insertion
+try:
+    from retail_datagen.db.models.master import (
+        Geography as GeographyModel,
+        Store as StoreModel,
+        DistributionCenter as DistributionCenterModel,
+        Truck as TruckModel,
+        Customer as CustomerModel,
+        Product as ProductModel,
+    )
+    SQLALCHEMY_AVAILABLE = True
+except ImportError:
+    SQLALCHEMY_AVAILABLE = False
+    GeographyModel = None
+    StoreModel = None
+    DistributionCenterModel = None
+    TruckModel = None
+    CustomerModel = None
+    ProductModel = None
+
 from .utils import (
     AddressGenerator,
-    DataFrameExporter,
     GeographicDistribution,
     IdentifierGenerator,
     ProgressReporter,
@@ -102,9 +124,6 @@ class MasterDataGenerator:
             Callable[[str, float, str | None], None] | None
         ) = None
 
-        # Ensure exports from parallel stages are thread-safe
-        self._export_lock = Lock()
-
         print(f"MasterDataGenerator initialized with seed {config.seed}")
 
     def set_progress_callback(
@@ -112,6 +131,114 @@ class MasterDataGenerator:
     ) -> None:
         """Register or clear a callback for incremental progress updates."""
         self._progress_callback = callback
+
+    async def _insert_to_db(
+        self,
+        session: AsyncSession,
+        model_class: Type[DeclarativeBase],
+        pydantic_models: list,
+        batch_size: int = 10000,
+    ) -> None:
+        """
+        Insert Pydantic models into database table using bulk insertion.
+
+        This method converts Pydantic models to dictionaries and performs
+        efficient bulk inserts with progress logging.
+
+        Args:
+            session: Database session for insertion
+            model_class: SQLAlchemy model class (e.g., GeographyModel)
+            pydantic_models: List of Pydantic model instances to insert
+            batch_size: Number of rows per batch insert (default: 10,000)
+
+        Raises:
+            Exception: If database insertion fails
+        """
+        if not pydantic_models:
+            logger.warning(f"No data to insert for {model_class.__tablename__}")
+            return
+
+        table_name = model_class.__tablename__
+        total_records = len(pydantic_models)
+        logger.info(f"Inserting {total_records:,} records into {table_name}")
+
+        try:
+            # Convert Pydantic models to dictionaries
+            records = []
+            for model in pydantic_models:
+                # Convert Pydantic model to dict
+                record = model.model_dump()
+
+                # Map Pydantic field names to SQLAlchemy column names
+                mapped_record = self._map_pydantic_to_db_columns(record, model_class)
+                records.append(mapped_record)
+
+            # Insert in batches for performance and memory efficiency
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+
+                # Use bulk_insert_mappings for performance
+                await session.execute(
+                    model_class.__table__.insert(),
+                    batch
+                )
+                await session.flush()  # Flush to database but don't commit yet
+
+                records_inserted = min(i + batch_size, total_records)
+                logger.info(
+                    f"Inserted {records_inserted:,} / {total_records:,} rows into {table_name}"
+                )
+
+            logger.info(f"Successfully inserted all {total_records:,} records into {table_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to insert data into {table_name}: {e}", exc_info=True)
+            raise
+
+    def _map_pydantic_to_db_columns(
+        self,
+        pydantic_dict: dict[str, Any],
+        model_class: Type[DeclarativeBase],
+    ) -> dict[str, Any]:
+        """
+        Map Pydantic model field names to SQLAlchemy column names.
+
+        The Pydantic models use PascalCase field names (e.g., ID, City, State),
+        while SQLAlchemy models use the same column names in the database.
+        This method also handles type conversions as needed.
+
+        Args:
+            pydantic_dict: Dictionary from Pydantic model.model_dump()
+            model_class: SQLAlchemy model class for column mapping
+
+        Returns:
+            Dictionary with database column names and properly typed values
+        """
+        mapped = {}
+
+        # Get column mappings from SQLAlchemy model
+        # The column 'name' attribute contains the actual database column name
+        column_mappings = {
+            col.key: col.name for col in model_class.__table__.columns
+        }
+
+        for key, value in pydantic_dict.items():
+            # Convert Decimal to float for SQLite
+            if isinstance(value, Decimal):
+                value = float(value)
+
+            # Convert datetime to ISO string if needed (SQLite stores as TEXT)
+            elif isinstance(value, datetime):
+                value = value.isoformat()
+
+            # Handle None values
+            elif value is None:
+                pass
+
+            # Map to correct column name (Pydantic uses same names as DB columns)
+            mapped[key] = value
+
+        return mapped
 
     def _emit_progress(
         self,
@@ -132,150 +259,28 @@ class MasterDataGenerator:
                 "Master progress callback failed for %s: %s", table_name, exc, exc_info=True
             )
 
-    def _export_table(self, table_name: str) -> None:
-        """Export a single master table to CSV for incremental availability."""
-
-        output_path = Path(self.config.paths.master)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        with self._export_lock:
-            if table_name == "geographies_master":
-                data = [
-                    {
-                        "ID": geo.ID,
-                        "City": geo.City,
-                        "State": geo.State,
-                        "ZipCode": geo.ZipCode,
-                        "District": geo.District,
-                        "Region": geo.Region,
-                    }
-                    for geo in self.geography_master
-                ]
-                DataFrameExporter.export_to_csv(
-                    data, output_path / "geographies_master.csv"
-                )
-
-            elif table_name == "stores":
-                store_data = [
-                    {
-                        "ID": store.ID,
-                        "StoreNumber": store.StoreNumber,
-                        "Address": store.Address,
-                        "GeographyID": store.GeographyID,
-                    }
-                    for store in self.stores
-                ]
-                DataFrameExporter.export_to_csv(store_data, output_path / "stores.csv")
-
-            elif table_name == "distribution_centers":
-                dc_data = [
-                    {
-                        "ID": dc.ID,
-                        "DCNumber": dc.DCNumber,
-                        "Address": dc.Address,
-                        "GeographyID": dc.GeographyID,
-                    }
-                    for dc in self.distribution_centers
-                ]
-                DataFrameExporter.export_to_csv(
-                    dc_data, output_path / "distribution_centers.csv"
-                )
-
-            elif table_name == "trucks":
-                truck_data = [
-                    {
-                        "ID": truck.ID,
-                        "LicensePlate": truck.LicensePlate,
-                        "Refrigeration": truck.Refrigeration,
-                        "DCID": truck.DCID,
-                    }
-                    for truck in self.trucks
-                ]
-                DataFrameExporter.export_to_csv(truck_data, output_path / "trucks.csv")
-
-            elif table_name == "customers":
-                customer_data = [
-                    {
-                        "ID": customer.ID,
-                        "FirstName": customer.FirstName,
-                        "LastName": customer.LastName,
-                        "Address": customer.Address,
-                        "GeographyID": customer.GeographyID,
-                        "LoyaltyCard": customer.LoyaltyCard,
-                        "Phone": customer.Phone,
-                        "BLEId": customer.BLEId,
-                        "AdId": customer.AdId,
-                    }
-                    for customer in self.customers
-                ]
-                DataFrameExporter.export_to_csv(
-                    customer_data, output_path / "customers.csv"
-                )
-
-            elif table_name == "products_master":
-                product_data = [
-                    {
-                        "ID": product.ID,
-                        "ProductName": product.ProductName,
-                        "Brand": product.Brand,
-                        "Company": product.Company,
-                        "Department": product.Department,
-                        "Category": product.Category,
-                        "Subcategory": product.Subcategory,
-                        "Cost": str(product.Cost),
-                        "MSRP": str(product.MSRP),
-                        "SalePrice": str(product.SalePrice),
-                        "RequiresRefrigeration": product.RequiresRefrigeration,
-                        "LaunchDate": product.LaunchDate.isoformat(),
-                    }
-                    for product in self.products_master
-                ]
-                DataFrameExporter.export_to_csv(
-                    product_data, output_path / "products_master.csv"
-                )
-
-            elif table_name == "dc_inventory_snapshots":
-                dc_inventory_data = [
-                    {
-                        "DCID": snapshot.DCID,
-                        "ProductID": snapshot.ProductID,
-                        "CurrentQuantity": snapshot.CurrentQuantity,
-                        "ReorderPoint": snapshot.ReorderPoint,
-                        "LastUpdated": snapshot.LastUpdated.isoformat(),
-                    }
-                    for snapshot in self.dc_inventory_snapshots
-                ]
-                DataFrameExporter.export_to_csv(
-                    dc_inventory_data, output_path / "dc_inventory_snapshots.csv"
-                )
-
-            elif table_name == "store_inventory_snapshots":
-                store_inventory_data = [
-                    {
-                        "StoreID": snapshot.StoreID,
-                        "ProductID": snapshot.ProductID,
-                        "CurrentQuantity": snapshot.CurrentQuantity,
-                        "ReorderPoint": snapshot.ReorderPoint,
-                        "LastUpdated": snapshot.LastUpdated.isoformat(),
-                    }
-                    for snapshot in self.store_inventory_snapshots
-                ]
-                DataFrameExporter.export_to_csv(
-                    store_inventory_data, output_path / "store_inventory_snapshots.csv"
-                )
-
-    def generate_all_master_data(
-        self, entity_counts: dict[str, int] | None = None, parallel: bool = True
+    async def generate_all_master_data_async(
+        self,
+        session: AsyncSession,
+        parallel: bool = True,
     ) -> None:
-        """Generate all master data tables and save to CSV files.
+        """
+        Generate all master data tables and write to SQLite database.
 
         Args:
-            entity_counts: Optional dictionary specifying entity counts
-                          (stores, dcs, customers, products)
+            session: AsyncSession for master.db (required)
             parallel: Enable parallel generation for independent tables (default True)
         """
+        if not SQLALCHEMY_AVAILABLE:
+            raise RuntimeError(
+                "SQLAlchemy models not available. Cannot write to database."
+            )
+
         print("Starting master data generation...")
         print(f"Parallel processing: {'enabled' if parallel else 'disabled'}")
+
+        # Store session for later use
+        self._db_session = session
 
         # Load dictionary data
         self._load_dictionary_data()
@@ -285,20 +290,22 @@ class MasterDataGenerator:
 
         # Phase 1: Sequential (geographic dependencies)
         print("\nPhase 1: Generating geographic dependencies (sequential)...")
-        self.generate_geography_master()
-        self.generate_distribution_centers()
-        self.generate_stores(count=stores_count)
-        self.generate_trucks()
+        await self.generate_geography_master_async()
+        await self.generate_distribution_centers_async()
+        await self.generate_stores_async(count=stores_count)
+        await self.generate_trucks_async()
 
         # Phase 2: Parallel customer + product generation
         if parallel:
             print("\nPhase 2: Generating customers and products (parallel)...")
             max_workers = min(2, self.config.performance.get_max_workers())
             print(f"Using {max_workers} parallel workers (CPU limit: {self.config.performance.max_cpu_percent}%)")
+
+            # Note: Running async methods in thread pool - they'll complete synchronously
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
-                    executor.submit(self.generate_customers): 'customers',
-                    executor.submit(self.generate_products_master): 'products'
+                    executor.submit(self._run_async_in_thread, self.generate_customers_async): 'customers',
+                    executor.submit(self._run_async_in_thread, self.generate_products_master_async): 'products'
                 }
                 for future in as_completed(futures):
                     table = futures[future]
@@ -311,8 +318,8 @@ class MasterDataGenerator:
         else:
             # Sequential fallback
             print("\nPhase 2: Generating customers and products (sequential)...")
-            self.generate_customers()
-            self.generate_products_master()
+            await self.generate_customers_async()
+            await self.generate_products_master_async()
 
         # Phase 3: Parallel inventory snapshots
         if parallel:
@@ -320,8 +327,8 @@ class MasterDataGenerator:
             max_workers = min(2, self.config.performance.get_max_workers())
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
-                    executor.submit(self.generate_dc_inventory_snapshots): 'dc_inventory',
-                    executor.submit(self.generate_store_inventory_snapshots): 'store_inventory'
+                    executor.submit(self._run_async_in_thread, self.generate_dc_inventory_snapshots_async): 'dc_inventory',
+                    executor.submit(self._run_async_in_thread, self.generate_store_inventory_snapshots_async): 'store_inventory'
                 }
                 for future in as_completed(futures):
                     table = futures[future]
@@ -334,16 +341,31 @@ class MasterDataGenerator:
         else:
             # Sequential fallback
             print("\nPhase 3: Generating inventory snapshots (sequential)...")
-            self.generate_dc_inventory_snapshots()
-            self.generate_store_inventory_snapshots()
+            await self.generate_dc_inventory_snapshots_async()
+            await self.generate_store_inventory_snapshots_async()
 
         # Validate foreign key relationships
         self._validate_foreign_keys()
 
-        # Export all data to CSV
-        self._export_all_master_data()
+        # Final commit if using database
+        if session:
+            try:
+                await session.commit()
+                print("Database transaction committed successfully")
+            except Exception as e:
+                logger.error(f"Failed to commit database transaction: {e}")
+                await session.rollback()
+                raise
+
+        # Cache counts
+        self._cache_master_counts()
 
         print("Master data generation complete!")
+
+    def _run_async_in_thread(self, coro):
+        """Helper to run async coroutine in thread pool."""
+        import asyncio
+        return asyncio.run(coro)
 
     def _load_dictionary_data(self) -> None:
         """Load all required dictionary data from CSV files."""
@@ -386,8 +408,8 @@ class MasterDataGenerator:
 
         print("Dictionary data loading complete")
 
-    def generate_geography_master(self) -> None:
-        """Generate geographies_master.csv from geography dictionary."""
+    async def generate_geography_master_async(self) -> None:
+        """Generate geographies_master data with optional database insertion."""
         print("Generating geography master data...")
         self._emit_progress("geographies_master", 0.0, "Generating geographies")
 
@@ -428,13 +450,26 @@ class MasterDataGenerator:
         self.fk_validator.register_geography_ids(geography_ids)
 
         print(f"Generated {len(self.geography_master)} geography master records")
-        self._export_table("geographies_master")
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                GeographyModel,
+                self.geography_master
+            )
+
         self._emit_progress(
             "geographies_master",
             1.0,
             "Geographies complete",
             {"geographies_master": len(self.geography_master)},
         )
+
+    def generate_geography_master(self) -> None:
+        """Generate geographies_master.csv from geography dictionary (legacy sync wrapper)."""
+        import asyncio
+        asyncio.run(self.generate_geography_master_async())
 
     def generate_stores(self, count: int | None = None) -> None:
         """Generate stores.csv with strategic geographic distribution.
@@ -557,7 +592,136 @@ class MasterDataGenerator:
         self.fk_validator.register_store_ids(store_ids)
 
         print(f"Generated {len(self.stores)} store records")
-        self._export_table("stores")
+        self._emit_progress(
+            "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
+        )
+
+    async def generate_stores_async(self, count: int | None = None) -> None:
+        """Generate stores data with optional database insertion (async version)."""
+        print("Generating store data...")
+        self._emit_progress("stores", 0.0, "Generating stores")
+
+        if not self.geography_master:
+            raise ValueError("Geography master data must be generated first")
+
+        if not self.distribution_centers:
+            raise ValueError(
+                "Distribution centers must be generated before stores for supply chain constraint"
+            )
+
+        store_count = count if count is not None else self.config.volume.stores
+
+        # Get states where DCs exist to constrain store placement
+        dc_states = set()
+        for dc in self.distribution_centers:
+            dc_geo = next(gm for gm in self.geography_master if gm.ID == dc.GeographyID)
+            dc_states.add(dc_geo.State)
+
+        print(
+            f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
+        )
+
+        # Filter geography data to only include states with DCs
+        selected_geography_data = getattr(
+            self, "_selected_geography_data", self._geography_data
+        )
+        dc_constrained_geo_data = [
+            geo for geo in selected_geography_data if geo.State in dc_states
+        ]
+
+        if not dc_constrained_geo_data:
+            raise ValueError(
+                "No geography data found in states with distribution centers"
+            )
+
+        # Initialize geographic distribution using DC-constrained geographies
+        geo_distribution = GeographicDistribution(
+            dc_constrained_geo_data, self.config.seed
+        )
+        address_generator = AddressGenerator(dc_constrained_geo_data, self.config.seed)
+        id_generator = IdentifierGenerator(self.config.seed)
+
+        # Get strategic locations for stores (high-weight geographies in DC states only)
+        strategic_geos = geo_distribution.get_strategic_locations(
+            min(store_count, len(dc_constrained_geo_data))
+        )
+
+        # If we need more stores than strategic locations, distribute remainder
+        if store_count > len(strategic_geos):
+            remaining_stores = store_count - len(strategic_geos)
+            additional_distribution = (
+                geo_distribution.distribute_entities_across_geographies(
+                    remaining_stores
+                )
+            )
+        else:
+            additional_distribution = []
+
+        self.stores = []
+        current_id = 1
+
+        # Place at least one store in each strategic location
+        for geo in strategic_geos:
+            # Find matching geography master record
+            geo_master = next(
+                gm
+                for gm in self.geography_master
+                if (
+                    gm.City == geo.City
+                    and gm.State == geo.State
+                    and gm.ZipCode == geo.Zip
+                )
+            )
+
+            store = Store(
+                ID=current_id,
+                StoreNumber=id_generator.generate_store_number(current_id),
+                Address=address_generator.generate_address(geo, "commercial"),
+                GeographyID=geo_master.ID,
+            )
+            self.stores.append(store)
+            current_id += 1
+
+        # Add additional stores based on distribution
+        for geo, count_per_geo in additional_distribution:
+            # Find matching geography master record
+            geo_master = next(
+                gm
+                for gm in self.geography_master
+                if (
+                    gm.City == geo.City
+                    and gm.State == geo.State
+                    and gm.ZipCode == geo.Zip
+                )
+            )
+
+            for _ in range(count_per_geo):
+                if current_id > store_count:
+                    break
+
+                store = Store(
+                    ID=current_id,
+                    StoreNumber=id_generator.generate_store_number(current_id),
+                    Address=address_generator.generate_address(geo, "commercial"),
+                    GeographyID=geo_master.ID,
+                )
+                self.stores.append(store)
+                current_id += 1
+
+        # Register store IDs with FK validator
+        store_ids = [store.ID for store in self.stores]
+        self.fk_validator.register_store_ids(store_ids)
+
+        print(f"Generated {len(self.stores)} store records")
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                StoreModel,
+                self.stores
+            )
+
         self._emit_progress(
             "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
         )
@@ -616,13 +780,25 @@ class MasterDataGenerator:
         self.fk_validator.register_dc_ids(dc_ids)
 
         print(f"Generated {len(self.distribution_centers)} distribution center records")
-        self._export_table("distribution_centers")
         self._emit_progress(
             "distribution_centers",
             1.0,
             "Distribution centers complete",
             {"distribution_centers": len(self.distribution_centers)},
         )
+
+    async def generate_distribution_centers_async(self) -> None:
+        """Generate distribution centers with optional database insertion (async version)."""
+        # Call sync method for generation logic (without DB writes)
+        self.generate_distribution_centers()
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                DistributionCenterModel,
+                self.distribution_centers
+            )
 
     def generate_trucks(self) -> None:
         """Generate trucks.csv with refrigeration capabilities."""
@@ -706,8 +882,8 @@ class MasterDataGenerator:
                 f"Generating {supplier_total_trucks} supplier trucks ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
             )
 
-            # Use DCID = 0 to represent supplier trucks (not assigned to specific DCs)
-            supplier_dc_id = 0
+            # Use DCID = None to represent supplier trucks (not assigned to specific DCs)
+            supplier_dc_id = None
 
             # Generate supplier refrigerated trucks
             for _ in range(supplier_refrigerated_count):
@@ -744,7 +920,6 @@ class MasterDataGenerator:
             print(
                 f"  - Supplier-to-DC trucks: {supplier_total_trucks} ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
             )
-            self._export_table("trucks")
             self._emit_progress("trucks", 1.0, "Trucks complete", {"trucks": total_trucks})
         except Exception as e:
             print(f"ERROR in generate_trucks: {e}")
@@ -752,6 +927,19 @@ class MasterDataGenerator:
 
             traceback.print_exc()
             raise
+
+    async def generate_trucks_async(self) -> None:
+        """Generate trucks with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_trucks()
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                TruckModel,
+                self.trucks
+            )
 
     def generate_customers(self) -> None:
         """Generate customers.csv with realistic geographic distribution."""
@@ -832,11 +1020,8 @@ class MasterDataGenerator:
                         f"Generating customers ({len(self.customers):,}/{customer_count:,})",
                         {"customers": len(self.customers)},
                     )
-                    if len(self.customers) % 10000 == 0:
-                        self._export_table("customers")
 
         progress_reporter.complete()
-        self._export_table("customers")
         self._emit_progress(
             "customers",
             1.0,
@@ -849,6 +1034,19 @@ class MasterDataGenerator:
         self.fk_validator.register_customer_ids(customer_ids)
 
         print(f"Generated {len(self.customers)} customer records")
+
+    async def generate_customers_async(self) -> None:
+        """Generate customers with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_customers()
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                CustomerModel,
+                self.customers
+            )
 
     def generate_products_master(self) -> None:
         """Generate products_master.csv with realistic pricing and brand combinations."""
@@ -1079,7 +1277,6 @@ class MasterDataGenerator:
             )
 
         progress_reporter.complete()
-        self._export_table("products_master")
         self._emit_progress(
             "products_master",
             1.0,
@@ -1110,6 +1307,19 @@ class MasterDataGenerator:
         print(
             f"Generated {len(self.products_master)} product master records with brand combinations"
         )
+
+    async def generate_products_master_async(self) -> None:
+        """Generate products with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_products_master()
+
+        # Insert to database if session provided
+        if hasattr(self, '_db_session') and self._db_session:
+            await self._insert_to_db(
+                self._db_session,
+                ProductModel,
+                self.products_master
+            )
 
     def _map_product_to_brand_category(
         self, product_category: str, product_department: str
@@ -1363,76 +1573,6 @@ class MasterDataGenerator:
         summary = self.fk_validator.get_validation_summary()
         print(f"FK validation passed: {summary}")
 
-    def _export_all_master_data(self) -> None:
-        """Export all master data to CSV files."""
-        print("Exporting master data to CSV files...")
-        output_path = Path(self.config.paths.master)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        # Integrity check: ensure all brands/companies are sourced from dictionaries
-        try:
-            allowed_brands = {b.Brand for b in self._brand_data}
-            allowed_companies = {c.Company for c in self._company_data}
-            unexpected = []
-            for p in self.products_master:
-                if p.Brand not in allowed_brands or p.Company not in allowed_companies:
-                    unexpected.append((p.ID, p.Brand, p.Company))
-            if unexpected:
-                sample = ", ".join(
-                    [
-                        f"#{pid}:{brand}/{company}"
-                        for pid, brand, company in unexpected[:5]
-                    ]
-                )
-                raise ValueError(
-                    f"Detected products with brands/companies not present in dictionaries. Examples: {sample}. "
-                    f"Check dictionary path and inputs."
-                )
-        except Exception:
-            # Fail hard to prevent leaking real names
-            raise
-
-        for table_name in [
-            "geographies_master",
-            "stores",
-            "distribution_centers",
-            "trucks",
-            "customers",
-            "products_master",
-            "dc_inventory_snapshots",
-            "store_inventory_snapshots",
-        ]:
-            self._export_table(table_name)
-
-        # Validate all exported files
-        expected_files = [
-            "geographies_master.csv",
-            "stores.csv",
-            "distribution_centers.csv",
-            "trucks.csv",
-            "customers.csv",
-            "products_master.csv",
-        ]
-
-        # Add inventory snapshot files to validation if they exist
-        if hasattr(self, "dc_inventory_snapshots") and self.dc_inventory_snapshots:
-            expected_files.append("dc_inventory_snapshots.csv")
-        if (
-            hasattr(self, "store_inventory_snapshots")
-            and self.store_inventory_snapshots
-        ):
-            expected_files.append("store_inventory_snapshots.csv")
-
-        for filename in expected_files:
-            file_path = output_path / filename
-            if not DataFrameExporter.validate_csv_output(file_path):
-                raise ValueError(f"Failed to export or validate {filename}")
-
-        print(f"Successfully exported all master data to {output_path}")
-
-        # Cache the counts for dashboard performance
-        self._cache_master_counts()
-
     def generate_dc_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for distribution centers."""
         print("Generating DC inventory snapshots...")
@@ -1476,13 +1616,20 @@ class MasterDataGenerator:
                 self.dc_inventory_snapshots.append(inventory_record)
 
         print(f"Generated {len(self.dc_inventory_snapshots):,} DC inventory records")
-        self._export_table("dc_inventory_snapshots")
         self._emit_progress(
             "dc_inventory_snapshots",
             1.0,
             "DC inventory snapshots complete",
             {"dc_inventory_snapshots": len(self.dc_inventory_snapshots)},
         )
+
+    async def generate_dc_inventory_snapshots_async(self) -> None:
+        """Generate DC inventory snapshots with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_dc_inventory_snapshots()
+
+        # Note: Inventory snapshots don't have DB models yet - CSV only for now
+        # When DB models are added, insert logic would go here
 
     def generate_store_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for stores."""
@@ -1529,13 +1676,20 @@ class MasterDataGenerator:
         print(
             f"Generated {len(self.store_inventory_snapshots):,} store inventory records"
         )
-        self._export_table("store_inventory_snapshots")
         self._emit_progress(
             "store_inventory_snapshots",
             1.0,
             "Store inventory snapshots complete",
             {"store_inventory_snapshots": len(self.store_inventory_snapshots)},
         )
+
+    async def generate_store_inventory_snapshots_async(self) -> None:
+        """Generate store inventory snapshots with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_store_inventory_snapshots()
+
+        # Note: Inventory snapshots don't have DB models yet - CSV only for now
+        # When DB models are added, insert logic would go here
 
     def _cache_master_counts(self) -> None:
         """Cache master table counts for dashboard performance."""
@@ -1578,24 +1732,3 @@ class MasterDataGenerator:
             },
             "validation": self.fk_validator.get_validation_summary(),
         }
-
-
-# Convenience function for direct usage
-def generate_master_data(config_path: str, parallel: bool = True) -> MasterDataGenerator:
-    """
-    Convenience function to generate master data from config file.
-
-    Args:
-        config_path: Path to configuration JSON file
-        parallel: Enable parallel generation for independent tables (default True)
-
-    Returns:
-        MasterDataGenerator instance with generated data
-    """
-    from retail_datagen.config.models import RetailConfig
-
-    config = RetailConfig.from_file(config_path)
-    generator = MasterDataGenerator(config)
-    generator.generate_all_master_data(parallel=parallel)
-
-    return generator

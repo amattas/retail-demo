@@ -18,6 +18,9 @@ from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from ..config.models import RetailConfig
 from ..shared.logging_utils import get_structured_logger
 from ..shared.metrics import event_generation_duration_seconds, metrics_collector
@@ -167,6 +170,7 @@ class EventStreamer:
         products: list[ProductMaster] | None = None,
         distribution_centers: list[DistributionCenter] | None = None,
         azure_connection_string: str | None = None,
+        session: AsyncSession | None = None,
     ):
         """
         Initialize the event streaming engine.
@@ -178,6 +182,7 @@ class EventStreamer:
             products: List of product master records (loaded if None)
             distribution_centers: List of DC master records (loaded if None)
             azure_connection_string: Azure Event Hub connection string
+            session: Optional AsyncSession for SQLite database mode
         """
         self.config = config
         self.streaming_config = StreamingConfig.from_retail_config(config)
@@ -191,6 +196,9 @@ class EventStreamer:
         self._customers = customers
         self._products = products
         self._distribution_centers = distribution_centers
+
+        # Database session (for SQLite mode)
+        self._session = session
 
         # Components
         self._azure_client: AzureEventHubClient | None = None
@@ -589,6 +597,10 @@ class EventStreamer:
             )
             return False
 
+        # Check if using database mode (batch streaming from SQLite)
+        if self._session is not None:
+            return await self.start_batch_streaming()
+
         if not await self.initialize():
             self.log.error(
                 "Failed to initialize streaming engine",
@@ -645,6 +657,140 @@ class EventStreamer:
             return False
         finally:
             await self._cleanup()
+
+    async def start_batch_streaming(self) -> bool:
+        """
+        Start batch streaming from SQLite database.
+
+        Reads unpublished data from facts.db and streams to Azure Event Hub,
+        updating watermarks after successful publication.
+
+        Returns:
+            bool: True if streaming completed successfully, False otherwise
+        """
+        if not self._session:
+            self.log.error(
+                "Cannot start batch streaming without database session",
+                session_id=self._session_id,
+            )
+            return False
+
+        self.log.info(
+            "Starting batch streaming from SQLite",
+            session_id=self._session_id,
+        )
+
+        try:
+            # Initialize Azure client
+            if self.streaming_config.azure_connection_string:
+                self._azure_client = AzureEventHubClient(
+                    connection_string=self.streaming_config.azure_connection_string,
+                    hub_name=self.streaming_config.hub_name,
+                    max_batch_size=self.streaming_config.max_batch_size,
+                    batch_timeout_ms=self.streaming_config.batch_timeout_ms,
+                    retry_attempts=self.streaming_config.retry_attempts,
+                    backoff_multiplier=self.streaming_config.backoff_multiplier,
+                    circuit_breaker_enabled=self.streaming_config.circuit_breaker_enabled,
+                )
+
+                if not await self._azure_client.connect():
+                    self.log.error(
+                        "Failed to connect to Azure Event Hub",
+                        session_id=self._session_id,
+                    )
+                    return False
+            else:
+                self.log.warning(
+                    "No Azure connection string - events will not be sent",
+                    session_id=self._session_id,
+                )
+                self._azure_client = AzureEventHubClient("", self.streaming_config.hub_name)
+
+            # Get streaming window from watermarks
+            try:
+                start_ts, end_ts = await self._get_streaming_window_from_watermarks()
+                self.log.info(
+                    f"Streaming data from {start_ts} to {end_ts}",
+                    session_id=self._session_id,
+                )
+            except ValueError as e:
+                self.log.warning(str(e), session_id=self._session_id)
+                return True  # No data to stream is not an error
+
+            # Stream events from each table
+            total_published = 0
+            from ..db.purge import update_publication_watermark
+
+            for table_name in self._get_fact_tables():
+                fact_table_name = f"fact_{table_name}"
+                try:
+                    # Load unpublished events
+                    events = await self._load_unpublished_events_from_db(
+                        fact_table_name, start_ts, end_ts
+                    )
+
+                    if not events:
+                        self.log.debug(
+                            f"No unpublished events in {fact_table_name}",
+                            session_id=self._session_id,
+                        )
+                        continue
+
+                    self.log.info(
+                        f"Loaded {len(events)} events from {fact_table_name}",
+                        session_id=self._session_id,
+                    )
+
+                    # Convert to EventEnvelope format
+                    envelopes = self._convert_db_events_to_envelopes(events, table_name)
+
+                    # Publish events
+                    if envelopes:
+                        success = await self._azure_client.send_events(envelopes)
+
+                        if success:
+                            total_published += len(envelopes)
+
+                            # Update watermark after successful publication
+                            await update_publication_watermark(
+                                self._session, fact_table_name, end_ts
+                            )
+
+                            self.log.info(
+                                f"Published {len(envelopes)} events from {fact_table_name}",
+                                session_id=self._session_id,
+                            )
+                        else:
+                            self.log.error(
+                                f"Failed to publish events from {fact_table_name}",
+                                session_id=self._session_id,
+                            )
+
+                except Exception as e:
+                    self.log.error(
+                        f"Error streaming {fact_table_name}: {e}",
+                        session_id=self._session_id,
+                        error_type=type(e).__name__,
+                    )
+                    # Continue with next table
+
+            self.log.info(
+                f"Batch streaming complete: {total_published} events published",
+                session_id=self._session_id,
+            )
+            return True
+
+        except Exception as e:
+            self.log.error(
+                "Batch streaming failed",
+                session_id=self._session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return False
+        finally:
+            if self._azure_client:
+                await self._azure_client.disconnect()
 
     async def stop(self) -> bool:
         """
@@ -1336,6 +1482,177 @@ class EventStreamer:
                     succeeded=result["succeeded"],
                     failed=result["failed"],
                 )
+
+    # SQLite database integration methods
+
+    async def _load_unpublished_events_from_db(
+        self,
+        table_name: str,
+        start_ts: datetime,
+        end_ts: datetime,
+        batch_size: int = 1000,
+    ) -> list[dict]:
+        """
+        Load unpublished events from SQLite facts.db.
+
+        Args:
+            table_name: Fact table name (e.g., "fact_receipts")
+            start_ts: Start timestamp (from watermark)
+            end_ts: End timestamp (current time or batch end)
+            batch_size: Maximum events to return
+
+        Returns:
+            List of event records as dicts
+        """
+        if not self._session:
+            raise ValueError("No database session provided - cannot read from SQLite")
+
+        # Import here to avoid circular dependencies
+        from ..db.models.facts import (
+            Receipt,
+            ReceiptLine,
+            DCInventoryTransaction,
+            StoreInventoryTransaction,
+            TruckMove,
+            FootTraffic,
+            BLEPing,
+            MarketingImpression,
+            OnlineOrder,
+        )
+
+        # Map table name to model
+        model_map = {
+            "fact_receipts": Receipt,
+            "fact_receipt_lines": ReceiptLine,
+            "fact_dc_inventory_txn": DCInventoryTransaction,
+            "fact_store_inventory_txn": StoreInventoryTransaction,
+            "fact_truck_moves": TruckMove,
+            "fact_foot_traffic": FootTraffic,
+            "fact_ble_pings": BLEPing,
+            "fact_marketing": MarketingImpression,
+            "fact_online_orders": OnlineOrder,
+        }
+
+        model_class = model_map.get(table_name)
+        if not model_class:
+            raise ValueError(f"Unknown table: {table_name}")
+
+        # Query unpublished data
+        query = (
+            select(model_class)
+            .where(model_class.event_ts >= start_ts)
+            .where(model_class.event_ts < end_ts)
+            .order_by(model_class.event_ts)
+            .limit(batch_size)
+        )
+
+        result = await self._session.execute(query)
+        rows = result.scalars().all()
+
+        # Convert to dicts
+        events = []
+        for row in rows:
+            event_dict = {
+                column.name: getattr(row, column.name)
+                for column in row.__table__.columns
+            }
+            events.append(event_dict)
+
+        return events
+
+    async def _get_streaming_window_from_watermarks(self) -> tuple[datetime, datetime]:
+        """Get time window of unpublished data from watermarks."""
+        from ..db.purge import get_unpublished_data_range
+
+        # Get earliest unpublished across all tables
+        earliest = None
+        latest = None
+
+        for table in self._get_fact_tables():
+            start, end = await get_unpublished_data_range(
+                self._session, f"fact_{table}"
+            )
+            if start:
+                if not earliest or start < earliest:
+                    earliest = start
+            if end:
+                if not latest or end > latest:
+                    latest = end
+
+        if not earliest:
+            raise ValueError("No unpublished data found")
+
+        if not latest:
+            latest = datetime.now(UTC)
+
+        return earliest, latest
+
+    def _get_fact_tables(self) -> list[str]:
+        """Get list of fact table names (without 'fact_' prefix)."""
+        return [
+            "receipts",
+            "receipt_lines",
+            "dc_inventory_txn",
+            "store_inventory_txn",
+            "truck_moves",
+            "foot_traffic",
+            "ble_pings",
+            "marketing",
+            "online_orders",
+        ]
+
+    def _convert_db_events_to_envelopes(
+        self, events: list[dict], table_name: str
+    ) -> list[EventEnvelope]:
+        """
+        Convert database records to EventEnvelope format for streaming.
+
+        Args:
+            events: List of event records from database
+            table_name: Table name (without 'fact_' prefix)
+
+        Returns:
+            List of EventEnvelope objects ready for streaming
+        """
+        import random
+
+        # Map table names to event types
+        event_type_map = {
+            "receipts": EventType.RECEIPT_CREATED,
+            "receipt_lines": EventType.RECEIPT_LINE_ADDED,
+            "dc_inventory_txn": EventType.INVENTORY_UPDATED,
+            "store_inventory_txn": EventType.INVENTORY_UPDATED,
+            "truck_moves": EventType.TRUCK_ARRIVED,
+            "foot_traffic": EventType.CUSTOMER_ENTERED,
+            "ble_pings": EventType.BLE_PING_DETECTED,
+            "marketing": EventType.AD_IMPRESSION,
+            "online_orders": EventType.ONLINE_ORDER_CREATED,
+        }
+
+        event_type = event_type_map.get(table_name, EventType.RECEIPT_CREATED)
+
+        envelopes = []
+        for event_data in events:
+            # Extract timestamp field (event_ts)
+            timestamp = event_data.get("event_ts", datetime.now(UTC))
+            if isinstance(timestamp, str):
+                timestamp = datetime.fromisoformat(timestamp)
+
+            # Generate trace ID
+            trace_id = f"TR_{int(timestamp.timestamp())}_{random.randint(10000, 99999)}"
+
+            # Create envelope
+            envelope = EventEnvelope(
+                event_type=event_type,
+                payload=event_data,
+                trace_id=trace_id,
+                ingest_timestamp=timestamp,
+                schema_version="1.0",
+                source="retail-datagen-batch",
+            )
+            envelopes.append(envelope)
+
+        return envelopes
 
     # Public API methods
 

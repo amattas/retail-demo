@@ -9,6 +9,7 @@ import re
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -185,10 +186,10 @@ class Truck(BaseModel):
     Refrigeration: bool = Field(
         ..., description="Whether truck has refrigeration capability"
     )
-    DCID: int = Field(
-        ...,
-        ge=0,
-        description="Home distribution center for this truck (0 for supplier trucks)",
+    DCID: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Home distribution center for this truck (NULL for supplier trucks)",
     )
 
 

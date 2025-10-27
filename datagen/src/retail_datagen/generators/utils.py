@@ -6,14 +6,10 @@ address generation, identifier generation, and geographic distribution
 management.
 """
 
-import csv
 import math
 import random
 import string
 from pathlib import Path
-from typing import Any
-
-import pandas as pd
 
 from retail_datagen.shared.models import GeographyDict
 from retail_datagen.shared.validators import SyntheticDataValidator
@@ -390,63 +386,7 @@ class GeographicDistribution:
         return [geo for geo, weight in geo_weight_pairs[:selected_count]]
 
 
-class DataFrameExporter:
-    """Utility for exporting data to CSV files with proper formatting."""
-
-    @staticmethod
-    def export_to_csv(
-        data: list[dict[str, Any]], file_path: Path, encoding: str = "utf-8"
-    ) -> None:
-        """
-        Export list of dictionaries to CSV file.
-
-        Args:
-            data: List of dictionaries to export
-            file_path: Path where to save CSV file
-            encoding: File encoding
-        """
-        if not data:
-            raise ValueError("Cannot export empty data")
-
-        # Ensure parent directory exists
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Convert to DataFrame for consistent formatting
-        df = pd.DataFrame(data)
-
-        # Export to CSV with proper formatting
-        df.to_csv(
-            file_path,
-            index=False,
-            encoding=encoding,
-            quoting=csv.QUOTE_NONNUMERIC,  # Quote all non-numeric fields
-            escapechar="\\",
-            lineterminator="\n",
-        )
-
-    @staticmethod
-    def validate_csv_output(file_path: Path) -> bool:
-        """
-        Validate that CSV file was created correctly.
-
-        Args:
-            file_path: Path to CSV file to validate
-
-        Returns:
-            True if file is valid CSV
-        """
-        try:
-            if not file_path.exists():
-                return False
-
-            # Try to read the file
-            df = pd.read_csv(file_path)
-
-            # Basic validation
-            return len(df) > 0 and len(df.columns) > 0
-
-        except Exception:
-            return False
+# DataFrameExporter removed - use SQLAlchemy for data writes, db.migration for CSV reading
 
 
 class ProgressReporter:

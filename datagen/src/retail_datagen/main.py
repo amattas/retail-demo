@@ -24,6 +24,10 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .api.models import ErrorResponse, HealthCheckResponse, ValidationErrorResponse
 from .config.models import RetailConfig
+from .db.engine import dispose_engines, get_facts_engine, get_master_engine
+from .db.init import init_databases
+from .db.manager import get_database_status, get_db_manager
+from .db.models.base import Base
 from .generators.router import router as generators_router
 from .shared.dependencies import (
     check_azure_connection,
@@ -88,6 +92,31 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {APP_NAME} v{APP_VERSION}")
 
+    # Initialize databases
+    try:
+        logger.info("Initializing SQLite databases...")
+
+        # Initialize database directories and connections
+        await init_databases()
+
+        # Create all tables if they don't exist
+        master_engine = get_master_engine()
+        facts_engine = get_facts_engine()
+
+        async with master_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        async with facts_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        logger.info("✅ SQLite databases initialized successfully")
+        logger.info(f"  - Master DB: {master_engine.url}")
+        logger.info(f"  - Facts DB: {facts_engine.url}")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize databases: {e}", exc_info=True)
+        logger.warning("Application will continue but SQLite features may not work")
+
     try:
         # Initialize configuration
         config_path = Path("config.json")
@@ -129,6 +158,13 @@ async def lifespan(app: FastAPI):
         if not task.done():
             logger.info(f"Cancelling background task: {task_id}")
             task.cancel()
+
+    # Dispose database engines
+    try:
+        await dispose_engines()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Error closing database connections: {e}")
 
     logger.info("Application shutdown completed")
 
@@ -376,6 +412,24 @@ async def health_check():
     if azure_check["status"] in ["error", "invalid_config"]:
         overall_status = "degraded"
 
+    # Check database health
+    try:
+        db_manager = get_db_manager()
+        db_health = await db_manager.check_health()
+        checks["databases"] = {
+            "status": "healthy" if db_health["overall"] else "degraded",
+            "master": "healthy" if db_health["master"] else "unhealthy",
+            "facts": "healthy" if db_health["facts"] else "unhealthy",
+        }
+        if not db_health["overall"]:
+            overall_status = "degraded"
+    except Exception as e:
+        checks["databases"] = {
+            "status": "unknown",
+            "error": str(e),
+        }
+        logger.warning(f"Database health check failed: {e}")
+
     return HealthCheckResponse(
         status=overall_status,
         timestamp=datetime.now(),
@@ -527,6 +581,38 @@ async def validate_config(config_data: RetailConfig):
             "message": f"Configuration validation failed: {str(e)}",
             "timestamp": datetime.now(),
         }
+
+
+# ================================
+# DATABASE STATUS ROUTES
+# ================================
+
+
+@app.get(
+    "/api/database/status",
+    summary="Get database status",
+    description="Get comprehensive database status and statistics",
+    tags=["Database"],
+)
+async def database_status():
+    """
+    Get database status and statistics.
+
+    Returns information about both master and facts databases including:
+    - Health status
+    - File sizes
+    - Connection state
+    - Configuration settings
+    """
+    try:
+        status = await get_database_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting database status: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get database status: {str(e)}",
+        )
 
 
 # ================================

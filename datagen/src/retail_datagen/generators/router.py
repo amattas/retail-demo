@@ -222,7 +222,13 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
-            await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
+            from retail_datagen.db.session import get_master_session
+
+            async with get_master_session() as session:
+                await master_generator.generate_all_master_data_async(
+                    session=session,
+                    parallel=True
+                )
 
             for table in table_progress:
                 table_progress[table] = max(table_progress[table], 1.0)
@@ -356,7 +362,13 @@ async def generate_specific_master_table(
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
             # Generate the specific table (parallel=True by default)
-            result = await asyncio.to_thread(master_generator.generate_all_master_data, None, True)
+            from retail_datagen.db.session import get_master_session
+
+            async with get_master_session() as session:
+                result = await master_generator.generate_all_master_data_async(
+                    session=session,
+                    parallel=True
+                )
 
             update_task_progress(task_id, 1.0, f"Generated {table_name}")
 
@@ -466,6 +478,10 @@ async def generate_historical_data(
                 estimated_seconds_remaining: float | None = None,
                 progress_rate: float | None = None,
                 table_counts: dict[str, int] | None = None,
+                # NEW: Hourly progress fields
+                current_hour: int | None = None,
+                hourly_progress: dict[str, float] | None = None,
+                total_hours_completed: int | None = None,
             ):
                 progress = current_day / total_days if total_days > 0 else 0.0
                 if total_days > 0 and current_day == 0:
@@ -514,6 +530,11 @@ async def generate_historical_data(
                     estimated_seconds_remaining=estimated_seconds_remaining,
                     progress_rate=progress_rate,
                     table_counts=table_counts,
+                    # NEW: Pass hourly progress fields
+                    current_day=current_day,
+                    current_hour=current_hour,
+                    hourly_progress=hourly_progress,
+                    total_hours_completed=total_hours_completed,
                 )
 
             # Also wire a master-style per-table progress callback for consistent UI updates
@@ -603,8 +624,9 @@ async def generate_historical_data(
             logger.info(f"Starting historical generation from {start_date.date()} to {end_date.date()} in {mode_str} mode")
 
             # Generate historical data using the fact generator
-            summary = await asyncio.to_thread(
-                fact_generator.generate_historical_data,
+            # Note: generate_historical_data is now async (Phase 3B SQLite migration)
+            # TODO: Add database session support when SQLite mode is enabled in config
+            summary = await fact_generator.generate_historical_data(
                 start_date,
                 end_date,
                 use_parallel
@@ -734,8 +756,10 @@ async def generate_specific_historical_table(
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
             # Generate historical data using the fact generator
-            summary = await asyncio.to_thread(
-                fact_generator.generate_historical_data, start_date, end_date
+            # Note: generate_historical_data is now async (Phase 3B SQLite migration)
+            # TODO: Add database session support when SQLite mode is enabled in config
+            summary = await fact_generator.generate_historical_data(
+                start_date, end_date, False  # use_parallel=False for single table
             )
 
             # Update generation state with the end timestamp

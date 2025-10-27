@@ -79,6 +79,20 @@ class TaskStatus(BaseModel):
         default=None, description="Timestamp of last progress update"
     )
 
+    # NEW: Hourly progress tracking fields
+    current_day: int | None = Field(
+        default=None, description="Current day being processed (1-indexed)", ge=1
+    )
+    current_hour: int | None = Field(
+        default=None, description="Current hour being processed (0-23)", ge=0, le=23
+    )
+    hourly_progress: dict[str, float] | None = Field(
+        default=None, description="Per-table hourly progress (0.0-1.0)"
+    )
+    total_hours_completed: int | None = Field(
+        default=None, description="Total hours completed across all days", ge=0
+    )
+
     def __getitem__(self, key: str) -> Any:
         """Support dictionary-style access for backwards compatibility."""
         return getattr(self, key)
@@ -266,6 +280,10 @@ def update_task_progress(
     estimated_seconds_remaining: float | None = None,
     progress_rate: float | None = None,
     table_counts: dict[str, int] | None = None,
+    # NEW: Hourly progress fields
+    current_hour: int | None = None,
+    hourly_progress: dict[str, float] | None = None,
+    total_hours_completed: int | None = None,
 ) -> None:
     """Update progress for a background task with optional per-table tracking.
 
@@ -281,6 +299,9 @@ def update_task_progress(
         tables_remaining: Optional list of tables not yet started
         estimated_seconds_remaining: Optional estimated seconds until completion
         progress_rate: Optional progress rate (percent per second)
+        current_hour: Optional current hour being processed (0-23)
+        hourly_progress: Optional per-table hourly progress
+        total_hours_completed: Optional total hours completed across all days
     """
     if task_id in _task_status:
         # Get existing status fields we want to preserve
@@ -313,6 +334,13 @@ def update_task_progress(
             updated_fields["progress_rate"] = progress_rate
         if table_counts is not None:
             updated_fields["table_counts"] = table_counts
+        # NEW: Update hourly progress fields if provided
+        if current_hour is not None:
+            updated_fields["current_hour"] = current_hour
+        if hourly_progress is not None:
+            updated_fields["hourly_progress"] = hourly_progress
+        if total_hours_completed is not None:
+            updated_fields["total_hours_completed"] = total_hours_completed
 
         # Create new TaskStatus with merged fields
         _task_status[task_id] = TaskStatus(**{**existing, **updated_fields})

@@ -57,3 +57,8 @@ htmlcov/
 
 # Logs
 *.log
+
+# SQLite databases
+data/*.db
+data/*.db-shm
+data/*.db-wal

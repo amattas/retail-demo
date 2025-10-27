@@ -218,7 +218,39 @@ async def start_streaming(
         try:
             update_task_progress(session_id, 0.0, "Initializing event streaming")
 
-            # Configure EventStreamer and start
+            # Check if SQLite mode should be used
+            use_sqlite = True  # Default to SQLite if database exists
+
+            # Try SQLite batch streaming first
+            if use_sqlite:
+                try:
+                    from ..db.session import get_facts_session
+
+                    async with get_facts_session() as db_session:
+                        # Create new streamer with database session
+                        db_streamer = EventStreamer(
+                            config=config,
+                            azure_connection_string=config.realtime.azure_connection_string,
+                            session=db_session,
+                        )
+                        success = await db_streamer.start()
+
+                        update_task_progress(session_id, 1.0, "Batch streaming completed")
+
+                        stats = await db_streamer.get_statistics()
+                        return {
+                            "events_sent": stats.get("events_sent_successfully", 0),
+                            "duration_minutes": request.duration_minutes,
+                            "event_types": request.event_types or AVAILABLE_EVENT_TYPES,
+                            "end_reason": "batch_completed",
+                            "mode": "sqlite_batch",
+                        }
+
+                except Exception as db_error:
+                    logger.warning(f"SQLite batch streaming failed, falling back to real-time: {db_error}")
+                    # Fall through to real-time mode
+
+            # Fall back to real-time generation mode
             if request.event_types:
                 event_streamer.set_allowed_event_types(request.event_types)
             duration = (
@@ -240,11 +272,12 @@ async def start_streaming(
                 "end_reason": (
                     "duration_completed" if request.duration_minutes else "manual_stop"
                 ),
+                "mode": "real_time",
             }
 
         except asyncio.CancelledError:
             update_task_progress(session_id, 1.0, "Streaming cancelled")
-            return {"events_sent": event_count, "end_reason": "cancelled"}
+            return {"events_sent": 0, "end_reason": "cancelled"}
         except Exception as e:
             logger.error(f"Streaming task failed: {e}")
             _streaming_statistics["connection_failures"] += 1

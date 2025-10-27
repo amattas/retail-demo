@@ -2,8 +2,8 @@
 Historical fact data generation engine for retail data generator.
 
 This module implements the FactDataGenerator class that creates realistic
-retail transaction data for all 8 fact tables with proper temporal patterns,
-business logic coordination, and partitioned output.
+retail transaction data for all 9 fact tables with proper temporal patterns,
+business logic coordination, and SQLite database storage.
 """
 
 import inspect
@@ -18,11 +18,15 @@ from decimal import Decimal
 from multiprocessing import cpu_count
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, Type, Optional
 
 import pandas as pd
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase
+
 from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
-from retail_datagen.generators.utils import DataFrameExporter, ProgressReporter
+from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.models import (
     Customer,
@@ -162,8 +166,9 @@ class HourlyProgressTracker:
             overall_progress = sum(per_table_progress.values()) / len(self._fact_tables) if self._fact_tables else 0.0
 
             # Find the most advanced position across all tables
-            max_day = max(self._current_day.values()) if self._current_day else 0
-            max_hour = max(self._current_hour.values()) if self._current_hour else 0
+            # Return None instead of 0 to avoid validation issues (current_day must be >= 1)
+            max_day = max(self._current_day.values()) if self._current_day else None
+            max_hour = max(self._current_hour.values()) if self._current_hour else None
 
             return {
                 "overall_progress": min(1.0, overall_progress),
@@ -244,8 +249,9 @@ class FactDataGenerator:
     """
     Main historical fact data generation engine.
 
-    Generates all 8 fact tables with realistic retail behaviors, temporal patterns,
+    Generates all 9 fact tables with realistic retail behaviors, temporal patterns,
     and cross-fact coordination while maintaining business rule compliance.
+    Writes data directly to SQLite database.
     """
 
     # Define the core fact tables that are always generated
@@ -262,15 +268,25 @@ class FactDataGenerator:
         "online_orders",
     ]
 
-    def __init__(self, config: RetailConfig):
+    def __init__(
+        self,
+        config: RetailConfig,
+        session: AsyncSession,
+    ):
         """
         Initialize fact data generator.
 
         Args:
             config: Retail configuration containing generation parameters
+            session: AsyncSession for facts.db (required)
         """
         self.config = config
         self._rng = random.Random(config.seed)
+        self._session = session
+
+        # Buffer for database writes
+        # Structure: {table_name: [list of records]}
+        self._db_buffer: dict[str, list[dict]] = {}
 
         # Initialize patterns and simulators
         self.temporal_patterns = CompositeTemporalPatterns(config.seed)
@@ -549,19 +565,27 @@ class FactDataGenerator:
             f"{loaded_counts.get('products', 0)} products"
         )
 
-    def generate_historical_data(
+    async def generate_historical_data(
         self, start_date: datetime, end_date: datetime, parallel: bool = True
     ) -> FactGenerationSummary:
         """
         Generate historical fact data for the specified date range.
 
+        Writes data directly to SQLite database.
+
         Args:
             start_date: Start of historical data generation
             end_date: End of historical data generation
-            parallel: Enable parallel day-by-day processing (default True)
+            parallel: Enable parallel day-by-day processing (default True, currently disabled for database mode)
 
         Returns:
             Summary of generation results
+
+        Note:
+            This method is async to support database operations. Call with:
+            ```python
+            summary = await generator.generate_historical_data(start, end)
+            ```
         """
         generation_start_time = datetime.now()
         print(
@@ -607,133 +631,90 @@ class FactDataGenerator:
         expected_records = {k: v for k, v in expected_records_all.items() if k in active_tables}
 
         progress_reporter = ProgressReporter(total_days, "Generating historical data")
-        partitions_created = 0
 
         # Generate data day by day
         current_date = start_date
         day_counter = 0
 
         if parallel:
-            # PARALLEL PROCESSING: Use ThreadPoolExecutor for day-by-day
-            max_workers = min(cpu_count(), 8)  # Cap at 8 to avoid memory issues
-            print(f"Using parallel processing with {max_workers} thread workers")
+            # PARALLEL PROCESSING: Not yet supported for SQLite writes
+            logger.warning(
+                "Parallel processing not yet supported for database writes. "
+                "Falling back to sequential processing."
+            )
+            parallel = False
 
-            # Generate list of all dates
-            dates_to_process = []
-            temp_date = start_date
-            while temp_date <= end_date:
-                dates_to_process.append(temp_date)
-                temp_date += timedelta(days=1)
+        # SEQUENTIAL PROCESSING
+        while current_date <= end_date:
+            day_counter += 1
 
-            # Process days in parallel
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all days for processing with progress reporting enabled
-                future_to_date = {
-                    executor.submit(
-                        self._generate_and_export_day,
-                        date,
-                        day_idx + 1,
-                        total_days,
-                        report_progress=True  # Enable progress reporting from workers
-                    ): date
-                    for day_idx, date in enumerate(dates_to_process)
-                }
+            # Generate daily facts (progress updates now happen during actual generation)
+            daily_facts = await self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
 
-                # Collect results as they complete
-                for future in as_completed(future_to_date):
-                    date = future_to_date[future]
-                    try:
-                        daily_counts, partition_count = future.result()
+            # Update counters
+            for fact_type, records in daily_facts.items():
+                facts_generated[fact_type] += len(records)
 
-                        # Update counters
-                        for fact_type, count in daily_counts.items():
-                            facts_generated[fact_type] += count
-                        partitions_created += partition_count
+            # Update per-table progress based on actual records generated
+            for fact_type in facts_generated.keys():
+                current_count = facts_generated[fact_type]
+                expected = expected_records.get(fact_type, 1)
+                # Calculate actual progress (0.0 to 1.0), never exceed 1.0
+                table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
 
-                        day_counter += 1
-                        progress_reporter.update(1)
-
-                        # Note: Progress updates are now sent from worker threads
-                        # No need to send them again from main thread
-                    except Exception as e:
-                        print(f"Error processing {date}: {e}")
-                        raise
-        else:
-            # SEQUENTIAL PROCESSING: Original loop (fallback)
-            while current_date <= end_date:
-                day_counter += 1
-
-                # Generate daily facts (progress updates now happen during actual generation)
-                daily_facts = self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
-
-                # Export daily facts to partitioned files
-                partition_count = self._export_daily_facts(current_date, daily_facts)
-                partitions_created += partition_count
-
-                # Update counters
-                for fact_type, records in daily_facts.items():
-                    facts_generated[fact_type] += len(records)
-
-                # Update per-table progress based on actual records generated
-                for fact_type in facts_generated.keys():
-                    current_count = facts_generated[fact_type]
-                    expected = expected_records.get(fact_type, 1)
-                    # Calculate actual progress (0.0 to 1.0), never exceed 1.0
-                    table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
-
-                # Emit per-table progress (master-style)
-                for fact_type, prog in table_progress.items():
-                    self._emit_table_progress(
-                        fact_type,
-                        prog,
-                        f"Generating {fact_type.replace('_',' ')}",
-                        None,
-                    )
-
-                # Update table states based on progress
-                self._update_table_states(table_progress)
-
-                # Calculate tables completed count
-                tables_completed_count = sum(
-                    1 for state in self._table_states.values()
-                    if state == "completed"
+            # Emit per-table progress (master-style)
+            for fact_type, prog in table_progress.items():
+                self._emit_table_progress(
+                    fact_type,
+                    prog,
+                    f"Generating {fact_type.replace('_',' ')}",
+                    None,
                 )
 
-                # Enhanced message with table completion count
-                enhanced_message = (
-                    f"Generating data for {current_date.strftime('%Y-%m-%d')} "
-                    f"(day {day_counter}/{total_days}) "
-                    f"({tables_completed_count}/{len(self._table_states)} tables complete)"
-                )
+            # Update table states based on progress
+            self._update_table_states(table_progress)
 
-                # Get table lists for detailed reporting
-                tables_completed = [
-                    table for table, state in self._table_states.items()
-                    if state == "completed"
-                ]
-                tables_in_progress = [
-                    table for table, state in self._table_states.items()
-                    if state == "in_progress"
-                ]
-                tables_remaining = [
-                    table for table, state in self._table_states.items()
-                    if state == "not_started"
-                ]
+            # Calculate tables completed count
+            tables_completed_count = sum(
+                1 for state in self._table_states.values()
+                if state == "completed"
+            )
 
-                # Update API progress with throttling, include cumulative counts
-                self._send_throttled_progress_update(
-                    day_counter,
-                    enhanced_message,
-                    total_days,
-                    table_progress=table_progress,
-                    tables_completed=tables_completed,
-                    tables_in_progress=tables_in_progress,
-                    tables_remaining=tables_remaining,
-                    table_counts=facts_generated.copy(),
-                )
+            # Enhanced message with table completion count
+            enhanced_message = (
+                f"Generating data for {current_date.strftime('%Y-%m-%d')} "
+                f"(day {day_counter}/{total_days}) "
+                f"({tables_completed_count}/{len(self._table_states)} tables complete)"
+            )
 
-                progress_reporter.update(1)
-                current_date += timedelta(days=1)
+            # Get table lists for detailed reporting
+            tables_completed = [
+                table for table, state in self._table_states.items()
+                if state == "completed"
+            ]
+            tables_in_progress = [
+                table for table, state in self._table_states.items()
+                if state == "in_progress"
+            ]
+            tables_remaining = [
+                table for table, state in self._table_states.items()
+                if state == "not_started"
+            ]
+
+            # Update API progress with throttling, include cumulative counts
+            self._send_throttled_progress_update(
+                day_counter,
+                enhanced_message,
+                total_days,
+                table_progress=table_progress,
+                tables_completed=tables_completed,
+                tables_in_progress=tables_in_progress,
+                tables_remaining=tables_remaining,
+                table_counts=facts_generated.copy(),
+            )
+
+            progress_reporter.update(1)
+            current_date += timedelta(days=1)
 
         progress_reporter.complete()
 
@@ -751,7 +732,7 @@ class FactDataGenerator:
             total_records=total_records,
             validation_results=validation_results,
             generation_time_seconds=generation_time,
-            partitions_created=partitions_created,
+            partitions_created=0,  # No longer applicable in database-only mode
         )
 
         print(
@@ -759,16 +740,22 @@ class FactDataGenerator:
             f"in {generation_time:.1f}s"
         )
         print(
-            f"Generated {partitions_created} partitions "
-            f"across {len(facts_generated)} fact tables"
+            f"Generated {len(facts_generated)} fact tables"
         )
 
         # Cache the counts for dashboard performance
         self._cache_fact_counts(facts_generated)
 
+        # Update watermarks if database session provided
+        if self._session:
+            await self._update_watermarks_after_generation(
+                start_date, end_date, active_tables
+            )
+            logger.info("Updated watermarks for all generated fact tables")
+
         return summary
 
-    def _generate_daily_facts(
+    async def _generate_daily_facts(
         self,
         date: datetime,
         active_tables: list[str],
@@ -791,6 +778,9 @@ class FactDataGenerator:
 
         Returns:
             Dictionary of fact tables with their records
+
+        Note:
+            Now async to support database operations during hourly exports.
         """
         daily_facts = {t: [] for t in active_tables}
 
@@ -832,7 +822,7 @@ class FactDataGenerator:
         for hour_idx, hour_data in enumerate(hourly_data):
             hourly_subset = {t: (hour_data.get(t, []) if t in active_tables else []) for t in active_tables}
             try:
-                self._export_hourly_facts(date, hour_idx, hourly_subset)
+                await self._export_hourly_facts(date, hour_idx, hourly_subset)
 
                 # NEW: Update hourly progress tracker after successful export
                 for table in active_tables:
@@ -1001,25 +991,40 @@ class FactDataGenerator:
             )
             trace_id = self._generate_trace_id()
 
-            orders.append(
-                {
-                    "TraceId": trace_id,
-                    "EventTS": event_ts,
-                    "OrderId": order_id,
-                    "CustomerID": customer.ID,
-                    "FulfillmentMode": mode,
-                    "FulfillmentNodeType": node_type,
-                    "FulfillmentNodeID": node_id,
-                    "Subtotal": str(subtotal),
-                    "Tax": str(tax),
-                    "Total": str(total),
-                    "TenderType": TenderType.CREDIT_CARD.value,
-                }
-            )
+            # Create one order record per product (like receipt lines)
+            for product, qty in basket.items:
+                # Calculate line total for this product
+                line_subtotal = product.SalePrice * qty
+                line_tax = line_subtotal * tax_rate
+                line_total = line_subtotal + line_tax
+
+                orders.append(
+                    {
+                        "TraceId": trace_id,
+                        "EventTS": event_ts,
+                        "OrderId": order_id,
+                        "CustomerID": customer.ID,
+                        "ProductID": product.ID,
+                        "Quantity": qty,
+                        "Total": str(line_total),
+                        "FulfillmentMode": mode,
+                        "FulfillmentNodeType": node_type,
+                        "FulfillmentNodeID": node_id,
+                        "Subtotal": str(line_subtotal),
+                        "Tax": str(line_tax),
+                        "TenderType": TenderType.CREDIT_CARD.value,
+                    }
+                )
 
             # Create inventory effects: decrement stock at node
             for product, qty in basket.items:
                 if node_type == "STORE":
+                    # Update store inventory and get balance
+                    key = (node_id, product.ID)
+                    current_balance = self.inventory_flow_sim._store_inventory.get(key, 0)
+                    new_balance = max(0, current_balance - qty)
+                    self.inventory_flow_sim._store_inventory[key] = new_balance
+
                     store_txn.append(
                         {
                             "TraceId": trace_id,
@@ -1029,9 +1034,16 @@ class FactDataGenerator:
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
                             "Source": "ONLINE",
+                            "Balance": new_balance,
                         }
                     )
                 else:  # DC
+                    # Update DC inventory and get balance
+                    key = (node_id, product.ID)
+                    current_balance = self.inventory_flow_sim._dc_inventory.get(key, 0)
+                    new_balance = max(0, current_balance - qty)
+                    self.inventory_flow_sim._dc_inventory[key] = new_balance
+
                     dc_txn.append(
                         {
                             "TraceId": trace_id,
@@ -1041,6 +1053,7 @@ class FactDataGenerator:
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
                             "Source": "ONLINE",
+                            "Balance": new_balance,
                         }
                     )
 
@@ -1057,6 +1070,10 @@ class FactDataGenerator:
             dc_transactions = self.inventory_flow_sim.simulate_dc_receiving(dc.ID, date)
 
             for transaction in dc_transactions:
+                # Get current balance from inventory simulator
+                key = (transaction["DCID"], transaction["ProductID"])
+                balance = self.inventory_flow_sim._dc_inventory.get(key, 0)
+
                 transactions.append(
                     {
                         "TraceId": self._generate_trace_id(),
@@ -1065,6 +1082,7 @@ class FactDataGenerator:
                         "ProductID": transaction["ProductID"],
                         "QtyDelta": transaction["QtyDelta"],
                         "Reason": transaction["Reason"].value,
+                        "Balance": balance,
                     }
                 )
 
@@ -1385,6 +1403,12 @@ class FactDataGenerator:
             lines.append(line)
 
             # Create inventory transaction (sale)
+            # Update store inventory and get balance
+            key = (store.ID, product.ID)
+            current_balance = self.inventory_flow_sim._store_inventory.get(key, 0)
+            new_balance = max(0, current_balance - qty)
+            self.inventory_flow_sim._store_inventory[key] = new_balance
+
             inventory_transaction = {
                 "TraceId": trace_id,
                 "EventTS": transaction_time,
@@ -1393,6 +1417,7 @@ class FactDataGenerator:
                 "QtyDelta": -qty,  # Negative for sale
                 "Reason": InventoryReason.SALE.value,
                 "Source": "CUSTOMER_PURCHASE",
+                "Balance": new_balance,
             }
             inventory_transactions.append(inventory_transaction)
 
@@ -1548,6 +1573,10 @@ class FactDataGenerator:
                 transactions = self.inventory_flow_sim.complete_delivery(shipment_id)
 
                 for transaction in transactions:
+                    # Get current balance from inventory simulator
+                    key = (transaction["StoreID"], transaction["ProductID"])
+                    balance = self.inventory_flow_sim._store_inventory.get(key, 0)
+
                     delivery_transactions.append(
                         {
                             "TraceId": self._generate_trace_id(),
@@ -1557,6 +1586,7 @@ class FactDataGenerator:
                             "QtyDelta": transaction["QtyDelta"],
                             "Reason": transaction["Reason"].value,
                             "Source": transaction["Source"],
+                            "Balance": balance,
                         }
                     )
 
@@ -1576,69 +1606,44 @@ class FactDataGenerator:
             if product.LaunchDate.date() <= date.date()
         ]
 
-    def _export_daily_facts(
-        self, date: datetime, daily_facts: dict[str, list[dict]]
-    ) -> int:
-        """Export daily facts to partitioned CSV files."""
-        facts_path = Path(self.config.paths.facts)
-        date_partition = f"dt={date.strftime('%Y-%m-%d')}"
-        partitions_created = 0
-
-        for fact_table, records in daily_facts.items():
-            if not records:
-                continue
-
-            # Create partition directory
-            partition_path = facts_path / fact_table / date_partition
-            partition_path.mkdir(parents=True, exist_ok=True)
-
-            # Export to CSV file
-            file_path = partition_path / f"{fact_table}_{date.strftime('%Y%m%d')}.csv"
-            DataFrameExporter.export_to_csv(records, file_path)
-
-            partitions_created += 1
-
-        return partitions_created
-
-    def _export_hourly_facts(
+    async def _export_hourly_facts(
         self, date: datetime, hour: int, hourly_facts: dict[str, list[dict]]
-    ) -> int:
-        """Export hourly facts to partitioned CSV files.
-
-        Files are written under: facts/<table>/dt=YYYY-MM-DD/hr=HH/
+    ) -> None:
         """
-        facts_path = Path(self.config.paths.facts)
-        dt_part = f"dt={date.strftime('%Y-%m-%d')}"
-        hr_part = f"hr={hour:02d}"
-        partitions_created = 0
+        Export hourly facts to database.
 
+        Args:
+            date: Date being generated
+            hour: Hour of day (0-23)
+            hourly_facts: Dictionary mapping table names to record lists
+        """
         for fact_table, records in hourly_facts.items():
             if not records:
                 continue
 
-            partition_path = facts_path / fact_table / dt_part / hr_part
-            partition_path.mkdir(parents=True, exist_ok=True)
-
-            file_path = partition_path / (
-                f"{fact_table}_{date.strftime('%Y%m%d')}_{hour:02d}_{self._rng.randint(1000,9999)}.csv"
-            )
-            DataFrameExporter.export_to_csv(records, file_path)
-            partitions_created += 1
-
-        return partitions_created
+            try:
+                # Convert records to DataFrame for database insertion
+                df = pd.DataFrame(records)
+                await self._insert_hourly_to_db(
+                    self._session,
+                    fact_table,
+                    df,
+                    hour
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to insert {fact_table} hour {hour} to database: {e}"
+                )
+                raise
 
     def _generate_and_export_day(
         self, date: datetime, day_num: int, total_days: int, report_progress: bool = False
     ) -> tuple[dict[str, int], int]:
         """
-        Generate and export data for a single day (used by parallel processing).
+        Generate data for a single day (used by parallel processing - currently disabled).
 
-        This method is called by parallel threads. Thread-safe as each day
-        writes to separate partition directories.
-
-        In parallel mode, this method enables hourly progress reporting from worker threads.
-        The hourly progress updates are sent from within _generate_daily_facts and are
-        thread-safe thanks to the _progress_lock protecting shared state.
+        This method is called by parallel threads. Currently disabled for database mode
+        as SQLite does not support concurrent writes from multiple threads.
 
         Args:
             date: Date to generate data for
@@ -1647,16 +1652,44 @@ class FactDataGenerator:
             report_progress: Whether to send progress updates (default False for backward compatibility)
 
         Returns:
-            Tuple of (daily_counts dict, partition_count)
+            Tuple of (daily_counts dict, 0)
+
+        Note:
+            Wraps async _generate_daily_facts in asyncio.run() for thread compatibility.
+            Parallel mode is currently disabled for database writes.
         """
+        import asyncio
+
         # Get active tables
         active_tables = self._active_fact_tables()
 
-        # Generate daily facts
-        daily_facts = self._generate_daily_facts(date, active_tables, day_num, total_days)
-
-        # Export to CSV
-        partition_count = self._export_daily_facts(date, daily_facts)
+        # Generate daily facts (wrap async call for thread pool compatibility)
+        try:
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, we're in async context - shouldn't happen in threads
+                logger.warning(f"Event loop already running in thread for {date}")
+                # Fall back to creating new loop
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                daily_facts = loop.run_until_complete(
+                    self._generate_daily_facts(date, active_tables, day_num, total_days)
+                )
+                loop.close()
+            else:
+                # Use existing event loop
+                daily_facts = loop.run_until_complete(
+                    self._generate_daily_facts(date, active_tables, day_num, total_days)
+                )
+        except RuntimeError:
+            # No event loop in thread, create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            daily_facts = loop.run_until_complete(
+                self._generate_daily_facts(date, active_tables, day_num, total_days)
+            )
+            loop.close()
 
         # Count records
         daily_counts = {fact_type: len(records) for fact_type, records in daily_facts.items()}
@@ -1670,7 +1703,7 @@ class FactDataGenerator:
                 daily_counts=daily_counts
             )
 
-        return daily_counts, partition_count
+        return daily_counts, 0  # No partitions in database mode
 
     def _send_progress_from_worker(
         self,
@@ -1823,8 +1856,7 @@ class FactDataGenerator:
                 "estimated_seconds_remaining": eta,
                 "progress_rate": progress_rate,
                 "table_counts": table_counts,
-                # NEW: Add hourly progress fields
-                "current_day": hourly_progress_data.get("current_day"),
+                # NEW: Add hourly progress fields (note: current_day is passed as first positional arg, don't duplicate)
                 "current_hour": hourly_progress_data.get("current_hour"),
                 "hourly_progress": hourly_progress_data.get("per_table_progress"),
                 "total_hours_completed": sum(hourly_progress_data.get("completed_hours", {}).values()),
@@ -1901,6 +1933,303 @@ class FactDataGenerator:
 
         return {key: value for key, value in cleaned_kwargs.items() if key in accepted_names}
 
+    def _get_model_for_table(self, table_name: str) -> Type[DeclarativeBase]:
+        """
+        Map fact table name to SQLAlchemy model.
+
+        Args:
+            table_name: Name of fact table (e.g., "receipts", "dc_inventory_txn")
+
+        Returns:
+            SQLAlchemy model class for the table
+
+        Raises:
+            ValueError: If table name is unknown
+        """
+        from retail_datagen.db.models.facts import (
+            DCInventoryTransaction,
+            TruckMove,
+            StoreInventoryTransaction,
+            Receipt,
+            ReceiptLine,
+            FootTraffic,
+            BLEPing,
+            MarketingImpression,
+            OnlineOrder,
+        )
+
+        mapping = {
+            "dc_inventory_txn": DCInventoryTransaction,
+            "truck_moves": TruckMove,
+            "store_inventory_txn": StoreInventoryTransaction,
+            "receipts": Receipt,
+            "receipt_lines": ReceiptLine,
+            "foot_traffic": FootTraffic,
+            "ble_pings": BLEPing,
+            "marketing": MarketingImpression,
+            "online_orders": OnlineOrder,
+        }
+
+        if table_name not in mapping:
+            raise ValueError(f"Unknown table: {table_name}")
+
+        return mapping[table_name]
+
+    def _map_field_names_for_db(self, table_name: str, record: dict) -> dict:
+        """
+        Map generator field names (PascalCase) to database field names (snake_case).
+
+        Args:
+            table_name: Name of fact table
+            record: Record dict with generator field names
+
+        Returns:
+            New dict with database-compatible field names
+
+        Notes:
+            - TraceId field is skipped (not in DB models)
+            - balance field (DC/Store inventory) not in generator output - will be NULL
+            - Some generator fields don't map to DB (e.g., ReceiptId string, OrderId string)
+            - Receipts table: discount_amount field not in generator - will default to 0.0
+        """
+        # Define field mappings for each table
+        # Generator fields -> Database fields
+        common_mappings = {
+            # Skip TraceId - not in DB models
+            "EventTS": "event_ts",
+        }
+
+        table_specific_mappings = {
+            "receipts": {
+                **common_mappings,
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
+                # Note: ReceiptId (string) not in DB model (has auto-increment receipt_id instead)
+                "Tax": "tax_amount",
+                "Total": "total_amount",
+                "TenderType": "payment_method",
+                # Note: discount_amount field in DB will default to 0.0 (not in generator)
+            },
+            "receipt_lines": {
+                **common_mappings,
+                "ReceiptId": "receipt_id",  # Maps to FK
+                "ProductID": "product_id",
+                "Qty": "quantity",
+                "UnitPrice": "unit_price",
+                "ExtPrice": "line_total",
+                # Note: Line and PromoCode fields in generator don't exist in DB model
+            },
+            "dc_inventory_txn": {
+                **common_mappings,
+                "DCID": "dc_id",
+                "ProductID": "product_id",
+                "QtyDelta": "quantity",
+                "Reason": "txn_type",
+                "Balance": "balance",
+            },
+            "truck_moves": {
+                **common_mappings,
+                "TruckId": "truck_id",
+                "DCID": "dc_id",
+                "StoreID": "store_id",
+                "ProductID": "product_id",
+                "Status": "status",
+                "ShipmentId": "shipment_id",
+                "ETA": "eta",
+                "ETD": "etd",
+            },
+            "store_inventory_txn": {
+                **common_mappings,
+                "StoreID": "store_id",
+                "ProductID": "product_id",
+                "QtyDelta": "quantity",
+                "Reason": "txn_type",
+                "Balance": "balance",
+                # Note: Source field in generator doesn't exist in DB model (will be ignored)
+            },
+            "foot_traffic": {
+                **common_mappings,
+                "StoreID": "store_id",
+                "SensorId": "sensor_id",
+                "Zone": "zone",
+                "Dwell": "dwell_seconds",
+                "Count": "count",
+            },
+            "ble_pings": {
+                **common_mappings,
+                "StoreID": "store_id",
+                "CustomerBLEId": "customer_ble_id",
+                "BeaconId": "beacon_id",
+                "RSSI": "rssi",
+                "Zone": "zone",
+                # Note: customer_id field in DB is nullable (requires lookup from BLE ID)
+            },
+            "marketing": {
+                **common_mappings,
+                "CampaignId": "campaign_id",
+                "CreativeId": "creative_id",
+                "ImpressionId": "impression_id_ext",
+                "CustomerAdId": "customer_ad_id",
+                "Channel": "channel",
+                "Device": "device",
+                "Cost": "cost",
+                # Note: customer_id field in DB is nullable (requires lookup from ad ID)
+            },
+            "online_orders": {
+                **common_mappings,
+                "CustomerID": "customer_id",
+                "ProductID": "product_id",
+                "Quantity": "quantity",
+                "Total": "total_amount",
+                "FulfillmentMode": "fulfillment_status",
+                # Note: OrderId, FulfillmentNodeType, FulfillmentNodeID, Subtotal, Tax, TenderType
+                # fields from generator don't exist in DB model (will be ignored)
+            },
+        }
+
+        mapping = table_specific_mappings.get(table_name, common_mappings)
+        mapped_record = {}
+
+        for gen_field, value in record.items():
+            # Skip TraceId field entirely (not in any DB model)
+            if gen_field == "TraceId":
+                continue
+
+            db_field = mapping.get(gen_field, gen_field.lower())
+            mapped_record[db_field] = value
+
+        return mapped_record
+
+    async def _insert_hourly_to_db(
+        self,
+        session: AsyncSession,
+        table_name: str,
+        df: pd.DataFrame,
+        hour: int,
+        batch_size: int = 10000,
+    ) -> None:
+        """
+        Insert hourly data batch into SQLite.
+
+        Args:
+            session: Database session for facts.db
+            table_name: Name of fact table (e.g., "receipts")
+            df: DataFrame with hourly data
+            hour: Hour index (0-23)
+            batch_size: Rows per batch insert (default: 10000)
+
+        Note:
+            Commits once after all batches are inserted for performance.
+            Individual batches are not committed to minimize I/O overhead.
+            Field names are automatically mapped from PascalCase to snake_case.
+        """
+        if df.empty:
+            logger.debug(f"No data to insert for {table_name} hour {hour}")
+            return
+
+        # Map table name to model
+        try:
+            model_class = self._get_model_for_table(table_name)
+        except ValueError as e:
+            logger.error(f"Cannot insert data: {e}")
+            return
+
+        # Convert DataFrame to records and map field names
+        records = df.to_dict('records')
+        mapped_records = [
+            self._map_field_names_for_db(table_name, record)
+            for record in records
+        ]
+
+        # Batch insert using bulk operations
+        try:
+            for i in range(0, len(mapped_records), batch_size):
+                batch = mapped_records[i:i + batch_size]
+
+                # Use bulk insert for performance
+                # Note: This doesn't populate auto-increment IDs back to Python objects
+                await session.execute(
+                    model_class.__table__.insert(),
+                    batch
+                )
+
+                logger.debug(
+                    f"Inserted batch {i//batch_size + 1} for {table_name} hour {hour}: "
+                    f"{len(batch)} rows"
+                )
+
+            # Commit once after all batches (not per batch for performance)
+            await session.commit()
+            logger.info(
+                f"Inserted {len(mapped_records)} rows for {table_name} hour {hour}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to insert hourly data for {table_name} hour {hour}: {e}"
+            )
+            await session.rollback()
+            raise
+
+    async def _update_watermarks_after_generation(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        active_tables: list[str],
+    ) -> None:
+        """
+        Update watermarks for all generated fact tables.
+
+        Marks the generated date range as unpublished so streaming knows
+        where to start publishing from.
+
+        Args:
+            start_date: Start of generated data range
+            end_date: End of generated data range
+            active_tables: List of table names that were generated
+
+        Note:
+            Called after generation completes successfully.
+        """
+        if not self._session:
+            return
+
+        from retail_datagen.db.purge import mark_data_unpublished
+
+        # Map generator table names to database table names
+        table_name_mapping = {
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_orders",
+        }
+
+        for table_name in active_tables:
+            db_table_name = table_name_mapping.get(table_name)
+            if db_table_name:
+                try:
+                    await mark_data_unpublished(
+                        self._session,
+                        db_table_name,
+                        start_date,
+                        end_date
+                    )
+                    logger.debug(
+                        f"Marked {db_table_name} as unpublished: "
+                        f"{start_date} to {end_date}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to update watermark for {db_table_name}: {e}"
+                    )
+                    # Don't fail generation if watermark update fails
+                    continue
+
     def _generate_trace_id(self) -> str:
         """Generate unique trace ID."""
         trace_id = f"TRC{self._trace_counter:010d}"
@@ -1952,42 +2281,20 @@ class FactDataGenerator:
         """
         Cache fact table counts for dashboard performance.
 
-        Reads actual counts from disk to ensure accuracy.
+        Uses the counts from generation for accurate metrics.
 
         Args:
-            facts_generated: Dictionary of table names that were just generated
+            facts_generated: Dictionary of table names and their record counts
         """
         try:
-            from pathlib import Path
-
             cache_manager = CacheManager()
-            facts_path = Path(self.config.paths.facts)
 
-            # For each fact table, count actual records from all partitions
-            for table_name in facts_generated.keys():
-                table_path = facts_path / table_name
-                if not table_path.exists():
-                    continue
-
-                total_count = 0
-                # Count records across all date partitions
-                for partition_dir in table_path.iterdir():
-                    if partition_dir.is_dir() and partition_dir.name.startswith("dt="):
-                        date_part = partition_dir.name[3:]  # Remove "dt=" prefix
-                        date_suffix = date_part.replace("-", "")
-                        csv_file = partition_dir / f"{table_name}_{date_suffix}.csv"
-
-                        if csv_file.exists():
-                            with open(csv_file, encoding="utf-8") as f:
-                                # Subtract 1 for header row
-                                count = sum(1 for _ in f) - 1
-                                total_count += count
-
-                # Cache the actual total count
+            # Cache the generation counts directly
+            for table_name, count in facts_generated.items():
                 cache_manager.update_fact_table(
-                    table_name, total_count, "Historical Data"
+                    table_name, count, "Historical Data"
                 )
-                logger.info(f"Cached {table_name}: {total_count} total records")
+                logger.info(f"Cached {table_name}: {count} records")
 
             logger.info("Fact data counts cached successfully")
         except Exception as e:
