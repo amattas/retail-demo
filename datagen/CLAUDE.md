@@ -451,3 +451,4 @@ When modifying progress reporting:
 - **docs/CREDENTIALS.md**: Secure credential management guide
 - **docs/SECURITY_AUDIT_REPORT.md**: Security audit findings and recommendations
 - **tests/results/**: Test results and coverage reports (gitignored)
+- You can remove them, since this isn't launched yet we don't have to worry about backwards compatibility
