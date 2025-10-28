@@ -904,7 +904,45 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         cache_manager = CacheManager()
         cache_manager.clear_cache()
 
-        # Clear all data
+        # Clear all data in SQLite databases (master and facts)
+        from sqlalchemy import text
+        from ..db.session import get_master_session, get_facts_session
+
+        # Truncate master tables (delete all rows)
+        master_tables = [
+            "dim_customers",
+            "dim_products",
+            "dim_trucks",
+            "dim_stores",
+            "dim_distribution_centers",
+            "dim_geographies",
+        ]
+
+        async with get_master_session() as session:
+            for table in master_tables:
+                await session.execute(text(f"DELETE FROM {table}"))
+            await session.flush()
+
+        # Truncate facts tables and watermarks
+        fact_tables = [
+            "fact_receipt_lines",
+            "fact_receipts",
+            "fact_store_inventory_txn",
+            "fact_dc_inventory_txn",
+            "fact_truck_moves",
+            "fact_foot_traffic",
+            "fact_ble_pings",
+            "fact_marketing",
+            "fact_online_orders",
+            "fact_data_watermarks",
+        ]
+
+        async with get_facts_session() as session:
+            for table in fact_tables:
+                await session.execute(text(f"DELETE FROM {table}"))
+            await session.flush()
+
+        # Also clear file-based artifacts if any (backward compatibility)
         results = state_manager.clear_all_data(config_paths)
 
         if results["errors"]:
@@ -915,12 +953,10 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
                 started_at=datetime.now(),
             )
         else:
-            logger.info(
-                f"All data cleared successfully. Files deleted: {len(results['files_deleted'])}"
-            )
+            logger.info("All data cleared successfully from SQLite and file cache")
             return OperationResult(
                 success=True,
-                message=f"All data cleared successfully. Files deleted: {len(results['files_deleted'])}",
+                message="All data cleared successfully (SQLite tables truncated; caches and legacy files removed)",
                 started_at=datetime.now(),
             )
 
@@ -955,26 +991,22 @@ async def list_master_tables():
     description="Get a list of generated fact tables",
 )
 async def list_fact_tables(config: RetailConfig = Depends(get_config)):
-    """List all generated fact tables."""
-    facts_path = Path(config.paths.facts)
+    """List all generated fact tables (SQLite-backed)."""
+    try:
+        from sqlalchemy import select, func
+        from ..db.session import get_facts_session
 
-    if not facts_path.exists():
+        tables_with_data: list[str] = []
+        async with get_facts_session() as session:
+            for table_name, model in FACT_TABLE_MODELS.items():
+                result = await session.execute(select(func.count()).select_from(model))
+                if (result.scalar() or 0) > 0:
+                    tables_with_data.append(table_name)
+
+        return TableListResponse(tables=tables_with_data, count=len(tables_with_data))
+    except Exception as e:
+        logger.warning(f"Falling back to empty fact table list due to error: {e}")
         return TableListResponse(tables=[], count=0)
-
-    # Check which fact tables actually have data
-    generated_tables = []
-    for table_name in FACT_TABLES:
-        table_path = facts_path / table_name
-        if table_path.exists() and table_path.is_dir():
-            # Check if it has at least one partition
-            has_data = any(
-                p.is_dir() and p.name.startswith("dt=")
-                for p in table_path.iterdir()
-            )
-            if has_data:
-                generated_tables.append(table_name)
-
-    return TableListResponse(tables=generated_tables, count=len(generated_tables))
 
 
 # ================================
@@ -1003,18 +1035,19 @@ async def get_table_summary(table_name: str):
 
     try:
         from sqlalchemy import select, func, inspect
-        from ..db.session import get_master_session, get_fact_session
+        from ..db.session import get_master_session, get_facts_session
 
-        session_manager = get_master_session if is_master else get_fact_session
+        session_manager = get_master_session if is_master else get_facts_session
 
         async with session_manager() as session:
             # Get row count
             result = await session.execute(select(func.count()).select_from(model))
             total_records = result.scalar() or 0
 
-            # Get column names from the model
-            inspector = inspect(model)
-            columns = [col.key for col in inspector.columns]
+            # Map attribute keys to DB column names for stable headers
+            mapper = inspect(model)
+            column_props = list(mapper.column_attrs)
+            columns = [prop.columns[0].name for prop in column_props]
 
             return {
                 "table_name": table_name,
@@ -1056,9 +1089,9 @@ async def preview_table(
 
     try:
         from sqlalchemy import select, func, inspect
-        from ..db.session import get_master_session, get_fact_session
+        from ..db.session import get_master_session, get_facts_session
 
-        session_manager = get_master_session if is_master else get_fact_session
+        session_manager = get_master_session if is_master else get_facts_session
 
         async with session_manager() as session:
             # Get total row count
@@ -1069,21 +1102,22 @@ async def preview_table(
             result = await session.execute(select(model).limit(limit))
             rows = result.scalars().all()
 
-            # Get column names from the model
-            inspector = inspect(model)
-            columns = [col.key for col in inspector.columns]
+            # Map attribute keys to DB column names for headers and row dicts
+            mapper = inspect(model)
+            column_props = list(mapper.column_attrs)
+            columns = [prop.columns[0].name for prop in column_props]
 
-            # Convert SQLAlchemy objects to dicts
+            # Convert SQLAlchemy objects to dicts with DB column names
             preview_rows = []
             for row in rows:
-                row_dict = {}
-                for col in columns:
-                    value = getattr(row, col, None)
-                    # Convert datetime and other types to string for JSON serialization
-                    if value is not None:
-                        row_dict[col] = str(value) if not isinstance(value, (str, int, float, bool)) else value
-                    else:
-                        row_dict[col] = None
+                row_dict: dict[str, object | None] = {}
+                for prop in column_props:
+                    attr = prop.key
+                    db_col = prop.columns[0].name
+                    value = getattr(row, attr, None)
+                    row_dict[db_col] = (
+                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
+                    )
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1129,6 +1163,136 @@ async def cancel_generation_operation(operation_id: str):
         message=f"Operation {operation_id} cancelled successfully",
         operation_id=operation_id,
     )
+
+
+# ================================
+# UI COMPATIBILITY ALIASES
+# ================================
+
+
+@router.get(
+    "/master/{table_name}",
+    response_model=TablePreviewResponse,
+    summary="Preview master table (UI alias)",
+    description="Alias used by UI to preview master tables",
+)
+async def preview_master_table_alias(
+    table_name: str,
+    limit: int = Query(100, ge=1, le=1000),
+):
+    if table_name not in MASTER_TABLE_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Master table {table_name} not found.",
+        )
+
+    try:
+        from sqlalchemy import select, func, inspect
+        from ..db.session import get_master_session
+
+        model = MASTER_TABLE_MODELS[table_name]
+        async with get_master_session() as session:
+            count_result = await session.execute(select(func.count()).select_from(model))
+            total_rows = count_result.scalar() or 0
+
+            result = await session.execute(select(model).limit(limit))
+            rows = result.scalars().all()
+
+            mapper = inspect(model)
+            column_props = list(mapper.column_attrs)
+            columns = [prop.columns[0].name for prop in column_props]
+
+            preview_rows: list[dict[str, object]] = []
+            for row in rows:
+                row_dict: dict[str, object | None] = {}
+                for prop in column_props:
+                    attr = prop.key
+                    db_col = prop.columns[0].name
+                    value = getattr(row, attr, None)
+                    row_dict[db_col] = (
+                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
+                    )
+                preview_rows.append(row_dict)
+
+            return TablePreviewResponse(
+                table_name=table_name,
+                columns=columns,
+                row_count=total_rows,
+                preview_rows=preview_rows,
+            )
+    except Exception as e:
+        logger.error(f"Master preview failed for {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview {table_name}: {str(e)}",
+        )
+
+
+@router.get(
+    "/facts/{table_name}/recent",
+    response_model=TablePreviewResponse,
+    summary="Preview recent fact data (UI alias)",
+    description="Alias used by UI to preview recent rows from fact tables",
+)
+async def preview_recent_fact_alias(
+    table_name: str,
+    limit: int = Query(100, ge=1, le=1000),
+):
+    if table_name not in FACT_TABLE_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fact table {table_name} not found.",
+        )
+
+    try:
+        from sqlalchemy import select, func, inspect, desc
+        from ..db.session import get_facts_session
+
+        model = FACT_TABLE_MODELS[table_name]
+        async with get_facts_session() as session:
+            # Total count
+            count_result = await session.execute(select(func.count()).select_from(model))
+            total_rows = count_result.scalar() or 0
+
+            # Most recent event_ts
+            recent_result = await session.execute(select(func.max(model.event_ts)))
+            most_recent = recent_result.scalar_one_or_none()
+
+            # Recent rows by event_ts desc
+            result = await session.execute(select(model).order_by(desc(model.event_ts)).limit(limit))
+            rows = result.scalars().all()
+
+            mapper = inspect(model)
+            column_props = list(mapper.column_attrs)
+            columns = [prop.columns[0].name for prop in column_props]
+
+            preview_rows: list[dict[str, object]] = []
+            for row in rows:
+                row_dict: dict[str, object | None] = {}
+                for prop in column_props:
+                    attr = prop.key
+                    db_col = prop.columns[0].name
+                    value = getattr(row, attr, None)
+                    row_dict[db_col] = (
+                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
+                    )
+                preview_rows.append(row_dict)
+
+            # Include most_recent_date for UI hint if available
+            response = TablePreviewResponse(
+                table_name=table_name,
+                columns=columns,
+                row_count=total_rows,
+                preview_rows=preview_rows,
+                most_recent_date=str(most_recent) if most_recent is not None else None,
+            )
+            return response
+    except Exception as e:
+        logger.error(f"Fact preview failed for {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview {table_name}: {str(e)}",
+        )
 
 
 # ================================

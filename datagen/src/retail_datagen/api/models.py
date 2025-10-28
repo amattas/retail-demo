@@ -319,6 +319,9 @@ class TablePreviewResponse(BaseModel):
     date_partition: str | None = Field(
         None, description="Date partition for fact tables (YYYY-MM-DD format)"
     )
+    most_recent_date: str | None = Field(
+        None, description="Most recent event date/time for fact tables"
+    )
 
 
 class HealthCheckResponse(BaseModel):

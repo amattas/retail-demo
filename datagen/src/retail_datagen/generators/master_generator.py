@@ -216,20 +216,20 @@ class MasterDataGenerator:
         """
         mapped = {}
 
-        # Get column mappings from SQLAlchemy model
+        # Get column mappings from SQLAlchemy model (not currently used for renaming,
+        # but retained for potential future divergence between Pydantic and DB names)
         # The column 'name' attribute contains the actual database column name
-        column_mappings = {
-            col.key: col.name for col in model_class.__table__.columns
-        }
+        column_mappings = {col.key: col.name for col in model_class.__table__.columns}
 
         for key, value in pydantic_dict.items():
             # Convert Decimal to float for SQLite
             if isinstance(value, Decimal):
                 value = float(value)
 
-            # Convert datetime to ISO string if needed (SQLite stores as TEXT)
+            # Convert datetime to date for SQLite Date columns (e.g., Product.LaunchDate)
+            # SQLite's Date type only accepts Python date objects.
             elif isinstance(value, datetime):
-                value = value.isoformat()
+                value = value.date()
 
             # Handle None values
             elif value is None:
