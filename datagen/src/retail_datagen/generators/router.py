@@ -261,12 +261,13 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
+            # Note: parallel=False required for SQLite (AsyncSession can't be shared across threads)
             from retail_datagen.db.session import get_master_session
 
             async with get_master_session() as session:
                 await master_generator.generate_all_master_data_async(
                     session=session,
-                    parallel=True
+                    parallel=False
                 )
 
             for table in table_progress:
@@ -400,13 +401,13 @@ async def generate_specific_master_table(
         try:
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
-            # Generate the specific table (parallel=True by default)
+            # Generate all master tables (SQLite requires sequential mode)
             from retail_datagen.db.session import get_master_session
 
             async with get_master_session() as session:
                 result = await master_generator.generate_all_master_data_async(
                     session=session,
-                    parallel=True
+                    parallel=False
                 )
 
             update_task_progress(task_id, 1.0, f"Generated {table_name}")
