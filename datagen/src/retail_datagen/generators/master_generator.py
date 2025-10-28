@@ -209,10 +209,10 @@ class MasterDataGenerator:
 
                 # Emit incremental progress every batch (default 10,000)
                 if ui_table_name:
-                    # Keep tile progress at complete while updating counts live
+                    fraction = records_inserted / total_records if total_records else 1.0
                     self._emit_progress(
                         ui_table_name,
-                        1.0,
+                        fraction,
                         f"Writing {ui_table_name.replace('_', ' ')} ({records_inserted:,}/{total_records:,})",
                         {ui_table_name: records_inserted},
                     )
@@ -485,12 +485,7 @@ class MasterDataGenerator:
                 self.geography_master
             )
 
-        self._emit_progress(
-            "geographies_master",
-            1.0,
-            "Geographies complete",
-            {"geographies_master": len(self.geography_master)},
-        )
+        self._emit_progress("geographies_master", 1.0, "Geographies complete")
 
     def generate_geography_master(self) -> None:
         """Generate geographies_master.csv from geography dictionary (legacy sync wrapper)."""
@@ -618,9 +613,7 @@ class MasterDataGenerator:
         self.fk_validator.register_store_ids(store_ids)
 
         print(f"Generated {len(self.stores)} store records")
-        self._emit_progress(
-            "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
-        )
+        # Do not mark complete here; async method will finalize after DB write
 
     async def generate_stores_async(self, count: int | None = None) -> None:
         """Generate stores data with optional database insertion (async version)."""
@@ -747,6 +740,8 @@ class MasterDataGenerator:
                 StoreModel,
                 self.stores
             )
+            # Now mark complete after DB write
+            self._emit_progress("stores", 1.0, "Stores complete")
 
         self._emit_progress(
             "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
@@ -946,7 +941,7 @@ class MasterDataGenerator:
             print(
                 f"  - Supplier-to-DC trucks: {supplier_total_trucks} ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
             )
-            self._emit_progress("trucks", 1.0, "Trucks complete", {"trucks": total_trucks})
+            # Do not mark complete here; async method will finalize after DB write
         except Exception as e:
             print(f"ERROR in generate_trucks: {e}")
             import traceback
@@ -966,6 +961,8 @@ class MasterDataGenerator:
                 TruckModel,
                 self.trucks
             )
+            # Mark complete after DB write
+            self._emit_progress("trucks", 1.0, "Trucks complete")
 
     def generate_customers(self) -> None:
         """Generate customers.csv with realistic geographic distribution."""
@@ -1003,6 +1000,7 @@ class MasterDataGenerator:
         self.customers = []
         current_id = 1
 
+        # We'll reflect progress during DB write phase to tiles; just seed initial state
         progress_reporter = ProgressReporter(customer_count, "Generating customers")
         self._emit_progress("customers", 0.0, "Generating customers")
 
@@ -1036,24 +1034,12 @@ class MasterDataGenerator:
                 self.customers.append(customer)
                 current_id += 1
 
-                # Update progress every 1000 customers
+                # Update internal reporter; UI progress will reflect DB insert
                 if len(self.customers) % 1000 == 0:
                     progress_reporter.update(1000)
-                    fraction = len(self.customers) / customer_count
-                    self._emit_progress(
-                        "customers",
-                        fraction,
-                        f"Generating customers ({len(self.customers):,}/{customer_count:,})",
-                        {"customers": len(self.customers)},
-                    )
 
         progress_reporter.complete()
-        self._emit_progress(
-            "customers",
-            1.0,
-            f"Customers complete ({len(self.customers):,}/{customer_count:,})",
-            {"customers": len(self.customers)},
-        )
+        # Don't mark complete yet; DB write progress will follow
 
         # Register customer IDs with FK validator
         customer_ids = [customer.ID for customer in self.customers]
@@ -1280,35 +1266,17 @@ class MasterDataGenerator:
 
             product_id += 1
 
-            # Update progress every 500 successful products
+            # Update internal progress reporter every 500
             if successful_products % 500 == 0 and successful_products > 0:
                 progress_reporter.update(500)
-                fraction = successful_products / target_product_count
-                self._emit_progress(
-                    "products_master",
-                    fraction,
-                    f"Generating products ({successful_products:,}/{target_product_count:,})",
-                    {"products_master": successful_products},
-                )
 
-        # Final progress update
+        # Final progress update for internal reporter only
         remaining_progress = target_product_count - (successful_products // 500) * 500
         if remaining_progress > 0:
             progress_reporter.update(remaining_progress)
-            fraction = successful_products / target_product_count
-            self._emit_progress(
-                "products_master",
-                fraction,
-                f"Generating products ({successful_products:,}/{target_product_count:,})",
-            )
 
         progress_reporter.complete()
-        self._emit_progress(
-            "products_master",
-            1.0,
-            f"Products complete ({successful_products:,}/{target_product_count:,})",
-            {"products_master": successful_products},
-        )
+        # Don't mark complete yet; DB write progress will follow
 
         # Detailed generation summary
         print("\n=== Product Generation Summary ===")
@@ -1646,7 +1614,6 @@ class MasterDataGenerator:
             "dc_inventory_snapshots",
             1.0,
             "DC inventory snapshots complete",
-            {"dc_inventory_snapshots": len(self.dc_inventory_snapshots)},
         )
 
     async def generate_dc_inventory_snapshots_async(self) -> None:
@@ -1706,7 +1673,6 @@ class MasterDataGenerator:
             "store_inventory_snapshots",
             1.0,
             "Store inventory snapshots complete",
-            {"store_inventory_snapshots": len(self.store_inventory_snapshots)},
         )
 
     async def generate_store_inventory_snapshots_async(self) -> None:

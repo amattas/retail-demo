@@ -947,6 +947,11 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
             for table in master_tables:
                 await session.execute(text(f"DELETE FROM {table}"))
             await session.flush()
+        # VACUUM master database
+        from ..db.engine import get_master_engine
+        master_engine = get_master_engine()
+        async with master_engine.begin() as conn:
+            await conn.execute(text("VACUUM"))
 
         # Truncate facts tables and watermarks
         fact_tables = [
@@ -966,6 +971,11 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
             for table in fact_tables:
                 await session.execute(text(f"DELETE FROM {table}"))
             await session.flush()
+        # VACUUM facts database
+        from ..db.engine import get_facts_engine
+        facts_engine = get_facts_engine()
+        async with facts_engine.begin() as conn:
+            await conn.execute(text("VACUUM"))
 
         # Also clear file-based artifacts if any (backward compatibility)
         results = state_manager.clear_all_data(config_paths)
