@@ -347,15 +347,13 @@ class MasterDataGenerator:
         # Validate foreign key relationships
         self._validate_foreign_keys()
 
-        # Final commit if using database
+        # NOTE: Do NOT commit here - let the calling context manager handle commit
+        # This prevents double-commit issues with get_master_session() context manager
+
+        # Flush to ensure all changes are in the transaction
         if session:
-            try:
-                await session.commit()
-                print("Database transaction committed successfully")
-            except Exception as e:
-                logger.error(f"Failed to commit database transaction: {e}")
-                await session.rollback()
-                raise
+            await session.flush()
+            logger.info("All master data flushed to session (commit will be handled by context manager)")
 
         # Cache counts
         self._cache_master_counts()

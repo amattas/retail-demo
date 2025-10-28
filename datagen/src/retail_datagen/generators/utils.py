@@ -186,20 +186,73 @@ class IdentifierGenerator:
         return f"({area_code}) {exchange}-{number}"
 
     def generate_ble_id(self, customer_id: int) -> str:
-        """Generate BLE ID in format BLE followed by 6 alphanumeric chars."""
-        # Use customer ID as seed for consistency
-        id_rng = random.Random(customer_id)
-        chars = string.ascii_uppercase + string.digits
-        suffix = "".join(id_rng.choice(chars) for _ in range(6))
-        return f"BLE{suffix}"
+        """Generate BLE ID in format BLE followed by 6 alphanumeric chars.
+
+        Uses customer_id to guarantee uniqueness via base-36 encoding.
+        Supports up to 36^6 = 2,176,782,336 unique IDs.
+        """
+        # Encode customer ID as base-36 (0-9, A-Z) to create unique suffix
+        # IMPORTANT: Digits first, then uppercase letters for proper base-36
+        chars = string.digits + string.ascii_uppercase
+
+        # Convert customer_id to base-36
+        base36 = ""
+        num = customer_id
+        if num == 0:
+            base36 = "0"
+        else:
+            while num > 0:
+                base36 = chars[num % 36] + base36
+                num //= 36
+
+        # Left-pad with zeros to reach exactly 6 characters
+        base36 = base36.zfill(6)
+
+        # For IDs exceeding 6 chars (>2.1B customers), use modulo to wrap
+        if len(base36) > 6:
+            num = customer_id % (36 ** 6)
+            base36 = ""
+            while num > 0:
+                base36 = chars[num % 36] + base36
+                num //= 36
+            base36 = base36.zfill(6)
+
+        return f"BLE{base36}"
 
     def generate_ad_id(self, customer_id: int) -> str:
-        """Generate advertising ID in format AD followed by 6 alphanumeric chars."""
-        # Use customer ID as seed for consistency
-        id_rng = random.Random(customer_id + 1000)  # Offset to differ from BLE
-        chars = string.ascii_uppercase + string.digits
-        suffix = "".join(id_rng.choice(chars) for _ in range(6))
-        return f"AD{suffix}"
+        """Generate advertising ID in format AD followed by 6 alphanumeric chars.
+
+        Uses customer_id to guarantee uniqueness via base-36 encoding.
+        Supports up to 36^6 = 2,176,782,336 unique IDs.
+        """
+        # Encode customer ID as base-36 (0-9, A-Z) to create unique suffix
+        # IMPORTANT: Digits first, then uppercase letters for proper base-36
+        chars = string.digits + string.ascii_uppercase
+
+        # Convert customer_id to base-36
+        base36 = ""
+        num = customer_id
+        if num == 0:
+            base36 = "0"
+        else:
+            while num > 0:
+                base36 = chars[num % 36] + base36
+                num //= 36
+
+        # Left-pad with zeros to reach exactly 6 characters
+        base36 = base36.zfill(6)
+
+        # For IDs exceeding 6 chars (>2.1B customers), use modulo to wrap
+        if len(base36) > 6:
+            # Use modulo to keep within 6-char space while maintaining determinism
+            num = customer_id % (36 ** 6)
+            base36 = ""
+            while num > 0:
+                base36 = chars[num % 36] + base36
+                num //= 36
+            base36 = base36.zfill(6)
+
+        return f"AD{base36}"
 
     def generate_license_plate(self, truck_id: int) -> str:
         """Generate synthetic license plate in format ABC1234."""

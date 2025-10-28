@@ -263,12 +263,28 @@ async def generate_all_master_data(
             # Run full generation once (progress callback handles per-table reporting)
             # Note: parallel=False required for SQLite (AsyncSession can't be shared across threads)
             from retail_datagen.db.session import get_master_session
+            from sqlalchemy import text
 
             async with get_master_session() as session:
+                # Clear existing data to avoid UNIQUE constraint violations
+                logger.info("Clearing existing master data...")
+                for table in [
+                    "dim_customers",
+                    "dim_products",
+                    "dim_trucks",
+                    "dim_stores",
+                    "dim_distribution_centers",
+                    "dim_geographies",
+                ]:
+                    await session.execute(text(f"DELETE FROM {table}"))
+                await session.flush()  # Flush deletes immediately
+                logger.info("Existing master data cleared")
+
                 await master_generator.generate_all_master_data_async(
                     session=session,
                     parallel=False
                 )
+                # Context manager will commit everything on exit
 
             for table in table_progress:
                 table_progress[table] = max(table_progress[table], 1.0)
@@ -403,12 +419,28 @@ async def generate_specific_master_table(
 
             # Generate all master tables (SQLite requires sequential mode)
             from retail_datagen.db.session import get_master_session
+            from sqlalchemy import text
 
             async with get_master_session() as session:
+                # Clear existing data to avoid UNIQUE constraint violations
+                logger.info("Clearing existing master data...")
+                for table in [
+                    "dim_customers",
+                    "dim_products",
+                    "dim_trucks",
+                    "dim_stores",
+                    "dim_distribution_centers",
+                    "dim_geographies",
+                ]:
+                    await session.execute(text(f"DELETE FROM {table}"))
+                await session.flush()  # Flush deletes immediately
+                logger.info("Existing master data cleared")
+
                 result = await master_generator.generate_all_master_data_async(
                     session=session,
                     parallel=False
                 )
+                # Context manager will commit everything on exit
 
             update_task_progress(task_id, 1.0, f"Generated {table_name}")
 
