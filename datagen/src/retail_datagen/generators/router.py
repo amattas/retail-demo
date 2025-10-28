@@ -292,6 +292,15 @@ async def generate_all_master_data(
             completed_tables = list(table_progress.keys())
 
             final_eta, final_rate = compute_timing_metrics(1.0)
+            # Build final table counts from generator state for accuracy
+            final_counts = {
+                "geographies_master": len(master_generator.geography_master),
+                "stores": len(master_generator.stores),
+                "distribution_centers": len(master_generator.distribution_centers),
+                "trucks": len(master_generator.trucks),
+                "customers": len(master_generator.customers),
+                "products_master": len(master_generator.products_master),
+            }
             update_task_progress(
                 task_id,
                 1.0,
@@ -302,6 +311,7 @@ async def generate_all_master_data(
                 estimated_seconds_remaining=final_eta,
                 progress_rate=final_rate,
                 table_progress=table_progress.copy(),
+                table_counts=final_counts,
             )
 
             return {
@@ -442,7 +452,22 @@ async def generate_specific_master_table(
                 )
                 # Context manager will commit everything on exit
 
-            update_task_progress(task_id, 1.0, f"Generated {table_name}")
+            # Final accurate counts
+            final_counts = {
+                "geographies_master": len(master_generator.geography_master),
+                "stores": len(master_generator.stores),
+                "distribution_centers": len(master_generator.distribution_centers),
+                "trucks": len(master_generator.trucks),
+                "customers": len(master_generator.customers),
+                "products_master": len(master_generator.products_master),
+            }
+
+            update_task_progress(
+                task_id,
+                1.0,
+                f"Generated {table_name}",
+                table_counts=final_counts,
+            )
 
             return {
                 "table_name": table_name,
@@ -1034,20 +1059,17 @@ async def get_table_summary(table_name: str):
     is_master = table_name in MASTER_TABLE_MODELS
 
     try:
-        from sqlalchemy import select, func, inspect
+        from sqlalchemy import select, func
         from ..db.session import get_master_session, get_facts_session
 
         session_manager = get_master_session if is_master else get_facts_session
 
         async with session_manager() as session:
-            # Get row count
-            result = await session.execute(select(func.count()).select_from(model))
+            table = model.__table__
+            # Get row count (fast path on table)
+            result = await session.execute(select(func.count()).select_from(table))
             total_records = result.scalar() or 0
-
-            # Map attribute keys to DB column names for stable headers
-            mapper = inspect(model)
-            column_props = list(mapper.column_attrs)
-            columns = [prop.columns[0].name for prop in column_props]
+            columns = [col.name for col in table.c]
 
             return {
                 "table_name": table_name,
@@ -1088,36 +1110,23 @@ async def preview_table(
     is_master = table_name in MASTER_TABLE_MODELS
 
     try:
-        from sqlalchemy import select, func, inspect
+        from sqlalchemy import select, func
         from ..db.session import get_master_session, get_facts_session
 
         session_manager = get_master_session if is_master else get_facts_session
 
         async with session_manager() as session:
+            table = model.__table__
             # Get total row count
-            count_result = await session.execute(select(func.count()).select_from(model))
+            count_result = await session.execute(select(func.count()).select_from(table))
             total_rows = count_result.scalar() or 0
-
-            # Get preview rows
-            result = await session.execute(select(model).limit(limit))
-            rows = result.scalars().all()
-
-            # Map attribute keys to DB column names for headers and row dicts
-            mapper = inspect(model)
-            column_props = list(mapper.column_attrs)
-            columns = [prop.columns[0].name for prop in column_props]
-
-            # Convert SQLAlchemy objects to dicts with DB column names
+            # Get preview rows via Core for speed; returns Mapping[str, Any]
+            result = await session.execute(select(table).limit(limit))
+            rows = result.mappings().all()
+            columns = [col.name for col in table.c]
             preview_rows = []
-            for row in rows:
-                row_dict: dict[str, object | None] = {}
-                for prop in column_props:
-                    attr = prop.key
-                    db_col = prop.columns[0].name
-                    value = getattr(row, attr, None)
-                    row_dict[db_col] = (
-                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
-                    )
+            for r in rows:
+                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1187,31 +1196,20 @@ async def preview_master_table_alias(
         )
 
     try:
-        from sqlalchemy import select, func, inspect
+        from sqlalchemy import select, func
         from ..db.session import get_master_session
 
         model = MASTER_TABLE_MODELS[table_name]
         async with get_master_session() as session:
-            count_result = await session.execute(select(func.count()).select_from(model))
+            table = model.__table__
+            count_result = await session.execute(select(func.count()).select_from(table))
             total_rows = count_result.scalar() or 0
-
-            result = await session.execute(select(model).limit(limit))
-            rows = result.scalars().all()
-
-            mapper = inspect(model)
-            column_props = list(mapper.column_attrs)
-            columns = [prop.columns[0].name for prop in column_props]
-
+            result = await session.execute(select(table).limit(limit))
+            rows = result.mappings().all()
+            columns = [col.name for col in table.c]
             preview_rows: list[dict[str, object]] = []
-            for row in rows:
-                row_dict: dict[str, object | None] = {}
-                for prop in column_props:
-                    attr = prop.key
-                    db_col = prop.columns[0].name
-                    value = getattr(row, attr, None)
-                    row_dict[db_col] = (
-                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
-                    )
+            for r in rows:
+                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1245,37 +1243,27 @@ async def preview_recent_fact_alias(
         )
 
     try:
-        from sqlalchemy import select, func, inspect, desc
+        from sqlalchemy import select, func, desc
         from ..db.session import get_facts_session
 
         model = FACT_TABLE_MODELS[table_name]
         async with get_facts_session() as session:
+            table = model.__table__
             # Total count
-            count_result = await session.execute(select(func.count()).select_from(model))
+            count_result = await session.execute(select(func.count()).select_from(table))
             total_rows = count_result.scalar() or 0
 
             # Most recent event_ts
-            recent_result = await session.execute(select(func.max(model.event_ts)))
+            recent_result = await session.execute(select(func.max(table.c.event_ts)))
             most_recent = recent_result.scalar_one_or_none()
 
             # Recent rows by event_ts desc
-            result = await session.execute(select(model).order_by(desc(model.event_ts)).limit(limit))
-            rows = result.scalars().all()
-
-            mapper = inspect(model)
-            column_props = list(mapper.column_attrs)
-            columns = [prop.columns[0].name for prop in column_props]
-
+            result = await session.execute(select(table).order_by(desc(table.c.event_ts)).limit(limit))
+            rows = result.mappings().all()
+            columns = [col.name for col in table.c]
             preview_rows: list[dict[str, object]] = []
-            for row in rows:
-                row_dict: dict[str, object | None] = {}
-                for prop in column_props:
-                    attr = prop.key
-                    db_col = prop.columns[0].name
-                    value = getattr(row, attr, None)
-                    row_dict[db_col] = (
-                        value if isinstance(value, (str, int, float, bool)) or value is None else str(value)
-                    )
+            for r in rows:
+                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
                 preview_rows.append(row_dict)
 
             # Include most_recent_date for UI hint if available

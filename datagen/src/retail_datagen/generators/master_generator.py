@@ -132,6 +132,23 @@ class MasterDataGenerator:
         """Register or clear a callback for incremental progress updates."""
         self._progress_callback = callback
 
+    def _get_ui_table_name(self, model_class: Type[DeclarativeBase]) -> str | None:
+        """Map ORM model to UI table key used by progress tiles."""
+        try:
+            tbl = model_class.__tablename__
+        except Exception:
+            return None
+
+        mapping = {
+            "dim_geographies": "geographies_master",
+            "dim_stores": "stores",
+            "dim_distribution_centers": "distribution_centers",
+            "dim_trucks": "trucks",
+            "dim_customers": "customers",
+            "dim_products": "products_master",
+        }
+        return mapping.get(tbl)
+
     async def _insert_to_db(
         self,
         session: AsyncSession,
@@ -159,6 +176,7 @@ class MasterDataGenerator:
             return
 
         table_name = model_class.__tablename__
+        ui_table_name = self._get_ui_table_name(model_class)
         total_records = len(pydantic_models)
         logger.info(f"Inserting {total_records:,} records into {table_name}")
 
@@ -188,6 +206,16 @@ class MasterDataGenerator:
                 logger.info(
                     f"Inserted {records_inserted:,} / {total_records:,} rows into {table_name}"
                 )
+
+                # Emit incremental progress every batch (default 10,000)
+                if ui_table_name:
+                    # Keep tile progress at complete while updating counts live
+                    self._emit_progress(
+                        ui_table_name,
+                        1.0,
+                        f"Writing {ui_table_name.replace('_', ' ')} ({records_inserted:,}/{total_records:,})",
+                        {ui_table_name: records_inserted},
+                    )
 
             logger.info(f"Successfully inserted all {total_records:,} records into {table_name}")
 

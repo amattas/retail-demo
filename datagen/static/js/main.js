@@ -1552,9 +1552,8 @@ class RetailDataGenerator {
                 return;
             }
 
-            // Create table HTML
+            // Create table HTML (suppress counts in preview)
             const headers = result.columns || Object.keys(data[0]);
-            const totalRecords = result.row_count || result.total_estimated || data.length;
             const tableHtml = `
                 <div class="table-container">
                     ${tableType === 'Historical Data' && result.most_recent_date ?
@@ -1569,7 +1568,6 @@ class RetailDataGenerator {
                             ).join('')}
                         </tbody>
                     </table>
-                    <p class="preview-note">Showing first 10 of ${totalRecords.toLocaleString()} records</p>
                 </div>
             `;
             

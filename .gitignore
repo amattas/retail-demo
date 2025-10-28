@@ -81,3 +81,4 @@ data/facts/**/*.csv
 *.log
 .env.local
 bandit_report.json
+/datagen/data

@@ -333,7 +333,13 @@ def update_task_progress(
         if progress_rate is not None:
             updated_fields["progress_rate"] = progress_rate
         if table_counts is not None:
-            updated_fields["table_counts"] = table_counts
+            # Merge with existing counts so we don't lose prior table updates
+            existing_counts = existing.get("table_counts") or {}
+            try:
+                merged = {**existing_counts, **table_counts}
+            except Exception:
+                merged = table_counts
+            updated_fields["table_counts"] = merged
         # NEW: Update hourly progress fields if provided
         if current_hour is not None:
             updated_fields["current_hour"] = current_hour
