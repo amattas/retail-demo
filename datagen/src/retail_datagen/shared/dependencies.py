@@ -310,8 +310,11 @@ def update_task_progress(
         existing = _task_status[task_id].model_dump()
 
         # Build updated fields
+        # Clamp progress to valid range AND prevent backwards movement (prevents UI bouncing)
+        existing_progress = float(existing.get("progress") or 0.0)
+        clamped_progress = max(existing_progress, max(0.0, min(1.0, progress)))
         updated_fields = {
-            "progress": max(0.0, min(1.0, progress)),
+            "progress": clamped_progress,
             "message": message,
             "last_updated": datetime.now(),
             "last_update_timestamp": datetime.now(),

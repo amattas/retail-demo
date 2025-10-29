@@ -1,15 +1,17 @@
 {
   "seed": 42,
   "volume": {
-    "stores": 214,
-    "dcs": 8,
+    "stores": 57,
+    "dcs": 4,
     "refrigerated_trucks": 8,
     "non_refrigerated_trucks": 12,
     "total_geographies": 100,
-    "total_customers": 500000,
+    "total_customers": 50000,
     "total_products": 10000,
-    "customers_per_day": 2000,
+    "customers_per_day": 200,
     "items_per_ticket_mean": 8.2,
+    "online_orders_per_day": 250,
+    "marketing_impressions_per_day": 1000,
     "dc_initial_inventory_min": 500,
     "dc_initial_inventory_max": 5000,
     "store_initial_inventory_min": 20,
@@ -49,7 +51,7 @@
     "start_date": "2024-01-01"
   },
   "performance": {
-    "max_cpu_percent": 100,
+    "max_cpu_percent": 100.0,
     "max_workers": null
   }
 }
