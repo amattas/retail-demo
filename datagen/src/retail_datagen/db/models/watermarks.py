@@ -102,6 +102,7 @@ class FactDataWatermark(Base):
             'fact_table_name',
             'earliest_unpublished_ts'
         ),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:

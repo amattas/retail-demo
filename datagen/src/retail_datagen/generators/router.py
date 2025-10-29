@@ -291,16 +291,41 @@ async def generate_all_master_data(
 
             completed_tables = list(table_progress.keys())
 
+            # Prefer DB-confirmed counts to avoid cache/DB drift
+            final_counts = {}
+            try:
+                from sqlalchemy import select, func
+                from ..db.session import get_master_session
+                from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
+
+                async with get_master_session() as s2:
+                    final_counts["geographies_master"] = (await s2.execute(select(func.count()).select_from(Geography))).scalar() or 0
+                    final_counts["stores"] = (await s2.execute(select(func.count()).select_from(Store))).scalar() or 0
+                    final_counts["distribution_centers"] = (await s2.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
+                    final_counts["trucks"] = (await s2.execute(select(func.count()).select_from(Truck))).scalar() or 0
+                    final_counts["customers"] = (await s2.execute(select(func.count()).select_from(Customer))).scalar() or 0
+                    final_counts["products_master"] = (await s2.execute(select(func.count()).select_from(Product))).scalar() or 0
+
+                # Update dashboard cache with DB counts
+                try:
+                    from ..shared.cache import CacheManager
+                    cache = CacheManager()
+                    for k, v in final_counts.items():
+                        cache.update_master_table(k, int(v), "Master Data")
+                except Exception as cache_exc:
+                    logger.warning(f"Failed to update dashboard cache with DB counts: {cache_exc}")
+            except Exception as count_exc:
+                logger.warning(f"Failed to query DB counts; falling back to in-memory counts: {count_exc}")
+                final_counts = {
+                    "geographies_master": len(master_generator.geography_master),
+                    "stores": len(master_generator.stores),
+                    "distribution_centers": len(master_generator.distribution_centers),
+                    "trucks": len(master_generator.trucks),
+                    "customers": len(master_generator.customers),
+                    "products_master": len(master_generator.products_master),
+                }
+
             final_eta, final_rate = compute_timing_metrics(1.0)
-            # Build final table counts from generator state for accuracy
-            final_counts = {
-                "geographies_master": len(master_generator.geography_master),
-                "stores": len(master_generator.stores),
-                "distribution_centers": len(master_generator.distribution_centers),
-                "trucks": len(master_generator.trucks),
-                "customers": len(master_generator.customers),
-                "products_master": len(master_generator.products_master),
-            }
             update_task_progress(
                 task_id,
                 1.0,
@@ -381,6 +406,7 @@ async def get_master_generation_status(
         progress_rate=task_status.get("progress_rate"),
         last_update_timestamp=task_status.get("last_update_timestamp"),
         table_counts=task_status.get("table_counts"),
+        sequence=task_status.get("sequence"),
     )
 
     # Add completed tables from result if available and not already set
@@ -559,6 +585,37 @@ async def generate_historical_data(
         try:
             update_task_progress(task_id, 0.0, "Starting historical data generation")
 
+            # Pre-check: validate master DB has required rows for historical generation
+            try:
+                from sqlalchemy import select, func
+                from ..db.session import get_master_session
+                from ..db.models.master import Geography, Store, DistributionCenter, Customer, Product
+
+                async with get_master_session() as s:
+                    geo_cnt = (await s.execute(select(func.count()).select_from(Geography))).scalar() or 0
+                    store_cnt = (await s.execute(select(func.count()).select_from(Store))).scalar() or 0
+                    dc_cnt = (await s.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
+                    cust_cnt = (await s.execute(select(func.count()).select_from(Customer))).scalar() or 0
+                    prod_cnt = (await s.execute(select(func.count()).select_from(Product))).scalar() or 0
+
+                update_task_progress(
+                    task_id,
+                    0.01,
+                    f"Master ready: {geo_cnt} geos, {store_cnt} stores, {dc_cnt} DCs, {cust_cnt} customers, {prod_cnt} products",
+                )
+
+                if store_cnt == 0 or cust_cnt == 0 or prod_cnt == 0:
+                    raise RuntimeError(
+                        "Master DB missing required data. Ensure master generation completed successfully."
+                    )
+            except Exception as pre_exc:
+                update_task_progress(
+                    task_id,
+                    0.0,
+                    f"Pre-check failed: {pre_exc}",
+                )
+                raise
+
             # Calculate total days for progress tracking
             total_days = (end_date - start_date).days + 1
 
@@ -732,7 +789,14 @@ async def generate_historical_data(
             # Update generation state with the end timestamp
             state_manager.update_historical_generation(end_date)
 
-            update_task_progress(task_id, 1.0, "Historical data generation completed")
+            # Final table counts from summary for accuracy
+            final_counts = summary.facts_generated
+            update_task_progress(
+                task_id,
+                1.0,
+                "Historical data generation completed",
+                table_counts=final_counts,
+            )
 
             return {
                 "start_date": start_date.isoformat(),
@@ -747,6 +811,13 @@ async def generate_historical_data(
 
         except Exception as e:
             logger.error(f"Historical data generation failed: {e}")
+            # Surface error to task status for UI
+            update_task_progress(
+                task_id,
+                0.0,
+                f"Historical generation failed: {e}",
+                tables_failed=tables_to_generate,
+            )
             raise
 
     create_background_task(
@@ -805,6 +876,7 @@ async def get_historical_generation_status(
         estimated_seconds_remaining=task_status.get("estimated_seconds_remaining"),
         progress_rate=task_status.get("progress_rate"),
         last_update_timestamp=task_status.get("last_update_timestamp"),
+        sequence=task_status.get("sequence"),
     )
 
 
@@ -1096,6 +1168,17 @@ async def get_table_summary(table_name: str):
         )
 
 
+# New unified alias: /api/{table_name}/summary (works for master or fact)
+@router.get(
+    "/{table_name}/summary",
+    summary="Get table summary (unified)",
+    description="Get record counts and metadata for any table (master or fact) via unified path",
+)
+async def get_table_summary_unified(table_name: str):
+    # Reuse the existing implementation
+    return await get_table_summary(table_name)
+
+
 @router.get(
     "/data/{table_name}",
     response_model=TablePreviewResponse,
@@ -1154,6 +1237,19 @@ async def preview_table(
         )
 
 
+# New unified alias: /api/{table_name} (works for master or fact)
+@router.get(
+    "/{table_name}",
+    response_model=TablePreviewResponse,
+    summary="Preview table (unified)",
+    description="Preview any table (master or fact) via unified path",
+)
+async def preview_table_unified(
+    table_name: str,
+    limit: int = Query(100, ge=1, le=1000, description="Number of rows to return"),
+):
+    # Delegate to existing preview handler
+    return await preview_table(table_name=table_name, limit=limit)
 
 # ================================
 # OPERATION CONTROL ENDPOINTS
@@ -1237,6 +1333,68 @@ async def preview_master_table_alias(
 
 
 @router.get(
+    "/facts/{table_name}",
+    response_model=TablePreviewResponse,
+    summary="Preview fact table (UI alias)",
+    description="Alias used by UI to preview fact tables; returns empty preview when no data",
+)
+async def preview_fact_table_alias(
+    table_name: str,
+    limit: int = Query(100, ge=1, le=1000),
+):
+    if table_name not in FACT_TABLE_MODELS:
+        # Gracefully return 404 if truly unknown table
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fact table {table_name} not found.",
+        )
+
+    try:
+        from sqlalchemy import select, func
+        from ..db.session import get_facts_session
+
+        model = FACT_TABLE_MODELS[table_name]
+        async with get_facts_session() as session:
+            table = model.__table__
+            # Total count
+            count_result = await session.execute(select(func.count()).select_from(table))
+            total_rows = count_result.scalar() or 0
+
+            if total_rows == 0:
+                # Return empty preview with columns for consistent UI
+                columns = [col.name for col in table.c]
+                return TablePreviewResponse(
+                    table_name=table_name,
+                    columns=columns,
+                    row_count=0,
+                    preview_rows=[],
+                )
+
+            # Return recent rows if we have data
+            from sqlalchemy import desc
+            result = await session.execute(select(table).order_by(desc(table.c.event_ts)).limit(limit))
+            rows = result.mappings().all()
+            columns = [col.name for col in table.c]
+            preview_rows = []
+            for r in rows:
+                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
+                preview_rows.append(row_dict)
+
+            return TablePreviewResponse(
+                table_name=table_name,
+                columns=columns,
+                row_count=total_rows,
+                preview_rows=preview_rows,
+            )
+    except Exception as e:
+        logger.error(f"Fact preview (alias) failed for {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview {table_name}: {str(e)}",
+        )
+
+
+@router.get(
     "/facts/{table_name}/recent",
     response_model=TablePreviewResponse,
     summary="Preview recent fact data (UI alias)",
@@ -1300,10 +1458,40 @@ async def preview_recent_fact_alias(
 
 @router.get(
     "/dashboard/counts",
-    summary="Get cached dashboard counts",
-    description="Get cached table counts for fast dashboard loading",
+    summary="Get live dashboard counts",
+    description="Get live table counts from SQLite (no cache)",
 )
 async def get_dashboard_counts():
-    """Get cached table counts for dashboard."""
-    cache_manager = CacheManager()
-    return cache_manager.get_all_counts()
+    """Get live table counts for dashboard (queries databases directly)."""
+    from sqlalchemy import select, func
+    from datetime import datetime
+    from ..db.session import get_master_session, get_facts_session
+
+    master_counts: dict[str, int] = {}
+    fact_counts: dict[str, int] = {}
+
+    # Master tables
+    try:
+        async with get_master_session() as s:
+            for name, model in MASTER_TABLE_MODELS.items():
+                table = model.__table__
+                result = await s.execute(select(func.count()).select_from(table))
+                master_counts[name] = int(result.scalar() or 0)
+    except Exception as e:
+        logger.warning(f"Failed to read master counts: {e}")
+
+    # Fact tables
+    try:
+        async with get_facts_session() as s:
+            for name, model in FACT_TABLE_MODELS.items():
+                table = model.__table__
+                result = await s.execute(select(func.count()).select_from(table))
+                fact_counts[name] = int(result.scalar() or 0)
+    except Exception as e:
+        logger.warning(f"Failed to read fact counts: {e}")
+
+    return {
+        "master_tables": master_counts,
+        "fact_tables": fact_counts,
+        "last_updated": datetime.utcnow().isoformat() + "Z",
+    }

@@ -83,6 +83,29 @@ async def init_databases() -> None:
         raise
 
 
+async def migrate_fact_schema() -> None:
+    """
+    Validate/auto-migrate facts database schema to match current models.
+
+    - Ensures fact_receipts has 'receipt_id_ext' column and index.
+    - (Extend here for future, non-destructive ALTERs.)
+    """
+    engine = get_facts_engine()
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        # Ensure receipt_id_ext exists
+        try:
+            res = await conn.execute(text("PRAGMA table_info('fact_receipts')"))
+            cols = [row[1] for row in res.fetchall()]
+            if 'receipt_id_ext' not in cols:
+                await conn.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
+                logger.info("Migrated fact_receipts: added receipt_id_ext column + index")
+        except Exception as e:
+            logger.warning(f"Schema check/migration for fact_receipts failed: {e}")
+
+
 async def create_all_tables(metadata, engine: AsyncEngine) -> None:
     """
     Create all tables defined in metadata for a specific engine.

@@ -204,6 +204,10 @@ class GenerationStatusResponse(BaseModel):
         None,
         description="ISO-8601 timestamp of last progress update"
     )
+    sequence: int | None = Field(
+        None,
+        description="Monotonic update sequence (drop older updates on UI if needed)"
+    )
 
     # Hourly progress tracking fields (Phase 1B enhancements)
     current_day: int | None = Field(

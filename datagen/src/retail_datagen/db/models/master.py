@@ -84,7 +84,7 @@ class Geography(Base):
     __table_args__ = (
         Index("idx_geography_state_city", "State", "City"),
         Index("idx_geography_region", "Region"),
-        {"comment": "Master geography dimension table"},
+        {"extend_existing": True, "comment": "Master geography dimension table"},
     )
 
     def __repr__(self) -> str:
@@ -140,7 +140,7 @@ class Store(Base):
     __table_args__ = (
         Index("idx_store_geography", "GeographyID"),
         Index("idx_store_number", "StoreNumber"),
-        {"comment": "Store dimension table"},
+        {"extend_existing": True, "comment": "Store dimension table"},
     )
 
     def __repr__(self) -> str:
@@ -199,7 +199,7 @@ class DistributionCenter(Base):
     __table_args__ = (
         Index("idx_dc_geography", "GeographyID"),
         Index("idx_dc_number", "DCNumber"),
-        {"comment": "Distribution center dimension table"},
+        {"extend_existing": True, "comment": "Distribution center dimension table"},
     )
 
     def __repr__(self) -> str:
@@ -262,7 +262,7 @@ class Truck(Base):
         Index("idx_truck_dc", "DCID"),
         Index("idx_truck_license_plate", "LicensePlate"),
         Index("idx_truck_refrigeration", "Refrigeration"),
-        {"comment": "Truck dimension table for supply chain logistics"},
+        {"extend_existing": True, "comment": "Truck dimension table for supply chain logistics"},
     )
 
     def __repr__(self) -> str:
@@ -350,7 +350,7 @@ class Customer(Base):
         Index("idx_customer_loyalty_card", "LoyaltyCard"),
         Index("idx_customer_ble_id", "BLEId"),
         Index("idx_customer_ad_id", "AdId"),
-        {"comment": "Customer dimension table (100% synthetic data)"},
+        {"extend_existing": True, "comment": "Customer dimension table (100% synthetic data)"},
     )
 
     def __repr__(self) -> str:
@@ -440,7 +440,7 @@ class Product(Base):
         Index("idx_product_refrigeration", "RequiresRefrigeration"),
         Index("idx_product_sale_price", "SalePrice"),
         Index("idx_product_launch_date", "LaunchDate"),
-        {"comment": "Product master dimension table (100% synthetic data)"},
+        {"extend_existing": True, "comment": "Product master dimension table (100% synthetic data)"},
     )
 
     def __repr__(self) -> str:

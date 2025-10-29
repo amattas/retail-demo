@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from multiprocessing import cpu_count
 from pathlib import Path
+from datetime import time as dt_time
 from threading import Lock
 from typing import Any, Callable, Type, Optional
 
@@ -264,6 +265,7 @@ class FactDataGenerator:
         "receipt_lines",
         "foot_traffic",
         "ble_pings",
+        "marketing",
         # Omnichannel extension integrated into core facts
         "online_orders",
     ]
@@ -529,8 +531,8 @@ class FactDataGenerator:
                 self._table_states[table_name] = "in_progress"
 
     def load_master_data(self) -> None:
-        """Load master data from existing CSV files."""
-        print("Loading master data for fact generation...")
+        """Legacy CSV loader (retained for backward compatibility)."""
+        print("Loading master data for fact generation (CSV legacy path)...")
 
         master_path = Path(self.config.paths.master)
 
@@ -557,12 +559,133 @@ class FactDataGenerator:
         )
 
         print(
-            "Loaded master data: "
+            "Loaded master data (CSV): "
             f"{loaded_counts.get('geographies', 0)} geographies, "
             f"{loaded_counts.get('stores', 0)} stores, "
             f"{loaded_counts.get('distribution_centers', 0)} DCs, "
             f"{loaded_counts.get('customers', 0)} customers, "
             f"{loaded_counts.get('products', 0)} products"
+        )
+
+    async def load_master_data_from_db(self) -> None:
+        """Load master data directly from SQLite master database."""
+        print("Loading master data for fact generation (SQLite)...")
+
+        # Import ORM models lazily to avoid circulars
+        from retail_datagen.db.models.master import (
+            Geography as GeographyModel,
+            Store as StoreModel,
+            DistributionCenter as DistributionCenterModel,
+            Truck as TruckModel,
+            Customer as CustomerModel,
+            Product as ProductModel,
+        )
+        from retail_datagen.db.session import master_session_maker
+        from sqlalchemy import select
+
+        SessionMaker = master_session_maker()
+        async with SessionMaker() as session:
+            # Geographies
+            geos = (await session.execute(select(GeographyModel))).scalars().all()
+            self.geographies = [
+                GeographyMaster(
+                    ID=g.geography_id,
+                    City=g.city,
+                    State=g.state,
+                    ZipCode=str(g.postal_code),
+                    District=g.district,
+                    Region=g.region,
+                )
+                for g in geos
+            ]
+
+            # Stores
+            stores = (await session.execute(select(StoreModel))).scalars().all()
+            self.stores = [
+                Store(
+                    ID=s.store_id,
+                    StoreNumber=s.store_number,
+                    Address=s.address,
+                    GeographyID=s.geography_id,
+                )
+                for s in stores
+            ]
+
+            # Distribution Centers
+            dcs = (await session.execute(select(DistributionCenterModel))).scalars().all()
+            self.distribution_centers = [
+                DistributionCenter(
+                    ID=d.dc_id,
+                    DCNumber=d.dc_number,
+                    Address=d.address,
+                    GeographyID=d.geography_id,
+                )
+                for d in dcs
+            ]
+
+            # Customers
+            customers = (await session.execute(select(CustomerModel))).scalars().all()
+            self.customers = [
+                Customer(
+                    ID=c.customer_id,
+                    FirstName=c.first_name,
+                    LastName=c.last_name,
+                    Address=c.address,
+                    GeographyID=c.geography_id,
+                    LoyaltyCard=c.loyalty_card,
+                    Phone=c.phone,
+                    BLEId=c.ble_id,
+                    AdId=c.ad_id,
+                )
+                for c in customers
+            ]
+
+            # Products
+            products = (await session.execute(select(ProductModel))).scalars().all()
+            self.products = []
+            for p in products:
+                # Convert pricing floats to Decimal and date to datetime
+                launch_dt = datetime.combine(p.launch_date, dt_time(0, 0)) if hasattr(p, "launch_date") and p.launch_date else datetime.now()
+                self.products.append(
+                    ProductMaster(
+                        ID=p.product_id,
+                        ProductName=p.product_name,
+                        Brand=p.brand,
+                        Company=p.company,
+                        Department=p.department,
+                        Category=p.category,
+                        Subcategory=p.subcategory,
+                        Cost=self._to_decimal(p.cost),
+                        MSRP=self._to_decimal(p.msrp),
+                        SalePrice=self._to_decimal(p.sale_price),
+                        RequiresRefrigeration=bool(p.requires_refrigeration),
+                        LaunchDate=launch_dt,
+                    )
+                )
+
+        # Initialize simulators with loaded data
+        self.customer_journey_sim = CustomerJourneySimulator(
+            self.customers, self.products, self.stores, self.config.seed + 1000
+        )
+
+        self.inventory_flow_sim = InventoryFlowSimulator(
+            self.distribution_centers,
+            self.stores,
+            self.products,
+            self.config.seed + 2000,
+        )
+
+        self.marketing_campaign_sim = MarketingCampaignSimulator(
+            self.customers, self.config.seed + 3000
+        )
+
+        print(
+            "Loaded master data (SQLite): "
+            f"{len(self.geographies)} geographies, "
+            f"{len(self.stores)} stores, "
+            f"{len(self.distribution_centers)} DCs, "
+            f"{len(self.customers)} customers, "
+            f"{len(self.products)} products"
         )
 
     async def generate_historical_data(
@@ -598,15 +721,39 @@ class FactDataGenerator:
         # Reset hourly progress tracker for new generation run
         self.hourly_tracker.reset()
 
-        # Ensure master data is loaded
+        # Ensure master data is loaded (from SQLite)
         if not self.stores:
-            self.load_master_data()
+            await self.load_master_data_from_db()
+
+        # Pre-check master readiness
+        errors: list[str] = []
+        if not self.stores:
+            errors.append("No stores found in master database")
+        if not self.customers:
+            errors.append("No customers found in master database")
+        if not self.products:
+            errors.append("No products found in master database")
+        if errors:
+            raise ValueError("; ".join(errors))
 
         # Determine active tables
         active_tables = self._active_fact_tables()
 
         # Initialize tracking for active tables only
         facts_generated = {t: 0 for t in active_tables}
+        # Track records actually written to DB for live tile counts
+        self._table_insert_counts: dict[str, int] = {t: 0 for t in active_tables}
+        # Track DB totals to verify deltas
+        self._fact_db_counts: dict[str, int] = {}
+        try:
+            from sqlalchemy import select, func
+            # Read initial DB totals once for all active tables
+            for t in active_tables:
+                model = self._get_model_for_table(t)
+                total = (await self._session.execute(select(func.count()).select_from(model))).scalar() or 0
+                self._fact_db_counts[t] = int(total)
+        except Exception as e:
+            logger.debug(f"Initial DB count read failed (will verify per-hour): {e}")
 
         # NEW: Add table progress tracking
         table_progress = {table: 0.0 for table in active_tables}
@@ -614,10 +761,13 @@ class FactDataGenerator:
         total_days = (end_date - start_date).days + 1
 
         # Calculate expected records per table for accurate progress tracking
-        customers_per_day = self.config.volume.customers_per_day
+        # NOTE: customers_per_day is configured PER STORE, not total
+        # Total daily customers = customers_per_day * number of stores
+        customers_per_store_per_day = self.config.volume.customers_per_day
+        total_customers_per_day = customers_per_store_per_day * len(self.stores)
         expected_records_all = {
-            "receipts": total_days * customers_per_day,
-            "receipt_lines": total_days * customers_per_day * 3,
+            "receipts": total_days * total_customers_per_day,
+            "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
@@ -644,77 +794,109 @@ class FactDataGenerator:
             )
             parallel = False
 
-        # SEQUENTIAL PROCESSING
-        while current_date <= end_date:
-            day_counter += 1
+        # SEQUENTIAL PROCESSING with managed facts session if not provided
+        from retail_datagen.db.session import facts_session_maker
+        created_session = False
+        if self._session is None:
+            SessionMaker = facts_session_maker()
+        
+        async def _ensure_receipt_ext_column(session: AsyncSession) -> None:
+            try:
+                from sqlalchemy import text
+                # Check if column exists
+                res = await session.execute(text("PRAGMA table_info('fact_receipts')"))
+                cols = [row[1] for row in res.fetchall()]
+                if 'receipt_id_ext' not in cols:
+                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
+                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
+                    await session.commit()
+                    logger.info("Migrated fact_receipts: added receipt_id_ext column and index")
+            except Exception as e:
+                logger.warning(f"Could not ensure receipt_id_ext column exists: {e}")
 
-            # Generate daily facts (progress updates now happen during actual generation)
-            daily_facts = await self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
+        async def _run_with_session():
+            nonlocal day_counter, current_date
+            # Ensure schema is compatible (adds receipt_id_ext if missing)
+            await _ensure_receipt_ext_column(self._session)
+            while current_date <= end_date:
+                day_counter += 1
 
-            # Update counters
-            for fact_type, records in daily_facts.items():
-                facts_generated[fact_type] += len(records)
+                # Generate daily facts (progress updates now happen during actual generation)
+                daily_facts = await self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
 
-            # Update per-table progress based on actual records generated
-            for fact_type in facts_generated.keys():
-                current_count = facts_generated[fact_type]
-                expected = expected_records.get(fact_type, 1)
-                # Calculate actual progress (0.0 to 1.0), never exceed 1.0
-                table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
+                # Update counters
+                for fact_type, records in daily_facts.items():
+                    facts_generated[fact_type] += len(records)
 
-            # Emit per-table progress (master-style)
-            for fact_type, prog in table_progress.items():
-                self._emit_table_progress(
-                    fact_type,
-                    prog,
-                    f"Generating {fact_type.replace('_',' ')}",
-                    None,
+                # Update per-table progress based on actual records generated
+                for fact_type in facts_generated.keys():
+                    current_count = facts_generated[fact_type]
+                    expected = expected_records.get(fact_type, 1)
+                    # Calculate actual progress (0.0 to 1.0), never exceed 1.0
+                    table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
+
+                # Emit per-table progress (master-style)
+                for fact_type, prog in table_progress.items():
+                    self._emit_table_progress(
+                        fact_type,
+                        prog,
+                        f"Generating {fact_type.replace('_',' ')}",
+                        None,
+                    )
+
+                # Update table states based on progress
+                self._update_table_states(table_progress)
+
+                # Calculate tables completed count
+                tables_completed_count = sum(
+                    1 for state in self._table_states.values()
+                    if state == "completed"
                 )
 
-            # Update table states based on progress
-            self._update_table_states(table_progress)
+                # Enhanced message with table completion count
+                enhanced_message = (
+                    f"Generating data for {current_date.strftime('%Y-%m-%d')} "
+                    f"(day {day_counter}/{total_days}) "
+                    f"({tables_completed_count}/{len(self._table_states)} tables complete)"
+                )
 
-            # Calculate tables completed count
-            tables_completed_count = sum(
-                1 for state in self._table_states.values()
-                if state == "completed"
-            )
+                # Get table lists for detailed reporting
+                tables_completed = [
+                    table for table, state in self._table_states.items()
+                    if state == "completed"
+                ]
+                tables_in_progress = [
+                    table for table, state in self._table_states.items()
+                    if state == "in_progress"
+                ]
+                tables_remaining = [
+                    table for table, state in self._table_states.items()
+                    if state == "not_started"
+                ]
 
-            # Enhanced message with table completion count
-            enhanced_message = (
-                f"Generating data for {current_date.strftime('%Y-%m-%d')} "
-                f"(day {day_counter}/{total_days}) "
-                f"({tables_completed_count}/{len(self._table_states)} tables complete)"
-            )
+                # Update API progress with throttling, include cumulative counts
+                self._send_throttled_progress_update(
+                    day_counter,
+                    enhanced_message,
+                    total_days,
+                    table_progress=table_progress,
+                    tables_completed=tables_completed,
+                    tables_in_progress=tables_in_progress,
+                    tables_remaining=tables_remaining,
+                    # For UI tiles prefer DB-written counts if available, otherwise generation counts
+                    table_counts=(self._table_insert_counts.copy() if getattr(self, "_table_insert_counts", None) else facts_generated.copy()),
+                )
 
-            # Get table lists for detailed reporting
-            tables_completed = [
-                table for table, state in self._table_states.items()
-                if state == "completed"
-            ]
-            tables_in_progress = [
-                table for table, state in self._table_states.items()
-                if state == "in_progress"
-            ]
-            tables_remaining = [
-                table for table, state in self._table_states.items()
-                if state == "not_started"
-            ]
+                progress_reporter.update(1)
+                current_date += timedelta(days=1)
 
-            # Update API progress with throttling, include cumulative counts
-            self._send_throttled_progress_update(
-                day_counter,
-                enhanced_message,
-                total_days,
-                table_progress=table_progress,
-                tables_completed=tables_completed,
-                tables_in_progress=tables_in_progress,
-                tables_remaining=tables_remaining,
-                table_counts=facts_generated.copy(),
-            )
-
-            progress_reporter.update(1)
-            current_date += timedelta(days=1)
+        if self._session is None:
+            async with SessionMaker() as session:
+                self._session = session
+                await _run_with_session()
+                self._session = None
+        else:
+            await _run_with_session()
 
         progress_reporter.complete()
 
@@ -794,8 +976,16 @@ class FactDataGenerator:
 
         # 1. Generate DC inventory transactions (supplier deliveries)
         if "dc_inventory_txn" in active_tables:
-            dc_transactions = self._generate_dc_inventory_transactions(date, base_multiplier)
+            dc_transactions = self._generate_dc_inventory_txn(date, base_multiplier) if hasattr(self, '_generate_dc_inventory_txn') else self._generate_dc_inventory_transactions(date, base_multiplier)
             daily_facts["dc_inventory_txn"].extend(dc_transactions)
+            # Insert daily DC transactions immediately (not hourly)
+            if dc_transactions:
+                try:
+                    import pandas as pd
+                    df_dc = pd.DataFrame(dc_transactions)
+                    await self._insert_hourly_to_db(self._session, "dc_inventory_txn", df_dc, hour=0, commit_every_batches=1)
+                except Exception as e:
+                    logger.error(f"Failed to insert dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}")
 
         # 2. Generate marketing campaigns and impressions
         # Digital marketing runs 24/7 independently of store traffic/hours
@@ -814,6 +1004,23 @@ class FactDataGenerator:
                     hour=hour,
                     total_days=total_days
                 )
+
+            # NEW: Insert marketing records for the day directly (not hourly)
+            if marketing_records:
+                try:
+                    import pandas as pd
+                    df = pd.DataFrame(marketing_records)
+                    await self._insert_hourly_to_db(self._session, "marketing", df, hour=0, commit_every_batches=1)
+                    # Verify daily insert size once for marketing
+                    try:
+                        from sqlalchemy import select, func
+                        model = self._get_model_for_table("marketing")
+                        total_db = (await self._session.execute(select(func.count()).select_from(model))).scalar() or 0
+                        logger.info(f"marketing verification (daily): inserted={len(marketing_records)}, db_total={int(total_db)}")
+                    except Exception as ve:
+                        logger.debug(f"Marketing verification skipped: {ve}")
+                except Exception as e:
+                    logger.error(f"Failed to insert marketing for {date.strftime('%Y-%m-%d')}: {e}")
 
         # 3. Generate store operations throughout the day (always generate hourly data)
         hourly_data = self._generate_hourly_store_activity(date, base_multiplier)
@@ -866,6 +1073,13 @@ class FactDataGenerator:
             base_store_txn = daily_facts.get("store_inventory_txn", [])
             truck_movements = self._generate_truck_movements(date, base_store_txn)
             daily_facts["truck_moves"].extend(truck_movements)
+            if truck_movements:
+                try:
+                    import pandas as pd
+                    df_tm = pd.DataFrame(truck_movements)
+                    await self._insert_hourly_to_db(self._session, "truck_moves", df_tm, hour=0, commit_every_batches=1)
+                except Exception as e:
+                    logger.error(f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}")
 
         # 4a. Generate truck inventory tracking events
         if "truck_inventory" in active_tables:
@@ -895,9 +1109,18 @@ class FactDataGenerator:
         if "online_orders" in active_tables:
             online_orders, online_store_txn, online_dc_txn = self._generate_online_orders(date)
             daily_facts["online_orders"].extend(online_orders)
-            if "store_inventory_txn" in active_tables:
+            # Write online orders immediately (daily batch)
+            if online_orders:
+                try:
+                    import pandas as pd
+                    df_oo = pd.DataFrame(online_orders)
+                    await self._insert_hourly_to_db(self._session, "online_orders", df_oo, hour=0, commit_every_batches=1)
+                except Exception as e:
+                    logger.error(f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}")
+            # Cascade inventory effects
+            if "store_inventory_txn" in active_tables and online_store_txn:
                 daily_facts["store_inventory_txn"].extend(online_store_txn)
-            if "dc_inventory_txn" in active_tables:
+            if "dc_inventory_txn" in active_tables and online_dc_txn:
                 daily_facts["dc_inventory_txn"].extend(online_dc_txn)
 
         # 7. Generate supply chain disruptions
@@ -1297,6 +1520,7 @@ class FactDataGenerator:
         }
 
         # Calculate expected customers for this hour
+        # NOTE: customers_per_day is configured PER STORE, not total across all stores
         base_customers_per_hour = self.config.volume.customers_per_day / 24
         expected_customers = int(base_customers_per_hour * multiplier)
 
@@ -1617,7 +1841,19 @@ class FactDataGenerator:
             hour: Hour of day (0-23)
             hourly_facts: Dictionary mapping table names to record lists
         """
-        for fact_table, records in hourly_facts.items():
+        # Deterministic insertion order to respect FKs
+        preferred_order = [
+            "receipts",
+            "receipt_lines",
+            "store_inventory_txn",
+            "dc_inventory_txn",
+            "truck_moves",
+            "foot_traffic",
+            "ble_pings",
+            "online_orders",
+        ]
+        for fact_table in preferred_order:
+            records = hourly_facts.get(fact_table) or []
             if not records:
                 continue
 
@@ -2004,7 +2240,8 @@ class FactDataGenerator:
                 **common_mappings,
                 "StoreID": "store_id",
                 "CustomerID": "customer_id",
-                # Note: ReceiptId (string) not in DB model (has auto-increment receipt_id instead)
+                # Store external receipt id for linkage with receipt_lines
+                "ReceiptId": "receipt_id_ext",
                 "Tax": "tax_amount",
                 "Total": "total_amount",
                 "TenderType": "payment_method",
@@ -2012,7 +2249,7 @@ class FactDataGenerator:
             },
             "receipt_lines": {
                 **common_mappings,
-                "ReceiptId": "receipt_id",  # Maps to FK
+                # ReceiptId will be resolved to numeric FK by lookup before insert
                 "ProductID": "product_id",
                 "Qty": "quantity",
                 "UnitPrice": "unit_price",
@@ -2107,6 +2344,7 @@ class FactDataGenerator:
         df: pd.DataFrame,
         hour: int,
         batch_size: int = 10000,
+        commit_every_batches: int = 1,
     ) -> None:
         """
         Insert hourly data batch into SQLite.
@@ -2134,16 +2372,51 @@ class FactDataGenerator:
             logger.error(f"Cannot insert data: {e}")
             return
 
-        # Convert DataFrame to records and map field names
+        # Convert DataFrame to records
         records = df.to_dict('records')
-        mapped_records = [
-            self._map_field_names_for_db(table_name, record)
-            for record in records
-        ]
+
+        # Special handling: link receipt_lines to receipts by external id
+        if table_name == "receipt_lines":
+            try:
+                # Collect unique external ids
+                ext_ids = list({r.get("ReceiptId") for r in records if r.get("ReceiptId")})
+                # Build map from external id -> numeric PK
+                receipts_model = self._get_model_for_table("receipts")
+                from sqlalchemy import select
+                rows = (
+                    await session.execute(
+                        select(receipts_model.receipt_id, receipts_model.receipt_id_ext)
+                        .where(receipts_model.receipt_id_ext.in_(ext_ids))
+                    )
+                ).all()
+                id_map = {ext: pk for (pk, ext) in rows}
+
+                mapped_records = []
+                for record in records:
+                    mapped = self._map_field_names_for_db(table_name, record)
+                    ext = record.get("ReceiptId")
+                    pk = id_map.get(ext)
+                    if not pk:
+                        # No matching receipt yet; skip this line to preserve FK integrity
+                        logger.debug(f"Skipping receipt_line with unknown ReceiptId={ext}")
+                        continue
+                    mapped["receipt_id"] = int(pk)
+                    mapped_records.append(mapped)
+            except Exception as e:
+                logger.error(f"Failed to resolve receipt_ids for receipt_lines: {e}")
+                return
+        else:
+            # Default mapping path
+            mapped_records = [
+                self._map_field_names_for_db(table_name, record)
+                for record in records
+            ]
 
         # Batch insert using bulk operations
         try:
-            for i in range(0, len(mapped_records), batch_size):
+            total_hour_rows = len(mapped_records)
+            batch_index = 0
+            for i in range(0, total_hour_rows, batch_size):
                 batch = mapped_records[i:i + batch_size]
 
                 # Use bulk insert for performance
@@ -2152,17 +2425,74 @@ class FactDataGenerator:
                     model_class.__table__.insert(),
                     batch
                 )
+                # Flush to DB
+                await session.flush()
 
                 logger.debug(
                     f"Inserted batch {i//batch_size + 1} for {table_name} hour {hour}: "
                     f"{len(batch)} rows"
                 )
 
+                # Live per-table progress and counts (master-style tiles)
+                try:
+                    # Update cumulative DB-written counts for this table
+                    if not hasattr(self, "_table_insert_counts"):
+                        self._table_insert_counts = {}
+                    self._table_insert_counts[table_name] = self._table_insert_counts.get(table_name, 0) + len(batch)
+
+                    # Compute fractional progress across the whole range using hourly tracker state
+                    tracker_state = self.hourly_tracker.get_current_progress()
+                    completed_hours = tracker_state.get("completed_hours", {}).get(table_name, 0)
+                    total_days = tracker_state.get("total_days") or 1
+                    total_hours_expected = max(1, total_days * 24)
+                    # Partial hour progress within this hour based on batch position
+                    partial_hour = (i + len(batch)) / total_hour_rows if total_hour_rows > 0 else 1.0
+                    per_table_fraction = min(1.0, (completed_hours + partial_hour) / total_hours_expected)
+
+                    # Emit per-table progress callback (router merges counts and recomputes overall)
+                    self._emit_table_progress(
+                        table_name,
+                        per_table_fraction,
+                        f"Writing {table_name.replace('_',' ')} ({self._table_insert_counts[table_name]:,})",
+                        {table_name: self._table_insert_counts[table_name]},
+                    )
+                except Exception as _:
+                    # Non-fatal: progress updates should not break inserts
+                    pass
+
+                # Periodic commit for durability
+                batch_index += 1
+                if commit_every_batches > 0 and (batch_index % commit_every_batches == 0):
+                    try:
+                        await session.commit()
+                        logger.debug(
+                            f"Committed {len(batch)} rows for {table_name} hour {hour}, batch {batch_index}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Interim commit failed for {table_name} hour {hour}: {e}")
+
             # Commit once after all batches (not per batch for performance)
             await session.commit()
             logger.info(
                 f"Inserted {len(mapped_records)} rows for {table_name} hour {hour}"
             )
+
+            # Optional verification: compare DB count delta (throttled by hour)
+            try:
+                if hour % 6 == 0:  # verify every 6 hours to reduce overhead
+                    from sqlalchemy import select, func
+                    total_db = (await session.execute(select(func.count()).select_from(model_class))).scalar() or 0
+                    prev = 0
+                    if not hasattr(self, "_fact_db_counts"):
+                        self._fact_db_counts = {}
+                    prev = int(self._fact_db_counts.get(table_name, 0))
+                    added = int(total_db) - prev
+                    self._fact_db_counts[table_name] = int(total_db)
+                    logger.info(
+                        f"{table_name} verification (hour {hour}): added={added}, expected={len(mapped_records)}, db_total={total_db}"
+                    )
+            except Exception as e:
+                logger.debug(f"Verification skipped for {table_name} hour {hour}: {e}")
 
         except Exception as e:
             logger.error(
@@ -2319,10 +2649,9 @@ def generate_historical_facts(
     from retail_datagen.config.models import RetailConfig
 
     config = RetailConfig.from_file(config_path)
-    generator = FactDataGenerator(config)
-    summary = generator.generate_historical_data(start_date, end_date)
+    # NOTE: This convenience function is legacy; in API flow we construct with an AsyncSession.
+    # Here we construct a temporary generator without DB session which is not supported in DB mode.
+    # Users should use the FastAPI endpoints instead.
+    raise RuntimeError("Use API endpoints for historical generation in SQLite mode")
 
-    print(
-        f"Generated {summary.total_records} fact records across {summary.partitions_created} partitions"
-    )
-    return generator
+    # Unreachable in DB mode

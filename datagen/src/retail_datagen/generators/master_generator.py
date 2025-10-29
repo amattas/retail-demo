@@ -155,6 +155,7 @@ class MasterDataGenerator:
         model_class: Type[DeclarativeBase],
         pydantic_models: list,
         batch_size: int = 10000,
+        commit_every_batches: int = 5,
     ) -> None:
         """
         Insert Pydantic models into database table using bulk insertion.
@@ -192,6 +193,7 @@ class MasterDataGenerator:
                 records.append(mapped_record)
 
             # Insert in batches for performance and memory efficiency
+            batch_index = 0
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
 
@@ -216,6 +218,19 @@ class MasterDataGenerator:
                         f"Writing {ui_table_name.replace('_', ' ')} ({records_inserted:,}/{total_records:,})",
                         {ui_table_name: records_inserted},
                     )
+
+                batch_index += 1
+                if commit_every_batches > 0 and (batch_index % commit_every_batches == 0):
+                    # Periodic commit improves durability for very large tables
+                    try:
+                        await session.commit()
+                        logger.info(
+                            f"Committed after {batch_index} batches for {table_name}"
+                        )
+                    except Exception:
+                        logger.warning(
+                            f"Commit failed after batch {batch_index} for {table_name}; continuing with session context manager"
+                        )
 
             logger.info(f"Successfully inserted all {total_records:,} records into {table_name}")
 
@@ -1057,8 +1072,22 @@ class MasterDataGenerator:
             await self._insert_to_db(
                 self._db_session,
                 CustomerModel,
-                self.customers
+                self.customers,
+                batch_size=5000,
+                commit_every_batches=1,
             )
+            # Verify DB count matches generated count for diagnostics
+            try:
+                from sqlalchemy import select, func
+                result = await self._db_session.execute(
+                    select(func.count()).select_from(CustomerModel)
+                )
+                db_count = int(result.scalar() or 0)
+                logger.info(
+                    f"Customer insert verification: expected={len(self.customers):,}, db={db_count:,}"
+                )
+            except Exception as e:
+                logger.warning(f"Could not verify customer DB count: {e}")
 
     def generate_products_master(self) -> None:
         """Generate products_master.csv with realistic pricing and brand combinations."""
@@ -1312,8 +1341,22 @@ class MasterDataGenerator:
             await self._insert_to_db(
                 self._db_session,
                 ProductModel,
-                self.products_master
+                self.products_master,
+                batch_size=2000,
+                commit_every_batches=1,
             )
+            # Verify DB count matches generated count for diagnostics
+            try:
+                from sqlalchemy import select, func
+                result = await self._db_session.execute(
+                    select(func.count()).select_from(ProductModel)
+                )
+                db_count = int(result.scalar() or 0)
+                logger.info(
+                    f"Product insert verification: expected={len(self.products_master):,}, db={db_count:,}"
+                )
+            except Exception as e:
+                logger.warning(f"Could not verify product DB count: {e}")
 
     def _map_product_to_brand_category(
         self, product_category: str, product_department: str

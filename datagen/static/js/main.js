@@ -291,7 +291,7 @@ class RetailDataGenerator {
                 }
 
                 try {
-                    const response = await fetch(`/api/master/${key}`);
+                    const response = await fetch(`/api/${key}`);
                     if (response.ok) {
                         const result = await response.json();
                         const count = typeof result.row_count === 'number' ? result.row_count : null;
@@ -323,7 +323,7 @@ class RetailDataGenerator {
             // Backfill receipts if needed
             if (receiptCount === null) {
                 try {
-                    const response = await fetch('/api/facts/receipts');
+                    const response = await fetch('/api/receipts');
                     if (response.ok) {
                         const result = await response.json();
                         if (typeof result.total_records === 'number') {
@@ -521,7 +521,7 @@ class RetailDataGenerator {
         try {
             const requestVersion = this._nextCountVersion();
             if (this.masterTableNames.includes(tableName)) {
-                const response = await fetch(`/api/master/${tableName}?limit=1`);
+                const response = await fetch(`/api/${tableName}?limit=1`);
                 if (!response.ok) {
                     if (response.status === 404) {
                         this.setTableCount(
@@ -542,7 +542,7 @@ class RetailDataGenerator {
             }
 
             if (this.factTableNames.includes(tableName)) {
-                const response = await fetch(`/api/facts/${tableName}`);
+                const response = await fetch(`/api/${tableName}`);
                 if (!response.ok) {
                     if (response.status === 404) {
                         this.setTableCount(
@@ -631,7 +631,7 @@ class RetailDataGenerator {
                     );
                     for (const table of missingMasterTables) {
                         try {
-                            const response = await fetch(`/api/master/${table.name}`);
+                            const response = await fetch(`/api/${table.name}`);
                             if (response.ok) {
                                 const result = await response.json();
                                 table.count = result.row_count || 0;
@@ -649,7 +649,7 @@ class RetailDataGenerator {
                         // Fallback: query summary if cache missing
                         if (count === null) {
                             try {
-                                const summaryResp = await fetch(`/api/facts/${table.name}`);
+                                const summaryResp = await fetch(`/api/${table.name}`);
                                 if (summaryResp.ok) {
                                     const summary = await summaryResp.json();
                                     count = summary.total_records || 0;
@@ -670,7 +670,7 @@ class RetailDataGenerator {
                 // Fallback to direct queries if cache fails
                 for (const table of masterTables) {
                     try {
-                        const response = await fetch(`/api/master/${table.name}`);
+                        const response = await fetch(`/api/${table.name}`);
                         if (response.ok) {
                             const result = await response.json();
                             allTables.push({
@@ -705,7 +705,7 @@ class RetailDataGenerator {
                             if (existingFactTables.includes(table.name)) {
                                 // Fetch summary to get actual count
                                 try {
-                                    const summaryResp = await fetch(`/api/facts/${table.name}`);
+                                    const summaryResp = await fetch(`/api/${table.name}`);
                                     if (summaryResp.ok) {
                                         const summary = await summaryResp.json();
                                         allTables.push({ ...table, count: summary.total_records || 0, status: (summary.total_records || 0) > 0 ? 'Generated' : 'Not Generated' });
@@ -1531,14 +1531,7 @@ class RetailDataGenerator {
         modal.style.display = 'block';
 
         try {
-            let response;
-            if (tableType === 'Historical Data') {
-                // For fact tables, get recent data
-                response = await fetch(`/api/facts/${tableName}/recent?limit=100`);
-            } else {
-                // For master tables
-                response = await fetch(`/api/master/${tableName}`);
-            }
+            const response = await fetch(`/api/${tableName}`);
 
             if (!response.ok) {
                 throw new Error('Table not found or not generated yet');
@@ -1586,6 +1579,7 @@ class RetailDataGenerator {
     async pollProgress(statusUrl, progressFillId, progressTextId) {
         const maxAttempts = 600; // 10 minutes max
         let attempts = 0;
+        this._lastSequences = this._lastSequences || {};
 
         return new Promise((resolve) => {
             const isMasterProgress = progressFillId === 'masterProgressFill';
@@ -1627,6 +1621,17 @@ class RetailDataGenerator {
 
                     const status = await response.json();
                     console.log('[Progress Poll] Status received:', status);
+
+                    // Drop out-of-order updates using sequence
+                    if (typeof status.sequence === 'number') {
+                        const prev = this._lastSequences[statusUrl] || 0;
+                        if (status.sequence < prev) {
+                            console.warn('[Progress Poll] Dropping stale update seq=', status.sequence, 'prev=', prev);
+                            setTimeout(poll, 300);
+                            return;
+                        }
+                        this._lastSequences[statusUrl] = status.sequence;
+                    }
 
                     const proceedWithStatus = (statusObj) => {
                         // Update progress bar

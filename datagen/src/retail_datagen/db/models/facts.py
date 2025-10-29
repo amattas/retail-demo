@@ -71,6 +71,7 @@ class DCInventoryTransaction(Base):
     __table_args__ = (
         Index('ix_dc_inv_event_dc', 'event_ts', 'dc_id'),
         Index('ix_dc_inv_event_product', 'event_ts', 'product_id'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -121,6 +122,7 @@ class TruckMove(Base):
         Index('ix_truck_event_truck', 'event_ts', 'truck_id'),
         Index('ix_truck_event_store', 'event_ts', 'store_id'),
         Index('ix_truck_shipment_status', 'shipment_id', 'status'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -168,6 +170,7 @@ class StoreInventoryTransaction(Base):
     __table_args__ = (
         Index('ix_store_inv_event_store', 'event_ts', 'store_id'),
         Index('ix_store_inv_event_product', 'event_ts', 'product_id'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -198,6 +201,11 @@ class Receipt(Base):
     # Primary key
     receipt_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
+    # External business key (string), used to relate receipt_lines to receipts
+    receipt_id_ext: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+
     # Foreign keys (references master.db tables - not enforced)
     store_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -217,6 +225,7 @@ class Receipt(Base):
     __table_args__ = (
         Index('ix_receipt_event_store', 'event_ts', 'store_id'),
         Index('ix_receipt_event_customer', 'event_ts', 'customer_id'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -263,6 +272,7 @@ class ReceiptLine(Base):
     # Index for receipt lookups
     __table_args__ = (
         Index('ix_receipt_line_receipt_product', 'receipt_id', 'product_id'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -311,6 +321,7 @@ class FootTraffic(Base):
         Index('ix_foot_traffic_event_store', 'event_ts', 'store_id'),
         Index('ix_foot_traffic_zone_event', 'zone', 'event_ts'),
         Index('ix_foot_traffic_sensor_event', 'sensor_id', 'event_ts'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -364,6 +375,7 @@ class BLEPing(Base):
         Index('ix_ble_event_customer', 'event_ts', 'customer_id'),
         Index('ix_ble_beacon_event', 'beacon_id', 'event_ts'),
         Index('ix_ble_customer_ble_id', 'customer_ble_id', 'event_ts'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -419,6 +431,7 @@ class MarketingImpression(Base):
         Index('ix_marketing_channel_event', 'channel', 'event_ts'),
         Index('ix_marketing_campaign_event', 'campaign_id', 'event_ts'),
         Index('ix_marketing_customer_ad_id', 'customer_ad_id', 'event_ts'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:
@@ -467,6 +480,7 @@ class OnlineOrder(Base):
         Index('ix_online_order_event_customer', 'event_ts', 'customer_id'),
         Index('ix_online_order_event_product', 'event_ts', 'product_id'),
         Index('ix_online_order_status_event', 'fulfillment_status', 'event_ts'),
+        {"extend_existing": True},
     )
 
     def __repr__(self) -> str:

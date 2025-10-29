@@ -78,6 +78,10 @@ class TaskStatus(BaseModel):
     last_update_timestamp: datetime | None = Field(
         default=None, description="Timestamp of last progress update"
     )
+    # Monotonic sequence number for UI to de-dup/out-of-order
+    sequence: int | None = Field(
+        default=None, description="Monotonic update sequence per task"
+    )
 
     # NEW: Hourly progress tracking fields
     current_day: int | None = Field(
@@ -151,7 +155,8 @@ async def update_config(new_config: RetailConfig) -> None:
 
     # Reinitialize generators with new config
     _master_generator = MasterDataGenerator(new_config)
-    _fact_generator = FactDataGenerator(new_config)
+    # Defer FactDataGenerator creation until requested so we can supply a fresh DB session
+    _fact_generator = None
     _event_streamer = EventStreamer(new_config)
 
 
@@ -173,11 +178,8 @@ async def get_master_generator(
 async def get_fact_generator(
     config: RetailConfig = Depends(get_config),
 ) -> FactDataGenerator:
-    """Get the fact data generator instance."""
-    global _fact_generator
-    if _fact_generator is None:
-        _fact_generator = FactDataGenerator(config)
-    return _fact_generator
+    """Get a fact data generator; session is managed inside the generator."""
+    return FactDataGenerator(config, session=None)
 
 
 async def get_event_streamer(
@@ -315,30 +317,47 @@ def update_task_progress(
             "last_update_timestamp": datetime.now(),
         }
 
-        # Update table-level progress if provided
+        # Update table-level progress if provided (merge with max to avoid regressions)
         if table_progress is not None:
-            updated_fields["table_progress"] = table_progress
+            existing_progress = existing.get("table_progress") or {}
+            merged_progress: dict[str, float] = {}
+            # Union of keys
+            keys = set(existing_progress.keys()) | set(table_progress.keys())
+            for k in keys:
+                old = existing_progress.get(k, 0.0) or 0.0
+                new = table_progress.get(k, 0.0) or 0.0
+                merged_progress[k] = max(old, new)
+            updated_fields["table_progress"] = merged_progress
         if current_table is not None:
             updated_fields["current_table"] = current_table
-        if tables_completed is not None:
-            updated_fields["tables_completed"] = tables_completed
+        # Derive tables_completed/in_progress/remaining from merged table_progress when available
+        if "table_progress" in updated_fields:
+            prog = updated_fields["table_progress"]
+            updated_fields["tables_completed"] = sorted([k for k,v in prog.items() if v >= 1.0])
+            updated_fields["tables_in_progress"] = sorted([k for k,v in prog.items() if 0.0 < v < 1.0])
+            updated_fields["tables_remaining"] = sorted([k for k,v in prog.items() if v == 0.0])
+        else:
+            if tables_completed is not None:
+                updated_fields["tables_completed"] = tables_completed
         if tables_failed is not None:
             updated_fields["tables_failed"] = tables_failed
-        if tables_in_progress is not None:
+        if "tables_in_progress" not in updated_fields and tables_in_progress is not None:
             updated_fields["tables_in_progress"] = tables_in_progress
-        if tables_remaining is not None:
+        if "tables_remaining" not in updated_fields and tables_remaining is not None:
             updated_fields["tables_remaining"] = tables_remaining
         if estimated_seconds_remaining is not None:
             updated_fields["estimated_seconds_remaining"] = estimated_seconds_remaining
         if progress_rate is not None:
             updated_fields["progress_rate"] = progress_rate
         if table_counts is not None:
-            # Merge with existing counts so we don't lose prior table updates
+            # Merge with existing counts so we don't lose prior table updates; clamp with max to avoid decreases
             existing_counts = existing.get("table_counts") or {}
-            try:
-                merged = {**existing_counts, **table_counts}
-            except Exception:
-                merged = table_counts
+            merged: dict[str, int] = {}
+            keys = set(existing_counts.keys()) | set(table_counts.keys())
+            for k in keys:
+                old = int(existing_counts.get(k, 0) or 0)
+                new = int(table_counts.get(k, 0) or 0)
+                merged[k] = max(old, new)
             updated_fields["table_counts"] = merged
         # NEW: Update hourly progress fields if provided
         if current_hour is not None:
@@ -347,6 +366,10 @@ def update_task_progress(
             updated_fields["hourly_progress"] = hourly_progress
         if total_hours_completed is not None:
             updated_fields["total_hours_completed"] = total_hours_completed
+
+        # Increment sequence for out-of-order handling
+        prev_seq = int(existing.get("sequence") or 0)
+        updated_fields["sequence"] = prev_seq + 1
 
         # Create new TaskStatus with merged fields
         _task_status[task_id] = TaskStatus(**{**existing, **updated_fields})
