@@ -222,7 +222,9 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
         try:
             result = future.result()
             _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(exclude={"status", "completed_at", "progress", "message", "result"}),
+                **_task_status[task_id].model_dump(
+                    exclude={"status", "completed_at", "progress", "message", "result"}
+                ),
                 status="completed",
                 completed_at=datetime.now(),
                 progress=1.0,
@@ -232,7 +234,9 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
         except Exception as e:
             logger.error(f"Background task {task_id} failed: {e}")
             _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(exclude={"status", "completed_at", "message", "error"}),
+                **_task_status[task_id].model_dump(
+                    exclude={"status", "completed_at", "message", "error"}
+                ),
                 status="failed",
                 completed_at=datetime.now(),
                 message=f"Task failed: {str(e)}",
@@ -259,7 +263,9 @@ def cancel_task(task_id: str) -> bool:
     if not task.done():
         task.cancel()
         _task_status[task_id] = TaskStatus(
-            **_task_status[task_id].model_dump(exclude={"status", "completed_at", "message"}),
+            **_task_status[task_id].model_dump(
+                exclude={"status", "completed_at", "message"}
+            ),
             status="cancelled",
             completed_at=datetime.now(),
             message="Task was cancelled",
@@ -293,7 +299,8 @@ def update_task_progress(
         task_id: Unique identifier for the task
         progress: Overall progress (0.0 to 1.0)
         message: Status message
-        table_progress: Optional dictionary mapping table names to their progress (0.0 to 1.0)
+        table_progress: Optional dictionary mapping table names to their
+            progress (0.0 to 1.0)
         current_table: Optional name of the currently processing table
         tables_completed: Optional list of completed table names
         tables_failed: Optional list of failed table names
@@ -310,7 +317,8 @@ def update_task_progress(
         existing = _task_status[task_id].model_dump()
 
         # Build updated fields
-        # Clamp progress to valid range AND prevent backwards movement (prevents UI bouncing)
+        # Clamp progress to valid range AND prevent backwards movement
+        # (prevents UI bouncing)
         existing_progress = float(existing.get("progress") or 0.0)
         clamped_progress = max(existing_progress, max(0.0, min(1.0, progress)))
         updated_fields = {
@@ -333,44 +341,26 @@ def update_task_progress(
             updated_fields["table_progress"] = merged_progress
         if current_table is not None:
             updated_fields["current_table"] = current_table
-        # Derive tables_completed/in_progress/remaining based on overall progress
-        # Since all tables are generated hour-by-hour together, they all move together
-        if "table_progress" in updated_fields:
-            prog = updated_fields["table_progress"]
-            # Check if generation is complete (all hours done)
-            overall_done = all(v >= 1.0 for v in prog.values())
-            overall_started = any(v > 0.0 for v in prog.values())
 
-            if overall_done:
-                # All tables complete
-                updated_fields["tables_completed"] = sorted(prog.keys())
-                updated_fields["tables_in_progress"] = []
-                updated_fields["tables_remaining"] = []
-            elif overall_started:
-                # All tables in progress (generated together hour-by-hour)
-                updated_fields["tables_completed"] = []
-                updated_fields["tables_in_progress"] = sorted(prog.keys())
-                updated_fields["tables_remaining"] = []
-            else:
-                # Not started yet
-                updated_fields["tables_completed"] = []
-                updated_fields["tables_in_progress"] = []
-                updated_fields["tables_remaining"] = sorted(prog.keys())
-        else:
-            if tables_completed is not None:
-                updated_fields["tables_completed"] = tables_completed
+        # Pass through table state lists from TableProgressTracker
+        # (authoritative source). Don't derive states from progress
+        # percentages - they represent different concepts
+        # (progress % = work done, state = lifecycle position)
+        if tables_completed is not None:
+            updated_fields["tables_completed"] = tables_completed
         if tables_failed is not None:
             updated_fields["tables_failed"] = tables_failed
-        if "tables_in_progress" not in updated_fields and tables_in_progress is not None:
+        if tables_in_progress is not None:
             updated_fields["tables_in_progress"] = tables_in_progress
-        if "tables_remaining" not in updated_fields and tables_remaining is not None:
+        if tables_remaining is not None:
             updated_fields["tables_remaining"] = tables_remaining
         if estimated_seconds_remaining is not None:
             updated_fields["estimated_seconds_remaining"] = estimated_seconds_remaining
         if progress_rate is not None:
             updated_fields["progress_rate"] = progress_rate
         if table_counts is not None:
-            # Merge with existing counts so we don't lose prior table updates; clamp with max to avoid decreases
+            # Merge with existing counts to preserve prior updates;
+            # clamp with max to avoid decreases
             existing_counts = existing.get("table_counts") or {}
             merged: dict[str, int] = {}
             keys = set(existing_counts.keys()) | set(table_counts.keys())

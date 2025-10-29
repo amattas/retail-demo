@@ -209,7 +209,16 @@ async def generate_all_master_data(
                 progress_value: float,
                 detail_message: str | None,
                 table_counts: dict[str, int] | None = None,
+                tables_completed: list[str] | None = None,
+                tables_in_progress: list[str] | None = None,
+                tables_remaining: list[str] | None = None,
             ) -> None:
+                """
+                Master generation progress callback.
+
+                Now accepts table state lists directly from TableProgressTracker.
+                The router no longer recalculates states from progress percentages.
+                """
                 if table_name not in table_progress:
                     return
 
@@ -217,29 +226,21 @@ async def generate_all_master_data(
                     0.0, min(1.0, progress_value)
                 )
 
-                tables_completed = [
-                    table for table, value in table_progress.items() if value >= 1.0
-                ]
-                tables_in_progress = [
-                    table for table, value in table_progress.items() if 0.0 < value < 1.0
-                ]
-                tables_remaining = [
-                    table for table, value in table_progress.items() if value == 0.0
-                ]
-
                 overall_progress = (
                     sum(table_progress.values()) / total_tables if total_tables else progress_value
                 )
                 eta_estimate, rate_estimate = compute_timing_metrics(overall_progress)
                 callback_message = detail_message or f"Generating {table_name.replace('_', ' ')}"
 
+                # Pass through state lists from generator without modification
+                # Generator's TableProgressTracker provides correct states
                 update_task_progress(
                     task_id,
                     overall_progress,
                     callback_message,
-                    tables_completed=tables_completed,
-                    tables_in_progress=tables_in_progress,
-                    tables_remaining=tables_remaining,
+                    tables_completed=tables_completed or [],
+                    tables_in_progress=tables_in_progress or [],
+                    tables_remaining=tables_remaining or [],
                     table_progress=table_progress.copy(),
                     estimated_seconds_remaining=eta_estimate,
                     progress_rate=rate_estimate,
@@ -648,28 +649,20 @@ async def generate_historical_data(
                         name: value for name, value in table_progress.items() if name in FACT_TABLES
                     }
 
-                # Derive sensible defaults based on filtered_table_progress if not provided
-                if tables_in_progress is not None:
-                    tables_in_progress_override = [
-                        t for t in tables_in_progress if t in FACT_TABLES
-                    ]
-                else:
-                    # If we don't yet have progress data, show all requested as in-progress (master-style UX)
-                    if not filtered_table_progress:
-                        tables_in_progress_override = list(tables_to_generate)
-                    else:
-                        tables_in_progress_override = [
-                            table for table, value in filtered_table_progress.items() if 0.0 < value < 1.0
-                        ]
-                if tables_remaining is not None:
-                    tables_remaining_override = [t for t in tables_remaining if t in FACT_TABLES]
-                else:
-                    if not filtered_table_progress:
-                        tables_remaining_override = list(tables_to_generate)
-                    else:
-                        tables_remaining_override = [
-                            table for table, value in filtered_table_progress.items() if value == 0.0
-                        ]
+                # Filter state lists to only known UI fact tables
+                # Pass through states from generator without manual calculation
+                tables_in_progress_filtered = [
+                    t for t in (tables_in_progress or []) if t in FACT_TABLES
+                ]
+                tables_remaining_filtered = [
+                    t for t in (tables_remaining or []) if t in FACT_TABLES
+                ]
+                tables_completed_filtered = [
+                    t for t in (tables_completed or []) if t in FACT_TABLES
+                ]
+                tables_failed_filtered = [
+                    t for t in (tables_failed or []) if t in FACT_TABLES
+                ]
 
                 update_task_progress(
                     task_id,
@@ -677,10 +670,10 @@ async def generate_historical_data(
                     message,
                     table_progress=filtered_table_progress,
                     current_table=current_table,
-                    tables_completed=[t for t in (tables_completed or []) if t in FACT_TABLES] if tables_completed is not None else [],
-                    tables_failed=[t for t in (tables_failed or []) if t in FACT_TABLES] if tables_failed is not None else [],
-                    tables_in_progress=tables_in_progress_override,
-                    tables_remaining=tables_remaining_override,
+                    tables_completed=tables_completed_filtered,
+                    tables_failed=tables_failed_filtered,
+                    tables_in_progress=tables_in_progress_filtered,
+                    tables_remaining=tables_remaining_filtered,
                     estimated_seconds_remaining=estimated_seconds_remaining,
                     progress_rate=progress_rate,
                     table_counts=table_counts,
@@ -701,7 +694,16 @@ async def generate_historical_data(
                 progress_value: float,
                 detail_message: str | None,
                 table_counts: dict[str, int] | None = None,
+                tables_completed: list[str] | None = None,
+                tables_in_progress: list[str] | None = None,
+                tables_remaining: list[str] | None = None,
             ) -> None:
+                """
+                Per-table progress callback for historical generation.
+
+                Now accepts table state lists directly from TableProgressTracker.
+                The router no longer recalculates states from progress percentages.
+                """
                 if table_name not in FACT_TABLES:
                     return
 
@@ -712,30 +714,22 @@ async def generate_historical_data(
 
                     per_table_progress[table_name] = max(0.0, min(1.0, progress_value))
 
-                    tables_completed = [
-                        t for t, v in per_table_progress.items() if v >= 1.0
-                    ]
-                    tables_in_progress = [
-                        t for t, v in per_table_progress.items() if 0.0 < v < 1.0
-                    ]
-                    tables_remaining = [
-                        t for t, v in per_table_progress.items() if v == 0.0
-                    ]
-
                     overall_progress = (
                         sum(per_table_progress.values()) / len(per_table_progress)
                         if per_table_progress else progress_value
                     )
 
+                    # Pass through state lists from generator without modification
+                    # Generator's TableProgressTracker provides correct states
                     # Call update while holding lock (brief operation, acceptable)
                     update_task_progress(
                         task_id,
                         overall_progress,
                         detail_message or f"Generating {table_name.replace('_',' ')}",
                         table_progress=dict(per_table_progress),  # Pass copy while locked
-                        tables_completed=list(tables_completed),  # Pass copy while locked
-                        tables_in_progress=list(tables_in_progress),
-                        tables_remaining=list(tables_remaining),
+                        tables_completed=tables_completed or [],
+                        tables_in_progress=tables_in_progress or [],
+                        tables_remaining=tables_remaining or [],
                         table_counts=table_counts,
                     )
 

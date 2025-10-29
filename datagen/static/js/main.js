@@ -1653,16 +1653,9 @@ class RetailDataGenerator {
                             console.error('[Progress Poll] Elements not found! Cannot update UI.');
                         }
 
-                        // Update per-table status indicators
-                        if (statusObj.table_progress) {
-                            for (const [tableName, tableProgress] of Object.entries(statusObj.table_progress)) {
-                                if (tableProgress >= 1.0) {
-                                    this.updateTableStatus(tableName, 'completed');
-                                } else if (tableProgress > 0) {
-                                    this.updateTableStatus(tableName, 'processing');
-                                }
-                            }
-                        }
+                        // Update per-table status indicators using state lists from backend
+                        // Note: We use tables_completed/tables_in_progress lists from backend,
+                        // NOT table_progress percentages, to determine icon colors
 
                         if (statusObj.tables_completed) {
                             statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
@@ -1670,10 +1663,7 @@ class RetailDataGenerator {
 
                         if (statusObj.tables_in_progress) {
                             statusObj.tables_in_progress.forEach(table => {
-                                const progressValue = statusObj.table_progress?.[table];
-                                if (!progressValue || progressValue < 1.0) {
-                                    this.updateTableStatus(table, 'processing');
-                                }
+                                this.updateTableStatus(table, 'processing');
                             });
                         }
 

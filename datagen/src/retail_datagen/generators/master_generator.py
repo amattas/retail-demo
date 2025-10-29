@@ -61,6 +61,7 @@ except ImportError:
     ProductModel = None
     get_retail_session = None
 
+from .progress_tracker import TableProgressTracker
 from .utils import (
     AddressGenerator,
     GeographicDistribution,
@@ -125,6 +126,9 @@ class MasterDataGenerator:
         self._progress_callback: (
             Callable[[str, float, str | None], None] | None
         ) = None
+
+        # Table progress tracker for state management
+        self._progress_tracker: TableProgressTracker | None = None
 
         print(f"MasterDataGenerator initialized with seed {config.seed}")
 
@@ -298,6 +302,13 @@ class MasterDataGenerator:
 
         try:
             clamped = max(0.0, min(1.0, progress))
+
+            # Update progress tracker if available
+            if self._progress_tracker and table_name in self._progress_tracker.get_all_states():
+                self._progress_tracker.update_progress(table_name, clamped)
+
+            # Call progress callback with positional and keyword arguments
+            # Positional args maintain backward compatibility
             self._progress_callback(table_name, clamped, message, table_counts)
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug(
@@ -329,6 +340,21 @@ class MasterDataGenerator:
 
         # Load dictionary data
         self._load_dictionary_data()
+
+        # Initialize progress tracker with all master tables
+        master_table_names = [
+            "geographies_master",
+            "stores",
+            "distribution_centers",
+            "trucks",
+            "customers",
+            "products_master"
+        ]
+        self._progress_tracker = TableProgressTracker(master_table_names)
+
+        # Mark all tables as started
+        for table_name in master_table_names:
+            self._progress_tracker.mark_table_started(table_name)
 
         # Read entity counts from configuration
         stores_count = self.config.volume.stores
@@ -399,6 +425,11 @@ class MasterDataGenerator:
         if session:
             await session.flush()
             logger.info("All master data flushed to session (commit will be handled by context manager)")
+
+        # Mark all tables as completed
+        if self._progress_tracker:
+            self._progress_tracker.mark_generation_complete()
+            logger.info("All master tables marked as completed")
 
         # Cache counts
         self._cache_master_counts()

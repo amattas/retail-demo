@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
+from retail_datagen.generators.progress_tracker import TableProgressTracker
 from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.models import (
@@ -336,8 +337,7 @@ class FactDataGenerator:
         self._progress_history: list[tuple[float, float]] = []
 
         # Table state tracking for enhanced progress reporting
-        self._table_states: dict[str, str] = {}
-        self._reset_table_states()
+        self._progress_tracker: TableProgressTracker | None = None
 
         # Initialize hourly progress tracker for granular progress reporting
         self.hourly_tracker = HourlyProgressTracker(self.FACT_TABLES)
@@ -438,8 +438,9 @@ class FactDataGenerator:
         return records
 
     def _reset_table_states(self) -> None:
-        """Reset table states to 'not_started' for all tables."""
-        self._table_states = {table: "not_started" for table in self._active_fact_tables()}
+        """Reset table states using progress tracker."""
+        active_tables = self._active_fact_tables()
+        self._progress_tracker = TableProgressTracker(active_tables)
         self._progress_history = []
 
     def set_included_tables(self, tables: list[str] | None) -> None:
@@ -520,24 +521,6 @@ class FactDataGenerator:
             self._table_progress_callback(table_name, clamped, message, table_counts)
         except Exception:
             pass
-
-    def _update_table_states(self, table_progress: dict[str, float]) -> None:
-        """
-        Update table states based on current progress.
-
-        Args:
-            table_progress: Dictionary mapping table names to progress (0.0 to 1.0)
-        """
-        for table_name, progress in table_progress.items():
-            if table_name not in self._table_states:
-                continue
-
-            current_state = self._table_states[table_name]
-
-            if progress >= 1.0 and current_state != "completed":
-                self._table_states[table_name] = "completed"
-            elif progress > 0.0 and current_state == "not_started":
-                self._table_states[table_name] = "in_progress"
 
     def load_master_data(self) -> None:
         """Legacy CSV loader (retained for backward compatibility)."""
@@ -748,6 +731,10 @@ class FactDataGenerator:
         # Determine active tables
         active_tables = self._active_fact_tables()
 
+        # Mark all tables as started
+        for table in active_tables:
+            self._progress_tracker.mark_table_started(table)
+
         # Initialize tracking for active tables only
         facts_generated = {t: 0 for t in active_tables}
         # Track records actually written to DB for live tile counts
@@ -853,35 +840,24 @@ class FactDataGenerator:
                         None,
                     )
 
-                # Update table states based on progress
-                self._update_table_states(table_progress)
+                # Update progress tracker (progress only, not states)
+                for table_name, progress in table_progress.items():
+                    self._progress_tracker.update_progress(table_name, progress)
+
+                # Get table lists from progress tracker
+                tables_completed = self._progress_tracker.get_tables_by_state("completed")
+                tables_in_progress = self._progress_tracker.get_tables_by_state("in_progress")
+                tables_remaining = self._progress_tracker.get_tables_by_state("not_started")
 
                 # Calculate tables completed count
-                tables_completed_count = sum(
-                    1 for state in self._table_states.values()
-                    if state == "completed"
-                )
+                tables_completed_count = len(tables_completed)
 
                 # Enhanced message with table completion count
                 enhanced_message = (
                     f"Generating data for {current_date.strftime('%Y-%m-%d')} "
                     f"(day {day_counter}/{total_days}) "
-                    f"({tables_completed_count}/{len(self._table_states)} tables complete)"
+                    f"({tables_completed_count}/{len(active_tables)} tables complete)"
                 )
-
-                # Get table lists for detailed reporting
-                tables_completed = [
-                    table for table, state in self._table_states.items()
-                    if state == "completed"
-                ]
-                tables_in_progress = [
-                    table for table, state in self._table_states.items()
-                    if state == "in_progress"
-                ]
-                tables_remaining = [
-                    table for table, state in self._table_states.items()
-                    if state == "not_started"
-                ]
 
                 # Update API progress with throttling, include cumulative counts
                 self._send_throttled_progress_update(
@@ -908,6 +884,9 @@ class FactDataGenerator:
             await _run_with_session()
 
         progress_reporter.complete()
+
+        # Mark generation complete (transitions all tables to 'completed')
+        self._progress_tracker.mark_generation_complete()
 
         # Final validation
         validation_results = self.business_rules.get_validation_summary()
@@ -1978,22 +1957,14 @@ class FactDataGenerator:
 
         # Thread-safe: all state updates within lock, then release before calling progress update
         with self._progress_lock:
-            # Update table states based on progress
-            self._update_table_states(table_progress)
+            # Update progress tracker
+            for table_name, progress_val in table_progress.items():
+                self._progress_tracker.update_progress(table_name, progress_val)
 
-            # Get current table states for reporting (copy so we can release lock)
-            tables_completed = [
-                table for table, state in self._table_states.items()
-                if state == "completed"
-            ]
-            tables_in_progress = [
-                table for table, state in self._table_states.items()
-                if state == "in_progress"
-            ]
-            tables_remaining = [
-                table for table, state in self._table_states.items()
-                if state == "not_started"
-            ]
+            # Get current table states from tracker (copy so we can release lock)
+            tables_completed = self._progress_tracker.get_tables_by_state("completed")
+            tables_in_progress = self._progress_tracker.get_tables_by_state("in_progress")
+            tables_remaining = self._progress_tracker.get_tables_by_state("not_started")
 
             tables_completed_count = len(tables_completed)
 
