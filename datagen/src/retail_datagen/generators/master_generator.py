@@ -49,6 +49,7 @@ try:
         Customer as CustomerModel,
         Product as ProductModel,
     )
+    from retail_datagen.db.session import get_retail_session
     SQLALCHEMY_AVAILABLE = True
 except ImportError:
     SQLALCHEMY_AVAILABLE = False
@@ -58,6 +59,7 @@ except ImportError:
     TruckModel = None
     CustomerModel = None
     ProductModel = None
+    get_retail_session = None
 
 from .utils import (
     AddressGenerator,
@@ -311,7 +313,7 @@ class MasterDataGenerator:
         Generate all master data tables and write to SQLite database.
 
         Args:
-            session: AsyncSession for master.db (required)
+            session: AsyncSession for retail.db (required)
             parallel: Enable parallel generation for independent tables (default True)
         """
         if not SQLALCHEMY_AVAILABLE:
@@ -391,7 +393,7 @@ class MasterDataGenerator:
         self._validate_foreign_keys()
 
         # NOTE: Do NOT commit here - let the calling context manager handle commit
-        # This prevents double-commit issues with get_master_session() context manager
+        # This prevents double-commit issues with get_retail_session() context manager
 
         # Flush to ensure all changes are in the transaction
         if session:

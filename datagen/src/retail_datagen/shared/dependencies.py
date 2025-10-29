@@ -333,12 +333,29 @@ def update_task_progress(
             updated_fields["table_progress"] = merged_progress
         if current_table is not None:
             updated_fields["current_table"] = current_table
-        # Derive tables_completed/in_progress/remaining from merged table_progress when available
+        # Derive tables_completed/in_progress/remaining based on overall progress
+        # Since all tables are generated hour-by-hour together, they all move together
         if "table_progress" in updated_fields:
             prog = updated_fields["table_progress"]
-            updated_fields["tables_completed"] = sorted([k for k,v in prog.items() if v >= 1.0])
-            updated_fields["tables_in_progress"] = sorted([k for k,v in prog.items() if 0.0 < v < 1.0])
-            updated_fields["tables_remaining"] = sorted([k for k,v in prog.items() if v == 0.0])
+            # Check if generation is complete (all hours done)
+            overall_done = all(v >= 1.0 for v in prog.values())
+            overall_started = any(v > 0.0 for v in prog.values())
+
+            if overall_done:
+                # All tables complete
+                updated_fields["tables_completed"] = sorted(prog.keys())
+                updated_fields["tables_in_progress"] = []
+                updated_fields["tables_remaining"] = []
+            elif overall_started:
+                # All tables in progress (generated together hour-by-hour)
+                updated_fields["tables_completed"] = []
+                updated_fields["tables_in_progress"] = sorted(prog.keys())
+                updated_fields["tables_remaining"] = []
+            else:
+                # Not started yet
+                updated_fields["tables_completed"] = []
+                updated_fields["tables_in_progress"] = []
+                updated_fields["tables_remaining"] = sorted(prog.keys())
         else:
             if tables_completed is not None:
                 updated_fields["tables_completed"] = tables_completed

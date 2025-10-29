@@ -541,12 +541,32 @@
                 <div class="card">
                     <h3>Data Management</h3>
                     <p style="color: #dc3545; font-weight: 500;">
-                        ⚠️ Danger Zone: The button below will permanently delete ALL generated data, including master data, historical data, and generation state. This action cannot be undone.
+                        ⚠️ Danger Zone: These actions will permanently delete data. This cannot be undone.
                     </p>
-                    <button class="btn danger large" onclick="app.clearAllData()" style="margin-top: 16px;">
-                        <i class="fas fa-trash-alt"></i>
-                        Delete All Data
-                    </button>
+
+                    <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="padding: 12px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+                            <p style="margin: 0 0 8px 0; font-weight: 500; color: #856404;">Delete Fact Data Only</p>
+                            <p style="margin: 0 0 12px 0; font-size: 0.9em; color: #856404;">
+                                Removes all historical fact data (receipts, inventory, etc.) but preserves master data (stores, customers, products).
+                            </p>
+                            <button class="btn danger" onclick="app.clearFactData()">
+                                <i class="fas fa-chart-line"></i>
+                                Delete Fact Data
+                            </button>
+                        </div>
+
+                        <div style="padding: 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+                            <p style="margin: 0 0 8px 0; font-weight: 500; color: #721c24;">Delete All Data</p>
+                            <p style="margin: 0 0 12px 0; font-size: 0.9em; color: #721c24;">
+                                Removes ALL generated data including master data, historical data, and generation state.
+                            </p>
+                            <button class="btn danger" onclick="app.clearAllData()">
+                                <i class="fas fa-trash-alt"></i>
+                                Delete All Data
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="config-actions">
@@ -588,7 +608,7 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=20250911b"></script>
+    <script src="/static/js/main.js?v=20251029b"></script>
     <script>
         // Minimal header scroll behavior for subtle shadow
         (function() {

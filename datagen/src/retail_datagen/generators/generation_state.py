@@ -219,3 +219,43 @@ class GenerationStateManager:
             results["errors"].append(f"General error during data clearing: {e}")
 
         return results
+
+    def clear_fact_data(self, config_paths: dict) -> dict:
+        """
+        Clear only fact data and reset generation state, preserving master data.
+
+        Args:
+            config_paths: Dictionary with 'facts' path from config
+
+        Returns:
+            Dictionary with deletion results
+        """
+        import shutil
+        from pathlib import Path
+
+        results = {
+            "state_reset": False,
+            "facts_data_cleared": False,
+            "files_deleted": [],
+            "errors": [],
+        }
+
+        try:
+            # Reset generation state
+            self.reset_state()
+            results["state_reset"] = True
+
+            # Clear facts data (entire directory structure)
+            facts_path = Path(config_paths.get("facts", ""))
+            if facts_path.exists():
+                try:
+                    shutil.rmtree(facts_path)
+                    results["files_deleted"].append(str(facts_path))
+                    results["facts_data_cleared"] = True
+                except Exception as e:
+                    results["errors"].append(f"Failed to delete facts directory: {e}")
+
+        except Exception as e:
+            results["errors"].append(f"General error during fact data clearing: {e}")
+
+        return results

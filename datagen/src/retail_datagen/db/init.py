@@ -12,7 +12,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from retail_datagen.db.config import DatabaseConfig
-from retail_datagen.db.engine import get_facts_engine, get_master_engine
+from retail_datagen.db.engine import get_facts_engine, get_master_engine, get_retail_engine
+from retail_datagen.db.migration import migrate_to_unified_db, needs_migration
+from retail_datagen.db.models.base import Base
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ def ensure_database_directories() -> None:
     """
     Ensure all required database directories exist.
 
-    Creates parent directories for master and facts databases if they
+    Creates parent directories for master, facts, and retail databases if they
     don't already exist. This prevents file system errors during
     database creation.
 
@@ -31,25 +33,36 @@ def ensure_database_directories() -> None:
     """
     master_path = Path(DatabaseConfig.MASTER_DB_PATH)
     facts_path = Path(DatabaseConfig.FACTS_DB_PATH)
+    retail_path = Path(DatabaseConfig.RETAIL_DB_PATH)
 
     # Create parent directories
     master_path.parent.mkdir(parents=True, exist_ok=True)
     facts_path.parent.mkdir(parents=True, exist_ok=True)
+    retail_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info(
-        f"Ensured database directories exist: {master_path.parent}, {facts_path.parent}"
+        f"Ensured database directories exist: {retail_path.parent}"
     )
 
 
 async def init_databases() -> None:
     """
-    Initialize both master and facts databases.
+    Initialize database tables with automatic migration support.
 
     This function:
     1. Ensures database directories exist
-    2. Creates database files if they don't exist
-    3. Initializes engines (which applies PRAGMAs)
-    4. Verifies connectivity
+    2. Checks if migration from split to unified database is needed
+    3. Performs migration if necessary (preserving all data)
+    4. Creates database files if they don't exist
+    5. Initializes engines and creates tables
+    6. Verifies connectivity
+
+    Migration is automatically triggered when:
+    - retail.db doesn't exist AND
+    - Either master.db or facts.db exists
+
+    After migration, the system switches to unified retail.db mode.
+    Original split databases are preserved as backups.
 
     This should be called during application startup.
 
@@ -57,6 +70,7 @@ async def init_databases() -> None:
         >>> await init_databases()
 
     Raises:
+        RuntimeError: If database migration fails
         Exception: If database initialization fails
     """
     logger.info("Initializing databases...")
@@ -64,23 +78,69 @@ async def init_databases() -> None:
     # Ensure directories exist
     ensure_database_directories()
 
-    # Initialize engines (creates files and applies PRAGMAs)
-    master_engine = get_master_engine()
-    facts_engine = get_facts_engine()
+    # Check if migration is needed (split → unified)
+    if needs_migration():
+        logger.info("Detected split databases. Starting migration to unified database...")
 
-    # Test connectivity
-    try:
+        try:
+            result = await migrate_to_unified_db()
+
+            if result['success']:
+                logger.info(f"✓ Migration successful: {len(result['tables_migrated'])} tables migrated")
+                logger.info(f"  Row counts: {sum(result['row_counts'].values())} total rows")
+                logger.info(f"  Duration: {result['duration_seconds']:.2f} seconds")
+                logger.info(f"  Backups created: {len(result['backups_created'])}")
+            else:
+                logger.error(f"✗ Migration failed: {result['errors']}")
+                raise RuntimeError(f"Database migration failed: {result['errors']}")
+        except Exception as e:
+            logger.error(f"Migration failed with exception: {e}")
+            raise RuntimeError(f"Database migration failed: {e}") from e
+
+    # Determine which mode we're in
+    if DatabaseConfig.is_unified_mode():
+        logger.info("Using unified retail database mode")
+        retail_engine = get_retail_engine()
+
+        # Create all tables in retail.db
+        async with retail_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Test connectivity
+        try:
+            async with retail_engine.begin() as conn:
+                await conn.execute(text("SELECT 1"))
+            logger.info(f"✓ Retail database initialized: {DatabaseConfig.RETAIL_DB_PATH}")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            raise
+    else:
+        logger.info("Using legacy split database mode")
+        # Keep existing split database initialization logic
+        master_engine = get_master_engine()
+        facts_engine = get_facts_engine()
+
+        # Create all tables in both databases
         async with master_engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
-        logger.info(f"Master database initialized: {DatabaseConfig.MASTER_DB_PATH}")
+            await conn.run_sync(Base.metadata.create_all)
 
         async with facts_engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
-        logger.info(f"Facts database initialized: {DatabaseConfig.FACTS_DB_PATH}")
+            await conn.run_sync(Base.metadata.create_all)
 
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        raise
+        # Test connectivity
+        try:
+            async with master_engine.begin() as conn:
+                await conn.execute(text("SELECT 1"))
+            logger.info(f"✓ Master database initialized: {DatabaseConfig.MASTER_DB_PATH}")
+
+            async with facts_engine.begin() as conn:
+                await conn.execute(text("SELECT 1"))
+            logger.info(f"✓ Facts database initialized: {DatabaseConfig.FACTS_DB_PATH}")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            raise
+
+    logger.info("Database initialization completed")
 
 
 async def migrate_fact_schema() -> None:

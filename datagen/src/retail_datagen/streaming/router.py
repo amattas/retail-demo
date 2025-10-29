@@ -224,9 +224,9 @@ async def start_streaming(
             # Try SQLite batch streaming first
             if use_sqlite:
                 try:
-                    from ..db.session import get_facts_session
+                    from ..db.session import get_retail_session
 
-                    async with get_facts_session() as db_session:
+                    async with get_retail_session() as db_session:
                         # Create new streamer with database session
                         db_streamer = EventStreamer(
                             config=config,

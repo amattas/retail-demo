@@ -1,7 +1,7 @@
 """
 Data purge system for fact tables.
 
-Provides utilities to safely delete published data from facts.db after
+Provides utilities to safely delete published data from retail.db after
 Azure Event Hub publication, using watermark tracking to maintain data integrity.
 
 Key Features:
@@ -12,7 +12,7 @@ Key Features:
 - Comprehensive purge metrics and logging
 
 Workflow:
-1. Historical generation writes fact data to facts.db
+1. Historical generation writes fact data to retail.db
 2. Streaming publishes data to Azure Event Hub
 3. After publication, update_publication_watermark() is called
 4. Periodically, purge_published_data() removes old published data
@@ -74,7 +74,7 @@ async def update_publication_watermark(
     Update watermark after successfully publishing data to Azure Event Hub.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         fact_table_name: Name of fact table (e.g., "fact_receipts")
         published_up_to_ts: Timestamp up to which data has been published
 
@@ -84,7 +84,7 @@ async def update_publication_watermark(
             earliest_unpublished_ts = published_up_to_ts + 1 second
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     await update_publication_watermark(
         ...         session,
         ...         "fact_receipts",
@@ -141,7 +141,7 @@ async def mark_data_unpublished(
     Mark new data range as unpublished after fact generation.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         fact_table_name: Name of fact table
         data_start_ts: Start of new data range
         data_end_ts: End of new data range
@@ -151,7 +151,7 @@ async def mark_data_unpublished(
             earliest_unpublished_ts = data_start_ts
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     await mark_data_unpublished(
         ...         session,
         ...         "fact_receipts",
@@ -201,7 +201,7 @@ async def get_unpublished_data_range(
     Get the time range of unpublished data.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         fact_table_name: Name of fact table
 
     Returns:
@@ -209,7 +209,7 @@ async def get_unpublished_data_range(
         Both None if no unpublished data exists
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     start, end = await get_unpublished_data_range(
         ...         session,
         ...         "fact_receipts"
@@ -253,7 +253,7 @@ async def purge_published_data(
     Delete published data older than buffer period.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         fact_table_name: Name of fact table to purge
         keep_buffer_hours: Keep this many recent hours (safety buffer)
         dry_run: If True, report what would be deleted without deleting
@@ -272,7 +272,7 @@ async def purge_published_data(
         - Purge only if cutoff < earliest_unpublished_ts
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     result = await purge_published_data(
         ...         session,
         ...         "fact_receipts",
@@ -429,7 +429,7 @@ async def purge_all_fact_tables(
     Purge all fact tables in one operation.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         keep_buffer_hours: Keep this many recent hours (safety buffer)
         dry_run: If True, report what would be deleted without deleting
 
@@ -437,7 +437,7 @@ async def purge_all_fact_tables(
         Dictionary mapping table names to purge results
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     results = await purge_all_fact_tables(
         ...         session,
         ...         keep_buffer_hours=24,
@@ -492,7 +492,7 @@ async def get_purge_candidates(
     Get summary of data eligible for purging across all tables.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
         keep_buffer_hours: Buffer hours to calculate purge cutoff
 
     Returns:
@@ -508,7 +508,7 @@ async def get_purge_candidates(
         }
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     candidates = await get_purge_candidates(session)
         ...     for table, info in candidates.items():
         ...         if info['estimated_rows'] > 0:
@@ -590,7 +590,7 @@ async def get_watermark_status(
     Get watermark status for all fact tables.
 
     Args:
-        session: AsyncSession for facts.db
+        session: AsyncSession for retail.db
 
     Returns:
         Dictionary mapping table names to watermark info:
@@ -606,7 +606,7 @@ async def get_watermark_status(
         }
 
     Example:
-        >>> async with get_facts_session() as session:
+        >>> async with get_retail_session() as session:
         ...     status = await get_watermark_status(session)
         ...     for table, info in status.items():
         ...         print(f"{table}: {info['is_fully_published']}")

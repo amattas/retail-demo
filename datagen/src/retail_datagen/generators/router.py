@@ -262,10 +262,10 @@ async def generate_all_master_data(
 
             # Run full generation once (progress callback handles per-table reporting)
             # Note: parallel=False required for SQLite (AsyncSession can't be shared across threads)
-            from retail_datagen.db.session import get_master_session
+            from retail_datagen.db.session import get_retail_session
             from sqlalchemy import text
 
-            async with get_master_session() as session:
+            async with get_retail_session() as session:
                 # Clear existing data to avoid UNIQUE constraint violations
                 logger.info("Clearing existing master data...")
                 for table in [
@@ -295,10 +295,10 @@ async def generate_all_master_data(
             final_counts = {}
             try:
                 from sqlalchemy import select, func
-                from ..db.session import get_master_session
+                from ..db.session import get_retail_session
                 from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
 
-                async with get_master_session() as s2:
+                async with get_retail_session() as s2:
                     final_counts["geographies_master"] = (await s2.execute(select(func.count()).select_from(Geography))).scalar() or 0
                     final_counts["stores"] = (await s2.execute(select(func.count()).select_from(Store))).scalar() or 0
                     final_counts["distribution_centers"] = (await s2.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
@@ -454,10 +454,10 @@ async def generate_specific_master_table(
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
             # Generate all master tables (SQLite requires sequential mode)
-            from retail_datagen.db.session import get_master_session
+            from retail_datagen.db.session import get_retail_session
             from sqlalchemy import text
 
-            async with get_master_session() as session:
+            async with get_retail_session() as session:
                 # Clear existing data to avoid UNIQUE constraint violations
                 logger.info("Clearing existing master data...")
                 for table in [
@@ -585,13 +585,13 @@ async def generate_historical_data(
         try:
             update_task_progress(task_id, 0.0, "Starting historical data generation")
 
-            # Pre-check: validate master DB has required rows for historical generation
+            # Pre-check: validate retail DB has required rows for historical generation
             try:
                 from sqlalchemy import select, func
-                from ..db.session import get_master_session
+                from ..db.session import get_retail_session
                 from ..db.models.master import Geography, Store, DistributionCenter, Customer, Product
 
-                async with get_master_session() as s:
+                async with get_retail_session() as s:
                     geo_cnt = (await s.execute(select(func.count()).select_from(Geography))).scalar() or 0
                     store_cnt = (await s.execute(select(func.count()).select_from(Store))).scalar() or 0
                     dc_cnt = (await s.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
@@ -606,7 +606,7 @@ async def generate_historical_data(
 
                 if store_cnt == 0 or cust_cnt == 0 or prod_cnt == 0:
                     raise RuntimeError(
-                        "Master DB missing required data. Ensure master generation completed successfully."
+                        "Retail DB missing required data. Ensure master generation completed successfully."
                     )
             except Exception as pre_exc:
                 update_task_progress(
@@ -1001,32 +1001,20 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         cache_manager = CacheManager()
         cache_manager.clear_cache()
 
-        # Clear all data in SQLite databases (master and facts)
+        # Clear all data in unified retail SQLite database
         from sqlalchemy import text
-        from ..db.session import get_master_session, get_facts_session
+        from ..db.session import get_retail_session
 
-        # Truncate master tables (delete all rows)
-        master_tables = [
+        # All tables to truncate (master + facts)
+        all_tables = [
+            # Master tables
             "dim_customers",
             "dim_products",
             "dim_trucks",
             "dim_stores",
             "dim_distribution_centers",
             "dim_geographies",
-        ]
-
-        async with get_master_session() as session:
-            for table in master_tables:
-                await session.execute(text(f"DELETE FROM {table}"))
-            await session.flush()
-        # VACUUM master database
-        from ..db.engine import get_master_engine
-        master_engine = get_master_engine()
-        async with master_engine.begin() as conn:
-            await conn.execute(text("VACUUM"))
-
-        # Truncate facts tables and watermarks
-        fact_tables = [
+            # Fact tables
             "fact_receipt_lines",
             "fact_receipts",
             "fact_store_inventory_txn",
@@ -1039,14 +1027,15 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
             "fact_data_watermarks",
         ]
 
-        async with get_facts_session() as session:
-            for table in fact_tables:
+        async with get_retail_session() as session:
+            for table in all_tables:
                 await session.execute(text(f"DELETE FROM {table}"))
             await session.flush()
-        # VACUUM facts database
-        from ..db.engine import get_facts_engine
-        facts_engine = get_facts_engine()
-        async with facts_engine.begin() as conn:
+
+        # VACUUM unified retail database
+        from ..db.engine import get_retail_engine
+        retail_engine = get_retail_engine()
+        async with retail_engine.begin() as conn:
             await conn.execute(text("VACUUM"))
 
         # Also clear file-based artifacts if any (backward compatibility)
@@ -1072,6 +1061,81 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to clear data: {str(e)}",
+        )
+
+
+@router.delete(
+    "/generation/clear-facts",
+    response_model=OperationResult,
+    summary="Clear fact data only",
+    description="Clear all historical fact data and reset generation state, but preserve master data",
+)
+@rate_limit(max_requests=2, window_seconds=300)  # Very restrictive for safety
+async def clear_fact_data(config: RetailConfig = Depends(get_config)):
+    """Clear only fact data and reset generation state, preserving master data."""
+
+    try:
+        state_manager = GenerationStateManager()
+
+        # Prepare config paths for clearing
+        config_paths = {"facts": config.paths.facts}
+
+        # Clear the cache
+        cache_manager = CacheManager()
+        cache_manager.clear_cache()
+
+        # Clear fact data in unified retail SQLite database
+        from sqlalchemy import text
+        from ..db.session import get_retail_session
+
+        # Truncate facts tables and watermarks (preserve master data)
+        fact_tables = [
+            "fact_receipt_lines",
+            "fact_receipts",
+            "fact_store_inventory_txn",
+            "fact_dc_inventory_txn",
+            "fact_truck_moves",
+            "fact_foot_traffic",
+            "fact_ble_pings",
+            "fact_marketing",
+            "fact_online_orders",
+            "fact_data_watermarks",
+        ]
+
+        async with get_retail_session() as session:
+            for table in fact_tables:
+                await session.execute(text(f"DELETE FROM {table}"))
+            await session.flush()
+
+        # VACUUM unified retail database
+        from ..db.engine import get_retail_engine
+        retail_engine = get_retail_engine()
+        async with retail_engine.begin() as conn:
+            await conn.execute(text("VACUUM"))
+
+        # Also clear file-based fact artifacts if any (backward compatibility)
+        results = state_manager.clear_fact_data(config_paths)
+
+        if results.get("errors"):
+            logger.warning(f"Fact data clearing completed with errors: {results['errors']}")
+            return OperationResult(
+                success=True,
+                message=f"Fact data cleared with some errors. Files deleted: {len(results.get('files_deleted', []))}, Errors: {len(results['errors'])}",
+                started_at=datetime.now(),
+            )
+        else:
+            logger.info("All fact data cleared successfully from SQLite and file cache")
+            return OperationResult(
+                success=True,
+                message="Fact data cleared successfully (SQLite fact tables truncated; caches and legacy files removed). Master data preserved.",
+                started_at=datetime.now(),
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to clear fact data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear fact data: {str(e)}",
         )
 
 
@@ -1101,10 +1165,10 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
     """List all generated fact tables (SQLite-backed)."""
     try:
         from sqlalchemy import select, func
-        from ..db.session import get_facts_session
+        from ..db.session import get_retail_session
 
         tables_with_data: list[str] = []
-        async with get_facts_session() as session:
+        async with get_retail_session() as session:
             for table_name, model in FACT_TABLE_MODELS.items():
                 result = await session.execute(select(func.count()).select_from(model))
                 if (result.scalar() or 0) > 0:
@@ -1137,16 +1201,14 @@ async def get_table_summary(table_name: str):
             detail=f"Table {table_name} not found.",
         )
 
-    # Determine which session to use
+    # Determine table type for response
     is_master = table_name in MASTER_TABLE_MODELS
 
     try:
         from sqlalchemy import select, func
-        from ..db.session import get_master_session, get_facts_session
+        from ..db.session import get_retail_session
 
-        session_manager = get_master_session if is_master else get_facts_session
-
-        async with session_manager() as session:
+        async with get_retail_session() as session:
             table = model.__table__
             # Get row count (fast path on table)
             result = await session.execute(select(func.count()).select_from(table))
@@ -1199,16 +1261,11 @@ async def preview_table(
             detail=f"Table {table_name} not found.",
         )
 
-    # Determine which session to use
-    is_master = table_name in MASTER_TABLE_MODELS
-
     try:
         from sqlalchemy import select, func
-        from ..db.session import get_master_session, get_facts_session
+        from ..db.session import get_retail_session
 
-        session_manager = get_master_session if is_master else get_facts_session
-
-        async with session_manager() as session:
+        async with get_retail_session() as session:
             table = model.__table__
             # Get total row count
             count_result = await session.execute(select(func.count()).select_from(table))
@@ -1303,10 +1360,10 @@ async def preview_master_table_alias(
 
     try:
         from sqlalchemy import select, func
-        from ..db.session import get_master_session
+        from ..db.session import get_retail_session
 
         model = MASTER_TABLE_MODELS[table_name]
-        async with get_master_session() as session:
+        async with get_retail_session() as session:
             table = model.__table__
             count_result = await session.execute(select(func.count()).select_from(table))
             total_rows = count_result.scalar() or 0
@@ -1351,10 +1408,10 @@ async def preview_fact_table_alias(
 
     try:
         from sqlalchemy import select, func
-        from ..db.session import get_facts_session
+        from ..db.session import get_retail_session
 
         model = FACT_TABLE_MODELS[table_name]
-        async with get_facts_session() as session:
+        async with get_retail_session() as session:
             table = model.__table__
             # Total count
             count_result = await session.execute(select(func.count()).select_from(table))
@@ -1412,10 +1469,10 @@ async def preview_recent_fact_alias(
 
     try:
         from sqlalchemy import select, func, desc
-        from ..db.session import get_facts_session
+        from ..db.session import get_retail_session
 
         model = FACT_TABLE_MODELS[table_name]
-        async with get_facts_session() as session:
+        async with get_retail_session() as session:
             table = model.__table__
             # Total count
             count_result = await session.execute(select(func.count()).select_from(table))
@@ -1462,33 +1519,30 @@ async def preview_recent_fact_alias(
     description="Get live table counts from SQLite (no cache)",
 )
 async def get_dashboard_counts():
-    """Get live table counts for dashboard (queries databases directly)."""
+    """Get live table counts for dashboard (queries unified retail database directly)."""
     from sqlalchemy import select, func
     from datetime import datetime
-    from ..db.session import get_master_session, get_facts_session
+    from ..db.session import get_retail_session
 
     master_counts: dict[str, int] = {}
     fact_counts: dict[str, int] = {}
 
-    # Master tables
+    # Query all tables from unified retail database
     try:
-        async with get_master_session() as s:
+        async with get_retail_session() as s:
+            # Master tables
             for name, model in MASTER_TABLE_MODELS.items():
                 table = model.__table__
                 result = await s.execute(select(func.count()).select_from(table))
                 master_counts[name] = int(result.scalar() or 0)
-    except Exception as e:
-        logger.warning(f"Failed to read master counts: {e}")
 
-    # Fact tables
-    try:
-        async with get_facts_session() as s:
+            # Fact tables
             for name, model in FACT_TABLE_MODELS.items():
                 table = model.__table__
                 result = await s.execute(select(func.count()).select_from(table))
                 fact_counts[name] = int(result.scalar() or 0)
     except Exception as e:
-        logger.warning(f"Failed to read fact counts: {e}")
+        logger.warning(f"Failed to read table counts from retail database: {e}")
 
     return {
         "master_tables": master_counts,

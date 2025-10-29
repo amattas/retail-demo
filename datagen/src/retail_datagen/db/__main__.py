@@ -15,6 +15,9 @@ Purge Usage:
     python -m retail_datagen.db purge --dry-run
     python -m retail_datagen.db status
     python -m retail_datagen.db candidates
+
+Note: All operations use the unified retail.db database (preferred).
+      Legacy split database mode (master.db + facts.db) is supported for migration only.
 """
 
 import asyncio
@@ -35,7 +38,7 @@ from retail_datagen.db.purge import (
     get_watermark_status,
     FACT_TABLE_MAPPING,
 )
-from retail_datagen.db.session import get_master_session, get_facts_session
+from retail_datagen.db.session import get_retail_session, get_master_session, get_facts_session
 from retail_datagen.db.init import init_databases
 
 
@@ -152,13 +155,15 @@ async def cmd_purge(args: argparse.Namespace) -> int:
     """
     Purge published data from fact tables.
 
+    Uses unified retail.db database.
+
     Args:
         args: Command-line arguments
 
     Returns:
         Exit code (0 for success, 1 for error)
     """
-    async with get_facts_session() as session:
+    async with get_retail_session() as session:
         try:
             if args.all:
                 # Purge all tables
@@ -238,13 +243,15 @@ async def cmd_status(args: argparse.Namespace) -> int:
     """
     Display watermark status for all fact tables.
 
+    Uses unified retail.db database.
+
     Args:
         args: Command-line arguments
 
     Returns:
         Exit code (0 for success, 1 for error)
     """
-    async with get_facts_session() as session:
+    async with get_retail_session() as session:
         try:
             status = await get_watermark_status(session)
 
@@ -279,13 +286,15 @@ async def cmd_candidates(args: argparse.Namespace) -> int:
     """
     Display purge candidates for all fact tables.
 
+    Uses unified retail.db database.
+
     Args:
         args: Command-line arguments
 
     Returns:
         Exit code (0 for success, 1 for error)
     """
-    async with get_facts_session() as session:
+    async with get_retail_session() as session:
         try:
             candidates = await get_purge_candidates(
                 session,

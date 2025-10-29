@@ -2,7 +2,21 @@
 Database connection and session management for retail data generator.
 
 This module provides connection pooling, transaction support, and SQLite
-configuration for both master (dimensions) and facts databases.
+configuration for the unified retail database (preferred) and legacy split
+databases (master.db + facts.db for backward compatibility).
+
+Preferred Usage:
+    from retail_datagen.db import get_retail_session, get_retail_engine
+
+    async with get_retail_session() as session:
+        # Work with unified retail database
+        ...
+
+Legacy Usage (backward compatibility):
+    from retail_datagen.db import get_master_session, get_facts_session
+
+    # For migration from split databases only
+    ...
 """
 
 from retail_datagen.db.config import DatabaseConfig
@@ -10,14 +24,17 @@ from retail_datagen.db.engine import (
     create_engine,
     get_master_engine,
     get_facts_engine,
+    get_retail_engine,
     dispose_engines,
     check_engine_health,
 )
 from retail_datagen.db.session import (
     get_master_session,
     get_facts_session,
+    get_retail_session,
     master_session_maker,
     facts_session_maker,
+    retail_session_maker,
     get_session,
     SessionContext,
 )
@@ -49,10 +66,9 @@ from retail_datagen.db.purge import (
     get_watermark_status,
 )
 from retail_datagen.db.migration import (
-    migrate_master_data_from_csv,
-    migrate_fact_data_from_csv,
-    migrate_table_from_csv,
-    validate_foreign_keys,
+    needs_migration,
+    migrate_to_unified_db,
+    verify_migration,
 )
 
 __all__ = [
@@ -62,13 +78,16 @@ __all__ = [
     "create_engine",
     "get_master_engine",
     "get_facts_engine",
+    "get_retail_engine",
     "dispose_engines",
     "check_engine_health",
     # Session management
     "get_master_session",
     "get_facts_session",
+    "get_retail_session",
     "master_session_maker",
     "facts_session_maker",
+    "retail_session_maker",
     "get_session",
     "SessionContext",
     # Initialization and utilities
@@ -96,8 +115,7 @@ __all__ = [
     "get_purge_candidates",
     "get_watermark_status",
     # Migration utilities
-    "migrate_master_data_from_csv",
-    "migrate_fact_data_from_csv",
-    "migrate_table_from_csv",
-    "validate_foreign_keys",
+    "needs_migration",
+    "migrate_to_unified_db",
+    "verify_migration",
 ]

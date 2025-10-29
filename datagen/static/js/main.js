@@ -1790,9 +1790,14 @@ class RetailDataGenerator {
     }
 
     updateHistoricalProgress(status) {
-        this.updateTableCounter(status, 'tableProgressCounter');
+        // Note: Table counter removed since we use hour-based progress (all tables move together)
+        // The hourly progress display shows current day/hour and total hours completed
+        this.hideTableCounter('tableProgressCounter');
         this.updateETA(status.estimated_seconds_remaining, 'progressETA');
-        this.updateProgressDetails(status, 'historicalProgressDetails');
+
+        // Don't show table lists since all tables generate together hour-by-hour
+        // The hourly progress info is more meaningful
+        this.clearProgressDetails('historicalProgressDetails');
     }
 
     updateMasterProgress(status) {
@@ -2024,6 +2029,47 @@ class RetailDataGenerator {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
+    async clearFactData() {
+        // Single confirmation dialog
+        const confirmed = confirm(
+            '⚠️ This will permanently delete FACT data only:\n' +
+            '• Historical fact data (receipts, inventory, etc.)\n' +
+            '• Generation state tracking\n\n' +
+            'Master data (stores, customers, products) will be PRESERVED.\n\n' +
+            'This action cannot be undone. Proceed?'
+        );
+        if (!confirmed) return;
+
+        try {
+            this.showNotification('Clearing fact data...', 'info');
+
+            const response = await fetch('/api/generation/clear-facts', {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            this.showNotification(result.message, 'success');
+            this.hideProgress('historicalProgress');
+            // Clear only historical table statuses, preserve master
+            this.clearHistoricalTableStatuses();
+
+            // Refresh the UI state
+            await this.loadGenerationState();
+            await this.updateDashboardStats();
+            await this.updateTableCounts();
+            await this.updateAllTablesData();
+
+        } catch (error) {
+            console.error('Failed to clear fact data:', error);
+            this.showNotification(`Failed to clear fact data: ${error.message}`, 'error');
+        }
+    }
+
     async clearAllData() {
         // Single confirmation dialog
         const confirmed = confirm(
@@ -2034,20 +2080,20 @@ class RetailDataGenerator {
             'This action cannot be undone. Proceed?'
         );
         if (!confirmed) return;
-        
+
         try {
             this.showNotification('Clearing all data...', 'info');
-            
+
             const response = await fetch('/api/generation/clear', {
                 method: 'DELETE'
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const result = await response.json();
-            
+
             this.showNotification(result.message, 'success');
             this.hideProgress('masterDataProgress');
             this.hideProgress('historicalProgress');

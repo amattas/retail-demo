@@ -24,7 +24,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .api.models import ErrorResponse, HealthCheckResponse, ValidationErrorResponse
 from .config.models import RetailConfig
-from .db.engine import dispose_engines, get_facts_engine, get_master_engine
+from .db.engine import dispose_engines, get_retail_engine
 from .db.init import init_databases
 from .db.manager import get_database_status, get_db_manager
 from .db.models.base import Base
@@ -94,30 +94,20 @@ async def lifespan(app: FastAPI):
 
     # Initialize databases
     try:
-        logger.info("Initializing SQLite databases...")
+        logger.info("Initializing SQLite database...")
 
         # Initialize database directories and connections
+        # init_databases() now handles both migration and table creation
         await init_databases()
 
-        # Create all tables if they don't exist
-        master_engine = get_master_engine()
-        facts_engine = get_facts_engine()
+        # Get retail engine to verify it's ready
+        retail_engine = get_retail_engine()
 
-        async with master_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        async with facts_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        # Run lightweight schema validations/migrations for facts
-        from .db.init import migrate_fact_schema
-        await migrate_fact_schema()
-
-        logger.info("✅ SQLite databases initialized successfully")
-        logger.info(f"  - Master DB: {master_engine.url}")
-        logger.info(f"  - Facts DB: {facts_engine.url}")
+        logger.info("✅ SQLite database initialized successfully")
+        logger.info(f"  - Retail DB: {retail_engine.url}")
 
     except Exception as e:
-        logger.error(f"❌ Failed to initialize databases: {e}", exc_info=True)
+        logger.error(f"❌ Failed to initialize database: {e}", exc_info=True)
         logger.warning("Application will continue but SQLite features may not work")
 
     try:

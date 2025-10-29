@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Module-level engine cache
 _master_engine: AsyncEngine | None = None
 _facts_engine: AsyncEngine | None = None
+_retail_engine: AsyncEngine | None = None
 
 
 def create_engine(
@@ -154,6 +155,38 @@ def get_facts_engine() -> AsyncEngine:
     return _facts_engine
 
 
+def get_retail_engine() -> AsyncEngine:
+    """
+    Get or create the unified retail database engine (singleton).
+
+    The retail database stores all tables in a single unified database:
+    - Master data: Geographies, Stores, Distribution Centers, Trucks,
+      Customers, Products, DC and Store inventory snapshots
+    - Fact data: Receipt transactions, inventory movements, foot traffic,
+      BLE pings, marketing campaigns, online orders and logistics
+
+    This is the preferred engine for all new development. The separate
+    master and facts engines are maintained for backward compatibility.
+
+    Returns:
+        AsyncEngine for unified retail database
+
+    Note:
+        This function implements lazy initialization and caching.
+        The engine is created only once and reused across the application.
+    """
+    global _retail_engine
+
+    if _retail_engine is None:
+        _retail_engine = create_engine(
+            db_path=DatabaseConfig.RETAIL_DB_PATH,
+            echo=DatabaseConfig.ECHO_SQL,
+        )
+        logger.info("Initialized unified retail database engine")
+
+    return _retail_engine
+
+
 async def dispose_engines() -> None:
     """
     Dispose of all database engines and close connections.
@@ -164,7 +197,7 @@ async def dispose_engines() -> None:
     Example:
         >>> await dispose_engines()
     """
-    global _master_engine, _facts_engine
+    global _master_engine, _facts_engine, _retail_engine
 
     if _master_engine is not None:
         await _master_engine.dispose()
@@ -175,6 +208,11 @@ async def dispose_engines() -> None:
         await _facts_engine.dispose()
         logger.info("Disposed facts database engine")
         _facts_engine = None
+
+    if _retail_engine is not None:
+        await _retail_engine.dispose()
+        logger.info("Disposed unified retail database engine")
+        _retail_engine = None
 
 
 async def check_engine_health(engine: AsyncEngine) -> bool:

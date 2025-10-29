@@ -163,8 +163,17 @@ class HourlyProgressTracker:
                 if 0 < progress < 1.0:
                     tables_in_progress.append(table)
 
-            # Calculate overall progress as average across all tables
-            overall_progress = sum(per_table_progress.values()) / len(self._fact_tables) if self._fact_tables else 0.0
+            # Calculate overall progress based on hours completed (not per-table average)
+            # Since all tables are generated hour-by-hour together, use max hours completed
+            max_completed_hours = max(completed_hours_map.values()) if completed_hours_map else 0
+            overall_progress = max_completed_hours / total_hours_expected if total_hours_expected > 0 else 0.0
+
+            # All tables are "in progress" until all hours are complete (since they move together)
+            # Only show tables as in_progress if we've started and haven't finished
+            if 0 < overall_progress < 1.0:
+                tables_in_progress = sorted(self._fact_tables)
+            else:
+                tables_in_progress = []
 
             # Find the most advanced position across all tables
             # Return None instead of 0 to avoid validation issues (current_day must be >= 1)
@@ -173,7 +182,7 @@ class HourlyProgressTracker:
 
             return {
                 "overall_progress": min(1.0, overall_progress),
-                "tables_in_progress": sorted(tables_in_progress),
+                "tables_in_progress": tables_in_progress,
                 "current_day": max_day,
                 "current_hour": max_hour,
                 "per_table_progress": per_table_progress,
@@ -580,10 +589,10 @@ class FactDataGenerator:
             Customer as CustomerModel,
             Product as ProductModel,
         )
-        from retail_datagen.db.session import master_session_maker
+        from retail_datagen.db.session import retail_session_maker
         from sqlalchemy import select
 
-        SessionMaker = master_session_maker()
+        SessionMaker = retail_session_maker()
         async with SessionMaker() as session:
             # Geographies
             geos = (await session.execute(select(GeographyModel))).scalars().all()
@@ -794,11 +803,11 @@ class FactDataGenerator:
             )
             parallel = False
 
-        # SEQUENTIAL PROCESSING with managed facts session if not provided
-        from retail_datagen.db.session import facts_session_maker
+        # SEQUENTIAL PROCESSING with managed retail session if not provided
+        from retail_datagen.db.session import retail_session_maker
         created_session = False
         if self._session is None:
-            SessionMaker = facts_session_maker()
+            SessionMaker = retail_session_maker()
         
         async def _ensure_receipt_ext_column(session: AsyncSession) -> None:
             try:
