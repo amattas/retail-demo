@@ -1447,10 +1447,9 @@ class RetailDataGenerator {
         try {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
-            const parallel = document.getElementById('parallelGeneration').checked;
 
             // Create request body - dates are optional now for intelligent date logic
-            const requestBody = { parallel: parallel };
+            const requestBody = {};
 
             // Always generate all fact tables; switches removed
 

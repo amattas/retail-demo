@@ -127,9 +127,8 @@ def test_master_generation_exports_expected_files():
             gen = MasterDataGenerator(cfg)
 
             # Generate data using async method with database session
-            # Use parallel=False for small test datasets to avoid race conditions
             async with get_master_session() as session:
-                await gen.generate_all_master_data_async(session=session, parallel=False)
+                await gen.generate_all_master_data_async(session=session)
 
                 # Verify data in database
                 # Check geographies

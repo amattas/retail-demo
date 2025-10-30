@@ -56,8 +56,7 @@ class HourlyProgressTracker:
     Thread-safe tracker for hourly progress across fact tables.
 
     Tracks progress on a per-table, per-day, per-hour basis to enable fine-grained
-    progress reporting during historical data generation. Designed to work in both
-    sequential and parallel processing modes.
+    progress reporting during historical data generation.
 
     Thread-safety is achieved using a threading.Lock to protect all shared state.
     """
@@ -94,7 +93,7 @@ class HourlyProgressTracker:
         """
         Update progress for a specific table after completing an hour.
 
-        This method is thread-safe and can be called from parallel workers.
+        This method is thread-safe.
 
         Args:
             table: Name of the fact table
@@ -681,7 +680,7 @@ class FactDataGenerator:
         )
 
     async def generate_historical_data(
-        self, start_date: datetime, end_date: datetime, parallel: bool = True
+        self, start_date: datetime, end_date: datetime
     ) -> FactGenerationSummary:
         """
         Generate historical fact data for the specified date range.
@@ -691,7 +690,6 @@ class FactDataGenerator:
         Args:
             start_date: Start of historical data generation
             end_date: End of historical data generation
-            parallel: Enable parallel day-by-day processing (default True, currently disabled for database mode)
 
         Returns:
             Summary of generation results
@@ -782,15 +780,7 @@ class FactDataGenerator:
         current_date = start_date
         day_counter = 0
 
-        if parallel:
-            # PARALLEL PROCESSING: Not yet supported for SQLite writes
-            logger.warning(
-                "Parallel processing not yet supported for database writes. "
-                "Falling back to sequential processing."
-            )
-            parallel = False
-
-        # SEQUENTIAL PROCESSING with managed retail session if not provided
+        # Generate data sequentially with managed retail session if not provided
         from retail_datagen.db.session import retail_session_maker
         created_session = False
         if self._session is None:
@@ -935,8 +925,6 @@ class FactDataGenerator:
         """
         Generate all fact data for a single day.
 
-        This method works in both sequential and parallel modes. In parallel mode,
-        multiple worker threads call this method simultaneously for different days.
         Hourly progress updates are sent after each hour's data is exported, with
         thread-safe locking to prevent race conditions.
 
@@ -1051,7 +1039,7 @@ class FactDataGenerator:
                     # Convert to table progress dict format expected by throttled update
                     table_progress = progress_data.get('per_table_progress', {})
 
-                    # Log thread info for parallel mode debugging
+                    # Log thread info for debugging
                     thread_name = threading.current_thread().name
                     logger.debug(
                         f"[{thread_name}] Sending hourly progress: day {day_index}/{total_days}, "
@@ -1881,141 +1869,6 @@ class FactDataGenerator:
                     f"Failed to insert {fact_table} hour {hour} to database: {e}"
                 )
                 raise
-
-    def _generate_and_export_day(
-        self, date: datetime, day_num: int, total_days: int, report_progress: bool = False
-    ) -> tuple[dict[str, int], int]:
-        """
-        Generate data for a single day (used by parallel processing - currently disabled).
-
-        This method is called by parallel threads. Currently disabled for database mode
-        as SQLite does not support concurrent writes from multiple threads.
-
-        Args:
-            date: Date to generate data for
-            day_num: Day number (for logging)
-            total_days: Total number of days (for logging)
-            report_progress: Whether to send progress updates (default False for backward compatibility)
-
-        Returns:
-            Tuple of (daily_counts dict, 0)
-
-        Note:
-            Wraps async _generate_daily_facts in asyncio.run() for thread compatibility.
-            Parallel mode is currently disabled for database writes.
-        """
-        import asyncio
-
-        # Get active tables
-        active_tables = self._active_fact_tables()
-
-        # Generate daily facts (wrap async call for thread pool compatibility)
-        try:
-            # Try to get existing event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is running, we're in async context - shouldn't happen in threads
-                logger.warning(f"Event loop already running in thread for {date}")
-                # Fall back to creating new loop
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                daily_facts = loop.run_until_complete(
-                    self._generate_daily_facts(date, active_tables, day_num, total_days)
-                )
-                loop.close()
-            else:
-                # Use existing event loop
-                daily_facts = loop.run_until_complete(
-                    self._generate_daily_facts(date, active_tables, day_num, total_days)
-                )
-        except RuntimeError:
-            # No event loop in thread, create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            daily_facts = loop.run_until_complete(
-                self._generate_daily_facts(date, active_tables, day_num, total_days)
-            )
-            loop.close()
-
-        # Count records
-        daily_counts = {fact_type: len(records) for fact_type, records in daily_facts.items()}
-
-        # Report progress if enabled
-        if report_progress:
-            self._send_progress_from_worker(
-                day_num=day_num,
-                total_days=total_days,
-                date=date,
-                daily_counts=daily_counts
-            )
-
-        return daily_counts, 0  # No partitions in database mode
-
-    def _send_progress_from_worker(
-        self,
-        day_num: int,
-        total_days: int,
-        date: datetime,
-        daily_counts: dict[str, int]
-    ) -> None:
-        """
-        Thread-safe progress update from parallel worker.
-
-        Called by worker threads to report progress. Uses locking to ensure
-        thread safety when updating shared state.
-
-        Args:
-            day_num: Current day number
-            total_days: Total number of days being generated
-            date: Date being processed
-            daily_counts: Record counts per fact table for this day
-        """
-        # Calculate table progress based on day completion
-        progress = day_num / total_days if total_days > 0 else 0.0
-
-        # Create table progress dict (all active tables progress together in parallel mode)
-        active_tables = self._active_fact_tables()
-        table_progress = {table: progress for table in active_tables}
-
-        # Thread-safe: all state updates within lock, then release before calling progress update
-        with self._progress_lock:
-            # Update progress tracker
-            for table_name, progress_val in table_progress.items():
-                self._progress_tracker.update_progress(table_name, progress_val)
-
-            # Get current table states from tracker (copy so we can release lock)
-            tables_completed = self._progress_tracker.get_tables_by_state("completed")
-            tables_in_progress = self._progress_tracker.get_tables_by_state("in_progress")
-            tables_remaining = self._progress_tracker.get_tables_by_state("not_started")
-
-            tables_completed_count = len(tables_completed)
-
-        # Emit per-table progress (master-style) outside the lock
-        for table, prog in table_progress.items():
-            self._emit_table_progress(
-                table,
-                prog,
-                f"Generating {table.replace('_',' ')}",
-                None,
-            )
-
-        # Create progress message OUTSIDE the lock
-        message = (
-            f"Generated data for {date.strftime('%Y-%m-%d')} "
-            f"(day {day_num}/{total_days}, "
-            f"{tables_completed_count}/{len(active_tables)} tables complete)"
-        )
-
-        # Send throttled update OUTSIDE the lock (it will acquire its own lock)
-        self._send_throttled_progress_update(
-            day_counter=day_num,
-            message=message,
-            total_days=total_days,
-            table_progress=table_progress,
-            tables_completed=tables_completed,
-            tables_in_progress=tables_in_progress,
-            tables_remaining=tables_remaining
-        )
 
     def _send_throttled_progress_update(
         self,

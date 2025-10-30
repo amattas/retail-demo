@@ -76,15 +76,6 @@ class HistoricalDataRequest(BaseModel):
         ),
         examples=[["receipts", "receipt_lines", "store_inventory_txn"]],
     )
-    parallel: bool = Field(
-        False,
-        description=(
-            "Enable parallel processing for faster generation. "
-            "Sequential mode (default) provides deterministic ordering; "
-            "parallel mode is faster for multi-day ranges. "
-            "Both modes support rich hourly progress updates."
-        )
-    )
 
 
 class ConfigUpdateRequest(BaseModel):

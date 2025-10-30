@@ -587,7 +587,7 @@ class TestStateTransitionEdgeCases:
         tracker.mark_generation_complete()  # Should not error
 
     def test_concurrent_state_updates(self):
-        """Test thread-safe state updates (simulating parallel generation)."""
+        """Test thread-safe state updates (simulating concurrent progress callbacks)."""
         import threading
 
         tracker = TableProgressTracker(FACT_TABLES[:5])

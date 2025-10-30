@@ -280,8 +280,7 @@ validation_summary = rules.get_validation_summary()
 
 1. **Use appropriate date ranges**: Start with small ranges for testing
 2. **Monitor memory usage**: Large customer bases require more memory
-3. **Leverage partitioning**: Daily partitions enable parallel processing
-4. **Configure customer density**: Adjust `customers_per_day` for your needs
+3. **Configure customer density**: Adjust `customers_per_day` for your needs
 
 ## 🧪 Testing & Validation
 

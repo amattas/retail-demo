@@ -318,14 +318,12 @@ class MasterDataGenerator:
     async def generate_all_master_data_async(
         self,
         session: AsyncSession,
-        parallel: bool = True,
     ) -> None:
         """
         Generate all master data tables and write to SQLite database.
 
         Args:
             session: AsyncSession for retail.db (required)
-            parallel: Enable parallel generation for independent tables (default True)
         """
         if not SQLALCHEMY_AVAILABLE:
             raise RuntimeError(
@@ -333,7 +331,6 @@ class MasterDataGenerator:
             )
 
         print("Starting master data generation...")
-        print(f"Parallel processing: {'enabled' if parallel else 'disabled'}")
 
         # Store session for later use
         self._db_session = session
@@ -366,54 +363,15 @@ class MasterDataGenerator:
         await self.generate_stores_async(count=stores_count)
         await self.generate_trucks_async()
 
-        # Phase 2: Parallel customer + product generation
-        if parallel:
-            print("\nPhase 2: Generating customers and products (parallel)...")
-            max_workers = min(2, self.config.performance.get_max_workers())
-            print(f"Using {max_workers} parallel workers (CPU limit: {self.config.performance.max_cpu_percent}%)")
+        # Phase 2: Generate customers and products
+        print("\nPhase 2: Generating customers and products...")
+        await self.generate_customers_async()
+        await self.generate_products_master_async()
 
-            # Note: Running async methods in thread pool - they'll complete synchronously
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(self._run_async_in_thread, self.generate_customers_async): 'customers',
-                    executor.submit(self._run_async_in_thread, self.generate_products_master_async): 'products'
-                }
-                for future in as_completed(futures):
-                    table = futures[future]
-                    try:
-                        future.result()
-                        print(f"✓ {table} generation completed")
-                    except Exception as e:
-                        print(f"✗ {table} generation failed: {e}")
-                        raise
-        else:
-            # Sequential fallback
-            print("\nPhase 2: Generating customers and products (sequential)...")
-            await self.generate_customers_async()
-            await self.generate_products_master_async()
-
-        # Phase 3: Parallel inventory snapshots
-        if parallel:
-            print("\nPhase 3: Generating inventory snapshots (parallel)...")
-            max_workers = min(2, self.config.performance.get_max_workers())
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(self._run_async_in_thread, self.generate_dc_inventory_snapshots_async): 'dc_inventory',
-                    executor.submit(self._run_async_in_thread, self.generate_store_inventory_snapshots_async): 'store_inventory'
-                }
-                for future in as_completed(futures):
-                    table = futures[future]
-                    try:
-                        future.result()
-                        print(f"✓ {table} snapshot completed")
-                    except Exception as e:
-                        print(f"✗ {table} snapshot failed: {e}")
-                        raise
-        else:
-            # Sequential fallback
-            print("\nPhase 3: Generating inventory snapshots (sequential)...")
-            await self.generate_dc_inventory_snapshots_async()
-            await self.generate_store_inventory_snapshots_async()
+        # Phase 3: Generate inventory snapshots
+        print("\nPhase 3: Generating inventory snapshots...")
+        await self.generate_dc_inventory_snapshots_async()
+        await self.generate_store_inventory_snapshots_async()
 
         # Validate foreign key relationships
         self._validate_foreign_keys()
@@ -435,11 +393,6 @@ class MasterDataGenerator:
         self._cache_master_counts()
 
         print("Master data generation complete!")
-
-    def _run_async_in_thread(self, coro):
-        """Helper to run async coroutine in thread pool."""
-        import asyncio
-        return asyncio.run(coro)
 
     def _load_dictionary_data(self) -> None:
         """Load all required dictionary data from CSV files."""

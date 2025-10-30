@@ -262,7 +262,6 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
-            # Note: parallel=False required for SQLite (AsyncSession can't be shared across threads)
             from retail_datagen.db.session import get_retail_session
             from sqlalchemy import text
 
@@ -282,8 +281,7 @@ async def generate_all_master_data(
                 logger.info("Existing master data cleared")
 
                 await master_generator.generate_all_master_data_async(
-                    session=session,
-                    parallel=False
+                    session=session
                 )
                 # Context manager will commit everything on exit
 
@@ -474,8 +472,7 @@ async def generate_specific_master_table(
                 logger.info("Existing master data cleared")
 
                 result = await master_generator.generate_all_master_data_async(
-                    session=session,
-                    parallel=False
+                    session=session
                 )
                 # Context manager will commit everything on exit
 
@@ -538,14 +535,10 @@ async def generate_historical_data(
     """
     Generate historical fact data using intelligent date range logic.
 
-    Supports both sequential and parallel processing modes:
-    - Sequential: Processes one day at a time with deterministic ordering (default)
-    - Parallel: Processes multiple days concurrently for faster generation
+    Processes data sequentially one day at a time with deterministic ordering.
+    Provides rich hourly progress updates (24 updates per day per table).
 
-    Both modes provide rich hourly progress updates (24 updates per day per table).
-
-    The parallel mode can significantly reduce generation time for multi-day ranges
-    while maintaining data quality and progress visibility.
+    Note: Parallel processing is not supported with SQLite database backend.
     """
 
     # Debug logging - log the received request
@@ -686,7 +679,6 @@ async def generate_historical_data(
 
             # Also wire a master-style per-table progress callback for consistent UI updates
             per_table_progress: dict[str, float] = {table: 0.0 for table in tables_to_generate}
-            # Thread lock to protect shared state in parallel mode
             progress_lock = Lock()
 
             def per_table_callback(
@@ -707,7 +699,7 @@ async def generate_historical_data(
                 if table_name not in FACT_TABLES:
                     return
 
-                # Protect all dict operations with lock for thread safety in parallel mode
+                # Protect dict operations with lock for thread safety
                 with progress_lock:
                     if table_name not in per_table_progress:
                         return
@@ -766,18 +758,14 @@ async def generate_historical_data(
             except Exception:
                 pass
 
-            # Use user's parallel preference (both modes now support rich hourly progress)
-            use_parallel = request.parallel if request.parallel is not None else False
-            mode_str = "parallel" if use_parallel else "sequential"
-            logger.info(f"Starting historical generation from {start_date.date()} to {end_date.date()} in {mode_str} mode")
+            logger.info(f"Starting historical generation from {start_date.date()} to {end_date.date()}")
 
             # Generate historical data using the fact generator
             # Note: generate_historical_data is now async (Phase 3B SQLite migration)
-            # TODO: Add database session support when SQLite mode is enabled in config
+            # Note: Parallel processing not supported with SQLite (sequential only)
             summary = await fact_generator.generate_historical_data(
                 start_date,
-                end_date,
-                use_parallel
+                end_date
             )
 
             # Update generation state with the end timestamp
@@ -800,7 +788,6 @@ async def generate_historical_data(
                 "end_date": end_date.isoformat(),
                 "days_generated": (end_date - start_date).days + 1,
                 "tables_generated": tables_to_generate,
-                "parallel_processing": request.parallel,
                 "total_records": summary.total_records,
                 "partitions_created": summary.partitions_created,
                 "generation_time_seconds": summary.generation_time_seconds,
@@ -923,9 +910,8 @@ async def generate_specific_historical_table(
 
             # Generate historical data using the fact generator
             # Note: generate_historical_data is now async (Phase 3B SQLite migration)
-            # TODO: Add database session support when SQLite mode is enabled in config
             summary = await fact_generator.generate_historical_data(
-                start_date, end_date, False  # use_parallel=False for single table
+                start_date, end_date
             )
 
             # Update generation state with the end timestamp
