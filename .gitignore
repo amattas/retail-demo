@@ -83,4 +83,4 @@ data/facts/**/*.csv
 bandit_report.json
 /datagen/data/*.db*
 /datagen/data/*.json
-/datagen/data/cache/*.json
+/datagen/data/cache
