@@ -17,6 +17,7 @@
     --warning-color: #ff7b2b;
     --danger-color: #ef4444;
     --info-color: #00b5e6;
+    --ready-color: #3776ff;
 
     /* Neutral Palette */
     --text-primary: #2c3e50;
@@ -609,6 +610,10 @@ body {
 
 .table-item.table-status-failed i {
     color: var(--danger-color);
+}
+
+.table-item.table-status-ready i {
+    color: var(--ready-color);
 }
 
 .table-item span {

@@ -972,6 +972,9 @@ class FactDataGenerator:
                     import pandas as pd
                     df_dc = pd.DataFrame(dc_transactions)
                     await self._insert_hourly_to_db(self._session, "dc_inventory_txn", df_dc, hour=0, commit_every_batches=1)
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress("dc_inventory_txn", day_index, hour, total_days)
                 except Exception as e:
                     logger.error(f"Failed to insert dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}")
 
@@ -999,6 +1002,9 @@ class FactDataGenerator:
                     import pandas as pd
                     df = pd.DataFrame(marketing_records)
                     await self._insert_hourly_to_db(self._session, "marketing", df, hour=0, commit_every_batches=1)
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress("marketing", day_index, hour, total_days)
                     # Verify daily insert size once for marketing
                     try:
                         from sqlalchemy import select, func
@@ -1013,6 +1019,12 @@ class FactDataGenerator:
         # 3. Generate store operations throughout the day (always generate hourly data)
         hourly_data = self._generate_hourly_store_activity(date, base_multiplier)
 
+        # Define which tables are generated hourly (others are generated daily)
+        hourly_generated_tables = ["receipts", "receipt_lines", "store_inventory_txn", "foot_traffic", "ble_pings"]
+
+        # Log hourly data structure size for debugging
+        logger.debug(f"Day {day_index}/{total_days} ({date.strftime('%Y-%m-%d')}): Processing {len(hourly_data)} hours")
+
         # Export per-hour and aggregate into daily facts
         for hour_idx, hour_data in enumerate(hourly_data):
             hourly_subset = {t: (hour_data.get(t, []) if t in active_tables else []) for t in active_tables}
@@ -1020,14 +1032,18 @@ class FactDataGenerator:
                 await self._export_hourly_facts(date, hour_idx, hourly_subset)
 
                 # NEW: Update hourly progress tracker after successful export
-                for table in active_tables:
-                    if table != "marketing":  # Marketing is daily, not hourly
+                # Only update progress for tables that are actually generated hourly
+                for table in hourly_generated_tables:
+                    if table in active_tables:
                         self.hourly_tracker.update_hourly_progress(
                             table=table,
                             day=day_index,
                             hour=hour_idx,
                             total_days=total_days
                         )
+                        # Log receipts progress at debug level
+                        if table == "receipts":
+                            logger.debug(f"Receipts progress updated: day={day_index}, hour={hour_idx}, total_days={total_days}")
 
                 # NEW: Send progress update after hourly exports complete (throttled)
                 if self._progress_callback:
@@ -1066,6 +1082,9 @@ class FactDataGenerator:
                     import pandas as pd
                     df_tm = pd.DataFrame(truck_movements)
                     await self._insert_hourly_to_db(self._session, "truck_moves", df_tm, hour=0, commit_every_batches=1)
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress("truck_moves", day_index, hour, total_days)
                 except Exception as e:
                     logger.error(f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}")
 
@@ -1103,6 +1122,9 @@ class FactDataGenerator:
                     import pandas as pd
                     df_oo = pd.DataFrame(online_orders)
                     await self._insert_hourly_to_db(self._session, "online_orders", df_oo, hour=0, commit_every_batches=1)
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress("online_orders", day_index, hour, total_days)
                 except Exception as e:
                     logger.error(f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}")
             # Cascade inventory effects

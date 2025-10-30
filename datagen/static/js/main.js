@@ -27,11 +27,41 @@ class RetailDataGenerator {
         this._lastCountRefresh = {};
         this._tableCountVersions = {};
         this._countVersionSeq = 0;
+        this.completedTables = new Set();
+        this._isInitialPageLoad = true; // Track if this is the first page load
         this.init();
+    }
+
+    saveCompletedTables() {
+        try {
+            const tablesArray = Array.from(this.completedTables);
+            localStorage.setItem('completedHistoricalTables', JSON.stringify(tablesArray));
+        } catch (error) {
+            console.warn('Failed to save completed tables to localStorage:', error);
+        }
+    }
+
+    loadCompletedTables() {
+        try {
+            const stored = localStorage.getItem('completedHistoricalTables');
+            if (stored) {
+                const tablesArray = JSON.parse(stored);
+                this.completedTables = new Set(tablesArray);
+                console.log('[Tab Switch] Restored completed tables from localStorage:', tablesArray);
+            } else {
+                console.log('[Tab Switch] No completed tables found in localStorage');
+            }
+        } catch (error) {
+            console.warn('Failed to load completed tables from localStorage:', error);
+            this.completedTables = new Set();
+        }
     }
 
     async init() {
         this.setupEventListeners();
+
+        // Note: Don't load completed tables from localStorage on page load
+        // Tiles should start blue on fresh page load, only persist during tab switches
 
         // Determine initial tab before any loading to avoid flicker
         let initialTab = 'dashboard';
@@ -56,6 +86,7 @@ class RetailDataGenerator {
             await this.updateAllTablesData();
         } else if (initialTab === 'historical') {
             // already updated counts above
+            await this.initializeTableStatuses();
         } else if (initialTab === 'streaming') {
             await this.updateStreamingStatus();
         }
@@ -370,33 +401,54 @@ class RetailDataGenerator {
         if (!item) return;
 
         item.classList.remove(
+            'table-status-ready',
             'table-status-processing',
             'table-status-completed',
             'table-status-failed'
         );
 
-        if (status === 'processing') {
+        if (status === 'ready') {
+            item.classList.add('table-status-ready');
+            // Remove from completed tables set when resetting to ready
+            this.completedTables.delete(tableName);
+        } else if (status === 'processing') {
             item.classList.add('table-status-processing');
-        const currentEl = document.getElementById(`count-${tableName}`);
-        const previous = currentEl ? Number(currentEl.dataset.countValue) : NaN;
-        if (!Number.isNaN(previous) && previous > 0) {
-            this.setTableCount(tableName, previous);
-        } else {
-            this.setTableCount(tableName, null, 'Generating...');
-        }
+            // Remove from completed tables set when processing starts
+            this.completedTables.delete(tableName);
+            const currentEl = document.getElementById(`count-${tableName}`);
+            const previous = currentEl ? Number(currentEl.dataset.countValue) : NaN;
+            if (!Number.isNaN(previous) && previous > 0) {
+                this.setTableCount(tableName, previous);
+            } else {
+                this.setTableCount(tableName, null, 'Generating...');
+            }
         } else if (status === 'completed') {
             item.classList.add('table-status-completed');
+            // Add to completed tables set and persist
+            this.completedTables.add(tableName);
+            this.saveCompletedTables();
+            console.log(`[Completed] Table "${tableName}" marked as completed and saved to localStorage`);
             this.refreshTableCount(tableName);
         } else if (status === 'failed') {
             item.classList.add('table-status-failed');
+            // Remove from completed tables set on failure
+            this.completedTables.delete(tableName);
             this.setTableCount(tableName, null, 'Failed');
         } else {
-            this.setTableCount(tableName, null);
+            // Only clear if not in completed tables set
+            if (!this.completedTables.has(tableName)) {
+                this.setTableCount(tableName, null);
+            }
         }
     }
 
-    clearTableStatuses(tables) {
+    clearTableStatuses(tables, forceReset = false) {
         tables.forEach(table => {
+            // Preserve completed status unless forceReset is true
+            if (!forceReset && this.completedTables.has(table)) {
+                // Keep the completed state
+                return;
+            }
             this.updateTableStatus(table, null);
             delete this._tableCountVersions[table];
             this.setTableCount(
@@ -423,6 +475,22 @@ class RetailDataGenerator {
 
     clearMasterTableStatuses() {
         this.clearTableStatuses(this.masterTableNames);
+    }
+
+    async initializeTableStatuses() {
+        // Initialize table statuses based on completed state (in-memory only)
+        const completedCount = this.completedTables.size;
+        console.log(`[Initialize] Setting tile statuses. Completed tables: ${completedCount}`, Array.from(this.completedTables));
+
+        for (const tableName of this.factTableNames) {
+            // If table is in completed set (from current session), mark as completed
+            if (this.completedTables.has(tableName)) {
+                this.updateTableStatus(tableName, 'completed');
+            } else {
+                // All other tables start as ready (blue) on page load
+                this.updateTableStatus(tableName, 'ready');
+            }
+        }
     }
 
     _nextCountVersion() {
@@ -996,19 +1064,23 @@ class RetailDataGenerator {
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.remove('active');
         });
-        
+
         // Show selected tab
         document.getElementById(tabName).classList.add('active');
-        
+
         // Update nav tabs
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        
+
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        
+
         this.currentTab = tabName;
         try { localStorage.setItem('activeTab', tabName); } catch (_) {}
+
+        // After first actual tab switch, clear initial load flag
+        const wasInitialLoad = this._isInitialPageLoad;
+        this._isInitialPageLoad = false;
 
         // Load tab-specific data
         if (tabName === 'streaming') {
@@ -1020,7 +1092,16 @@ class RetailDataGenerator {
             await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
             await this.updateAllTablesData();
         } else if (tabName === 'historical') {
+            // Only restore from localStorage if this is NOT the initial page load
+            if (!wasInitialLoad) {
+                console.log('[Tab Switch] Not initial load, restoring from localStorage');
+                this.loadCompletedTables();
+            } else {
+                console.log('[Page Load] Initial load, NOT restoring from localStorage');
+            }
             await this.updateTableCounts();
+            // Apply saved completion states to table tiles
+            await this.initializeTableStatuses();
         }
     }
 
@@ -1610,7 +1691,10 @@ class RetailDataGenerator {
                                     // Normalize legacy payload to current shape
                                     status.progress = status.progress || 0;
                                     proceedWithStatus(status);
-                                    setTimeout(poll, 500);
+                                    // Only continue polling if not completed or failed
+                                    if (status.status !== 'completed' && status.status !== 'failed') {
+                                        setTimeout(poll, 500);
+                                    }
                                     return;
                                 }
                             }
@@ -1627,7 +1711,10 @@ class RetailDataGenerator {
                         const prev = this._lastSequences[statusUrl] || 0;
                         if (status.sequence < prev) {
                             console.warn('[Progress Poll] Dropping stale update seq=', status.sequence, 'prev=', prev);
-                            setTimeout(poll, 300);
+                            // Only continue polling if not completed or failed
+                            if (status.status !== 'completed' && status.status !== 'failed') {
+                                setTimeout(poll, 300);
+                            }
                             return;
                         }
                         this._lastSequences[statusUrl] = status.sequence;
@@ -1657,8 +1744,28 @@ class RetailDataGenerator {
                         // Note: We use tables_completed/tables_in_progress lists from backend,
                         // NOT table_progress percentages, to determine icon colors
 
-                        if (statusObj.tables_completed) {
+                        console.log('[Tile Status] tables_completed:', statusObj.tables_completed);
+                        console.log('[Tile Status] tables_in_progress:', statusObj.tables_in_progress);
+                        console.log('[Tile Status] table_progress:', statusObj.table_progress);
+
+                        // If backend provides tables_completed, use it
+                        if (statusObj.tables_completed && statusObj.tables_completed.length > 0) {
+                            console.log('[Tile Status] Processing completed tables:', statusObj.tables_completed);
                             statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
+                        }
+                        // Fallback: Infer completion from table_progress if tables_completed is empty
+                        else if (statusObj.table_progress && Object.keys(statusObj.table_progress).length > 0) {
+                            console.log('[Tile Status] Inferring completion from table_progress:', statusObj.table_progress);
+                            const allTables = Object.keys(statusObj.table_progress);
+                            const completedTables = [];
+                            Object.entries(statusObj.table_progress).forEach(([table, progress]) => {
+                                if (progress >= 0.99) {
+                                    console.log(`[Tile Status] Marking ${table} as completed (progress: ${progress})`);
+                                    completedTables.push(table);
+                                    this.updateTableStatus(table, 'completed');
+                                }
+                            });
+                            console.log(`[Tile Status] Completed: ${completedTables.length}/${allTables.length} tables:`, completedTables);
                         }
 
                         if (statusObj.tables_in_progress) {
@@ -1715,6 +1822,8 @@ class RetailDataGenerator {
                                 this.hideETA('progressETA');
                                 this.clearProgressDetails('historicalProgressDetails');
                                 this.hideHourlyProgress();
+                                // Don't clear completed statuses - they should persist
+                                // Only clear processing/failed states if any
                             } else if (isMasterProgress) {
                                 this.hideTableCounter('masterTableProgressCounter');
                                 this.hideETA('masterProgressETA');
@@ -1727,8 +1836,10 @@ class RetailDataGenerator {
 
                     proceedWithStatus(status);
 
-                    // Wait before next poll
-                    setTimeout(poll, 500);
+                    // Only continue polling if not completed or failed
+                    if (status.status !== 'completed' && status.status !== 'failed') {
+                        setTimeout(poll, 500);
+                    }
                 } catch (error) {
                     console.error('Progress polling error:', error);
                     // Retry on error
@@ -2045,8 +2156,15 @@ class RetailDataGenerator {
 
             this.showNotification(result.message, 'success');
             this.hideProgress('historicalProgress');
-            // Clear only historical table statuses, preserve master
-            this.clearHistoricalTableStatuses();
+            // Clear completed tables state
+            this.completedTables.clear();
+            try {
+                localStorage.removeItem('completedHistoricalTables');
+            } catch (error) {
+                console.warn('Failed to clear completedHistoricalTables from localStorage:', error);
+            }
+            // Clear only historical table statuses with force reset
+            this.clearTableStatuses(this.factTableNames, true);
 
             // Refresh the UI state
             await this.loadGenerationState();
@@ -2090,8 +2208,16 @@ class RetailDataGenerator {
             this._tableCountVersions = {};
             this._countVersionSeq = 0;
             this._lastCountRefresh = {};
-            this.clearMasterTableStatuses();
-            this.clearHistoricalTableStatuses();
+            // Clear completed tables state
+            this.completedTables.clear();
+            try {
+                localStorage.removeItem('completedHistoricalTables');
+            } catch (error) {
+                console.warn('Failed to clear completedHistoricalTables from localStorage:', error);
+            }
+            // Force reset all table statuses
+            this.clearTableStatuses(this.masterTableNames, true);
+            this.clearTableStatuses(this.factTableNames, true);
 
             // Refresh the UI state
             await this.loadGenerationState();

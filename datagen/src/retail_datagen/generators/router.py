@@ -790,6 +790,9 @@ async def generate_historical_data(
                 1.0,
                 "Historical data generation completed",
                 table_counts=final_counts,
+                tables_completed=tables_to_generate,
+                tables_in_progress=[],
+                tables_remaining=[],
             )
 
             return {
