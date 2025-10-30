@@ -47,9 +47,6 @@ class RetailDataGenerator {
             if (stored) {
                 const tablesArray = JSON.parse(stored);
                 this.completedTables = new Set(tablesArray);
-                console.log('[Tab Switch] Restored completed tables from localStorage:', tablesArray);
-            } else {
-                console.log('[Tab Switch] No completed tables found in localStorage');
             }
         } catch (error) {
             console.warn('Failed to load completed tables from localStorage:', error);
@@ -207,7 +204,7 @@ class RetailDataGenerator {
                         hasFactData = factTablesData.tables && factTablesData.tables.length > 0;
                     }
                 } catch (err2) {
-                    console.log('Could not determine fact data status');
+                    // Could not determine fact data status
                 }
             }
         }
@@ -300,7 +297,7 @@ class RetailDataGenerator {
                     }
                 }
             } catch (err) {
-                console.log('Dashboard cache not available, will backfill counts directly');
+                // Dashboard cache not available, will backfill counts directly
             }
 
             // Backfill any missing master counts directly
@@ -427,7 +424,6 @@ class RetailDataGenerator {
             // Add to completed tables set and persist
             this.completedTables.add(tableName);
             this.saveCompletedTables();
-            console.log(`[Completed] Table "${tableName}" marked as completed and saved to localStorage`);
             this.refreshTableCount(tableName);
         } else if (status === 'failed') {
             item.classList.add('table-status-failed');
@@ -479,9 +475,6 @@ class RetailDataGenerator {
 
     async initializeTableStatuses() {
         // Initialize table statuses based on completed state (in-memory only)
-        const completedCount = this.completedTables.size;
-        console.log(`[Initialize] Setting tile statuses. Completed tables: ${completedCount}`, Array.from(this.completedTables));
-
         for (const tableName of this.factTableNames) {
             // If table is in completed set (from current session), mark as completed
             if (this.completedTables.has(tableName)) {
@@ -733,8 +726,6 @@ class RetailDataGenerator {
                     throw new Error('Cache not available');
                 }
             } catch (err) {
-                console.log('Using direct queries for table data');
-
                 // Fallback to direct queries if cache fails
                 for (const table of masterTables) {
                     try {
@@ -789,7 +780,6 @@ class RetailDataGenerator {
                         }
                     }
                 } catch (err) {
-                    console.log('No fact tables available yet');
                     for (const table of factTables) {
                         allTables.push({
                             ...table,
@@ -952,7 +942,6 @@ class RetailDataGenerator {
 
                 // If task not found (404) or any error, clear localStorage
                 if (!response.ok) {
-                    console.log('Task not found on server, clearing localStorage:', taskId);
                     localStorage.removeItem('activeHistoricalTask');
                     return;
                 }
@@ -961,12 +950,10 @@ class RetailDataGenerator {
 
                 // Only reconnect if task is actively running
                 if (status.status === 'running' || status.status === 'pending') {
-                    console.log('Found active historical task, reconnecting...', taskId);
                     this.reconnectToHistoricalTask(taskId);
                     return;
                 } else {
                     // Task completed or failed, clear localStorage
-                    console.log('Task no longer active, clearing localStorage:', status.status);
                     localStorage.removeItem('activeHistoricalTask');
                 }
             }
@@ -983,7 +970,6 @@ class RetailDataGenerator {
                 );
 
                 if (historicalTask) {
-                    console.log('Found active historical task on server, reconnecting...', historicalTask.task_id);
                     this.reconnectToHistoricalTask(historicalTask.task_id);
                 }
             }
@@ -1028,7 +1014,6 @@ class RetailDataGenerator {
             }
 
             // Resume polling
-            console.log('Resuming polling for task:', taskId);
             const finalStatus = await this.pollProgress(
                 `/api/tasks/${taskId}/status`,
                 'historicalProgressFill',
