@@ -1215,6 +1215,54 @@ input[type="checkbox"] {
     text-align: right;
 }
 
+/* Export Controls */
+.generation-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.export-controls {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.format-selector {
+    padding: 10px 15px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    background: var(--surface-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: var(--transition-smooth);
+}
+
+.format-selector:hover {
+    border-color: var(--primary-blue);
+    background: #fafbff;
+}
+
+.format-selector:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(55, 118, 255, 0.1);
+}
+
+.format-selector:disabled {
+    background: var(--surface-inset);
+    cursor: not-allowed;
+    opacity: 0.6;
+    border-color: var(--border-color);
+}
+
 /* Utility Classes */
 .text-red { color: var(--danger-color); }
 .text-green { color: var(--success-color); }
@@ -1363,5 +1411,25 @@ input[type="checkbox"] {
 
     .table-percentage {
         font-size: 11px;
+    }
+
+    /* Responsive export controls */
+    .generation-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .export-controls {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .format-selector {
+        flex: 1;
+    }
+
+    #exportMasterBtn,
+    #exportFactBtn {
+        flex: 1;
     }
 }

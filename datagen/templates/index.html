@@ -192,10 +192,22 @@
 
             <div class="card">
                 <h3>Generate Master Data</h3>
-                <button class="btn primary large" onclick="generateMasterData()">
-                    <i class="fas fa-play"></i>
-                    Generate All Master Data
-                </button>
+                <div class="generation-controls">
+                    <button class="btn primary large" onclick="generateMasterData()">
+                        <i class="fas fa-play"></i>
+                        Generate All Master Data
+                    </button>
+
+                    <div class="export-controls">
+                        <select id="masterExportFormat" class="format-selector">
+                            <option value="csv">CSV</option>
+                            <option value="parquet">Parquet</option>
+                        </select>
+                        <button id="exportMasterBtn" class="btn secondary large" disabled>
+                            <i class="fas fa-file-export"></i> Export
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div id="masterDataProgress" class="progress-section" style="display: none;">
@@ -207,6 +219,14 @@
                 <div id="masterTableProgressCounter" class="table-counter" style="display: none;"></div>
                 <div id="masterProgressETA" class="progress-eta" style="display: none;"></div>
                 <div id="masterProgressDetails" class="progress-details"></div>
+            </div>
+
+            <div id="masterExportProgress" class="progress-section" style="display: none;">
+                <h3>Export Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="masterExportProgressFill"></div>
+                </div>
+                <div class="progress-text" id="masterExportProgressText">Preparing export...</div>
             </div>
         </div>
 
@@ -241,10 +261,22 @@
                     </label>
                 </div>
 
-                <button class="btn primary large" onclick="generateHistoricalData()">
-                    <i class="fas fa-chart-bar"></i>
-                    Generate Historical Data
-                </button>
+                <div class="generation-controls">
+                    <button class="btn primary large" onclick="generateHistoricalData()">
+                        <i class="fas fa-chart-bar"></i>
+                        Generate Historical Data
+                    </button>
+
+                    <div class="export-controls">
+                        <select id="factExportFormat" class="format-selector">
+                            <option value="csv">CSV</option>
+                            <option value="parquet">Parquet</option>
+                        </select>
+                        <button id="exportFactBtn" class="btn secondary large" disabled>
+                            <i class="fas fa-file-export"></i> Export
+                        </button>
+                    </div>
+                </div>
             </div>
 
                 <div class="card">
@@ -349,6 +381,14 @@
 
                 <!-- Per-table progress container -->
                 <div id="tableProgressContainer" class="table-progress-container" style="display: none; margin-top: 15px;"></div>
+            </div>
+
+            <div id="factExportProgress" class="progress-section" style="display: none;">
+                <h3>Export Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="factExportProgressFill"></div>
+                </div>
+                <div class="progress-text" id="factExportProgressText">Preparing export...</div>
             </div>
         </div>
 

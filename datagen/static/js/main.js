@@ -56,6 +56,7 @@ class RetailDataGenerator {
 
     async init() {
         this.setupEventListeners();
+        this.initializeExportButtons();
 
         // Note: Don't load completed tables from localStorage on page load
         // Tiles should start blue on fresh page load, only persist during tab switches
@@ -1076,6 +1077,7 @@ class RetailDataGenerator {
             await this.updateTableCounts();
             await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
             await this.updateAllTablesData();
+            this.updateExportButtonStates();
         } else if (tabName === 'historical') {
             // Only restore from localStorage if this is NOT the initial page load
             if (!wasInitialLoad) {
@@ -1084,6 +1086,291 @@ class RetailDataGenerator {
             await this.updateTableCounts();
             // Apply saved completion states to table tiles
             await this.initializeTableStatuses();
+            this.updateExportButtonStates();
+        }
+    }
+
+    // =========================
+    // Export Functionality
+    // =========================
+
+    /**
+     * Initialize export buttons and attach event handlers
+     */
+    initializeExportButtons() {
+        // Note: Export buttons will be added to HTML separately
+        // This method sets up event listeners once the DOM is ready
+
+        // Master data export button
+        const masterExportBtn = document.getElementById('exportMasterBtn');
+        if (masterExportBtn) {
+            masterExportBtn.addEventListener('click', () => {
+                const format = document.getElementById('masterExportFormat')?.value || 'csv';
+                this.exportMasterData(format);
+            });
+        }
+
+        // Historical data export button (note: button ID is 'exportFactBtn' not 'exportHistoricalBtn')
+        const historicalExportBtn = document.getElementById('exportFactBtn');
+        if (historicalExportBtn) {
+            historicalExportBtn.addEventListener('click', () => {
+                const format = document.getElementById('factExportFormat')?.value || 'csv';
+                this.exportFactData(format);
+            });
+        }
+    }
+
+    /**
+     * Export master data tables
+     * @param {string} format - Export format ('csv' or 'parquet')
+     */
+    async exportMasterData(format) {
+        const exportBtn = document.getElementById('exportMasterBtn');
+        if (!exportBtn) return;
+
+        const originalHTML = exportBtn.innerHTML;
+        const originalDisabled = exportBtn.disabled;
+
+        try {
+            // Disable button and show loading state
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            this.disableExportButtons();
+
+            // Show progress section
+            this.showProgress('masterExportProgress', 'masterExportProgressFill', 'masterExportProgressText');
+
+            // Start export
+            const response = await fetch('/api/export/master', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ format })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const taskId = result.task_id;
+
+            // Poll for progress
+            const finalStatus = await this.pollExportProgress(
+                taskId,
+                'masterExportProgressFill',
+                'masterExportProgressText'
+            );
+
+            // Handle completion
+            if (finalStatus?.status === 'completed') {
+                this.showNotification(`Master data exported successfully to ${format.toUpperCase()}!`, 'success');
+            } else if (finalStatus?.status === 'failed') {
+                this.showNotification(
+                    `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
+                    'error'
+                );
+            }
+
+        } catch (error) {
+            console.error('Master data export failed:', error);
+            this.showNotification(`Export failed: ${error.message}`, 'error');
+        } finally {
+            // Restore button state
+            exportBtn.disabled = originalDisabled;
+            exportBtn.innerHTML = originalHTML;
+            this.enableExportButtons();
+            this.hideProgress('masterExportProgress');
+        }
+    }
+
+    /**
+     * Export fact data tables
+     * @param {string} format - Export format ('csv' or 'parquet')
+     */
+    async exportFactData(format) {
+        const exportBtn = document.getElementById('exportFactBtn');
+        if (!exportBtn) return;
+
+        const originalHTML = exportBtn.innerHTML;
+        const originalDisabled = exportBtn.disabled;
+
+        try {
+            // Disable button and show loading state
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            this.disableExportButtons();
+
+            // Show progress section
+            this.showProgress('factExportProgress', 'factExportProgressFill', 'factExportProgressText');
+
+            // Start export
+            const response = await fetch('/api/export/facts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ format })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const taskId = result.task_id;
+
+            // Poll for progress
+            const finalStatus = await this.pollExportProgress(
+                taskId,
+                'factExportProgressFill',
+                'factExportProgressText'
+            );
+
+            // Handle completion
+            if (finalStatus?.status === 'completed') {
+                this.showNotification(`Historical data exported successfully to ${format.toUpperCase()}!`, 'success');
+            } else if (finalStatus?.status === 'failed') {
+                this.showNotification(
+                    `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
+                    'error'
+                );
+            }
+
+        } catch (error) {
+            console.error('Historical data export failed:', error);
+            this.showNotification(`Export failed: ${error.message}`, 'error');
+        } finally {
+            // Restore button state
+            exportBtn.disabled = originalDisabled;
+            exportBtn.innerHTML = originalHTML;
+            this.enableExportButtons();
+            this.hideProgress('factExportProgress');
+        }
+    }
+
+    /**
+     * Poll export progress endpoint
+     * @param {string} taskId - Export task ID
+     * @param {string} progressFillId - Progress bar fill element ID
+     * @param {string} progressTextId - Progress text element ID
+     * @returns {Promise} Final export status
+     */
+    async pollExportProgress(taskId, progressFillId, progressTextId) {
+        const maxAttempts = 600; // 10 minutes max
+        let attempts = 0;
+
+        return new Promise((resolve) => {
+            const poll = async () => {
+                if (attempts >= maxAttempts) {
+                    console.error('Export polling timeout after 10 minutes');
+                    resolve({ status: 'failed', message: 'Polling timeout' });
+                    return;
+                }
+                attempts++;
+
+                try {
+                    const response = await fetch(`/api/export/status/${taskId}`);
+
+                    if (!response.ok) {
+                        console.error('Export polling failed:', response.status);
+                        setTimeout(poll, 500);
+                        return;
+                    }
+
+                    const status = await response.json();
+
+                    // Update progress bar
+                    const progressFill = document.getElementById(progressFillId);
+                    const progressText = document.getElementById(progressTextId);
+
+                    if (progressFill && progressText) {
+                        const progress = Math.round((status.progress || 0) * 100);
+                        progressFill.style.width = `${progress}%`;
+
+                        // Show table count in progress message
+                        const tablesMsg = status.tables_completed && status.total_tables
+                            ? ` (${status.tables_completed}/${status.total_tables} tables)`
+                            : '';
+                        progressText.textContent = status.message || `${progress}%${tablesMsg}`;
+                    }
+
+                    // Check if done
+                    if (status.status === 'completed' || status.status === 'failed') {
+                        resolve(status);
+                        return;
+                    }
+
+                    // Continue polling
+                    setTimeout(poll, 500);
+
+                } catch (error) {
+                    console.error('Export progress polling error:', error);
+                    setTimeout(poll, 500);
+                }
+            };
+
+            poll();
+        });
+    }
+
+    /**
+     * Disable all export buttons
+     */
+    disableExportButtons() {
+        const masterExportBtn = document.getElementById('exportMasterBtn');
+        const factExportBtn = document.getElementById('exportFactBtn');
+
+        if (masterExportBtn) masterExportBtn.disabled = true;
+        if (factExportBtn) factExportBtn.disabled = true;
+    }
+
+    /**
+     * Enable all export buttons (checks if data is available)
+     */
+    enableExportButtons() {
+        this.updateExportButtonStates();
+    }
+
+    /**
+     * Update export button states based on data availability
+     */
+    async updateExportButtonStates() {
+        // Master data export button
+        const masterExportBtn = document.getElementById('exportMasterBtn');
+        if (masterExportBtn) {
+            // Check if master data exists by looking at table counts
+            const storesCount = document.getElementById('count-stores');
+            const hasMasterData = storesCount && storesCount.dataset.countValue &&
+                                  Number(storesCount.dataset.countValue) > 0;
+
+            masterExportBtn.disabled = !hasMasterData;
+
+            if (!hasMasterData) {
+                masterExportBtn.title = 'Generate master data first';
+            } else {
+                masterExportBtn.title = 'Export master data';
+            }
+        }
+
+        // Historical data export button
+        const factExportBtn = document.getElementById('exportFactBtn');
+        if (factExportBtn) {
+            // Check if historical data exists
+            const receiptsCount = document.getElementById('count-receipts');
+            const hasFactData = receiptsCount && receiptsCount.dataset.countValue &&
+                                Number(receiptsCount.dataset.countValue) > 0;
+
+            factExportBtn.disabled = !hasFactData;
+
+            if (!hasFactData) {
+                factExportBtn.title = 'Generate historical data first';
+            } else {
+                factExportBtn.title = 'Export historical data';
+            }
         }
     }
 
@@ -1099,9 +1386,12 @@ class RetailDataGenerator {
     async generateMasterData() {
         // Reset table indicators before starting
         this.clearMasterTableStatuses();
-        
+
+        // Disable export buttons during generation
+        this.disableExportButtons();
+
         this.showProgress('masterDataProgress', 'masterProgressFill', 'masterProgressText');
-        
+
         try {
             const response = await fetch('/api/generate/master', {
                 method: 'POST',
@@ -1110,13 +1400,13 @@ class RetailDataGenerator {
                 },
                 body: JSON.stringify({})
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const result = await response.json();
-            
+
             // Poll for progress updates using the operation_id
             await this.pollProgress(`/api/generate/master/status?operation_id=${result.operation_id}`, 'masterProgressFill', 'masterProgressText');
 
@@ -1124,12 +1414,14 @@ class RetailDataGenerator {
             await this.updateDashboardStats();
             await this.updateTableCounts();
             await this.updateAllTablesData();
-            
+
         } catch (error) {
             console.error('Master data generation failed:', error);
             this.showNotification(`Master data generation failed: ${error.message}`, 'error');
         } finally {
             this.hideProgress('masterDataProgress');
+            // Re-enable export buttons after generation
+            this.updateExportButtonStates();
         }
     }
 
@@ -1148,6 +1440,9 @@ class RetailDataGenerator {
         // Disable button and show loading state
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+        // Disable export buttons during generation
+        this.disableExportButtons();
 
         try {
             const startDate = document.getElementById('startDate').value;
@@ -1269,6 +1564,8 @@ class RetailDataGenerator {
             generateBtn.innerHTML = originalHTML;
             localStorage.removeItem('activeHistoricalTask');
             this.hideProgress('historicalProgress');
+            // Re-enable export buttons after generation
+            this.updateExportButtonStates();
         }
     }
 

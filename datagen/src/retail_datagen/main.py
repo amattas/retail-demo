@@ -28,6 +28,7 @@ from .db.engine import dispose_engines, get_retail_engine
 from .db.init import init_databases
 from .db.manager import get_database_status, get_db_manager
 from .db.models.base import Base
+from .api.export_router import router as export_router
 from .generators.router import router as generators_router
 from .shared.dependencies import (
     check_azure_connection,
@@ -681,6 +682,8 @@ async def get_active_tasks():
 app.include_router(generators_router, prefix="/api", tags=["Data Generation"])
 
 app.include_router(streaming_router, prefix="/api", tags=["Real-Time Streaming"])
+
+app.include_router(export_router, tags=["Data Export"])
 
 
 # ================================
