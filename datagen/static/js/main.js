@@ -1079,10 +1079,7 @@ class RetailDataGenerator {
         } else if (tabName === 'historical') {
             // Only restore from localStorage if this is NOT the initial page load
             if (!wasInitialLoad) {
-                console.log('[Tab Switch] Not initial load, restoring from localStorage');
                 this.loadCompletedTables();
-            } else {
-                console.log('[Page Load] Initial load, NOT restoring from localStorage');
             }
             await this.updateTableCounts();
             // Apply saved completion states to table tiles
@@ -1172,9 +1169,6 @@ class RetailDataGenerator {
                 requestBody.end_date = endDate;
             }
 
-            // Debug logging for troubleshooting
-            console.log('Historical data generation request body:', JSON.stringify(requestBody, null, 2));
-
             // Clear any previous table status indicators
             this.clearHistoricalTableStatuses();
 
@@ -1187,9 +1181,6 @@ class RetailDataGenerator {
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    console.log(`Historical data generation attempt ${attempt}/${maxRetries}...`);
-                    console.log('Sending request body:', JSON.stringify(requestBody));
-
                     response = await fetch('/api/generate/historical', {
                         method: 'POST',
                         headers: {
@@ -1198,13 +1189,9 @@ class RetailDataGenerator {
                         body: JSON.stringify(requestBody)
                     });
 
-                    console.log(`Attempt ${attempt} response: ${response.status} ${response.statusText}`);
-
                     if (response.ok) {
-                        console.log(`Attempt ${attempt} succeeded!`);
                         break; // Success, exit retry loop
                     } else if (response.status !== 400 && response.status !== 422) {
-                        console.log(`Attempt ${attempt} failed with non-retryable error: ${response.status}`);
                         break; // Non-retryable error, exit retry loop
                     }
 
@@ -1672,7 +1659,6 @@ class RetailDataGenerator {
                                 const legacyResp = await fetch(legacyUrl);
                                 if (legacyResp.ok) {
                                     const status = await legacyResp.json();
-                                    console.log('[Progress Poll] Legacy Status received:', status);
                                     // Normalize legacy payload to current shape
                                     status.progress = status.progress || 0;
                                     proceedWithStatus(status);
@@ -1689,7 +1675,6 @@ class RetailDataGenerator {
                     }
 
                     const status = await response.json();
-                    console.log('[Progress Poll] Status received:', status);
 
                     // Drop out-of-order updates using sequence
                     if (typeof status.sequence === 'number') {
@@ -1709,16 +1694,9 @@ class RetailDataGenerator {
                         // Update progress bar
                         const progressFill = document.getElementById(progressFillId);
                         const progressText = document.getElementById(progressTextId);
-                        console.log('[Progress Poll] Elements found:', {
-                            progressFillId,
-                            progressFill: !!progressFill,
-                            progressTextId,
-                            progressText: !!progressText
-                        });
 
                         if (progressFill && progressText) {
                             const progress = Math.round((statusObj.progress || 0) * 100);
-                            console.log('[Progress Poll] Updating UI - Progress:', progress, 'Message:', statusObj.message);
                             progressFill.style.width = `${progress}%`;
                             progressText.textContent = statusObj.message || `${progress}%`;
                         } else {
@@ -1729,28 +1707,17 @@ class RetailDataGenerator {
                         // Note: We use tables_completed/tables_in_progress lists from backend,
                         // NOT table_progress percentages, to determine icon colors
 
-                        console.log('[Tile Status] tables_completed:', statusObj.tables_completed);
-                        console.log('[Tile Status] tables_in_progress:', statusObj.tables_in_progress);
-                        console.log('[Tile Status] table_progress:', statusObj.table_progress);
-
                         // If backend provides tables_completed, use it
                         if (statusObj.tables_completed && statusObj.tables_completed.length > 0) {
-                            console.log('[Tile Status] Processing completed tables:', statusObj.tables_completed);
                             statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
                         }
                         // Fallback: Infer completion from table_progress if tables_completed is empty
                         else if (statusObj.table_progress && Object.keys(statusObj.table_progress).length > 0) {
-                            console.log('[Tile Status] Inferring completion from table_progress:', statusObj.table_progress);
-                            const allTables = Object.keys(statusObj.table_progress);
-                            const completedTables = [];
                             Object.entries(statusObj.table_progress).forEach(([table, progress]) => {
                                 if (progress >= 0.99) {
-                                    console.log(`[Tile Status] Marking ${table} as completed (progress: ${progress})`);
-                                    completedTables.push(table);
                                     this.updateTableStatus(table, 'completed');
                                 }
                             });
-                            console.log(`[Tile Status] Completed: ${completedTables.length}/${allTables.length} tables:`, completedTables);
                         }
 
                         if (statusObj.tables_in_progress) {
