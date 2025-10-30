@@ -1260,14 +1260,14 @@ class RetailDataGenerator {
      * @returns {Promise} Final export status
      */
     async pollExportProgress(taskId, progressFillId, progressTextId) {
-        const maxAttempts = 600; // 10 minutes max
+        const maxAttempts = 1200; // 20 minutes max (for large exports)
         let attempts = 0;
 
         return new Promise((resolve) => {
             const poll = async () => {
                 if (attempts >= maxAttempts) {
-                    console.error('Export polling timeout after 10 minutes');
-                    resolve({ status: 'failed', message: 'Polling timeout' });
+                    console.error('Export polling timeout after 20 minutes');
+                    resolve({ status: 'failed', message: 'Export polling timeout after 20 minutes' });
                     return;
                 }
                 attempts++;
@@ -1926,7 +1926,7 @@ class RetailDataGenerator {
     }
 
     async pollProgress(statusUrl, progressFillId, progressTextId) {
-        const maxAttempts = 600; // 10 minutes max
+        const maxAttempts = 3600; // 60 minutes max (for long historical generation runs)
         let attempts = 0;
         this._lastSequences = this._lastSequences || {};
 
@@ -1936,8 +1936,8 @@ class RetailDataGenerator {
 
             const poll = async () => {
                 if (attempts >= maxAttempts) {
-                    console.error('Polling timeout after 10 minutes');
-                    resolve({ status: 'failed', message: 'Polling timeout' });
+                    console.error('Polling timeout after 60 minutes');
+                    resolve({ status: 'failed', message: 'Polling timeout after 60 minutes' });
                     return;
                 }
                 attempts++;

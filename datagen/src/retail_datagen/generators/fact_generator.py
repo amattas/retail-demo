@@ -11,23 +11,22 @@ import logging
 import random
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
-from multiprocessing import cpu_count
-from pathlib import Path
 from datetime import time as dt_time
+from decimal import Decimal
+from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Type, Optional
+from typing import Any
 
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
-from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
 from retail_datagen.generators.progress_tracker import TableProgressTracker
+from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
 from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.models import (
@@ -89,7 +88,9 @@ class HourlyProgressTracker:
 
         logger.debug(f"HourlyProgressTracker initialized for {len(fact_tables)} tables")
 
-    def update_hourly_progress(self, table: str, day: int, hour: int, total_days: int) -> None:
+    def update_hourly_progress(
+        self, table: str, day: int, hour: int, total_days: int
+    ) -> None:
         """
         Update progress for a specific table after completing an hour.
 
@@ -104,7 +105,9 @@ class HourlyProgressTracker:
         with self._lock:
             # Validate inputs
             if table not in self._fact_tables:
-                logger.warning(f"Attempted to update progress for unknown table: {table}")
+                logger.warning(
+                    f"Attempted to update progress for unknown table: {table}"
+                )
                 return
 
             if not (0 <= hour <= 23):
@@ -156,7 +159,11 @@ class HourlyProgressTracker:
                 completed_hours_map[table] = completed_hours
 
                 # Calculate progress as fraction of total hours
-                progress = completed_hours / total_hours_expected if total_hours_expected > 0 else 0.0
+                progress = (
+                    completed_hours / total_hours_expected
+                    if total_hours_expected > 0
+                    else 0.0
+                )
                 per_table_progress[table] = min(1.0, progress)
 
                 # Table is in progress if it has completed some hours but not all
@@ -165,8 +172,14 @@ class HourlyProgressTracker:
 
             # Calculate overall progress based on hours completed (not per-table average)
             # Since all tables are generated hour-by-hour together, use max hours completed
-            max_completed_hours = max(completed_hours_map.values()) if completed_hours_map else 0
-            overall_progress = max_completed_hours / total_hours_expected if total_hours_expected > 0 else 0.0
+            max_completed_hours = (
+                max(completed_hours_map.values()) if completed_hours_map else 0
+            )
+            overall_progress = (
+                max_completed_hours / total_hours_expected
+                if total_hours_expected > 0
+                else 0.0
+            )
 
             # All tables are "in progress" until all hours are complete (since they move together)
             # Only show tables as in_progress if we've started and haven't finished
@@ -325,7 +338,9 @@ class FactDataGenerator:
         # Progress callback for API integration (day-based throttled status)
         self._progress_callback = None
         # Per-table (master-style) progress callback
-        self._table_progress_callback: Callable[[str, float, str | None, dict | None], None] | None = None
+        self._table_progress_callback: (
+            Callable[[str, float, str | None, dict | None], None] | None
+        ) = None
 
         # Optional inclusion filter for which fact tables to generate
         self._included_tables: set[str] | None = None
@@ -422,9 +437,7 @@ class FactDataGenerator:
             ),
         ]
 
-    def _load_master_table(
-        self, master_path: Path, spec: MasterTableSpec
-    ) -> list[Any]:
+    def _load_master_table(self, master_path: Path, spec: MasterTableSpec) -> list[Any]:
         """Load a master table based on the supplied specification."""
 
         dataframe = pd.read_csv(master_path / spec.filename, dtype=spec.dtype)
@@ -452,7 +465,11 @@ class FactDataGenerator:
         self._reset_table_states()
 
     def _active_fact_tables(self) -> list[str]:
-        return [t for t in self.FACT_TABLES if (self._included_tables is None or t in self._included_tables)]
+        return [
+            t
+            for t in self.FACT_TABLES
+            if (self._included_tables is None or t in self._included_tables)
+        ]
 
     def _calculate_eta(self, current_progress: float) -> float | None:
         """
@@ -564,15 +581,21 @@ class FactDataGenerator:
 
         # Import ORM models lazily to avoid circulars
         from retail_datagen.db.models.master import (
-            Geography as GeographyModel,
-            Store as StoreModel,
-            DistributionCenter as DistributionCenterModel,
-            Truck as TruckModel,
             Customer as CustomerModel,
+        )
+        from retail_datagen.db.models.master import (
+            DistributionCenter as DistributionCenterModel,
+        )
+        from retail_datagen.db.models.master import (
+            Geography as GeographyModel,
+        )
+        from retail_datagen.db.models.master import (
             Product as ProductModel,
         )
+        from retail_datagen.db.models.master import (
+            Store as StoreModel,
+        )
         from retail_datagen.db.session import retail_session_maker
-        from sqlalchemy import select
 
         SessionMaker = retail_session_maker()
         async with SessionMaker() as session:
@@ -603,7 +626,9 @@ class FactDataGenerator:
             ]
 
             # Distribution Centers
-            dcs = (await session.execute(select(DistributionCenterModel))).scalars().all()
+            dcs = (
+                (await session.execute(select(DistributionCenterModel))).scalars().all()
+            )
             self.distribution_centers = [
                 DistributionCenter(
                     ID=d.dc_id,
@@ -636,7 +661,11 @@ class FactDataGenerator:
             self.products = []
             for p in products:
                 # Convert pricing floats to Decimal and date to datetime
-                launch_dt = datetime.combine(p.launch_date, dt_time(0, 0)) if hasattr(p, "launch_date") and p.launch_date else datetime.now()
+                launch_dt = (
+                    datetime.combine(p.launch_date, dt_time(0, 0))
+                    if hasattr(p, "launch_date") and p.launch_date
+                    else datetime.now()
+                )
                 self.products.append(
                     ProductMaster(
                         ID=p.product_id,
@@ -740,11 +769,14 @@ class FactDataGenerator:
         # Track DB totals to verify deltas
         self._fact_db_counts: dict[str, int] = {}
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             # Read initial DB totals once for all active tables
             for t in active_tables:
                 model = self._get_model_for_table(t)
-                total = (await self._session.execute(select(func.count()).select_from(model))).scalar() or 0
+                total = (
+                    await self._session.execute(select(func.count()).select_from(model))
+                ).scalar() or 0
                 self._fact_db_counts[t] = int(total)
         except Exception as e:
             logger.debug(f"Initial DB count read failed (will verify per-hour): {e}")
@@ -770,9 +802,12 @@ class FactDataGenerator:
             "store_inventory_txn": total_days * len(self.stores) * 20,
             "marketing": total_days * 10,
             "supply_chain_disruption": total_days * 2,
-            "online_orders": total_days * max(0, int(self.config.volume.online_orders_per_day)),
+            "online_orders": total_days
+            * max(0, int(self.config.volume.online_orders_per_day)),
         }
-        expected_records = {k: v for k, v in expected_records_all.items() if k in active_tables}
+        expected_records = {
+            k: v for k, v in expected_records_all.items() if k in active_tables
+        }
 
         progress_reporter = ProgressReporter(total_days, "Generating historical data")
 
@@ -782,21 +817,31 @@ class FactDataGenerator:
 
         # Generate data sequentially with managed retail session if not provided
         from retail_datagen.db.session import retail_session_maker
+
         created_session = False
         if self._session is None:
             SessionMaker = retail_session_maker()
-        
+
         async def _ensure_receipt_ext_column(session: AsyncSession) -> None:
             try:
                 from sqlalchemy import text
+
                 # Check if column exists
                 res = await session.execute(text("PRAGMA table_info('fact_receipts')"))
                 cols = [row[1] for row in res.fetchall()]
-                if 'receipt_id_ext' not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
+                if "receipt_id_ext" not in cols:
+                    await session.execute(
+                        text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                        )
+                    )
                     await session.commit()
-                    logger.info("Migrated fact_receipts: added receipt_id_ext column and index")
+                    logger.info(
+                        "Migrated fact_receipts: added receipt_id_ext column and index"
+                    )
             except Exception as e:
                 logger.warning(f"Could not ensure receipt_id_ext column exists: {e}")
 
@@ -808,7 +853,9 @@ class FactDataGenerator:
                 day_counter += 1
 
                 # Generate daily facts (progress updates now happen during actual generation)
-                daily_facts = await self._generate_daily_facts(current_date, active_tables, day_counter, total_days)
+                daily_facts = await self._generate_daily_facts(
+                    current_date, active_tables, day_counter, total_days
+                )
 
                 # Update counters
                 for fact_type, records in daily_facts.items():
@@ -819,14 +866,16 @@ class FactDataGenerator:
                     current_count = facts_generated[fact_type]
                     expected = expected_records.get(fact_type, 1)
                     # Calculate actual progress (0.0 to 1.0), never exceed 1.0
-                    table_progress[fact_type] = min(1.0, current_count / expected) if expected > 0 else 0.0
+                    table_progress[fact_type] = (
+                        min(1.0, current_count / expected) if expected > 0 else 0.0
+                    )
 
                 # Emit per-table progress (master-style)
                 for fact_type, prog in table_progress.items():
                     self._emit_table_progress(
                         fact_type,
                         prog,
-                        f"Generating {fact_type.replace('_',' ')}",
+                        f"Generating {fact_type.replace('_', ' ')}",
                         None,
                     )
 
@@ -835,9 +884,15 @@ class FactDataGenerator:
                     self._progress_tracker.update_progress(table_name, progress)
 
                 # Get table lists from progress tracker
-                tables_completed = self._progress_tracker.get_tables_by_state("completed")
-                tables_in_progress = self._progress_tracker.get_tables_by_state("in_progress")
-                tables_remaining = self._progress_tracker.get_tables_by_state("not_started")
+                tables_completed = self._progress_tracker.get_tables_by_state(
+                    "completed"
+                )
+                tables_in_progress = self._progress_tracker.get_tables_by_state(
+                    "in_progress"
+                )
+                tables_remaining = self._progress_tracker.get_tables_by_state(
+                    "not_started"
+                )
 
                 # Calculate tables completed count
                 tables_completed_count = len(tables_completed)
@@ -859,7 +914,11 @@ class FactDataGenerator:
                     tables_in_progress=tables_in_progress,
                     tables_remaining=tables_remaining,
                     # For UI tiles prefer DB-written counts if available, otherwise generation counts
-                    table_counts=(self._table_insert_counts.copy() if getattr(self, "_table_insert_counts", None) else facts_generated.copy()),
+                    table_counts=(
+                        self._table_insert_counts.copy()
+                        if getattr(self, "_table_insert_counts", None)
+                        else facts_generated.copy()
+                    ),
                 )
 
                 progress_reporter.update(1)
@@ -899,9 +958,7 @@ class FactDataGenerator:
             f"Historical data generation complete: {total_records} records "
             f"in {generation_time:.1f}s"
         )
-        print(
-            f"Generated {len(facts_generated)} fact tables"
-        )
+        print(f"Generated {len(facts_generated)} fact tables")
 
         # Cache the counts for dashboard performance
         self._cache_fact_counts(facts_generated)
@@ -916,11 +973,7 @@ class FactDataGenerator:
         return summary
 
     async def _generate_daily_facts(
-        self,
-        date: datetime,
-        active_tables: list[str],
-        day_index: int,
-        total_days: int
+        self, date: datetime, active_tables: list[str], day_index: int, total_days: int
     ) -> dict[str, list[dict]]:
         """
         Generate all fact data for a single day.
@@ -952,19 +1005,34 @@ class FactDataGenerator:
 
         # 1. Generate DC inventory transactions (supplier deliveries)
         if "dc_inventory_txn" in active_tables:
-            dc_transactions = self._generate_dc_inventory_txn(date, base_multiplier) if hasattr(self, '_generate_dc_inventory_txn') else self._generate_dc_inventory_transactions(date, base_multiplier)
+            dc_transactions = (
+                self._generate_dc_inventory_txn(date, base_multiplier)
+                if hasattr(self, "_generate_dc_inventory_txn")
+                else self._generate_dc_inventory_transactions(date, base_multiplier)
+            )
             daily_facts["dc_inventory_txn"].extend(dc_transactions)
             # Insert daily DC transactions immediately (not hourly)
             if dc_transactions:
                 try:
                     import pandas as pd
+
                     df_dc = pd.DataFrame(dc_transactions)
-                    await self._insert_hourly_to_db(self._session, "dc_inventory_txn", df_dc, hour=0, commit_every_batches=1)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "dc_inventory_txn",
+                        df_dc,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress("dc_inventory_txn", day_index, hour, total_days)
+                        self.hourly_tracker.update_hourly_progress(
+                            "dc_inventory_txn", day_index, hour, total_days
+                        )
                 except Exception as e:
-                    logger.error(f"Failed to insert dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}")
+                    logger.error(
+                        f"Failed to insert dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
 
         # 2. Generate marketing campaigns and impressions
         # Digital marketing runs 24/7 independently of store traffic/hours
@@ -972,50 +1040,104 @@ class FactDataGenerator:
         if "marketing" in active_tables:
             marketing_records = self._generate_marketing_activity(date, 1.0)
             if marketing_records:
-                logger.debug(f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}")
+                logger.debug(
+                    f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}"
+                )
             daily_facts["marketing"].extend(marketing_records)
 
             # NEW: Update marketing progress (treated as completing all 24 hours at once)
             for hour in range(24):
                 self.hourly_tracker.update_hourly_progress(
-                    table="marketing",
-                    day=day_index,
-                    hour=hour,
-                    total_days=total_days
+                    table="marketing", day=day_index, hour=hour, total_days=total_days
                 )
 
             # NEW: Insert marketing records for the day directly (not hourly)
             if marketing_records:
                 try:
                     import pandas as pd
+
                     df = pd.DataFrame(marketing_records)
-                    await self._insert_hourly_to_db(self._session, "marketing", df, hour=0, commit_every_batches=1)
+                    await self._insert_hourly_to_db(
+                        self._session, "marketing", df, hour=0, commit_every_batches=1
+                    )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress("marketing", day_index, hour, total_days)
+                        self.hourly_tracker.update_hourly_progress(
+                            "marketing", day_index, hour, total_days
+                        )
                     # Verify daily insert size once for marketing
                     try:
-                        from sqlalchemy import select, func
+                        from sqlalchemy import func, select
+
                         model = self._get_model_for_table("marketing")
-                        total_db = (await self._session.execute(select(func.count()).select_from(model))).scalar() or 0
-                        logger.info(f"marketing verification (daily): inserted={len(marketing_records)}, db_total={int(total_db)}")
+                        total_db = (
+                            await self._session.execute(
+                                select(func.count()).select_from(model)
+                            )
+                        ).scalar() or 0
+                        logger.info(
+                            f"marketing verification (daily): inserted={len(marketing_records)}, db_total={int(total_db)}"
+                        )
                     except Exception as ve:
                         logger.debug(f"Marketing verification skipped: {ve}")
                 except Exception as e:
-                    logger.error(f"Failed to insert marketing for {date.strftime('%Y-%m-%d')}: {e}")
+                    logger.error(
+                        f"Failed to insert marketing for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
 
-        # 3. Generate store operations throughout the day (always generate hourly data)
-        hourly_data = self._generate_hourly_store_activity(date, base_multiplier)
-
+        # 3. Generate and write store operations hour-by-hour to minimize memory usage
         # Define which tables are generated hourly (others are generated daily)
-        hourly_generated_tables = ["receipts", "receipt_lines", "store_inventory_txn", "foot_traffic", "ble_pings"]
+        hourly_generated_tables = [
+            "receipts",
+            "receipt_lines",
+            "store_inventory_txn",
+            "foot_traffic",
+            "ble_pings",
+        ]
 
-        # Log hourly data structure size for debugging
-        logger.debug(f"Day {day_index}/{total_days} ({date.strftime('%Y-%m-%d')}): Processing {len(hourly_data)} hours")
+        # Log hourly data processing for debugging
+        logger.debug(
+            f"Day {day_index}/{total_days} ({date.strftime('%Y-%m-%d')}): Processing 24 hours"
+        )
 
-        # Export per-hour and aggregate into daily facts
-        for hour_idx, hour_data in enumerate(hourly_data):
-            hourly_subset = {t: (hour_data.get(t, []) if t in active_tables else []) for t in active_tables}
+        # Generate and export each hour immediately to avoid accumulating all 24 hours in memory
+        for hour_idx in range(24):
+            # Generate data for this specific hour only
+            hour_datetime = date.replace(
+                hour=hour_idx, minute=0, second=0, microsecond=0
+            )
+            hour_multiplier = self.temporal_patterns.get_overall_multiplier(
+                hour_datetime
+            )
+
+            if hour_multiplier == 0:  # Store closed
+                hour_data = {
+                    "receipts": [],
+                    "receipt_lines": [],
+                    "store_inventory_txn": [],
+                    "foot_traffic": [],
+                    "ble_pings": [],
+                }
+            else:
+                hour_data = {
+                    "receipts": [],
+                    "receipt_lines": [],
+                    "store_inventory_txn": [],
+                    "foot_traffic": [],
+                    "ble_pings": [],
+                }
+
+                # Generate customer transactions for each store for this hour
+                for store in self.stores:
+                    store_hour_data = self._generate_store_hour_activity(
+                        store, hour_datetime, hour_multiplier
+                    )
+                    for fact_type, records in store_hour_data.items():
+                        hour_data[fact_type].extend(records)
+            hourly_subset = {
+                t: (hour_data.get(t, []) if t in active_tables else [])
+                for t in active_tables
+            }
             try:
                 await self._export_hourly_facts(date, hour_idx, hourly_subset)
 
@@ -1027,17 +1149,19 @@ class FactDataGenerator:
                             table=table,
                             day=day_index,
                             hour=hour_idx,
-                            total_days=total_days
+                            total_days=total_days,
                         )
                         # Log receipts progress at debug level
                         if table == "receipts":
-                            logger.debug(f"Receipts progress updated: day={day_index}, hour={hour_idx}, total_days={total_days}")
+                            logger.debug(
+                                f"Receipts progress updated: day={day_index}, hour={hour_idx}, total_days={total_days}"
+                            )
 
                 # NEW: Send progress update after hourly exports complete (throttled)
                 if self._progress_callback:
                     progress_data = self.hourly_tracker.get_current_progress()
                     # Convert to table progress dict format expected by throttled update
-                    table_progress = progress_data.get('per_table_progress', {})
+                    table_progress = progress_data.get("per_table_progress", {})
 
                     # Log thread info for debugging
                     thread_name = threading.current_thread().name
@@ -1052,7 +1176,7 @@ class FactDataGenerator:
                         message=f"Generating {date.strftime('%Y-%m-%d')} (day {day_index}/{total_days}, hour {hour_idx + 1}/24)",
                         total_days=total_days,
                         table_progress=table_progress,
-                        tables_in_progress=progress_data.get('tables_in_progress', [])
+                        tables_in_progress=progress_data.get("tables_in_progress", []),
                     )
             except Exception as e:
                 logger.error(f"Hourly export failed for {date} hour {hour_idx}: {e}")
@@ -1068,17 +1192,30 @@ class FactDataGenerator:
             if truck_movements:
                 try:
                     import pandas as pd
+
                     df_tm = pd.DataFrame(truck_movements)
-                    await self._insert_hourly_to_db(self._session, "truck_moves", df_tm, hour=0, commit_every_batches=1)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "truck_moves",
+                        df_tm,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress("truck_moves", day_index, hour, total_days)
+                        self.hourly_tracker.update_hourly_progress(
+                            "truck_moves", day_index, hour, total_days
+                        )
                 except Exception as e:
-                    logger.error(f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}")
+                    logger.error(
+                        f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
 
         # 4a. Generate truck inventory tracking events
         if "truck_inventory" in active_tables:
-            truck_inventory_events = self.inventory_flow_sim.track_truck_inventory_status(date)
+            truck_inventory_events = (
+                self.inventory_flow_sim.track_truck_inventory_status(date)
+            )
             for event in truck_inventory_events:
                 daily_facts["truck_inventory"].append(
                     {
@@ -1097,24 +1234,39 @@ class FactDataGenerator:
         # 5. Update inventory based on truck deliveries
         if "store_inventory_txn" in active_tables:
             base_truck_moves = daily_facts.get("truck_moves", [])
-            delivery_transactions = self._process_truck_deliveries(date, base_truck_moves)
+            delivery_transactions = self._process_truck_deliveries(
+                date, base_truck_moves
+            )
             daily_facts["store_inventory_txn"].extend(delivery_transactions)
 
         # 6. Generate online orders and integrate inventory effects
         if "online_orders" in active_tables:
-            online_orders, online_store_txn, online_dc_txn = self._generate_online_orders(date)
+            online_orders, online_store_txn, online_dc_txn = (
+                self._generate_online_orders(date)
+            )
             daily_facts["online_orders"].extend(online_orders)
             # Write online orders immediately (daily batch)
             if online_orders:
                 try:
                     import pandas as pd
+
                     df_oo = pd.DataFrame(online_orders)
-                    await self._insert_hourly_to_db(self._session, "online_orders", df_oo, hour=0, commit_every_batches=1)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "online_orders",
+                        df_oo,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress("online_orders", day_index, hour, total_days)
+                        self.hourly_tracker.update_hourly_progress(
+                            "online_orders", day_index, hour, total_days
+                        )
                 except Exception as e:
-                    logger.error(f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}")
+                    logger.error(
+                        f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
             # Cascade inventory effects
             if "store_inventory_txn" in active_tables and online_store_txn:
                 daily_facts["store_inventory_txn"].extend(online_store_txn)
@@ -1123,12 +1275,16 @@ class FactDataGenerator:
 
         # 7. Generate supply chain disruptions
         if "supply_chain_disruption" in active_tables:
-            disruption_events = self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
+            disruption_events = (
+                self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
+            )
             for disruption in disruption_events:
                 daily_facts["supply_chain_disruption"].append(
                     {
                         "TraceId": self._generate_trace_id(),
-                        "EventTS": self._randomize_time_within_day(disruption["EventTS"]),
+                        "EventTS": self._randomize_time_within_day(
+                            disruption["EventTS"]
+                        ),
                         "DCID": disruption["DCID"],
                         "Type": disruption["DisruptionType"].value,
                         "Severity": disruption["Severity"].value,
@@ -1142,7 +1298,9 @@ class FactDataGenerator:
 
         return daily_facts
 
-    def _generate_online_orders(self, date: datetime) -> tuple[list[dict], list[dict], list[dict]]:
+    def _generate_online_orders(
+        self, date: datetime
+    ) -> tuple[list[dict], list[dict], list[dict]]:
         """Generate online orders for the given date and corresponding inventory effects.
 
         Returns:
@@ -1171,9 +1329,7 @@ class FactDataGenerator:
             hour = rng.randint(0, 23)
             minute = rng.randint(0, 59)
             second = rng.randint(0, 59)
-            event_ts = datetime(
-                date.year, date.month, date.day, hour, minute, second
-            )
+            event_ts = datetime(date.year, date.month, date.day, hour, minute, second)
 
             customer = rng.choice(self.customers)
 
@@ -1192,7 +1348,11 @@ class FactDataGenerator:
                 node_id = store.ID
             else:
                 node_type = "DC"
-                dc = rng.choice(self.distribution_centers) if self.distribution_centers else None
+                dc = (
+                    rng.choice(self.distribution_centers)
+                    if self.distribution_centers
+                    else None
+                )
                 if not dc:
                     # Fallback to store if no DCs
                     node_type = "STORE"
@@ -1207,9 +1367,7 @@ class FactDataGenerator:
             tax = subtotal * tax_rate
             total = subtotal + tax
 
-            order_id = (
-                f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100,999)}"
-            )
+            order_id = f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100, 999)}"
             trace_id = self._generate_trace_id()
 
             # Create one order record per product (like receipt lines)
@@ -1242,7 +1400,9 @@ class FactDataGenerator:
                 if node_type == "STORE":
                     # Update store inventory and get balance
                     key = (node_id, product.ID)
-                    current_balance = self.inventory_flow_sim._store_inventory.get(key, 0)
+                    current_balance = self.inventory_flow_sim._store_inventory.get(
+                        key, 0
+                    )
                     new_balance = max(0, current_balance - qty)
                     self.inventory_flow_sim._store_inventory[key] = new_balance
 
@@ -1379,7 +1539,9 @@ class FactDataGenerator:
         logger.debug(f"After sync: fact_gen campaigns={len(self._active_campaigns)}")
 
         # Performance guard: cap total impressions/day (scaled by multiplier)
-        base_cap = getattr(self.config.volume, 'marketing_impressions_per_day', 10000) or 10000
+        base_cap = (
+            getattr(self.config.volume, "marketing_impressions_per_day", 10000) or 10000
+        )
         daily_cap = max(1000, int(base_cap * max(0.5, min(multiplier, 2.0))))
         emitted = 0
 
@@ -1417,7 +1579,9 @@ class FactDataGenerator:
                     campaign_id, date, multiplier
                 )
             except Exception as e:
-                logger.error(f"generate_campaign_impressions failed for {campaign_id}: {e}")
+                logger.error(
+                    f"generate_campaign_impressions failed for {campaign_id}: {e}"
+                )
                 impressions = []
 
             logger.debug(f"impressions returned={len(impressions)}")
@@ -1460,50 +1624,10 @@ class FactDataGenerator:
         )
         return marketing_records
 
-    def _generate_hourly_store_activity(
-        self, date: datetime, base_multiplier: float
-    ) -> list[dict[str, list[dict]]]:
-        """Generate store activity for each hour of the day."""
-        hourly_activity = []
-
-        for hour in range(24):
-            hour_datetime = date.replace(hour=hour, minute=0, second=0, microsecond=0)
-            hour_multiplier = self.temporal_patterns.get_overall_multiplier(
-                hour_datetime
-            )
-
-            if hour_multiplier == 0:  # Store closed
-                hourly_activity.append(
-                    {
-                        "receipts": [],
-                        "receipt_lines": [],
-                        "store_inventory_txn": [],
-                        "foot_traffic": [],
-                        "ble_pings": [],
-                    }
-                )
-                continue
-
-            hour_data = {
-                "receipts": [],
-                "receipt_lines": [],
-                "store_inventory_txn": [],
-                "foot_traffic": [],
-                "ble_pings": [],
-            }
-
-            # Generate customer transactions for each store
-            for store in self.stores:
-                store_hour_data = self._generate_store_hour_activity(
-                    store, hour_datetime, hour_multiplier
-                )
-
-                for fact_type, records in store_hour_data.items():
-                    hour_data[fact_type].extend(records)
-
-            hourly_activity.append(hour_data)
-
-        return hourly_activity
+    # NOTE: _generate_hourly_store_activity was removed in favor of inline hour-by-hour
+    # generation to reduce memory usage. The logic is now inlined in _generate_daily_facts
+    # starting at line ~1015 to write each hour to the database immediately instead of
+    # accumulating all 24 hours in memory first.
 
     def _generate_store_hour_activity(
         self, store: Store, hour_datetime: datetime, multiplier: float
@@ -1858,12 +1982,7 @@ class FactDataGenerator:
             try:
                 # Convert records to DataFrame for database insertion
                 df = pd.DataFrame(records)
-                await self._insert_hourly_to_db(
-                    self._session,
-                    fact_table,
-                    df,
-                    hour
-                )
+                await self._insert_hourly_to_db(self._session, fact_table, df, hour)
             except Exception as e:
                 logger.error(
                     f"Failed to insert {fact_table} hour {hour} to database: {e}"
@@ -1903,7 +2022,9 @@ class FactDataGenerator:
             return
 
         thread_name = threading.current_thread().name
-        logger.info(f"[PROGRESS][{thread_name}] Callback exists, sending update: {message[:50]}")
+        logger.info(
+            f"[PROGRESS][{thread_name}] Callback exists, sending update: {message[:50]}"
+        )
         with self._progress_lock:
             current_time = time.time()
             progress = day_counter / total_days if total_days > 0 else 0.0
@@ -1912,7 +2033,7 @@ class FactDataGenerator:
             time_since_last = current_time - self._last_progress_update_time
             if time_since_last < 0.05:
                 logger.debug(
-                    f"[{thread_name}] Throttling progress update (too soon: {time_since_last*1000:.1f}ms < 50ms)"
+                    f"[{thread_name}] Throttling progress update (too soon: {time_since_last * 1000:.1f}ms < 50ms)"
                 )
                 return
 
@@ -1942,15 +2063,21 @@ class FactDataGenerator:
                 "current_table": current_table,
                 "tables_completed": (tables_completed or []).copy(),
                 "tables_failed": (tables_failed or []).copy(),
-                "tables_in_progress": (tables_in_progress or []).copy() if tables_in_progress is not None else [],
-                "tables_remaining": (tables_remaining or []).copy() if tables_remaining is not None else [],
+                "tables_in_progress": (tables_in_progress or []).copy()
+                if tables_in_progress is not None
+                else [],
+                "tables_remaining": (tables_remaining or []).copy()
+                if tables_remaining is not None
+                else [],
                 "estimated_seconds_remaining": eta,
                 "progress_rate": progress_rate,
                 "table_counts": table_counts,
                 # NEW: Add hourly progress fields (note: current_day is passed as first positional arg, don't duplicate)
                 "current_hour": hourly_progress_data.get("current_hour"),
                 "hourly_progress": hourly_progress_data.get("per_table_progress"),
-                "total_hours_completed": sum(hourly_progress_data.get("completed_hours", {}).values()),
+                "total_hours_completed": sum(
+                    hourly_progress_data.get("completed_hours", {}).values()
+                ),
             }
 
             filtered_kwargs = self._filter_progress_kwargs(callback_kwargs)
@@ -1960,7 +2087,9 @@ class FactDataGenerator:
                 self._progress_callback(day_counter, message, **filtered_kwargs)
                 logger.debug(
                     f"Progress update sent: {progress:.2%} (day {day_counter}/{total_days}) "
-                    f"ETA: {eta:.0f}s, tables_in_progress: {tables_in_progress}" if eta else f"at {current_time:.3f}"
+                    f"ETA: {eta:.0f}s, tables_in_progress: {tables_in_progress}"
+                    if eta
+                    else f"at {current_time:.3f}"
                 )
             except TypeError:
                 # Fallback for old callbacks that only accept 2 parameters
@@ -1978,14 +2107,18 @@ class FactDataGenerator:
             # Update last update timestamp
             self._last_progress_update_time = current_time
 
-    def _filter_progress_kwargs(self, candidate_kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _filter_progress_kwargs(
+        self, candidate_kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
         """Return only the keyword arguments supported by the progress callback."""
         callback = self._progress_callback
         if not callback:
             return {}
 
         # Drop fields that have no value so legacy callbacks don't see noisy kwargs
-        cleaned_kwargs = {key: value for key, value in candidate_kwargs.items() if value is not None}
+        cleaned_kwargs = {
+            key: value for key, value in candidate_kwargs.items() if value is not None
+        }
         if not cleaned_kwargs:
             return {}
 
@@ -1995,7 +2128,10 @@ class FactDataGenerator:
             # If the signature can't be inspected, assume callback can handle everything we pass now
             return cleaned_kwargs
 
-        if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in signature.parameters.values()):
+        if any(
+            param.kind == inspect.Parameter.VAR_KEYWORD
+            for param in signature.parameters.values()
+        ):
             return cleaned_kwargs
 
         accepted_names: set[str] = set()
@@ -2022,9 +2158,11 @@ class FactDataGenerator:
         if not accepted_names:
             return {}
 
-        return {key: value for key, value in cleaned_kwargs.items() if key in accepted_names}
+        return {
+            key: value for key, value in cleaned_kwargs.items() if key in accepted_names
+        }
 
-    def _get_model_for_table(self, table_name: str) -> Type[DeclarativeBase]:
+    def _get_model_for_table(self, table_name: str) -> type[DeclarativeBase]:
         """
         Map fact table name to SQLAlchemy model.
 
@@ -2038,15 +2176,15 @@ class FactDataGenerator:
             ValueError: If table name is unknown
         """
         from retail_datagen.db.models.facts import (
-            DCInventoryTransaction,
-            TruckMove,
-            StoreInventoryTransaction,
-            Receipt,
-            ReceiptLine,
-            FootTraffic,
             BLEPing,
+            DCInventoryTransaction,
+            FootTraffic,
             MarketingImpression,
             OnlineOrder,
+            Receipt,
+            ReceiptLine,
+            StoreInventoryTransaction,
+            TruckMove,
         )
 
         mapping = {
@@ -2228,20 +2366,24 @@ class FactDataGenerator:
             return
 
         # Convert DataFrame to records
-        records = df.to_dict('records')
+        records = df.to_dict("records")
 
         # Special handling: link receipt_lines to receipts by external id
         if table_name == "receipt_lines":
             try:
                 # Collect unique external ids
-                ext_ids = list({r.get("ReceiptId") for r in records if r.get("ReceiptId")})
+                ext_ids = list(
+                    {r.get("ReceiptId") for r in records if r.get("ReceiptId")}
+                )
                 # Build map from external id -> numeric PK
                 receipts_model = self._get_model_for_table("receipts")
                 from sqlalchemy import select
+
                 rows = (
                     await session.execute(
-                        select(receipts_model.receipt_id, receipts_model.receipt_id_ext)
-                        .where(receipts_model.receipt_id_ext.in_(ext_ids))
+                        select(
+                            receipts_model.receipt_id, receipts_model.receipt_id_ext
+                        ).where(receipts_model.receipt_id_ext.in_(ext_ids))
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -2253,7 +2395,9 @@ class FactDataGenerator:
                     pk = id_map.get(ext)
                     if not pk:
                         # No matching receipt yet; skip this line to preserve FK integrity
-                        logger.debug(f"Skipping receipt_line with unknown ReceiptId={ext}")
+                        logger.debug(
+                            f"Skipping receipt_line with unknown ReceiptId={ext}"
+                        )
                         continue
                     mapped["receipt_id"] = int(pk)
                     mapped_records.append(mapped)
@@ -2263,8 +2407,7 @@ class FactDataGenerator:
         else:
             # Default mapping path
             mapped_records = [
-                self._map_field_names_for_db(table_name, record)
-                for record in records
+                self._map_field_names_for_db(table_name, record) for record in records
             ]
 
         # Batch insert using bulk operations
@@ -2272,19 +2415,16 @@ class FactDataGenerator:
             total_hour_rows = len(mapped_records)
             batch_index = 0
             for i in range(0, total_hour_rows, batch_size):
-                batch = mapped_records[i:i + batch_size]
+                batch = mapped_records[i : i + batch_size]
 
                 # Use bulk insert for performance
                 # Note: This doesn't populate auto-increment IDs back to Python objects
-                await session.execute(
-                    model_class.__table__.insert(),
-                    batch
-                )
+                await session.execute(model_class.__table__.insert(), batch)
                 # Flush to DB
                 await session.flush()
 
                 logger.debug(
-                    f"Inserted batch {i//batch_size + 1} for {table_name} hour {hour}: "
+                    f"Inserted batch {i // batch_size + 1} for {table_name} hour {hour}: "
                     f"{len(batch)} rows"
                 )
 
@@ -2293,22 +2433,32 @@ class FactDataGenerator:
                     # Update cumulative DB-written counts for this table
                     if not hasattr(self, "_table_insert_counts"):
                         self._table_insert_counts = {}
-                    self._table_insert_counts[table_name] = self._table_insert_counts.get(table_name, 0) + len(batch)
+                    self._table_insert_counts[table_name] = (
+                        self._table_insert_counts.get(table_name, 0) + len(batch)
+                    )
 
                     # Compute fractional progress across the whole range using hourly tracker state
                     tracker_state = self.hourly_tracker.get_current_progress()
-                    completed_hours = tracker_state.get("completed_hours", {}).get(table_name, 0)
+                    completed_hours = tracker_state.get("completed_hours", {}).get(
+                        table_name, 0
+                    )
                     total_days = tracker_state.get("total_days") or 1
                     total_hours_expected = max(1, total_days * 24)
                     # Partial hour progress within this hour based on batch position
-                    partial_hour = (i + len(batch)) / total_hour_rows if total_hour_rows > 0 else 1.0
-                    per_table_fraction = min(1.0, (completed_hours + partial_hour) / total_hours_expected)
+                    partial_hour = (
+                        (i + len(batch)) / total_hour_rows
+                        if total_hour_rows > 0
+                        else 1.0
+                    )
+                    per_table_fraction = min(
+                        1.0, (completed_hours + partial_hour) / total_hours_expected
+                    )
 
                     # Emit per-table progress callback (router merges counts and recomputes overall)
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,
-                        f"Writing {table_name.replace('_',' ')} ({self._table_insert_counts[table_name]:,})",
+                        f"Writing {table_name.replace('_', ' ')} ({self._table_insert_counts[table_name]:,})",
                         {table_name: self._table_insert_counts[table_name]},
                     )
                 except Exception as _:
@@ -2317,14 +2467,18 @@ class FactDataGenerator:
 
                 # Periodic commit for durability
                 batch_index += 1
-                if commit_every_batches > 0 and (batch_index % commit_every_batches == 0):
+                if commit_every_batches > 0 and (
+                    batch_index % commit_every_batches == 0
+                ):
                     try:
                         await session.commit()
                         logger.debug(
                             f"Committed {len(batch)} rows for {table_name} hour {hour}, batch {batch_index}"
                         )
                     except Exception as e:
-                        logger.warning(f"Interim commit failed for {table_name} hour {hour}: {e}")
+                        logger.warning(
+                            f"Interim commit failed for {table_name} hour {hour}: {e}"
+                        )
 
             # Commit once after all batches (not per batch for performance)
             await session.commit()
@@ -2335,8 +2489,13 @@ class FactDataGenerator:
             # Optional verification: compare DB count delta (throttled by hour)
             try:
                 if hour % 6 == 0:  # verify every 6 hours to reduce overhead
-                    from sqlalchemy import select, func
-                    total_db = (await session.execute(select(func.count()).select_from(model_class))).scalar() or 0
+                    from sqlalchemy import func, select
+
+                    total_db = (
+                        await session.execute(
+                            select(func.count()).select_from(model_class)
+                        )
+                    ).scalar() or 0
                     prev = 0
                     if not hasattr(self, "_fact_db_counts"):
                         self._fact_db_counts = {}
@@ -2399,19 +2558,14 @@ class FactDataGenerator:
             if db_table_name:
                 try:
                     await mark_data_unpublished(
-                        self._session,
-                        db_table_name,
-                        start_date,
-                        end_date
+                        self._session, db_table_name, start_date, end_date
                     )
                     logger.debug(
                         f"Marked {db_table_name} as unpublished: "
                         f"{start_date} to {end_date}"
                     )
                 except Exception as e:
-                    logger.error(
-                        f"Failed to update watermark for {db_table_name}: {e}"
-                    )
+                    logger.error(f"Failed to update watermark for {db_table_name}: {e}")
                     # Don't fail generation if watermark update fails
                     continue
 
@@ -2476,9 +2630,7 @@ class FactDataGenerator:
 
             # Cache the generation counts directly
             for table_name, count in facts_generated.items():
-                cache_manager.update_fact_table(
-                    table_name, count, "Historical Data"
-                )
+                cache_manager.update_fact_table(table_name, count, "Historical Data")
                 logger.info(f"Cached {table_name}: {count} records")
 
             logger.info("Fact data counts cached successfully")
