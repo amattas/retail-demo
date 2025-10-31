@@ -32,9 +32,8 @@ class GenerationState(BaseModel):
         None, description="Last real-time generation run time"
     )
 
-    def model_dump_json(self, **kwargs) -> str:
-        """Custom JSON serialization with datetime handling."""
-        return super().model_dump_json(default=str, **kwargs)
+    # Note: Pydantic v2 handles datetime serialization automatically
+    # No need for custom model_dump_json override
 
 
 class GenerationStateManager:
