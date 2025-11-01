@@ -7,11 +7,11 @@ tables from dictionary data as specified in AGENTS.md.
 
 import logging
 import random
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Type
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
@@ -29,6 +29,7 @@ from retail_datagen.shared.models import (
     ProductCompanyDict,
     ProductDict,
     ProductMaster,
+    ProductTaxability,
     Store,
     StoreInventorySnapshot,
     Truck,
@@ -42,14 +43,25 @@ from retail_datagen.shared.validators import (
 # Import SQLAlchemy models for database insertion
 try:
     from retail_datagen.db.models.master import (
-        Geography as GeographyModel,
-        Store as StoreModel,
-        DistributionCenter as DistributionCenterModel,
-        Truck as TruckModel,
         Customer as CustomerModel,
+    )
+    from retail_datagen.db.models.master import (
+        DistributionCenter as DistributionCenterModel,
+    )
+    from retail_datagen.db.models.master import (
+        Geography as GeographyModel,
+    )
+    from retail_datagen.db.models.master import (
         Product as ProductModel,
     )
+    from retail_datagen.db.models.master import (
+        Store as StoreModel,
+    )
+    from retail_datagen.db.models.master import (
+        Truck as TruckModel,
+    )
     from retail_datagen.db.session import get_retail_session
+
     SQLALCHEMY_AVAILABLE = True
 except ImportError:
     SQLALCHEMY_AVAILABLE = False
@@ -71,6 +83,7 @@ from .utils import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 class MasterDataGenerator:
     """
@@ -109,6 +122,9 @@ class MasterDataGenerator:
         self._product_data: list[ProductDict] | None = None
         self._brand_data: list[ProductBrandDict] | None = None
         self._company_data: list[ProductCompanyDict] | None = None
+        self._tax_rate_mapping: dict[
+            tuple[str, str], Decimal
+        ] = {}  # (StateCode, City) -> CombinedRate
 
         # Generated master data
         self.geography_master: list[GeographyMaster] = []
@@ -123,9 +139,7 @@ class MasterDataGenerator:
         self.store_inventory_snapshots: list[StoreInventorySnapshot] = []
 
         # Progress callback for UI updates (table_name, progress, message)
-        self._progress_callback: (
-            Callable[[str, float, str | None], None] | None
-        ) = None
+        self._progress_callback: Callable[[str, float, str | None], None] | None = None
 
         # Table progress tracker for state management
         self._progress_tracker: TableProgressTracker | None = None
@@ -138,7 +152,7 @@ class MasterDataGenerator:
         """Register or clear a callback for incremental progress updates."""
         self._progress_callback = callback
 
-    def _get_ui_table_name(self, model_class: Type[DeclarativeBase]) -> str | None:
+    def _get_ui_table_name(self, model_class: type[DeclarativeBase]) -> str | None:
         """Map ORM model to UI table key used by progress tiles."""
         try:
             tbl = model_class.__tablename__
@@ -158,7 +172,7 @@ class MasterDataGenerator:
     async def _insert_to_db(
         self,
         session: AsyncSession,
-        model_class: Type[DeclarativeBase],
+        model_class: type[DeclarativeBase],
         pydantic_models: list,
         batch_size: int = 10000,
         commit_every_batches: int = 5,
@@ -201,13 +215,10 @@ class MasterDataGenerator:
             # Insert in batches for performance and memory efficiency
             batch_index = 0
             for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
+                batch = records[i : i + batch_size]
 
                 # Use bulk_insert_mappings for performance
-                await session.execute(
-                    model_class.__table__.insert(),
-                    batch
-                )
+                await session.execute(model_class.__table__.insert(), batch)
                 await session.flush()  # Flush to database but don't commit yet
 
                 records_inserted = min(i + batch_size, total_records)
@@ -217,7 +228,9 @@ class MasterDataGenerator:
 
                 # Emit incremental progress every batch (default 10,000)
                 if ui_table_name:
-                    fraction = records_inserted / total_records if total_records else 1.0
+                    fraction = (
+                        records_inserted / total_records if total_records else 1.0
+                    )
                     self._emit_progress(
                         ui_table_name,
                         fraction,
@@ -226,7 +239,9 @@ class MasterDataGenerator:
                     )
 
                 batch_index += 1
-                if commit_every_batches > 0 and (batch_index % commit_every_batches == 0):
+                if commit_every_batches > 0 and (
+                    batch_index % commit_every_batches == 0
+                ):
                     # Periodic commit improves durability for very large tables
                     try:
                         await session.commit()
@@ -238,7 +253,9 @@ class MasterDataGenerator:
                             f"Commit failed after batch {batch_index} for {table_name}; continuing with session context manager"
                         )
 
-            logger.info(f"Successfully inserted all {total_records:,} records into {table_name}")
+            logger.info(
+                f"Successfully inserted all {total_records:,} records into {table_name}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to insert data into {table_name}: {e}", exc_info=True)
@@ -247,7 +264,7 @@ class MasterDataGenerator:
     def _map_pydantic_to_db_columns(
         self,
         pydantic_dict: dict[str, Any],
-        model_class: Type[DeclarativeBase],
+        model_class: type[DeclarativeBase],
     ) -> dict[str, Any]:
         """
         Map Pydantic model field names to SQLAlchemy column names.
@@ -268,7 +285,7 @@ class MasterDataGenerator:
         # Get column mappings from SQLAlchemy model (not currently used for renaming,
         # but retained for potential future divergence between Pydantic and DB names)
         # The column 'name' attribute contains the actual database column name
-        column_mappings = {col.key: col.name for col in model_class.__table__.columns}
+        {col.key: col.name for col in model_class.__table__.columns}
 
         for key, value in pydantic_dict.items():
             # Convert Decimal to float for SQLite
@@ -304,7 +321,10 @@ class MasterDataGenerator:
             clamped = max(0.0, min(1.0, progress))
 
             # Update progress tracker if available
-            if self._progress_tracker and table_name in self._progress_tracker.get_all_states():
+            if (
+                self._progress_tracker
+                and table_name in self._progress_tracker.get_all_states()
+            ):
                 self._progress_tracker.update_progress(table_name, clamped)
 
             # Call progress callback with positional and keyword arguments
@@ -312,7 +332,10 @@ class MasterDataGenerator:
             self._progress_callback(table_name, clamped, message, table_counts)
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug(
-                "Master progress callback failed for %s: %s", table_name, exc, exc_info=True
+                "Master progress callback failed for %s: %s",
+                table_name,
+                exc,
+                exc_info=True,
             )
 
     async def generate_all_master_data_async(
@@ -345,7 +368,7 @@ class MasterDataGenerator:
             "distribution_centers",
             "trucks",
             "customers",
-            "products_master"
+            "products_master",
         ]
         self._progress_tracker = TableProgressTracker(master_table_names)
 
@@ -382,7 +405,9 @@ class MasterDataGenerator:
         # Flush to ensure all changes are in the transaction
         if session:
             await session.flush()
-            logger.info("All master data flushed to session (commit will be handled by context manager)")
+            logger.info(
+                "All master data flushed to session (commit will be handled by context manager)"
+            )
 
         # Mark all tables as completed
         if self._progress_tracker:
@@ -433,6 +458,22 @@ class MasterDataGenerator:
                 f"  Sample company: '{self._company_data[0].Company}' | Category='{self._company_data[0].Category}'"
             )
 
+        # Load tax rates
+        tax_jurisdictions = self.dictionary_loader.load_tax_rates()
+        print(f"Loaded {len(tax_jurisdictions)} tax jurisdictions")
+
+        # Create (StateCode, City) -> CombinedRate mapping
+        for tax_jurisdiction in tax_jurisdictions:
+            key = (tax_jurisdiction.StateCode, tax_jurisdiction.City)
+            self._tax_rate_mapping[key] = tax_jurisdiction.CombinedRate
+
+        print(f"Created tax rate mapping with {len(self._tax_rate_mapping)} entries")
+        if self._tax_rate_mapping:
+            # Show a sample
+            sample_key = list(self._tax_rate_mapping.keys())[0]
+            sample_rate = self._tax_rate_mapping[sample_key]
+            print(f"  Sample: {sample_key[1]}, {sample_key[0]} -> {sample_rate:.4f}")
+
         print("Dictionary data loading complete")
 
     async def generate_geography_master_async(self) -> None:
@@ -479,11 +520,9 @@ class MasterDataGenerator:
         print(f"Generated {len(self.geography_master)} geography master records")
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
+        if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(
-                self._db_session,
-                GeographyModel,
-                self.geography_master
+                self._db_session, GeographyModel, self.geography_master
             )
 
         self._emit_progress("geographies_master", 1.0, "Geographies complete")
@@ -491,6 +530,7 @@ class MasterDataGenerator:
     def generate_geography_master(self) -> None:
         """Generate geographies_master.csv from geography dictionary (legacy sync wrapper)."""
         import asyncio
+
         asyncio.run(self.generate_geography_master_async())
 
     def generate_stores(self, count: int | None = None) -> None:
@@ -574,11 +614,18 @@ class MasterDataGenerator:
                 )
             )
 
+            # Look up tax rate for this store's location
+            tax_rate_key = (geo_master.State, geo_master.City)
+            tax_rate = self._tax_rate_mapping.get(
+                tax_rate_key, Decimal("0.07407")
+            )  # Default 7.407% if not found
+
             store = Store(
                 ID=current_id,
                 StoreNumber=id_generator.generate_store_number(current_id),
                 Address=address_generator.generate_address(geo, "commercial"),
                 GeographyID=geo_master.ID,
+                tax_rate=tax_rate,
             )
             self.stores.append(store)
             current_id += 1
@@ -600,11 +647,18 @@ class MasterDataGenerator:
                 if current_id > store_count:
                     break
 
+                # Look up tax rate for this store's location
+                tax_rate_key = (geo_master.State, geo_master.City)
+                tax_rate = self._tax_rate_mapping.get(
+                    tax_rate_key, Decimal("0.07407")
+                )  # Default 7.407% if not found
+
                 store = Store(
                     ID=current_id,
                     StoreNumber=id_generator.generate_store_number(current_id),
                     Address=address_generator.generate_address(geo, "commercial"),
                     GeographyID=geo_master.ID,
+                    tax_rate=tax_rate,
                 )
                 self.stores.append(store)
                 current_id += 1
@@ -693,11 +747,18 @@ class MasterDataGenerator:
                 )
             )
 
+            # Look up tax rate for this store's location
+            tax_rate_key = (geo_master.State, geo_master.City)
+            tax_rate = self._tax_rate_mapping.get(
+                tax_rate_key, Decimal("0.07407")
+            )  # Default 7.407% if not found
+
             store = Store(
                 ID=current_id,
                 StoreNumber=id_generator.generate_store_number(current_id),
                 Address=address_generator.generate_address(geo, "commercial"),
                 GeographyID=geo_master.ID,
+                tax_rate=tax_rate,
             )
             self.stores.append(store)
             current_id += 1
@@ -735,12 +796,8 @@ class MasterDataGenerator:
         print(f"Generated {len(self.stores)} store records")
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
-            await self._insert_to_db(
-                self._db_session,
-                StoreModel,
-                self.stores
-            )
+        if hasattr(self, "_db_session") and self._db_session:
+            await self._insert_to_db(self._db_session, StoreModel, self.stores)
             # Now mark complete after DB write
             self._emit_progress("stores", 1.0, "Stores complete")
 
@@ -815,15 +872,13 @@ class MasterDataGenerator:
         self.generate_distribution_centers()
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
+        if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(
-                self._db_session,
-                DistributionCenterModel,
-                self.distribution_centers
+                self._db_session, DistributionCenterModel, self.distribution_centers
             )
 
     def generate_trucks(self) -> None:
-        """Generate trucks.csv with refrigeration capabilities."""
+        """Generate trucks.csv with refrigeration capabilities and DC assignment."""
         try:
             print("Generating truck data...")
             self._emit_progress("trucks", 0.0, "Generating trucks")
@@ -836,38 +891,108 @@ class MasterDataGenerator:
 
             refrigerated_count = self.config.volume.refrigerated_trucks
             non_refrigerated_count = self.config.volume.non_refrigerated_trucks
-            total_trucks = refrigerated_count + non_refrigerated_count
+            total_dc_trucks = refrigerated_count + non_refrigerated_count
             print(
-                f"Trucks to generate: {total_trucks} ({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
+                f"DC-to-Store trucks to generate: {total_dc_trucks} ({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
             )
+
+            # Determine truck-to-DC assignment strategy
+            dc_count = len(self.distribution_centers)
+            trucks_per_dc_config = self.config.volume.trucks_per_dc
+            truck_dc_assignment_rate = self.config.volume.truck_dc_assignment_rate
+
+            if trucks_per_dc_config is not None:
+                # Fixed assignment: exactly N trucks per DC
+                num_assigned_trucks = trucks_per_dc_config * dc_count
+                num_pool_trucks = max(0, total_dc_trucks - num_assigned_trucks)
+                assignment_strategy = "fixed"
+                print(f"Using fixed assignment: {trucks_per_dc_config} trucks per DC")
+                print(
+                    f"  - Assigned trucks: {num_assigned_trucks} ({trucks_per_dc_config} × {dc_count} DCs)"
+                )
+                print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
+            else:
+                # Percentage-based assignment
+                num_assigned_trucks = int(total_dc_trucks * truck_dc_assignment_rate)
+                num_pool_trucks = total_dc_trucks - num_assigned_trucks
+                assignment_strategy = "percentage"
+                print(
+                    f"Using percentage-based assignment: {truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
+                )
+                print(f"  - Assigned trucks: {num_assigned_trucks}")
+                print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
 
             id_generator = IdentifierGenerator(self.config.seed + 3000)
             self.trucks = []
-
-            # Distribute trucks evenly across DCs
-            dc_count = len(self.distribution_centers)
-            trucks_per_dc = total_trucks // dc_count
-            remaining_trucks = total_trucks % dc_count
-
             current_id = 1
 
-            # Generate refrigerated trucks first
-            refrigerated_generated = 0
-            for dc_idx, dc in enumerate(self.distribution_centers):
-                # Calculate how many trucks this DC should get
-                base_trucks = trucks_per_dc
-                if dc_idx < remaining_trucks:
-                    base_trucks += 1
-
-                # Determine refrigerated vs non-refrigerated split for this DC
-                dc_refrigerated = min(
-                    refrigerated_count - refrigerated_generated,
-                    max(1, int(base_trucks * (refrigerated_count / total_trucks))),
+            # Determine refrigerated/non-refrigerated split for assigned trucks
+            if num_assigned_trucks > 0:
+                # Maintain same refrigeration ratio as overall fleet
+                assigned_refrigerated = int(
+                    num_assigned_trucks * (refrigerated_count / total_dc_trucks)
                 )
-                dc_non_refrigerated = base_trucks - dc_refrigerated
+                assigned_non_refrigerated = num_assigned_trucks - assigned_refrigerated
+            else:
+                assigned_refrigerated = 0
+                assigned_non_refrigerated = 0
 
-                # Create refrigerated trucks for this DC
-                for _ in range(dc_refrigerated):
+            # Pool trucks get the remainder
+            pool_refrigerated = refrigerated_count - assigned_refrigerated
+            pool_non_refrigerated = non_refrigerated_count - assigned_non_refrigerated
+
+            # Generate assigned trucks (round-robin across DCs)
+            assigned_trucks_generated = 0
+            refrigerated_assigned = 0
+            dc_assignment_list = []  # Track which trucks are assigned to which DCs
+
+            if assignment_strategy == "fixed" and trucks_per_dc_config is not None:
+                # Fixed assignment: exactly trucks_per_dc per DC
+                for dc in self.distribution_centers:
+                    # Calculate refrigeration split for this DC
+                    dc_refrigerated = min(
+                        trucks_per_dc_config,
+                        assigned_refrigerated - refrigerated_assigned,
+                    )
+                    dc_non_refrigerated = trucks_per_dc_config - dc_refrigerated
+
+                    # Create refrigerated trucks for this DC
+                    for _ in range(dc_refrigerated):
+                        truck = Truck(
+                            ID=current_id,
+                            LicensePlate=id_generator.generate_license_plate(
+                                current_id
+                            ),
+                            Refrigeration=True,
+                            DCID=dc.ID,
+                        )
+                        self.trucks.append(truck)
+                        dc_assignment_list.append((current_id, dc.ID, True))
+                        current_id += 1
+                        refrigerated_assigned += 1
+                        assigned_trucks_generated += 1
+
+                    # Create non-refrigerated trucks for this DC
+                    for _ in range(dc_non_refrigerated):
+                        truck = Truck(
+                            ID=current_id,
+                            LicensePlate=id_generator.generate_license_plate(
+                                current_id
+                            ),
+                            Refrigeration=False,
+                            DCID=dc.ID,
+                        )
+                        self.trucks.append(truck)
+                        dc_assignment_list.append((current_id, dc.ID, False))
+                        current_id += 1
+                        assigned_trucks_generated += 1
+
+            else:
+                # Percentage-based: round-robin distribution
+                dc_index = 0
+                # Generate refrigerated assigned trucks
+                for _ in range(assigned_refrigerated):
+                    dc = self.distribution_centers[dc_index % dc_count]
                     truck = Truck(
                         ID=current_id,
                         LicensePlate=id_generator.generate_license_plate(current_id),
@@ -875,11 +1000,14 @@ class MasterDataGenerator:
                         DCID=dc.ID,
                     )
                     self.trucks.append(truck)
+                    dc_assignment_list.append((current_id, dc.ID, True))
                     current_id += 1
-                    refrigerated_generated += 1
+                    dc_index += 1
+                    assigned_trucks_generated += 1
 
-                # Create non-refrigerated trucks for this DC
-                for _ in range(dc_non_refrigerated):
+                # Generate non-refrigerated assigned trucks
+                for _ in range(assigned_non_refrigerated):
+                    dc = self.distribution_centers[dc_index % dc_count]
                     truck = Truck(
                         ID=current_id,
                         LicensePlate=id_generator.generate_license_plate(current_id),
@@ -887,9 +1015,39 @@ class MasterDataGenerator:
                         DCID=dc.ID,
                     )
                     self.trucks.append(truck)
+                    dc_assignment_list.append((current_id, dc.ID, False))
                     current_id += 1
+                    dc_index += 1
+                    assigned_trucks_generated += 1
 
-            # Generate additional supplier-to-DC trucks
+            # Generate pool trucks (DCID = None)
+            pool_trucks_generated = 0
+
+            # Pool refrigerated trucks
+            for _ in range(pool_refrigerated):
+                truck = Truck(
+                    ID=current_id,
+                    LicensePlate=id_generator.generate_license_plate(current_id),
+                    Refrigeration=True,
+                    DCID=None,
+                )
+                self.trucks.append(truck)
+                current_id += 1
+                pool_trucks_generated += 1
+
+            # Pool non-refrigerated trucks
+            for _ in range(pool_non_refrigerated):
+                truck = Truck(
+                    ID=current_id,
+                    LicensePlate=id_generator.generate_license_plate(current_id),
+                    Refrigeration=False,
+                    DCID=None,
+                )
+                self.trucks.append(truck)
+                current_id += 1
+                pool_trucks_generated += 1
+
+            # Generate supplier-to-DC trucks (always pool trucks with DCID=None)
             supplier_refrigerated_count = (
                 self.config.volume.supplier_refrigerated_trucks
             )
@@ -901,11 +1059,8 @@ class MasterDataGenerator:
             )
 
             print(
-                f"Generating {supplier_total_trucks} supplier trucks ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
+                f"\nGenerating {supplier_total_trucks} supplier trucks ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
             )
-
-            # Use DCID = None to represent supplier trucks (not assigned to specific DCs)
-            supplier_dc_id = None
 
             # Generate supplier refrigerated trucks
             for _ in range(supplier_refrigerated_count):
@@ -913,7 +1068,7 @@ class MasterDataGenerator:
                     ID=current_id,
                     LicensePlate=id_generator.generate_license_plate(current_id),
                     Refrigeration=True,
-                    DCID=supplier_dc_id,
+                    DCID=None,
                 )
                 self.trucks.append(truck)
                 current_id += 1
@@ -924,7 +1079,7 @@ class MasterDataGenerator:
                     ID=current_id,
                     LicensePlate=id_generator.generate_license_plate(current_id),
                     Refrigeration=False,
-                    DCID=supplier_dc_id,
+                    DCID=None,
                 )
                 self.trucks.append(truck)
                 current_id += 1
@@ -933,15 +1088,64 @@ class MasterDataGenerator:
             truck_ids = [truck.ID for truck in self.trucks]
             self.fk_validator.register_truck_ids(truck_ids)
 
+            # Print detailed generation summary
             total_trucks = len(self.trucks)
-            dc_trucks = refrigerated_count + non_refrigerated_count
-            print(f"Generated {total_trucks} total truck records:")
-            print(
-                f"  - DC-to-Store trucks: {dc_trucks} ({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
-            )
-            print(
-                f"  - Supplier-to-DC trucks: {supplier_total_trucks} ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
-            )
+            pool_trucks_generated + supplier_total_trucks
+
+            print("\n=== Truck Generation Summary ===")
+            print(f"Total trucks generated: {total_trucks}")
+            print(f"\nDC-to-Store Fleet ({total_dc_trucks} trucks):")
+            print(f"  - Assigned to DCs: {assigned_trucks_generated}")
+            print(f"    • Refrigerated: {assigned_refrigerated}")
+            print(f"    • Non-refrigerated: {assigned_non_refrigerated}")
+            print(f"  - Pool trucks (DCID=NULL): {pool_trucks_generated}")
+            print(f"    • Refrigerated: {pool_refrigerated}")
+            print(f"    • Non-refrigerated: {pool_non_refrigerated}")
+            print(f"\nSupplier-to-DC Fleet ({supplier_total_trucks} trucks):")
+            print("  - All pool trucks (DCID=NULL)")
+            print(f"    • Refrigerated: {supplier_refrigerated_count}")
+            print(f"    • Non-refrigerated: {supplier_non_refrigerated_count}")
+
+            # Show per-DC distribution for assigned trucks
+            if assignment_strategy == "fixed" and trucks_per_dc_config is not None:
+                print(f"\nPer-DC Assignment (fixed: {trucks_per_dc_config} trucks/DC):")
+                dc_truck_counts = {}
+                for truck_id, dc_id, is_ref in dc_assignment_list:
+                    if dc_id not in dc_truck_counts:
+                        dc_truck_counts[dc_id] = {
+                            "refrigerated": 0,
+                            "non_refrigerated": 0,
+                        }
+                    if is_ref:
+                        dc_truck_counts[dc_id]["refrigerated"] += 1
+                    else:
+                        dc_truck_counts[dc_id]["non_refrigerated"] += 1
+                for dc_id in sorted(dc_truck_counts.keys()):
+                    counts = dc_truck_counts[dc_id]
+                    total_dc = counts["refrigerated"] + counts["non_refrigerated"]
+                    print(
+                        f"  DC {dc_id}: {total_dc} trucks ({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
+                    )
+            elif assignment_strategy == "percentage":
+                print("\nPer-DC Assignment (round-robin distribution):")
+                dc_truck_counts = {}
+                for truck_id, dc_id, is_ref in dc_assignment_list:
+                    if dc_id not in dc_truck_counts:
+                        dc_truck_counts[dc_id] = {
+                            "refrigerated": 0,
+                            "non_refrigerated": 0,
+                        }
+                    if is_ref:
+                        dc_truck_counts[dc_id]["refrigerated"] += 1
+                    else:
+                        dc_truck_counts[dc_id]["non_refrigerated"] += 1
+                for dc_id in sorted(dc_truck_counts.keys()):
+                    counts = dc_truck_counts[dc_id]
+                    total_dc = counts["refrigerated"] + counts["non_refrigerated"]
+                    print(
+                        f"  DC {dc_id}: {total_dc} trucks ({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
+                    )
+
             # Do not mark complete here; async method will finalize after DB write
         except Exception as e:
             print(f"ERROR in generate_trucks: {e}")
@@ -956,12 +1160,8 @@ class MasterDataGenerator:
         self.generate_trucks()
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
-            await self._insert_to_db(
-                self._db_session,
-                TruckModel,
-                self.trucks
-            )
+        if hasattr(self, "_db_session") and self._db_session:
+            await self._insert_to_db(self._db_session, TruckModel, self.trucks)
             # Mark complete after DB write
             self._emit_progress("trucks", 1.0, "Trucks complete")
 
@@ -1054,7 +1254,7 @@ class MasterDataGenerator:
         self.generate_customers()
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
+        if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(
                 self._db_session,
                 CustomerModel,
@@ -1064,7 +1264,8 @@ class MasterDataGenerator:
             )
             # Verify DB count matches generated count for diagnostics
             try:
-                from sqlalchemy import select, func
+                from sqlalchemy import func, select
+
                 result = await self._db_session.execute(
                     select(func.count()).select_from(CustomerModel)
                 )
@@ -1231,6 +1432,12 @@ class MasterDataGenerator:
                 product_id, target_product_count
             )
 
+            # Determine product taxability based on category/department
+            # Business logic: groceries/food = NON_TAXABLE (25%), clothing = REDUCED_RATE (10%), rest = TAXABLE (65%)
+            taxability = self._determine_product_taxability(
+                product.Department, product.Category
+            )
+
             # Use brand as provided without blocklist-based screening
 
             # Try to create ProductMaster with validation retry
@@ -1252,6 +1459,7 @@ class MasterDataGenerator:
                         SalePrice=pricing["SalePrice"],
                         RequiresRefrigeration=requires_refrigeration,
                         LaunchDate=launch_date,
+                        taxability=taxability,
                     )
                     break  # Success - exit retry loop
                 except ValueError as e:
@@ -1302,12 +1510,12 @@ class MasterDataGenerator:
         print(f"Final product count: {len(self.products_master)}")
 
         # The loop above should have guaranteed exactly target_product_count products
-        assert (
-            successful_products == target_product_count
-        ), f"Expected {target_product_count} products, got {successful_products}"
-        assert (
-            len(self.products_master) == target_product_count
-        ), f"Expected {target_product_count} products in list, got {len(self.products_master)}"
+        assert successful_products == target_product_count, (
+            f"Expected {target_product_count} products, got {successful_products}"
+        )
+        assert len(self.products_master) == target_product_count, (
+            f"Expected {target_product_count} products in list, got {len(self.products_master)}"
+        )
 
         # Register product IDs with FK validator
         product_ids = [product.ID for product in self.products_master]
@@ -1323,7 +1531,7 @@ class MasterDataGenerator:
         self.generate_products_master()
 
         # Insert to database if session provided
-        if hasattr(self, '_db_session') and self._db_session:
+        if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(
                 self._db_session,
                 ProductModel,
@@ -1333,7 +1541,8 @@ class MasterDataGenerator:
             )
             # Verify DB count matches generated count for diagnostics
             try:
-                from sqlalchemy import select, func
+                from sqlalchemy import func, select
+
                 result = await self._db_session.execute(
                     select(func.count()).select_from(ProductModel)
                 )
@@ -1556,6 +1765,69 @@ class MasterDataGenerator:
 
         # Check if category is explicitly refrigerated
         return category in refrigerated_categories
+
+    def _determine_product_taxability(
+        self, department: str, category: str
+    ) -> ProductTaxability:
+        """
+        Determine product taxability based on department and category.
+
+        Business logic:
+        - Groceries/Food: NON_TAXABLE (25% of products)
+        - Clothing: REDUCED_RATE (10% of products)
+        - Rest: TAXABLE (65% of products)
+
+        Args:
+            department: Product department
+            category: Product category
+
+        Returns:
+            ProductTaxability enum value
+        """
+        # Food/Grocery items are typically non-taxable
+        food_keywords = {
+            "food",
+            "grocery",
+            "fresh",
+            "frozen",
+            "meat",
+            "dairy",
+            "produce",
+            "beverage",
+            "snack",
+            "bakery",
+            "pantry",
+            "organic",
+        }
+
+        department_lower = department.lower()
+        category_lower = category.lower()
+
+        # Check if it's food/grocery
+        if any(
+            keyword in department_lower or keyword in category_lower
+            for keyword in food_keywords
+        ):
+            return ProductTaxability.NON_TAXABLE
+
+        # Clothing items have reduced tax rate
+        clothing_keywords = {
+            "apparel",
+            "clothing",
+            "fashion",
+            "wear",
+            "shoe",
+            "footwear",
+        }
+
+        if any(
+            keyword in department_lower or keyword in category_lower
+            for keyword in clothing_keywords
+        ):
+            return ProductTaxability.REDUCED_RATE
+
+        # Everything else is fully taxable
+        return ProductTaxability.TAXABLE
 
     def _validate_foreign_keys(self) -> None:
         """Validate all foreign key relationships."""

@@ -22,7 +22,6 @@ from ..shared.dependencies import (
     update_task_progress,
 )
 from .export_models import (
-    ExportFormat,
     ExportOperationResult,
     ExportRequest,
     ExportStatusResponse,
@@ -99,7 +98,7 @@ async def export_master_data(
 
             # Track progress
             completed_tables = []
-            total_tables = len(tables_to_export)
+            len(tables_to_export)
             total_files = 0
             total_rows = 0
 

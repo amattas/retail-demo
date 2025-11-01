@@ -10,7 +10,6 @@ Supports two modes:
 """
 
 import os
-from typing import Dict
 
 
 class DatabaseConfig:
@@ -26,35 +25,28 @@ class DatabaseConfig:
 
     # SQLite pragmas for optimal performance and safety
     # Applied on each connection via event listeners
-    SQLITE_PRAGMAS: Dict[str, str | int] = {
+    SQLITE_PRAGMAS: dict[str, str | int] = {
         # Write-Ahead Logging mode for better concurrency
         # Allows readers and writers to operate simultaneously
-        'journal_mode': 'WAL',
-
+        "journal_mode": "WAL",
         # Balance between safety and performance
         # NORMAL is sufficient for most use cases with WAL
-        'synchronous': 'NORMAL',
-
+        "synchronous": "NORMAL",
         # Enable foreign key constraints (disabled by default in SQLite)
-        'foreign_keys': 1,
-
+        "foreign_keys": 1,
         # Store temporary tables in memory for better performance
-        'temp_store': 'MEMORY',
-
+        "temp_store": "MEMORY",
         # Memory-mapped I/O for large databases (30GB)
         # Improves read performance significantly
-        'mmap_size': 30000000000,
-
+        "mmap_size": 30000000000,
         # Page size in bytes (4KB is optimal for most systems)
-        'page_size': 4096,
-
+        "page_size": 4096,
         # Negative value = size in KB (64MB cache)
         # Positive value = number of pages
-        'cache_size': -64000,
-
+        "cache_size": -64000,
         # Busy timeout in milliseconds
         # Wait up to 5 seconds when database is locked
-        'busy_timeout': 5000,
+        "busy_timeout": 5000,
     }
 
     # Connection pool settings

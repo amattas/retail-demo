@@ -28,13 +28,16 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from retail_datagen.db.config import DatabaseConfig
-from retail_datagen.db.engine import get_facts_engine, get_master_engine, get_retail_engine
+from retail_datagen.db.engine import (
+    get_facts_engine,
+    get_master_engine,
+    get_retail_engine,
+)
 from retail_datagen.db.models.base import Base
 
 logger = logging.getLogger(__name__)
@@ -108,10 +111,10 @@ def _create_backup(db_path: str) -> str | None:
         return backup_path
     except Exception as e:
         logger.error(f"Failed to create backup of {db_path}: {e}")
-        raise IOError(f"Backup creation failed: {e}")
+        raise OSError(f"Backup creation failed: {e}")
 
 
-async def _get_table_names(engine: AsyncEngine) -> List[str]:
+async def _get_table_names(engine: AsyncEngine) -> list[str]:
     """
     Get list of all table names in a database.
 
@@ -121,6 +124,7 @@ async def _get_table_names(engine: AsyncEngine) -> List[str]:
     Returns:
         List of table names
     """
+
     def _sync_get_tables(connection):
         inspector = inspect(connection)
         return inspector.get_table_names()
@@ -150,10 +154,8 @@ async def _get_row_count(engine: AsyncEngine, table_name: str) -> int:
 
 
 async def _copy_table_data(
-    source_engine: AsyncEngine,
-    target_engine: AsyncEngine,
-    table_name: str
-) -> Dict[str, int]:
+    source_engine: AsyncEngine, target_engine: AsyncEngine, table_name: str
+) -> dict[str, int]:
     """
     Copy all data from source table to target table.
 
@@ -179,7 +181,7 @@ async def _copy_table_data(
 
     # If table is empty, skip the copy
     if source_count == 0:
-        logger.debug(f"  Table is empty, skipping")
+        logger.debug("  Table is empty, skipping")
         return {"source_count": 0, "target_count": 0}
 
     # Read all data from source table
@@ -190,7 +192,9 @@ async def _copy_table_data(
         column_list = ", ".join(columns)
 
         # Read all rows
-        result = await source_conn.execute(text(f"SELECT {column_list} FROM {table_name}"))
+        result = await source_conn.execute(
+            text(f"SELECT {column_list} FROM {table_name}")
+        )
         rows = result.fetchall()
 
     logger.debug(f"  Read {len(rows)} rows from source")
@@ -201,21 +205,25 @@ async def _copy_table_data(
 
     async with target_engine.begin() as target_conn:
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
 
             # Build INSERT statement with placeholders
-            placeholders = ", ".join([f"({', '.join(['?' for _ in columns])})" for _ in batch])
+            placeholders = ", ".join(
+                [f"({', '.join(['?' for _ in columns])})" for _ in batch]
+            )
             # Flatten the batch data
             flat_data = [val for row in batch for val in row]
 
-            insert_sql = f"INSERT INTO {table_name} ({column_list}) VALUES {placeholders}"
+            insert_sql = (
+                f"INSERT INTO {table_name} ({column_list}) VALUES {placeholders}"
+            )
             await target_conn.execute(text(insert_sql), flat_data)
 
             total_written += len(batch)
             if len(rows) > batch_size:
                 logger.debug(f"  Written {total_written}/{len(rows)} rows")
 
-    logger.debug(f"  Data copied successfully")
+    logger.debug("  Data copied successfully")
 
     # Verify target row count after copy
     target_count = await _get_row_count(target_engine, table_name)
@@ -230,10 +238,7 @@ async def _copy_table_data(
 
     logger.info(f"  ✓ Successfully copied {target_count} rows")
 
-    return {
-        "source_count": source_count,
-        "target_count": target_count
-    }
+    return {"source_count": source_count, "target_count": target_count}
 
 
 async def _test_foreign_keys(engine: AsyncEngine) -> bool:
@@ -265,12 +270,14 @@ async def _test_foreign_keys(engine: AsyncEngine) -> bool:
 
             # Try a query that exercises FK relationships
             # This will fail if FKs are broken
-            result = await conn.execute(text("""
+            result = await conn.execute(
+                text("""
                 SELECT COUNT(*)
                 FROM dim_stores s
                 JOIN dim_geographies g ON s.GeographyID = g.ID
                 LIMIT 1
-            """))
+            """)
+            )
             result.scalar()
 
         logger.info("Foreign key constraints validated successfully")
@@ -281,7 +288,7 @@ async def _test_foreign_keys(engine: AsyncEngine) -> bool:
         return False
 
 
-async def migrate_to_unified_db() -> Dict:
+async def migrate_to_unified_db() -> dict:
     """
     Migrate data from split databases (master.db + facts.db) to unified database (retail.db).
 
@@ -319,13 +326,13 @@ async def migrate_to_unified_db() -> Dict:
     """
     start_time = datetime.now()
 
-    result: Dict = {
+    result: dict = {
         "success": False,
         "tables_migrated": [],
         "row_counts": {},
         "backups_created": [],
         "errors": [],
-        "duration_seconds": 0.0
+        "duration_seconds": 0.0,
     }
 
     logger.info("=" * 70)
@@ -444,12 +451,13 @@ async def migrate_to_unified_db() -> Dict:
 
         # Log full traceback for debugging
         import traceback
+
         logger.error(traceback.format_exc())
 
     return result
 
 
-async def verify_migration() -> Dict:
+async def verify_migration() -> dict:
     """
     Verify that migration was successful by comparing databases.
 
@@ -473,13 +481,13 @@ async def verify_migration() -> Dict:
         >>> if result['verified']:
         ...     print("Migration verified successfully")
     """
-    result: Dict = {
+    result: dict = {
         "verified": False,
         "retail_db_exists": False,
         "table_count": 0,
         "row_count_matches": False,
         "foreign_keys_valid": False,
-        "errors": []
+        "errors": [],
     }
 
     logger.info("Verifying database migration...")
@@ -502,7 +510,9 @@ async def verify_migration() -> Dict:
         result["foreign_keys_valid"] = await _test_foreign_keys(retail_engine)
 
         # Compare row counts if split databases still exist
-        if os.path.exists(DatabaseConfig.MASTER_DB_PATH) or os.path.exists(DatabaseConfig.FACTS_DB_PATH):
+        if os.path.exists(DatabaseConfig.MASTER_DB_PATH) or os.path.exists(
+            DatabaseConfig.FACTS_DB_PATH
+        ):
             logger.info("Comparing row counts with source databases...")
 
             mismatches = []
@@ -548,11 +558,11 @@ async def verify_migration() -> Dict:
 
         # Mark as verified if all checks pass
         result["verified"] = (
-            result["retail_db_exists"] and
-            result["table_count"] > 0 and
-            result["foreign_keys_valid"] and
-            result["row_count_matches"] and
-            not result["errors"]
+            result["retail_db_exists"]
+            and result["table_count"] > 0
+            and result["foreign_keys_valid"]
+            and result["row_count_matches"]
+            and not result["errors"]
         )
 
         if result["verified"]:

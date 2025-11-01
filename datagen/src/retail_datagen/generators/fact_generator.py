@@ -563,7 +563,7 @@ class FactDataGenerator:
         )
 
         self.marketing_campaign_sim = MarketingCampaignSimulator(
-            self.customers, self.config.seed + 3000
+            self.customers, self.config.seed + 3000, self.config.marketing_cost
         )
 
         print(
@@ -696,7 +696,7 @@ class FactDataGenerator:
         )
 
         self.marketing_campaign_sim = MarketingCampaignSimulator(
-            self.customers, self.config.seed + 3000
+            self.customers, self.config.seed + 3000, self.config.marketing_cost
         )
 
         print(
@@ -818,7 +818,6 @@ class FactDataGenerator:
         # Generate data sequentially with managed retail session if not provided
         from retail_datagen.db.session import retail_session_maker
 
-        created_session = False
         if self._session is None:
             SessionMaker = retail_session_maker()
 
@@ -1337,9 +1336,10 @@ class FactDataGenerator:
             basket = self.customer_journey_sim.generate_shopping_basket(customer.ID)
 
             # Choose fulfillment mode and node
+            # Distribution: 60% DC, 30% Store, 10% BOPIS
             mode = rng.choices(
-                ["SHIP_FROM_STORE", "SHIP_FROM_DC", "BOPIS"],
-                weights=[0.55, 0.35, 0.10],
+                ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"],
+                weights=[0.60, 0.30, 0.10],
             )[0]
 
             if mode in ("SHIP_FROM_STORE", "BOPIS") and self.stores:
@@ -1365,7 +1365,7 @@ class FactDataGenerator:
             subtotal = basket.estimated_total
             tax_rate = Decimal("0.08")
             tax = subtotal * tax_rate
-            total = subtotal + tax
+            subtotal + tax
 
             order_id = f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100, 999)}"
             trace_id = self._generate_trace_id()
@@ -1386,9 +1386,10 @@ class FactDataGenerator:
                         "ProductID": product.ID,
                         "Quantity": qty,
                         "Total": str(line_total),
+                        "FulfillmentStatus": "created",  # Initial status
                         "FulfillmentMode": mode,
-                        "FulfillmentNodeType": node_type,
-                        "FulfillmentNodeID": node_id,
+                        "NodeType": node_type,
+                        "NodeID": node_id,
                         "Subtotal": str(line_subtotal),
                         "Tax": str(line_tax),
                         "TenderType": TenderType.CREDIT_CARD.value,
@@ -1414,8 +1415,7 @@ class FactDataGenerator:
                             "ProductID": product.ID,
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
-                            "Source": "ONLINE",
-                            "Balance": new_balance,
+                            "Source": order_id,
                         }
                     )
                 else:  # DC
@@ -1433,8 +1433,7 @@ class FactDataGenerator:
                             "ProductID": product.ID,
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
-                            "Source": "ONLINE",
-                            "Balance": new_balance,
+                            "Source": order_id,
                         }
                     )
 
@@ -1451,10 +1450,6 @@ class FactDataGenerator:
             dc_transactions = self.inventory_flow_sim.simulate_dc_receiving(dc.ID, date)
 
             for transaction in dc_transactions:
-                # Get current balance from inventory simulator
-                key = (transaction["DCID"], transaction["ProductID"])
-                balance = self.inventory_flow_sim._dc_inventory.get(key, 0)
-
                 transactions.append(
                     {
                         "TraceId": self._generate_trace_id(),
@@ -1463,7 +1458,6 @@ class FactDataGenerator:
                         "ProductID": transaction["ProductID"],
                         "QtyDelta": transaction["QtyDelta"],
                         "Reason": transaction["Reason"].value,
-                        "Balance": balance,
                     }
                 )
 
@@ -1687,12 +1681,6 @@ class FactDataGenerator:
         )
         trace_id = self._generate_trace_id()
 
-        # Calculate receipt totals
-        subtotal = basket.estimated_total
-        tax_rate = Decimal("0.08")  # 8% tax rate
-        tax = subtotal * tax_rate
-        total = subtotal + tax
-
         # Select tender type based on customer segment
         tender_weights = {
             TenderType.CREDIT_CARD: 0.4,
@@ -1705,22 +1693,17 @@ class FactDataGenerator:
         weights = list(tender_weights.values())
         tender_type = self._rng.choices(tender_options, weights=weights)[0]
 
-        # Create receipt header
-        receipt = {
-            "TraceId": trace_id,
-            "EventTS": transaction_time,
-            "StoreID": store.ID,
-            "CustomerID": customer.ID,
-            "ReceiptId": receipt_id,
-            "Subtotal": str(subtotal),
-            "Tax": str(tax),
-            "Total": str(total),
-            "TenderType": tender_type.value,
-        }
-
         # Create receipt lines and inventory transactions
+        # Tax will be calculated per line based on product taxability
         lines = []
         inventory_transactions = []
+        subtotal = Decimal("0")
+        total_tax = Decimal("0")
+
+        # Get store tax rate (with backward compatibility default)
+        store_tax_rate = (
+            store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
+        )
 
         for line_num, (product, qty) in enumerate(basket.items, 1):
             # Apply any promotional pricing
@@ -1734,6 +1717,24 @@ class FactDataGenerator:
                 promo_code = f"PROMO{self._rng.randint(100, 999)}"
 
             ext_price = unit_price * qty
+
+            # Calculate tax for this line item based on product taxability
+            # Get taxability multiplier: TAXABLE=1.0, REDUCED_RATE=0.5, NON_TAXABLE=0.0
+            from retail_datagen.shared.models import ProductTaxability
+
+            taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
+
+            if taxability == ProductTaxability.TAXABLE:
+                taxability_multiplier = Decimal("1.0")
+            elif taxability == ProductTaxability.REDUCED_RATE:
+                taxability_multiplier = Decimal("0.5")
+            else:  # NON_TAXABLE
+                taxability_multiplier = Decimal("0.0")
+
+            line_tax = ext_price * store_tax_rate * taxability_multiplier
+
+            subtotal += ext_price
+            total_tax += line_tax
 
             line = {
                 "TraceId": trace_id,
@@ -1762,10 +1763,25 @@ class FactDataGenerator:
                 "ProductID": product.ID,
                 "QtyDelta": -qty,  # Negative for sale
                 "Reason": InventoryReason.SALE.value,
-                "Source": "CUSTOMER_PURCHASE",
-                "Balance": new_balance,
+                "Source": receipt_id,
             }
             inventory_transactions.append(inventory_transaction)
+
+        # Calculate total
+        total = subtotal + total_tax
+
+        # Create receipt header
+        receipt = {
+            "TraceId": trace_id,
+            "EventTS": transaction_time,
+            "StoreID": store.ID,
+            "CustomerID": customer.ID,
+            "ReceiptId": receipt_id,
+            "Subtotal": str(subtotal),
+            "Tax": str(total_tax),
+            "Total": str(total),
+            "TenderType": tender_type.value,
+        }
 
         return {
             "receipt": receipt,
@@ -1919,10 +1935,6 @@ class FactDataGenerator:
                 transactions = self.inventory_flow_sim.complete_delivery(shipment_id)
 
                 for transaction in transactions:
-                    # Get current balance from inventory simulator
-                    key = (transaction["StoreID"], transaction["ProductID"])
-                    balance = self.inventory_flow_sim._store_inventory.get(key, 0)
-
                     delivery_transactions.append(
                         {
                             "TraceId": self._generate_trace_id(),
@@ -1932,7 +1944,6 @@ class FactDataGenerator:
                             "QtyDelta": transaction["QtyDelta"],
                             "Reason": transaction["Reason"].value,
                             "Source": transaction["Source"],
-                            "Balance": balance,
                         }
                     )
 
@@ -2255,7 +2266,6 @@ class FactDataGenerator:
                 "ProductID": "product_id",
                 "QtyDelta": "quantity",
                 "Reason": "txn_type",
-                "Balance": "balance",
             },
             "truck_moves": {
                 **common_mappings,
@@ -2274,8 +2284,7 @@ class FactDataGenerator:
                 "ProductID": "product_id",
                 "QtyDelta": "quantity",
                 "Reason": "txn_type",
-                "Balance": "balance",
-                # Note: Source field in generator doesn't exist in DB model (will be ignored)
+                "Source": "source",
             },
             "foot_traffic": {
                 **common_mappings,
@@ -2311,9 +2320,12 @@ class FactDataGenerator:
                 "ProductID": "product_id",
                 "Quantity": "quantity",
                 "Total": "total_amount",
-                "FulfillmentMode": "fulfillment_status",
-                # Note: OrderId, FulfillmentNodeType, FulfillmentNodeID, Subtotal, Tax, TenderType
-                # fields from generator don't exist in DB model (will be ignored)
+                "FulfillmentStatus": "fulfillment_status",
+                "FulfillmentMode": "fulfillment_mode",
+                "NodeType": "node_type",
+                "NodeID": "node_id",
+                # Note: OrderId, Subtotal, Tax, TenderType fields from generator
+                # don't exist in DB model (will be ignored)
             },
         }
 
@@ -2655,7 +2667,7 @@ def generate_historical_facts(
     """
     from retail_datagen.config.models import RetailConfig
 
-    config = RetailConfig.from_file(config_path)
+    RetailConfig.from_file(config_path)
     # NOTE: This convenience function is legacy; in API flow we construct with an AsyncSession.
     # Here we construct a temporary generator without DB session which is not supported in DB mode.
     # Users should use the FastAPI endpoints instead.

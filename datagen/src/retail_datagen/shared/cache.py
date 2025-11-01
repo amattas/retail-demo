@@ -57,7 +57,7 @@ class CacheManager:
             return DashboardCache()
 
         try:
-            with open(self.cache_path, "r", encoding="utf-8") as f:
+            with open(self.cache_path, encoding="utf-8") as f:
                 data = json.load(f)
                 return DashboardCache(**data)
         except Exception as e:
@@ -113,7 +113,9 @@ class CacheManager:
         )
         self.save_cache(cache)
 
-    def get_table_count(self, table_name: str, table_type: str = "master") -> int | None:
+    def get_table_count(
+        self, table_name: str, table_type: str = "master"
+    ) -> int | None:
         """
         Get count for a specific table.
 

@@ -10,11 +10,12 @@ Watermarks are stored in facts.db alongside the fact tables they track.
 """
 
 from datetime import datetime
+
 from sqlalchemy import (
-    Integer,
-    String,
     DateTime,
     Index,
+    Integer,
+    String,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -53,6 +54,7 @@ class FactDataWatermark(Base):
             last_purge_ts=datetime(2025, 1, 15, 12, 5, 0)             # Purge timestamp
         )
     """
+
     __tablename__ = "fact_data_watermarks"
 
     # Primary key
@@ -60,47 +62,32 @@ class FactDataWatermark(Base):
 
     # Fact table identifier (unique constraint)
     fact_table_name: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        unique=True,
-        index=True
+        String(100), nullable=False, unique=True, index=True
     )
 
     # Watermark timestamps
     earliest_unpublished_ts: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-        index=True
+        DateTime, nullable=True, index=True
     )
     latest_published_ts: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-        index=True
+        DateTime, nullable=True, index=True
     )
-    last_purge_ts: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True
-    )
+    last_purge_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Audit timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=func.now()
+        DateTime, nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now()
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
     # Composite index for watermark queries
     __table_args__ = (
         Index(
-            'ix_watermark_table_unpublished',
-            'fact_table_name',
-            'earliest_unpublished_ts'
+            "ix_watermark_table_unpublished",
+            "fact_table_name",
+            "earliest_unpublished_ts",
         ),
         {"extend_existing": True},
     )
@@ -135,7 +122,9 @@ class FactDataWatermark(Base):
         if self.last_purge_ts is None:
             return True
 
-        hours_since_purge = (datetime.utcnow() - self.last_purge_ts).total_seconds() / 3600
+        hours_since_purge = (
+            datetime.utcnow() - self.last_purge_ts
+        ).total_seconds() / 3600
         return hours_since_purge >= purge_interval_hours
 
     def get_publication_lag_seconds(self) -> float | None:

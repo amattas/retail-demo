@@ -31,31 +31,30 @@ Usage:
 
 import logging
 from datetime import date, datetime
-from typing import Any, Type
 
 import pandas as pd
-from sqlalchemy import select, func
+from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from retail_datagen.db.models.base import Base
-from retail_datagen.db.models.master import (
-    Geography,
-    Store,
-    DistributionCenter,
-    Truck,
-    Customer,
-    Product,
-)
 from retail_datagen.db.models.facts import (
-    DCInventoryTransaction,
-    TruckMove,
-    StoreInventoryTransaction,
-    Receipt,
-    ReceiptLine,
-    FootTraffic,
     BLEPing,
+    DCInventoryTransaction,
+    FootTraffic,
     MarketingImpression,
     OnlineOrder,
+    Receipt,
+    ReceiptLine,
+    StoreInventoryTransaction,
+    TruckMove,
+)
+from retail_datagen.db.models.master import (
+    Customer,
+    DistributionCenter,
+    Geography,
+    Product,
+    Store,
+    Truck,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,9 +86,49 @@ FACT_TABLES = {
 }
 
 
+def _convert_nullable_int_columns(
+    df: pd.DataFrame, table_model: type[Base]
+) -> pd.DataFrame:
+    """
+    Convert nullable integer columns to pandas nullable Int64 dtype.
+
+    This prevents None values from being converted to float NaN when exporting to CSV.
+    Identifies nullable integer columns from the SQLAlchemy model and converts them
+    to use pandas' nullable integer dtype (Int64), which preserves None as <NA>
+    and renders as empty string in CSV exports instead of "nan" or "1.0".
+
+    Args:
+        df: DataFrame to convert
+        table_model: SQLAlchemy ORM model class
+
+    Returns:
+        DataFrame with nullable integer columns properly typed
+    """
+    if df.empty:
+        return df
+
+    # Identify nullable integer columns from the SQLAlchemy model
+    nullable_int_cols = []
+    for column in table_model.__table__.columns:
+        # Check if column is Integer type and nullable
+        if isinstance(column.type, Integer) and column.nullable:
+            col_name = column.key
+            if col_name in df.columns:
+                nullable_int_cols.append(col_name)
+
+    # Convert each nullable integer column to nullable Int64 dtype
+    for col in nullable_int_cols:
+        # Convert to nullable Int64 dtype, which preserves None as pd.NA
+        # This prevents None -> NaN -> "nan" or "1.0" issues in CSV export
+        df[col] = df[col].astype("Int64")
+        logger.debug(f"Converted nullable integer column '{col}' to Int64 dtype")
+
+    return df
+
+
 async def get_table_row_count(
     session: AsyncSession,
-    table_model: Type[Base],
+    table_model: type[Base],
 ) -> int:
     """
     Get total row count for a table.
@@ -119,7 +158,7 @@ async def get_table_row_count(
 
 async def read_master_table(
     session: AsyncSession,
-    table_model: Type[Base],
+    table_model: type[Base],
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> pd.DataFrame:
     """
@@ -202,6 +241,11 @@ async def read_master_table(
         # Combine all chunks
         if chunks:
             df = pd.concat(chunks, ignore_index=True)
+
+            # Convert nullable integer foreign key columns to proper nullable Int64 dtype
+            # This prevents None values from being converted to float NaN in CSV export
+            df = _convert_nullable_int_columns(df, table_model)
+
             logger.info(f"Successfully read {len(df)} rows from {table_name}")
             return df
         else:
@@ -261,7 +305,7 @@ async def read_all_master_tables(
 
 async def read_fact_table(
     session: AsyncSession,
-    table_model: Type[Base],
+    table_model: type[Base],
     start_date: date | None = None,
     end_date: date | None = None,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
@@ -394,6 +438,11 @@ async def read_fact_table(
         # Combine all chunks
         if chunks:
             df = pd.concat(chunks, ignore_index=True)
+
+            # Convert nullable integer foreign key columns to proper nullable Int64 dtype
+            # This prevents None values from being converted to float NaN in CSV export
+            df = _convert_nullable_int_columns(df, table_model)
+
             logger.info(
                 f"Successfully read {len(df)} rows from {table_name} "
                 f"(date_range: {start_date} to {end_date})"
@@ -480,7 +529,7 @@ async def read_all_fact_tables(
 
 async def get_fact_table_date_range(
     session: AsyncSession,
-    table_model: Type[Base],
+    table_model: type[Base],
 ) -> tuple[datetime | None, datetime | None]:
     """
     Get the earliest and latest event_ts for a fact table.

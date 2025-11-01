@@ -81,7 +81,11 @@ AVAILABLE_EVENT_TYPES = [e.value for e in EventType]
 
 def _reset_streaming_state():
     """Reset global streaming state."""
-    global _streaming_session_id, _streaming_start_time, _recent_events, _streaming_statistics
+    global \
+        _streaming_session_id, \
+        _streaming_start_time, \
+        _recent_events, \
+        _streaming_statistics
 
     _streaming_session_id = None
     _streaming_start_time = None
@@ -233,9 +237,11 @@ async def start_streaming(
                             azure_connection_string=config.realtime.azure_connection_string,
                             session=db_session,
                         )
-                        success = await db_streamer.start()
+                        await db_streamer.start()
 
-                        update_task_progress(session_id, 1.0, "Batch streaming completed")
+                        update_task_progress(
+                            session_id, 1.0, "Batch streaming completed"
+                        )
 
                         stats = await db_streamer.get_statistics()
                         return {
@@ -247,7 +253,9 @@ async def start_streaming(
                         }
 
                 except Exception as db_error:
-                    logger.warning(f"SQLite batch streaming failed, falling back to real-time: {db_error}")
+                    logger.warning(
+                        f"SQLite batch streaming failed, falling back to real-time: {db_error}"
+                    )
                     # Fall through to real-time mode
 
             # Fall back to real-time generation mode

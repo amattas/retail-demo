@@ -97,6 +97,22 @@ class VolumeConfig(BaseModel):
         description="Number of non-refrigerated trucks for supplier-to-DC transport",
     )
 
+    # Truck-to-DC assignment configuration
+    truck_dc_assignment_rate: float = Field(
+        0.85,
+        gt=0.0,
+        le=1.0,
+        description="Percentage of trucks assigned to specific DCs (0.0-1.0). "
+        "Remaining trucks represent 'pool' or 'rental' trucks with DCID=NULL.",
+    )
+    trucks_per_dc: int | None = Field(
+        None,
+        gt=0,
+        description="Optional: Override automatic truck assignment calculation. "
+        "If specified, exactly this many trucks will be assigned to each DC. "
+        "If None, trucks are distributed based on truck_dc_assignment_rate.",
+    )
+
 
 class RealtimeConfig(BaseModel):
     """Configuration for real-time streaming settings."""
@@ -147,7 +163,8 @@ class RealtimeConfig(BaseModel):
         default=False, description="Load connection string from Azure Key Vault"
     )
     keyvault_url: str | None = Field(
-        default=None, description="Azure Key Vault URL (e.g., https://your-vault.vault.azure.net/)"
+        default=None,
+        description="Azure Key Vault URL (e.g., https://your-vault.vault.azure.net/)",
     )
     keyvault_secret_name: str = Field(
         default="eventhub-connection-string",
@@ -363,6 +380,157 @@ class PerformanceConfig(BaseModel):
         return max_workers
 
 
+class MarketingCostConfig(BaseModel):
+    """Configuration for marketing impression costs.
+
+    Costs are per impression in USD. Actual cost is calculated by:
+    base_cost * device_multiplier, where base_cost is randomly selected
+    from the [min, max] range for the channel.
+    """
+
+    # Channel-specific cost ranges (min, max) in dollars
+    # Based on industry averages for digital marketing channels
+
+    email_cost_min: float = Field(
+        0.10,
+        ge=0.0,
+        description="Minimum cost per EMAIL channel impression in USD",
+    )
+    email_cost_max: float = Field(
+        0.50,
+        ge=0.0,
+        description="Maximum cost per EMAIL channel impression in USD",
+    )
+
+    display_cost_min: float = Field(
+        0.50,
+        ge=0.0,
+        description="Minimum cost per DISPLAY channel impression in USD",
+    )
+    display_cost_max: float = Field(
+        2.00,
+        ge=0.0,
+        description="Maximum cost per DISPLAY channel impression in USD",
+    )
+
+    social_cost_min: float = Field(
+        0.20,
+        ge=0.0,
+        description="Minimum cost per SOCIAL channel impression in USD",
+    )
+    social_cost_max: float = Field(
+        1.50,
+        ge=0.0,
+        description="Maximum cost per SOCIAL channel impression in USD",
+    )
+
+    search_cost_min: float = Field(
+        0.50,
+        ge=0.0,
+        description="Minimum cost per SEARCH channel impression in USD",
+    )
+    search_cost_max: float = Field(
+        3.00,
+        ge=0.0,
+        description="Maximum cost per SEARCH channel impression in USD",
+    )
+
+    video_cost_min: float = Field(
+        0.30,
+        ge=0.0,
+        description="Minimum cost per VIDEO channel impression in USD",
+    )
+    video_cost_max: float = Field(
+        2.50,
+        ge=0.0,
+        description="Maximum cost per VIDEO channel impression in USD",
+    )
+
+    facebook_cost_min: float = Field(
+        0.25,
+        ge=0.0,
+        description="Minimum cost per FACEBOOK channel impression in USD",
+    )
+    facebook_cost_max: float = Field(
+        1.50,
+        ge=0.0,
+        description="Maximum cost per FACEBOOK channel impression in USD",
+    )
+
+    google_cost_min: float = Field(
+        0.50,
+        ge=0.0,
+        description="Minimum cost per GOOGLE channel impression in USD",
+    )
+    google_cost_max: float = Field(
+        3.50,
+        ge=0.0,
+        description="Maximum cost per GOOGLE channel impression in USD",
+    )
+
+    instagram_cost_min: float = Field(
+        0.20,
+        ge=0.0,
+        description="Minimum cost per INSTAGRAM channel impression in USD",
+    )
+    instagram_cost_max: float = Field(
+        1.75,
+        ge=0.0,
+        description="Maximum cost per INSTAGRAM channel impression in USD",
+    )
+
+    youtube_cost_min: float = Field(
+        0.30,
+        ge=0.0,
+        description="Minimum cost per YOUTUBE channel impression in USD",
+    )
+    youtube_cost_max: float = Field(
+        2.00,
+        ge=0.0,
+        description="Maximum cost per YOUTUBE channel impression in USD",
+    )
+
+    # Device-specific multipliers
+    mobile_multiplier: float = Field(
+        1.0,
+        gt=0.0,
+        description="Cost multiplier for MOBILE devices (1.0 = baseline)",
+    )
+    tablet_multiplier: float = Field(
+        1.2,
+        gt=0.0,
+        description="Cost multiplier for TABLET devices (higher engagement)",
+    )
+    desktop_multiplier: float = Field(
+        1.5,
+        gt=0.0,
+        description="Cost multiplier for DESKTOP devices (highest engagement)",
+    )
+
+    @model_validator(mode="after")
+    def validate_cost_ranges(self) -> "MarketingCostConfig":
+        """Validate that min costs are less than or equal to max costs."""
+        cost_pairs = [
+            ("email", self.email_cost_min, self.email_cost_max),
+            ("display", self.display_cost_min, self.display_cost_max),
+            ("social", self.social_cost_min, self.social_cost_max),
+            ("search", self.search_cost_min, self.search_cost_max),
+            ("video", self.video_cost_min, self.video_cost_max),
+            ("facebook", self.facebook_cost_min, self.facebook_cost_max),
+            ("google", self.google_cost_min, self.google_cost_max),
+            ("instagram", self.instagram_cost_min, self.instagram_cost_max),
+            ("youtube", self.youtube_cost_min, self.youtube_cost_max),
+        ]
+
+        for channel, min_cost, max_cost in cost_pairs:
+            if min_cost > max_cost:
+                raise ValueError(
+                    f"{channel} min cost ({min_cost}) must be <= max cost ({max_cost})"
+                )
+
+        return self
+
+
 class RetailConfig(BaseModel):
     """Main configuration model for the retail data generator."""
 
@@ -385,6 +553,10 @@ class RetailConfig(BaseModel):
     performance: PerformanceConfig = Field(
         default_factory=PerformanceConfig,
         description="Performance and resource usage configuration",
+    )
+    marketing_cost: MarketingCostConfig = Field(
+        default_factory=MarketingCostConfig,
+        description="Marketing impression cost configuration",
     )
 
     @classmethod

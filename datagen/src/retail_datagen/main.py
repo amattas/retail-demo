@@ -22,13 +22,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from .api.export_router import router as export_router
 from .api.models import ErrorResponse, HealthCheckResponse, ValidationErrorResponse
 from .config.models import RetailConfig
 from .db.engine import dispose_engines, get_retail_engine
 from .db.init import init_databases
 from .db.manager import get_database_status, get_db_manager
-from .db.models.base import Base
-from .api.export_router import router as export_router
 from .generators.router import router as generators_router
 from .shared.dependencies import (
     check_azure_connection,

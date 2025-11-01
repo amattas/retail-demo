@@ -247,7 +247,9 @@ class OnlineOrderCreatedPayload(BaseModel):
 
     order_id: str = Field(..., min_length=1)
     customer_id: int = Field(..., gt=0)
-    fulfillment_mode: str = Field(..., min_length=1)  # SHIP_FROM_STORE / SHIP_FROM_DC / BOPIS
+    fulfillment_mode: str = Field(
+        ..., min_length=1
+    )  # SHIP_FROM_STORE / SHIP_FROM_DC / BOPIS
     node_type: str = Field(..., min_length=1)  # STORE or DC
     node_id: int = Field(..., gt=0)
     item_count: int = Field(..., gt=0)

@@ -6,12 +6,11 @@ Azure Event Hub connection strings and other credentials.
 """
 
 import re
-from typing import Tuple
 
 
 def validate_eventhub_connection_string(
     conn_str: str, strict: bool = True, allow_mock: bool = False
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Validate Event Hub or Microsoft Fabric RTI connection string format.
 
@@ -229,7 +228,9 @@ def is_fabric_rti_connection_string(conn_str: str) -> bool:
     fabric_indicators = [
         re.search(r"EntityPath=es_", conn_str),  # Event stream prefix
         re.search(r"SharedAccessKeyName=key_", conn_str),  # Key prefix
-        re.search(r"eventstream-[a-z0-9]+\.servicebus\.windows\.net", conn_str),  # Eventstream subdomain
+        re.search(
+            r"eventstream-[a-z0-9]+\.servicebus\.windows\.net", conn_str
+        ),  # Eventstream subdomain
     ]
 
     # If at least 2 indicators match, likely Fabric RTI
@@ -237,7 +238,7 @@ def is_fabric_rti_connection_string(conn_str: str) -> bool:
     return matches >= 2
 
 
-def validate_fabric_rti_specific(conn_str: str) -> Tuple[bool, str, dict]:
+def validate_fabric_rti_specific(conn_str: str) -> tuple[bool, str, dict]:
     """
     Validate Fabric RTI specific requirements and extract metadata.
 

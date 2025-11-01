@@ -20,26 +20,29 @@ Note: All operations use the unified retail.db database (preferred).
       Legacy split database mode (master.db + facts.db) is supported for migration only.
 """
 
-import asyncio
 import argparse
+import asyncio
 import sys
 from pathlib import Path
-from typing import Optional
 
+from retail_datagen.db.init import init_databases
 from retail_datagen.db.migration import (
-    migrate_master_data_from_csv,
     migrate_fact_data_from_csv,
+    migrate_master_data_from_csv,
     validate_foreign_keys,
 )
 from retail_datagen.db.purge import (
-    purge_published_data,
-    purge_all_fact_tables,
+    FACT_TABLE_MAPPING,
     get_purge_candidates,
     get_watermark_status,
-    FACT_TABLE_MAPPING,
+    purge_all_fact_tables,
+    purge_published_data,
 )
-from retail_datagen.db.session import get_retail_session, get_master_session, get_facts_session
-from retail_datagen.db.init import init_databases
+from retail_datagen.db.session import (
+    get_facts_session,
+    get_master_session,
+    get_retail_session,
+)
 
 
 def progress_callback(table_name: str, rows_loaded: int, total_rows: int) -> None:
@@ -167,7 +170,9 @@ async def cmd_purge(args: argparse.Namespace) -> int:
         try:
             if args.all:
                 # Purge all tables
-                print(f"\n=== Purging All Fact Tables (buffer={args.buffer}h, dry_run={args.dry_run}) ===\n")
+                print(
+                    f"\n=== Purging All Fact Tables (buffer={args.buffer}h, dry_run={args.dry_run}) ===\n"
+                )
                 results = await purge_all_fact_tables(
                     session,
                     keep_buffer_hours=args.buffer,
@@ -184,9 +189,9 @@ async def cmd_purge(args: argparse.Namespace) -> int:
                     if "error" in result:
                         print(f"  {table_name}: ERROR - {result['error']}")
                     else:
-                        rows = result['rows_deleted']
-                        freed = result['disk_space_freed_mb']
-                        cutoff = format_datetime(result.get('purge_cutoff_ts'))
+                        rows = result["rows_deleted"]
+                        freed = result["disk_space_freed_mb"]
+                        cutoff = format_datetime(result.get("purge_cutoff_ts"))
 
                         if rows > 0 or args.verbose:
                             print(f"  {table_name}:")
@@ -198,7 +203,9 @@ async def cmd_purge(args: argparse.Namespace) -> int:
                         total_freed += freed
 
                 print("-" * 80)
-                print(f"Total: {total_deleted:,} rows deleted, {total_freed:.2f} MB freed\n")
+                print(
+                    f"Total: {total_deleted:,} rows deleted, {total_freed:.2f} MB freed\n"
+                )
 
             elif args.table:
                 # Purge single table
@@ -208,7 +215,9 @@ async def cmd_purge(args: argparse.Namespace) -> int:
                     print(f"Valid tables: {', '.join(FACT_TABLE_MAPPING.keys())}")
                     return 1
 
-                print(f"\n=== Purging {table_name} (buffer={args.buffer}h, dry_run={args.dry_run}) ===\n")
+                print(
+                    f"\n=== Purging {table_name} (buffer={args.buffer}h, dry_run={args.dry_run}) ===\n"
+                )
                 result = await purge_published_data(
                     session,
                     table_name,
@@ -235,6 +244,7 @@ async def cmd_purge(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"ERROR: Purge failed: {e}")
             import traceback
+
             traceback.print_exc()
             return 1
 
@@ -260,16 +270,22 @@ async def cmd_status(args: argparse.Namespace) -> int:
 
             for table_name, info in status.items():
                 print(f"\n{table_name}:")
-                print(f"  Earliest unpublished: {format_datetime(info['earliest_unpublished_ts'])}")
-                print(f"  Latest published:     {format_datetime(info['latest_published_ts'])}")
-                print(f"  Last purge:           {format_datetime(info['last_purge_ts'])}")
+                print(
+                    f"  Earliest unpublished: {format_datetime(info['earliest_unpublished_ts'])}"
+                )
+                print(
+                    f"  Latest published:     {format_datetime(info['latest_published_ts'])}"
+                )
+                print(
+                    f"  Last purge:           {format_datetime(info['last_purge_ts'])}"
+                )
                 print(f"  Fully published:      {info['is_fully_published']}")
 
-                lag = info['publication_lag_seconds']
+                lag = info["publication_lag_seconds"]
                 if lag is not None:
                     print(f"  Publication lag:      {format_duration(lag)}")
                 else:
-                    print(f"  Publication lag:      N/A")
+                    print("  Publication lag:      N/A")
 
             print("=" * 100)
             print()
@@ -278,6 +294,7 @@ async def cmd_status(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"ERROR: Status check failed: {e}")
             import traceback
+
             traceback.print_exc()
             return 1
 
@@ -310,16 +327,24 @@ async def cmd_candidates(args: argparse.Namespace) -> int:
                     print(f"\n{table_name}: ERROR - {info['error']}")
                     continue
 
-                rows = info['estimated_rows']
+                rows = info["estimated_rows"]
                 if rows == 0 and not args.verbose:
                     continue
 
                 print(f"\n{table_name}:")
                 print(f"  Eligible rows:        {rows:,}")
-                print(f"  Earliest published:   {format_datetime(info['earliest_published'])}")
-                print(f"  Latest published:     {format_datetime(info['latest_published'])}")
-                print(f"  Purge cutoff:         {format_datetime(info['purge_cutoff'])}")
-                print(f"  Earliest unpublished: {format_datetime(info['earliest_unpublished'])}")
+                print(
+                    f"  Earliest published:   {format_datetime(info['earliest_published'])}"
+                )
+                print(
+                    f"  Latest published:     {format_datetime(info['latest_published'])}"
+                )
+                print(
+                    f"  Purge cutoff:         {format_datetime(info['purge_cutoff'])}"
+                )
+                print(
+                    f"  Earliest unpublished: {format_datetime(info['earliest_unpublished'])}"
+                )
 
                 total_rows += rows
 
@@ -330,6 +355,7 @@ async def cmd_candidates(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"ERROR: Candidate check failed: {e}")
             import traceback
+
             traceback.print_exc()
             return 1
 
@@ -380,6 +406,7 @@ async def cmd_migrate(args: argparse.Namespace) -> int:
     except Exception as e:
         print(f"\nERROR: Migration failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -521,7 +548,7 @@ Examples:
     )
 
     # ===== STATUS SUBCOMMAND =====
-    status_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "status",
         help="Show watermark status for all fact tables",
     )
@@ -548,7 +575,9 @@ Examples:
     # Validate migrate subcommand arguments
     if args.command == "migrate":
         if not any([args.master, args.facts, args.all, args.validate]):
-            migrate_parser.error("At least one of --master, --facts, --all, or --validate is required")
+            migrate_parser.error(
+                "At least one of --master, --facts, --all, or --validate is required"
+            )
     elif args.command == "purge":
         if not args.table and not args.all:
             purge_parser.error("Either --table or --all is required")

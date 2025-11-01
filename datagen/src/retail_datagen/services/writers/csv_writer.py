@@ -63,7 +63,7 @@ class CSVWriter(BaseWriter):
             logger.info(f"Wrote {len(df):,} records to {output_path}")
         except Exception as e:
             logger.error(f"Failed to write CSV to {output_path}: {e}")
-            raise IOError(f"Failed to write CSV file: {e}") from e
+            raise OSError(f"Failed to write CSV file: {e}") from e
 
     def write_partitioned(
         self,

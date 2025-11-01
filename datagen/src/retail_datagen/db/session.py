@@ -12,7 +12,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from retail_datagen.db.engine import get_facts_engine, get_master_engine, get_retail_engine
+from retail_datagen.db.engine import (
+    get_facts_engine,
+    get_master_engine,
+    get_retail_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +263,9 @@ async def get_session(database: str = "master") -> AsyncIterator[AsyncSession]:
         async with get_retail_session() as session:
             yield session
     else:
-        raise ValueError(f"Invalid database: {database}. Must be 'master', 'facts', or 'retail'")
+        raise ValueError(
+            f"Invalid database: {database}. Must be 'master', 'facts', or 'retail'"
+        )
 
 
 class SessionContext:

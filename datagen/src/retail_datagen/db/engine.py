@@ -6,7 +6,6 @@ pragma enforcement, and connection event handling.
 """
 
 import logging
-from typing import Dict
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -24,7 +23,7 @@ _retail_engine: AsyncEngine | None = None
 
 def create_engine(
     db_path: str,
-    pragmas: Dict[str, str | int] | None = None,
+    pragmas: dict[str, str | int] | None = None,
     echo: bool = False,
 ) -> AsyncEngine:
     """

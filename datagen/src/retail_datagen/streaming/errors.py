@@ -1,6 +1,6 @@
 """Error classification for streaming system."""
+
 from enum import Enum
-from typing import Optional
 
 
 class ErrorSeverity(Enum):
@@ -31,7 +31,7 @@ class StreamingError(Exception):
         severity: ErrorSeverity,
         category: ErrorCategory,
         retryable: bool = True,
-        original_exception: Optional[Exception] = None,
+        original_exception: Exception | None = None,
     ):
         super().__init__(message)
         self.severity = severity
@@ -47,7 +47,8 @@ def classify_error(exception: Exception) -> StreamingError:
 
     # Network errors (transient, retryable)
     if any(
-        keyword in error_type.lower() for keyword in ["timeout", "connection", "network"]
+        keyword in error_type.lower()
+        for keyword in ["timeout", "connection", "network"]
     ):
         return StreamingError(
             message=f"Network error: {error_message}",
@@ -59,7 +60,8 @@ def classify_error(exception: Exception) -> StreamingError:
 
     # Authentication errors (permanent, not retryable)
     if any(
-        keyword in error_type.lower() for keyword in ["auth", "unauthorized", "forbidden"]
+        keyword in error_type.lower()
+        for keyword in ["auth", "unauthorized", "forbidden"]
     ):
         return StreamingError(
             message=f"Authentication error: {error_message}",
@@ -70,7 +72,10 @@ def classify_error(exception: Exception) -> StreamingError:
         )
 
     # Throttling errors (transient, retryable with backoff)
-    if any(keyword in error_message.lower() for keyword in ["throttl", "rate limit", "quota"]):
+    if any(
+        keyword in error_message.lower()
+        for keyword in ["throttl", "rate limit", "quota"]
+    ):
         return StreamingError(
             message=f"Throttling error: {error_message}",
             severity=ErrorSeverity.TRANSIENT,
@@ -81,7 +86,8 @@ def classify_error(exception: Exception) -> StreamingError:
 
     # Serialization errors (permanent)
     if any(
-        keyword in error_type.lower() for keyword in ["json", "serialization", "encoding"]
+        keyword in error_type.lower()
+        for keyword in ["json", "serialization", "encoding"]
     ):
         return StreamingError(
             message=f"Serialization error: {error_message}",

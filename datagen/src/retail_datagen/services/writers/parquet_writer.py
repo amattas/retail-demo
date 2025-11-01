@@ -70,8 +70,8 @@ class ParquetWriter(BaseWriter):
             logger.info(f"Wrote {len(df):,} records to {output_path}")
         except ImportError as e:
             logger.error(
-                f"pyarrow is required for Parquet writing. "
-                f"Install with: pip install pyarrow"
+                "pyarrow is required for Parquet writing. "
+                "Install with: pip install pyarrow"
             )
             raise ImportError(
                 "pyarrow is required for Parquet writing. "
@@ -79,7 +79,7 @@ class ParquetWriter(BaseWriter):
             ) from e
         except Exception as e:
             logger.error(f"Failed to write Parquet to {output_path}: {e}")
-            raise IOError(f"Failed to write Parquet file: {e}") from e
+            raise OSError(f"Failed to write Parquet file: {e}") from e
 
     def write_partitioned(
         self,

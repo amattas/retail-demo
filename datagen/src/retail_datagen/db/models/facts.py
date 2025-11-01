@@ -23,13 +23,14 @@ Data Flow:
 """
 
 from datetime import datetime
+
 from sqlalchemy import (
-    Integer,
-    String,
     DateTime,
     Float,
-    Index,
     ForeignKey,
+    Index,
+    Integer,
+    String,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -50,6 +51,7 @@ class DCInventoryTransaction(Base):
     - Balance tracking maintained by application logic
     - Txn_type values: 'receipt', 'shipment', 'adjustment'
     """
+
     __tablename__ = "fact_dc_inventory_txn"
 
     # Primary key
@@ -69,8 +71,8 @@ class DCInventoryTransaction(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_dc_inv_event_dc', 'event_ts', 'dc_id'),
-        Index('ix_dc_inv_event_product', 'event_ts', 'product_id'),
+        Index("ix_dc_inv_event_dc", "event_ts", "dc_id"),
+        Index("ix_dc_inv_event_product", "event_ts", "product_id"),
         {"extend_existing": True},
     )
 
@@ -97,6 +99,7 @@ class TruckMove(Base):
     - Links to both DC (origin) and Store (destination)
     - ETA/ETD nullable (may not be set for all status updates)
     """
+
     __tablename__ = "fact_truck_moves"
 
     # Primary key
@@ -113,15 +116,17 @@ class TruckMove(Base):
 
     # Logistics fields (what generator produces)
     status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    shipment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    shipment_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
     eta: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     etd: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_truck_event_truck', 'event_ts', 'truck_id'),
-        Index('ix_truck_event_store', 'event_ts', 'store_id'),
-        Index('ix_truck_shipment_status', 'shipment_id', 'status'),
+        Index("ix_truck_event_truck", "event_ts", "truck_id"),
+        Index("ix_truck_event_store", "event_ts", "store_id"),
+        Index("ix_truck_shipment_status", "shipment_id", "status"),
         {"extend_existing": True},
     )
 
@@ -149,6 +154,7 @@ class StoreInventoryTransaction(Base):
     - Txn_type values: 'delivery', 'sale', 'shrinkage', 'adjustment'
     - Source tracks origin (truck ID, 'ONLINE', 'MANUAL', etc.)
     """
+
     __tablename__ = "fact_store_inventory_txn"
 
     # Primary key
@@ -168,8 +174,8 @@ class StoreInventoryTransaction(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_store_inv_event_store', 'event_ts', 'store_id'),
-        Index('ix_store_inv_event_product', 'event_ts', 'product_id'),
+        Index("ix_store_inv_event_store", "event_ts", "store_id"),
+        Index("ix_store_inv_event_product", "event_ts", "product_id"),
         {"extend_existing": True},
     )
 
@@ -196,10 +202,13 @@ class Receipt(Base):
     - CustomerID nullable for cash transactions without loyalty card
     - Receipt lines stored separately in ReceiptLine table
     """
+
     __tablename__ = "fact_receipts"
 
     # Primary key
-    receipt_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    receipt_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
 
     # External business key (string), used to relate receipt_lines to receipts
     receipt_id_ext: Mapped[str | None] = mapped_column(
@@ -223,8 +232,8 @@ class Receipt(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_receipt_event_store', 'event_ts', 'store_id'),
-        Index('ix_receipt_event_customer', 'event_ts', 'customer_id'),
+        Index("ix_receipt_event_store", "event_ts", "store_id"),
+        Index("ix_receipt_event_customer", "event_ts", "customer_id"),
         {"extend_existing": True},
     )
 
@@ -250,6 +259,7 @@ class ReceiptLine(Base):
     - Links to Receipt via receipt_id (same database, can be FK)
     - Product pricing may differ from master due to promotions
     """
+
     __tablename__ = "fact_receipt_lines"
 
     # Primary key
@@ -257,10 +267,7 @@ class ReceiptLine(Base):
 
     # Foreign keys
     receipt_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey('fact_receipts.receipt_id'),
-        nullable=False,
-        index=True
+        Integer, ForeignKey("fact_receipts.receipt_id"), nullable=False, index=True
     )
     product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
@@ -271,7 +278,7 @@ class ReceiptLine(Base):
 
     # Index for receipt lookups
     __table_args__ = (
-        Index('ix_receipt_line_receipt_product', 'receipt_id', 'product_id'),
+        Index("ix_receipt_line_receipt_product", "receipt_id", "product_id"),
         {"extend_existing": True},
     )
 
@@ -299,10 +306,13 @@ class FootTraffic(Base):
     - Count typically 1 (single person detection per record)
     - Used for heat mapping and flow analysis
     """
+
     __tablename__ = "fact_foot_traffic"
 
     # Primary key
-    traffic_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    traffic_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
 
     # Foreign keys (references master.db tables - not enforced)
     store_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -318,9 +328,9 @@ class FootTraffic(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_foot_traffic_event_store', 'event_ts', 'store_id'),
-        Index('ix_foot_traffic_zone_event', 'zone', 'event_ts'),
-        Index('ix_foot_traffic_sensor_event', 'sensor_id', 'event_ts'),
+        Index("ix_foot_traffic_event_store", "event_ts", "store_id"),
+        Index("ix_foot_traffic_zone_event", "zone", "event_ts"),
+        Index("ix_foot_traffic_sensor_event", "sensor_id", "event_ts"),
         {"extend_existing": True},
     )
 
@@ -349,6 +359,7 @@ class BLEPing(Base):
     - Zone tracks general store area
     - Used for proximity marketing and zone analytics
     """
+
     __tablename__ = "fact_ble_pings"
 
     # Primary key
@@ -361,7 +372,9 @@ class BLEPing(Base):
     event_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
     # BLE fields (what generator produces)
-    customer_ble_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    customer_ble_id: Mapped[str] = mapped_column(
+        String(100), nullable=False, index=True
+    )
     beacon_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     rssi: Mapped[int] = mapped_column(Integer, nullable=False)  # Signal strength in dBm
     zone: Mapped[str] = mapped_column(String(50), nullable=True)
@@ -371,10 +384,10 @@ class BLEPing(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_ble_event_store', 'event_ts', 'store_id'),
-        Index('ix_ble_event_customer', 'event_ts', 'customer_id'),
-        Index('ix_ble_beacon_event', 'beacon_id', 'event_ts'),
-        Index('ix_ble_customer_ble_id', 'customer_ble_id', 'event_ts'),
+        Index("ix_ble_event_store", "event_ts", "store_id"),
+        Index("ix_ble_event_customer", "event_ts", "customer_id"),
+        Index("ix_ble_beacon_event", "beacon_id", "event_ts"),
+        Index("ix_ble_customer_ble_id", "customer_ble_id", "event_ts"),
         {"extend_existing": True},
     )
 
@@ -405,10 +418,13 @@ class MarketingImpression(Base):
     - Cost tracked in dollars per impression
     - Device values: 'mobile', 'desktop', 'tablet'
     """
+
     __tablename__ = "fact_marketing"
 
     # Primary key
-    impression_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    impression_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
 
     # Event metadata
     event_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
@@ -416,8 +432,12 @@ class MarketingImpression(Base):
     # Ad impression fields (what generator produces)
     campaign_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     creative_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    impression_id_ext: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
-    customer_ad_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    impression_id_ext: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+    customer_ad_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
     channel: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     device: Mapped[str | None] = mapped_column(String(50), nullable=True)
     cost: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -427,10 +447,10 @@ class MarketingImpression(Base):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_marketing_event_customer', 'event_ts', 'customer_id'),
-        Index('ix_marketing_channel_event', 'channel', 'event_ts'),
-        Index('ix_marketing_campaign_event', 'campaign_id', 'event_ts'),
-        Index('ix_marketing_customer_ad_id', 'customer_ad_id', 'event_ts'),
+        Index("ix_marketing_event_customer", "event_ts", "customer_id"),
+        Index("ix_marketing_channel_event", "channel", "event_ts"),
+        Index("ix_marketing_campaign_event", "campaign_id", "event_ts"),
+        Index("ix_marketing_customer_ad_id", "customer_ad_id", "event_ts"),
         {"extend_existing": True},
     )
 
@@ -458,6 +478,7 @@ class OnlineOrder(Base):
     - Customer_id references registered online customers
     - Each order creates corresponding inventory transactions
     """
+
     __tablename__ = "fact_online_orders"
 
     # Primary key
@@ -473,13 +494,23 @@ class OnlineOrder(Base):
     # Order details
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     total_amount: Mapped[float] = mapped_column(Float, nullable=False)
-    fulfillment_status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    fulfillment_status: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True
+    )
+
+    # Fulfillment details (optional - may be null for older records)
+    fulfillment_mode: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, index=True
+    )
+    node_type: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    node_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('ix_online_order_event_customer', 'event_ts', 'customer_id'),
-        Index('ix_online_order_event_product', 'event_ts', 'product_id'),
-        Index('ix_online_order_status_event', 'fulfillment_status', 'event_ts'),
+        Index("ix_online_order_event_customer", "event_ts", "customer_id"),
+        Index("ix_online_order_event_product", "event_ts", "product_id"),
+        Index("ix_online_order_status_event", "fulfillment_status", "event_ts"),
+        Index("ix_online_order_mode_node", "fulfillment_mode", "node_type", "node_id"),
         {"extend_existing": True},
     )
 

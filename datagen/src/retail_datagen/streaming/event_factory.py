@@ -10,6 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from ..shared.models import (
     Customer,
     DeviceType,
@@ -20,7 +21,6 @@ from ..shared.models import (
     Store,
     TenderType,
 )
-from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from .schemas import (
     AdImpressionPayload,
     BLEPingDetectedPayload,
@@ -412,7 +412,8 @@ class EventFactory:
                                 node_type=node_type,
                                 node_id=node_id,
                                 fulfillment_mode=pl.get("fulfillment_mode"),
-                                picked_time=event_timestamp + timedelta(seconds=self.rng.randint(60, 900)),
+                                picked_time=event_timestamp
+                                + timedelta(seconds=self.rng.randint(60, 900)),
                             )
                             events.append(
                                 EventEnvelope(
@@ -431,7 +432,8 @@ class EventFactory:
                                 node_type=node_type,
                                 node_id=node_id,
                                 fulfillment_mode=pl.get("fulfillment_mode"),
-                                shipped_time=event_timestamp + timedelta(seconds=self.rng.randint(900, 3600)),
+                                shipped_time=event_timestamp
+                                + timedelta(seconds=self.rng.randint(900, 3600)),
                             )
                             events.append(
                                 EventEnvelope(
@@ -1002,10 +1004,16 @@ class EventFactory:
     def _generate_online_order_created(
         self, timestamp: datetime
     ) -> tuple[OnlineOrderCreatedPayload, str, str]:
-        """Generate an online order created event with fulfillment details."""
+        """Generate an online order created event with fulfillment details.
+
+        Fulfillment mode distribution:
+        - SHIP_FROM_DC: 60% (most common)
+        - SHIP_FROM_STORE: 30% (ship-from-store programs)
+        - BOPIS: 10% (buy online, pick up in store)
+        """
         customer_id = self.rng.choice(list(self.customers.keys()))
         mode = self.rng.choices(
-            ["SHIP_FROM_STORE", "SHIP_FROM_DC", "BOPIS"], weights=[0.55, 0.35, 0.10]
+            ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10]
         )[0]
 
         if mode in ("SHIP_FROM_STORE", "BOPIS"):

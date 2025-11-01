@@ -15,6 +15,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+from retail_datagen.config.models import MarketingCostConfig
 from retail_datagen.shared.models import (
     Customer,
     DeviceType,
@@ -29,7 +30,9 @@ from retail_datagen.shared.models import (
 )
 
 # Marketing campaign generation constants
-CAMPAIGN_START_PROBABILITY = 0.90  # Probability of starting new campaigns when no campaign is active
+CAMPAIGN_START_PROBABILITY = (
+    0.90  # Probability of starting new campaigns when no campaign is active
+)
 
 
 class ShoppingBehaviorType(Enum):
@@ -1025,17 +1028,24 @@ class MarketingCampaignSimulator:
     impression generation with realistic costs and conversion patterns.
     """
 
-    def __init__(self, customers: list[Customer], seed: int = 42):
+    def __init__(
+        self,
+        customers: list[Customer],
+        seed: int = 42,
+        cost_config: MarketingCostConfig | None = None,
+    ):
         """
         Initialize marketing campaign simulator.
 
         Args:
             customers: List of customer dimension records
             seed: Random seed for reproducible campaigns
+            cost_config: Marketing cost configuration (uses defaults if None)
         """
         self.customers = customers
         self._rng = random.Random(seed)
         self._impression_counter = 0  # Counter for unique impression IDs
+        self.cost_config = cost_config or MarketingCostConfig()
 
         # Campaign types and their characteristics
         self._campaign_types = {
@@ -1087,6 +1097,80 @@ class MarketingCampaignSimulator:
         # Active campaigns tracking
         self._active_campaigns: dict[str, dict] = {}
         self._campaign_counter = 1
+
+    def calculate_impression_cost(
+        self, channel: MarketingChannel, device: DeviceType
+    ) -> Decimal:
+        """
+        Calculate cost for a single impression based on channel and device.
+
+        Args:
+            channel: Marketing channel for the impression
+            device: Device type for the impression
+
+        Returns:
+            Calculated cost as Decimal
+        """
+        # Get channel cost range based on channel type
+        channel_cost_ranges = {
+            MarketingChannel.EMAIL: (
+                self.cost_config.email_cost_min,
+                self.cost_config.email_cost_max,
+            ),
+            MarketingChannel.DISPLAY: (
+                self.cost_config.display_cost_min,
+                self.cost_config.display_cost_max,
+            ),
+            MarketingChannel.SOCIAL: (
+                self.cost_config.social_cost_min,
+                self.cost_config.social_cost_max,
+            ),
+            MarketingChannel.SEARCH: (
+                self.cost_config.search_cost_min,
+                self.cost_config.search_cost_max,
+            ),
+            MarketingChannel.VIDEO: (
+                self.cost_config.video_cost_min,
+                self.cost_config.video_cost_max,
+            ),
+            MarketingChannel.FACEBOOK: (
+                self.cost_config.facebook_cost_min,
+                self.cost_config.facebook_cost_max,
+            ),
+            MarketingChannel.GOOGLE: (
+                self.cost_config.google_cost_min,
+                self.cost_config.google_cost_max,
+            ),
+            MarketingChannel.INSTAGRAM: (
+                self.cost_config.instagram_cost_min,
+                self.cost_config.instagram_cost_max,
+            ),
+            MarketingChannel.YOUTUBE: (
+                self.cost_config.youtube_cost_min,
+                self.cost_config.youtube_cost_max,
+            ),
+        }
+
+        # Get device multiplier based on device type
+        device_multipliers = {
+            DeviceType.MOBILE: self.cost_config.mobile_multiplier,
+            DeviceType.TABLET: self.cost_config.tablet_multiplier,
+            DeviceType.DESKTOP: self.cost_config.desktop_multiplier,
+        }
+
+        # Calculate base cost from channel range
+        cost_min, cost_max = channel_cost_ranges.get(
+            channel,
+            (0.25, 0.25),  # Default fallback
+        )
+        base_cost = self._rng.uniform(cost_min, cost_max)
+
+        # Apply device multiplier
+        device_multiplier = device_multipliers.get(device, 1.0)
+        final_cost = base_cost * device_multiplier
+
+        # Return as Decimal with 4 decimal places for precision
+        return Decimal(str(round(final_cost, 4)))
 
     def start_campaign(self, campaign_type: str, start_date: datetime) -> str:
         """
@@ -1220,13 +1304,16 @@ class MarketingCampaignSimulator:
                 self._impression_counter += 1
                 impression_id = f"IMP{self._impression_counter:010d}"
 
+                # Calculate cost based on channel and device
+                impression_cost = self.calculate_impression_cost(channel, device)
+
                 impression = {
                     "Channel": channel,
                     "CampaignId": campaign_id,
                     "CreativeId": creative_id,
                     "CustomerAdId": target_customer.AdId,
                     "ImpressionId": impression_id,
-                    "Cost": config["cost_per_impression"],
+                    "Cost": impression_cost,
                     "Device": device,
                     "EventTS": date,
                 }

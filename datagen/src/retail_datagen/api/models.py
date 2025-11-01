@@ -71,8 +71,7 @@ class HistoricalDataRequest(BaseModel):
     tables: list[str] | None = Field(
         None,
         description=(
-            "Specific fact tables to generate. "
-            "If None, all tables are generated."
+            "Specific fact tables to generate. If None, all tables are generated."
         ),
         examples=[["receipts", "receipt_lines", "store_inventory_txn"]],
     )
@@ -178,48 +177,39 @@ class GenerationStatusResponse(BaseModel):
 
     # Enhanced progress tracking fields (all optional for backward compatibility)
     tables_in_progress: list[str] | None = Field(
-        None,
-        description="List of fact tables currently being generated"
+        None, description="List of fact tables currently being generated"
     )
     estimated_seconds_remaining: float | None = Field(
-        None,
-        ge=0.0,
-        description="Estimated seconds until completion (approximate)"
+        None, ge=0.0, description="Estimated seconds until completion (approximate)"
     )
     progress_rate: float | None = Field(
-        None,
-        ge=0.0,
-        description="Progress per second (rolling average)"
+        None, ge=0.0, description="Progress per second (rolling average)"
     )
     last_update_timestamp: datetime | None = Field(
-        None,
-        description="ISO-8601 timestamp of last progress update"
+        None, description="ISO-8601 timestamp of last progress update"
     )
     sequence: int | None = Field(
         None,
-        description="Monotonic update sequence (drop older updates on UI if needed)"
+        description="Monotonic update sequence (drop older updates on UI if needed)",
     )
 
     # Hourly progress tracking fields (Phase 1B enhancements)
     current_day: int | None = Field(
         None,
         ge=1,
-        description="Current day being processed (1-indexed, e.g., 1 = first day)"
+        description="Current day being processed (1-indexed, e.g., 1 = first day)",
     )
     current_hour: int | None = Field(
         None,
         ge=0,
         le=23,
-        description="Current hour being processed (0-23, within the current day)"
+        description="Current hour being processed (0-23, within the current day)",
     )
     hourly_progress: dict[str, float] | None = Field(
-        None,
-        description="Per-table hourly progress (0.0 to 1.0) for current hour"
+        None, description="Per-table hourly progress (0.0 to 1.0) for current hour"
     )
     total_hours_completed: int | None = Field(
-        None,
-        ge=0,
-        description="Total hours processed across all days so far"
+        None, ge=0, description="Total hours processed across all days so far"
     )
 
     model_config = ConfigDict(
@@ -229,8 +219,17 @@ class GenerationStatusResponse(BaseModel):
                 "progress": 0.45,
                 "message": "Processing receipts (3/8 tables complete)",
                 "estimated_completion": "2025-10-21T14:30:00Z",
-                "tables_completed": ["dc_inventory_txn", "truck_moves", "store_inventory_txn"],
-                "tables_remaining": ["receipt_lines", "foot_traffic", "ble_pings", "marketing"],
+                "tables_completed": [
+                    "dc_inventory_txn",
+                    "truck_moves",
+                    "store_inventory_txn",
+                ],
+                "tables_remaining": [
+                    "receipt_lines",
+                    "foot_traffic",
+                    "ble_pings",
+                    "marketing",
+                ],
                 "current_table": "receipts",
                 "tables_failed": [],
                 "tables_in_progress": ["receipts"],
@@ -243,7 +242,7 @@ class GenerationStatusResponse(BaseModel):
                     "receipt_lines": 0.0,
                     "foot_traffic": 0.0,
                     "ble_pings": 0.0,
-                    "marketing": 0.0
+                    "marketing": 0.0,
                 },
                 "estimated_seconds_remaining": 45.2,
                 "progress_rate": 0.01,
@@ -253,9 +252,9 @@ class GenerationStatusResponse(BaseModel):
                 "hourly_progress": {
                     "receipts": 0.65,
                     "receipt_lines": 0.43,
-                    "store_inventory_txn": 0.78
+                    "store_inventory_txn": 0.78,
                 },
-                "total_hours_completed": 98
+                "total_hours_completed": 98,
             }
         }
     )

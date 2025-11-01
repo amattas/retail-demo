@@ -3,6 +3,8 @@ FastAPI web interface for the retail data generator.
 """
 
 from .export_models import (
+    VALID_FACT_TABLES,
+    VALID_MASTER_TABLES,
     ExportFormat,
     ExportOperationResult,
     ExportRequest,
@@ -13,8 +15,6 @@ from .export_models import (
     FactExportRequest,
     TableCategory,
     validate_table_names,
-    VALID_FACT_TABLES,
-    VALID_MASTER_TABLES,
 )
 from .models import (
     ActiveDisruptionsResponse,

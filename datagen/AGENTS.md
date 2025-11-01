@@ -20,28 +20,48 @@ Authoritative spec for data contracts, invariants, safety rules, and contributor
 - `product_companies.csv`: 112 companies (current repo)
 - `product_brands.csv`: 629 brand-company-category mappings (current repo)
 - `products.csv`: 599 base products (current repo)
+- `tax_jurisdictions.csv`: Tax rates by state/county/city `(StateCode, County, City, CombinedRate)`
 
 ### Master Dimensions (outputs)
 - `geographies_master.csv`: `ID, City, State, ZipCode, District, Region`
-- `stores.csv`: `ID, StoreNumber, Address, GeographyID`
+- `stores.csv`: `ID, StoreNumber, Address, GeographyID, tax_rate`
 - `distribution_centers.csv`: `ID, DCNumber, Address, GeographyID`
 - `trucks.csv`: `ID, LicensePlate, Refrigeration, DCID`
 - `customers.csv`: `ID, FirstName, LastName, Address, GeographyID, LoyaltyCard, Phone, BLEId, AdId`
-- `products_master.csv`: `ID, ProductName, Brand, Company, Department, Category, Subcategory, Cost, MSRP, SalePrice, RequiresRefrigeration, LaunchDate`
+- `products_master.csv`: `ID, ProductName, Brand, Company, Department, Category, Subcategory, Cost, MSRP, SalePrice, RequiresRefrigeration, LaunchDate, taxability`
 - Snapshots: `dc_inventory_snapshots.csv`, `store_inventory_snapshots.csv`
 
-Pricing invariants: Cost < SalePrice ≤ MSRP; Cost is 50–85% of SalePrice.
+**Pricing invariants**: Cost < SalePrice ≤ MSRP; Cost is 50–85% of SalePrice.
+
+**Tax system**:
+- Stores have jurisdiction-based `tax_rate` (0% to 10.25%) based on geography
+- Products have `taxability` field (TAXABLE, NON_TAXABLE, REDUCED_RATE)
+- Tax calculation: `tax = subtotal * store.tax_rate * product.taxability_multiplier`
+- Default tax rate: 7.407% if jurisdiction not found in tax_jurisdictions.csv
+
+**Truck assignment**:
+- Trucks can be assigned to DCs (DCID set) or pool/rental (DCID = NULL)
+- Default assignment rate: 85% of DC-to-Store trucks assigned to DCs, 15% pool
+- All supplier-to-DC trucks are pool trucks (DCID = NULL)
+- Configurable via `volume.truck_dc_assignment_rate` or `volume.trucks_per_dc`
 
 ### Fact Tables (historical)
 - `dc_inventory_txn`: `TraceId, EventTS, DCID, ProductID, QtyDelta, Reason`
 - `truck_moves`: `TraceId, EventTS, TruckId, DCID, StoreID, ShipmentId, Status, ETA, ETD`
 - `store_inventory_txn`: `TraceId, EventTS, StoreID, ProductID, QtyDelta, Reason, Source`
+  - `Reason` (optional): InventoryReason enum (INBOUND_SHIPMENT, SALE, RETURN, ADJUSTMENT, etc.)
+  - `Source` (optional): Source identifier (truck ID, receipt ID, adjustment ID)
 - `receipts`: `TraceId, EventTS, StoreID, CustomerID, ReceiptId, Subtotal, Tax, Total, TenderType`
+  - `Tax` calculated using store-specific tax rate and product taxability
 - `receipt_lines`: `TraceId, EventTS, ReceiptId, Line, ProductID, Qty, UnitPrice, ExtPrice, PromoCode`
 - `foot_traffic`: `TraceId, EventTS, StoreID, SensorId, Zone, Dwell, Count`
 - `ble_pings`: `TraceId, EventTS, StoreID, BeaconId, CustomerBLEId, RSSI, Zone`
 - `marketing`: `TraceId, EventTS, Channel, CampaignId, CreativeId, CustomerAdId, ImpressionId, Cost, Device`
-- `online_orders`: `TraceId, EventTS, OrderId, CustomerID, FulfillmentMode, FulfillmentNodeType, FulfillmentNodeID, Subtotal, Tax, Total, TenderType`
+  - `Cost` varies by channel ($0.10-$5.25) and device multiplier (1.0x mobile, 1.2x tablet, 1.5x desktop)
+- `online_orders`: `TraceId, EventTS, OrderId, CustomerID, ProductID, Qty, Subtotal, Tax, Total, TenderType, FulfillmentStatus, FulfillmentMode, NodeType, NodeID`
+  - `FulfillmentMode` (optional): SHIP_FROM_DC (60%), SHIP_FROM_STORE (30%), BOPIS (10%)
+  - `NodeType` (optional): STORE or DC (indicates fulfillment location type)
+  - `NodeID` (optional): Store ID or DC ID performing fulfillment
 
 ### Real-Time Event Envelope
 ```

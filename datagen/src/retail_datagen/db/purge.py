@@ -29,21 +29,21 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import text, select, func
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from retail_datagen.db.models.watermarks import FactDataWatermark
 from retail_datagen.db.models.facts import (
-    DCInventoryTransaction,
-    TruckMove,
-    StoreInventoryTransaction,
-    Receipt,
-    ReceiptLine,
-    FootTraffic,
     BLEPing,
+    DCInventoryTransaction,
+    FootTraffic,
     MarketingImpression,
     OnlineOrder,
+    Receipt,
+    ReceiptLine,
+    StoreInventoryTransaction,
+    TruckMove,
 )
+from retail_datagen.db.models.watermarks import FactDataWatermark
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,9 @@ async def update_publication_watermark(
             and watermark.earliest_unpublished_ts <= published_up_to_ts
         ):
             # Set to 1 second after published timestamp
-            watermark.earliest_unpublished_ts = published_up_to_ts + timedelta(seconds=1)
+            watermark.earliest_unpublished_ts = published_up_to_ts + timedelta(
+                seconds=1
+            )
 
         logger.info(
             f"Updated watermark for {fact_table_name}: "
@@ -324,8 +326,10 @@ async def purge_published_data(
         }
 
     # Count rows to delete
-    count_stmt = select(func.count()).select_from(table_class).where(
-        table_class.event_ts < purge_cutoff
+    count_stmt = (
+        select(func.count())
+        .select_from(table_class)
+        .where(table_class.event_ts < purge_cutoff)
     )
     result = await session.execute(count_stmt)
     rows_to_delete = result.scalar_one()
@@ -352,7 +356,9 @@ async def purge_published_data(
         }
 
     # Get database size before purge (for disk space calculation)
-    size_before_stmt = text("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
+    size_before_stmt = text(
+        "SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"
+    )
     result = await session.execute(size_before_stmt)
     size_before_bytes = result.scalar_one()
 
@@ -370,8 +376,7 @@ async def purge_published_data(
             f")"
         )
         result = await session.execute(
-            delete_stmt,
-            {"cutoff": purge_cutoff, "batch_size": BATCH_SIZE}
+            delete_stmt, {"cutoff": purge_cutoff, "batch_size": BATCH_SIZE}
         )
         deleted = result.rowcount
 
@@ -379,7 +384,9 @@ async def purge_published_data(
             break
 
         total_deleted += deleted
-        logger.debug(f"Deleted {deleted} rows from {fact_table_name} (total: {total_deleted})")
+        logger.debug(
+            f"Deleted {deleted} rows from {fact_table_name} (total: {total_deleted})"
+        )
 
         # Commit batch
         await session.commit()
@@ -542,7 +549,9 @@ async def get_purge_candidates(
             # Adjust cutoff if it would delete unpublished data
             if watermark.earliest_unpublished_ts is not None:
                 if purge_cutoff >= watermark.earliest_unpublished_ts:
-                    purge_cutoff = watermark.earliest_unpublished_ts - timedelta(seconds=1)
+                    purge_cutoff = watermark.earliest_unpublished_ts - timedelta(
+                        seconds=1
+                    )
 
             # Get ORM class
             table_class = FACT_TABLE_MAPPING.get(fact_table_name)
@@ -550,8 +559,10 @@ async def get_purge_candidates(
                 continue
 
             # Count eligible rows
-            count_stmt = select(func.count()).select_from(table_class).where(
-                table_class.event_ts < purge_cutoff
+            count_stmt = (
+                select(func.count())
+                .select_from(table_class)
+                .where(table_class.event_ts < purge_cutoff)
             )
             result = await session.execute(count_stmt)
             estimated_rows = result.scalar_one()
@@ -621,8 +632,7 @@ async def get_watermark_status(
     # Create status for all fact tables
     for fact_table_name in FACT_TABLE_MAPPING.keys():
         watermark = next(
-            (w for w in watermarks if w.fact_table_name == fact_table_name),
-            None
+            (w for w in watermarks if w.fact_table_name == fact_table_name), None
         )
 
         if watermark is None:

@@ -13,8 +13,7 @@ All models include proper relationships, indexes, and constraints aligned with
 the existing Pydantic models in shared/models.py.
 """
 
-from datetime import date, datetime
-from typing import List
+from datetime import date
 
 from sqlalchemy import (
     Boolean,
@@ -70,13 +69,13 @@ class Geography(Base):
     )
 
     # Relationships (back-populated from related tables)
-    stores: Mapped[List["Store"]] = relationship(
+    stores: Mapped[list["Store"]] = relationship(
         "Store", back_populates="geography", lazy="selectin"
     )
-    distribution_centers: Mapped[List["DistributionCenter"]] = relationship(
+    distribution_centers: Mapped[list["DistributionCenter"]] = relationship(
         "DistributionCenter", back_populates="geography", lazy="selectin"
     )
-    customers: Mapped[List["Customer"]] = relationship(
+    customers: Mapped[list["Customer"]] = relationship(
         "Customer", back_populates="geography", lazy="selectin"
     )
 
@@ -191,7 +190,7 @@ class DistributionCenter(Base):
     geography: Mapped["Geography"] = relationship(
         "Geography", back_populates="distribution_centers", lazy="joined"
     )
-    trucks: Mapped[List["Truck"]] = relationship(
+    trucks: Mapped[list["Truck"]] = relationship(
         "Truck", back_populates="distribution_center", lazy="selectin"
     )
 
@@ -262,7 +261,10 @@ class Truck(Base):
         Index("idx_truck_dc", "DCID"),
         Index("idx_truck_license_plate", "LicensePlate"),
         Index("idx_truck_refrigeration", "Refrigeration"),
-        {"extend_existing": True, "comment": "Truck dimension table for supply chain logistics"},
+        {
+            "extend_existing": True,
+            "comment": "Truck dimension table for supply chain logistics",
+        },
     )
 
     def __repr__(self) -> str:
@@ -293,7 +295,11 @@ class Customer(Base):
         "FirstName", String(50), nullable=False, comment="Synthetic first name"
     )
     last_name: Mapped[str] = mapped_column(
-        "LastName", String(50), nullable=False, index=True, comment="Synthetic last name"
+        "LastName",
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Synthetic last name",
     )
     address: Mapped[str] = mapped_column(
         "Address", Text, nullable=False, comment="Synthetic street address"
@@ -350,7 +356,10 @@ class Customer(Base):
         Index("idx_customer_loyalty_card", "LoyaltyCard"),
         Index("idx_customer_ble_id", "BLEId"),
         Index("idx_customer_ad_id", "AdId"),
-        {"extend_existing": True, "comment": "Customer dimension table (100% synthetic data)"},
+        {
+            "extend_existing": True,
+            "comment": "Customer dimension table (100% synthetic data)",
+        },
     )
 
     def __repr__(self) -> str:
@@ -393,7 +402,11 @@ class Product(Base):
 
     # Category hierarchy
     department: Mapped[str] = mapped_column(
-        "Department", String(100), nullable=False, index=True, comment="Product department"
+        "Department",
+        String(100),
+        nullable=False,
+        index=True,
+        comment="Product department",
     )
     category: Mapped[str] = mapped_column(
         "Category", String(100), nullable=False, index=True, comment="Product category"
@@ -440,7 +453,10 @@ class Product(Base):
         Index("idx_product_refrigeration", "RequiresRefrigeration"),
         Index("idx_product_sale_price", "SalePrice"),
         Index("idx_product_launch_date", "LaunchDate"),
-        {"extend_existing": True, "comment": "Product master dimension table (100% synthetic data)"},
+        {
+            "extend_existing": True,
+            "comment": "Product master dimension table (100% synthetic data)",
+        },
     )
 
     def __repr__(self) -> str:

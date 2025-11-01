@@ -12,14 +12,14 @@ import logging
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from retail_datagen.db.config import DatabaseConfig
 from retail_datagen.db.engine import (
     dispose_engines,
-    get_retail_engine,
     get_facts_engine,
     get_master_engine,
+    get_retail_engine,
 )
 from retail_datagen.db.init import (
     check_database_integrity,
@@ -28,12 +28,12 @@ from retail_datagen.db.init import (
     init_databases,
 )
 from retail_datagen.db.session import (
-    retail_session_maker,
     facts_session_maker,
-    get_retail_session,
     get_facts_session,
     get_master_session,
+    get_retail_session,
     master_session_maker,
+    retail_session_maker,
 )
 
 logger = logging.getLogger(__name__)

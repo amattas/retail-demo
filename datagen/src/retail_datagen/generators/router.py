@@ -5,7 +5,6 @@ This module provides REST API endpoints for generating master data (dimensions)
 and historical fact data with comprehensive status tracking and validation.
 """
 
-import asyncio
 import logging
 import time
 from datetime import datetime
@@ -56,17 +55,24 @@ MASTER_TABLES = [
 ]
 
 # Mapping of table names to SQLAlchemy models
-from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
 from ..db.models.facts import (
-    DCInventoryTransaction,
-    TruckMove,
-    StoreInventoryTransaction,
-    Receipt,
-    ReceiptLine,
-    FootTraffic,
     BLEPing,
+    DCInventoryTransaction,
+    FootTraffic,
     MarketingImpression,
     OnlineOrder,
+    Receipt,
+    ReceiptLine,
+    StoreInventoryTransaction,
+    TruckMove,
+)
+from ..db.models.master import (
+    Customer,
+    DistributionCenter,
+    Geography,
+    Product,
+    Store,
+    Truck,
 )
 
 # Master table models
@@ -140,7 +146,9 @@ async def generate_all_master_data(
         try:
             start_time = time.perf_counter()
 
-            def compute_timing_metrics(progress_value: float) -> tuple[float | None, float | None]:
+            def compute_timing_metrics(
+                progress_value: float,
+            ) -> tuple[float | None, float | None]:
                 """Return ETA and progress rate for the given completion fraction."""
                 elapsed = time.perf_counter() - start_time
                 clamped_progress = max(0.0, min(1.0, progress_value))
@@ -177,7 +185,7 @@ async def generate_all_master_data(
                 }
 
             table_progress = {table: 0.0 for table in tables_to_generate}
-            requested_tables = set(tables_to_generate)
+            set(tables_to_generate)
 
             # Short-circuit when everything already exists and regeneration not forced
             if not request.force_regenerate:
@@ -222,15 +230,17 @@ async def generate_all_master_data(
                 if table_name not in table_progress:
                     return
 
-                table_progress[table_name] = max(
-                    0.0, min(1.0, progress_value)
-                )
+                table_progress[table_name] = max(0.0, min(1.0, progress_value))
 
                 overall_progress = (
-                    sum(table_progress.values()) / total_tables if total_tables else progress_value
+                    sum(table_progress.values()) / total_tables
+                    if total_tables
+                    else progress_value
                 )
                 eta_estimate, rate_estimate = compute_timing_metrics(overall_progress)
-                callback_message = detail_message or f"Generating {table_name.replace('_', ' ')}"
+                callback_message = (
+                    detail_message or f"Generating {table_name.replace('_', ' ')}"
+                )
 
                 # Pass through state lists from generator without modification
                 # Generator's TableProgressTracker provides correct states
@@ -262,8 +272,9 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
-            from retail_datagen.db.session import get_retail_session
             from sqlalchemy import text
+
+            from retail_datagen.db.session import get_retail_session
 
             async with get_retail_session() as session:
                 # Clear existing data to avoid UNIQUE constraint violations
@@ -280,9 +291,7 @@ async def generate_all_master_data(
                 await session.flush()  # Flush deletes immediately
                 logger.info("Existing master data cleared")
 
-                await master_generator.generate_all_master_data_async(
-                    session=session
-                )
+                await master_generator.generate_all_master_data_async(session=session)
                 # Context manager will commit everything on exit
 
             for table in table_progress:
@@ -293,28 +302,55 @@ async def generate_all_master_data(
             # Prefer DB-confirmed counts to avoid cache/DB drift
             final_counts = {}
             try:
-                from sqlalchemy import select, func
+                from sqlalchemy import func, select
+
+                from ..db.models.master import (
+                    Customer,
+                    DistributionCenter,
+                    Geography,
+                    Product,
+                    Store,
+                    Truck,
+                )
                 from ..db.session import get_retail_session
-                from ..db.models.master import Geography, Store, DistributionCenter, Truck, Customer, Product
 
                 async with get_retail_session() as s2:
-                    final_counts["geographies_master"] = (await s2.execute(select(func.count()).select_from(Geography))).scalar() or 0
-                    final_counts["stores"] = (await s2.execute(select(func.count()).select_from(Store))).scalar() or 0
-                    final_counts["distribution_centers"] = (await s2.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
-                    final_counts["trucks"] = (await s2.execute(select(func.count()).select_from(Truck))).scalar() or 0
-                    final_counts["customers"] = (await s2.execute(select(func.count()).select_from(Customer))).scalar() or 0
-                    final_counts["products_master"] = (await s2.execute(select(func.count()).select_from(Product))).scalar() or 0
+                    final_counts["geographies_master"] = (
+                        await s2.execute(select(func.count()).select_from(Geography))
+                    ).scalar() or 0
+                    final_counts["stores"] = (
+                        await s2.execute(select(func.count()).select_from(Store))
+                    ).scalar() or 0
+                    final_counts["distribution_centers"] = (
+                        await s2.execute(
+                            select(func.count()).select_from(DistributionCenter)
+                        )
+                    ).scalar() or 0
+                    final_counts["trucks"] = (
+                        await s2.execute(select(func.count()).select_from(Truck))
+                    ).scalar() or 0
+                    final_counts["customers"] = (
+                        await s2.execute(select(func.count()).select_from(Customer))
+                    ).scalar() or 0
+                    final_counts["products_master"] = (
+                        await s2.execute(select(func.count()).select_from(Product))
+                    ).scalar() or 0
 
                 # Update dashboard cache with DB counts
                 try:
                     from ..shared.cache import CacheManager
+
                     cache = CacheManager()
                     for k, v in final_counts.items():
                         cache.update_master_table(k, int(v), "Master Data")
                 except Exception as cache_exc:
-                    logger.warning(f"Failed to update dashboard cache with DB counts: {cache_exc}")
+                    logger.warning(
+                        f"Failed to update dashboard cache with DB counts: {cache_exc}"
+                    )
             except Exception as count_exc:
-                logger.warning(f"Failed to query DB counts; falling back to in-memory counts: {count_exc}")
+                logger.warning(
+                    f"Failed to query DB counts; falling back to in-memory counts: {count_exc}"
+                )
                 final_counts = {
                     "geographies_master": len(master_generator.geography_master),
                     "stores": len(master_generator.stores),
@@ -409,7 +445,11 @@ async def get_master_generation_status(
     )
 
     # Add completed tables from result if available and not already set
-    if not response.tables_completed and "result" in task_status and task_status["result"]:
+    if (
+        not response.tables_completed
+        and "result" in task_status
+        and task_status["result"]
+    ):
         result = task_status["result"]
         response.tables_completed = result.get("tables_generated", [])
 
@@ -453,8 +493,9 @@ async def generate_specific_master_table(
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
             # Generate all master tables (SQLite requires sequential mode)
-            from retail_datagen.db.session import get_retail_session
             from sqlalchemy import text
+
+            from retail_datagen.db.session import get_retail_session
 
             async with get_retail_session() as session:
                 # Clear existing data to avoid UNIQUE constraint violations
@@ -581,16 +622,35 @@ async def generate_historical_data(
 
             # Pre-check: validate retail DB has required rows for historical generation
             try:
-                from sqlalchemy import select, func
+                from sqlalchemy import func, select
+
+                from ..db.models.master import (
+                    Customer,
+                    DistributionCenter,
+                    Geography,
+                    Product,
+                    Store,
+                )
                 from ..db.session import get_retail_session
-                from ..db.models.master import Geography, Store, DistributionCenter, Customer, Product
 
                 async with get_retail_session() as s:
-                    geo_cnt = (await s.execute(select(func.count()).select_from(Geography))).scalar() or 0
-                    store_cnt = (await s.execute(select(func.count()).select_from(Store))).scalar() or 0
-                    dc_cnt = (await s.execute(select(func.count()).select_from(DistributionCenter))).scalar() or 0
-                    cust_cnt = (await s.execute(select(func.count()).select_from(Customer))).scalar() or 0
-                    prod_cnt = (await s.execute(select(func.count()).select_from(Product))).scalar() or 0
+                    geo_cnt = (
+                        await s.execute(select(func.count()).select_from(Geography))
+                    ).scalar() or 0
+                    store_cnt = (
+                        await s.execute(select(func.count()).select_from(Store))
+                    ).scalar() or 0
+                    dc_cnt = (
+                        await s.execute(
+                            select(func.count()).select_from(DistributionCenter)
+                        )
+                    ).scalar() or 0
+                    cust_cnt = (
+                        await s.execute(select(func.count()).select_from(Customer))
+                    ).scalar() or 0
+                    prod_cnt = (
+                        await s.execute(select(func.count()).select_from(Product))
+                    ).scalar() or 0
 
                 update_task_progress(
                     task_id,
@@ -639,7 +699,9 @@ async def generate_historical_data(
                 filtered_table_progress = None
                 if table_progress is not None:
                     filtered_table_progress = {
-                        name: value for name, value in table_progress.items() if name in FACT_TABLES
+                        name: value
+                        for name, value in table_progress.items()
+                        if name in FACT_TABLES
                     }
 
                 # Filter state lists to only known UI fact tables
@@ -678,7 +740,9 @@ async def generate_historical_data(
                 )
 
             # Also wire a master-style per-table progress callback for consistent UI updates
-            per_table_progress: dict[str, float] = {table: 0.0 for table in tables_to_generate}
+            per_table_progress: dict[str, float] = {
+                table: 0.0 for table in tables_to_generate
+            }
             progress_lock = Lock()
 
             def per_table_callback(
@@ -708,7 +772,8 @@ async def generate_historical_data(
 
                     overall_progress = (
                         sum(per_table_progress.values()) / len(per_table_progress)
-                        if per_table_progress else progress_value
+                        if per_table_progress
+                        else progress_value
                     )
 
                     # Pass through state lists from generator without modification
@@ -717,8 +782,10 @@ async def generate_historical_data(
                     update_task_progress(
                         task_id,
                         overall_progress,
-                        detail_message or f"Generating {table_name.replace('_',' ')}",
-                        table_progress=dict(per_table_progress),  # Pass copy while locked
+                        detail_message or f"Generating {table_name.replace('_', ' ')}",
+                        table_progress=dict(
+                            per_table_progress
+                        ),  # Pass copy while locked
                         tables_completed=tables_completed or [],
                         tables_in_progress=tables_in_progress or [],
                         tables_remaining=tables_remaining or [],
@@ -758,14 +825,15 @@ async def generate_historical_data(
             except Exception:
                 pass
 
-            logger.info(f"Starting historical generation from {start_date.date()} to {end_date.date()}")
+            logger.info(
+                f"Starting historical generation from {start_date.date()} to {end_date.date()}"
+            )
 
             # Generate historical data using the fact generator
             # Note: generate_historical_data is now async (Phase 3B SQLite migration)
             # Note: Parallel processing not supported with SQLite (sequential only)
             summary = await fact_generator.generate_historical_data(
-                start_date,
-                end_date
+                start_date, end_date
             )
 
             # Update generation state with the end timestamp
@@ -986,6 +1054,7 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
 
         # Clear all data in unified retail SQLite database
         from sqlalchemy import text
+
         from ..db.session import get_retail_session
 
         # All tables to truncate (master + facts)
@@ -1017,6 +1086,7 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
 
         # VACUUM unified retail database
         from ..db.engine import get_retail_engine
+
         retail_engine = get_retail_engine()
         async with retail_engine.begin() as conn:
             await conn.execute(text("VACUUM"))
@@ -1069,6 +1139,7 @@ async def clear_fact_data(config: RetailConfig = Depends(get_config)):
 
         # Clear fact data in unified retail SQLite database
         from sqlalchemy import text
+
         from ..db.session import get_retail_session
 
         # Truncate facts tables and watermarks (preserve master data)
@@ -1092,6 +1163,7 @@ async def clear_fact_data(config: RetailConfig = Depends(get_config)):
 
         # VACUUM unified retail database
         from ..db.engine import get_retail_engine
+
         retail_engine = get_retail_engine()
         async with retail_engine.begin() as conn:
             await conn.execute(text("VACUUM"))
@@ -1100,7 +1172,9 @@ async def clear_fact_data(config: RetailConfig = Depends(get_config)):
         results = state_manager.clear_fact_data(config_paths)
 
         if results.get("errors"):
-            logger.warning(f"Fact data clearing completed with errors: {results['errors']}")
+            logger.warning(
+                f"Fact data clearing completed with errors: {results['errors']}"
+            )
             return OperationResult(
                 success=True,
                 message=f"Fact data cleared with some errors. Files deleted: {len(results.get('files_deleted', []))}, Errors: {len(results['errors'])}",
@@ -1147,7 +1221,8 @@ async def list_master_tables():
 async def list_fact_tables(config: RetailConfig = Depends(get_config)):
     """List all generated fact tables (SQLite-backed)."""
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..db.session import get_retail_session
 
         tables_with_data: list[str] = []
@@ -1188,7 +1263,8 @@ async def get_table_summary(table_name: str):
     is_master = table_name in MASTER_TABLE_MODELS
 
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..db.session import get_retail_session
 
         async with get_retail_session() as session:
@@ -1245,13 +1321,16 @@ async def preview_table(
         )
 
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..db.session import get_retail_session
 
         async with get_retail_session() as session:
             table = model.__table__
             # Get total row count
-            count_result = await session.execute(select(func.count()).select_from(table))
+            count_result = await session.execute(
+                select(func.count()).select_from(table)
+            )
             total_rows = count_result.scalar() or 0
             # Get preview rows via Core for speed; returns Mapping[str, Any]
             result = await session.execute(select(table).limit(limit))
@@ -1259,7 +1338,14 @@ async def preview_table(
             columns = [col.name for col in table.c]
             preview_rows = []
             for r in rows:
-                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
+                row_dict = {
+                    c: (
+                        r[c]
+                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
+                        else str(r[c])
+                    )
+                    for c in columns
+                }
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1290,6 +1376,7 @@ async def preview_table_unified(
 ):
     # Delegate to existing preview handler
     return await preview_table(table_name=table_name, limit=limit)
+
 
 # ================================
 # OPERATION CONTROL ENDPOINTS
@@ -1342,20 +1429,30 @@ async def preview_master_table_alias(
         )
 
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..db.session import get_retail_session
 
         model = MASTER_TABLE_MODELS[table_name]
         async with get_retail_session() as session:
             table = model.__table__
-            count_result = await session.execute(select(func.count()).select_from(table))
+            count_result = await session.execute(
+                select(func.count()).select_from(table)
+            )
             total_rows = count_result.scalar() or 0
             result = await session.execute(select(table).limit(limit))
             rows = result.mappings().all()
             columns = [col.name for col in table.c]
             preview_rows: list[dict[str, object]] = []
             for r in rows:
-                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
+                row_dict = {
+                    c: (
+                        r[c]
+                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
+                        else str(r[c])
+                    )
+                    for c in columns
+                }
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1390,14 +1487,17 @@ async def preview_fact_table_alias(
         )
 
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..db.session import get_retail_session
 
         model = FACT_TABLE_MODELS[table_name]
         async with get_retail_session() as session:
             table = model.__table__
             # Total count
-            count_result = await session.execute(select(func.count()).select_from(table))
+            count_result = await session.execute(
+                select(func.count()).select_from(table)
+            )
             total_rows = count_result.scalar() or 0
 
             if total_rows == 0:
@@ -1412,12 +1512,22 @@ async def preview_fact_table_alias(
 
             # Return recent rows if we have data
             from sqlalchemy import desc
-            result = await session.execute(select(table).order_by(desc(table.c.event_ts)).limit(limit))
+
+            result = await session.execute(
+                select(table).order_by(desc(table.c.event_ts)).limit(limit)
+            )
             rows = result.mappings().all()
             columns = [col.name for col in table.c]
             preview_rows = []
             for r in rows:
-                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
+                row_dict = {
+                    c: (
+                        r[c]
+                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
+                        else str(r[c])
+                    )
+                    for c in columns
+                }
                 preview_rows.append(row_dict)
 
             return TablePreviewResponse(
@@ -1451,14 +1561,17 @@ async def preview_recent_fact_alias(
         )
 
     try:
-        from sqlalchemy import select, func, desc
+        from sqlalchemy import desc, func, select
+
         from ..db.session import get_retail_session
 
         model = FACT_TABLE_MODELS[table_name]
         async with get_retail_session() as session:
             table = model.__table__
             # Total count
-            count_result = await session.execute(select(func.count()).select_from(table))
+            count_result = await session.execute(
+                select(func.count()).select_from(table)
+            )
             total_rows = count_result.scalar() or 0
 
             # Most recent event_ts
@@ -1466,12 +1579,21 @@ async def preview_recent_fact_alias(
             most_recent = recent_result.scalar_one_or_none()
 
             # Recent rows by event_ts desc
-            result = await session.execute(select(table).order_by(desc(table.c.event_ts)).limit(limit))
+            result = await session.execute(
+                select(table).order_by(desc(table.c.event_ts)).limit(limit)
+            )
             rows = result.mappings().all()
             columns = [col.name for col in table.c]
             preview_rows: list[dict[str, object]] = []
             for r in rows:
-                row_dict = {c: (r[c] if isinstance(r[c], (str, int, float, bool)) or r[c] is None else str(r[c])) for c in columns}
+                row_dict = {
+                    c: (
+                        r[c]
+                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
+                        else str(r[c])
+                    )
+                    for c in columns
+                }
                 preview_rows.append(row_dict)
 
             # Include most_recent_date for UI hint if available
@@ -1503,8 +1625,10 @@ async def preview_recent_fact_alias(
 )
 async def get_dashboard_counts():
     """Get live table counts for dashboard (queries unified retail database directly)."""
-    from sqlalchemy import select, func
     from datetime import datetime
+
+    from sqlalchemy import func, select
+
     from ..db.session import get_retail_session
 
     master_counts: dict[str, int] = {}

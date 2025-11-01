@@ -12,7 +12,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from retail_datagen.db.config import DatabaseConfig
-from retail_datagen.db.engine import get_facts_engine, get_master_engine, get_retail_engine
+from retail_datagen.db.engine import (
+    get_facts_engine,
+    get_master_engine,
+    get_retail_engine,
+)
 from retail_datagen.db.migration import migrate_to_unified_db, needs_migration
 from retail_datagen.db.models.base import Base
 
@@ -40,9 +44,7 @@ def ensure_database_directories() -> None:
     facts_path.parent.mkdir(parents=True, exist_ok=True)
     retail_path.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.info(
-        f"Ensured database directories exist: {retail_path.parent}"
-    )
+    logger.info(f"Ensured database directories exist: {retail_path.parent}")
 
 
 async def init_databases() -> None:
@@ -80,14 +82,20 @@ async def init_databases() -> None:
 
     # Check if migration is needed (split → unified)
     if needs_migration():
-        logger.info("Detected split databases. Starting migration to unified database...")
+        logger.info(
+            "Detected split databases. Starting migration to unified database..."
+        )
 
         try:
             result = await migrate_to_unified_db()
 
-            if result['success']:
-                logger.info(f"✓ Migration successful: {len(result['tables_migrated'])} tables migrated")
-                logger.info(f"  Row counts: {sum(result['row_counts'].values())} total rows")
+            if result["success"]:
+                logger.info(
+                    f"✓ Migration successful: {len(result['tables_migrated'])} tables migrated"
+                )
+                logger.info(
+                    f"  Row counts: {sum(result['row_counts'].values())} total rows"
+                )
                 logger.info(f"  Duration: {result['duration_seconds']:.2f} seconds")
                 logger.info(f"  Backups created: {len(result['backups_created'])}")
             else:
@@ -110,7 +118,9 @@ async def init_databases() -> None:
         try:
             async with retail_engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-            logger.info(f"✓ Retail database initialized: {DatabaseConfig.RETAIL_DB_PATH}")
+            logger.info(
+                f"✓ Retail database initialized: {DatabaseConfig.RETAIL_DB_PATH}"
+            )
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
             raise
@@ -131,7 +141,9 @@ async def init_databases() -> None:
         try:
             async with master_engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-            logger.info(f"✓ Master database initialized: {DatabaseConfig.MASTER_DB_PATH}")
+            logger.info(
+                f"✓ Master database initialized: {DatabaseConfig.MASTER_DB_PATH}"
+            )
 
             async with facts_engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
@@ -158,10 +170,18 @@ async def migrate_fact_schema() -> None:
         try:
             res = await conn.execute(text("PRAGMA table_info('fact_receipts')"))
             cols = [row[1] for row in res.fetchall()]
-            if 'receipt_id_ext' not in cols:
-                await conn.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
-                await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
-                logger.info("Migrated fact_receipts: added receipt_id_ext column + index")
+            if "receipt_id_ext" not in cols:
+                await conn.execute(
+                    text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
+                )
+                await conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                    )
+                )
+                logger.info(
+                    "Migrated fact_receipts: added receipt_id_ext column + index"
+                )
         except Exception as e:
             logger.warning(f"Schema check/migration for fact_receipts failed: {e}")
 

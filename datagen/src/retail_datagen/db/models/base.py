@@ -18,4 +18,5 @@ class Base(DeclarativeBase):
     metadata/Base class for consistency. Foreign key relationships will be
     defined but not enforced at the database level due to cross-database references.
     """
+
     pass

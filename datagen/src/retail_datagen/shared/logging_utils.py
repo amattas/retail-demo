@@ -1,9 +1,9 @@
 """Structured logging utilities for streaming."""
+
 import json
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Optional
 
 
 class StructuredLogger:
@@ -11,7 +11,7 @@ class StructuredLogger:
 
     def __init__(self, logger_name: str):
         self.logger = logging.getLogger(logger_name)
-        self._correlation_id: Optional[str] = None
+        self._correlation_id: str | None = None
 
     def set_correlation_id(self, correlation_id: str):
         """Set correlation ID for current context."""

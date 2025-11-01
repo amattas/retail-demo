@@ -34,6 +34,7 @@ from .models import (
     ProductBrandDict,
     ProductCompanyDict,
     ProductDict,
+    TaxJurisdiction,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,6 +167,13 @@ class DictionaryLoader:
             model_class=ProductDict,
             expected_rows=10000,
             description="Product catalog with base pricing",
+        ),
+        "tax_rates": DictionaryInfo(
+            name="tax_rates",
+            filename="tax_rates.csv",
+            model_class=TaxJurisdiction,
+            expected_rows=164,
+            description="Tax rates by jurisdiction (state, county, city)",
         ),
     }
 
@@ -684,3 +692,9 @@ class DictionaryLoader:
         if not self.is_loaded("product_companies"):
             self.load_dictionary("product_companies")
         return self.get_data("product_companies")
+
+    def load_tax_rates(self) -> list[TaxJurisdiction]:
+        """Load and return tax rates dictionary data."""
+        if not self.is_loaded("tax_rates"):
+            self.load_dictionary("tax_rates")
+        return self.get_data("tax_rates")

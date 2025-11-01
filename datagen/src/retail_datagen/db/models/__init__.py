@@ -9,24 +9,24 @@ This module contains all database models split into:
 """
 
 from retail_datagen.db.models.base import Base
-from retail_datagen.db.models.master import (
-    Geography,
-    Store,
-    DistributionCenter,
-    Truck,
-    Customer,
-    Product,
-)
 from retail_datagen.db.models.facts import (
-    DCInventoryTransaction,
-    TruckMove,
-    StoreInventoryTransaction,
-    Receipt,
-    ReceiptLine,
-    FootTraffic,
     BLEPing,
+    DCInventoryTransaction,
+    FootTraffic,
     MarketingImpression,
     OnlineOrder,
+    Receipt,
+    ReceiptLine,
+    StoreInventoryTransaction,
+    TruckMove,
+)
+from retail_datagen.db.models.master import (
+    Customer,
+    DistributionCenter,
+    Geography,
+    Product,
+    Store,
+    Truck,
 )
 from retail_datagen.db.models.watermarks import FactDataWatermark
 

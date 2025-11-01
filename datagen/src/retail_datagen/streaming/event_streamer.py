@@ -18,8 +18,8 @@ from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config.models import RetailConfig
 from ..shared.logging_utils import get_structured_logger
@@ -140,7 +140,9 @@ class StreamingConfig:
         if hasattr(config.realtime, "dlq_retry_enabled"):
             streaming_config.dlq_retry_enabled = config.realtime.dlq_retry_enabled
         if hasattr(config.realtime, "dlq_retry_max_attempts"):
-            streaming_config.dlq_retry_max_attempts = config.realtime.dlq_retry_max_attempts
+            streaming_config.dlq_retry_max_attempts = (
+                config.realtime.dlq_retry_max_attempts
+            )
 
         return streaming_config
 
@@ -592,9 +594,7 @@ class EventStreamer:
             bool: True if streaming started successfully, False otherwise
         """
         if self._is_streaming:
-            self.log.warning(
-                "Streaming is already active", session_id=self._session_id
-            )
+            self.log.warning("Streaming is already active", session_id=self._session_id)
             return False
 
         # Check if using database mode (batch streaming from SQLite)
@@ -704,7 +704,9 @@ class EventStreamer:
                     "No Azure connection string - events will not be sent",
                     session_id=self._session_id,
                 )
-                self._azure_client = AzureEventHubClient("", self.streaming_config.hub_name)
+                self._azure_client = AzureEventHubClient(
+                    "", self.streaming_config.hub_name
+                )
 
             # Get streaming window from watermarks
             try:
@@ -800,9 +802,7 @@ class EventStreamer:
             bool: True if stopped successfully, False otherwise
         """
         if not self._is_streaming:
-            self.log.info(
-                "Streaming is not active", session_id=self._session_id
-            )
+            self.log.info("Streaming is not active", session_id=self._session_id)
             return True
 
         self.log.info("Stopping event streaming", session_id=self._session_id)
@@ -993,7 +993,11 @@ class EventStreamer:
         # Build weights based on daily targets
         all_weights = self._build_event_weights(timestamp)
         if self._allowed_event_types:
-            weights = {et: w for et, w in all_weights.items() if et in self._allowed_event_types}
+            weights = {
+                et: w
+                for et, w in all_weights.items()
+                if et in self._allowed_event_types
+            }
             if not weights:
                 weights = {et: 1.0 for et in self._allowed_event_types}
         else:
@@ -1008,7 +1012,9 @@ class EventStreamer:
         # Update daily counts for pacing
         for ev in events:
             if ev.event_type in self._daily_targets:
-                self._daily_counts[ev.event_type] = self._daily_counts.get(ev.event_type, 0) + 1
+                self._daily_counts[ev.event_type] = (
+                    self._daily_counts.get(ev.event_type, 0) + 1
+                )
 
         return events
 
@@ -1065,7 +1071,9 @@ class EventStreamer:
                     # Send failed - record metrics
                     self.metrics.record_batch_failed("send_failed")
                     for event in events_to_send:
-                        self.metrics.record_event_failed(event.event_type, "send_failed")
+                        self.metrics.record_event_failed(
+                            event.event_type, "send_failed"
+                        )
 
                     # Send failed - add to DLQ with metadata
                     await self._handle_send_failure(
@@ -1308,7 +1316,9 @@ class EventStreamer:
             ),
         }
 
-    async def _handle_send_failure(self, events: list[EventEnvelope], exception: Exception):
+    async def _handle_send_failure(
+        self, events: list[EventEnvelope], exception: Exception
+    ):
         """Handle send failure with error classification."""
         # Classify error
         error = classify_error(exception)
@@ -1425,7 +1435,9 @@ class EventStreamer:
                     # Update retry count and re-add to DLQ
                     entry.retry_count += 1
                     entry.last_retry_timestamp = datetime.now(UTC).isoformat()
-                    entry.error_message = f"{entry.error_message} | Retry failed: {str(e)}"
+                    entry.error_message = (
+                        f"{entry.error_message} | Retry failed: {str(e)}"
+                    )
                     self._dlq.append(entry)
                     failed += 1
 
@@ -1509,15 +1521,15 @@ class EventStreamer:
 
         # Import here to avoid circular dependencies
         from ..db.models.facts import (
-            Receipt,
-            ReceiptLine,
-            DCInventoryTransaction,
-            StoreInventoryTransaction,
-            TruckMove,
-            FootTraffic,
             BLEPing,
+            DCInventoryTransaction,
+            FootTraffic,
             MarketingImpression,
             OnlineOrder,
+            Receipt,
+            ReceiptLine,
+            StoreInventoryTransaction,
+            TruckMove,
         )
 
         # Map table name to model

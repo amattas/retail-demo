@@ -9,13 +9,44 @@ import re
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ================================
 # DICTIONARY MODELS (CSV INPUTS)
 # ================================
+
+
+class TaxJurisdiction(BaseModel):
+    """Tax jurisdiction model for tax rates CSV input."""
+
+    StateCode: str = Field(
+        ..., min_length=2, max_length=2, description="Two-letter state code"
+    )
+    County: str = Field(..., min_length=1, description="County name")
+    City: str = Field(..., min_length=1, description="City name")
+    CombinedRate: Decimal = Field(
+        ..., ge=0, le=Decimal("0.15"), description="Combined tax rate (0-15%)"
+    )
+
+    @field_validator("StateCode")
+    @classmethod
+    def validate_state_format(cls, v: str) -> str:
+        """Validate state is 2 uppercase letters."""
+        if not v.isalpha() or len(v) != 2:
+            raise ValueError("StateCode must be exactly 2 alphabetic characters")
+        return v.upper()
+
+    @field_validator("CombinedRate", mode="before")
+    @classmethod
+    def parse_combined_rate(cls, v) -> Decimal:
+        """Parse combined rate from string or number."""
+        if isinstance(v, str):
+            try:
+                return Decimal(v)
+            except Exception:
+                raise ValueError("CombinedRate must be a valid decimal number")
+        return Decimal(str(v))
 
 
 class GeographyDict(BaseModel):
@@ -145,6 +176,12 @@ class Store(BaseModel):
     StoreNumber: str = Field(..., min_length=1, description="Store identifier")
     Address: str = Field(..., min_length=1, description="Store address")
     GeographyID: int = Field(..., gt=0, description="Foreign key to GeographyMaster")
+    tax_rate: Decimal | None = Field(
+        None,
+        ge=0,
+        le=Decimal("0.15"),
+        description="Local tax rate for this store (0-15%, optional)",
+    )
 
 
 class DistributionCenter(BaseModel):
@@ -186,10 +223,10 @@ class Truck(BaseModel):
     Refrigeration: bool = Field(
         ..., description="Whether truck has refrigeration capability"
     )
-    DCID: Optional[int] = Field(
+    DCID: int | None = Field(
         None,
         ge=1,
-        description="Home distribution center for this truck (NULL for supplier trucks)",
+        description="Home distribution center for this truck. NULL indicates pool/rental trucks not assigned to a specific DC.",
     )
 
 
@@ -224,6 +261,14 @@ class Customer(BaseModel):
         return v
 
 
+class ProductTaxability(str, Enum):
+    """Product taxability classification."""
+
+    TAXABLE = "TAXABLE"  # Standard taxable goods
+    NON_TAXABLE = "NON_TAXABLE"  # Exempt items (groceries in some states)
+    REDUCED_RATE = "REDUCED_RATE"  # Items with reduced tax rate
+
+
 class ProductMaster(BaseModel):
     """Product master dimension table with pricing constraints."""
 
@@ -242,6 +287,10 @@ class ProductMaster(BaseModel):
     )
     LaunchDate: datetime = Field(
         ..., description="Product launch date - when it became available in stores"
+    )
+    taxability: ProductTaxability = Field(
+        default=ProductTaxability.TAXABLE,
+        description="Product tax classification (default: TAXABLE)",
     )
 
     @model_validator(mode="after")
@@ -363,7 +412,9 @@ class DCInventoryTransaction(BaseModel):
     def validate_qty_delta_not_zero(cls, v: int) -> int:
         """Validate that quantity delta is not zero."""
         if v == 0:
-            raise ValueError("QtyDelta cannot be zero - must be a net positive or negative change")
+            raise ValueError(
+                "QtyDelta cannot be zero - must be a net positive or negative change"
+            )
         return v
 
 
@@ -398,15 +449,26 @@ class TruckInventory(BaseModel):
 
 
 class StoreInventoryTransaction(BaseModel):
-    """Store inventory transaction fact."""
+    """
+    Store inventory transaction fact.
+
+    Tracks all inventory changes at the store level with optional
+    reason codes and source tracking for supply chain visibility.
+    """
 
     TraceId: str = Field(..., description="Unique trace identifier")
     EventTS: datetime = Field(..., description="Event timestamp")
     StoreID: int = Field(..., gt=0, description="Store ID")
     ProductID: int = Field(..., gt=0, description="Product ID")
     QtyDelta: int = Field(..., description="Quantity change")
-    Reason: InventoryReason = Field(..., description="Reason for inventory change")
-    Source: str = Field(..., description="Source of inventory (truck ID, etc.)")
+    Reason: InventoryReason | None = Field(
+        None,
+        description="Reason for inventory change (INBOUND_SHIPMENT, SALE, RETURN, etc.)",
+    )
+    Source: str | None = Field(
+        None,
+        description="Source of inventory transaction (truck ID, receipt ID, adjustment ID, etc.)",
+    )
 
 
 class Receipt(BaseModel):
@@ -530,6 +592,53 @@ class SupplyChainDisruption(BaseModel):
     )
 
 
+class OnlineOrder(BaseModel):
+    """
+    Online order fact table.
+
+    Tracks e-commerce orders from creation through fulfillment with
+    optional fulfillment mode and node information for order routing.
+    """
+
+    TraceId: str = Field(..., description="Unique trace identifier")
+    EventTS: datetime = Field(..., description="Event timestamp")
+    OrderId: str = Field(..., min_length=1, description="Order identifier")
+    CustomerID: int = Field(..., gt=0, description="Customer ID")
+    ProductID: int = Field(..., gt=0, description="Product ID")
+    Qty: int = Field(..., gt=0, description="Quantity ordered")
+    Subtotal: Decimal = Field(..., ge=0, description="Subtotal amount")
+    Tax: Decimal = Field(..., ge=0, description="Tax amount")
+    Total: Decimal = Field(..., ge=0, description="Total amount")
+    tender_type: TenderType = Field(
+        ..., description="Payment method", alias="TenderType"
+    )
+    FulfillmentStatus: str = Field(
+        ...,
+        min_length=1,
+        description="Order status (created, picked, shipped, delivered)",
+    )
+    FulfillmentMode: str | None = Field(
+        None,
+        description="How order is fulfilled (SHIP_FROM_STORE, SHIP_FROM_DC, BOPIS)",
+    )
+    NodeType: str | None = Field(
+        None, description="Type of fulfillment node (STORE or DC)"
+    )
+    NodeID: int | None = Field(
+        None, gt=0, description="ID of fulfillment node (Store ID or DC ID)"
+    )
+
+    @model_validator(mode="after")
+    def validate_order_total(self) -> "OnlineOrder":
+        """Validate that Total = Subtotal + Tax."""
+        expected_total = self.Subtotal + self.Tax
+        if abs(self.Total - expected_total) > Decimal("0.01"):  # Allow for rounding
+            raise ValueError(
+                f"Total ({self.Total}) must equal Subtotal ({self.Subtotal}) + Tax ({self.Tax})"
+            )
+        return self
+
+
 # ================================
 # ALIASES FOR TEST COMPATIBILITY
 # ================================
@@ -558,3 +667,4 @@ ReceiptLine = ReceiptLine
 FootTraffic = FootTraffic
 BLEPing = BLEPing
 Marketing = Marketing
+OnlineOrder = OnlineOrder

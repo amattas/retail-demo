@@ -1,4 +1,5 @@
 """Prometheus metrics for streaming system."""
+
 import time
 
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram, Summary
@@ -91,7 +92,9 @@ circuit_breaker_state = _get_or_create_metric(
 )
 
 circuit_breaker_failures = _get_or_create_metric(
-    Counter, "circuit_breaker_failures_total", "Total number of circuit breaker failures"
+    Counter,
+    "circuit_breaker_failures_total",
+    "Total number of circuit breaker failures",
 )
 
 circuit_breaker_trips = _get_or_create_metric(
@@ -215,9 +218,7 @@ class MetricsCollector:
         """Record Event Hub connection failure."""
         eventhub_connection_failures_total.inc()
 
-    def update_throughput(
-        self, events_count: int, bytes_count: int, duration: float
-    ):
+    def update_throughput(self, events_count: int, bytes_count: int, duration: float):
         """Update throughput metrics."""
         if duration > 0:
             events_per_second.set(events_count / duration)

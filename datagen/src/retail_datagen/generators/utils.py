@@ -9,7 +9,6 @@ management.
 import math
 import random
 import string
-from pathlib import Path
 
 from retail_datagen.shared.models import GeographyDict
 from retail_datagen.shared.validators import SyntheticDataValidator
@@ -210,7 +209,7 @@ class IdentifierGenerator:
 
         # For IDs exceeding 6 chars (>2.1B customers), use modulo to wrap
         if len(base36) > 6:
-            num = customer_id % (36 ** 6)
+            num = customer_id % (36**6)
             base36 = ""
             while num > 0:
                 base36 = chars[num % 36] + base36
@@ -245,7 +244,7 @@ class IdentifierGenerator:
         # For IDs exceeding 6 chars (>2.1B customers), use modulo to wrap
         if len(base36) > 6:
             # Use modulo to keep within 6-char space while maintaining determinism
-            num = customer_id % (36 ** 6)
+            num = customer_id % (36**6)
             base36 = ""
             while num > 0:
                 base36 = chars[num % 36] + base36
