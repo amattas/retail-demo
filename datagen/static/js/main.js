@@ -1200,13 +1200,13 @@ class RetailDataGenerator {
         try {
             // Disable button and show loading state
             exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting all data (chunked)...';
             this.disableExportButtons();
 
             // Show progress section
             this.showProgress('factExportProgress', 'factExportProgressFill', 'factExportProgressText');
 
-            // Start export
+            // Start export (no date range = export all data in 7-day chunks)
             const response = await fetch('/api/export/facts', {
                 method: 'POST',
                 headers: {
@@ -1232,7 +1232,10 @@ class RetailDataGenerator {
 
             // Handle completion
             if (finalStatus?.status === 'completed') {
-                this.showNotification(`Historical data exported successfully to ${format.toUpperCase()}!`, 'success');
+                this.showNotification(
+                    `Historical data exported successfully to ${format.toUpperCase()}!`,
+                    'success'
+                );
             } else if (finalStatus?.status === 'failed') {
                 this.showNotification(
                     `Export failed: ${finalStatus.error_message || 'Unknown error'}`,

@@ -82,7 +82,7 @@ class FactExportRequest(ExportRequest):
         json_schema_extra={
             "example": {
                 "format": "parquet",
-                "tables": ["receipts", "receipt_lines"],
+                "tables": ["fact_receipts", "fact_receipt_lines"],
                 "start_date": "2024-01-01",
                 "end_date": "2024-01-31",
             }
@@ -301,17 +301,17 @@ VALID_MASTER_TABLES = {
     "products_master",
 }
 
-# Valid fact table names
+# Valid fact table names (must match db_reader.FACT_TABLES keys with "fact_" prefix)
 VALID_FACT_TABLES = {
-    "dc_inventory_txn",
-    "truck_moves",
-    "store_inventory_txn",
-    "receipts",
-    "receipt_lines",
-    "foot_traffic",
-    "ble_pings",
-    "marketing",
-    "online_orders",
+    "fact_dc_inventory_txn",
+    "fact_truck_moves",
+    "fact_store_inventory_txn",
+    "fact_receipts",
+    "fact_receipt_lines",
+    "fact_foot_traffic",
+    "fact_ble_pings",
+    "fact_marketing",
+    "fact_online_orders",
 }
 
 

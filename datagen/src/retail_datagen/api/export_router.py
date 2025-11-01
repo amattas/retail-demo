@@ -249,86 +249,130 @@ async def export_fact_data(
 
     # Define background export task
     async def export_task():
-        """Background task for fact data export."""
+        """Background task for fact data export with chunking for large date ranges."""
         try:
             logger.info(f"Starting fact export task {task_id}")
+            from ..services import db_reader
 
             # Initialize export service
             base_dir = Path(config.paths.facts).parent  # Get base "data" directory
             service = ExportService(base_dir=base_dir)
 
             # Track progress
-            completed_tables = []
-            total_tables = len(tables_to_export)
             total_files = 0
             total_rows = 0
+            all_files = []
 
-            # Progress callback for export service
-            def progress_callback(message: str, current: int, total: int):
-                """Update task progress during export."""
-                progress = current / total if total > 0 else 0.0
+            # Determine date range (query database if not provided)
+            start_date = request.start_date
+            end_date = request.end_date
 
-                # Determine current and remaining tables
-                current_table = (
-                    tables_to_export[current - 1]
-                    if current > 0 and current <= total
-                    else None
+            async with get_retail_session() as session:
+                if start_date is None or end_date is None:
+                    logger.info(
+                        "No date range provided, querying database for full range"
+                    )
+                    update_task_progress(task_id, 0.0, "Determining date range...")
+
+                    # Get date ranges for all tables
+                    date_ranges = await db_reader.get_all_fact_table_date_ranges(
+                        session
+                    )
+
+                    # Find overall min/max across all tables
+                    all_starts = [
+                        start
+                        for start, end in date_ranges.values()
+                        if start is not None
+                    ]
+                    all_ends = [
+                        end for start, end in date_ranges.values() if end is not None
+                    ]
+
+                    if not all_starts or not all_ends:
+                        raise ValueError("No data found in fact tables")
+
+                    start_date = min(all_starts).date()
+                    end_date = max(all_ends).date()
+
+                    logger.info(f"Determined date range: {start_date} to {end_date}")
+
+            # Calculate chunks (7 days each to keep memory manageable)
+            from datetime import timedelta
+
+            chunk_size_days = 7
+            chunks = []
+            current_start = start_date
+
+            while current_start <= end_date:
+                chunk_end = min(
+                    current_start + timedelta(days=chunk_size_days - 1), end_date
                 )
-                tables_remaining = tables_to_export[current:] if current < total else []
+                chunks.append((current_start, chunk_end))
+                current_start = chunk_end + timedelta(days=1)
+
+            total_chunks = len(chunks)
+            logger.info(
+                f"Split export into {total_chunks} chunks of {chunk_size_days} days each"
+            )
+
+            # Export each chunk
+            for chunk_idx, (chunk_start, chunk_end) in enumerate(chunks, 1):
+                chunk_progress = (chunk_idx - 1) / total_chunks
+                days_in_chunk = (chunk_end - chunk_start).days + 1
 
                 update_task_progress(
                     task_id,
-                    progress,
-                    message,
-                    current_table=current_table,
-                    tables_completed=completed_tables,
-                    tables_remaining=tables_remaining,
+                    chunk_progress,
+                    f"Exporting chunk {chunk_idx}/{total_chunks}: {chunk_start} to {chunk_end} ({days_in_chunk} days)",
                 )
 
-            # Export fact tables
-            logger.debug(
-                f"Exporting {len(tables_to_export)} fact tables "
-                f"(date range: {request.start_date} to {request.end_date})"
-            )
-
-            async with get_retail_session() as session:
-                result = await service.export_fact_tables(
-                    session,
-                    format=request.format,
-                    start_date=request.start_date,
-                    end_date=request.end_date,
-                    progress_callback=progress_callback,
+                logger.info(
+                    f"Exporting chunk {chunk_idx}/{total_chunks}: {chunk_start} to {chunk_end}"
                 )
 
-            # Calculate results
-            all_files = []
-            for table_name, partition_files in result.items():
-                total_files += len(partition_files)
-                all_files.extend(
-                    [
-                        str(path.resolve().relative_to(base_dir.resolve()))
-                        for path in partition_files
-                    ]
+                # Export this chunk
+                async with get_retail_session() as session:
+                    result = await service.export_fact_tables(
+                        session,
+                        format=request.format,
+                        start_date=chunk_start,
+                        end_date=chunk_end,
+                        progress_callback=None,  # Don't use per-table callbacks for chunks
+                    )
+
+                # Accumulate results
+                for table_name, partition_files in result.items():
+                    total_files += len(partition_files)
+                    all_files.extend(
+                        [
+                            str(path.resolve().relative_to(base_dir.resolve()))
+                            for path in partition_files
+                        ]
+                    )
+
+                logger.info(
+                    f"Chunk {chunk_idx}/{total_chunks} complete: {len(result)} tables, {sum(len(files) for files in result.values())} files"
                 )
 
-            files_written = all_files
-
-            # Count total rows exported (approximate from file sizes)
-            for partition_files in result.values():
-                for path in partition_files:
-                    if path.exists():
-                        if request.format == "csv":
-                            with open(path) as f:
-                                total_rows += sum(1 for _ in f) - 1  # Subtract header
-                        else:
-                            # Skip for Parquet due to performance
-                            pass
+            # Skip row counting for large exports (too slow)
+            if request.format == "csv" and total_files < 100:
+                # Only count rows for small exports
+                logger.info("Counting rows in exported files...")
+                for file_path_str in all_files:
+                    full_path = base_dir / file_path_str
+                    if full_path.exists():
+                        with open(full_path) as f:
+                            total_rows += sum(1 for _ in f) - 1
+            else:
+                logger.info("Skipping row count (too many files)")
+                total_rows = None
 
             # Update final progress
             update_task_progress(
                 task_id,
                 1.0,
-                f"Fact export completed: {total_files} files written across {len(result)} tables",
+                f"Export completed: {total_files} files written across {total_chunks} chunks ({start_date} to {end_date})",
                 tables_completed=tables_to_export,
                 tables_remaining=[],
             )
@@ -336,10 +380,12 @@ async def export_fact_data(
             logger.info(f"Fact export task {task_id} completed successfully")
 
             return {
-                "files_written": files_written,
+                "files_written": all_files,
                 "total_files": total_files,
-                "total_rows": total_rows if request.format == "csv" else None,
+                "total_rows": total_rows,
                 "output_directory": str(base_dir / "facts"),
+                "date_range": f"{start_date} to {end_date}",
+                "chunks_exported": total_chunks,
             }
 
         except Exception as e:
