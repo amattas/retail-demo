@@ -1407,6 +1407,9 @@ class FactDataGenerator:
                     new_balance = max(0, current_balance - qty)
                     self.inventory_flow_sim._store_inventory[key] = new_balance
 
+                    # Get balance after transaction
+                    balance = self.inventory_flow_sim.get_store_balance(node_id, product.ID)
+
                     store_txn.append(
                         {
                             "TraceId": trace_id,
@@ -1416,6 +1419,7 @@ class FactDataGenerator:
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
                             "Source": order_id,
+                            "Balance": balance,
                         }
                     )
                 else:  # DC
@@ -1424,6 +1428,9 @@ class FactDataGenerator:
                     current_balance = self.inventory_flow_sim._dc_inventory.get(key, 0)
                     new_balance = max(0, current_balance - qty)
                     self.inventory_flow_sim._dc_inventory[key] = new_balance
+
+                    # Get balance after transaction
+                    balance = self.inventory_flow_sim.get_dc_balance(node_id, product.ID)
 
                     dc_txn.append(
                         {
@@ -1434,6 +1441,7 @@ class FactDataGenerator:
                             "QtyDelta": -qty,
                             "Reason": InventoryReason.SALE.value,
                             "Source": order_id,
+                            "Balance": balance,
                         }
                     )
 
@@ -1450,6 +1458,11 @@ class FactDataGenerator:
             dc_transactions = self.inventory_flow_sim.simulate_dc_receiving(dc.ID, date)
 
             for transaction in dc_transactions:
+                # Get current balance after this transaction
+                balance = self.inventory_flow_sim.get_dc_balance(
+                    transaction["DCID"], transaction["ProductID"]
+                )
+
                 transactions.append(
                     {
                         "TraceId": self._generate_trace_id(),
@@ -1458,6 +1471,7 @@ class FactDataGenerator:
                         "ProductID": transaction["ProductID"],
                         "QtyDelta": transaction["QtyDelta"],
                         "Reason": transaction["Reason"].value,
+                        "Balance": balance,
                     }
                 )
 
@@ -1756,6 +1770,9 @@ class FactDataGenerator:
             new_balance = max(0, current_balance - qty)
             self.inventory_flow_sim._store_inventory[key] = new_balance
 
+            # Get current balance after this transaction
+            balance = self.inventory_flow_sim.get_store_balance(store.ID, product.ID)
+
             inventory_transaction = {
                 "TraceId": trace_id,
                 "EventTS": transaction_time,
@@ -1764,6 +1781,7 @@ class FactDataGenerator:
                 "QtyDelta": -qty,  # Negative for sale
                 "Reason": InventoryReason.SALE.value,
                 "Source": receipt_id,
+                "Balance": balance,
             }
             inventory_transactions.append(inventory_transaction)
 
@@ -1935,6 +1953,11 @@ class FactDataGenerator:
                 transactions = self.inventory_flow_sim.complete_delivery(shipment_id)
 
                 for transaction in transactions:
+                    # Get current balance after this transaction
+                    balance = self.inventory_flow_sim.get_store_balance(
+                        transaction["StoreID"], transaction["ProductID"]
+                    )
+
                     delivery_transactions.append(
                         {
                             "TraceId": self._generate_trace_id(),
@@ -1944,6 +1967,7 @@ class FactDataGenerator:
                             "QtyDelta": transaction["QtyDelta"],
                             "Reason": transaction["Reason"].value,
                             "Source": transaction["Source"],
+                            "Balance": balance,
                         }
                     )
 
@@ -2266,6 +2290,7 @@ class FactDataGenerator:
                 "ProductID": "product_id",
                 "QtyDelta": "quantity",
                 "Reason": "txn_type",
+                "Balance": "balance",
             },
             "truck_moves": {
                 **common_mappings,
@@ -2285,6 +2310,7 @@ class FactDataGenerator:
                 "QtyDelta": "quantity",
                 "Reason": "txn_type",
                 "Source": "source",
+                "Balance": "balance",
             },
             "foot_traffic": {
                 **common_mappings,

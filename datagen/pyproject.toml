@@ -47,7 +47,7 @@ known-first-party = ["retail_datagen"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "--strict-markers --strict-config --disable-plugin-autoload"
+addopts = "--strict-markers --strict-config"
 markers = [
     "integration: marks tests as integration tests",
     "slow: marks tests as slow",
@@ -55,7 +55,7 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

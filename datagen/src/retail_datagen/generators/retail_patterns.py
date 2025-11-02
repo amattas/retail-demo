@@ -1019,6 +1019,32 @@ class InventoryFlowSimulator:
             return 1.0 - (impact_percentage / 100)
         return 1.0
 
+    def get_dc_balance(self, dc_id: int, product_id: int) -> int:
+        """Get current inventory balance for a DC-product combination.
+
+        Args:
+            dc_id: Distribution center ID
+            product_id: Product ID
+
+        Returns:
+            Current inventory balance (0 if not found)
+        """
+        key = (dc_id, product_id)
+        return self._dc_inventory.get(key, 0)
+
+    def get_store_balance(self, store_id: int, product_id: int) -> int:
+        """Get current inventory balance for a store-product combination.
+
+        Args:
+            store_id: Store ID
+            product_id: Product ID
+
+        Returns:
+            Current inventory balance (0 if not found)
+        """
+        key = (store_id, product_id)
+        return self._store_inventory.get(key, 0)
+
 
 class MarketingCampaignSimulator:
     """

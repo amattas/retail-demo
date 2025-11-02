@@ -264,7 +264,7 @@ async def generate_all_master_data(
                 0.0,
                 "Starting master data generation",
                 tables_completed=[],
-                tables_in_progress=list(tables_to_generate),
+                tables_in_progress=[],
                 tables_remaining=list(tables_to_generate),
                 estimated_seconds_remaining=None,
                 progress_rate=None,

@@ -80,6 +80,54 @@ This is a **synthetic retail data generator** that produces realistic but entire
 
 4. **Verify all tests pass** before considering the task complete
 
+### Phase 3.5: Code and Functionality Review with Codex
+**After testing passes, perform comprehensive code review using Codex MCP server**
+
+1. **Use the Codex MCP server** (`mcp__codex__codex`) to conduct automated code reviews:
+   - Review code quality and adherence to project patterns
+   - Validate functionality against requirements
+   - Check for potential bugs or edge cases
+   - Assess code maintainability and documentation
+   - Verify alignment with project architecture
+
+2. **Codex review focus areas**:
+   - Business logic correctness (retail patterns, temporal patterns, state management)
+   - Data safety (synthetic data validation, no real PII)
+   - Pricing rules enforcement
+   - State dependency management
+   - Error handling and edge cases
+   - Performance considerations
+   - API contract consistency
+
+3. **Configuration parameters** for Codex reviews:
+   ```
+   - approval-policy: "never" (bypass approvals for autonomous review)
+   - sandbox: "danger-full-access" (full access to run tests and analyze)
+   - model: "o3" or "o4-mini" (depending on review complexity)
+   - base-instructions: Include project context and specific review criteria
+   ```
+
+4. **Address Codex findings** before proceeding:
+   - Fix critical issues immediately
+   - Document design decisions for architectural questions
+   - Update tests if new edge cases are discovered
+   - Re-run testing phase if code changes are made
+
+5. **When to skip Codex review**:
+   - Trivial changes (documentation only, typo fixes)
+   - Emergency hotfixes (review post-deployment)
+   - Changes already reviewed in previous iteration
+
+**Example Codex Review Invocation**:
+```
+Use the Codex MCP server to review the changes in src/retail_datagen/generators/fact_generator.py
+focusing on:
+- Correctness of the new inventory balance restoration logic
+- Edge cases in date range handling
+- Performance implications of the new caching approach
+- Adherence to existing error handling patterns
+```
+
 ### Phase 4: Final Validation
 **Ensure everything works together**
 
@@ -97,7 +145,7 @@ This is a **synthetic retail data generator** that produces realistic but entire
 ## Development Environment
 
 **Required Setup:**
-- Python 3.11 (strict requirement)
+- Python 3.11 or higher (tested with 3.11-3.13)
 - Miniconda or Miniforge (preferred over virtualenv)
 - Conda environment: `retail-datagen`
 
@@ -139,8 +187,8 @@ python -m uvicorn src.retail_datagen.main:app --host 0.0.0.0 --port 8000 --reloa
 
 **Run all tests:**
 ```bash
-# Using pytest with plugin autoload disabled (recommended)
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
+# Using pytest (recommended)
+python -m pytest -q
 
 # Using the bundled test runner
 python tests/test_runner.py --all
@@ -149,19 +197,19 @@ python tests/test_runner.py --all
 **Run specific test suites:**
 ```bash
 # Unit tests only
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/unit/
+python -m pytest tests/unit/
 
 # Integration tests
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/integration/
+python -m pytest tests/integration/
 
 # Smoke tests
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/smoke/
+python -m pytest tests/smoke/
 
 # Run with coverage
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest --cov=src/retail_datagen
+python -m pytest --cov=src/retail_datagen
 ```
 
-**Note**: Always disable pytest plugin autoload to avoid environment interference. Python 3.11 is required.
+**Note**: pytest-asyncio is required for async tests. Python 3.11+ is required.
 
 ### Code Quality
 
@@ -308,8 +356,8 @@ When implementing features (after planning with Opus 4.1):
 
 ### Working with Tests
 
-- All tests require Python 3.11
-- Always use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` flag
+- All tests require Python 3.11+
+- pytest-asyncio is automatically loaded for async tests
 - Test fixtures in `tests/conftest.py`
 - Integration tests use small test dictionaries
 - Hypothesis property-based tests for generators

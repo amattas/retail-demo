@@ -92,6 +92,249 @@ Key types include:
 - Historical: `historical.start_date`.
 - Realtime: burst, interval, batch, retry, circuit breaker, buffer.
 - Volume: `online_orders_per_day` controls the scale of online orders (historical and streaming pacing).
+- Truck assignment: `volume.truck_dc_assignment_rate` (default 0.85) or `volume.trucks_per_dc` (fixed per-DC count).
+- Marketing costs: `marketing_cost.*` configures per-channel cost ranges and device multipliers.
+
+## Data Examples
+
+### Tax Calculation
+Tax is calculated based on store location and product taxability:
+
+**Example 1: Standard taxable item in California**
+```python
+store.tax_rate = Decimal("0.0725")  # 7.25% California base rate
+product.taxability = ProductTaxability.TAXABLE  # Standard goods
+subtotal = Decimal("100.00")
+
+# Tax calculation
+tax = subtotal * store.tax_rate  # $7.25
+total = subtotal + tax  # $107.25
+```
+
+**Example 2: Non-taxable groceries**
+```python
+store.tax_rate = Decimal("0.0825")  # 8.25% rate
+product.taxability = ProductTaxability.NON_TAXABLE  # Groceries
+subtotal = Decimal("50.00")
+
+# Tax calculation
+tax = Decimal("0.00")  # No tax on non-taxable items
+total = subtotal  # $50.00
+```
+
+**Example 3: Reduced-rate items**
+```python
+store.tax_rate = Decimal("0.1025")  # 10.25% rate (high jurisdiction)
+product.taxability = ProductTaxability.REDUCED_RATE  # Special category
+subtotal = Decimal("75.00")
+
+# Tax calculation (reduced rate implementation varies, typically 50% of standard)
+tax = subtotal * store.tax_rate * Decimal("0.50")  # $3.84
+total = subtotal + tax  # $78.84
+```
+
+### Marketing Costs
+Marketing costs vary by channel and device type:
+
+**Channel-based cost ranges** (per impression):
+- Email: $0.10 - $0.25
+- Display: $0.50 - $2.00
+- Social (Facebook/Instagram): $0.75 - $3.00
+- Search (Google): $1.00 - $5.00
+- Video (YouTube): $1.50 - $5.25
+
+**Device multipliers**:
+- Mobile: 1.0x (baseline)
+- Tablet: 1.2x (higher engagement)
+- Desktop: 1.5x (highest engagement)
+
+**Example calculation**:
+```python
+channel = MarketingChannel.GOOGLE  # Search ads
+device = DeviceType.DESKTOP
+
+# Base cost randomly selected from range
+base_cost = random.uniform(1.00, 5.00)  # e.g., $2.50
+
+# Apply device multiplier
+final_cost = base_cost * 1.5  # $3.75 for desktop
+```
+
+### Inventory Transaction Source Tracking
+Store inventory transactions include reason and source for audit trail:
+
+**Example 1: Inbound shipment from truck**
+```python
+StoreInventoryTransaction(
+    StoreID=42,
+    ProductID=1523,
+    QtyDelta=100,  # Received 100 units
+    Reason=InventoryReason.INBOUND_SHIPMENT,
+    Source="TRUCK-8734"  # Truck license plate
+)
+```
+
+**Example 2: Sale from receipt**
+```python
+StoreInventoryTransaction(
+    StoreID=42,
+    ProductID=1523,
+    QtyDelta=-5,  # Sold 5 units
+    Reason=InventoryReason.SALE,
+    Source="RCP-2024-01-15-00001"  # Receipt ID
+)
+```
+
+**Example 3: Inventory adjustment**
+```python
+StoreInventoryTransaction(
+    StoreID=42,
+    ProductID=1523,
+    QtyDelta=-3,  # Shrinkage
+    Reason=InventoryReason.DAMAGED,
+    Source="ADJ-20240115-001"  # Adjustment ID
+)
+```
+
+### Online Order Fulfillment
+Online orders route through different fulfillment modes:
+
+**Example 1: Ship from DC (60% probability)**
+```python
+OnlineOrder(
+    OrderId="ORD-2024-001",
+    CustomerID=5432,
+    FulfillmentMode="SHIP_FROM_DC",
+    NodeType="DC",
+    NodeID=3,  # DC ID
+    FulfillmentStatus="created"
+)
+```
+
+**Example 2: Ship from Store (30% probability)**
+```python
+OnlineOrder(
+    OrderId="ORD-2024-002",
+    CustomerID=7821,
+    FulfillmentMode="SHIP_FROM_STORE",
+    NodeType="STORE",
+    NodeID=42,  # Store ID
+    FulfillmentStatus="created"
+)
+```
+
+**Example 3: Buy Online Pickup In Store (10% probability)**
+```python
+OnlineOrder(
+    OrderId="ORD-2024-003",
+    CustomerID=1234,
+    FulfillmentMode="BOPIS",
+    NodeType="STORE",
+    NodeID=15,  # Store ID for pickup
+    FulfillmentStatus="created"
+)
+```
+
+### Truck Assignment Strategies
+Trucks can be assigned to DCs or remain in a pool:
+
+**Strategy 1: Percentage-based (default 85%)**
+```python
+total_trucks = 100
+assigned_trucks = int(100 * 0.85)  # 85 trucks assigned to DCs
+pool_trucks = 15  # 15 pool/rental trucks (DCID = NULL)
+
+# Round-robin assignment across DCs
+for i in range(assigned_trucks):
+    dc_id = dcs[i % len(dcs)].ID
+    truck.DCID = dc_id
+```
+
+**Strategy 2: Fixed per-DC count**
+```python
+trucks_per_dc = 10
+dc_count = 8
+assigned_trucks = 10 * 8  # 80 trucks (10 per DC)
+remaining_pool = total_trucks - 80  # Remainder are pool
+
+# Each DC gets exactly 10 trucks
+for dc in dcs:
+    for _ in range(trucks_per_dc):
+        truck.DCID = dc.ID
+```
+
+## Field Constraints and Enums
+
+### ProductTaxability Enum
+Product tax classification affects tax calculation:
+- `TAXABLE`: Standard taxable goods (full tax rate applied)
+- `NON_TAXABLE`: Exempt items like groceries in some jurisdictions (0% tax)
+- `REDUCED_RATE`: Items with reduced tax rate (implementation-specific, typically 50% of standard rate)
+
+### InventoryReason Enum
+Tracks why inventory changed:
+- `INBOUND_SHIPMENT`: Goods received from truck/supplier
+- `OUTBOUND_SHIPMENT`: Goods shipped to another location
+- `SALE`: Sold to customer (negative QtyDelta)
+- `RETURN`: Customer return (positive QtyDelta)
+- `ADJUSTMENT`: Manual inventory correction
+- `DAMAGED`: Damaged goods write-off (negative QtyDelta)
+- `LOST`: Lost/stolen goods (negative QtyDelta)
+
+### FulfillmentMode Values
+How online orders are fulfilled:
+- `SHIP_FROM_DC`: Order ships from distribution center (60% of orders)
+- `SHIP_FROM_STORE`: Order ships from retail store (30% of orders)
+- `BOPIS`: Buy Online Pickup In Store (10% of orders)
+
+### NodeType Values
+Type of fulfillment location:
+- `DC`: Distribution center
+- `STORE`: Retail store
+
+### MarketingChannel Enum
+Digital marketing channels with varying costs:
+- `EMAIL`: $0.10-$0.25 per impression
+- `DISPLAY`: $0.50-$2.00 per impression
+- `SOCIAL`: $0.75-$3.00 per impression (Facebook, Instagram)
+- `SEARCH`: $1.00-$5.00 per impression (Google)
+- `VIDEO`: $1.50-$5.25 per impression (YouTube)
+- `FACEBOOK`, `GOOGLE`, `INSTAGRAM`, `YOUTUBE`: Platform-specific channels
+
+### DeviceType Enum
+Device type affects marketing cost via multiplier:
+- `MOBILE`: 1.0x multiplier (baseline)
+- `TABLET`: 1.2x multiplier (20% premium for higher engagement)
+- `DESKTOP`: 1.5x multiplier (50% premium for highest engagement)
+
+### TenderType Enum
+Payment methods:
+- `CASH`: Physical currency
+- `CREDIT_CARD`: Credit card payment
+- `DEBIT_CARD`: Debit card payment
+- `CHECK`: Paper check
+- `MOBILE_PAY`: Mobile payment (Apple Pay, Google Pay, etc.)
+
+### TruckStatus Enum
+Truck movement lifecycle:
+- `SCHEDULED`: Shipment scheduled but not started
+- `LOADING`: Currently being loaded at DC
+- `IN_TRANSIT`: En route to destination
+- `ARRIVED`: Arrived at destination
+- `UNLOADING`: Being unloaded at store
+- `COMPLETED`: Delivery complete
+- `DELAYED`: Experiencing delay
+
+### Field Nullability
+**Optional fields** (can be NULL/None):
+- `Store.tax_rate`: Defaults to 7.407% if not found in tax jurisdiction mapping
+- `Truck.DCID`: NULL for pool/rental trucks (15% of fleet by default)
+- `StoreInventoryTransaction.Reason`: Optional reason code for inventory changes
+- `StoreInventoryTransaction.Source`: Optional source identifier (truck ID, receipt ID, etc.)
+- `OnlineOrder.FulfillmentMode`: Optional fulfillment method
+- `OnlineOrder.NodeType`: Optional node type (STORE or DC)
+- `OnlineOrder.NodeID`: Optional node ID (Store ID or DC ID)
+- `ProductMaster.taxability`: Defaults to TAXABLE if not specified
 
 ## Safety Rules
 - No real names or brands; see `SyntheticDataValidator` blocklist.
