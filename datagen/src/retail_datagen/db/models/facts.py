@@ -253,9 +253,10 @@ class ReceiptLine(Base):
     - Product and quantity information
     - Unit price at time of sale
     - Line total calculation
+    - Promotional code tracking
 
     Business Rules:
-    - Line_total = Unit_price * Quantity
+    - Line_total = Unit_price * Quantity (after discount)
     - Links to Receipt via receipt_id (same database, can be FK)
     - Product pricing may differ from master due to promotions
     """
@@ -272,9 +273,17 @@ class ReceiptLine(Base):
     product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     # Line details
+    line_num: Mapped[int] = mapped_column(Integer, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, nullable=False)
-    line_total: Mapped[float] = mapped_column(Float, nullable=False)
+    ext_price: Mapped[float] = mapped_column(Float, nullable=False)  # Also known as line_total
+    promo_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Alias for backward compatibility
+    @property
+    def line_total(self) -> float:
+        """Alias for ext_price for backward compatibility."""
+        return self.ext_price
 
     # Index for receipt lookups
     __table_args__ = (
@@ -285,8 +294,8 @@ class ReceiptLine(Base):
     def __repr__(self) -> str:
         return (
             f"<ReceiptLine(line_id={self.line_id}, receipt_id={self.receipt_id}, "
-            f"product_id={self.product_id}, qty={self.quantity}, "
-            f"unit_price={self.unit_price}, total={self.line_total})>"
+            f"product_id={self.product_id}, line={self.line_num}, qty={self.quantity}, "
+            f"unit_price={self.unit_price}, ext_price={self.ext_price}, promo={self.promo_code})>"
         )
 
 

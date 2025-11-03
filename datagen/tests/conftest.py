@@ -219,12 +219,14 @@ def sample_stores(sample_geography_master) -> list[dict]:
             "StoreNumber": "ST001",
             "Address": "123 Main St, Springfield, IL 62701",
             "GeographyID": 1,
+            "tax_rate": Decimal("0.0825"),  # 8.25% tax rate (IL typical rate)
         },
         {
             "ID": 2,
             "StoreNumber": "ST002",
             "Address": "456 Oak Ave, Riverside, CA 92501",
             "GeographyID": 2,
+            "tax_rate": Decimal("0.0775"),  # 7.75% tax rate (CA typical rate)
         },
     ]
 
@@ -286,18 +288,30 @@ def sample_products_master() -> list[dict]:
             "ProductName": "Widget Pro",
             "Brand": "SuperBrand",
             "Company": "Acme Corp",
+            "Department": "Electronics",
+            "Category": "Gadgets",
+            "Subcategory": "Widgets",
             "Cost": Decimal("15.00"),
             "MSRP": Decimal("22.99"),
             "SalePrice": Decimal("19.99"),
+            "RequiresRefrigeration": False,
+            "LaunchDate": datetime.now(),
+            "taxability": "TAXABLE",  # Electronics are typically taxable
         },
         {
             "ID": 2,
             "ProductName": "Gadget Plus",
             "Brand": "MegaBrand",
             "Company": "Global Industries",
+            "Department": "Electronics",
+            "Category": "Devices",
+            "Subcategory": "Smart Devices",
             "Cost": Decimal("20.00"),
             "MSRP": Decimal("34.49"),
             "SalePrice": Decimal("29.99"),
+            "RequiresRefrigeration": False,
+            "LaunchDate": datetime.now(),
+            "taxability": "TAXABLE",  # Electronics are typically taxable
         },
     ]
 
@@ -344,7 +358,7 @@ def sample_receipt_lines(sample_receipts, sample_products_master) -> list[dict]:
             "Qty": 1,
             "UnitPrice": Decimal("19.99"),
             "ExtPrice": Decimal("19.99"),
-            "PromoCode": None,
+            "PromoCode": None,  # No promo code on this line
         },
         {
             "TraceId": str(uuid4()),
@@ -355,7 +369,7 @@ def sample_receipt_lines(sample_receipts, sample_products_master) -> list[dict]:
             "Qty": 2,
             "UnitPrice": Decimal("29.99"),
             "ExtPrice": Decimal("59.98"),
-            "PromoCode": "SAVE10",
+            "PromoCode": "SAVE10",  # Promo code applied
         },
     ]
 
@@ -380,8 +394,17 @@ def sample_inventory_transactions(
             "StoreID": 1,
             "ProductID": 1,
             "QtyDelta": -5,
-            "Reason": "SALE",
-            "Source": "TRUCK_001",
+            "Reason": "SALE",  # Inventory decreased due to sale
+            "Source": "RCP001",  # Source is receipt ID
+        },
+        {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "StoreID": 1,
+            "ProductID": 2,
+            "QtyDelta": 50,
+            "Reason": "INBOUND_SHIPMENT",  # Restocking from truck
+            "Source": "TRUCK_001",  # Source is truck ID
         },
     ]
 
@@ -491,6 +514,45 @@ def sample_marketing(sample_customers) -> list[dict]:
             "ImpressionId": "IMP002",
             "Cost": Decimal("0.35"),
             "Device": "DESKTOP",
+        },
+    ]
+
+
+@pytest.fixture
+def sample_online_orders(sample_customers, sample_products_master) -> list[dict]:
+    """Sample online order data for testing."""
+    return [
+        {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("39.98"),
+            "Tax": Decimal("3.30"),
+            "Total": Decimal("43.28"),
+            "TenderType": "CREDIT_CARD",
+            "FulfillmentStatus": "created",
+            "FulfillmentMode": "SHIP_FROM_DC",
+            "NodeType": "DC",
+            "NodeID": 1,
+        },
+        {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD002",
+            "CustomerID": 2,
+            "ProductID": 2,
+            "Qty": 1,
+            "Subtotal": Decimal("29.99"),
+            "Tax": Decimal("2.32"),
+            "Total": Decimal("32.31"),
+            "TenderType": "DEBIT_CARD",
+            "FulfillmentStatus": "shipped",
+            "FulfillmentMode": "SHIP_FROM_STORE",
+            "NodeType": "STORE",
+            "NodeID": 1,
         },
     ]
 

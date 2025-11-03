@@ -193,8 +193,43 @@ class TestDimensionModels:
             "StoreNumber": "ST001",
             "Address": "123 Main St, Springfield, IL 62701",
             "GeographyID": 1,
+            "tax_rate": Decimal("0.0825"),
         }
         Store(**valid_store)  # Should not raise
+
+    def test_store_valid_without_tax_rate(self):
+        """Test valid store record without optional tax_rate."""
+        valid_store = {
+            "ID": 1,
+            "StoreNumber": "ST001",
+            "Address": "123 Main St, Springfield, IL 62701",
+            "GeographyID": 1,
+        }
+        Store(**valid_store)  # Should not raise (tax_rate is optional)
+
+    def test_store_tax_rate_validation_negative(self):
+        """Test that negative tax rate is rejected."""
+        invalid_store = {
+            "ID": 1,
+            "StoreNumber": "ST001",
+            "Address": "123 Main St, Springfield, IL 62701",
+            "GeographyID": 1,
+            "tax_rate": Decimal("-0.05"),  # Negative tax rate
+        }
+        with pytest.raises(ValidationError):
+            Store(**invalid_store)
+
+    def test_store_tax_rate_validation_too_high(self):
+        """Test that tax rate above 15% is rejected."""
+        invalid_store = {
+            "ID": 1,
+            "StoreNumber": "ST001",
+            "Address": "123 Main St, Springfield, IL 62701",
+            "GeographyID": 1,
+            "tax_rate": Decimal("0.20"),  # 20% tax rate (too high)
+        }
+        with pytest.raises(ValidationError):
+            Store(**invalid_store)
 
     def test_store_invalid_geography_id(self):
         """Test that store with invalid geography ID is rejected."""
@@ -269,8 +304,87 @@ class TestDimensionModels:
             "SalePrice": Decimal("19.99"),
             "RequiresRefrigeration": False,
             "LaunchDate": datetime.now(),
+            "taxability": "TAXABLE",
         }
         ProductMaster(**valid_product)  # Should not raise
+
+    def test_product_master_valid_non_taxable(self):
+        """Test valid product master record with NON_TAXABLE taxability."""
+        valid_product = {
+            "ID": 1,
+            "ProductName": "Fresh Milk",
+            "Brand": "DairyBrand",
+            "Company": "Dairy Corp",
+            "Department": "Grocery",
+            "Category": "Dairy",
+            "Subcategory": "Milk",
+            "Cost": Decimal("2.00"),
+            "MSRP": Decimal("3.49"),
+            "SalePrice": Decimal("2.99"),
+            "RequiresRefrigeration": True,
+            "LaunchDate": datetime.now(),
+            "taxability": "NON_TAXABLE",  # Groceries are often non-taxable
+        }
+        ProductMaster(**valid_product)  # Should not raise
+
+    def test_product_master_valid_reduced_rate(self):
+        """Test valid product master record with REDUCED_RATE taxability."""
+        valid_product = {
+            "ID": 1,
+            "ProductName": "Vitamins",
+            "Brand": "HealthBrand",
+            "Company": "Health Corp",
+            "Department": "Health",
+            "Category": "Supplements",
+            "Subcategory": "Vitamins",
+            "Cost": Decimal("10.00"),
+            "MSRP": Decimal("19.99"),
+            "SalePrice": Decimal("16.99"),
+            "RequiresRefrigeration": False,
+            "LaunchDate": datetime.now(),
+            "taxability": "REDUCED_RATE",  # Some states have reduced rates for health items
+        }
+        ProductMaster(**valid_product)  # Should not raise
+
+    def test_product_master_default_taxability(self):
+        """Test that taxability defaults to TAXABLE when not specified."""
+        valid_product = {
+            "ID": 1,
+            "ProductName": "Widget Pro",
+            "Brand": "SuperBrand",
+            "Company": "Acme Corp",
+            "Department": "Electronics",
+            "Category": "Gadgets",
+            "Subcategory": "Widgets",
+            "Cost": Decimal("15.00"),
+            "MSRP": Decimal("22.99"),
+            "SalePrice": Decimal("19.99"),
+            "RequiresRefrigeration": False,
+            "LaunchDate": datetime.now(),
+            # taxability not specified - should default to TAXABLE
+        }
+        product = ProductMaster(**valid_product)
+        assert product.taxability.value == "TAXABLE"
+
+    def test_product_master_invalid_taxability(self):
+        """Test that invalid taxability value is rejected."""
+        invalid_product = {
+            "ID": 1,
+            "ProductName": "Widget Pro",
+            "Brand": "SuperBrand",
+            "Company": "Acme Corp",
+            "Department": "Electronics",
+            "Category": "Gadgets",
+            "Subcategory": "Widgets",
+            "Cost": Decimal("15.00"),
+            "MSRP": Decimal("22.99"),
+            "SalePrice": Decimal("19.99"),
+            "RequiresRefrigeration": False,
+            "LaunchDate": datetime.now(),
+            "taxability": "INVALID_STATUS",  # Invalid taxability
+        }
+        with pytest.raises(ValidationError):
+            ProductMaster(**invalid_product)
 
     def test_product_master_pricing_constraints_cost_less_than_sale(self):
         """Test that cost must be less than sale price."""
@@ -391,18 +505,99 @@ class TestFactModels:
         with pytest.raises(ValidationError):
             TruckMove(**invalid_move)
 
-    def test_store_inventory_transaction_valid(self):
-        """Test valid store inventory transaction."""
-        {
+    def test_store_inventory_transaction_valid_with_reason_and_source(self):
+        """Test valid store inventory transaction with Reason and Source."""
+        from retail_datagen.shared.models import StoreInventoryTransaction
+
+        valid_txn = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "StoreID": 1,
             "ProductID": 1,
             "QtyDelta": -5,
             "Reason": "SALE",
-            "Source": "TRUCK_001",
+            "Source": "RCP001",  # Source is receipt ID
         }
-        # StoreInventoryTransaction(**valid_txn)  # Should not raise
+        StoreInventoryTransaction(**valid_txn)  # Should not raise
+
+    def test_store_inventory_transaction_valid_without_optional_fields(self):
+        """Test valid store inventory transaction without optional Reason and Source."""
+        from retail_datagen.shared.models import StoreInventoryTransaction
+
+        valid_txn = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "StoreID": 1,
+            "ProductID": 1,
+            "QtyDelta": 50,
+            # Reason and Source are optional
+        }
+        StoreInventoryTransaction(**valid_txn)  # Should not raise
+
+    def test_store_inventory_transaction_valid_reason_values(self):
+        """Test that all valid InventoryReason enum values are accepted."""
+        from retail_datagen.shared.models import StoreInventoryTransaction
+
+        valid_reasons = [
+            "INBOUND_SHIPMENT",
+            "OUTBOUND_SHIPMENT",
+            "ADJUSTMENT",
+            "DAMAGED",
+            "LOST",
+            "SALE",
+            "RETURN",
+        ]
+
+        for reason in valid_reasons:
+            valid_txn = {
+                "TraceId": str(uuid4()),
+                "EventTS": datetime.now(),
+                "StoreID": 1,
+                "ProductID": 1,
+                "QtyDelta": 10,
+                "Reason": reason,
+                "Source": "TEST_SOURCE",
+            }
+            StoreInventoryTransaction(**valid_txn)  # Should not raise
+
+    def test_store_inventory_transaction_invalid_reason(self):
+        """Test that invalid Reason value is rejected."""
+        from retail_datagen.shared.models import StoreInventoryTransaction
+
+        invalid_txn = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "StoreID": 1,
+            "ProductID": 1,
+            "QtyDelta": 10,
+            "Reason": "INVALID_REASON",  # Invalid reason
+            "Source": "TEST_SOURCE",
+        }
+        with pytest.raises(ValidationError):
+            StoreInventoryTransaction(**invalid_txn)
+
+    def test_store_inventory_transaction_source_format(self):
+        """Test that Source field accepts various formats."""
+        from retail_datagen.shared.models import StoreInventoryTransaction
+
+        valid_sources = [
+            "TRUCK_001",  # Truck ID
+            "RCP001",  # Receipt ID
+            "ADJ_20250102_001",  # Adjustment ID
+            "DC_TRANSFER_123",  # DC transfer
+        ]
+
+        for source in valid_sources:
+            valid_txn = {
+                "TraceId": str(uuid4()),
+                "EventTS": datetime.now(),
+                "StoreID": 1,
+                "ProductID": 1,
+                "QtyDelta": 10,
+                "Reason": "INBOUND_SHIPMENT",
+                "Source": source,
+            }
+            StoreInventoryTransaction(**valid_txn)  # Should not raise
 
     def test_receipt_valid(self):
         """Test valid receipt record."""
@@ -435,9 +630,9 @@ class TestFactModels:
         with pytest.raises(ValidationError):
             Receipt(**invalid_receipt)
 
-    def test_receipt_line_valid(self):
-        """Test valid receipt line record."""
-        {
+    def test_receipt_line_valid_with_promo_code(self):
+        """Test valid receipt line record with promo code."""
+        valid_line = {
             "TraceId": str(uuid4()),
             "EventTS": datetime.now(),
             "ReceiptId": "RCP001",
@@ -446,9 +641,48 @@ class TestFactModels:
             "Qty": 2,
             "UnitPrice": Decimal("12.99"),
             "ExtPrice": Decimal("25.98"),
-            "PromoCode": None,
+            "PromoCode": "SAVE10",  # Promo code applied
         }
-        # ReceiptLine(**valid_line)  # Should not raise
+        ReceiptLine(**valid_line)  # Should not raise
+
+    def test_receipt_line_valid_without_promo_code(self):
+        """Test valid receipt line record without promo code."""
+        valid_line = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "ReceiptId": "RCP001",
+            "Line": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "UnitPrice": Decimal("12.99"),
+            "ExtPrice": Decimal("25.98"),
+            "PromoCode": None,  # No promo code
+        }
+        ReceiptLine(**valid_line)  # Should not raise
+
+    def test_receipt_line_promo_code_formats(self):
+        """Test that various promo code formats are accepted."""
+        valid_promo_codes = [
+            "SAVE10",
+            "PROMO_2025_WINTER",
+            "BUY1GET1",
+            "CLEARANCE50",
+            "LOYALTY_BONUS",
+        ]
+
+        for promo_code in valid_promo_codes:
+            valid_line = {
+                "TraceId": str(uuid4()),
+                "EventTS": datetime.now(),
+                "ReceiptId": "RCP001",
+                "Line": 1,
+                "ProductID": 1,
+                "Qty": 2,
+                "UnitPrice": Decimal("12.99"),
+                "ExtPrice": Decimal("25.98"),
+                "PromoCode": promo_code,
+            }
+            ReceiptLine(**valid_line)  # Should not raise
 
     def test_receipt_line_invalid_ext_price_calculation(self):
         """Test that invalid extended price calculation is rejected."""
@@ -520,6 +754,136 @@ class TestFactModels:
             "Device": "MOBILE",
         }
         # Marketing(**valid_marketing)  # Should not raise
+
+    def test_online_order_valid(self):
+        """Test valid online order record with all required fields."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        valid_order = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("39.98"),
+            "Tax": Decimal("3.30"),
+            "Total": Decimal("43.28"),
+            "TenderType": "CREDIT_CARD",
+            "FulfillmentStatus": "created",
+            "FulfillmentMode": "SHIP_FROM_DC",
+            "NodeType": "DC",
+            "NodeID": 1,
+        }
+        OnlineOrder(**valid_order)  # Should not raise
+
+    def test_online_order_total_validation(self):
+        """Test that Total = Subtotal + Tax validation works."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        invalid_order = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("39.98"),
+            "Tax": Decimal("3.30"),
+            "Total": Decimal("50.00"),  # Wrong total (should be 43.28)
+            "TenderType": "CREDIT_CARD",
+            "FulfillmentStatus": "created",
+        }
+        with pytest.raises(ValidationError):
+            OnlineOrder(**invalid_order)
+
+    def test_online_order_valid_tender_types(self):
+        """Test that all valid TenderType enum values are accepted."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        valid_tender_types = [
+            "CASH",
+            "CREDIT_CARD",
+            "DEBIT_CARD",
+            "CHECK",
+            "MOBILE_PAY",
+        ]
+
+        for tender_type in valid_tender_types:
+            valid_order = {
+                "TraceId": str(uuid4()),
+                "EventTS": datetime.now(),
+                "OrderId": f"ORD_{tender_type}",
+                "CustomerID": 1,
+                "ProductID": 1,
+                "Qty": 2,
+                "Subtotal": Decimal("39.98"),
+                "Tax": Decimal("3.30"),
+                "Total": Decimal("43.28"),
+                "TenderType": tender_type,
+                "FulfillmentStatus": "created",
+            }
+            OnlineOrder(**valid_order)  # Should not raise
+
+    def test_online_order_invalid_tender_type(self):
+        """Test that invalid TenderType value is rejected."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        invalid_order = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("39.98"),
+            "Tax": Decimal("3.30"),
+            "Total": Decimal("43.28"),
+            "TenderType": "INVALID_TENDER",  # Invalid tender type
+            "FulfillmentStatus": "created",
+        }
+        with pytest.raises(ValidationError):
+            OnlineOrder(**invalid_order)
+
+    def test_online_order_negative_subtotal_rejected(self):
+        """Test that negative subtotal is rejected."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        invalid_order = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("-10.00"),  # Negative subtotal
+            "Tax": Decimal("0.00"),
+            "Total": Decimal("-10.00"),
+            "TenderType": "CREDIT_CARD",
+            "FulfillmentStatus": "created",
+        }
+        with pytest.raises(ValidationError):
+            OnlineOrder(**invalid_order)
+
+    def test_online_order_negative_tax_rejected(self):
+        """Test that negative tax is rejected."""
+        from retail_datagen.shared.models import OnlineOrder
+
+        invalid_order = {
+            "TraceId": str(uuid4()),
+            "EventTS": datetime.now(),
+            "OrderId": "ORD001",
+            "CustomerID": 1,
+            "ProductID": 1,
+            "Qty": 2,
+            "Subtotal": Decimal("39.98"),
+            "Tax": Decimal("-3.30"),  # Negative tax
+            "Total": Decimal("36.68"),
+            "TenderType": "CREDIT_CARD",
+            "FulfillmentStatus": "created",
+        }
+        with pytest.raises(ValidationError):
+            OnlineOrder(**invalid_order)
 
     @given(
         qty=st.integers(min_value=1, max_value=100),

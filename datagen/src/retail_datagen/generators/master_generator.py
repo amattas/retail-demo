@@ -39,6 +39,7 @@ from retail_datagen.shared.validators import (
     PricingCalculator,
     SyntheticDataValidator,
 )
+from retail_datagen.shared.store_profiles import StoreProfiler
 
 # Import SQLAlchemy models for database insertion
 try:
@@ -296,6 +297,13 @@ class MasterDataGenerator:
             # SQLite's Date type only accepts Python date objects.
             elif isinstance(value, datetime):
                 value = value.date()
+
+            # Convert enums (like ProductTaxability) to their string value for SQLite
+            elif hasattr(value, 'value') and hasattr(value, '__class__') and hasattr(value.__class__, '__mro__'):
+                # Check if it's an enum by looking for the Enum base class
+                from enum import Enum
+                if any(base.__name__ == 'Enum' for base in value.__class__.__mro__):
+                    value = value.value
 
             # Handle None values
             elif value is None:
@@ -794,6 +802,22 @@ class MasterDataGenerator:
         self.fk_validator.register_store_ids(store_ids)
 
         print(f"Generated {len(self.stores)} store records")
+
+        # Assign store profiles for realistic variability
+        print("Assigning store profiles for realistic variability...")
+        profiler = StoreProfiler(self.stores, self.geography_master, self.config.seed)
+        store_profiles = profiler.assign_profiles()
+
+        # Update store records with profile information
+        for store in self.stores:
+            if store.ID in store_profiles:
+                profile = store_profiles[store.ID]
+                store.volume_class = profile.volume_class.value
+                store.store_format = profile.store_format.value
+                store.operating_hours = profile.operating_hours.value
+                store.daily_traffic_multiplier = profile.daily_traffic_multiplier
+
+        print(f"Assigned profiles to {len(store_profiles)} stores")
 
         # Insert to database if session provided
         if hasattr(self, "_db_session") and self._db_session:

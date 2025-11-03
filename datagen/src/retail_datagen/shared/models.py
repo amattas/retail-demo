@@ -26,7 +26,7 @@ class TaxJurisdiction(BaseModel):
     County: str = Field(..., min_length=1, description="County name")
     City: str = Field(..., min_length=1, description="City name")
     CombinedRate: Decimal = Field(
-        ..., ge=0, le=Decimal("0.15"), description="Combined tax rate (0-15%)"
+        ..., ge=0, le=Decimal("0.20"), description="Combined tax rate (0-20%)"
     )
 
     @field_validator("StateCode")
@@ -179,8 +179,24 @@ class Store(BaseModel):
     tax_rate: Decimal | None = Field(
         None,
         ge=0,
-        le=Decimal("0.15"),
-        description="Local tax rate for this store (0-15%, optional)",
+        le=Decimal("0.20"),
+        description="Combined state/county/city tax rate for this store (0-20%, e.g., 0.0825 for 8.25%)",
+    )
+    # Store profile fields for realistic variability
+    volume_class: str | None = Field(
+        None, description="Store volume classification (flagship, high_volume, etc.)"
+    )
+    store_format: str | None = Field(
+        None, description="Store format (hypermarket, superstore, standard, etc.)"
+    )
+    operating_hours: str | None = Field(
+        None, description="Operating hours pattern (24/7, extended, standard, etc.)"
+    )
+    daily_traffic_multiplier: Decimal | None = Field(
+        None,
+        ge=Decimal("0.1"),
+        le=Decimal("5.0"),
+        description="Traffic multiplier relative to baseline (0.3-3.0 typical)",
     )
 
 
@@ -355,6 +371,8 @@ class TenderType(str, Enum):
     DEBIT_CARD = "DEBIT_CARD"
     CHECK = "CHECK"
     MOBILE_PAY = "MOBILE_PAY"
+    PAYPAL = "PAYPAL"
+    OTHER = "OTHER"
 
 
 class DisruptionType(str, Enum):

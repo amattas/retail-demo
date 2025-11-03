@@ -50,6 +50,57 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 
 ## 🆕 Latest Enhancements
 
+### 🔧 **Comprehensive Data Quality Initiative** ⭐ **MAJOR UPDATE**
+
+A comprehensive code review and fix initiative has addressed all data quality and realism issues:
+
+**Receipt & Financial Integrity:**
+- ✅ 100% of receipts now have ≥1 line items (fixed 2.6% empty receipts)
+- ✅ All receipt totals accurate within $0.01 (fixed 0.06% mismatches)
+- ✅ Proper formula: `Total = Subtotal - Discount + Tax`
+- ✅ All financial calculations use Decimal precision (no floating point errors)
+
+**Tax System Overhaul:**
+- ✅ Store-specific tax rates loaded from 164 tax jurisdictions (state/county/city)
+- ✅ Product taxability system (TAXABLE, NON_TAXABLE, REDUCED_RATE)
+- ✅ Tax calculated on post-discount amounts (industry standard)
+- ✅ Reduced-rate products taxed at 50% of normal rate
+
+**Promotion System:**
+- ✅ 13 promotion types with seasonal patterns (SAVE10, BFRIDAY30, SUMMER25, etc.)
+- ✅ 10-20% of receipts now have promotions with proper discounts
+- ✅ PromoCode tracking in receipt_lines
+- ✅ Customer segment-based promotion usage (Budget: 30%, Premium: 5%)
+
+**Store & Customer Variability:**
+- ✅ Store profiles create realistic variability (FLAGSHIP/HIGH/MEDIUM/LOW/KIOSK)
+- ✅ Coefficient of variation > 0.6 (strong variability in store volumes)
+- ✅ Customer home geographies with distance-based store affinity
+- ✅ 70% of customer visits at top 2 home stores
+- ✅ 80% of trips under 10 miles from customer home
+
+**Complete Lifecycle Management:**
+- ✅ Truck 6-status lifecycle (SCHEDULED → LOADING → IN_TRANSIT → ARRIVED → UNLOADING → COMPLETED)
+- ✅ DC OUTBOUND and Store INBOUND inventory transactions linked via shipment_id
+- ✅ Online orders with multi-line support (1-5 items per order)
+- ✅ Online order 4-status progression (created → picked → shipped → delivered)
+- ✅ Location-aware tax calculation for online orders
+
+**Sensor & Marketing Data:**
+- ✅ Foot traffic with aggregate counts and 10-30% conversion rates
+- ✅ BLE 30% customer_id match rate (was 0%)
+- ✅ Marketing 5% customer_id resolution (was 0%)
+- ✅ Marketing costs match documented ranges per channel
+
+**New Files Added:**
+- `src/retail_datagen/shared/tax_utils.py` - Tax calculation engine
+- `src/retail_datagen/shared/promotion_utils.py` - Promotion system
+- `src/retail_datagen/shared/customer_geography.py` - Geographic assignment
+- `src/retail_datagen/generators/online_order_generator.py` - Order lifecycle
+- 18+ validation scripts for quality assurance
+
+**For complete implementation details, see CHANGELOG.md and the comprehensive fix documentation.**
+
 ### 🛍️ Online Orders Integration — Unified
 - Online orders are now a first-class fact table (`online_orders`) integrated into the core generator and streamer.
 - Inventory impacts from online orders are applied to existing tables: `store_inventory_txn` and `dc_inventory_txn` with `Source=ONLINE`.

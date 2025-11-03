@@ -25,6 +25,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
+from retail_datagen.generators.online_order_generator import (
+    generate_online_orders_with_lifecycle,
+)
 from retail_datagen.generators.progress_tracker import TableProgressTracker
 from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
 from retail_datagen.generators.utils import ProgressReporter
@@ -40,6 +43,7 @@ from retail_datagen.shared.models import (
 )
 
 from ..config.models import RetailConfig
+from ..shared.customer_geography import GeographyAssigner, StoreSelector
 from .retail_patterns import (
     BusinessRulesEngine,
     CustomerJourneySimulator,
@@ -328,6 +332,13 @@ class FactDataGenerator:
         self.inventory_flow_sim: InventoryFlowSimulator | None = None
         self.marketing_campaign_sim: MarketingCampaignSimulator | None = None
 
+        # Customer geography and store selector (initialized after loading master data)
+        self.store_selector: StoreSelector | None = None
+
+        # Customer pools per store (for efficient selection during transaction generation)
+        # Maps store_id -> list of (customer, weight) tuples
+        self._store_customer_pools: dict[int, list[tuple[Customer, float]]] = {}
+
         # Track active campaigns and shipments
         self._active_campaigns: dict[str, Any] = {}
         self._active_shipments: dict[str, Any] = {}
@@ -566,6 +577,20 @@ class FactDataGenerator:
             self.customers, self.config.seed + 3000, self.config.marketing_cost
         )
 
+        # Initialize customer geography and store selector
+        print("Assigning customer geographies and store affinities...")
+        geography_assigner = GeographyAssigner(
+            self.customers, self.stores, self.geographies, self.config.seed + 4000
+        )
+        customer_geographies = geography_assigner.assign_geographies()
+        self.store_selector = StoreSelector(
+            customer_geographies, self.stores, self.config.seed + 5000
+        )
+
+        # Build customer pools per store for efficient selection
+        print("Building customer pools for each store...")
+        self._build_store_customer_pools(customer_geographies)
+
         print(
             "Loaded master data (CSV): "
             f"{loaded_counts.get('geographies', 0)} geographies, "
@@ -621,6 +646,10 @@ class FactDataGenerator:
                     StoreNumber=s.store_number,
                     Address=s.address,
                     GeographyID=s.geography_id,
+                    volume_class=s.volume_class,
+                    store_format=s.store_format,
+                    operating_hours=s.operating_hours,
+                    daily_traffic_multiplier=Decimal(str(s.daily_traffic_multiplier)) if s.daily_traffic_multiplier is not None else None,
                 )
                 for s in stores
             ]
@@ -699,6 +728,20 @@ class FactDataGenerator:
             self.customers, self.config.seed + 3000, self.config.marketing_cost
         )
 
+        # Initialize customer geography and store selector
+        print("Assigning customer geographies and store affinities...")
+        geography_assigner = GeographyAssigner(
+            self.customers, self.stores, self.geographies, self.config.seed + 4000
+        )
+        customer_geographies = geography_assigner.assign_geographies()
+        self.store_selector = StoreSelector(
+            customer_geographies, self.stores, self.config.seed + 5000
+        )
+
+        # Build customer pools per store for efficient selection
+        print("Building customer pools for each store...")
+        self._build_store_customer_pools(customer_geographies)
+
         print(
             "Loaded master data (SQLite): "
             f"{len(self.geographies)} geographies, "
@@ -707,6 +750,51 @@ class FactDataGenerator:
             f"{len(self.customers)} customers, "
             f"{len(self.products)} products"
         )
+
+    def _build_store_customer_pools(self, customer_geographies: dict) -> None:
+        """
+        Build customer pools for each store for efficient weighted selection.
+
+        For each store, create a list of (customer, weight) tuples where weight
+        represents the probability of that customer shopping at that store.
+
+        Args:
+            customer_geographies: Dictionary mapping customer_id to CustomerGeography
+        """
+        # Initialize pools for all stores
+        for store in self.stores:
+            self._store_customer_pools[store.ID] = []
+
+        # Build pools by calculating weights for each customer
+        store_ids = [store.ID for store in self.stores]
+
+        for customer in self.customers:
+            customer_geo = customer_geographies.get(customer.ID)
+            if not customer_geo:
+                # If no geography, give equal weight to all stores
+                equal_weight = 1.0 / len(self.stores)
+                for store in self.stores:
+                    self._store_customer_pools[store.ID].append((customer, equal_weight))
+                continue
+
+            # Get store selection weights for this customer
+            store_weights = customer_geo.get_store_selection_weights(store_ids)
+
+            # Add customer to each store's pool with appropriate weight
+            for store_id, weight in store_weights.items():
+                if weight > 0:  # Only add if there's a non-zero probability
+                    self._store_customer_pools[store_id].append((customer, weight))
+
+        # Log summary statistics
+        pool_sizes = [len(pool) for pool in self._store_customer_pools.values()]
+        avg_pool_size = sum(pool_sizes) / len(pool_sizes) if pool_sizes else 0
+        min_pool_size = min(pool_sizes) if pool_sizes else 0
+        max_pool_size = max(pool_sizes) if pool_sizes else 0
+
+        logger.info(f"Built customer pools for {len(self.stores)} stores")
+        logger.info(f"  Average pool size: {avg_pool_size:.0f} customers per store")
+        logger.info(f"  Min pool size: {min_pool_size}")
+        logger.info(f"  Max pool size: {max_pool_size}")
 
     async def generate_historical_data(
         self, start_date: datetime, end_date: datetime
@@ -1184,15 +1272,35 @@ class FactDataGenerator:
                     daily_facts[fact_type].extend(records)
 
         # 4. Generate truck movements (based on inventory needs)
+        # This creates initial shipments in SCHEDULED status
         if "truck_moves" in active_tables:
             base_store_txn = daily_facts.get("store_inventory_txn", [])
             truck_movements = self._generate_truck_movements(date, base_store_txn)
             daily_facts["truck_moves"].extend(truck_movements)
-            if truck_movements:
+
+            # Process all active shipments and generate status progression throughout the day
+            truck_lifecycle_records, dc_outbound_txn, store_inbound_txn = (
+                self._process_truck_lifecycle(date)
+            )
+
+            # Add truck status progression records
+            daily_facts["truck_moves"].extend(truck_lifecycle_records)
+
+            # Add DC outbound transactions (when trucks are loaded)
+            if "dc_inventory_txn" in active_tables and dc_outbound_txn:
+                daily_facts["dc_inventory_txn"].extend(dc_outbound_txn)
+
+            # Add store inbound transactions (when trucks are unloaded)
+            if "store_inventory_txn" in active_tables and store_inbound_txn:
+                daily_facts["store_inventory_txn"].extend(store_inbound_txn)
+
+            # Write all truck_moves records (including lifecycle progression)
+            all_truck_moves = daily_facts.get("truck_moves", [])
+            if all_truck_moves:
                 try:
                     import pandas as pd
 
-                    df_tm = pd.DataFrame(truck_movements)
+                    df_tm = pd.DataFrame(all_truck_moves)
                     await self._insert_hourly_to_db(
                         self._session,
                         "truck_moves",
@@ -1230,13 +1338,19 @@ class FactDataGenerator:
                     }
                 )
 
-        # 5. Update inventory based on truck deliveries
+        # 5. Legacy delivery processing - now handled by _process_truck_lifecycle
+        # Kept for backward compatibility but will be empty since lifecycle handles it
         if "store_inventory_txn" in active_tables:
             base_truck_moves = daily_facts.get("truck_moves", [])
             delivery_transactions = self._process_truck_deliveries(
                 date, base_truck_moves
             )
-            daily_facts["store_inventory_txn"].extend(delivery_transactions)
+            if delivery_transactions:
+                # Only add if not already added by lifecycle processing
+                # This prevents double-counting
+                logger.debug(f"Legacy delivery processing added {len(delivery_transactions)} transactions")
+                # Skip adding these since _process_truck_lifecycle handles it
+                pass
 
         # 6. Generate online orders and integrate inventory effects
         if "online_orders" in active_tables:
@@ -1300,152 +1414,30 @@ class FactDataGenerator:
     def _generate_online_orders(
         self, date: datetime
     ) -> tuple[list[dict], list[dict], list[dict]]:
-        """Generate online orders for the given date and corresponding inventory effects.
+        """Generate online orders for the given date with complete lifecycle and corresponding inventory effects.
+
+        Delegates to generate_online_orders_with_lifecycle for full implementation including:
+        - Multi-line orders (1-5 items per order via basket generation)
+        - Status progression (created -> picked -> shipped -> delivered)
+        - Proper tax calculation based on fulfillment location
+        - Realistic tender type distribution
 
         Returns:
             (orders, store_inventory_txn, dc_inventory_txn)
         """
-        orders: list[dict] = []
-        store_txn: list[dict] = []
-        dc_txn: list[dict] = []
-
-        base_per_day = max(0, int(self.config.volume.online_orders_per_day))
-        if base_per_day == 0 or not self.customers:
-            return orders, store_txn, dc_txn
-
-        # Seasonality/holiday multiplier, not bounded by store hours
-        seasonal_mult = self.temporal_patterns.seasonal.get_seasonal_multiplier(date)
-        # Smooth out extremes
-        seasonal_mult = max(0.5, min(seasonal_mult, 2.5))
-        total_orders = max(0, int(base_per_day * seasonal_mult))
-
-        # Convenience
-        rng = self._rng
-        # InventoryReason and TenderType already imported from shared.models at module level
-
-        for i in range(total_orders):
-            # Random event time during the day
-            hour = rng.randint(0, 23)
-            minute = rng.randint(0, 59)
-            second = rng.randint(0, 59)
-            event_ts = datetime(date.year, date.month, date.day, hour, minute, second)
-
-            customer = rng.choice(self.customers)
-
-            # Generate a small basket using the same simulator
-            basket = self.customer_journey_sim.generate_shopping_basket(customer.ID)
-
-            # Choose fulfillment mode and node
-            # Distribution: 60% DC, 30% Store, 10% BOPIS
-            mode = rng.choices(
-                ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"],
-                weights=[0.60, 0.30, 0.10],
-            )[0]
-
-            if mode in ("SHIP_FROM_STORE", "BOPIS") and self.stores:
-                node_type = "STORE"
-                store = rng.choice(self.stores)
-                node_id = store.ID
-            else:
-                node_type = "DC"
-                dc = (
-                    rng.choice(self.distribution_centers)
-                    if self.distribution_centers
-                    else None
-                )
-                if not dc:
-                    # Fallback to store if no DCs
-                    node_type = "STORE"
-                    store = rng.choice(self.stores)
-                    node_id = store.ID
-                else:
-                    node_id = dc.ID
-
-            # Tally totals similar to receipts
-            subtotal = basket.estimated_total
-            tax_rate = Decimal("0.08")
-            tax = subtotal * tax_rate
-            subtotal + tax
-
-            order_id = f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100, 999)}"
-            trace_id = self._generate_trace_id()
-
-            # Create one order record per product (like receipt lines)
-            for product, qty in basket.items:
-                # Calculate line total for this product
-                line_subtotal = product.SalePrice * qty
-                line_tax = line_subtotal * tax_rate
-                line_total = line_subtotal + line_tax
-
-                orders.append(
-                    {
-                        "TraceId": trace_id,
-                        "EventTS": event_ts,
-                        "OrderId": order_id,
-                        "CustomerID": customer.ID,
-                        "ProductID": product.ID,
-                        "Quantity": qty,
-                        "Total": str(line_total),
-                        "FulfillmentStatus": "created",  # Initial status
-                        "FulfillmentMode": mode,
-                        "NodeType": node_type,
-                        "NodeID": node_id,
-                        "Subtotal": str(line_subtotal),
-                        "Tax": str(line_tax),
-                        "TenderType": TenderType.CREDIT_CARD.value,
-                    }
-                )
-
-            # Create inventory effects: decrement stock at node
-            for product, qty in basket.items:
-                if node_type == "STORE":
-                    # Update store inventory and get balance
-                    key = (node_id, product.ID)
-                    current_balance = self.inventory_flow_sim._store_inventory.get(
-                        key, 0
-                    )
-                    new_balance = max(0, current_balance - qty)
-                    self.inventory_flow_sim._store_inventory[key] = new_balance
-
-                    # Get balance after transaction
-                    balance = self.inventory_flow_sim.get_store_balance(node_id, product.ID)
-
-                    store_txn.append(
-                        {
-                            "TraceId": trace_id,
-                            "EventTS": event_ts,
-                            "StoreID": node_id,
-                            "ProductID": product.ID,
-                            "QtyDelta": -qty,
-                            "Reason": InventoryReason.SALE.value,
-                            "Source": order_id,
-                            "Balance": balance,
-                        }
-                    )
-                else:  # DC
-                    # Update DC inventory and get balance
-                    key = (node_id, product.ID)
-                    current_balance = self.inventory_flow_sim._dc_inventory.get(key, 0)
-                    new_balance = max(0, current_balance - qty)
-                    self.inventory_flow_sim._dc_inventory[key] = new_balance
-
-                    # Get balance after transaction
-                    balance = self.inventory_flow_sim.get_dc_balance(node_id, product.ID)
-
-                    dc_txn.append(
-                        {
-                            "TraceId": trace_id,
-                            "EventTS": event_ts,
-                            "DCID": node_id,
-                            "ProductID": product.ID,
-                            "QtyDelta": -qty,
-                            "Reason": InventoryReason.SALE.value,
-                            "Source": order_id,
-                            "Balance": balance,
-                        }
-                    )
-
-        return orders, store_txn, dc_txn
+        return generate_online_orders_with_lifecycle(
+            date=date,
+            config=self.config,
+            customers=self.customers,
+            geographies=self.geographies,
+            stores=self.stores,
+            distribution_centers=self.distribution_centers,
+            customer_journey_sim=self.customer_journey_sim,
+            inventory_flow_sim=self.inventory_flow_sim,
+            temporal_patterns=self.temporal_patterns,
+            rng=self._rng,
+            generate_trace_id_func=self._generate_trace_id,
+        )
 
     def _generate_dc_inventory_transactions(
         self, date: datetime, multiplier: float
@@ -1604,6 +1596,17 @@ class FactDataGenerator:
                 logger.debug(
                     f"      Creating marketing record: {impression.get('channel', 'unknown')}"
                 )
+
+                # Resolve customer_id from AdId (5% of the time - CRM join / authenticated users)
+                customer_id = None
+                if self._rng.random() < 0.05:
+                    # Find customer with this AdId
+                    customer_ad_id = impression["CustomerAdId"]
+                    for customer in self.customers:
+                        if customer.AdId == customer_ad_id:
+                            customer_id = customer.ID
+                            break
+
                 marketing_records.append(
                     {
                         "TraceId": self._generate_trace_id(),
@@ -1612,6 +1615,7 @@ class FactDataGenerator:
                         "CampaignId": impression["CampaignId"],
                         "CreativeId": impression["CreativeId"],
                         "CustomerAdId": impression["CustomerAdId"],
+                        "CustomerId": customer_id,  # 5% resolution
                         "ImpressionId": impression["ImpressionId"],
                         "Cost": str(impression["Cost"]),
                         "Device": impression["Device"].value,
@@ -1652,24 +1656,46 @@ class FactDataGenerator:
         # Calculate expected customers for this hour
         # NOTE: customers_per_day is configured PER STORE, not total across all stores
         base_customers_per_hour = self.config.volume.customers_per_day / 24
-        expected_customers = int(base_customers_per_hour * multiplier)
+
+        # Apply store profile multiplier for realistic variability
+        store_multiplier = float(getattr(store, 'daily_traffic_multiplier', Decimal("1.0")))
+        expected_customers = int(base_customers_per_hour * multiplier * store_multiplier)
+
+        # Generate foot traffic (will be calibrated to receipts with conversion rates)
+        # Pass expected_customers (receipt count) to calculate realistic foot traffic
+        foot_traffic_records = self._generate_foot_traffic(
+            store, hour_datetime, expected_customers
+        )
+        hour_data["foot_traffic"].extend(foot_traffic_records)
 
         if expected_customers == 0:
             return hour_data
 
-        # Generate foot traffic (slightly more than actual customers)
-        foot_traffic_count = max(1, int(expected_customers * 1.2))
-        foot_traffic_records = self._generate_foot_traffic(
-            store, hour_datetime, foot_traffic_count
-        )
-        hour_data["foot_traffic"].extend(foot_traffic_records)
-
         # Generate customer transactions
+        # NEW: Use geography-based customer selection for this store
+        # Select customers who are likely to shop at this specific store
         for _ in range(expected_customers):
-            customer = self._rng.choice(self.customers)
+            # Select customer based on store affinity using pre-built pools
+            if store.ID in self._store_customer_pools and self._store_customer_pools[store.ID]:
+                # Use weighted random selection from this store's customer pool
+                customer_pool = self._store_customer_pools[store.ID]
+                customers_list = [c for c, w in customer_pool]
+                weights_list = [w for c, w in customer_pool]
 
-            # Generate shopping basket
-            basket = self.customer_journey_sim.generate_shopping_basket(customer.ID)
+                # Normalize weights to sum to 1.0
+                total_weight = sum(weights_list)
+                if total_weight > 0:
+                    normalized_weights = [w / total_weight for w in weights_list]
+                    customer = self._rng.choices(customers_list, weights=normalized_weights)[0]
+                else:
+                    # Fallback if all weights are zero
+                    customer = self._rng.choice(self.customers)
+            else:
+                # Fallback to random selection if pools not initialized
+                customer = self._rng.choice(self.customers)
+
+            # Generate shopping basket (pass store for format-based adjustments)
+            basket = self.customer_journey_sim.generate_shopping_basket(customer.ID, store=store)
 
             # Create receipt
             receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
@@ -1688,7 +1714,28 @@ class FactDataGenerator:
     def _create_receipt(
         self, store: Store, customer: Customer, basket: Any, transaction_time: datetime
     ) -> dict[str, list[dict]]:
-        """Create receipt, receipt lines, and inventory transactions."""
+        """Create receipt, receipt lines, and inventory transactions.
+
+        Args:
+            store: Store where transaction occurred
+            customer: Customer making purchase
+            basket: ShoppingBasket with items to purchase
+            transaction_time: Timestamp of transaction
+
+        Returns:
+            Dictionary with receipt, lines, and inventory_transactions
+
+        Raises:
+            ValueError: If basket has no items (business rule violation)
+        """
+        # CRITICAL: Validate basket has at least 1 item
+        # Empty receipts violate business rules and should never be generated
+        if not basket.items or len(basket.items) == 0:
+            raise ValueError(
+                f"Cannot create receipt with empty basket for customer {customer.ID} "
+                f"at store {store.ID}. All receipts must have at least 1 line."
+            )
+
         receipt_id = (
             f"RCP{transaction_time.strftime('%Y%m%d%H%M')}"
             f"{store.ID:03d}{self._rng.randint(1000, 9999)}"
@@ -1707,32 +1754,44 @@ class FactDataGenerator:
         weights = list(tender_weights.values())
         tender_type = self._rng.choices(tender_options, weights=weights)[0]
 
+        # Apply promotions to basket using CustomerJourneySimulator
+        discount_amount, basket_items_with_promos = (
+            self.customer_journey_sim.apply_promotions_to_basket(
+                basket=basket,
+                customer_id=customer.ID,
+                transaction_date=transaction_time,
+            )
+        )
+
         # Create receipt lines and inventory transactions
         # Tax will be calculated per line based on product taxability
         lines = []
         inventory_transactions = []
-        subtotal = Decimal("0")
-        total_tax = Decimal("0")
+        subtotal = Decimal("0.00")
+        total_tax = Decimal("0.00")
 
         # Get store tax rate (with backward compatibility default)
         store_tax_rate = (
             store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
         )
 
-        for line_num, (product, qty) in enumerate(basket.items, 1):
-            # Apply any promotional pricing
+        for line_num, item_data in enumerate(basket_items_with_promos, 1):
+            product = item_data["product"]
+            qty = item_data["qty"]
+            line_subtotal = item_data["subtotal"]
+            promo_code = item_data.get("promo_code")
+            line_discount = item_data.get("discount", Decimal("0.00"))
+
+            # Calculate unit price (original price before any discount)
             unit_price = product.SalePrice
-            promo_code = None
 
-            # Random promotional discounts (10% chance)
-            if self._rng.random() < 0.1:
-                discount = self._rng.uniform(0.05, 0.25)
-                unit_price = unit_price * (1 - Decimal(str(discount)))
-                promo_code = f"PROMO{self._rng.randint(100, 999)}"
+            # Calculate extended price (pre-discount subtotal)
+            ext_price_before_discount = (unit_price * qty).quantize(Decimal("0.01"))
 
-            ext_price = unit_price * qty
+            # Apply discount to get final extended price
+            ext_price = (ext_price_before_discount - line_discount).quantize(Decimal("0.01"))
 
-            # Calculate tax for this line item based on product taxability
+            # Calculate tax for this line item based on POST-DISCOUNT price
             # Get taxability multiplier: TAXABLE=1.0, REDUCED_RATE=0.5, NON_TAXABLE=0.0
             from retail_datagen.shared.models import ProductTaxability
 
@@ -1745,8 +1804,12 @@ class FactDataGenerator:
             else:  # NON_TAXABLE
                 taxability_multiplier = Decimal("0.0")
 
-            line_tax = ext_price * store_tax_rate * taxability_multiplier
+            # Calculate line tax on POST-DISCOUNT price (tax on what customer pays)
+            line_tax = (ext_price * store_tax_rate * taxability_multiplier).quantize(
+                Decimal("0.01")
+            )
 
+            # Accumulate totals
             subtotal += ext_price
             total_tax += line_tax
 
@@ -1757,7 +1820,7 @@ class FactDataGenerator:
                 "Line": line_num,
                 "ProductID": product.ID,
                 "Qty": qty,
-                "UnitPrice": str(unit_price),
+                "UnitPrice": str(unit_price.quantize(Decimal("0.01"))),
                 "ExtPrice": str(ext_price),
                 "PromoCode": promo_code,
             }
@@ -1785,8 +1848,18 @@ class FactDataGenerator:
             }
             inventory_transactions.append(inventory_transaction)
 
-        # Calculate total
-        total = subtotal + total_tax
+        # Calculate total with proper formula: Subtotal - Discount + Tax
+        # All values are already Decimal with 2 decimal places
+        total = (subtotal - discount_amount + total_tax).quantize(Decimal("0.01"))
+
+        # Validate totals before creating receipt
+        # This should never fail, but catch any floating point edge cases
+        calculated_subtotal = sum(Decimal(line["ExtPrice"]) for line in lines)
+        if abs(calculated_subtotal - subtotal) > Decimal("0.01"):
+            logger.error(
+                f"Receipt {receipt_id}: Subtotal mismatch! "
+                f"Calculated={calculated_subtotal}, Recorded={subtotal}"
+            )
 
         # Create receipt header
         receipt = {
@@ -1796,6 +1869,7 @@ class FactDataGenerator:
             "CustomerID": customer.ID,
             "ReceiptId": receipt_id,
             "Subtotal": str(subtotal),
+            "DiscountAmount": str(discount_amount),  # Phase 2.2: Promotional discounts
             "Tax": str(total_tax),
             "Total": str(total),
             "TenderType": tender_type.value,
@@ -1808,39 +1882,102 @@ class FactDataGenerator:
         }
 
     def _generate_foot_traffic(
-        self, store: Store, hour_datetime: datetime, traffic_count: int
+        self, store: Store, hour_datetime: datetime, receipt_count: int
     ) -> list[dict]:
-        """Generate foot traffic sensor records."""
+        """
+        Generate foot traffic sensor records with aggregate hourly counts.
+
+        Args:
+            store: Store for which to generate foot traffic
+            hour_datetime: Hour timestamp
+            receipt_count: Number of receipts (customers who purchased) in this hour
+
+        Returns:
+            List of aggregate sensor records (one per sensor per hour)
+        """
         traffic_records = []
 
-        # Store zones where sensors are placed
-        zones = ["ENTRANCE", "AISLES_A", "AISLES_B", "CHECKOUT", "EXIT"]
+        # If no receipts, still may have some foot traffic (browsers)
+        if receipt_count == 0:
+            # Small chance of foot traffic even with no sales
+            if self._rng.random() > 0.7:
+                return []  # No traffic this hour
+            receipt_count = 1  # Minimal browsing traffic
 
-        for _ in range(traffic_count):
-            # Simulate customer path through store
-            zone = self._rng.choice(zones)
+        # Calculate conversion rate based on time of day and day of week
+        hour = hour_datetime.hour
+        is_weekend = hour_datetime.weekday() >= 5
+
+        # Base conversion rate: 20% (1 in 5 visitors make a purchase)
+        base_conversion = 0.20
+
+        # Peak hours have higher conversion (shoppers on a mission)
+        if hour in [12, 13, 17, 18, 19]:  # Lunch and after-work peaks
+            conversion_adjustment = 1.3  # 26% conversion
+        elif hour in [10, 11, 14, 15, 16]:  # Moderate hours
+            conversion_adjustment = 1.0  # 20% conversion
+        elif hour in [8, 9, 20, 21]:  # Early/late hours
+            conversion_adjustment = 0.7  # 14% conversion (browsers)
+        else:  # Off hours
+            conversion_adjustment = 0.5  # 10% conversion (minimal traffic)
+
+        # Weekend conversion slightly lower (more browsing)
+        if is_weekend:
+            conversion_adjustment *= 0.9
+
+        conversion_rate = base_conversion * conversion_adjustment
+
+        # Calculate total foot traffic from receipts
+        # foot_traffic = receipts / conversion_rate
+        total_foot_traffic = int(receipt_count / conversion_rate)
+        total_foot_traffic = max(receipt_count + 1, total_foot_traffic)  # Always > receipts
+
+        # 5 sensors per store with different traffic proportions
+        # Entrance sensors see the most, aisle sensors see moderate, exit sees all
+        sensor_zones = [
+            ("ENTRANCE_MAIN", 0.35),    # Main entrance - highest traffic
+            ("ENTRANCE_SIDE", 0.15),    # Side entrance - lower traffic
+            ("AISLES_A", 0.20),         # Main shopping aisles
+            ("AISLES_B", 0.15),         # Secondary aisles
+            ("CHECKOUT", 0.15),         # Checkout area
+        ]
+
+        # Distribute total traffic across sensors based on proportions
+        for zone, proportion in sensor_zones:
             sensor_id = f"SENSOR_{store.ID:03d}_{zone}"
 
-            # Dwell time based on zone
+            # Calculate count for this sensor
+            sensor_count = int(total_foot_traffic * proportion)
+
+            # Add some randomness (±10%)
+            variance = int(sensor_count * 0.1)
+            if variance > 0:
+                sensor_count += self._rng.randint(-variance, variance)
+
+            # Ensure minimum of 0
+            sensor_count = max(0, sensor_count)
+
+            # Average dwell time varies by zone
             dwell_times = {
-                "ENTRANCE": (30, 120),  # 30 seconds to 2 minutes
-                "AISLES_A": (120, 600),  # 2 to 10 minutes
-                "AISLES_B": (120, 600),  # 2 to 10 minutes
-                "CHECKOUT": (60, 300),  # 1 to 5 minutes
-                "EXIT": (15, 60),  # 15 seconds to 1 minute
+                "ENTRANCE_MAIN": (45, 90),    # Quick entry
+                "ENTRANCE_SIDE": (30, 75),    # Even quicker
+                "AISLES_A": (180, 420),       # Main shopping time (3-7 min)
+                "AISLES_B": (120, 300),       # Secondary browsing (2-5 min)
+                "CHECKOUT": (90, 240),        # Waiting in line (1.5-4 min)
             }
 
             min_dwell, max_dwell = dwell_times[zone]
-            dwell_time = self._rng.randint(min_dwell, max_dwell)
+            avg_dwell = self._rng.randint(min_dwell, max_dwell)
 
+            # Create one aggregate record per sensor per hour
             traffic_record = {
                 "TraceId": self._generate_trace_id(),
-                "EventTS": self._randomize_time_within_hour(hour_datetime),
+                "EventTS": hour_datetime,  # Top of the hour for aggregate
                 "StoreID": store.ID,
                 "SensorId": sensor_id,
                 "Zone": zone,
-                "Dwell": dwell_time,
-                "Count": 1,  # Single person detection
+                "Dwell": avg_dwell,  # Average dwell time for this hour
+                "Count": sensor_count,  # Aggregate count for the hour
             }
             traffic_records.append(traffic_record)
 
@@ -1849,7 +1986,11 @@ class FactDataGenerator:
     def _generate_ble_pings(
         self, store: Store, customer: Customer, transaction_time: datetime
     ) -> list[dict]:
-        """Generate BLE beacon pings for a customer visit."""
+        """Generate BLE beacon pings for a customer visit.
+
+        30% of BLE pings will have customer_id resolved (customers with store app).
+        70% remain anonymous (BLEId only).
+        """
         ble_records = []
 
         # Simulate customer journey through store with BLE pings
@@ -1860,6 +2001,9 @@ class FactDataGenerator:
         visited_zones = self._rng.sample(
             list(zip(zones, beacons)), self._rng.randint(2, 4)
         )
+
+        # Determine if this customer has the store app (30% match rate)
+        has_store_app = self._rng.random() < 0.30
 
         for zone, beacon_id in visited_zones:
             # Multiple pings per zone (2-5 pings)
@@ -1881,6 +2025,7 @@ class FactDataGenerator:
                     "StoreID": store.ID,
                     "BeaconId": beacon_id,
                     "CustomerBLEId": customer.BLEId,
+                    "CustomerId": customer.ID if has_store_app else None,  # 30% resolution
                     "RSSI": rssi,
                     "Zone": zone,
                 }
@@ -1891,7 +2036,11 @@ class FactDataGenerator:
     def _generate_truck_movements(
         self, date: datetime, store_transactions: list[dict]
     ) -> list[dict]:
-        """Generate truck movements based on store inventory needs."""
+        """Generate truck movements based on store inventory needs.
+
+        This method creates initial shipments in SCHEDULED status.
+        The _process_truck_lifecycle method will handle status progression.
+        """
         truck_movements = []
 
         # Analyze store inventory needs
@@ -1915,12 +2064,13 @@ class FactDataGenerator:
                 reorder_list = self.inventory_flow_sim.check_reorder_needs(store_id)
 
                 if reorder_list:
-                    # Generate truck shipment
+                    # Generate truck shipment (initial status: SCHEDULED)
                     departure_time = date.replace(hour=6, minute=0)  # 6 AM departure
                     shipment_info = self.inventory_flow_sim.generate_truck_shipment(
                         dc.ID, store_id, reorder_list, departure_time
                     )
 
+                    # Create initial truck_move record in SCHEDULED status
                     truck_record = {
                         "TraceId": self._generate_trace_id(),
                         "EventTS": departure_time,
@@ -1934,10 +2084,105 @@ class FactDataGenerator:
                     }
                     truck_movements.append(truck_record)
 
-                    # Track shipment for future delivery processing
+                    # Track shipment for lifecycle processing
                     self._active_shipments[shipment_info["shipment_id"]] = shipment_info
 
         return truck_movements
+
+    def _process_truck_lifecycle(
+        self, date: datetime
+    ) -> tuple[list[dict], list[dict], list[dict]]:
+        """Process truck lifecycle for all active shipments on this date.
+
+        Generates status progression records and inventory transactions:
+        - SCHEDULED → LOADING: Generate DC OUTBOUND transactions
+        - LOADING → IN_TRANSIT → ARRIVED
+        - ARRIVED → UNLOADING: Generate Store INBOUND transactions
+        - UNLOADING → COMPLETED
+
+        Returns:
+            Tuple of (truck_move_records, dc_outbound_txn, store_inbound_txn)
+        """
+        truck_lifecycle_records = []
+        dc_outbound_txn = []
+        store_inbound_txn = []
+
+        # Process each active shipment to check for status changes on this date
+        shipments_to_process = list(self._active_shipments.values())
+
+        for shipment_info in shipments_to_process:
+            shipment_id = shipment_info["shipment_id"]
+            previous_status = shipment_info.get("status")
+
+            # Update shipment status based on current date/time
+            # We'll check at multiple times throughout the day to capture transitions
+            for hour in range(24):
+                check_time = date.replace(hour=hour, minute=0)
+                updated_info = self.inventory_flow_sim.update_shipment_status(
+                    shipment_id, check_time
+                )
+
+                if updated_info is None:
+                    # Shipment was completed and removed from tracking
+                    break
+
+                current_status = updated_info["status"]
+
+                # Generate records for status transitions
+                if current_status != previous_status:
+                    # Create truck_move record for this status change
+                    truck_record = {
+                        "TraceId": self._generate_trace_id(),
+                        "EventTS": check_time,
+                        "TruckId": updated_info["truck_id"],
+                        "DCID": updated_info["dc_id"],
+                        "StoreID": updated_info["store_id"],
+                        "ShipmentId": shipment_id,
+                        "Status": current_status.value,
+                        "ETA": updated_info["eta"],
+                        "ETD": updated_info["etd"],
+                    }
+                    truck_lifecycle_records.append(truck_record)
+
+                    # Generate inventory transactions at specific lifecycle stages
+                    from retail_datagen.shared.models import TruckStatus
+
+                    if current_status == TruckStatus.LOADING:
+                        # Generate DC OUTBOUND transactions
+                        dc_txn = self.inventory_flow_sim.generate_dc_outbound_transactions(
+                            updated_info, check_time
+                        )
+                        for txn in dc_txn:
+                            dc_outbound_txn.append({
+                                "TraceId": self._generate_trace_id(),
+                                "EventTS": txn["EventTS"],
+                                "DCID": txn["DCID"],
+                                "ProductID": txn["ProductID"],
+                                "QtyDelta": txn["QtyDelta"],
+                                "Reason": txn["Reason"].value,
+                                "Source": txn["Source"],
+                            })
+
+                    elif current_status == TruckStatus.UNLOADING:
+                        # Generate Store INBOUND transactions
+                        store_txn = self.inventory_flow_sim.generate_store_inbound_transactions(
+                            updated_info, check_time
+                        )
+                        for txn in store_txn:
+                            store_inbound_txn.append({
+                                "TraceId": self._generate_trace_id(),
+                                "EventTS": txn["EventTS"],
+                                "StoreID": txn["StoreID"],
+                                "ProductID": txn["ProductID"],
+                                "QtyDelta": txn["QtyDelta"],
+                                "Reason": txn["Reason"].value,
+                                "Source": txn["Source"],
+                                "Balance": txn["Balance"],
+                            })
+
+                    previous_status = current_status
+
+        return truck_lifecycle_records, dc_outbound_txn, store_inbound_txn
 
     def _process_truck_deliveries(
         self, date: datetime, truck_moves: list[dict]
@@ -2270,19 +2515,21 @@ class FactDataGenerator:
                 "CustomerID": "customer_id",
                 # Store external receipt id for linkage with receipt_lines
                 "ReceiptId": "receipt_id_ext",
+                # Note: Subtotal field in generator is not stored (can be calculated)
+                "DiscountAmount": "discount_amount",
                 "Tax": "tax_amount",
                 "Total": "total_amount",
                 "TenderType": "payment_method",
-                # Note: discount_amount field in DB will default to 0.0 (not in generator)
             },
             "receipt_lines": {
                 **common_mappings,
                 # ReceiptId will be resolved to numeric FK by lookup before insert
                 "ProductID": "product_id",
+                "Line": "line_num",
                 "Qty": "quantity",
                 "UnitPrice": "unit_price",
-                "ExtPrice": "line_total",
-                # Note: Line and PromoCode fields in generator don't exist in DB model
+                "ExtPrice": "ext_price",
+                "PromoCode": "promo_code",
             },
             "dc_inventory_txn": {
                 **common_mappings,

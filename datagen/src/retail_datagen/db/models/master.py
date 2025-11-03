@@ -130,6 +130,32 @@ class Store(Base):
         comment="Foreign key to Geography dimension",
     )
 
+    # Store profile fields for realistic variability
+    volume_class: Mapped[str | None] = mapped_column(
+        "volume_class",
+        String(50),
+        nullable=True,
+        comment="Store volume classification (flagship, high_volume, etc.)",
+    )
+    store_format: Mapped[str | None] = mapped_column(
+        "store_format",
+        String(50),
+        nullable=True,
+        comment="Store format (hypermarket, superstore, standard, etc.)",
+    )
+    operating_hours: Mapped[str | None] = mapped_column(
+        "operating_hours",
+        String(50),
+        nullable=True,
+        comment="Operating hours pattern (24/7, extended, standard, etc.)",
+    )
+    daily_traffic_multiplier: Mapped[float | None] = mapped_column(
+        "daily_traffic_multiplier",
+        Float,
+        nullable=True,
+        comment="Traffic multiplier relative to baseline (0.3-3.0 typical)",
+    )
+
     # Relationships
     geography: Mapped["Geography"] = relationship(
         "Geography", back_populates="stores", lazy="joined"
@@ -442,6 +468,14 @@ class Product(Base):
         nullable=False,
         comment="Product launch date (when available in stores)",
     )
+    taxability: Mapped[str] = mapped_column(
+        "taxability",
+        String(20),
+        nullable=False,
+        default="TAXABLE",
+        index=True,
+        comment="Product tax classification (TAXABLE, NON_TAXABLE, REDUCED_RATE)",
+    )
 
     # Indexes for common query patterns
     __table_args__ = (
@@ -453,6 +487,7 @@ class Product(Base):
         Index("idx_product_refrigeration", "RequiresRefrigeration"),
         Index("idx_product_sale_price", "SalePrice"),
         Index("idx_product_launch_date", "LaunchDate"),
+        Index("idx_product_taxability", "taxability"),
         {
             "extend_existing": True,
             "comment": "Product master dimension table (100% synthetic data)",

@@ -28,6 +28,7 @@ from retail_datagen.shared.models import (
     Store,
     TruckStatus,
 )
+from retail_datagen.shared.promotion_utils import PromotionEngine
 
 # Marketing campaign generation constants
 CAMPAIGN_START_PROBABILITY = (
@@ -100,6 +101,15 @@ class CustomerJourneySimulator:
         # Build product categories for realistic basket composition
         self._product_categories = self._categorize_products()
 
+        # Initialize promotion engine
+        self._promotion_engine = PromotionEngine(seed=seed)
+
+        # Build product ID to category mapping for promotions
+        self._product_category_map = {
+            product.ID: self._get_product_category(product)
+            for product in self.products
+        }
+
         # Customer segment distribution
         self._segment_distribution = {
             CustomerSegment.BUDGET_CONSCIOUS: 0.35,
@@ -139,20 +149,10 @@ class CustomerJourneySimulator:
         # Cache customer segments for consistency
         self._customer_segments = self._assign_customer_segments()
 
-    def _categorize_products(self) -> dict[str, list[ProductMaster]]:
-        """Categorize products based on their names for realistic grouping."""
-        categories = {
-            "food": [],
-            "beverages": [],
-            "household": [],
-            "personal_care": [],
-            "electronics": [],
-            "clothing": [],
-            "home_garden": [],
-            "other": [],
-        }
+    def _get_product_category(self, product: ProductMaster) -> str:
+        """Get category for a single product."""
+        product_name_lower = product.ProductName.lower()
 
-        # Keywords for categorization
         category_keywords = {
             "food": [
                 "bread",
@@ -203,18 +203,28 @@ class CustomerJourneySimulator:
             "home_garden": ["plant", "tool", "furniture", "decor", "garden", "outdoor"],
         }
 
+        for category, keywords in category_keywords.items():
+            if any(keyword in product_name_lower for keyword in keywords):
+                return category
+
+        return "other"
+
+    def _categorize_products(self) -> dict[str, list[ProductMaster]]:
+        """Categorize products based on their names for realistic grouping."""
+        categories = {
+            "food": [],
+            "beverages": [],
+            "household": [],
+            "personal_care": [],
+            "electronics": [],
+            "clothing": [],
+            "home_garden": [],
+            "other": [],
+        }
+
         for product in self.products:
-            product_name_lower = product.ProductName.lower()
-            categorized = False
-
-            for category, keywords in category_keywords.items():
-                if any(keyword in product_name_lower for keyword in keywords):
-                    categories[category].append(product)
-                    categorized = True
-                    break
-
-            if not categorized:
-                categories["other"].append(product)
+            category = self._get_product_category(product)
+            categories[category].append(product)
 
         return categories
 
@@ -249,7 +259,7 @@ class CustomerJourneySimulator:
         return self._rng.choices(behaviors, weights=weights)[0]
 
     def generate_shopping_basket(
-        self, customer_id: int, behavior_type: ShoppingBehaviorType | None = None
+        self, customer_id: int, behavior_type: ShoppingBehaviorType | None = None, store: Store | None = None
     ) -> ShoppingBasket:
         """
         Generate a realistic shopping basket for a customer.
@@ -257,9 +267,13 @@ class CustomerJourneySimulator:
         Args:
             customer_id: Customer ID
             behavior_type: Override shopping behavior (optional)
+            store: Store where shopping is occurring (optional, for format-based adjustment)
 
         Returns:
             ShoppingBasket with realistic product combinations
+
+        Raises:
+            ValueError: If no products are available to generate a basket
         """
         segment = self.get_customer_segment(customer_id)
         if behavior_type is None:
@@ -274,12 +288,41 @@ class CustomerJourneySimulator:
         }
 
         min_items, max_items = basket_sizes[behavior_type]
+
+        # Adjust basket size based on store format if provided
+        if store and hasattr(store, 'store_format') and store.store_format:
+            format_multipliers = {
+                'hypermarket': 1.3,   # Larger baskets in hypermarkets
+                'superstore': 1.1,    # Slightly larger in superstores
+                'standard': 1.0,      # Baseline
+                'neighborhood': 0.8,  # Smaller in neighborhood stores
+                'express': 0.6,       # Much smaller in express stores
+            }
+            multiplier = format_multipliers.get(store.store_format, 1.0)
+            min_items = max(1, int(min_items * multiplier))
+            max_items = max(min_items, int(max_items * multiplier))
+
         target_items = self._rng.randint(min_items, max_items)
 
         # Select products based on behavior and segment
         basket_items = self._select_basket_products(
             segment, behavior_type, target_items
         )
+
+        # CRITICAL: Validate that basket has at least 1 item
+        # This prevents empty receipts which violate business rules
+        if not basket_items or len(basket_items) == 0:
+            # Fallback: Add a random product if basket is somehow empty
+            if not self.products:
+                raise ValueError("Cannot generate basket: no products available")
+
+            # Add at least one random product
+            random_product = self._rng.choice(self.products)
+            basket_items = [(random_product, 1)]
+            logger.warning(
+                f"Empty basket generated for customer {customer_id}, "
+                f"added fallback product {random_product.ID}"
+            )
 
         # Calculate totals
         total_items = sum(qty for _, qty in basket_items)
@@ -433,6 +476,94 @@ class CustomerJourneySimulator:
         """Update the available products list and rebuild categories."""
         self.products = products
         self._product_categories = self._categorize_products()
+        # Rebuild product category map
+        self._product_category_map = {
+            product.ID: self._get_product_category(product)
+            for product in self.products
+        }
+
+    def apply_promotions_to_basket(
+        self,
+        basket: ShoppingBasket,
+        customer_id: int,
+        transaction_date: datetime,
+    ) -> tuple[Decimal, list[dict]]:
+        """
+        Apply promotional discounts to a shopping basket.
+
+        Args:
+            basket: Shopping basket to apply promotions to
+            customer_id: Customer ID for segment-based promotion selection
+            transaction_date: Date of transaction for seasonal promotions
+
+        Returns:
+            Tuple of (total_discount_amount, basket_items_with_promotions)
+            Each basket item is a dict with:
+                - product: ProductMaster
+                - qty: int
+                - subtotal: Decimal
+                - promo_code: str | None
+                - discount: Decimal
+        """
+        # Get customer segment
+        segment = self.get_customer_segment(customer_id)
+
+        # Prepare basket items for promotion engine
+        basket_items = []
+        basket_categories = []
+        basket_subtotal = Decimal("0.00")
+
+        for product, qty in basket.items:
+            item_subtotal = product.SalePrice * qty
+            basket_subtotal += item_subtotal
+
+            category = self._product_category_map.get(product.ID, "other")
+            basket_categories.append(category)
+
+            basket_items.append({
+                "product": product,
+                "qty": qty,
+                "subtotal": item_subtotal,
+            })
+
+        # Check if promotion should be applied
+        should_apply = self._promotion_engine.should_apply_promotion(
+            customer_segment=segment.value,
+            transaction_date=transaction_date,
+            basket_categories=basket_categories,
+        )
+
+        if not should_apply:
+            # No promotion, return items with no discount
+            items_without_promo = [
+                {**item, "promo_code": None, "discount": Decimal("0.00")}
+                for item in basket_items
+            ]
+            return Decimal("0.00"), items_without_promo
+
+        # Select appropriate promotion
+        promo_config = self._promotion_engine.select_promotion(
+            transaction_date=transaction_date,
+            basket_subtotal=basket_subtotal,
+            basket_categories=basket_categories,
+        )
+
+        if not promo_config:
+            # No eligible promotion found
+            items_without_promo = [
+                {**item, "promo_code": None, "discount": Decimal("0.00")}
+                for item in basket_items
+            ]
+            return Decimal("0.00"), items_without_promo
+
+        # Apply promotion to basket
+        total_discount, items_with_promos = self._promotion_engine.apply_promotion_to_basket(
+            basket_items=basket_items,
+            promo_config=promo_config,
+            product_categories=self._product_category_map,
+        )
+
+        return total_discount, items_with_promos
 
 
 class InventoryFlowSimulator:
@@ -703,6 +834,14 @@ class InventoryFlowSimulator:
         """
         Update shipment status based on current time.
 
+        Implements complete truck lifecycle state machine:
+        - SCHEDULED (T+0): Initial state when shipment is created
+        - LOADING (T+2hrs): Truck is being loaded at DC
+        - IN_TRANSIT (T+4hrs): Truck is traveling to destination
+        - ARRIVED (T+8hrs): Truck has arrived at destination
+        - UNLOADING (T+9hrs): Truck is being unloaded at store
+        - COMPLETED (T+10hrs): Delivery is complete
+
         Args:
             shipment_id: Shipment to update
             current_time: Current simulation time
@@ -714,18 +853,30 @@ class InventoryFlowSimulator:
             return None
 
         shipment = self._active_shipments[shipment_id]
+        departure_time = shipment["departure_time"]
+
+        # Calculate transition times
+        loading_start = departure_time + timedelta(hours=2)
+        transit_start = departure_time + timedelta(hours=4)
+        arrived_time = shipment["eta"]  # ETA calculated in generate_truck_shipment
+        unloading_start = arrived_time + timedelta(hours=1)
+        completion_time = shipment["etd"]  # ETD is arrival + 2 hours
 
         # Update status based on time progression
-        if current_time >= shipment["etd"]:
+        # Move through states in order as time progresses
+        if current_time >= completion_time:
             shipment["status"] = TruckStatus.COMPLETED
-            # Remove from active tracking
+            # Remove from active tracking after completion
             del self._active_shipments[shipment_id]
-        elif current_time >= shipment["eta"]:
+        elif current_time >= unloading_start:
             shipment["status"] = TruckStatus.UNLOADING
-        elif current_time >= shipment["departure_time"] + timedelta(hours=1):
+        elif current_time >= arrived_time:
+            shipment["status"] = TruckStatus.ARRIVED
+        elif current_time >= transit_start:
             shipment["status"] = TruckStatus.IN_TRANSIT
-        elif current_time >= shipment["departure_time"]:
+        elif current_time >= loading_start:
             shipment["status"] = TruckStatus.LOADING
+        # else: remains SCHEDULED
 
         return shipment
 
@@ -806,6 +957,88 @@ class InventoryFlowSimulator:
             )
 
         return truck_inventory_events
+
+    def generate_dc_outbound_transactions(
+        self, shipment_info: dict, load_time: datetime
+    ) -> list[dict]:
+        """
+        Generate DC outbound inventory transactions when truck loading starts.
+
+        These transactions link to the truck shipment via shipment_id in the Source field,
+        creating an audit trail from DC → Truck → Store.
+
+        Args:
+            shipment_info: Shipment information from generate_truck_shipment
+            load_time: When loading occurs (truck status = LOADING)
+
+        Returns:
+            List of DC inventory transaction records
+        """
+        dc_transactions = []
+        dc_id = shipment_info["dc_id"]
+        shipment_id = shipment_info["shipment_id"]
+
+        for product_id, quantity in shipment_info["products"]:
+            # Update DC inventory (outbound - negative delta)
+            dc_key = (dc_id, product_id)
+            current_inventory = self._dc_inventory.get(dc_key, 0)
+            self._dc_inventory[dc_key] = max(0, current_inventory - quantity)
+
+            dc_transactions.append(
+                {
+                    "DCID": dc_id,
+                    "ProductID": product_id,
+                    "QtyDelta": -quantity,  # Negative for outbound
+                    "Reason": InventoryReason.OUTBOUND_SHIPMENT,
+                    "Source": shipment_id,  # Link to truck shipment
+                    "EventTS": load_time,
+                }
+            )
+
+        return dc_transactions
+
+    def generate_store_inbound_transactions(
+        self, shipment_info: dict, unload_time: datetime
+    ) -> list[dict]:
+        """
+        Generate store inbound inventory transactions when truck unloading starts.
+
+        These transactions link to the truck shipment via shipment_id in the Source field,
+        creating an audit trail from DC → Truck → Store.
+
+        Args:
+            shipment_info: Shipment information from generate_truck_shipment
+            unload_time: When unloading occurs (truck status = UNLOADING)
+
+        Returns:
+            List of store inventory transaction records
+        """
+        store_transactions = []
+        store_id = shipment_info["store_id"]
+        shipment_id = shipment_info["shipment_id"]
+
+        for product_id, quantity in shipment_info["products"]:
+            # Update store inventory (inbound - positive delta)
+            store_key = (store_id, product_id)
+            current_inventory = self._store_inventory.get(store_key, 0)
+            self._store_inventory[store_key] = current_inventory + quantity
+
+            # Get balance after transaction
+            balance = self._store_inventory[store_key]
+
+            store_transactions.append(
+                {
+                    "StoreID": store_id,
+                    "ProductID": product_id,
+                    "QtyDelta": quantity,  # Positive for inbound
+                    "Reason": InventoryReason.INBOUND_SHIPMENT,
+                    "Source": shipment_id,  # Link to truck shipment
+                    "Balance": balance,
+                    "EventTS": unload_time,
+                }
+            )
+
+        return store_transactions
 
     def generate_truck_unloading_events(
         self, shipment_info: dict, unload_time: datetime

@@ -392,7 +392,7 @@ class MarketingCostConfig(BaseModel):
     # Based on industry averages for digital marketing channels
 
     email_cost_min: float = Field(
-        0.10,
+        0.05,
         ge=0.0,
         description="Minimum cost per EMAIL channel impression in USD",
     )
@@ -403,23 +403,23 @@ class MarketingCostConfig(BaseModel):
     )
 
     display_cost_min: float = Field(
-        0.50,
+        2.00,
         ge=0.0,
         description="Minimum cost per DISPLAY channel impression in USD",
     )
     display_cost_max: float = Field(
-        2.00,
+        10.00,
         ge=0.0,
         description="Maximum cost per DISPLAY channel impression in USD",
     )
 
     social_cost_min: float = Field(
-        0.20,
+        1.00,
         ge=0.0,
         description="Minimum cost per SOCIAL channel impression in USD",
     )
     social_cost_max: float = Field(
-        1.50,
+        5.00,
         ge=0.0,
         description="Maximum cost per SOCIAL channel impression in USD",
     )

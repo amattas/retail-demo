@@ -24,7 +24,7 @@ Authoritative spec for data contracts, invariants, safety rules, and contributor
 
 ### Master Dimensions (outputs)
 - `geographies_master.csv`: `ID, City, State, ZipCode, District, Region`
-- `stores.csv`: `ID, StoreNumber, Address, GeographyID, tax_rate`
+- `stores.csv`: `ID, StoreNumber, Address, GeographyID, tax_rate, volume_class, store_format, operating_hours, daily_traffic_multiplier`
 - `distribution_centers.csv`: `ID, DCNumber, Address, GeographyID`
 - `trucks.csv`: `ID, LicensePlate, Refrigeration, DCID`
 - `customers.csv`: `ID, FirstName, LastName, Address, GeographyID, LoyaltyCard, Phone, BLEId, AdId`
@@ -44,6 +44,15 @@ Authoritative spec for data contracts, invariants, safety rules, and contributor
 - Default assignment rate: 85% of DC-to-Store trucks assigned to DCs, 15% pool
 - All supplier-to-DC trucks are pool trucks (DCID = NULL)
 - Configurable via `volume.truck_dc_assignment_rate` or `volume.trucks_per_dc`
+
+**Store profiles** (for realistic variability):
+- Stores are classified into volume tiers: FLAGSHIP (5%), HIGH_VOLUME (15%), MEDIUM_VOLUME (50%), LOW_VOLUME (25%), KIOSK (5%)
+- Each store has a `daily_traffic_multiplier` (0.25x - 3.0x) that varies transaction volume
+- Store format influences basket size: HYPERMARKET (12-15 items), EXPRESS (1.5-3 items)
+- Operating hours vary: ALWAYS_OPEN (24/7), EXTENDED (6am-midnight), STANDARD (8am-10pm)
+- Geographic bias: urban stores more likely to be high-volume, rural more likely low-volume
+- Final hourly customer count = base_rate × temporal_multiplier × store_multiplier
+- See `docs/STORE_PROFILES.md` for complete specification
 
 ### Fact Tables (historical)
 - `dc_inventory_txn`: `TraceId, EventTS, DCID, ProductID, QtyDelta, Reason`
