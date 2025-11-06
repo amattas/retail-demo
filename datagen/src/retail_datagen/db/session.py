@@ -354,3 +354,16 @@ class SessionContext:
         else:
             await self.commit()
         await self.close()
+
+
+def reset_session_makers() -> None:
+    """Reset all cached async session makers.
+
+    Useful after disposing engines and deleting database files so that new
+    sessions are created against freshly initialized engines.
+    """
+    global _master_session_maker, _facts_session_maker, _retail_session_maker
+    _master_session_maker = None
+    _facts_session_maker = None
+    _retail_session_maker = None
+    logger.info("Reset session makers for master/facts/retail databases")

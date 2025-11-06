@@ -114,6 +114,35 @@ async def init_databases() -> None:
         async with retail_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+        # Lightweight, non-destructive schema migrations for new columns
+        try:
+            async with retail_engine.begin() as conn:
+                # Helper to check if a column exists on a table
+                async def _has_column(table: str, column: str) -> bool:
+                    res = await conn.execute(text(f"PRAGMA table_info('{table}')"))
+                    cols = [row[1] for row in res.fetchall()]
+                    return column in cols
+
+                # dim_stores.tax_rate (nullable FLOAT)
+                if not await _has_column("dim_stores", "tax_rate"):
+                    await conn.execute(
+                        text("ALTER TABLE dim_stores ADD COLUMN tax_rate FLOAT")
+                    )
+                    logger.info("Added missing column dim_stores.tax_rate")
+
+                # fact_store_inventory_txn.source (nullable TEXT)
+                if not await _has_column("fact_store_inventory_txn", "source"):
+                    await conn.execute(
+                        text(
+                            "ALTER TABLE fact_store_inventory_txn ADD COLUMN source TEXT"
+                        )
+                    )
+                    logger.info(
+                        "Added missing column fact_store_inventory_txn.source"
+                    )
+        except Exception as e:
+            logger.warning(f"Non-critical schema migration step failed: {e}")
+
         # Test connectivity
         try:
             async with retail_engine.begin() as conn:

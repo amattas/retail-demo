@@ -40,6 +40,7 @@ from retail_datagen.shared.models import (
     ProductMaster,
     Store,
     TenderType,
+    Truck,
 )
 
 from ..config.models import RetailConfig
@@ -294,6 +295,7 @@ class FactDataGenerator:
         "marketing",
         # Omnichannel extension integrated into core facts
         "online_orders",
+        "online_order_lines",
     ]
 
     def __init__(
@@ -571,6 +573,7 @@ class FactDataGenerator:
             self.stores,
             self.products,
             self.config.seed + 2000,
+            trucks=getattr(self, "trucks", None),
         )
 
         self.marketing_campaign_sim = MarketingCampaignSimulator(
@@ -620,6 +623,9 @@ class FactDataGenerator:
         from retail_datagen.db.models.master import (
             Store as StoreModel,
         )
+        from retail_datagen.db.models.master import (
+            Truck as TruckModel,
+        )
         from retail_datagen.db.session import retail_session_maker
 
         SessionMaker = retail_session_maker()
@@ -646,6 +652,7 @@ class FactDataGenerator:
                     StoreNumber=s.store_number,
                     Address=s.address,
                     GeographyID=s.geography_id,
+                    tax_rate=Decimal(str(s.tax_rate)) if getattr(s, "tax_rate", None) is not None else None,
                     volume_class=s.volume_class,
                     store_format=s.store_format,
                     operating_hours=s.operating_hours,
@@ -709,8 +716,22 @@ class FactDataGenerator:
                         SalePrice=self._to_decimal(p.sale_price),
                         RequiresRefrigeration=bool(p.requires_refrigeration),
                         LaunchDate=launch_dt,
+                        taxability=getattr(p, "taxability", None) or None,
+                        Tags=getattr(p, "tags", None),
                     )
                 )
+
+            # Trucks
+            trucks = (await session.execute(select(TruckModel))).scalars().all()
+            self.trucks = [
+                Truck(
+                    ID=t.truck_id,
+                    LicensePlate=t.license_plate,
+                    Refrigeration=bool(t.refrigeration),
+                    DCID=t.dc_id,
+                )
+                for t in trucks
+            ]
 
         # Initialize simulators with loaded data
         self.customer_journey_sim = CustomerJourneySimulator(
@@ -722,6 +743,7 @@ class FactDataGenerator:
             self.stores,
             self.products,
             self.config.seed + 2000,
+            trucks=getattr(self, "trucks", None),
         )
 
         self.marketing_campaign_sim = MarketingCampaignSimulator(
@@ -909,33 +931,62 @@ class FactDataGenerator:
         if self._session is None:
             SessionMaker = retail_session_maker()
 
-        async def _ensure_receipt_ext_column(session: AsyncSession) -> None:
+        async def _ensure_required_schema(session: AsyncSession) -> None:
             try:
                 from sqlalchemy import text
 
                 # Check if column exists
                 res = await session.execute(text("PRAGMA table_info('fact_receipts')"))
                 cols = [row[1] for row in res.fetchall()]
+                # receipt_id_ext
                 if "receipt_id_ext" not in cols:
-                    await session.execute(
-                        text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
-                    )
-                    await session.execute(
-                        text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
-                        )
-                    )
-                    await session.commit()
-                    logger.info(
-                        "Migrated fact_receipts: added receipt_id_ext column and index"
-                    )
+                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
+                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
+                    logger.info("Migrated fact_receipts: added receipt_id_ext column and index")
+
+                # receipt_type
+                if "receipt_type" not in cols:
+                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"))
+                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"))
+                    logger.info("Migrated fact_receipts: added receipt_type column and index")
+
+                # return_for_receipt_id
+                if "return_for_receipt_id" not in cols:
+                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"))
+                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"))
+                    logger.info("Migrated fact_receipts: added return_for_receipt_id column and index")
+
+                # Ensure online order lines table exists
+                await session.execute(text(
+                    "CREATE TABLE IF NOT EXISTS fact_online_order_lines (\n"
+                    " line_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+                    " order_id INTEGER NOT NULL,\n"
+                    " product_id INTEGER NOT NULL,\n"
+                    " line_num INTEGER NOT NULL,\n"
+                    " quantity INTEGER NOT NULL,\n"
+                    " unit_price FLOAT NOT NULL,\n"
+                    " ext_price FLOAT NOT NULL,\n"
+                    " promo_code VARCHAR(50) NULL\n"
+                    ")"
+                ))
+                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"))
+                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"))
+
+                # Ensure dim_products has tags column
+                res_prod = await session.execute(text("PRAGMA table_info('dim_products')"))
+                prod_cols = [row[1] for row in res_prod.fetchall()]
+                if "tags" not in prod_cols:
+                    await session.execute(text("ALTER TABLE dim_products ADD COLUMN tags TEXT"))
+                    logger.info("Migrated dim_products: added tags column")
+
+                await session.commit()
             except Exception as e:
-                logger.warning(f"Could not ensure receipt_id_ext column exists: {e}")
+                logger.warning(f"Schema ensure failed (non-fatal): {e}")
 
         async def _run_with_session():
             nonlocal day_counter, current_date
-            # Ensure schema is compatible (adds receipt_id_ext if missing)
-            await _ensure_receipt_ext_column(self._session)
+            # Ensure schema is compatible (adds new columns/tables if missing)
+            await _ensure_required_schema(self._session)
             while current_date <= end_date:
                 day_counter += 1
 
@@ -1125,7 +1176,12 @@ class FactDataGenerator:
         # Digital marketing runs 24/7 independently of store traffic/hours
         # Use constant multiplier of 1.0 for consistent digital ad delivery
         if "marketing" in active_tables:
-            marketing_records = self._generate_marketing_activity(date, 1.0)
+            marketing_boost = 1.0
+            try:
+                marketing_boost = self._compute_marketing_multiplier(date)
+            except Exception:
+                pass
+            marketing_records = self._generate_marketing_activity(date, marketing_boost)
             if marketing_records:
                 logger.debug(
                     f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}"
@@ -1289,10 +1345,52 @@ class FactDataGenerator:
             # Add DC outbound transactions (when trucks are loaded)
             if "dc_inventory_txn" in active_tables and dc_outbound_txn:
                 daily_facts["dc_inventory_txn"].extend(dc_outbound_txn)
+                # Insert these lifecycle DC transactions immediately (daily batch)
+                try:
+                    import pandas as pd
+
+                    df_dc_lc = pd.DataFrame(dc_outbound_txn)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "dc_inventory_txn",
+                        df_dc_lc,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
+                    # Mark hours complete for this table (lifecycle-generated)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "dc_inventory_txn", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert lifecycle dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
 
             # Add store inbound transactions (when trucks are unloaded)
             if "store_inventory_txn" in active_tables and store_inbound_txn:
                 daily_facts["store_inventory_txn"].extend(store_inbound_txn)
+                # Insert these lifecycle store transactions immediately (daily batch)
+                try:
+                    import pandas as pd
+
+                    df_store_lc = pd.DataFrame(store_inbound_txn)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "store_inventory_txn",
+                        df_store_lc,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
+                    # Mark hours complete for this table (lifecycle-generated)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "store_inventory_txn", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert lifecycle store_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
 
             # Write all truck_moves records (including lifecycle progression)
             all_truck_moves = daily_facts.get("truck_moves", [])
@@ -1337,6 +1435,11 @@ class FactDataGenerator:
                         "LocationType": event["LocationType"],
                     }
                 )
+            # Update progress for this daily-generated table (treated as complete across hours)
+            for hour in range(24):
+                self.hourly_tracker.update_hourly_progress(
+                    "truck_inventory", day_index, hour, total_days
+                )
 
         # 5. Legacy delivery processing - now handled by _process_truck_lifecycle
         # Kept for backward compatibility but will be empty since lifecycle handles it
@@ -1354,10 +1457,31 @@ class FactDataGenerator:
 
         # 6. Generate online orders and integrate inventory effects
         if "online_orders" in active_tables:
-            online_orders, online_store_txn, online_dc_txn = (
+            online_orders, online_store_txn, online_dc_txn, online_order_lines = (
                 self._generate_online_orders(date)
             )
             daily_facts["online_orders"].extend(online_orders)
+            # Write online order lines immediately (daily batch)
+            if online_order_lines:
+                try:
+                    import pandas as pd
+                    df_ool = pd.DataFrame(online_order_lines)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "online_order_lines",
+                        df_ool,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
+                    # Update progress for line items (treated as complete across hours)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "online_order_lines", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
             # Write online orders immediately (daily batch)
             if online_orders:
                 try:
@@ -1409,11 +1533,17 @@ class FactDataGenerator:
                     }
                 )
 
+        # 8. Generate return receipts and inventory effects (baseline + holiday spikes)
+        try:
+            await self._generate_and_insert_returns(date, active_tables)
+        except Exception as e:
+            logger.warning(f"Return generation failed for {date.strftime('%Y-%m-%d')}: {e}")
+
         return daily_facts
 
     def _generate_online_orders(
         self, date: datetime
-    ) -> tuple[list[dict], list[dict], list[dict]]:
+    ) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
         """Generate online orders for the given date with complete lifecycle and corresponding inventory effects.
 
         Delegates to generate_online_orders_with_lifecycle for full implementation including:
@@ -1423,8 +1553,12 @@ class FactDataGenerator:
         - Realistic tender type distribution
 
         Returns:
-            (orders, store_inventory_txn, dc_inventory_txn)
+            (orders, store_inventory_txn, dc_inventory_txn, order_lines)
         """
+        # Basket adjuster applies the same holiday overlay used for POS
+        def _adjuster(ts: datetime, basket):
+            self._apply_holiday_overlay_to_basket(ts, basket)
+
         return generate_online_orders_with_lifecycle(
             date=date,
             config=self.config,
@@ -1437,6 +1571,7 @@ class FactDataGenerator:
             temporal_patterns=self.temporal_patterns,
             rng=self._rng,
             generate_trace_id_func=self._generate_trace_id,
+            basket_adjuster=_adjuster,
         )
 
     def _generate_dc_inventory_transactions(
@@ -1653,6 +1788,10 @@ class FactDataGenerator:
             "ble_pings": [],
         }
 
+        # Holiday closure: Christmas Day closed (no activity)
+        if hour_datetime.month == 12 and hour_datetime.day == 25:
+            return hour_data
+
         # Calculate expected customers for this hour
         # NOTE: customers_per_day is configured PER STORE, not total across all stores
         base_customers_per_hour = self.config.volume.customers_per_day / 24
@@ -1696,6 +1835,11 @@ class FactDataGenerator:
 
             # Generate shopping basket (pass store for format-based adjustments)
             basket = self.customer_journey_sim.generate_shopping_basket(customer.ID, store=store)
+            # Apply holiday overlay to adjust basket composition/quantities
+            try:
+                self._apply_holiday_overlay_to_basket(hour_datetime, basket)
+            except Exception:
+                pass
 
             # Create receipt
             receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
@@ -1710,6 +1854,152 @@ class FactDataGenerator:
             hour_data["ble_pings"].extend(ble_records)
 
         return hour_data
+
+    # ---------------- Holiday Overlay Helpers -----------------
+    def _thanksgiving_date(self, year: int) -> datetime:
+        # 4th Thursday in November
+        from datetime import timedelta
+        d = datetime(year, 11, 1)
+        # weekday(): Mon=0..Sun=6; Thursday=3
+        first_thu = d + timedelta(days=(3 - d.weekday() + 7) % 7)
+        return first_thu + timedelta(weeks=3)
+
+    def _memorial_day(self, year: int) -> datetime:
+        # Last Monday of May
+        from datetime import timedelta
+        d = datetime(year, 5, 31)
+        return d - timedelta(days=(d.weekday() - 0) % 7)
+
+    def _labor_day(self, year: int) -> datetime:
+        # First Monday of September
+        from datetime import timedelta
+        d = datetime(year, 9, 1)
+        return d + timedelta(days=(0 - d.weekday()) % 7)
+
+    def _in_window(self, date: datetime, center: datetime, lead_days: int, lag_days: int) -> bool:
+        from datetime import timedelta
+        start = center - timedelta(days=lead_days)
+        end = center + timedelta(days=lag_days)
+        return start.date() <= date.date() <= end.date()
+
+    def _product_has_keywords(self, product: ProductMaster, keywords: list[str]) -> bool:
+        t = (getattr(product, 'Tags', None) or getattr(product, 'tags', None) or '')
+        hay = ' '.join([
+            str(product.ProductName),
+            str(product.Department),
+            str(product.Category),
+            str(product.Subcategory),
+            str(t or ''),
+        ]).lower()
+        return any(k in hay for k in keywords)
+
+    def _get_product_multiplier(self, date: datetime, product: ProductMaster) -> float:
+        year = date.year
+        tg = self._thanksgiving_date(year)
+        bf = tg.replace(day=tg.day) + timedelta(days=1)
+        xmas = datetime(year, 12, 25)
+        # Thanksgiving lead core foods
+        if self._in_window(date, tg, 10, 1):
+            core = [
+                'thanksgiving','turkey','stuffing','cranberry','cranberries','pie','pumpkin','rolls',
+                'casserole','green bean','cream of mushroom','fried onion','gravy','yams','sweet potato','baking'
+            ]
+            baking = ['baking','flour','sugar','spice','cinnamon','nutmeg','clove']
+            if self._product_has_keywords(product, core):
+                return 3.5
+            if self._product_has_keywords(product, baking):
+                return 1.8
+            # general grocery light bump
+            if self._product_has_keywords(product, ['grocery','produce','meat','beverage','snack']):
+                return 1.3
+        # Black Friday (non-food)
+        if date.date() == bf.date():
+            if self._product_has_keywords(product, ['electronics','tv','laptop','headphone','gaming','appliance']):
+                return 5.0
+            if self._product_has_keywords(product, ['toy','lego','action figure','doll']):
+                return 3.0
+            if self._product_has_keywords(product, ['home','home goods','cookware','small appliance']):
+                return 2.2
+            if self._product_has_keywords(product, ['apparel','clothing','shoe','footwear']):
+                return 2.3
+        # Christmas ramp
+        if self._in_window(date, xmas, 14, 0):
+            if self._product_has_keywords(product, ['ham','roast','cookie','baking','candy','cider','eggnog','hot chocolate','hot beverage']):
+                return 1.8
+            if self._product_has_keywords(product, ['electronics','toy','apparel','home']):
+                return 1.6
+        # Grill-out windows
+        mem = self._memorial_day(year)
+        lab = self._labor_day(year)
+        jul4 = datetime(year, 7, 4)
+        grill_tags = ['grill','hot dog','hotdog','sausage','burger','ground beef','steak','chicken breast','bun','buns','ketchup','mustard','relish','bbq sauce','charcoal','chips','soda','ice']
+        if self._in_window(date, mem, 2, 2) or self._in_window(date, lab, 2, 2) or self._in_window(date, jul4, 2, 2):
+            if self._product_has_keywords(product, grill_tags):
+                return 2.5
+        return 1.0
+
+    def _apply_holiday_overlay_to_basket(self, date: datetime, basket) -> None:
+        """Adjust basket in-place based on holiday overlay (qty boosts + occasional extra lines)."""
+        from decimal import Decimal
+        if not getattr(basket, 'items', None):
+            return
+        # Increase quantity for existing targeted items
+        new_items = []
+        targeted_candidates = []
+        for product, qty in basket.items:
+            m = self._get_product_multiplier(date, product)
+            if m > 1.0:
+                # Rough qty bump: +1 for ~each full +0.8 in multiplier
+                bump = 0
+                if m >= 3.0:
+                    bump = self._rng.choice([1, 2])
+                elif m >= 1.5:
+                    bump = self._rng.choice([0, 1])
+                qty = max(1, qty + bump)
+                targeted_candidates.append(product)
+            new_items.append((product, qty))
+
+        # Basket size bump for some holidays
+        basket_mult = 1.0
+        year = date.year
+        tg = self._thanksgiving_date(year)
+        xmas = datetime(year, 12, 25)
+        if self._in_window(date, tg, 10, 1):
+            basket_mult = 1.2
+        elif self._in_window(date, xmas, 2, 0):
+            basket_mult = 1.2
+
+        extra = 0
+        if basket_mult > 1.0:
+            base_count = sum(q for _, q in new_items)
+            extra = max(0, int(base_count * (basket_mult - 1.0) * 0.5))
+
+        # Add a few extra targeted items if needed
+        if extra > 0:
+            # Choose from strong targets first; otherwise random
+            pool = targeted_candidates or [p for p, _ in new_items]
+            for _ in range(extra):
+                product = self._rng.choice(pool)
+                new_items.append((product, 1))
+
+        basket.items = new_items
+
+    def _compute_marketing_multiplier(self, date: datetime) -> float:
+        # Conservative boosts; configurable later
+        year = date.year
+        tg = self._thanksgiving_date(year)
+        bf = tg + timedelta(days=1)
+        xmas = datetime(year, 12, 25)
+        if self._in_window(date, tg, 10, 1):
+            return 1.7
+        if date.date() == bf.date():
+            return 2.5
+        if self._in_window(date, xmas, 14, 0):
+            return 1.5
+        # Grill weekends
+        if self._in_window(date, self._memorial_day(year), 2, 2) or self._in_window(date, datetime(year,7,4), 2, 2) or self._in_window(date, self._labor_day(year), 2, 2):
+            return 1.5
+        return 1.0
 
     def _create_receipt(
         self, store: Store, customer: Customer, basket: Any, transaction_time: datetime
@@ -1868,6 +2158,7 @@ class FactDataGenerator:
             "StoreID": store.ID,
             "CustomerID": customer.ID,
             "ReceiptId": receipt_id,
+            "ReceiptType": "SALE",
             "Subtotal": str(subtotal),
             "DiscountAmount": str(discount_amount),  # Phase 2.2: Promotional discounts
             "Tax": str(total_tax),
@@ -2461,6 +2752,7 @@ class FactDataGenerator:
             FootTraffic,
             MarketingImpression,
             OnlineOrder,
+            OnlineOrderLine,
             Receipt,
             ReceiptLine,
             StoreInventoryTransaction,
@@ -2477,12 +2769,243 @@ class FactDataGenerator:
             "ble_pings": BLEPing,
             "marketing": MarketingImpression,
             "online_orders": OnlineOrder,
+            "online_order_lines": OnlineOrderLine,
         }
 
         if table_name not in mapping:
             raise ValueError(f"Unknown table: {table_name}")
 
         return mapping[table_name]
+
+    def _is_food_product(self, product: ProductMaster) -> bool:
+        dept = (product.Department or "").lower()
+        cat = (product.Category or "").lower()
+        food_keywords = [
+            "grocery",
+            "food",
+            "produce",
+            "meat",
+            "seafood",
+            "dairy",
+            "bakery",
+            "beverage",
+            "snack",
+            "pantry",
+            "frozen",
+        ]
+        return any(k in dept or k in cat for k in food_keywords)
+
+    async def _generate_and_insert_returns(self, date: datetime, active_tables: list[str]) -> None:
+        """Generate return receipts for this date (baseline + Dec 26 spike) and insert into DB.
+
+        Strategy: sample a small subset of recent receipts, build negative receipts with
+        corresponding inventory transactions and dispositions.
+        """
+        from sqlalchemy import text
+
+        if "receipts" not in active_tables or "receipt_lines" not in active_tables:
+            return
+
+        # Determine spike factor for Dec 26 (day after Christmas)
+        spike = 1.0
+        if date.month == 12 and date.day == 26:
+            spike = 6.0  # mid point of 5–10x
+
+        # Baseline target returns per day as percentage of receipts (approx)
+        # We'll cap to avoid heavy runtime on large datasets
+        target_pct = 0.01 * spike  # 1% baseline, spiked on Dec 26
+
+        # Fetch today's receipts (ids and store_id)
+        rows = (
+            await self._session.execute(
+                text(
+                    "SELECT receipt_id, store_id, event_ts FROM fact_receipts "
+                    "WHERE date(event_ts)=:d AND (receipt_type IS NULL OR receipt_type='SALE')"
+                ),
+                {"d": date.strftime('%Y-%m-%d')},
+            )
+        ).fetchall()
+        if not rows:
+            return
+
+        import random as _r
+        max_returns = max(1, int(len(rows) * min(0.1, target_pct)))  # cap at 10% for safety
+        sampled = _r.sample(rows, min(max_returns, len(rows)))
+
+        # Build return receipts
+        return_receipts = []
+        return_lines = []
+        return_store_txn = []
+
+        store_rates = {s.ID: (s.tax_rate if s.tax_rate is not None else Decimal("0.07407")) for s in self.stores}
+        products_by_id = {p.ID: p for p in self.products}
+
+        for (orig_receipt_pk, store_id, event_ts) in sampled:
+            # Fetch lines for original receipt
+            line_rows = (
+                await self._session.execute(
+                    text(
+                        "SELECT product_id, quantity, unit_price, ext_price, line_num FROM fact_receipt_lines WHERE receipt_id=:rid"
+                    ),
+                    {"rid": orig_receipt_pk},
+                )
+            ).fetchall()
+            if not line_rows:
+                continue
+
+            # Build return header
+            return_id_ext = f"RET{date.strftime('%Y%m%d')}{store_id:03d}{self._rng.randint(1000,9999)}"
+            trace_id = self._generate_trace_id()
+            store_tax_rate = store_rates.get(store_id, Decimal("0.07407"))
+            subtotal = Decimal("0.00")
+            total_tax = Decimal("0.00")
+
+            # Lines
+            for (product_id, qty, unit_price, ext_price, line_num) in line_rows:
+                product = products_by_id.get(int(product_id))
+                if not product:
+                    continue
+                # Negative quantities and ext price
+                nqty = int(qty) * -1
+                unit_price_dec = self._to_decimal(unit_price)
+                next_price = (unit_price_dec * nqty).quantize(Decimal("0.01"))
+                # ext_price could be used, but recompute to ensure consistency with negative qty
+                neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
+
+                # Taxability
+                from retail_datagen.shared.models import ProductTaxability
+
+                taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
+                if taxability == ProductTaxability.TAXABLE:
+                    tax_mult = Decimal("1.0")
+                elif taxability == ProductTaxability.REDUCED_RATE:
+                    tax_mult = Decimal("0.5")
+                else:
+                    tax_mult = Decimal("0.0")
+
+                line_tax = (neg_ext * store_tax_rate * tax_mult).quantize(Decimal("0.01"))
+
+                subtotal += neg_ext
+                total_tax += line_tax
+
+                return_lines.append(
+                    {
+                        "TraceId": trace_id,
+                        "EventTS": date.replace(hour=12, minute=0, second=0),
+                        "ReceiptId": return_id_ext,
+                        "Line": int(line_num),
+                        "ProductID": int(product_id),
+                        "Qty": nqty,
+                        "UnitPrice": str(unit_price_dec.quantize(Decimal("0.01"))),
+                        "ExtPrice": str(neg_ext),
+                        "PromoCode": "RETURN",
+                    }
+                )
+
+                # Inventory add for return
+                key = (int(store_id), int(product_id))
+                current_balance = self.inventory_flow_sim._store_inventory.get(key, 0)
+                self.inventory_flow_sim._store_inventory[key] = current_balance + (-nqty)
+                balance = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+
+                return_store_txn.append(
+                    {
+                        "TraceId": trace_id,
+                        "EventTS": date.replace(hour=12, minute=30, second=0),
+                        "StoreID": int(store_id),
+                        "ProductID": int(product_id),
+                        "QtyDelta": -nqty,  # positive added back
+                        "Reason": InventoryReason.RETURN.value,
+                        "Source": return_id_ext,
+                        "Balance": balance,
+                    }
+                )
+
+                # Disposition
+                if self._is_food_product(product):
+                    # Destroy all food returns
+                    self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                    balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                    return_store_txn.append(
+                        {
+                            "TraceId": trace_id,
+                            "EventTS": date.replace(hour=12, minute=45, second=0),
+                            "StoreID": int(store_id),
+                            "ProductID": int(product_id),
+                            "QtyDelta": nqty,  # remove the quantity (negative of added)
+                            "Reason": InventoryReason.DAMAGED.value,
+                            "Source": "RETURN_DESTROY",
+                            "Balance": balance2,
+                        }
+                    )
+                else:
+                    # Non-food: 40% restock, 20% open-box, 30% RTV, 10% destroy
+                    r = self._rng.random()
+                    if r < 0.40:
+                        # Restock: nothing additional
+                        pass
+                    elif r < 0.60:
+                        # Open box: keep in stock for future sale (no immediate txn)
+                        pass
+                    elif r < 0.90:
+                        # Return to vendor: outbound shipment
+                        self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                        balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                        return_store_txn.append(
+                            {
+                                "TraceId": trace_id,
+                                "EventTS": date.replace(hour=13, minute=0, second=0),
+                                "StoreID": int(store_id),
+                                "ProductID": int(product_id),
+                                "QtyDelta": nqty,
+                                "Reason": InventoryReason.OUTBOUND_SHIPMENT.value,
+                                "Source": "RTV",
+                                "Balance": balance2,
+                            }
+                        )
+                    else:
+                        # Destroy/damaged
+                        self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                        balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                        return_store_txn.append(
+                            {
+                                "TraceId": trace_id,
+                                "EventTS": date.replace(hour=13, minute=15, second=0),
+                                "StoreID": int(store_id),
+                                "ProductID": int(product_id),
+                                "QtyDelta": nqty,
+                                "Reason": InventoryReason.DAMAGED.value,
+                                "Source": "RETURN_DESTROY",
+                                "Balance": balance2,
+                            }
+                        )
+
+            total = (subtotal + total_tax).quantize(Decimal("0.01"))
+            return_receipts.append(
+                {
+                    "TraceId": trace_id,
+                    "EventTS": date.replace(hour=12, minute=0, second=0),
+                    "StoreID": int(store_id),
+                    "CustomerID": None,
+                    "ReceiptId": return_id_ext,
+                    "ReceiptType": "RETURN",
+                    "ReturnForReceiptId": int(orig_receipt_pk),
+                    "Subtotal": str(subtotal),
+                    "DiscountAmount": str(Decimal("0.00")),
+                    "Tax": str(total_tax),
+                    "Total": str(total),
+                    "TenderType": TenderType.CREDIT_CARD.value,
+                }
+            )
+
+        # Insert returns
+        import pandas as pd
+        if return_receipts:
+            await self._insert_hourly_to_db(self._session, "receipts", pd.DataFrame(return_receipts), hour=0, commit_every_batches=1)
+        if return_lines:
+            await self._insert_hourly_to_db(self._session, "receipt_lines", pd.DataFrame(return_lines), hour=0, commit_every_batches=1)
+        if return_store_txn and "store_inventory_txn" in active_tables:
+            await self._insert_hourly_to_db(self._session, "store_inventory_txn", pd.DataFrame(return_store_txn), hour=0, commit_every_batches=1)
 
     def _map_field_names_for_db(self, table_name: str, record: dict) -> dict:
         """
@@ -2515,6 +3038,8 @@ class FactDataGenerator:
                 "CustomerID": "customer_id",
                 # Store external receipt id for linkage with receipt_lines
                 "ReceiptId": "receipt_id_ext",
+                "ReceiptType": "receipt_type",
+                "ReturnForReceiptId": "return_for_receipt_id",
                 # Note: Subtotal field in generator is not stored (can be calculated)
                 "DiscountAmount": "discount_amount",
                 "Tax": "tax_amount",
@@ -2591,7 +3116,8 @@ class FactDataGenerator:
                 **common_mappings,
                 "CustomerID": "customer_id",
                 "ProductID": "product_id",
-                "Quantity": "quantity",
+                # Generator uses 'Qty' for quantity
+                "Qty": "quantity",
                 "Total": "total_amount",
                 "FulfillmentStatus": "fulfillment_status",
                 "FulfillmentMode": "fulfillment_mode",
@@ -2599,6 +3125,16 @@ class FactDataGenerator:
                 "NodeID": "node_id",
                 # Note: OrderId, Subtotal, Tax, TenderType fields from generator
                 # don't exist in DB model (will be ignored)
+            },
+            "online_order_lines": {
+                **common_mappings,
+                "OrderId": "order_id",
+                "ProductID": "product_id",
+                "Line": "line_num",
+                "Qty": "quantity",
+                "UnitPrice": "unit_price",
+                "ExtPrice": "ext_price",
+                "PromoCode": "promo_code",
             },
         }
 
@@ -2694,6 +3230,18 @@ class FactDataGenerator:
             mapped_records = [
                 self._map_field_names_for_db(table_name, record) for record in records
             ]
+
+        # Filter out any keys that are not actual columns in the target table
+        try:
+            allowed_cols = {col.name for col in model_class.__table__.columns}
+            filtered_records = []
+            for rec in mapped_records:
+                filtered = {k: v for k, v in rec.items() if k in allowed_cols}
+                filtered_records.append(filtered)
+            mapped_records = filtered_records
+        except Exception:
+            # Defensive: if column introspection fails, proceed without filtering
+            pass
 
         # Batch insert using bulk operations
         try:

@@ -291,16 +291,19 @@ class CustomerJourneySimulator:
 
         # Adjust basket size based on store format if provided
         if store and hasattr(store, 'store_format') and store.store_format:
-            format_multipliers = {
-                'hypermarket': 1.3,   # Larger baskets in hypermarkets
-                'superstore': 1.1,    # Slightly larger in superstores
-                'standard': 1.0,      # Baseline
-                'neighborhood': 0.8,  # Smaller in neighborhood stores
-                'express': 0.6,       # Much smaller in express stores
-            }
-            multiplier = format_multipliers.get(store.store_format, 1.0)
-            min_items = max(1, int(min_items * multiplier))
-            max_items = max(min_items, int(max_items * multiplier))
+            # Clamp express explicitly to 1-3 items per profile spec
+            if store.store_format == 'express':
+                min_items, max_items = 1, 3
+            else:
+                format_multipliers = {
+                    'hypermarket': 1.3,   # Larger baskets in hypermarkets
+                    'superstore': 1.1,    # Slightly larger in superstores
+                    'standard': 1.0,      # Baseline
+                    'neighborhood': 0.8,  # Smaller in neighborhood stores
+                }
+                multiplier = format_multipliers.get(store.store_format, 1.0)
+                min_items = max(1, int(min_items * multiplier))
+                max_items = max(min_items, int(max_items * multiplier))
 
         target_items = self._rng.randint(min_items, max_items)
 
@@ -580,6 +583,7 @@ class InventoryFlowSimulator:
         stores: list[Store],
         products: list[ProductMaster],
         seed: int = 42,
+        trucks: list | None = None,
     ):
         """
         Initialize inventory flow simulator.
@@ -609,6 +613,43 @@ class InventoryFlowSimulator:
         # Truck fleet simulation
         self._truck_capacity = 1000  # items per truck
         self._active_shipments: dict[str, dict] = {}  # shipment_id -> shipment_info
+
+        # Optional trucks list (dimension trucks) for realistic linking from facts → dim
+        # When provided, we pick trucks assigned to the DC when generating shipments,
+        # otherwise we fall back to pool trucks, and finally to synthetic IDs.
+        self._trucks = trucks or []
+        self._trucks_by_dc: dict[int | None, list[int]] = {}
+        self._truck_rr_index: dict[int | None, int] = {}
+        if self._trucks:
+            for t in self._trucks:
+                # Pydantic Truck model fields: ID, DCID
+                dc_key = getattr(t, "DCID", None)
+                self._trucks_by_dc.setdefault(dc_key, []).append(getattr(t, "ID"))
+            # Initialize round-robin indices
+            for key in self._trucks_by_dc.keys():
+                self._truck_rr_index[key] = 0
+
+    def _select_truck_for_shipment(self, dc_id: int) -> int | str:
+        """Select a truck for a shipment, preferring trucks assigned to the DC.
+
+        Returns an integer Truck ID if available (matching dim_trucks.ID).
+        Falls back to a pooled truck (DCID=None), and finally a synthetic code.
+        """
+        # Prefer DC-assigned trucks (round-robin)
+        dc_list = self._trucks_by_dc.get(dc_id) or []
+        if dc_list:
+            idx = self._truck_rr_index.get(dc_id, 0) % len(dc_list)
+            self._truck_rr_index[dc_id] = idx + 1
+            return dc_list[idx]
+
+        # Fallback to pool trucks
+        pool_list = self._trucks_by_dc.get(None) or []
+        if pool_list:
+            # Random selection among pool for variety
+            return self._rng.choice(pool_list)
+
+        # Final fallback: synthetic truck code (kept for resilience)
+        return f"TRK{self._rng.randint(1000, 9999)}"
 
         # Reorder points and quantities
         self._reorder_points = self._calculate_reorder_points()
@@ -763,6 +804,9 @@ class InventoryFlowSimulator:
             List of (product_id, reorder_quantity) tuples
         """
         reorders = []
+        # Defensive: initialize reorder points if missing
+        if not hasattr(self, "_reorder_points") or self._reorder_points is None:
+            self._reorder_points = self._calculate_reorder_points()
 
         for product in self.products:
             key = (store_id, product.ID)
@@ -797,7 +841,8 @@ class InventoryFlowSimulator:
         """
         # Generate unique shipment ID
         shipment_id = f"SHIP{departure_time.strftime('%Y%m%d')}{dc_id:02d}{store_id:03d}{self._rng.randint(100, 999)}"
-        truck_id = f"TRK{self._rng.randint(1000, 9999)}"
+        # Choose a real truck when available to maintain referential integrity
+        truck_id = self._select_truck_for_shipment(dc_id)
 
         # Check for active disruptions at DC
         capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, departure_time)
@@ -983,6 +1028,7 @@ class InventoryFlowSimulator:
             dc_key = (dc_id, product_id)
             current_inventory = self._dc_inventory.get(dc_key, 0)
             self._dc_inventory[dc_key] = max(0, current_inventory - quantity)
+            new_balance = self._dc_inventory[dc_key]
 
             dc_transactions.append(
                 {
@@ -991,6 +1037,7 @@ class InventoryFlowSimulator:
                     "QtyDelta": -quantity,  # Negative for outbound
                     "Reason": InventoryReason.OUTBOUND_SHIPMENT,
                     "Source": shipment_id,  # Link to truck shipment
+                    "Balance": new_balance,
                     "EventTS": load_time,
                 }
             )
@@ -1246,8 +1293,9 @@ class InventoryFlowSimulator:
         Returns:
             Capacity multiplier (1.0 = normal, 0.5 = 50% capacity, etc.)
         """
-        if dc_id in self._active_disruptions:
-            disruption = self._active_disruptions[dc_id]
+        disruptions = getattr(self, "_active_disruptions", {})
+        if dc_id in disruptions:
+            disruption = disruptions[dc_id]
             impact_percentage = disruption["impact_percentage"]
             return 1.0 - (impact_percentage / 100)
         return 1.0

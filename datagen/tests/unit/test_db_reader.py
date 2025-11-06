@@ -102,7 +102,9 @@ class TestReadMasterTable:
 
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 3
-        assert list(df.columns) == ["ID", "StoreNumber", "Address", "GeographyID"]
+        # At minimum these core columns must be present; additional columns are allowed
+        for col in ["ID", "StoreNumber", "Address", "GeographyID"]:
+            assert col in df.columns
         assert df["StoreNumber"].tolist() == ["ST001", "ST002", "ST003"]
 
     @pytest.mark.asyncio

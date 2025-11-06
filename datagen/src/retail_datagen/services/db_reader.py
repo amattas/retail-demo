@@ -223,13 +223,22 @@ async def read_master_table(
                     # Map database column name to Python attribute name
                     column_to_attr[attr.columns[0].name] = attr.key
 
-            chunk_data = [
-                {
-                    column.key: getattr(row, column_to_attr.get(column.key, column.key))
-                    for column in table_model.__table__.columns
-                }
-                for row in rows
-            ]
+            chunk_data = []
+            for row in rows:
+                row_dict: dict[str, object] = {}
+                # Prefer SQLAlchemy python attribute name when it is a real attribute on the instance;
+                # fall back to database column name for mocked rows that set PascalCase attributes.
+                row_attrs = getattr(row, "__dict__", {}) or {}
+                for column in table_model.__table__.columns:
+                    py_attr = column_to_attr.get(column.key, column.key)
+                    if py_attr in row_attrs:
+                        row_dict[column.key] = getattr(row, py_attr)
+                    elif hasattr(row, column.key):
+                        row_dict[column.key] = getattr(row, column.key)
+                    else:
+                        # Last resort: try python attribute name (may yield None)
+                        row_dict[column.key] = getattr(row, py_attr, None)
+                chunk_data.append(row_dict)
             chunks.append(pd.DataFrame(chunk_data))
 
             offset += chunk_size

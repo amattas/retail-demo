@@ -152,6 +152,27 @@ class TableProgressTracker:
                 f"Marked {completed_count} tables as completed (generation finished)"
             )
 
+    def mark_table_completed(self, table_name: str) -> None:
+        """
+        Mark a specific table as completed.
+
+        Args:
+            table_name: Name of the table to mark completed.
+
+        Raises:
+            KeyError: If table_name is not being tracked.
+        """
+        with self._lock:
+            if table_name not in self._states:
+                raise KeyError(f"Table '{table_name}' is not being tracked")
+
+            old_state = self._states[table_name]
+            self._states[table_name] = self.STATE_COMPLETED
+
+            logger.debug(
+                f"Table '{table_name}' state transition: {old_state} → {self.STATE_COMPLETED}"
+            )
+
     def get_state(self, table_name: str) -> str:
         """
         Get current state: 'not_started', 'in_progress', or 'completed'.

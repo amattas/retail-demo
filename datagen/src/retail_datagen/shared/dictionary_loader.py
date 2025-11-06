@@ -34,6 +34,7 @@ from .models import (
     ProductBrandDict,
     ProductCompanyDict,
     ProductDict,
+    ProductTagDict,
     TaxJurisdiction,
 )
 
@@ -132,6 +133,14 @@ class DictionaryLoader:
             model_class=GeographyDict,
             expected_rows=1000,
             description="Geographic locations with synthetic addresses",
+        ),
+        "product_tags": DictionaryInfo(
+            name="product_tags",
+            filename="product_tags.csv",
+            model_class=ProductTagDict,
+            required=False,
+            expected_rows=None,
+            description="Optional product tag overlay (ProductName, Tags)",
         ),
         "first_names": DictionaryInfo(
             name="first_names",
@@ -316,15 +325,41 @@ class DictionaryLoader:
             DictionarySchemaError: If required columns are missing
         """
         # Get expected columns from the model
-        model_fields = list(dict_info.model_class.model_fields.keys())
+        model_fields = dict_info.model_class.model_fields
+        # Only require fields that are truly required (no default provided)
+        required_fields: list[str] = []
+        for name, fld in model_fields.items():
+            # Pydantic v2: is_required() method
+            is_req = False
+            is_required_method = getattr(fld, "is_required", None)
+            if callable(is_required_method):
+                try:
+                    is_req = bool(is_required_method())
+                except Exception:
+                    is_req = False
+            # Pydantic v1: 'required' attribute
+            if not is_req:
+                is_req = bool(getattr(fld, "required", False))
+            # If still unknown, fall back to checking for explicit default
+            if not is_req:
+                # If default attribute exists and is not None, treat as optional
+                if hasattr(fld, "default"):
+                    if getattr(fld, "default") is None:
+                        # Consider optional with default None
+                        is_req = False
+                    else:
+                        # Some fields have no default attribute in v1; leave as optional by default
+                        pass
+            if is_req:
+                required_fields.append(name)
         actual_columns = list(df.columns)
 
         warnings = []
 
-        # Check for missing required columns
-        missing_columns = set(model_fields) - set(actual_columns)
+        # Check for missing required columns only
+        missing_columns = set(required_fields) - set(actual_columns)
         if missing_columns:
-            raise DictionarySchemaError(file_path, model_fields, actual_columns)
+            raise DictionarySchemaError(file_path, required_fields, actual_columns)
 
         # Check for extra columns
         extra_columns = set(actual_columns) - set(model_fields)

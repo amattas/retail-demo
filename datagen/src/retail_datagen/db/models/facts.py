@@ -171,6 +171,8 @@ class StoreInventoryTransaction(Base):
     txn_type: Mapped[str] = mapped_column(String(50), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     balance: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Optional source identifier (truck ID, receipt ID, adjustment ID, etc.)
+    source: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Composite indexes for common query patterns
     __table_args__ = (
@@ -230,6 +232,15 @@ class Receipt(Base):
     # Payment information
     payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    # Receipt type and return linkage
+    # SALE (default) or RETURN; returns link to original sale via numeric PK
+    receipt_type: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="SALE", index=True
+    )
+    return_for_receipt_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+
     # Composite indexes for common query patterns
     __table_args__ = (
         Index("ix_receipt_event_store", "event_ts", "store_id"),
@@ -243,6 +254,37 @@ class Receipt(Base):
             f"customer_id={self.customer_id}, event_ts={self.event_ts}, "
             f"total={self.total_amount}, payment={self.payment_method})>"
         )
+
+
+class OnlineOrderLine(Base):
+    """
+    Online order line items (one row per product in an order).
+
+    Complements fact_online_orders lifecycle snapshots by capturing
+    the order composition at creation time.
+    """
+
+    __tablename__ = "fact_online_order_lines"
+
+    # Primary key
+    line_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign key to online order header
+    order_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
+    # Line details
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    line_num: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    unit_price: Mapped[float] = mapped_column(Float, nullable=False)
+    ext_price: Mapped[float] = mapped_column(Float, nullable=False)
+    promo_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    __table_args__ = (
+        Index("ix_online_order_lines_order", "order_id"),
+        Index("ix_online_order_lines_order_product", "order_id", "product_id"),
+        {"extend_existing": True},
+    )
 
 
 class ReceiptLine(Base):

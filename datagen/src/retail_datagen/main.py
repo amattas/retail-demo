@@ -643,6 +643,13 @@ async def get_task_status_endpoint(task_id: str):
         "estimated_seconds_remaining": task_status.estimated_seconds_remaining,
         "progress_rate": task_status.progress_rate,
         "last_update_timestamp": task_status.last_update_timestamp,
+        # Include sequence to support UI de-dup/out-of-order handling
+        "sequence": task_status.sequence,
+        # Include hourly progress fields for richer status in generic endpoint
+        "current_day": getattr(task_status, "current_day", None),
+        "current_hour": getattr(task_status, "current_hour", None),
+        "hourly_progress": getattr(task_status, "hourly_progress", None),
+        "total_hours_completed": getattr(task_status, "total_hours_completed", None),
         "table_counts": task_status.table_counts,
         "error_message": task_status.error,
         "estimated_completion": None,  # Not currently tracked in TaskStatus model

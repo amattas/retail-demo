@@ -1196,16 +1196,50 @@ input[type="checkbox"] {
 }
 
 .table-progress-bar-container {
-    height: 18px;
-    background: #e9ecef;
-    border-radius: 3px;
+    height: 24px;
+    background: var(--surface-inset);
+    border-radius: 9999px; /* fully rounded ends */
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55); /* subtle glass edge */
 }
 
 .table-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-    transition: width 0.3s ease;
+    width: 0%;
+    /* Match header gradient (blue → purple) for brand feel */
+    background: linear-gradient(120deg, var(--primary-blue), var(--accent-purple));
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 9999px; /* rounded ends even at small widths */
+    position: relative;
+    overflow: hidden;
+    /* depth + glow */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 2px 8px rgba(55, 118, 255, 0.35);
+}
+
+.table-progress-bar::before {
+    /* glossy top highlight for glass effect */
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 55%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0));
+    pointer-events: none;
+}
+
+.table-progress-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    animation: shimmer 2s infinite;
+    pointer-events: none;
 }
 
 .table-percentage {

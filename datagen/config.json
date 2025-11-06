@@ -1,14 +1,14 @@
 {
   "seed": 42,
   "volume": {
-    "stores": 57,
+    "stores": 5,
     "dcs": 4,
     "refrigerated_trucks": 8,
     "non_refrigerated_trucks": 12,
     "total_geographies": 100,
     "total_customers": 50000,
     "total_products": 10000,
-    "customers_per_day": 200,
+    "customers_per_day": 100,
     "items_per_ticket_mean": 8.2,
     "online_orders_per_day": 250,
     "marketing_impressions_per_day": 1000,
@@ -21,7 +21,9 @@
     "store_reorder_point_min": 5,
     "store_reorder_point_max": 50,
     "supplier_refrigerated_trucks": 12,
-    "supplier_non_refrigerated_trucks": 18
+    "supplier_non_refrigerated_trucks": 18,
+    "truck_dc_assignment_rate": 0.85,
+    "trucks_per_dc": null
   },
   "realtime": {
     "emit_interval_ms": 500,
@@ -53,5 +55,28 @@
   "performance": {
     "max_cpu_percent": 100.0,
     "max_workers": null
+  },
+  "marketing_cost": {
+    "email_cost_min": 0.1,
+    "email_cost_max": 0.25,
+    "display_cost_min": 0.5,
+    "display_cost_max": 2.0,
+    "social_cost_min": 0.75,
+    "social_cost_max": 3.0,
+    "search_cost_min": 1.0,
+    "search_cost_max": 5.0,
+    "video_cost_min": 1.5,
+    "video_cost_max": 5.25,
+    "facebook_cost_min": 0.25,
+    "facebook_cost_max": 3.0,
+    "google_cost_min": 1.0,
+    "google_cost_max": 5.0,
+    "instagram_cost_min": 0.2,
+    "instagram_cost_max": 3.0,
+    "youtube_cost_min": 1.5,
+    "youtube_cost_max": 5.25,
+    "mobile_multiplier": 1.0,
+    "tablet_multiplier": 1.2,
+    "desktop_multiplier": 1.5
   }
 }

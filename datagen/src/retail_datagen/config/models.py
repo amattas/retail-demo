@@ -392,56 +392,56 @@ class MarketingCostConfig(BaseModel):
     # Based on industry averages for digital marketing channels
 
     email_cost_min: float = Field(
-        0.05,
+        0.10,
         ge=0.0,
         description="Minimum cost per EMAIL channel impression in USD",
     )
     email_cost_max: float = Field(
-        0.50,
+        0.25,
         ge=0.0,
         description="Maximum cost per EMAIL channel impression in USD",
     )
 
     display_cost_min: float = Field(
-        2.00,
+        0.50,
         ge=0.0,
         description="Minimum cost per DISPLAY channel impression in USD",
     )
     display_cost_max: float = Field(
-        10.00,
+        2.00,
         ge=0.0,
         description="Maximum cost per DISPLAY channel impression in USD",
     )
 
     social_cost_min: float = Field(
-        1.00,
+        0.75,
         ge=0.0,
         description="Minimum cost per SOCIAL channel impression in USD",
     )
     social_cost_max: float = Field(
-        5.00,
+        3.00,
         ge=0.0,
         description="Maximum cost per SOCIAL channel impression in USD",
     )
 
     search_cost_min: float = Field(
-        0.50,
+        1.00,
         ge=0.0,
         description="Minimum cost per SEARCH channel impression in USD",
     )
     search_cost_max: float = Field(
-        3.00,
+        5.00,
         ge=0.0,
         description="Maximum cost per SEARCH channel impression in USD",
     )
 
     video_cost_min: float = Field(
-        0.30,
+        1.50,
         ge=0.0,
         description="Minimum cost per VIDEO channel impression in USD",
     )
     video_cost_max: float = Field(
-        2.50,
+        5.25,
         ge=0.0,
         description="Maximum cost per VIDEO channel impression in USD",
     )
@@ -452,18 +452,18 @@ class MarketingCostConfig(BaseModel):
         description="Minimum cost per FACEBOOK channel impression in USD",
     )
     facebook_cost_max: float = Field(
-        1.50,
+        3.00,
         ge=0.0,
         description="Maximum cost per FACEBOOK channel impression in USD",
     )
 
     google_cost_min: float = Field(
-        0.50,
+        1.00,
         ge=0.0,
         description="Minimum cost per GOOGLE channel impression in USD",
     )
     google_cost_max: float = Field(
-        3.50,
+        5.00,
         ge=0.0,
         description="Maximum cost per GOOGLE channel impression in USD",
     )
@@ -474,18 +474,18 @@ class MarketingCostConfig(BaseModel):
         description="Minimum cost per INSTAGRAM channel impression in USD",
     )
     instagram_cost_max: float = Field(
-        1.75,
+        3.00,
         ge=0.0,
         description="Maximum cost per INSTAGRAM channel impression in USD",
     )
 
     youtube_cost_min: float = Field(
-        0.30,
+        1.50,
         ge=0.0,
         description="Minimum cost per YOUTUBE channel impression in USD",
     )
     youtube_cost_max: float = Field(
-        2.00,
+        5.25,
         ge=0.0,
         description="Maximum cost per YOUTUBE channel impression in USD",
     )

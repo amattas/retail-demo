@@ -130,6 +130,16 @@ class Store(Base):
         comment="Foreign key to Geography dimension",
     )
 
+    # Jurisdiction-based tax rate for store location (0-20%)
+    # Note: This column mirrors the Pydantic Store model's tax_rate field and
+    # is used by historical and streaming generation for accurate tax calcs.
+    tax_rate: Mapped[float | None] = mapped_column(
+        "tax_rate",
+        Float,
+        nullable=True,
+        comment="Combined tax rate for store jurisdiction (e.g., 0.0825)",
+    )
+
     # Store profile fields for realistic variability
     volume_class: Mapped[str | None] = mapped_column(
         "volume_class",
@@ -475,6 +485,14 @@ class Product(Base):
         default="TAXABLE",
         index=True,
         comment="Product tax classification (TAXABLE, NON_TAXABLE, REDUCED_RATE)",
+    )
+
+    # Optional product tags (e.g., holiday/seasonal keywords) for generation-time affinity
+    tags: Mapped[str | None] = mapped_column(
+        "tags",
+        Text,
+        nullable=True,
+        comment="Optional semicolon-separated product tags for simulation",
     )
 
     # Indexes for common query patterns

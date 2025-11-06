@@ -22,7 +22,8 @@ class RetailDataGenerator {
             'foot_traffic',
             'ble_pings',
             'marketing',
-            'online_orders'
+            'online_orders',
+            'online_order_lines'
         ];
         this._lastCountRefresh = {};
         this._tableCountVersions = {};
@@ -668,7 +669,8 @@ class RetailDataGenerator {
                 { name: 'foot_traffic', displayName: 'Foot Traffic', icon: 'fas fa-walking', type: 'Historical Data' },
                 { name: 'ble_pings', displayName: 'BLE Pings', icon: 'fas fa-wifi', type: 'Historical Data' },
                 { name: 'marketing', displayName: 'Marketing', icon: 'fas fa-bullhorn', type: 'Historical Data' },
-                { name: 'online_orders', displayName: 'Online Orders', icon: 'fas fa-shopping-bag', type: 'Historical Data' }
+                { name: 'online_orders', displayName: 'Online Orders', icon: 'fas fa-shopping-bag', type: 'Historical Data' },
+                { name: 'online_order_lines', displayName: 'Online Order Lines', icon: 'fas fa-list', type: 'Historical Data' }
             ];
 
             // Try to use cached data first (fast path)
@@ -683,7 +685,7 @@ class RetailDataGenerator {
                         allTables.push({
                             ...table,
                             count: count !== null ? count : 0,
-                            status: count !== null ? 'Generated' : 'Not Generated'
+                            status: (typeof count === 'number' && count > 0) ? 'Generated' : 'Not Generated'
                         });
                     }
 
@@ -707,7 +709,7 @@ class RetailDataGenerator {
                     // Process fact tables from cache, with on-demand summary fallback for counts
                     for (const table of factTables) {
                         let count = this.resolveCountValue(cachedData.fact_tables?.[table.name]);
-                        let status = count !== null ? 'Generated' : 'Not Generated';
+                        let status = (typeof count === 'number' && count > 0) ? 'Generated' : 'Not Generated';
                         // Fallback: query summary if cache missing
                         if (count === null) {
                             try {
@@ -736,7 +738,7 @@ class RetailDataGenerator {
                             allTables.push({
                                 ...table,
                                 count: result.row_count || 0,
-                                status: 'Generated'
+                                status: (result.row_count || 0) > 0 ? 'Generated' : 'Not Generated'
                             });
                         } else {
                             allTables.push({
@@ -770,10 +772,10 @@ class RetailDataGenerator {
                                         const summary = await summaryResp.json();
                                         allTables.push({ ...table, count: summary.total_records || 0, status: (summary.total_records || 0) > 0 ? 'Generated' : 'Not Generated' });
                                     } else {
-                                        allTables.push({ ...table, count: 0, status: 'Generated' });
+                                        allTables.push({ ...table, count: 0, status: 'Not Generated' });
                                     }
                                 } catch (e) {
-                                    allTables.push({ ...table, count: 0, status: 'Generated' });
+                                    allTables.push({ ...table, count: 0, status: 'Not Generated' });
                                 }
                             } else {
                                 allTables.push({ ...table, count: 0, status: 'Not Generated' });
@@ -1937,6 +1939,88 @@ class RetailDataGenerator {
             const isMasterProgress = progressFillId === 'masterProgressFill';
             const isHistoricalProgress = progressFillId === 'historicalProgressFill';
 
+            // Hoist status handler so it can be used in all code paths
+            const proceedWithStatus = (statusObj) => {
+                // Update progress bar
+                const progressFill = document.getElementById(progressFillId);
+                const progressText = document.getElementById(progressTextId);
+
+                if (progressFill && progressText) {
+                    const progress = Math.round((statusObj.progress || 0) * 100);
+                    progressFill.style.width = `${progress}%`;
+                    progressText.textContent = statusObj.message || `${progress}%`;
+                }
+
+                // Update per-table status indicators using state lists from backend
+                if (statusObj.tables_completed && statusObj.tables_completed.length > 0) {
+                    statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
+                } else if (statusObj.table_progress && Object.keys(statusObj.table_progress).length > 0) {
+                    Object.entries(statusObj.table_progress).forEach(([table, progress]) => {
+                        if (progress >= 0.99) {
+                            this.updateTableStatus(table, 'completed');
+                        } else if (progress > 0) {
+                            this.updateTableStatus(table, 'processing');
+                        }
+                    });
+                }
+
+                if (statusObj.tables_in_progress) {
+                    statusObj.tables_in_progress.forEach(table => this.updateTableStatus(table, 'processing'));
+                }
+
+                if (statusObj.tables_remaining) {
+                    statusObj.tables_remaining.forEach(table => {
+                        if (!statusObj.table_progress || !(table in statusObj.table_progress)) {
+                            this.updateTableStatus(table, null);
+                        }
+                    });
+                }
+
+                if (statusObj.status === 'failed' && statusObj.tables_failed) {
+                    statusObj.tables_failed.forEach(table => this.updateTableStatus(table, 'failed'));
+                }
+
+                if (isHistoricalProgress) {
+                    this.updateHistoricalProgress(statusObj);
+                    this.updateHourlyProgress(statusObj);
+                } else if (isMasterProgress) {
+                    this.updateMasterProgress(statusObj);
+                }
+
+                const tablesToRefresh = new Set();
+                (statusObj.tables_in_progress || []).forEach(table => tablesToRefresh.add(table));
+                (statusObj.tables_completed || []).forEach(table => tablesToRefresh.add(table));
+                if (statusObj.table_progress) {
+                    Object.entries(statusObj.table_progress).forEach(([table, value]) => {
+                        if (value >= 0.99) tablesToRefresh.add(table);
+                    });
+                }
+                tablesToRefresh.forEach(table => this.maybeRefreshTableCount(table));
+
+                if (statusObj.table_counts) {
+                    Object.entries(statusObj.table_counts).forEach(([table, count]) => {
+                        if (typeof count === 'number') {
+                            const version = this._nextCountVersion();
+                            this.setTableCount(table, count, null, { version });
+                        }
+                    });
+                }
+
+                if (statusObj.status === 'completed' || statusObj.status === 'failed') {
+                    if (isHistoricalProgress) {
+                        this.hideTableCounter('tableProgressCounter');
+                        this.hideETA('progressETA');
+                        this.clearProgressDetails('historicalProgressDetails');
+                        this.hideHourlyProgress();
+                    } else if (isMasterProgress) {
+                        this.hideTableCounter('masterTableProgressCounter');
+                        this.hideETA('masterProgressETA');
+                        this.clearProgressDetails('masterProgressDetails');
+                    }
+                    resolve(statusObj);
+                }
+            };
+
             const poll = async () => {
                 if (attempts >= maxAttempts) {
                     console.error('Polling timeout after 60 minutes');
@@ -1949,26 +2033,6 @@ class RetailDataGenerator {
                     const response = await fetch(statusUrl);
                     if (!response.ok) {
                         console.error('Polling failed:', response.status, response.statusText, 'url:', statusUrl);
-                        // Fallback for older endpoint if generic task endpoint not found
-                        if (response.status === 404 && statusUrl.includes('/api/tasks/')) {
-                            const operationId = statusUrl.split('/api/tasks/')[1]?.split('/status')[0];
-                            if (operationId) {
-                                const legacyUrl = `/api/generate/historical/status?operation_id=${operationId}`;
-                                console.warn('Retrying poll with legacy endpoint:', legacyUrl);
-                                const legacyResp = await fetch(legacyUrl);
-                                if (legacyResp.ok) {
-                                    const status = await legacyResp.json();
-                                    // Normalize legacy payload to current shape
-                                    status.progress = status.progress || 0;
-                                    proceedWithStatus(status);
-                                    // Only continue polling if not completed or failed
-                                    if (status.status !== 'completed' && status.status !== 'failed') {
-                                        setTimeout(poll, 500);
-                                    }
-                                    return;
-                                }
-                            }
-                        }
                         setTimeout(poll, 500);
                         return;
                     }
@@ -1989,102 +2053,7 @@ class RetailDataGenerator {
                         this._lastSequences[statusUrl] = status.sequence;
                     }
 
-                    const proceedWithStatus = (statusObj) => {
-                        // Update progress bar
-                        const progressFill = document.getElementById(progressFillId);
-                        const progressText = document.getElementById(progressTextId);
-
-                        if (progressFill && progressText) {
-                            const progress = Math.round((statusObj.progress || 0) * 100);
-                            progressFill.style.width = `${progress}%`;
-                            progressText.textContent = statusObj.message || `${progress}%`;
-                        } else {
-                            console.error('[Progress Poll] Elements not found! Cannot update UI.');
-                        }
-
-                        // Update per-table status indicators using state lists from backend
-                        // Note: We use tables_completed/tables_in_progress lists from backend,
-                        // NOT table_progress percentages, to determine icon colors
-
-                        // If backend provides tables_completed, use it
-                        if (statusObj.tables_completed && statusObj.tables_completed.length > 0) {
-                            statusObj.tables_completed.forEach(table => this.updateTableStatus(table, 'completed'));
-                        }
-                        // Fallback: Infer completion from table_progress if tables_completed is empty
-                        else if (statusObj.table_progress && Object.keys(statusObj.table_progress).length > 0) {
-                            Object.entries(statusObj.table_progress).forEach(([table, progress]) => {
-                                if (progress >= 0.99) {
-                                    this.updateTableStatus(table, 'completed');
-                                }
-                            });
-                        }
-
-                        if (statusObj.tables_in_progress) {
-                            statusObj.tables_in_progress.forEach(table => {
-                                this.updateTableStatus(table, 'processing');
-                            });
-                        }
-
-                        if (statusObj.tables_remaining) {
-                            statusObj.tables_remaining.forEach(table => {
-                                if (!statusObj.table_progress || !(table in statusObj.table_progress)) {
-                                    this.updateTableStatus(table, null);
-                                }
-                            });
-                        }
-
-                        // Mark failed tables if any
-                        if (statusObj.status === 'failed' && statusObj.tables_failed) {
-                            statusObj.tables_failed.forEach(table => this.updateTableStatus(table, 'failed'));
-                        }
-
-                        if (isHistoricalProgress) {
-                            this.updateHistoricalProgress(statusObj);
-                            this.updateHourlyProgress(statusObj);
-                        } else if (isMasterProgress) {
-                            this.updateMasterProgress(statusObj);
-                        }
-
-                        const tablesToRefresh = new Set();
-                        (statusObj.tables_in_progress || []).forEach(table => tablesToRefresh.add(table));
-                        (statusObj.tables_completed || []).forEach(table => tablesToRefresh.add(table));
-                        if (statusObj.table_progress) {
-                            Object.entries(statusObj.table_progress).forEach(([table, value]) => {
-                                if (value >= 0.99) {
-                                    tablesToRefresh.add(table);
-                                }
-                            });
-                        }
-                        tablesToRefresh.forEach(table => this.maybeRefreshTableCount(table));
-
-                        if (statusObj.table_counts) {
-                            Object.entries(statusObj.table_counts).forEach(([table, count]) => {
-                                if (typeof count === 'number') {
-                                    const version = this._nextCountVersion();
-                                    this.setTableCount(table, count, null, { version });
-                                }
-                            });
-                        }
-
-                        // Check if done
-                        if (statusObj.status === 'completed' || statusObj.status === 'failed') {
-                            if (isHistoricalProgress) {
-                                this.hideTableCounter('tableProgressCounter');
-                                this.hideETA('progressETA');
-                                this.clearProgressDetails('historicalProgressDetails');
-                                this.hideHourlyProgress();
-                                // Don't clear completed statuses - they should persist
-                                // Only clear processing/failed states if any
-                            } else if (isMasterProgress) {
-                                this.hideTableCounter('masterTableProgressCounter');
-                                this.hideETA('masterProgressETA');
-                                this.clearProgressDetails('masterProgressDetails');
-                            }
-                            resolve(statusObj);
-                            return;
-                        }
-                    };
-
+                    // Use the shared handler
                     proceedWithStatus(status);
 
                     // Only continue polling if not completed or failed
@@ -2184,17 +2153,17 @@ class RetailDataGenerator {
     }
 
     updateHourlyProgress(status) {
-        // Display current day and hour
-        if (status.current_day !== undefined && status.current_hour !== undefined) {
+        // Display current day (hide hour portion for daily-only updates)
+        if (typeof status.current_day === 'number') {
             const hourDisplay = document.getElementById('currentHourDisplay');
             if (hourDisplay) {
-                hourDisplay.textContent = `Day ${status.current_day}, Hour ${status.current_hour + 1}/24`;
+                hourDisplay.textContent = `Day ${status.current_day}`;
                 hourDisplay.style.display = 'block';
             }
         }
 
         // Display total hours completed
-        if (status.total_hours_completed !== undefined) {
+        if (typeof status.total_hours_completed === 'number') {
             const hoursDisplay = document.getElementById('totalHoursDisplay');
             if (hoursDisplay) {
                 hoursDisplay.textContent = `${status.total_hours_completed} hours completed`;
@@ -2381,53 +2350,7 @@ class RetailDataGenerator {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
-    async clearFactData() {
-        // Single confirmation dialog
-        const confirmed = confirm(
-            '⚠️ This will permanently delete FACT data only:\n' +
-            '• Historical fact data (receipts, inventory, etc.)\n' +
-            '• Generation state tracking\n\n' +
-            'Master data (stores, customers, products) will be PRESERVED.\n\n' +
-            'This action cannot be undone. Proceed?'
-        );
-        if (!confirmed) return;
-
-        try {
-            this.showNotification('Clearing fact data...', 'info');
-
-            const response = await fetch('/api/generation/clear-facts', {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            this.showNotification(result.message, 'success');
-            this.hideProgress('historicalProgress');
-            // Clear completed tables state
-            this.completedTables.clear();
-            try {
-                localStorage.removeItem('completedHistoricalTables');
-            } catch (error) {
-                console.warn('Failed to clear completedHistoricalTables from localStorage:', error);
-            }
-            // Clear only historical table statuses with force reset
-            this.clearTableStatuses(this.factTableNames, true);
-
-            // Refresh the UI state
-            await this.loadGenerationState();
-            await this.updateDashboardStats();
-            await this.updateTableCounts();
-            await this.updateAllTablesData();
-
-        } catch (error) {
-            console.error('Failed to clear fact data:', error);
-            this.showNotification(`Failed to clear fact data: ${error.message}`, 'error');
-        }
-    }
+    // clearFactData removed: full clear is used for performance
 
     async clearAllData() {
         // Single confirmation dialog

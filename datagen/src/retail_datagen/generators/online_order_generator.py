@@ -30,7 +30,8 @@ def generate_online_orders_with_lifecycle(
     temporal_patterns,
     rng,
     generate_trace_id_func,
-) -> tuple[list[dict], list[dict], list[dict]]:
+    basket_adjuster=None,
+) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     """Generate online orders for the given date with complete lifecycle and corresponding inventory effects.
 
     Creates orders with status progression (created -> picked -> shipped -> delivered)
@@ -55,10 +56,11 @@ def generate_online_orders_with_lifecycle(
     orders: list[dict] = []
     store_txn: list[dict] = []
     dc_txn: list[dict] = []
+    order_lines: list[dict] = []
 
     base_per_day = max(0, int(config.volume.online_orders_per_day))
     if base_per_day == 0 or not customers:
-        return orders, store_txn, dc_txn
+        return orders, store_txn, dc_txn, order_lines
 
     # Seasonality/holiday multiplier, not bounded by store hours
     seasonal_mult = temporal_patterns.seasonal.get_seasonal_multiplier(date)
@@ -77,6 +79,11 @@ def generate_online_orders_with_lifecycle(
 
         # Generate a small basket using the same simulator
         basket = customer_journey_sim.generate_shopping_basket(customer.ID)
+        if callable(basket_adjuster):
+            try:
+                basket_adjuster(created_ts, basket)
+            except Exception:
+                pass
 
         # Choose fulfillment mode and node
         # Distribution: 60% DC, 30% Store, 10% BOPIS
@@ -174,6 +181,24 @@ def generate_online_orders_with_lifecycle(
             order_tax += line_tax
 
         order_total = (order_subtotal + order_tax).quantize(Decimal("0.01"))
+
+        # Create order line items at creation time for composition (single snapshot)
+        line_num = 0
+        for product, qty in basket.items:
+            line_num += 1
+            unit_price = product.SalePrice
+            ext_price = (unit_price * qty).quantize(Decimal("0.01"))
+            order_lines.append(
+                {
+                    "OrderId": order_id,
+                    "ProductID": product.ID,
+                    "Line": line_num,
+                    "Qty": qty,
+                    "UnitPrice": str(unit_price.quantize(Decimal("0.01"))),
+                    "ExtPrice": str(ext_price),
+                    "PromoCode": None,
+                }
+            )
 
         # Create order records for each status in the lifecycle
         # Status 1: created - Order placed, payment processed
@@ -311,4 +336,4 @@ def generate_online_orders_with_lifecycle(
                 }
             )
 
-    return orders, store_txn, dc_txn
+    return orders, store_txn, dc_txn, order_lines

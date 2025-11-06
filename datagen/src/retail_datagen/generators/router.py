@@ -60,6 +60,7 @@ from ..db.models.facts import (
     DCInventoryTransaction,
     FootTraffic,
     MarketingImpression,
+    OnlineOrderLine,
     OnlineOrder,
     Receipt,
     ReceiptLine,
@@ -96,6 +97,7 @@ FACT_TABLE_MODELS = {
     "ble_pings": BLEPing,
     "marketing": MarketingImpression,
     "online_orders": OnlineOrder,
+    "online_order_lines": OnlineOrderLine,
 }
 
 # Unified mapping of all tables
@@ -111,6 +113,7 @@ FACT_TABLES = [
     "ble_pings",
     "marketing",
     "online_orders",
+    "online_order_lines",
 ]
 
 
@@ -185,7 +188,6 @@ async def generate_all_master_data(
                 }
 
             table_progress = {table: 0.0 for table in tables_to_generate}
-            set(tables_to_generate)
 
             # Short-circuit when everything already exists and regeneration not forced
             if not request.force_regenerate:
@@ -244,17 +246,25 @@ async def generate_all_master_data(
 
                 # Pass through state lists from generator without modification
                 # Generator's TableProgressTracker provides correct states
+                # Build kwargs so we only update state lists when provided
+                kwargs: dict = {
+                    "table_progress": table_progress.copy(),
+                    "estimated_seconds_remaining": eta_estimate,
+                    "progress_rate": rate_estimate,
+                    "table_counts": table_counts,
+                }
+                if tables_completed is not None:
+                    kwargs["tables_completed"] = tables_completed
+                if tables_in_progress is not None:
+                    kwargs["tables_in_progress"] = tables_in_progress
+                if tables_remaining is not None:
+                    kwargs["tables_remaining"] = tables_remaining
+
                 update_task_progress(
                     task_id,
                     overall_progress,
                     callback_message,
-                    tables_completed=tables_completed or [],
-                    tables_in_progress=tables_in_progress or [],
-                    tables_remaining=tables_remaining or [],
-                    table_progress=table_progress.copy(),
-                    estimated_seconds_remaining=eta_estimate,
-                    progress_rate=rate_estimate,
-                    table_counts=table_counts,
+                    **kwargs,
                 )
 
             master_generator.set_progress_callback(master_progress_callback)
@@ -929,6 +939,13 @@ async def get_historical_generation_status(
         progress_rate=task_status.get("progress_rate"),
         last_update_timestamp=task_status.get("last_update_timestamp"),
         sequence=task_status.get("sequence"),
+        # Hourly progress fields (optional)
+        current_day=task_status.get("current_day"),
+        current_hour=task_status.get("current_hour"),
+        hourly_progress=task_status.get("hourly_progress"),
+        total_hours_completed=task_status.get("total_hours_completed"),
+        # Optional table counts if provided by background task
+        table_counts=task_status.get("table_counts"),
     )
 
 
@@ -1045,69 +1062,71 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
     try:
         state_manager = GenerationStateManager()
 
-        # Prepare config paths for clearing
-        config_paths = {"master": config.paths.master, "facts": config.paths.facts}
-
-        # Clear the cache
+        # Clear the dashboard cache first
         cache_manager = CacheManager()
         cache_manager.clear_cache()
 
-        # Clear all data in unified retail SQLite database
-        from sqlalchemy import text
+        # Gracefully shut down DB manager and dispose engines
+        from ..db.manager import get_db_manager
+        manager = get_db_manager()
+        try:
+            await manager.shutdown()
+        except Exception as e:
+            logger.warning(f"DatabaseManager shutdown during clear_all_data: {e}")
 
-        from ..db.session import get_retail_session
+        # Reset session makers so new sessions bind to fresh engines
+        try:
+            from ..db.session import reset_session_makers
+            reset_session_makers()
+        except Exception as e:
+            logger.warning(f"Failed to reset session makers: {e}")
 
-        # All tables to truncate (master + facts)
-        all_tables = [
-            # Master tables
-            "dim_customers",
-            "dim_products",
-            "dim_trucks",
-            "dim_stores",
-            "dim_distribution_centers",
-            "dim_geographies",
-            # Fact tables
-            "fact_receipt_lines",
-            "fact_receipts",
-            "fact_store_inventory_txn",
-            "fact_dc_inventory_txn",
-            "fact_truck_moves",
-            "fact_foot_traffic",
-            "fact_ble_pings",
-            "fact_marketing",
-            "fact_online_orders",
-            "fact_data_watermarks",
-        ]
+        # Delete database files (retail + any legacy split DBs) including WAL/SHM
+        from ..db.config import DatabaseConfig
+        from pathlib import Path
 
-        async with get_retail_session() as session:
-            for table in all_tables:
-                await session.execute(text(f"DELETE FROM {table}"))
-            await session.flush()
+        deleted_files: list[str] = []
+        for path in [
+            DatabaseConfig.RETAIL_DB_PATH,
+            DatabaseConfig.MASTER_DB_PATH,
+            DatabaseConfig.FACTS_DB_PATH,
+        ]:
+            for suffix in ("", "-wal", "-shm"):
+                p = Path(path + suffix)
+                try:
+                    if p.exists():
+                        p.unlink()
+                        deleted_files.append(str(p))
+                except Exception as e:
+                    logger.warning(f"Failed to delete {p}: {e}")
 
-        # VACUUM unified retail database
-        from ..db.engine import get_retail_engine
+        # Re-initialize fresh databases and bring manager back up
+        from ..db.init import init_databases
+        await init_databases()
+        try:
+            await manager.startup()
+        except Exception as e:
+            logger.warning(f"DatabaseManager startup after clear_all_data: {e}")
 
-        retail_engine = get_retail_engine()
-        async with retail_engine.begin() as conn:
-            await conn.execute(text("VACUUM"))
+        # Reset generation state and clean any legacy file artifacts
+        config_paths = {"master": config.paths.master, "facts": config.paths.facts}
+        file_results = state_manager.clear_all_data(config_paths)
 
-        # Also clear file-based artifacts if any (backward compatibility)
-        results = state_manager.clear_all_data(config_paths)
+        errors = file_results.get("errors", [])
+        if errors:
+            logger.warning(f"Data clearing completed with some errors: {errors}")
+        logger.info(
+            f"All data cleared by deleting DB files ({len(deleted_files)} files) and resetting state/cache"
+        )
 
-        if results["errors"]:
-            logger.warning(f"Data clearing completed with errors: {results['errors']}")
-            return OperationResult(
-                success=True,
-                message=f"Data cleared with some errors. Files deleted: {len(results['files_deleted'])}, Errors: {len(results['errors'])}",
-                started_at=datetime.now(),
-            )
-        else:
-            logger.info("All data cleared successfully from SQLite and file cache")
-            return OperationResult(
-                success=True,
-                message="All data cleared successfully (SQLite tables truncated; caches and legacy files removed)",
-                started_at=datetime.now(),
-            )
+        return OperationResult(
+            success=True,
+            message=(
+                "All data cleared by deleting database files; caches and legacy files removed. "
+                f"Deleted {len(deleted_files)} files."
+            ),
+            started_at=datetime.now(),
+        )
 
     except Exception as e:
         logger.error(f"Failed to clear data: {e}")
@@ -1117,83 +1136,7 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         )
 
 
-@router.delete(
-    "/generation/clear-facts",
-    response_model=OperationResult,
-    summary="Clear fact data only",
-    description="Clear all historical fact data and reset generation state, but preserve master data",
-)
-@rate_limit(max_requests=2, window_seconds=300)  # Very restrictive for safety
-async def clear_fact_data(config: RetailConfig = Depends(get_config)):
-    """Clear only fact data and reset generation state, preserving master data."""
-
-    try:
-        state_manager = GenerationStateManager()
-
-        # Prepare config paths for clearing
-        config_paths = {"facts": config.paths.facts}
-
-        # Clear the cache
-        cache_manager = CacheManager()
-        cache_manager.clear_cache()
-
-        # Clear fact data in unified retail SQLite database
-        from sqlalchemy import text
-
-        from ..db.session import get_retail_session
-
-        # Truncate facts tables and watermarks (preserve master data)
-        fact_tables = [
-            "fact_receipt_lines",
-            "fact_receipts",
-            "fact_store_inventory_txn",
-            "fact_dc_inventory_txn",
-            "fact_truck_moves",
-            "fact_foot_traffic",
-            "fact_ble_pings",
-            "fact_marketing",
-            "fact_online_orders",
-            "fact_data_watermarks",
-        ]
-
-        async with get_retail_session() as session:
-            for table in fact_tables:
-                await session.execute(text(f"DELETE FROM {table}"))
-            await session.flush()
-
-        # VACUUM unified retail database
-        from ..db.engine import get_retail_engine
-
-        retail_engine = get_retail_engine()
-        async with retail_engine.begin() as conn:
-            await conn.execute(text("VACUUM"))
-
-        # Also clear file-based fact artifacts if any (backward compatibility)
-        results = state_manager.clear_fact_data(config_paths)
-
-        if results.get("errors"):
-            logger.warning(
-                f"Fact data clearing completed with errors: {results['errors']}"
-            )
-            return OperationResult(
-                success=True,
-                message=f"Fact data cleared with some errors. Files deleted: {len(results.get('files_deleted', []))}, Errors: {len(results['errors'])}",
-                started_at=datetime.now(),
-            )
-        else:
-            logger.info("All fact data cleared successfully from SQLite and file cache")
-            return OperationResult(
-                success=True,
-                message="Fact data cleared successfully (SQLite fact tables truncated; caches and legacy files removed). Master data preserved.",
-                started_at=datetime.now(),
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to clear fact data: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to clear fact data: {str(e)}",
-        )
+## Removed: clear-facts endpoint (deprecated)
 
 
 # ================================

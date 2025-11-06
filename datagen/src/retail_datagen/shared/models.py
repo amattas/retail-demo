@@ -132,17 +132,20 @@ class ProductDict(BaseModel):
     Department: str = Field(..., min_length=1, description="Product department")
     Category: str = Field(..., min_length=1, description="Product category")
     Subcategory: str = Field(..., min_length=1, description="Product subcategory")
+    # Optional tags for holiday/seasonal/product targeting (semicolon-separated)
+    Tags: str | None = Field(
+        default=None,
+        description="Optional semicolon-separated tags (e.g., thanksgiving; turkey)",
+    )
 
-    @field_validator("BasePrice", mode="before")
-    @classmethod
-    def parse_base_price(cls, v) -> Decimal:
-        """Parse base price from string or number."""
-        if isinstance(v, str):
-            try:
-                return Decimal(v)
-            except Exception:
-                raise ValueError("BasePrice must be a valid decimal number")
-        return Decimal(str(v))
+
+class ProductTagDict(BaseModel):
+    """Optional overlay dictionary for product tags."""
+
+    ProductName: str = Field(..., min_length=1, description="Product name to tag")
+    Tags: str = Field(..., min_length=1, description="Semicolon-separated tags")
+
+    # No validators required; simple mapping file
 
 
 # ================================
@@ -307,6 +310,11 @@ class ProductMaster(BaseModel):
     taxability: ProductTaxability = Field(
         default=ProductTaxability.TAXABLE,
         description="Product tax classification (default: TAXABLE)",
+    )
+    # Optional tags carried through to dim_products for fast affinity lookups
+    Tags: str | None = Field(
+        default=None,
+        description="Optional semicolon-separated tags (not exported externally)",
     )
 
     @model_validator(mode="after")

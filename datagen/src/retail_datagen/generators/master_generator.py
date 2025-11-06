@@ -126,6 +126,8 @@ class MasterDataGenerator:
         self._tax_rate_mapping: dict[
             tuple[str, str], Decimal
         ] = {}  # (StateCode, City) -> CombinedRate
+        # State-level average tax rates for fallback when city not present
+        self._state_tax_avg: dict[str, Decimal] = {}
 
         # Generated master data
         self.geography_master: list[GeographyMaster] = []
@@ -139,8 +141,23 @@ class MasterDataGenerator:
         self.dc_inventory_snapshots: list[DCInventorySnapshot] = []
         self.store_inventory_snapshots: list[StoreInventorySnapshot] = []
 
-        # Progress callback for UI updates (table_name, progress, message)
-        self._progress_callback: Callable[[str, float, str | None], None] | None = None
+        # Progress callback for UI updates.
+        # Signature: (table_name, progress, message, table_counts, tables_completed, tables_in_progress, tables_remaining)
+        self._progress_callback: (
+            Callable[
+                [
+                    str,
+                    float,
+                    str | None,
+                    dict[str, int] | None,
+                    list[str] | None,
+                    list[str] | None,
+                    list[str] | None,
+                ],
+                None,
+            ]
+            | None
+        ) = None
 
         # Table progress tracker for state management
         self._progress_tracker: TableProgressTracker | None = None
@@ -148,7 +165,22 @@ class MasterDataGenerator:
         print(f"MasterDataGenerator initialized with seed {config.seed}")
 
     def set_progress_callback(
-        self, callback: Callable[[str, float, str | None], None] | None
+        self,
+        callback: (
+            Callable[
+                [
+                    str,
+                    float,
+                    str | None,
+                    dict[str, int] | None,
+                    list[str] | None,
+                    list[str] | None,
+                    list[str] | None,
+                ],
+                None,
+            ]
+            | None
+        ),
     ) -> None:
         """Register or clear a callback for incremental progress updates."""
         self._progress_callback = callback
@@ -283,10 +315,8 @@ class MasterDataGenerator:
         """
         mapped = {}
 
-        # Get column mappings from SQLAlchemy model (not currently used for renaming,
-        # but retained for potential future divergence between Pydantic and DB names)
-        # The column 'name' attribute contains the actual database column name
-        {col.key: col.name for col in model_class.__table__.columns}
+        # Build set of actual DB column names for simple key normalization
+        db_columns = {col.name for col in model_class.__table__.columns}
 
         for key, value in pydantic_dict.items():
             # Convert Decimal to float for SQLite
@@ -309,8 +339,15 @@ class MasterDataGenerator:
             elif value is None:
                 pass
 
-            # Map to correct column name (Pydantic uses same names as DB columns)
-            mapped[key] = value
+            # Map to correct column name
+            # Most Pydantic keys match DB column names exactly (PascalCase).
+            # For newly added optional columns like product 'tags', accept 'Tags' and map to 'tags'.
+            if key in db_columns:
+                mapped[key] = value
+            elif key.lower() in db_columns:
+                mapped[key.lower()] = value
+            else:
+                mapped[key] = value
 
         return mapped
 
@@ -335,9 +372,34 @@ class MasterDataGenerator:
             ):
                 self._progress_tracker.update_progress(table_name, clamped)
 
-            # Call progress callback with positional and keyword arguments
-            # Positional args maintain backward compatibility
-            self._progress_callback(table_name, clamped, message, table_counts)
+            # Derive table state lists from the tracker (if available)
+            tables_completed: list[str] | None = None
+            tables_in_progress: list[str] | None = None
+            tables_remaining: list[str] | None = None
+
+            if self._progress_tracker:
+                tables_completed = self._progress_tracker.get_tables_by_state(
+                    TableProgressTracker.STATE_COMPLETED
+                )
+                tables_in_progress = self._progress_tracker.get_tables_by_state(
+                    TableProgressTracker.STATE_IN_PROGRESS
+                )
+                tables_remaining = self._progress_tracker.get_tables_by_state(
+                    TableProgressTracker.STATE_NOT_STARTED
+                )
+
+            # Call progress callback with extended positional arguments.
+            # Routers that only care about the first 3–4 args remain compatible,
+            # and enhanced UIs can use the state lists to drive icons.
+            self._progress_callback(
+                table_name,
+                clamped,
+                message,
+                table_counts,
+                tables_completed,
+                tables_in_progress,
+                tables_remaining,
+            )
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug(
                 "Master progress callback failed for %s: %s",
@@ -379,10 +441,6 @@ class MasterDataGenerator:
             "products_master",
         ]
         self._progress_tracker = TableProgressTracker(master_table_names)
-
-        # Mark all tables as started
-        for table_name in master_table_names:
-            self._progress_tracker.mark_table_started(table_name)
 
         # Read entity counts from configuration
         stores_count = self.config.volume.stores
@@ -466,6 +524,21 @@ class MasterDataGenerator:
                 f"  Sample company: '{self._company_data[0].Company}' | Category='{self._company_data[0].Category}'"
             )
 
+        # Optional product tag overlay
+        try:
+            tag_result = self.dictionary_loader.load_dictionary("product_tags")
+            overlay = {}
+            for entry in tag_result.data:
+                name = getattr(entry, "ProductName", None)
+                t = getattr(entry, "Tags", None)
+                if name and t:
+                    overlay[name] = t
+            self._product_tags_overlay = overlay
+            if overlay:
+                print(f"Loaded {len(overlay)} product tag overlays")
+        except Exception:
+            self._product_tags_overlay = {}
+
         # Load tax rates
         tax_jurisdictions = self.dictionary_loader.load_tax_rates()
         print(f"Loaded {len(tax_jurisdictions)} tax jurisdictions")
@@ -476,6 +549,20 @@ class MasterDataGenerator:
             self._tax_rate_mapping[key] = tax_jurisdiction.CombinedRate
 
         print(f"Created tax rate mapping with {len(self._tax_rate_mapping)} entries")
+
+        # Build state-level average rates for fallback realism
+        if tax_jurisdictions:
+            state_groups: dict[str, list[Decimal]] = {}
+            for tj in tax_jurisdictions:
+                state_groups.setdefault(tj.StateCode, []).append(tj.CombinedRate)
+            for state, rates in state_groups.items():
+                try:
+                    avg = sum(rates) / Decimal(str(len(rates)))
+                except Exception:
+                    # Fallback to default if any arithmetic issue
+                    avg = Decimal("0.07407")
+                self._state_tax_avg[state] = avg
+            print(f"Computed state-level tax averages for {len(self._state_tax_avg)} states")
         if self._tax_rate_mapping:
             # Show a sample
             sample_key = list(self._tax_rate_mapping.keys())[0]
@@ -487,6 +574,8 @@ class MasterDataGenerator:
     async def generate_geography_master_async(self) -> None:
         """Generate geographies_master data with optional database insertion."""
         print("Generating geography master data...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("geographies_master")
         self._emit_progress("geographies_master", 0.0, "Generating geographies")
 
         if not self._geography_data:
@@ -532,7 +621,8 @@ class MasterDataGenerator:
             await self._insert_to_db(
                 self._db_session, GeographyModel, self.geography_master
             )
-
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("geographies_master")
         self._emit_progress("geographies_master", 1.0, "Geographies complete")
 
     def generate_geography_master(self) -> None:
@@ -548,6 +638,8 @@ class MasterDataGenerator:
             count: Number of stores to generate. If None, uses config default.
         """
         print("Generating store data...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("stores")
         self._emit_progress("stores", 0.0, "Generating stores")
 
         if not self.geography_master:
@@ -624,9 +716,10 @@ class MasterDataGenerator:
 
             # Look up tax rate for this store's location
             tax_rate_key = (geo_master.State, geo_master.City)
-            tax_rate = self._tax_rate_mapping.get(
-                tax_rate_key, Decimal("0.07407")
-            )  # Default 7.407% if not found
+            tax_rate = self._tax_rate_mapping.get(tax_rate_key)
+            if tax_rate is None:
+                # Fallback to state average if available, else default
+                tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
 
             store = Store(
                 ID=current_id,
@@ -657,9 +750,9 @@ class MasterDataGenerator:
 
                 # Look up tax rate for this store's location
                 tax_rate_key = (geo_master.State, geo_master.City)
-                tax_rate = self._tax_rate_mapping.get(
-                    tax_rate_key, Decimal("0.07407")
-                )  # Default 7.407% if not found
+                tax_rate = self._tax_rate_mapping.get(tax_rate_key)
+                if tax_rate is None:
+                    tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
 
                 store = Store(
                     ID=current_id,
@@ -757,9 +850,9 @@ class MasterDataGenerator:
 
             # Look up tax rate for this store's location
             tax_rate_key = (geo_master.State, geo_master.City)
-            tax_rate = self._tax_rate_mapping.get(
-                tax_rate_key, Decimal("0.07407")
-            )  # Default 7.407% if not found
+            tax_rate = self._tax_rate_mapping.get(tax_rate_key)
+            if tax_rate is None:
+                tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
 
             store = Store(
                 ID=current_id,
@@ -788,11 +881,18 @@ class MasterDataGenerator:
                 if current_id > store_count:
                     break
 
+                # Look up tax rate for this store's location
+                tax_rate_key = (geo_master.State, geo_master.City)
+                tax_rate = self._tax_rate_mapping.get(tax_rate_key)
+                if tax_rate is None:
+                    tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
+
                 store = Store(
                     ID=current_id,
                     StoreNumber=id_generator.generate_store_number(current_id),
                     Address=address_generator.generate_address(geo, "commercial"),
                     GeographyID=geo_master.ID,
+                    tax_rate=tax_rate,
                 )
                 self.stores.append(store)
                 current_id += 1
@@ -823,6 +923,8 @@ class MasterDataGenerator:
         if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(self._db_session, StoreModel, self.stores)
             # Now mark complete after DB write
+            if self._progress_tracker:
+                self._progress_tracker.mark_table_completed("stores")
             self._emit_progress("stores", 1.0, "Stores complete")
 
         self._emit_progress(
@@ -832,6 +934,8 @@ class MasterDataGenerator:
     def generate_distribution_centers(self) -> None:
         """Generate distribution_centers.csv with strategic placement."""
         print("Generating distribution center data...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("distribution_centers")
         self._emit_progress(
             "distribution_centers", 0.0, "Generating distribution centers"
         )
@@ -889,6 +993,8 @@ class MasterDataGenerator:
             "Distribution centers complete",
             {"distribution_centers": len(self.distribution_centers)},
         )
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("distribution_centers")
 
     async def generate_distribution_centers_async(self) -> None:
         """Generate distribution centers with optional database insertion (async version)."""
@@ -905,6 +1011,8 @@ class MasterDataGenerator:
         """Generate trucks.csv with refrigeration capabilities and DC assignment."""
         try:
             print("Generating truck data...")
+            if self._progress_tracker:
+                self._progress_tracker.mark_table_started("trucks")
             self._emit_progress("trucks", 0.0, "Generating trucks")
             print(
                 f"Distribution centers available: {len(self.distribution_centers) if self.distribution_centers else 0}"
@@ -1187,11 +1295,15 @@ class MasterDataGenerator:
         if hasattr(self, "_db_session") and self._db_session:
             await self._insert_to_db(self._db_session, TruckModel, self.trucks)
             # Mark complete after DB write
+            if self._progress_tracker:
+                self._progress_tracker.mark_table_completed("trucks")
             self._emit_progress("trucks", 1.0, "Trucks complete")
 
     def generate_customers(self) -> None:
         """Generate customers.csv with realistic geographic distribution."""
         print("Generating customer data...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("customers")
 
         if not self.geography_master:
             raise ValueError("Geography master data must be generated first")
@@ -1286,6 +1398,10 @@ class MasterDataGenerator:
                 batch_size=5000,
                 commit_every_batches=1,
             )
+            # Mark complete after DB write
+            if self._progress_tracker:
+                self._progress_tracker.mark_table_completed("customers")
+            self._emit_progress("customers", 1.0, "Customers complete")
             # Verify DB count matches generated count for diagnostics
             try:
                 from sqlalchemy import func, select
@@ -1301,8 +1417,10 @@ class MasterDataGenerator:
                 logger.warning(f"Could not verify customer DB count: {e}")
 
     def generate_products_master(self) -> None:
-        """Generate products_master.csv with realistic pricing and brand combinations."""
+        """Generate products_master.csv with realistic pricing and brand combinations.""" 
         print("Generating product master data with brand combinations...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("products_master")
         self._emit_progress("products_master", 0.0, "Generating products")
 
         if not self._product_data or not self._brand_data or not self._company_data:
@@ -1470,6 +1588,11 @@ class MasterDataGenerator:
 
             for retry in range(max_retries):
                 try:
+                    # Determine tags from product or overlay
+                    _tags = getattr(product, "Tags", None)
+                    if not _tags:
+                        _tags = getattr(self, "_product_tags_overlay", {}).get(product.ProductName)
+
                     product_master = ProductMaster(
                         ID=product_id,
                         ProductName=product.ProductName,
@@ -1484,6 +1607,7 @@ class MasterDataGenerator:
                         RequiresRefrigeration=requires_refrigeration,
                         LaunchDate=launch_date,
                         taxability=taxability,
+                        Tags=_tags,
                     )
                     break  # Success - exit retry loop
                 except ValueError as e:
@@ -1563,6 +1687,10 @@ class MasterDataGenerator:
                 batch_size=2000,
                 commit_every_batches=1,
             )
+            # Mark complete after DB write
+            if self._progress_tracker:
+                self._progress_tracker.mark_table_completed("products_master")
+            self._emit_progress("products_master", 1.0, "Products master complete")
             # Verify DB count matches generated count for diagnostics
             try:
                 from sqlalchemy import func, select

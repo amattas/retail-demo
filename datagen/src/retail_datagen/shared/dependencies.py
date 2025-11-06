@@ -289,6 +289,7 @@ def update_task_progress(
     progress_rate: float | None = None,
     table_counts: dict[str, int] | None = None,
     # NEW: Hourly progress fields
+    current_day: int | None = None,
     current_hour: int | None = None,
     hourly_progress: dict[str, float] | None = None,
     total_hours_completed: int | None = None,
@@ -370,6 +371,8 @@ def update_task_progress(
                 merged[k] = max(old, new)
             updated_fields["table_counts"] = merged
         # NEW: Update hourly progress fields if provided
+        if current_day is not None:
+            updated_fields["current_day"] = current_day
         if current_hour is not None:
             updated_fields["current_hour"] = current_hour
         if hourly_progress is not None:
@@ -489,6 +492,7 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
         valid_tables = [
             "dc_inventory_txn",
             "truck_moves",
+            "truck_inventory",
             "store_inventory_txn",
             "receipts",
             "receipt_lines",
@@ -496,6 +500,7 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
             "ble_pings",
             "marketing",
             "online_orders",
+            "online_order_lines",
         ]
     else:
         raise ValueError(f"Invalid table type: {table_type}")
