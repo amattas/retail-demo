@@ -368,8 +368,7 @@
                 <!-- Table counter -->
                 <div id="tableProgressCounter" class="table-counter" style="display: none;"></div>
 
-                <!-- ETA display -->
-                <div id="progressETA" class="progress-eta" style="display: none;"></div>
+                
 
                 <!-- Progress details -->
                 <div id="historicalProgressDetails" class="progress-details"></div>
@@ -377,8 +376,11 @@
                 <!-- Per-table progress container -->
                 <div id="tableProgressContainer" class="table-progress-container" style="display: none; margin-top: 15px;"></div>
 
-                <!-- Total hours completed (moved below bars) -->
-                <div id="totalHoursDisplay" class="hours-display" style="display: none; margin-top: 10px;"></div>
+                <!-- Footer row: hours generated + ETA -->
+                <div class="progress-footer">
+                    <div id="totalHoursDisplay" class="hours-display" style="display: none;"></div>
+                    <div id="progressETA" class="progress-eta" style="display: none;"></div>
+                </div>
             </div>
 
             <div id="factExportProgress" class="progress-section" style="display: none;">

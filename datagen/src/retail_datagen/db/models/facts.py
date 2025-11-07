@@ -280,9 +280,19 @@ class OnlineOrderLine(Base):
     ext_price: Mapped[float] = mapped_column(Float, nullable=False)
     promo_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
+    # Per-line fulfillment lifecycle (omnichannel)
+    picked_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    shipped_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    delivered_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    fulfillment_status: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    fulfillment_mode: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    node_type: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    node_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
     __table_args__ = (
         Index("ix_online_order_lines_order", "order_id"),
         Index("ix_online_order_lines_order_product", "order_id", "product_id"),
+        Index("ix_online_order_lines_status", "fulfillment_status", "order_id"),
         {"extend_existing": True},
     )
 
@@ -571,4 +581,48 @@ class OnlineOrder(Base):
             f"product_id={self.product_id}, event_ts={self.event_ts}, "
             f"qty={self.quantity}, total={self.total_amount}, "
             f"status={self.fulfillment_status})>"
+        )
+
+
+class OnlineOrderHeader(Base):
+    """
+    Online order header fact table (one row per order).
+
+    Mirrors the receipts header: captures created timestamp, financial totals,
+    tender type and fulfillment routing. Status reflects the final state
+    (e.g., 'delivered') without emitting multiple snapshot rows.
+    """
+
+    __tablename__ = "fact_online_order_headers"
+
+    # Primary key (synthetic)
+    order_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # Business identifier (optional external id)
+    order_id_ext: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
+    # Foreign keys (not enforced)
+    customer_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
+    # Timestamps
+    event_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)  # created
+    completed_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    # Financials
+    subtotal_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    tax_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    total_amount: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Tender
+    payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    __table_args__ = (
+        Index("ix_online_order_hdr_event_customer", "event_ts", "customer_id"),
+        {"extend_existing": True},
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<OnlineOrderHeader(order_id={self.order_id}, customer_id={self.customer_id}, "
+            f"event_ts={self.event_ts}, total={self.total_amount}, status={self.fulfillment_status})>"
         )

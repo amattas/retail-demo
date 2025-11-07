@@ -103,8 +103,8 @@ class ExportFileManager:
         Example:
             >>> manager.get_fact_table_path("receipts", date(2024, 1, 1), "csv")
             Path("data/facts/receipts/dt=2024-01-01/receipts_2024-01-01.csv")
-            >>> manager.get_fact_table_path("online_orders", date(2024, 12, 31), "parquet")
-            Path("data/facts/online_orders/dt=2024-12-31/online_orders_2024-12-31.parquet")
+            >>> manager.get_fact_table_path("fact_online_orders", date(2024, 12, 31), "parquet")
+            Path("data/facts/fact_online_orders/dt=2024-12-31/fact_online_orders_2024-12-31.parquet")
         """
         date_str = partition_date.strftime("%Y-%m-%d")
         partition_dir = f"dt={date_str}"

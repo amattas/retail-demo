@@ -140,6 +140,68 @@ async def init_databases() -> None:
                     logger.info(
                         "Added missing column fact_store_inventory_txn.source"
                     )
+
+                # Online order lines: add per-line lifecycle fields if missing
+                ool_cols = [
+                    ("picked_ts", "DATETIME"),
+                    ("shipped_ts", "DATETIME"),
+                    ("delivered_ts", "DATETIME"),
+                    ("fulfillment_status", "TEXT"),
+                    ("fulfillment_mode", "TEXT"),
+                    ("node_type", "TEXT"),
+                    ("node_id", "INTEGER"),
+                ]
+                for col, typ in ool_cols:
+                    if not await _has_column("fact_online_order_lines", col):
+                        await conn.execute(
+                            text(
+                                f"ALTER TABLE fact_online_order_lines ADD COLUMN {col} {typ}"
+                            )
+                        )
+                        logger.info(
+                            f"Added missing column fact_online_order_lines.{col}"
+                        )
+
+                # Online order headers: ensure only desired columns remain
+                # If deprecated columns exist, rebuild the table without them
+                res = await conn.execute(text("PRAGMA table_info('fact_online_orders')"))
+                hdr_cols = [row[1] for row in res.fetchall()]
+                deprecated = {"fulfillment_status", "fulfillment_mode", "node_type", "node_id"}
+                needs_rebuild = any(col in hdr_cols for col in deprecated)
+                # Also ensure completed_ts exists
+                if "completed_ts" not in hdr_cols:
+                    needs_rebuild = True
+
+                if needs_rebuild:
+                    logger.info("Rebuilding fact_online_orders to drop deprecated columns and ensure completed_ts")
+                    await conn.execute(text(
+                        """
+                        CREATE TABLE IF NOT EXISTS fact_online_orders_new (
+                            order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            order_id_ext VARCHAR(100),
+                            customer_id INTEGER NOT NULL,
+                            event_ts DATETIME NOT NULL,
+                            completed_ts DATETIME,
+                            subtotal_amount FLOAT NOT NULL,
+                            tax_amount FLOAT NOT NULL,
+                            total_amount FLOAT NOT NULL,
+                            payment_method VARCHAR(50) NOT NULL
+                        )
+                        """
+                    ))
+                    # Copy data from old table (mapping columns if present)
+                    copy_sql = (
+                        "INSERT INTO fact_online_orders_new (order_id, order_id_ext, customer_id, event_ts, completed_ts, subtotal_amount, tax_amount, total_amount, payment_method) "
+                        "SELECT order_id, order_id_ext, customer_id, event_ts, "
+                        + ("completed_ts" if "completed_ts" in hdr_cols else "NULL")
+                        + ", subtotal_amount, tax_amount, total_amount, payment_method FROM fact_online_orders"
+                    )
+                    await conn.execute(text(copy_sql))
+                    await conn.execute(text("DROP TABLE fact_online_orders"))
+                    await conn.execute(text("ALTER TABLE fact_online_orders_new RENAME TO fact_online_orders"))
+                    # Recreate essential indexes
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_hdr_event_customer ON fact_online_orders (event_ts, customer_id)"))
+                    logger.info("Rebuilt fact_online_orders with new schema")
         except Exception as e:
             logger.warning(f"Non-critical schema migration step failed: {e}")
 

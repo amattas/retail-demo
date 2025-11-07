@@ -902,11 +902,8 @@ input[type="checkbox"] {
 }
 
 .progress-fill::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    animation: shimmer 2s infinite;
+    /* Disable moving shimmer for accessibility */
+    display: none;
 }
 
 @keyframes shimmer {
@@ -1233,13 +1230,23 @@ input[type="checkbox"] {
     pointer-events: none;
 }
 
-.table-progress-bar::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
-    animation: shimmer 2s infinite;
-    pointer-events: none;
+.table-progress-bar::after { display: none; }
+
+/* Footer row under per-table bars */
+.progress-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px; /* a bit more space between items */
+    margin-top: 12px;
+}
+
+/* Harmonize footer text styles */
+.progress-footer .hours-display,
+.progress-footer .progress-eta {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-secondary);
 }
 
 .table-percentage {

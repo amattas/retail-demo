@@ -61,7 +61,7 @@ from ..db.models.facts import (
     FootTraffic,
     MarketingImpression,
     OnlineOrderLine,
-    OnlineOrder,
+    OnlineOrderHeader,
     Receipt,
     ReceiptLine,
     StoreInventoryTransaction,
@@ -96,7 +96,7 @@ FACT_TABLE_MODELS = {
     "foot_traffic": FootTraffic,
     "ble_pings": BLEPing,
     "marketing": MarketingImpression,
-    "online_orders": OnlineOrder,
+    "online_orders": OnlineOrderHeader,
     "online_order_lines": OnlineOrderLine,
 }
 

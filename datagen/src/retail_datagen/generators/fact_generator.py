@@ -1461,28 +1461,7 @@ class FactDataGenerator:
                 self._generate_online_orders(date)
             )
             daily_facts["online_orders"].extend(online_orders)
-            # Write online order lines immediately (daily batch)
-            if online_order_lines:
-                try:
-                    import pandas as pd
-                    df_ool = pd.DataFrame(online_order_lines)
-                    await self._insert_hourly_to_db(
-                        self._session,
-                        "online_order_lines",
-                        df_ool,
-                        hour=0,
-                        commit_every_batches=1,
-                    )
-                    # Update progress for line items (treated as complete across hours)
-                    for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress(
-                            "online_order_lines", day_index, hour, total_days
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
-                    )
-            # Write online orders immediately (daily batch)
+            # First write online order headers (so lines can resolve order_id)
             if online_orders:
                 try:
                     import pandas as pd
@@ -1503,6 +1482,27 @@ class FactDataGenerator:
                 except Exception as e:
                     logger.error(
                         f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
+            # Then write online order lines (daily batch)
+            if online_order_lines:
+                try:
+                    import pandas as pd
+                    df_ool = pd.DataFrame(online_order_lines)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "online_order_lines",
+                        df_ool,
+                        hour=0,
+                        commit_every_batches=1,
+                    )
+                    # Update progress for line items (treated as complete across hours)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "online_order_lines", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Cascade inventory effects
             if "store_inventory_txn" in active_tables and online_store_txn:
@@ -2452,6 +2452,8 @@ class FactDataGenerator:
                                 "QtyDelta": txn["QtyDelta"],
                                 "Reason": txn["Reason"].value,
                                 "Source": txn["Source"],
+                                # Ensure NOT NULL balance is populated for DC inventory
+                                "Balance": txn.get("Balance", self.inventory_flow_sim.get_dc_balance(txn["DCID"], txn["ProductID"]))
                             })
 
                     elif current_status == TruckStatus.UNLOADING:
@@ -2646,8 +2648,11 @@ class FactDataGenerator:
                 # NEW: Add hourly progress fields (note: current_day is passed as first positional arg, don't duplicate)
                 "current_hour": hourly_progress_data.get("current_hour"),
                 "hourly_progress": hourly_progress_data.get("per_table_progress"),
-                "total_hours_completed": sum(
-                    hourly_progress_data.get("completed_hours", {}).values()
+                # Use the most advanced table's completed hours; all tables move together
+                "total_hours_completed": (
+                    max(hourly_progress_data.get("completed_hours", {}).values())
+                    if hourly_progress_data.get("completed_hours")
+                    else 0
                 ),
             }
 
@@ -2751,7 +2756,7 @@ class FactDataGenerator:
             DCInventoryTransaction,
             FootTraffic,
             MarketingImpression,
-            OnlineOrder,
+            OnlineOrderHeader,
             OnlineOrderLine,
             Receipt,
             ReceiptLine,
@@ -2768,7 +2773,7 @@ class FactDataGenerator:
             "foot_traffic": FootTraffic,
             "ble_pings": BLEPing,
             "marketing": MarketingImpression,
-            "online_orders": OnlineOrder,
+            "online_orders": OnlineOrderHeader,
             "online_order_lines": OnlineOrderLine,
         }
 
@@ -3114,17 +3119,15 @@ class FactDataGenerator:
             },
             "online_orders": {
                 **common_mappings,
+                # Header shape
                 "CustomerID": "customer_id",
-                "ProductID": "product_id",
-                # Generator uses 'Qty' for quantity
-                "Qty": "quantity",
+                "Subtotal": "subtotal_amount",
+                "Tax": "tax_amount",
                 "Total": "total_amount",
-                "FulfillmentStatus": "fulfillment_status",
-                "FulfillmentMode": "fulfillment_mode",
-                "NodeType": "node_type",
-                "NodeID": "node_id",
-                # Note: OrderId, Subtotal, Tax, TenderType fields from generator
-                # don't exist in DB model (will be ignored)
+                "TenderType": "payment_method",
+                "CompletedTS": "completed_ts",
+                # Optional external order id
+                "OrderId": "order_id_ext",
             },
             "online_order_lines": {
                 **common_mappings,
@@ -3135,6 +3138,14 @@ class FactDataGenerator:
                 "UnitPrice": "unit_price",
                 "ExtPrice": "ext_price",
                 "PromoCode": "promo_code",
+                # Per-line lifecycle
+                "PickedTS": "picked_ts",
+                "ShippedTS": "shipped_ts",
+                "DeliveredTS": "delivered_ts",
+                "FulfillmentStatus": "fulfillment_status",
+                "FulfillmentMode": "fulfillment_mode",
+                "NodeType": "node_type",
+                "NodeID": "node_id",
             },
         }
 
@@ -3225,11 +3236,68 @@ class FactDataGenerator:
             except Exception as e:
                 logger.error(f"Failed to resolve receipt_ids for receipt_lines: {e}")
                 return
+        elif table_name == "online_order_lines":
+            try:
+                # Collect unique external order ids from raw records
+                ext_ids = list({r.get("OrderId") for r in records if r.get("OrderId")})
+                if not ext_ids:
+                    logger.debug("No online order external IDs to resolve for lines")
+                    return
+                # Map external order id -> header PK
+                headers_model = self._get_model_for_table("online_orders")
+                from sqlalchemy import select
+
+                rows = (
+                    await session.execute(
+                        select(headers_model.order_id, headers_model.order_id_ext).where(
+                            headers_model.order_id_ext.in_(ext_ids)
+                        )
+                    )
+                ).all()
+                id_map = {ext: pk for (pk, ext) in rows}
+
+                mapped_records = []
+                for record in records:
+                    mapped = self._map_field_names_for_db(table_name, record)
+                    ext = record.get("OrderId")
+                    pk = id_map.get(ext)
+                    if not pk:
+                        logger.debug(
+                            f"Skipping online_order_line with unknown OrderId={ext}"
+                        )
+                        continue
+                    mapped["order_id"] = int(pk)
+                    mapped_records.append(mapped)
+            except Exception as e:
+                logger.error(f"Failed to resolve order_ids for online_order_lines: {e}")
+                return
         else:
             # Default mapping path
             mapped_records = [
                 self._map_field_names_for_db(table_name, record) for record in records
             ]
+
+        # Normalize pandas NaT/NaN values to None to satisfy SQLAlchemy/SQLite
+        # Pandas can produce NaT (datetime) and NaN (float) which fail for
+        # INTEGER/DATETIME columns during bulk insert. Convert any pd.isna(x)
+        # values to plain None so NULLs are written instead.
+        try:
+            import pandas as _pd  # local import to avoid hard dependency elsewhere
+
+            normalized: list[dict] = []
+            for rec in mapped_records:
+                clean: dict = {}
+                for k, v in rec.items():
+                    # Convert pandas/NumPy missing values to None
+                    if _pd.isna(v):  # True for NaN/NaT
+                        clean[k] = None
+                    else:
+                        clean[k] = v
+                normalized.append(clean)
+            mapped_records = normalized
+        except Exception:
+            # If pandas isn't available or any issue occurs, proceed without normalization
+            pass
 
         # Filter out any keys that are not actual columns in the target table
         try:

@@ -42,7 +42,7 @@ from retail_datagen.db.models.facts import (
     DCInventoryTransaction,
     FootTraffic,
     MarketingImpression,
-    OnlineOrder,
+    OnlineOrderHeader,
     Receipt,
     ReceiptLine,
     StoreInventoryTransaction,
@@ -82,7 +82,7 @@ FACT_TABLES = {
     "fact_foot_traffic": FootTraffic,
     "fact_ble_pings": BLEPing,
     "fact_marketing": MarketingImpression,
-    "fact_online_orders": OnlineOrder,
+    "fact_online_orders": OnlineOrderHeader,
 }
 
 

@@ -399,6 +399,30 @@ class RetailDataGenerator {
         const item = document.querySelector(`.table-item[data-table="${tableName}"]`);
         if (!item) return;
 
+        // Determine existing state (monotonic unless failure)
+        const has = cls => item.classList.contains(cls);
+        const current = has('table-status-failed') ? 'failed'
+                       : has('table-status-completed') ? 'completed'
+                       : has('table-status-processing') ? 'processing'
+                       : has('table-status-ready') ? 'ready'
+                       : 'none';
+
+        // Normalize requested status; treat null/undefined as a non-downgrade hint
+        if (status == null) {
+            // Do not downgrade an existing state
+            if (current === 'completed' || current === 'processing' || current === 'failed' || this.completedTables.has(tableName)) {
+                return;
+            }
+            status = 'ready';
+        }
+
+        // Prevent downgrades (ready < processing < completed; failed overrides)
+        const rank = s => (s === 'ready' ? 1 : s === 'processing' ? 2 : s === 'completed' ? 3 : s === 'failed' ? 4 : 0);
+        if (status !== 'failed' && rank(status) <= rank(current)) {
+            return;
+        }
+
+        // Apply new status
         item.classList.remove(
             'table-status-ready',
             'table-status-processing',
@@ -408,11 +432,9 @@ class RetailDataGenerator {
 
         if (status === 'ready') {
             item.classList.add('table-status-ready');
-            // Remove from completed tables set when resetting to ready
             this.completedTables.delete(tableName);
         } else if (status === 'processing') {
             item.classList.add('table-status-processing');
-            // Remove from completed tables set when processing starts
             this.completedTables.delete(tableName);
             const currentEl = document.getElementById(`count-${tableName}`);
             const previous = currentEl ? Number(currentEl.dataset.countValue) : NaN;
@@ -423,20 +445,13 @@ class RetailDataGenerator {
             }
         } else if (status === 'completed') {
             item.classList.add('table-status-completed');
-            // Add to completed tables set and persist
             this.completedTables.add(tableName);
             this.saveCompletedTables();
             this.refreshTableCount(tableName);
         } else if (status === 'failed') {
             item.classList.add('table-status-failed');
-            // Remove from completed tables set on failure
             this.completedTables.delete(tableName);
             this.setTableCount(tableName, null, 'Failed');
-        } else {
-            // Only clear if not in completed tables set
-            if (!this.completedTables.has(tableName)) {
-                this.setTableCount(tableName, null);
-            }
         }
     }
 
@@ -532,6 +547,25 @@ class RetailDataGenerator {
             countEl.textContent = `${value.toLocaleString()} records`;
             countEl.classList.remove('no-data');
             this._tableCountVersions[tableName] = version;
+            // Drive tile state from data presence to avoid gray-with-count flicker
+            const item = document.querySelector(`.table-item[data-table="${tableName}"]`);
+            if (item) {
+                const isFailed = item.classList.contains('table-status-failed');
+                if (!isFailed) {
+                    if (value > 0) {
+                        // Promote to completed (green) as soon as rows exist
+                        item.classList.remove('table-status-ready','table-status-processing');
+                        item.classList.add('table-status-completed');
+                        this.completedTables.add(tableName);
+                    } else {
+                        // Only mark as ready if we don't know it as completed already
+                        if (!this.completedTables.has(tableName)) {
+                            item.classList.remove('table-status-completed','table-status-processing');
+                            item.classList.add('table-status-ready');
+                        }
+                    }
+                }
+            }
             return;
         }
 
@@ -2162,11 +2196,11 @@ class RetailDataGenerator {
             }
         }
 
-        // Display total hours completed
+        // Display total hours generated (footer line next to ETA)
         if (typeof status.total_hours_completed === 'number') {
             const hoursDisplay = document.getElementById('totalHoursDisplay');
             if (hoursDisplay) {
-                hoursDisplay.textContent = `${status.total_hours_completed} hours completed`;
+                hoursDisplay.textContent = `${status.total_hours_completed} hours generated`;
                 hoursDisplay.style.display = 'block';
             }
         }
