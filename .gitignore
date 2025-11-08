@@ -84,3 +84,5 @@ bandit_report.json
 /datagen/data/*.db*
 /datagen/data/*.json
 /datagen/data/cache
+*.duckdb
+*.duckdb
