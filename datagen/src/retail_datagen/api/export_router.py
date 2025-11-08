@@ -2,7 +2,7 @@
 FastAPI router for data export endpoints.
 
 This module provides REST API endpoints for exporting master and fact tables
-from the SQLite database to CSV or Parquet files with comprehensive progress tracking.
+from the DuckDB database to CSV or Parquet files with comprehensive progress tracking.
 """
 
 import logging
@@ -13,7 +13,6 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..config.models import RetailConfig
-from ..db.session import get_retail_session
 from ..services.export_service import ExportService
 from ..shared.dependencies import (
     create_background_task,
@@ -124,15 +123,13 @@ async def export_master_data(
                     tables_remaining=tables_remaining,
                 )
 
-            # Export master tables
+            # Export master tables from DuckDB
             logger.debug(f"Exporting {len(tables_to_export)} master tables")
-
-            async with get_retail_session() as session:
-                result = await service.export_master_tables(
-                    session,
-                    format=request.format,
-                    progress_callback=progress_callback,
-                )
+            result = await service.export_master_tables(
+                None,
+                format=request.format,
+                progress_callback=progress_callback,
+            )
 
             # Calculate results
             total_files = len(result)
@@ -251,7 +248,7 @@ async def export_fact_data(
         """Background task for fact data export with chunking for large date ranges."""
         try:
             logger.info(f"Starting fact export task {task_id}")
-            from ..services import db_reader
+            from ..services import duckdb_reader as db_reader
 
             # Initialize export service
             base_dir = Path(config.paths.facts).parent  # Get base "data" directory
@@ -266,35 +263,26 @@ async def export_fact_data(
             start_date = request.start_date
             end_date = request.end_date
 
-            async with get_retail_session() as session:
-                if start_date is None or end_date is None:
-                    logger.info(
-                        "No date range provided, querying database for full range"
-                    )
-                    update_task_progress(task_id, 0.0, "Determining date range...")
+            if start_date is None or end_date is None:
+                logger.info("No date range provided, querying DuckDB for full range")
+                update_task_progress(task_id, 0.0, "Determining date range...")
 
-                    # Get date ranges for all tables
-                    date_ranges = await db_reader.get_all_fact_table_date_ranges(
-                        session
-                    )
+                # Get date ranges for all tables from DuckDB
+                date_ranges = db_reader.get_all_fact_table_date_ranges()
 
-                    # Find overall min/max across all tables
-                    all_starts = [
-                        start
-                        for start, end in date_ranges.values()
-                        if start is not None
-                    ]
-                    all_ends = [
-                        end for start, end in date_ranges.values() if end is not None
-                    ]
+                # Find overall min/max across all tables
+                all_starts = [
+                    start for start, end in date_ranges.values() if start is not None
+                ]
+                all_ends = [end for start, end in date_ranges.values() if end is not None]
 
-                    if not all_starts or not all_ends:
-                        raise ValueError("No data found in fact tables")
+                if not all_starts or not all_ends:
+                    raise ValueError("No data found in fact tables")
 
-                    start_date = min(all_starts).date()
-                    end_date = max(all_ends).date()
+                start_date = min(all_starts).date()
+                end_date = max(all_ends).date()
 
-                    logger.info(f"Determined date range: {start_date} to {end_date}")
+                logger.info(f"Determined date range: {start_date} to {end_date}")
 
             # Calculate chunks (7 days each to keep memory manageable)
             from datetime import timedelta
@@ -330,15 +318,14 @@ async def export_fact_data(
                     f"Exporting chunk {chunk_idx}/{total_chunks}: {chunk_start} to {chunk_end}"
                 )
 
-                # Export this chunk
-                async with get_retail_session() as session:
-                    result = await service.export_fact_tables(
-                        session,
-                        format=request.format,
-                        start_date=chunk_start,
-                        end_date=chunk_end,
-                        progress_callback=None,  # Don't use per-table callbacks for chunks
-                    )
+                # Export this chunk from DuckDB
+                result = await service.export_fact_tables(
+                    None,
+                    format=request.format,
+                    start_date=chunk_start,
+                    end_date=chunk_end,
+                    progress_callback=None,
+                )
 
                 # Accumulate results
                 for table_name, partition_files in result.items():

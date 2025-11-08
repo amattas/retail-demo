@@ -222,41 +222,29 @@ async def start_streaming(
         try:
             update_task_progress(session_id, 0.0, "Initializing event streaming")
 
-            # Check if SQLite mode should be used
-            use_sqlite = True  # Default to SQLite if database exists
-
-            # Try SQLite batch streaming first
-            if use_sqlite:
-                try:
-                    from ..db.session import get_retail_session
-
-                    async with get_retail_session() as db_session:
-                        # Create new streamer with database session
-                        db_streamer = EventStreamer(
-                            config=config,
-                            azure_connection_string=config.realtime.azure_connection_string,
-                            session=db_session,
-                        )
-                        await db_streamer.start()
-
-                        update_task_progress(
-                            session_id, 1.0, "Batch streaming completed"
-                        )
-
-                        stats = await db_streamer.get_statistics()
-                        return {
-                            "events_sent": stats.get("events_sent_successfully", 0),
-                            "duration_minutes": request.duration_minutes,
-                            "event_types": request.event_types or AVAILABLE_EVENT_TYPES,
-                            "end_reason": "batch_completed",
-                            "mode": "sqlite_batch",
-                        }
-
-                except Exception as db_error:
-                    logger.warning(
-                        f"SQLite batch streaming failed, falling back to real-time: {db_error}"
-                    )
-                    # Fall through to real-time mode
+            # Prefer DuckDB batch streaming
+            try:
+                duck_streamer = EventStreamer(
+                    config=config,
+                    azure_connection_string=config.realtime.azure_connection_string,
+                )
+                # Start DuckDB batch streaming
+                success = await duck_streamer.start(duration=timedelta(seconds=0))
+                # start() will internally choose DuckDB batch path first
+                stats = await duck_streamer.get_statistics()
+                update_task_progress(session_id, 1.0, "Batch streaming completed")
+                return {
+                    "events_sent": stats.get("events_sent_successfully", 0),
+                    "duration_minutes": request.duration_minutes,
+                    "event_types": request.event_types or AVAILABLE_EVENT_TYPES,
+                    "end_reason": "batch_completed",
+                    "mode": "duckdb_batch",
+                }
+            except Exception as db_error:
+                logger.warning(
+                    f"DuckDB batch streaming failed, falling back to real-time: {db_error}"
+                )
+                # Fall through to real-time mode
 
             # Fall back to real-time generation mode
             if request.event_types:

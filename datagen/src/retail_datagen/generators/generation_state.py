@@ -193,7 +193,7 @@ class GenerationStateManager:
             self.reset_state()
             results["state_reset"] = True
 
-            # Clear master data
+            # Clear exported master CSVs if any (export artifacts)
             master_path = Path(config_paths.get("master", ""))
             if master_path.exists():
                 for file_path in master_path.glob("*.csv"):
@@ -204,15 +204,15 @@ class GenerationStateManager:
                         results["errors"].append(f"Failed to delete {file_path}: {e}")
                 results["master_data_cleared"] = True
 
-            # Clear facts data (entire directory structure)
-            facts_path = Path(config_paths.get("facts", ""))
-            if facts_path.exists():
+            # Remove DuckDB database file to clear all data
+            duck_path = Path("data/retail.duckdb")
+            if duck_path.exists():
                 try:
-                    shutil.rmtree(facts_path)
-                    results["files_deleted"].append(str(facts_path))
+                    duck_path.unlink()
+                    results["files_deleted"].append(str(duck_path))
                     results["facts_data_cleared"] = True
                 except Exception as e:
-                    results["errors"].append(f"Failed to delete facts directory: {e}")
+                    results["errors"].append(f"Failed to delete DuckDB file: {e}")
 
         except Exception as e:
             results["errors"].append(f"General error during data clearing: {e}")

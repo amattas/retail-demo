@@ -25,9 +25,6 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .api.export_router import router as export_router
 from .api.models import ErrorResponse, HealthCheckResponse, ValidationErrorResponse
 from .config.models import RetailConfig
-from .db.engine import dispose_engines, get_retail_engine
-from .db.init import init_databases
-from .db.manager import get_database_status, get_db_manager
 from .generators.router import router as generators_router
 from .shared.dependencies import (
     check_azure_connection,
@@ -92,23 +89,18 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {APP_NAME} v{APP_VERSION}")
 
-    # Initialize databases
+    # Initialize DuckDB
     try:
-        logger.info("Initializing SQLite database...")
+        logger.info("Initializing DuckDB database...")
+        from .db.duckdb_engine import get_duckdb_conn, get_duckdb_path
 
-        # Initialize database directories and connections
-        # init_databases() now handles both migration and table creation
-        await init_databases()
-
-        # Get retail engine to verify it's ready
-        retail_engine = get_retail_engine()
-
-        logger.info("✅ SQLite database initialized successfully")
-        logger.info(f"  - Retail DB: {retail_engine.url}")
-
+        conn = get_duckdb_conn()
+        conn.execute("SELECT 1")
+        logger.info("✅ DuckDB initialized successfully")
+        logger.info(f"  - DuckDB Path: {get_duckdb_path()}")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize database: {e}", exc_info=True)
-        logger.warning("Application will continue but SQLite features may not work")
+        logger.error(f"❌ Failed to initialize DuckDB: {e}", exc_info=True)
+        logger.warning("Application will continue but database features may not work")
 
     try:
         # Initialize configuration
@@ -152,12 +144,14 @@ async def lifespan(app: FastAPI):
             logger.info(f"Cancelling background task: {task_id}")
             task.cancel()
 
-    # Dispose database engines
+    # Close DuckDB connection (do not delete DB file)
     try:
-        await dispose_engines()
-        logger.info("Database connections closed")
+        from .db.duckdb_engine import close_duckdb
+
+        close_duckdb()
+        logger.info("DuckDB connection closed")
     except Exception as e:
-        logger.error(f"Error closing database connections: {e}")
+        logger.error(f"Error closing DuckDB connection: {e}")
 
     logger.info("Application shutdown completed")
 

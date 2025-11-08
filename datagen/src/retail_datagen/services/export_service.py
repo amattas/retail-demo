@@ -1,38 +1,34 @@
 """
 Export service orchestrator for data export functionality.
 
-This module provides the main ExportService class that coordinates database reading,
+This module provides the main ExportService class that coordinates DuckDB reading,
 format writing, and file management to perform complete export operations.
 
 The ExportService brings together:
-- Database reader (db_reader) for reading master and fact tables
+- DuckDB reader (duckdb_reader) for reading master and fact tables
 - Format writers (CSVWriter, ParquetWriter) for writing data
 - File manager (ExportFileManager) for path resolution and cleanup
 
 Usage:
     from pathlib import Path
     from retail_datagen.services import ExportService
-    from retail_datagen.db.session import get_retail_session
-
     # Initialize service
     service = ExportService(base_dir=Path("data"))
 
     # Export master tables to CSV
-    async with get_retail_session() as session:
-        master_files = await service.export_master_tables(
-            session,
-            format="csv",
-            progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
-        )
+    master_files = await service.export_master_tables(
+        None,
+        format="csv",
+        progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
+    )
 
     # Export fact tables to Parquet with date filtering
-    async with get_retail_session() as session:
-        fact_files = await service.export_fact_tables(
-            session,
-            format="parquet",
-            start_date=date(2024, 1, 1),
-            end_date=date(2024, 1, 31)
-        )
+    fact_files = await service.export_fact_tables(
+        None,
+        format="parquet",
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 31)
+    )
 """
 
 import logging
@@ -42,9 +38,7 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from retail_datagen.services import db_reader
+from retail_datagen.services import duckdb_reader
 from retail_datagen.services.file_manager import ExportFileManager
 from retail_datagen.services.writers import BaseWriter, CSVWriter, ParquetWriter
 
@@ -115,7 +109,7 @@ class ExportService:
 
     async def export_master_tables(
         self,
-        session: AsyncSession,
+        session: None,
         format: ExportFormat,
         progress_callback: ProgressCallback | None = None,
     ) -> dict[str, Path]:
@@ -126,7 +120,7 @@ class ExportService:
         in the data/master/ directory. Format: data/master/<table>.<ext>
 
         Args:
-            session: AsyncSession for database operations
+            session: Unused; kept for backward compatibility (DuckDB-only)
             format: Output format ("csv" or "parquet")
             progress_callback: Optional callback for progress updates
                 Signature: callback(message: str, current: int, total: int)
@@ -143,20 +137,18 @@ class ExportService:
             Exception: If export fails (after attempting cleanup)
 
         Example:
-            >>> async with get_retail_session() as session:
-            ...     files = await service.export_master_tables(
-            ...         session,
-            ...         format="csv",
-            ...         progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
-            ...     )
-            ...     print(f"Exported {len(files)} master tables")
+            >>> files = await service.export_master_tables(
+            ...     None,
+            ...     format="csv",
+            ...     progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
+            ... )
         """
         logger.info(f"Starting master table export (format={format})")
 
         try:
-            # Read all master tables from database
-            logger.debug("Reading all master tables from database")
-            all_master_data = await db_reader.read_all_master_tables(session)
+            # Read all master tables from DuckDB
+            logger.debug("Reading all master tables from DuckDB")
+            all_master_data = duckdb_reader.read_all_master_tables()
 
             # Get writer for the specified format
             writer = self._get_writer(format)
@@ -229,7 +221,7 @@ class ExportService:
 
     async def export_fact_tables(
         self,
-        session: AsyncSession,
+        session: None,
         format: ExportFormat,
         start_date: date | None = None,
         end_date: date | None = None,
@@ -243,7 +235,7 @@ class ExportService:
         data/facts/<table>/dt=YYYY-MM-DD/<table>_YYYY-MM-DD.<ext>
 
         Args:
-            session: AsyncSession for database operations
+            session: Unused; kept for backward compatibility (DuckDB-only)
             format: Output format ("csv" or "parquet")
             start_date: Optional start date for filtering (inclusive)
             end_date: Optional end date for filtering (inclusive)
@@ -265,16 +257,13 @@ class ExportService:
             Exception: If export fails (after attempting cleanup)
 
         Example:
-            >>> async with get_retail_session() as session:
-            ...     files = await service.export_fact_tables(
-            ...         session,
-            ...         format="parquet",
-            ...         start_date=date(2024, 1, 1),
-            ...         end_date=date(2024, 1, 31)
-            ...     )
-            ...     print(f"Exported {len(files)} fact tables")
-            ...     for table, paths in files.items():
-            ...         print(f"  {table}: {len(paths)} partitions")
+            >>> files = await service.export_fact_tables(
+            ...     None,
+            ...     format="parquet",
+            ...     start_date=date(2024, 1, 1),
+            ...     end_date=date(2024, 1, 31)
+            ... )
+            >>> print(f"Exported {len(files)} fact tables")
         """
         logger.info(
             f"Starting fact table export "
@@ -282,10 +271,10 @@ class ExportService:
         )
 
         try:
-            # Read all fact tables from database with date filtering
-            logger.debug("Reading all fact tables from database")
-            all_fact_data = await db_reader.read_all_fact_tables(
-                session, start_date, end_date
+            # Read all fact tables from DuckDB with date filtering
+            logger.debug("Reading all fact tables from DuckDB")
+            all_fact_data = duckdb_reader.read_all_fact_tables(
+                start_date, end_date
             )
 
             # Get writer for the specified format

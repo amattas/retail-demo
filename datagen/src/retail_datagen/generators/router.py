@@ -54,54 +54,28 @@ MASTER_TABLES = [
     "products_master",
 ]
 
-# Mapping of table names to SQLAlchemy models
-from ..db.models.facts import (
-    BLEPing,
-    DCInventoryTransaction,
-    FootTraffic,
-    MarketingImpression,
-    OnlineOrderLine,
-    OnlineOrderHeader,
-    Receipt,
-    ReceiptLine,
-    StoreInventoryTransaction,
-    TruckMove,
-)
-from ..db.models.master import (
-    Customer,
-    DistributionCenter,
-    Geography,
-    Product,
-    Store,
-    Truck,
-)
-
-# Master table models
-MASTER_TABLE_MODELS = {
-    "geographies_master": Geography,
-    "stores": Store,
-    "distribution_centers": DistributionCenter,
-    "trucks": Truck,
-    "customers": Customer,
-    "products_master": Product,
+# DuckDB logical→physical mappings
+DUCK_MASTER_MAP = {
+    "geographies_master": "dim_geographies",
+    "stores": "dim_stores",
+    "distribution_centers": "dim_distribution_centers",
+    "trucks": "dim_trucks",
+    "customers": "dim_customers",
+    "products_master": "dim_products",
 }
 
-# Fact table models
-FACT_TABLE_MODELS = {
-    "dc_inventory_txn": DCInventoryTransaction,
-    "truck_moves": TruckMove,
-    "store_inventory_txn": StoreInventoryTransaction,
-    "receipts": Receipt,
-    "receipt_lines": ReceiptLine,
-    "foot_traffic": FootTraffic,
-    "ble_pings": BLEPing,
-    "marketing": MarketingImpression,
-    "online_orders": OnlineOrderHeader,
-    "online_order_lines": OnlineOrderLine,
+DUCK_FACT_MAP = {
+    "dc_inventory_txn": "fact_dc_inventory_txn",
+    "truck_moves": "fact_truck_moves",
+    "store_inventory_txn": "fact_store_inventory_txn",
+    "receipts": "fact_receipts",
+    "receipt_lines": "fact_receipt_lines",
+    "foot_traffic": "fact_foot_traffic",
+    "ble_pings": "fact_ble_pings",
+    "marketing": "fact_marketing",
+    "online_orders": "fact_online_order_headers",
+    "online_order_lines": "fact_online_order_lines",
 }
-
-# Unified mapping of all tables
-ALL_TABLE_MODELS = {**MASTER_TABLE_MODELS, **FACT_TABLE_MODELS}
 
 FACT_TABLES = [
     "dc_inventory_txn",
@@ -189,30 +163,41 @@ async def generate_all_master_data(
 
             table_progress = {table: 0.0 for table in tables_to_generate}
 
-            # Short-circuit when everything already exists and regeneration not forced
+            # Short-circuit when everything already exists in DuckDB and regeneration not forced
             if not request.force_regenerate:
-                missing_tables: list[str] = []
-                for table in tables_to_generate:
-                    output_path = Path(config.paths.master) / f"{table}.csv"
-                    if not output_path.exists():
-                        missing_tables.append(table)
+                try:
+                    from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
-                if not missing_tables:
-                    update_task_progress(
-                        task_id,
-                        1.0,
-                        "All requested master tables already generated",
-                        tables_completed=list(tables_to_generate),
-                        tables_in_progress=[],
-                        tables_remaining=[],
-                        estimated_seconds_remaining=0.0,
-                        progress_rate=None,
-                    )
-                    return {
-                        "tables_generated": list(tables_to_generate),
-                        "total_tables": total_tables,
-                        "skipped_existing": True,
-                    }
+                    conn = get_duckdb_conn()
+                    missing_tables: list[str] = []
+                    for table in tables_to_generate:
+                        physical = DUCK_MASTER_MAP.get(table, table)
+                        try:
+                            count = conn.execute(f"SELECT COUNT(*) FROM {physical}").fetchone()[0]
+                            if count is None or int(count) == 0:
+                                missing_tables.append(table)
+                        except Exception:
+                            missing_tables.append(table)
+
+                    if not missing_tables:
+                        update_task_progress(
+                            task_id,
+                            1.0,
+                            "All requested master tables already generated (DuckDB)",
+                            tables_completed=list(tables_to_generate),
+                            tables_in_progress=[],
+                            tables_remaining=[],
+                            estimated_seconds_remaining=0.0,
+                            progress_rate=None,
+                        )
+                        return {
+                            "tables_generated": list(tables_to_generate),
+                            "total_tables": total_tables,
+                            "skipped_existing": True,
+                        }
+                except Exception:
+                    # If DuckDB check fails, proceed with generation
+                    pass
 
             def master_progress_callback(
                 table_name: str,
@@ -282,13 +267,11 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
-            from sqlalchemy import text
+            # DuckDB-only path: clear existing tables and regenerate; no SQLAlchemy session required
+            try:
+                from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
-            from retail_datagen.db.session import get_retail_session
-
-            async with get_retail_session() as session:
-                # Clear existing data to avoid UNIQUE constraint violations
-                logger.info("Clearing existing master data...")
+                conn = get_duckdb_conn()
                 for table in [
                     "dim_customers",
                     "dim_products",
@@ -297,12 +280,11 @@ async def generate_all_master_data(
                     "dim_distribution_centers",
                     "dim_geographies",
                 ]:
-                    await session.execute(text(f"DELETE FROM {table}"))
-                await session.flush()  # Flush deletes immediately
-                logger.info("Existing master data cleared")
-
-                await master_generator.generate_all_master_data_async(session=session)
-                # Context manager will commit everything on exit
+                    conn.execute(f"DROP TABLE IF EXISTS {table}")
+                logger.info("Existing DuckDB master tables dropped")
+            except Exception as drop_exc:
+                logger.warning(f"Failed to drop DuckDB tables: {drop_exc}")
+            await master_generator.generate_all_master_data_async(session=None)
 
             for table in table_progress:
                 table_progress[table] = max(table_progress[table], 1.0)
@@ -312,39 +294,19 @@ async def generate_all_master_data(
             # Prefer DB-confirmed counts to avoid cache/DB drift
             final_counts = {}
             try:
-                from sqlalchemy import func, select
+                # Query DuckDB for counts; fall back to in-memory if not available
+                from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
-                from ..db.models.master import (
-                    Customer,
-                    DistributionCenter,
-                    Geography,
-                    Product,
-                    Store,
-                    Truck,
-                )
-                from ..db.session import get_retail_session
-
-                async with get_retail_session() as s2:
-                    final_counts["geographies_master"] = (
-                        await s2.execute(select(func.count()).select_from(Geography))
-                    ).scalar() or 0
-                    final_counts["stores"] = (
-                        await s2.execute(select(func.count()).select_from(Store))
-                    ).scalar() or 0
-                    final_counts["distribution_centers"] = (
-                        await s2.execute(
-                            select(func.count()).select_from(DistributionCenter)
-                        )
-                    ).scalar() or 0
-                    final_counts["trucks"] = (
-                        await s2.execute(select(func.count()).select_from(Truck))
-                    ).scalar() or 0
-                    final_counts["customers"] = (
-                        await s2.execute(select(func.count()).select_from(Customer))
-                    ).scalar() or 0
-                    final_counts["products_master"] = (
-                        await s2.execute(select(func.count()).select_from(Product))
-                    ).scalar() or 0
+                conn = get_duckdb_conn()
+                q = lambda t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                final_counts = {
+                    "geographies_master": q("dim_geographies"),
+                    "stores": q("dim_stores"),
+                    "distribution_centers": q("dim_distribution_centers"),
+                    "trucks": q("dim_trucks"),
+                    "customers": q("dim_customers"),
+                    "products_master": q("dim_products"),
+                }
 
                 # Update dashboard cache with DB counts
                 try:
@@ -486,14 +448,7 @@ async def generate_specific_master_table(
     # Validate table name
     validate_table_name(table_name, "master")
 
-    # Check if table already exists
-    output_path = Path(config.paths.master) / f"{table_name}.csv"
-    if output_path.exists() and not force_regenerate:
-        return OperationResult(
-            success=True,
-            message=f"Table {table_name} already exists. Use force_regenerate=true to overwrite.",
-            started_at=datetime.now(),
-        )
+    # DuckDB-first: allow regeneration; skip CSV presence check
 
     task_id = f"master_{table_name}_{uuid4().hex[:8]}"
 
@@ -502,15 +457,12 @@ async def generate_specific_master_table(
         try:
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
-            # Generate all master tables (SQLite requires sequential mode)
-            from sqlalchemy import text
+            # DuckDB path: drop tables and regenerate
+            try:
+                from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
-            from retail_datagen.db.session import get_retail_session
-
-            async with get_retail_session() as session:
-                # Clear existing data to avoid UNIQUE constraint violations
-                logger.info("Clearing existing master data...")
-                for table in [
+                conn = get_duckdb_conn()
+                for tbl in [
                     "dim_customers",
                     "dim_products",
                     "dim_trucks",
@@ -518,14 +470,13 @@ async def generate_specific_master_table(
                     "dim_distribution_centers",
                     "dim_geographies",
                 ]:
-                    await session.execute(text(f"DELETE FROM {table}"))
-                await session.flush()  # Flush deletes immediately
-                logger.info("Existing master data cleared")
-
-                result = await master_generator.generate_all_master_data_async(
-                    session=session
-                )
-                # Context manager will commit everything on exit
+                    conn.execute(f"DROP TABLE IF EXISTS {tbl}")
+                logger.info("Existing DuckDB master tables dropped")
+            except Exception as drop_exc:
+                logger.warning(f"Failed to drop DuckDB tables: {drop_exc}")
+            result = await master_generator.generate_all_master_data_async(
+                session=None
+            )
 
             # Final accurate counts
             final_counts = {
@@ -547,7 +498,7 @@ async def generate_specific_master_table(
             return {
                 "table_name": table_name,
                 "records_generated": getattr(result, "records", 0),
-                "output_path": str(output_path),
+                "output_path": str(Path(config.paths.master)),
             }
 
         except Exception as e:
@@ -589,7 +540,7 @@ async def generate_historical_data(
     Processes data sequentially one day at a time with deterministic ordering.
     Provides rich hourly progress updates (24 updates per day per table).
 
-    Note: Parallel processing is not supported with SQLite database backend.
+    Note: Parallel processing is not supported in the current backend.
     """
 
     # Debug logging - log the received request
@@ -630,37 +581,20 @@ async def generate_historical_data(
         try:
             update_task_progress(task_id, 0.0, "Starting historical data generation")
 
-            # Pre-check: validate retail DB has required rows for historical generation
+            # Pre-check: validate DuckDB has required rows for historical generation
             try:
-                from sqlalchemy import func, select
-
-                from ..db.models.master import (
-                    Customer,
-                    DistributionCenter,
-                    Geography,
-                    Product,
-                    Store,
+                from retail_datagen.db.duck_master_reader import (
+                    read_geographies,
+                    read_stores,
+                    read_distribution_centers,
+                    read_customers,
+                    read_products,
                 )
-                from ..db.session import get_retail_session
-
-                async with get_retail_session() as s:
-                    geo_cnt = (
-                        await s.execute(select(func.count()).select_from(Geography))
-                    ).scalar() or 0
-                    store_cnt = (
-                        await s.execute(select(func.count()).select_from(Store))
-                    ).scalar() or 0
-                    dc_cnt = (
-                        await s.execute(
-                            select(func.count()).select_from(DistributionCenter)
-                        )
-                    ).scalar() or 0
-                    cust_cnt = (
-                        await s.execute(select(func.count()).select_from(Customer))
-                    ).scalar() or 0
-                    prod_cnt = (
-                        await s.execute(select(func.count()).select_from(Product))
-                    ).scalar() or 0
+                geo_cnt = len(read_geographies())
+                store_cnt = len(read_stores())
+                dc_cnt = len(read_distribution_centers())
+                cust_cnt = len(read_customers())
+                prod_cnt = len(read_products())
 
                 update_task_progress(
                     task_id,
@@ -670,7 +604,7 @@ async def generate_historical_data(
 
                 if store_cnt == 0 or cust_cnt == 0 or prod_cnt == 0:
                     raise RuntimeError(
-                        "Retail DB missing required data. Ensure master generation completed successfully."
+                        "DuckDB missing required data. Ensure master generation completed successfully."
                     )
             except Exception as pre_exc:
                 update_task_progress(
@@ -840,8 +774,7 @@ async def generate_historical_data(
             )
 
             # Generate historical data using the fact generator
-            # Note: generate_historical_data is now async (Phase 3B SQLite migration)
-            # Note: Parallel processing not supported with SQLite (sequential only)
+            # Historical generation runs sequentially to manage memory
             summary = await fact_generator.generate_historical_data(
                 start_date, end_date
             )
@@ -993,8 +926,7 @@ async def generate_specific_historical_table(
         try:
             update_task_progress(task_id, 0.0, f"Starting generation of {table_name}")
 
-            # Generate historical data using the fact generator
-            # Note: generate_historical_data is now async (Phase 3B SQLite migration)
+            # Generate historical data using the fact generator (async)
             summary = await fact_generator.generate_historical_data(
                 start_date, end_date
             )
@@ -1066,47 +998,16 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         cache_manager = CacheManager()
         cache_manager.clear_cache()
 
-        # Gracefully shut down DB manager and dispose engines
-        from ..db.manager import get_db_manager
-        manager = get_db_manager()
-        try:
-            await manager.shutdown()
-        except Exception as e:
-            logger.warning(f"DatabaseManager shutdown during clear_all_data: {e}")
-
-        # Reset session makers so new sessions bind to fresh engines
-        try:
-            from ..db.session import reset_session_makers
-            reset_session_makers()
-        except Exception as e:
-            logger.warning(f"Failed to reset session makers: {e}")
-
-        # Delete database files (retail + any legacy split DBs) including WAL/SHM
-        from ..db.config import DatabaseConfig
-        from pathlib import Path
-
+        # Reset DuckDB by closing any connection and deleting the DB file
         deleted_files: list[str] = []
-        for path in [
-            DatabaseConfig.RETAIL_DB_PATH,
-            DatabaseConfig.MASTER_DB_PATH,
-            DatabaseConfig.FACTS_DB_PATH,
-        ]:
-            for suffix in ("", "-wal", "-shm"):
-                p = Path(path + suffix)
-                try:
-                    if p.exists():
-                        p.unlink()
-                        deleted_files.append(str(p))
-                except Exception as e:
-                    logger.warning(f"Failed to delete {p}: {e}")
-
-        # Re-initialize fresh databases and bring manager back up
-        from ..db.init import init_databases
-        await init_databases()
         try:
-            await manager.startup()
+            from ..db.duckdb_engine import reset_duckdb, get_duckdb_path
+
+            path = get_duckdb_path()
+            reset_duckdb()
+            deleted_files.append(str(path))
         except Exception as e:
-            logger.warning(f"DatabaseManager startup after clear_all_data: {e}")
+            logger.warning(f"Failed to reset DuckDB: {e}")
 
         # Reset generation state and clean any legacy file artifacts
         config_paths = {"master": config.paths.master, "facts": config.paths.facts}
@@ -1116,13 +1017,13 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         if errors:
             logger.warning(f"Data clearing completed with some errors: {errors}")
         logger.info(
-            f"All data cleared by deleting DB files ({len(deleted_files)} files) and resetting state/cache"
+            f"All data cleared by resetting DuckDB ({len(deleted_files)} files) and resetting state/cache"
         )
 
         return OperationResult(
             success=True,
             message=(
-                "All data cleared by deleting database files; caches and legacy files removed. "
+                "All data cleared by resetting DuckDB; caches and legacy files removed. "
                 f"Deleted {len(deleted_files)} files."
             ),
             started_at=datetime.now(),
@@ -1162,19 +1063,30 @@ async def list_master_tables():
     description="Get a list of generated fact tables",
 )
 async def list_fact_tables(config: RetailConfig = Depends(get_config)):
-    """List all generated fact tables (SQLite-backed)."""
+    """List all generated fact tables (DuckDB-backed)."""
     try:
-        from sqlalchemy import func, select
-
-        from ..db.session import get_retail_session
-
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
         tables_with_data: list[str] = []
-        async with get_retail_session() as session:
-            for table_name, model in FACT_TABLE_MODELS.items():
-                result = await session.execute(select(func.count()).select_from(model))
-                if (result.scalar() or 0) > 0:
-                    tables_with_data.append(table_name)
-
+        mapping = {
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_order_headers",
+            "online_order_lines": "fact_online_order_lines",
+        }
+        for logical, duck in mapping.items():
+            try:
+                cnt = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+                if int(cnt) > 0:
+                    tables_with_data.append(logical)
+            except Exception:
+                pass
         return TableListResponse(tables=tables_with_data, count=len(tables_with_data))
     except Exception as e:
         logger.warning(f"Falling back to empty fact table list due to error: {e}")
@@ -1192,39 +1104,57 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
     description="Get record counts and metadata for any table (master or fact)",
 )
 async def get_table_summary(table_name: str):
-    """Get summary information for any table from SQLite database."""
+    """Get summary information for any table from DuckDB."""
 
-    # Check if table exists in our models
-    model = ALL_TABLE_MODELS.get(table_name)
-    if not model:
+    # Check if table exists in allowed lists
+    if table_name not in MASTER_TABLES + FACT_TABLES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Table {table_name} not found.",
         )
 
     # Determine table type for response
-    is_master = table_name in MASTER_TABLE_MODELS
+    is_master = table_name in MASTER_TABLES
 
     try:
-        from sqlalchemy import func, select
-
-        from ..db.session import get_retail_session
-
-        async with get_retail_session() as session:
-            table = model.__table__
-            # Get row count (fast path on table)
-            result = await session.execute(select(func.count()).select_from(table))
-            total_records = result.scalar() or 0
-            columns = [col.name for col in table.c]
-
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        mapping = {
+            "geographies_master": "dim_geographies",
+            "stores": "dim_stores",
+            "distribution_centers": "dim_distribution_centers",
+            "trucks": "dim_trucks",
+            "customers": "dim_customers",
+            "products_master": "dim_products",
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_order_headers",
+            "online_order_lines": "fact_online_order_lines",
+        }
+        duck = mapping.get(table_name, table_name)
+        total = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+        cols = [d[0] for d in (conn.execute(f"SELECT * FROM {duck} LIMIT 0").description or [])]
+        return {
+            "table_name": table_name,
+            "total_records": int(total),
+            "columns": cols,
+            "table_type": "master" if is_master else "fact",
+        }
+    except Exception as e:
+        # If table doesn't exist yet, return empty summary for better UX
+        if "does not exist" in str(e).lower():
             return {
                 "table_name": table_name,
-                "total_records": total_records,
-                "columns": columns,
+                "total_records": 0,
+                "columns": [],
                 "table_type": "master" if is_master else "fact",
             }
-
-    except Exception as e:
         logger.error(f"Failed to read table {table_name}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1253,52 +1183,61 @@ async def preview_table(
     table_name: str,
     limit: int = Query(100, ge=1, le=1000, description="Number of rows to return"),
 ):
-    """Preview any table from SQLite database."""
+    """Preview any table from DuckDB."""
 
-    # Check if table exists in our models
-    model = ALL_TABLE_MODELS.get(table_name)
-    if not model:
+    # Validate table name against known logical tables
+    if table_name not in MASTER_TABLES + FACT_TABLES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Table {table_name} not found.",
         )
 
     try:
-        from sqlalchemy import func, select
-
-        from ..db.session import get_retail_session
-
-        async with get_retail_session() as session:
-            table = model.__table__
-            # Get total row count
-            count_result = await session.execute(
-                select(func.count()).select_from(table)
-            )
-            total_rows = count_result.scalar() or 0
-            # Get preview rows via Core for speed; returns Mapping[str, Any]
-            result = await session.execute(select(table).limit(limit))
-            rows = result.mappings().all()
-            columns = [col.name for col in table.c]
-            preview_rows = []
-            for r in rows:
-                row_dict = {
-                    c: (
-                        r[c]
-                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
-                        else str(r[c])
-                    )
-                    for c in columns
-                }
-                preview_rows.append(row_dict)
-
-            return TablePreviewResponse(
-                table_name=table_name,
-                columns=columns,
-                row_count=total_rows,
-                preview_rows=preview_rows,
-            )
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        mapping = {
+            "geographies_master": "dim_geographies",
+            "stores": "dim_stores",
+            "distribution_centers": "dim_distribution_centers",
+            "trucks": "dim_trucks",
+            "customers": "dim_customers",
+            "products_master": "dim_products",
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_order_headers",
+            "online_order_lines": "fact_online_order_lines",
+        }
+        duck = mapping.get(table_name, table_name)
+        total_rows = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+        cur = conn.execute(f"SELECT * FROM {duck} LIMIT {int(limit)}")
+        columns = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        preview_rows = [
+            {columns[i]: rows[j][i] for i in range(len(columns))}
+            for j in range(len(rows))
+        ]
+        return TablePreviewResponse(
+            table_name=table_name,
+            columns=columns,
+            row_count=int(total_rows),
+            preview_rows=preview_rows,
+        )
 
     except Exception as e:
+        # If table doesn't exist yet, return empty preview for better UX
+        if "does not exist" in str(e).lower():
+            return TablePreviewResponse(
+                table_name=table_name,
+                columns=[],
+                row_count=0,
+                preview_rows=[],
+            )
         logger.error(f"Failed to read table {table_name}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1365,45 +1304,37 @@ async def preview_master_table_alias(
     table_name: str,
     limit: int = Query(100, ge=1, le=1000),
 ):
-    if table_name not in MASTER_TABLE_MODELS:
+    if table_name not in MASTER_TABLES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Master table {table_name} not found.",
         )
 
     try:
-        from sqlalchemy import func, select
-
-        from ..db.session import get_retail_session
-
-        model = MASTER_TABLE_MODELS[table_name]
-        async with get_retail_session() as session:
-            table = model.__table__
-            count_result = await session.execute(
-                select(func.count()).select_from(table)
-            )
-            total_rows = count_result.scalar() or 0
-            result = await session.execute(select(table).limit(limit))
-            rows = result.mappings().all()
-            columns = [col.name for col in table.c]
-            preview_rows: list[dict[str, object]] = []
-            for r in rows:
-                row_dict = {
-                    c: (
-                        r[c]
-                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
-                        else str(r[c])
-                    )
-                    for c in columns
-                }
-                preview_rows.append(row_dict)
-
-            return TablePreviewResponse(
-                table_name=table_name,
-                columns=columns,
-                row_count=total_rows,
-                preview_rows=preview_rows,
-            )
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        mapping = {
+            "geographies_master": "dim_geographies",
+            "stores": "dim_stores",
+            "distribution_centers": "dim_distribution_centers",
+            "trucks": "dim_trucks",
+            "customers": "dim_customers",
+            "products_master": "dim_products",
+        }
+        duck = mapping.get(table_name, table_name)
+        total_rows = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+        cur = conn.execute(f"SELECT * FROM {duck} LIMIT {int(limit)}")
+        columns = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        preview_rows: list[dict[str, object]] = []
+        for row in rows:
+            preview_rows.append({columns[i]: row[i] for i in range(len(columns))})
+        return TablePreviewResponse(
+            table_name=table_name,
+            columns=columns,
+            row_count=int(total_rows),
+            preview_rows=preview_rows,
+        )
     except Exception as e:
         logger.error(f"Master preview failed for {table_name}: {e}")
         raise HTTPException(
@@ -1422,7 +1353,7 @@ async def preview_fact_table_alias(
     table_name: str,
     limit: int = Query(100, ge=1, le=1000),
 ):
-    if table_name not in FACT_TABLE_MODELS:
+    if table_name not in FACT_TABLES:
         # Gracefully return 404 if truly unknown table
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1430,55 +1361,40 @@ async def preview_fact_table_alias(
         )
 
     try:
-        from sqlalchemy import func, select
-
-        from ..db.session import get_retail_session
-
-        model = FACT_TABLE_MODELS[table_name]
-        async with get_retail_session() as session:
-            table = model.__table__
-            # Total count
-            count_result = await session.execute(
-                select(func.count()).select_from(table)
-            )
-            total_rows = count_result.scalar() or 0
-
-            if total_rows == 0:
-                # Return empty preview with columns for consistent UI
-                columns = [col.name for col in table.c]
-                return TablePreviewResponse(
-                    table_name=table_name,
-                    columns=columns,
-                    row_count=0,
-                    preview_rows=[],
-                )
-
-            # Return recent rows if we have data
-            from sqlalchemy import desc
-
-            result = await session.execute(
-                select(table).order_by(desc(table.c.event_ts)).limit(limit)
-            )
-            rows = result.mappings().all()
-            columns = [col.name for col in table.c]
-            preview_rows = []
-            for r in rows:
-                row_dict = {
-                    c: (
-                        r[c]
-                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
-                        else str(r[c])
-                    )
-                    for c in columns
-                }
-                preview_rows.append(row_dict)
-
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        mapping = {
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_order_headers",
+            "online_order_lines": "fact_online_order_lines",
+        }
+        duck = mapping.get(table_name, table_name)
+        total_rows = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+        if int(total_rows) == 0:
+            cols = [d[0] for d in (conn.execute(f"SELECT * FROM {duck} LIMIT 0").description or [])]
             return TablePreviewResponse(
                 table_name=table_name,
-                columns=columns,
-                row_count=total_rows,
-                preview_rows=preview_rows,
+                columns=cols,
+                row_count=0,
+                preview_rows=[],
             )
+        cur = conn.execute(f"SELECT * FROM {duck} ORDER BY event_ts DESC LIMIT {int(limit)}")
+        columns = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        preview_rows = [{columns[i]: rows[j][i] for i in range(len(columns))} for j in range(len(rows))]
+        return TablePreviewResponse(
+            table_name=table_name,
+            columns=columns,
+            row_count=int(total_rows),
+            preview_rows=preview_rows,
+        )
     except Exception as e:
         logger.error(f"Fact preview (alias) failed for {table_name}: {e}")
         raise HTTPException(
@@ -1497,57 +1413,29 @@ async def preview_recent_fact_alias(
     table_name: str,
     limit: int = Query(100, ge=1, le=1000),
 ):
-    if table_name not in FACT_TABLE_MODELS:
+    if table_name not in FACT_TABLES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Fact table {table_name} not found.",
         )
 
     try:
-        from sqlalchemy import desc, func, select
-
-        from ..db.session import get_retail_session
-
-        model = FACT_TABLE_MODELS[table_name]
-        async with get_retail_session() as session:
-            table = model.__table__
-            # Total count
-            count_result = await session.execute(
-                select(func.count()).select_from(table)
-            )
-            total_rows = count_result.scalar() or 0
-
-            # Most recent event_ts
-            recent_result = await session.execute(select(func.max(table.c.event_ts)))
-            most_recent = recent_result.scalar_one_or_none()
-
-            # Recent rows by event_ts desc
-            result = await session.execute(
-                select(table).order_by(desc(table.c.event_ts)).limit(limit)
-            )
-            rows = result.mappings().all()
-            columns = [col.name for col in table.c]
-            preview_rows: list[dict[str, object]] = []
-            for r in rows:
-                row_dict = {
-                    c: (
-                        r[c]
-                        if isinstance(r[c], (str, int, float, bool)) or r[c] is None
-                        else str(r[c])
-                    )
-                    for c in columns
-                }
-                preview_rows.append(row_dict)
-
-            # Include most_recent_date for UI hint if available
-            response = TablePreviewResponse(
-                table_name=table_name,
-                columns=columns,
-                row_count=total_rows,
-                preview_rows=preview_rows,
-                most_recent_date=str(most_recent) if most_recent is not None else None,
-            )
-            return response
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        duck = DUCK_FACT_MAP.get(table_name, table_name)
+        total_rows = conn.execute(f"SELECT COUNT(*) FROM {duck}").fetchone()[0]
+        recent_row = conn.execute(f"SELECT MAX(event_ts) FROM {duck}").fetchone()[0]
+        cur = conn.execute(f"SELECT * FROM {duck} ORDER BY event_ts DESC LIMIT {int(limit)}")
+        cols = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        preview_rows = [{cols[i]: rows[j][i] for i in range(len(cols))} for j in range(len(rows))]
+        return TablePreviewResponse(
+            table_name=table_name,
+            columns=cols,
+            row_count=int(total_rows),
+            preview_rows=preview_rows,
+            most_recent_date=str(recent_row) if recent_row is not None else None,
+        )
     except Exception as e:
         logger.error(f"Fact preview failed for {table_name}: {e}")
         raise HTTPException(
@@ -1564,35 +1452,49 @@ async def preview_recent_fact_alias(
 @router.get(
     "/dashboard/counts",
     summary="Get live dashboard counts",
-    description="Get live table counts from SQLite (no cache)",
+    description="Get live table counts from DuckDB (no cache)",
 )
 async def get_dashboard_counts():
     """Get live table counts for dashboard (queries unified retail database directly)."""
     from datetime import datetime
 
-    from sqlalchemy import func, select
-
-    from ..db.session import get_retail_session
-
     master_counts: dict[str, int] = {}
     fact_counts: dict[str, int] = {}
-
-    # Query all tables from unified retail database
     try:
-        async with get_retail_session() as s:
-            # Master tables
-            for name, model in MASTER_TABLE_MODELS.items():
-                table = model.__table__
-                result = await s.execute(select(func.count()).select_from(table))
-                master_counts[name] = int(result.scalar() or 0)
-
-            # Fact tables
-            for name, model in FACT_TABLE_MODELS.items():
-                table = model.__table__
-                result = await s.execute(select(func.count()).select_from(table))
-                fact_counts[name] = int(result.scalar() or 0)
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        m_map = {
+            "geographies_master": "dim_geographies",
+            "stores": "dim_stores",
+            "distribution_centers": "dim_distribution_centers",
+            "trucks": "dim_trucks",
+            "customers": "dim_customers",
+            "products_master": "dim_products",
+        }
+        for k, v in m_map.items():
+            try:
+                master_counts[k] = int(conn.execute(f"SELECT COUNT(*) FROM {v}").fetchone()[0])
+            except Exception:
+                master_counts[k] = 0
+        f_map = {
+            "dc_inventory_txn": "fact_dc_inventory_txn",
+            "truck_moves": "fact_truck_moves",
+            "store_inventory_txn": "fact_store_inventory_txn",
+            "receipts": "fact_receipts",
+            "receipt_lines": "fact_receipt_lines",
+            "foot_traffic": "fact_foot_traffic",
+            "ble_pings": "fact_ble_pings",
+            "marketing": "fact_marketing",
+            "online_orders": "fact_online_order_headers",
+            "online_order_lines": "fact_online_order_lines",
+        }
+        for k, v in f_map.items():
+            try:
+                fact_counts[k] = int(conn.execute(f"SELECT COUNT(*) FROM {v}").fetchone()[0])
+            except Exception:
+                fact_counts[k] = 0
     except Exception as e:
-        logger.warning(f"Failed to read table counts from retail database: {e}")
+        logger.warning(f"Failed to read table counts from DuckDB: {e}")
 
     return {
         "master_tables": master_counts,

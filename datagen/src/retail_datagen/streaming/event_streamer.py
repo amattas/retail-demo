@@ -18,8 +18,6 @@ from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config.models import RetailConfig
 from ..shared.logging_utils import get_structured_logger
@@ -172,7 +170,6 @@ class EventStreamer:
         products: list[ProductMaster] | None = None,
         distribution_centers: list[DistributionCenter] | None = None,
         azure_connection_string: str | None = None,
-        session: AsyncSession | None = None,
     ):
         """
         Initialize the event streaming engine.
@@ -184,7 +181,7 @@ class EventStreamer:
             products: List of product master records (loaded if None)
             distribution_centers: List of DC master records (loaded if None)
             azure_connection_string: Azure Event Hub connection string
-            session: Optional AsyncSession for SQLite database mode
+            session: Deprecated (DuckDB-only runtime)
         """
         self.config = config
         self.streaming_config = StreamingConfig.from_retail_config(config)
@@ -199,8 +196,15 @@ class EventStreamer:
         self._products = products
         self._distribution_centers = distribution_centers
 
-        # Database session (for SQLite mode)
-        self._session = session
+        # DuckDB fast path for batch streaming
+        self._use_duckdb = True
+        self._duckdb_conn = None
+        try:
+            from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
+            self._duckdb_conn = get_duckdb_conn()
+        except Exception:
+            self._use_duckdb = False
 
         # Components
         self._azure_client: AzureEventHubClient | None = None
@@ -417,171 +421,34 @@ class EventStreamer:
             return False
 
     async def _ensure_master_data_loaded(self):
-        """Ensure all required master data is loaded."""
-        if not all(
-            [self._stores, self._customers, self._products, self._distribution_centers]
-        ):
-            self.log.info(
-                "Loading master data for streaming",
-                session_id=self._session_id,
+        """Ensure all required master data is loaded from DuckDB."""
+        if all([self._stores, self._customers, self._products, self._distribution_centers]):
+            return
+        self.log.info("Loading master data for streaming from DuckDB", session_id=self._session_id)
+        try:
+            from retail_datagen.db.duck_master_reader import (
+                read_stores,
+                read_customers,
+                read_products,
+                read_distribution_centers,
             )
 
-            # Try to load from generated master CSVs
-            try:
-                import csv
-                from pathlib import Path
-
-                master_dir = Path(self.config.paths.master)
-                if master_dir.exists():
-
-                    def _read_csv(path: Path):
-                        with path.open("r", newline="", encoding="utf-8") as f:
-                            return list(csv.DictReader(f))
-
-                    # Stores
-                    stores_path = master_dir / "stores.csv"
-                    if not self._stores and stores_path.exists():
-                        rows = _read_csv(stores_path)
-                        self._stores = [
-                            Store(
-                                ID=int(r["ID"]),
-                                StoreNumber=r["StoreNumber"],
-                                Address=r["Address"],
-                                GeographyID=int(r["GeographyID"]),
-                            )
-                            for r in rows
-                        ]
-
-                    # Customers
-                    customers_path = master_dir / "customers.csv"
-                    if not self._customers and customers_path.exists():
-                        rows = _read_csv(customers_path)
-                        self._customers = [
-                            Customer(
-                                ID=int(r["ID"]),
-                                FirstName=r["FirstName"],
-                                LastName=r["LastName"],
-                                Address=r["Address"],
-                                GeographyID=int(r["GeographyID"]),
-                                LoyaltyCard=r["LoyaltyCard"],
-                                Phone=r["Phone"],
-                                BLEId=r["BLEId"],
-                                AdId=r["AdId"],
-                            )
-                            for r in rows[:10000]  # cap for memory
-                        ]
-
-                    # Products
-                    products_path = master_dir / "products_master.csv"
-                    if not self._products and products_path.exists():
-                        rows = _read_csv(products_path)
-                        self._products = [ProductMaster(**r) for r in rows[:20000]]
-
-                    # DCs
-                    dcs_path = master_dir / "distribution_centers.csv"
-                    if not self._distribution_centers and dcs_path.exists():
-                        rows = _read_csv(dcs_path)
-                        self._distribution_centers = [
-                            DistributionCenter(
-                                ID=int(r["ID"]),
-                                DCNumber=r["DCNumber"],
-                                Address=r["Address"],
-                                GeographyID=int(r["GeographyID"]),
-                            )
-                            for r in rows
-                        ]
-
-            except Exception as e:
-                self.log.warning(
-                    "Failed to load master CSVs",
-                    session_id=self._session_id,
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-
-            # Fallback to minimal in-memory data for dev use
             if not self._stores:
-                self._stores = [
-                    Store(
-                        ID=1, StoreNumber="ST001", Address="123 Main St", GeographyID=1
-                    ),
-                    Store(
-                        ID=2, StoreNumber="ST002", Address="456 Oak Ave", GeographyID=2
-                    ),
-                ]
+                self._stores = read_stores()
             if not self._customers:
-                self._customers = [
-                    Customer(
-                        ID=1,
-                        FirstName="John",
-                        LastName="Doe",
-                        Address="789 Pine St",
-                        GeographyID=1,
-                        LoyaltyCard="LC000001234",
-                        Phone="(555) 123-4567",
-                        BLEId="BLEABC123",
-                        AdId="ADXYZ789",
-                    ),
-                    Customer(
-                        ID=2,
-                        FirstName="Jane",
-                        LastName="Smith",
-                        Address="321 Elm St",
-                        GeographyID=2,
-                        LoyaltyCard="LC000004321",
-                        Phone="(555) 987-6543",
-                        BLEId="BLEDEF456",
-                        AdId="ADUVW123",
-                    ),
-                ]
+                self._customers = read_customers()
             if not self._products:
-                from decimal import Decimal
-
-                self._products = [
-                    ProductMaster(
-                        ID=1,
-                        ProductName="Widget A",
-                        Brand="BrandX",
-                        Company="CompanyX",
-                        Department="Electronics",
-                        Category="Gadgets",
-                        Subcategory="Widgets",
-                        Cost=Decimal("10.00"),
-                        MSRP=Decimal("20.00"),
-                        SalePrice=Decimal("18.00"),
-                        RequiresRefrigeration=False,
-                        LaunchDate=datetime.now(UTC),
-                    ),
-                    ProductMaster(
-                        ID=2,
-                        ProductName="Gadget B",
-                        Brand="BrandY",
-                        Company="CompanyY",
-                        Department="Electronics",
-                        Category="Devices",
-                        Subcategory="Gadgets",
-                        Cost=Decimal("25.00"),
-                        MSRP=Decimal("50.00"),
-                        SalePrice=Decimal("45.00"),
-                        RequiresRefrigeration=False,
-                        LaunchDate=datetime.now(UTC),
-                    ),
-                ]
+                self._products = read_products()
             if not self._distribution_centers:
-                self._distribution_centers = [
-                    DistributionCenter(
-                        ID=1,
-                        DCNumber="DC001",
-                        Address="999 Industrial Blvd",
-                        GeographyID=1,
-                    ),
-                    DistributionCenter(
-                        ID=2,
-                        DCNumber="DC002",
-                        Address="888 Warehouse Way",
-                        GeographyID=2,
-                    ),
-                ]
+                self._distribution_centers = read_distribution_centers()
+        except Exception as e:
+            self.log.error(
+                "Failed to load master data from DuckDB",
+                session_id=self._session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     async def start(self, duration: timedelta | None = None) -> bool:
         """
@@ -597,9 +464,9 @@ class EventStreamer:
             self.log.warning("Streaming is already active", session_id=self._session_id)
             return False
 
-        # Check if using database mode (batch streaming from SQLite)
-        if self._session is not None:
-            return await self.start_batch_streaming()
+        # Check if using database mode (batch streaming)
+        if self._use_duckdb:
+            return await self.start_batch_streaming_duckdb()
 
         if not await self.initialize():
             self.log.error(
@@ -660,7 +527,7 @@ class EventStreamer:
 
     async def start_batch_streaming(self) -> bool:
         """
-        Start batch streaming from SQLite database.
+        Legacy: Start batch streaming from SQLite database (deprecated).
 
         Reads unpublished data from facts.db and streams to Azure Event Hub,
         updating watermarks after successful publication.
@@ -676,7 +543,7 @@ class EventStreamer:
             return False
 
         self.log.info(
-            "Starting batch streaming from SQLite",
+            "Starting batch streaming from legacy SQLite (deprecated)",
             session_id=self._session_id,
         )
 
@@ -721,7 +588,7 @@ class EventStreamer:
 
             # Stream events from each table
             total_published = 0
-            from ..db.purge import update_publication_watermark
+            from ..db.duck_watermarks import update_publication_watermark
 
             for table_name in self._get_fact_tables():
                 fact_table_name = f"fact_{table_name}"
@@ -793,6 +660,186 @@ class EventStreamer:
         finally:
             if self._azure_client:
                 await self._azure_client.disconnect()
+
+    async def start_batch_streaming_duckdb(self) -> bool:
+        """
+        Start batch streaming from DuckDB database.
+
+        Reads unpublished data from data/retail.duckdb and streams to Azure Event Hub,
+        updating watermarks after successful publication.
+
+        Returns:
+            bool: True if streaming completed successfully, False otherwise
+        """
+        if not (self._use_duckdb and self._duckdb_conn is not None):
+            self.log.error("DuckDB connection not available", session_id=self._session_id)
+            return False
+
+        self.log.info(
+            "Starting batch streaming from DuckDB",
+            session_id=self._session_id,
+        )
+
+        try:
+            # Initialize Azure client
+            if self.streaming_config.azure_connection_string:
+                self._azure_client = AzureEventHubClient(
+                    connection_string=self.streaming_config.azure_connection_string,
+                    hub_name=self.streaming_config.hub_name,
+                    max_batch_size=self.streaming_config.max_batch_size,
+                    batch_timeout_ms=self.streaming_config.batch_timeout_ms,
+                    retry_attempts=self.streaming_config.retry_attempts,
+                    backoff_multiplier=self.streaming_config.backoff_multiplier,
+                    circuit_breaker_enabled=self.streaming_config.circuit_breaker_enabled,
+                )
+
+                if not await self._azure_client.connect():
+                    self.log.error(
+                        "Failed to connect to Azure Event Hub",
+                        session_id=self._session_id,
+                    )
+                    return False
+            else:
+                self.log.warning(
+                    "No Azure connection string - events will not be sent",
+                    session_id=self._session_id,
+                )
+                self._azure_client = AzureEventHubClient(
+                    "", self.streaming_config.hub_name
+                )
+
+            # Get streaming window from watermarks
+            from retail_datagen.db.duck_watermarks import get_unpublished_data_range, update_publication_watermark
+
+            try:
+                # Compute global window across all tables: earliest min, latest max
+                earliest = None
+                latest = None
+                for tbl in self._get_fact_tables_duck():
+                    start, end = get_unpublished_data_range(self._duckdb_conn, tbl)
+                    if start and (earliest is None or start < earliest):
+                        earliest = start
+                    if end and (latest is None or end > latest):
+                        latest = end
+                if not earliest:
+                    raise ValueError("No unpublished data found")
+                if not latest:
+                    latest = datetime.now(UTC)
+                start_ts, end_ts = earliest, latest
+                self.log.info(
+                    f"Streaming data from {start_ts} to {end_ts} (DuckDB)",
+                    session_id=self._session_id,
+                )
+            except ValueError as e:
+                self.log.warning(str(e), session_id=self._session_id)
+                return True
+
+            # Stream events per table
+            total_published = 0
+            for duck_table in self._get_fact_tables_duck():
+                try:
+                    events = self._load_unpublished_events_from_duck(
+                        duck_table, start_ts, end_ts, batch_size=100000
+                    )
+                    if not events:
+                        self.log.debug(
+                            f"No unpublished events in {duck_table}",
+                            session_id=self._session_id,
+                        )
+                        continue
+
+                    logical_table = self._map_duck_table_to_logical(duck_table)
+                    envelopes = self._convert_db_events_to_envelopes(
+                        events, logical_table
+                    )
+                    if envelopes:
+                        success = await self._azure_client.send_events(envelopes)
+                        if success:
+                            total_published += len(envelopes)
+                            update_publication_watermark(
+                                self._duckdb_conn, duck_table, end_ts
+                            )
+                            self.log.info(
+                                f"Published {len(envelopes)} events from {duck_table}",
+                                session_id=self._session_id,
+                            )
+                        else:
+                            self.log.error(
+                                f"Failed to publish events from {duck_table}",
+                                session_id=self._session_id,
+                            )
+                except Exception as e:
+                    self.log.error(
+                        f"Error streaming {duck_table}: {e}",
+                        session_id=self._session_id,
+                        error_type=type(e).__name__,
+                    )
+
+            self.log.info(
+                f"DuckDB batch streaming complete: {total_published} events published",
+                session_id=self._session_id,
+            )
+            return True
+
+        except Exception as e:
+            self.log.error(
+                "DuckDB batch streaming failed",
+                session_id=self._session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return False
+        finally:
+            if self._azure_client:
+                await self._azure_client.disconnect()
+
+    def _get_fact_tables_duck(self) -> list[str]:
+        return [
+            "fact_receipts",
+            "fact_receipt_lines",
+            "fact_dc_inventory_txn",
+            "fact_store_inventory_txn",
+            "fact_truck_moves",
+            "fact_foot_traffic",
+            "fact_ble_pings",
+            "fact_marketing",
+            "fact_online_order_headers",
+            "fact_online_order_lines",
+        ]
+
+    def _map_duck_table_to_logical(self, duck_table: str) -> str:
+        mapping = {
+            "fact_receipts": "receipts",
+            "fact_receipt_lines": "receipt_lines",
+            "fact_dc_inventory_txn": "dc_inventory_txn",
+            "fact_store_inventory_txn": "store_inventory_txn",
+            "fact_truck_moves": "truck_moves",
+            "fact_foot_traffic": "foot_traffic",
+            "fact_ble_pings": "ble_pings",
+            "fact_marketing": "marketing",
+            "fact_online_order_headers": "online_orders",
+            "fact_online_order_lines": "online_orders",  # treat as order events
+        }
+        return mapping.get(duck_table, duck_table)
+
+    def _load_unpublished_events_from_duck(
+        self, duck_table: str, start_ts: datetime, end_ts: datetime, batch_size: int
+    ) -> list[dict]:
+        if not (self._use_duckdb and self._duckdb_conn is not None):
+            return []
+        # Pull rows in window
+        q = (
+            f"SELECT * FROM {duck_table} WHERE event_ts >= ? AND event_ts < ? ORDER BY event_ts LIMIT ?"
+        )
+        cur = self._duckdb_conn.execute(q, [start_ts, end_ts, batch_size])
+        rows = cur.fetchall()
+        cols = [d[0] for d in (cur.description or [])]
+        # Convert tuples to dicts
+        events: list[dict] = []
+        for tup in rows:
+            rec = {cols[i]: tup[i] for i in range(len(cols))}
+            events.append(rec)
+        return events
 
     async def stop(self) -> bool:
         """
@@ -1495,7 +1542,7 @@ class EventStreamer:
                     failed=result["failed"],
                 )
 
-    # SQLite database integration methods
+    # Legacy SQLite database integration methods (deprecated)
 
     async def _load_unpublished_events_from_db(
         self,
@@ -1505,7 +1552,7 @@ class EventStreamer:
         batch_size: int = 1000,
     ) -> list[dict]:
         """
-        Load unpublished events from SQLite facts.db.
+        Load unpublished events from legacy SQLite facts.db (deprecated).
 
         Args:
             table_name: Fact table name (e.g., "fact_receipts")
@@ -1517,7 +1564,7 @@ class EventStreamer:
             List of event records as dicts
         """
         if not self._session:
-            raise ValueError("No database session provided - cannot read from SQLite")
+            raise ValueError("No database session provided - cannot read from legacy SQLite")
 
         # Import here to avoid circular dependencies
         from ..db.models.facts import (

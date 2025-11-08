@@ -2,9 +2,10 @@
 Historical fact data generation engine for retail data generator.
 
 This module implements the FactDataGenerator class that creates realistic
-retail transaction data for all 9 fact tables with proper temporal patterns,
-business logic coordination, and SQLite database storage.
+retail transaction data for all fact tables with proper temporal patterns,
+business logic coordination, and DuckDB-backed storage.
 """
+from __future__ import annotations
 
 import inspect
 import logging
@@ -20,10 +21,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+import numpy as np
 import pandas as pd
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
 
 from retail_datagen.generators.online_order_generator import (
     generate_online_orders_with_lifecycle,
@@ -264,7 +263,7 @@ class FactGenerationSummary:
 
 @dataclass(frozen=True)
 class MasterTableSpec:
-    """Configuration describing how to load a master table."""
+    """Deprecated: CSV-based master specs removed in DuckDB-only mode."""
 
     attr_name: str
     filename: str
@@ -279,7 +278,7 @@ class FactDataGenerator:
 
     Generates all 9 fact tables with realistic retail behaviors, temporal patterns,
     and cross-fact coordination while maintaining business rule compliance.
-    Writes data directly to SQLite database.
+        Writes data directly to DuckDB.
     """
 
     # Define the core fact tables that are always generated
@@ -301,22 +300,39 @@ class FactDataGenerator:
     def __init__(
         self,
         config: RetailConfig,
-        session: AsyncSession,
+        session: Any | None = None,
     ):
         """
         Initialize fact data generator.
 
         Args:
             config: Retail configuration containing generation parameters
-            session: AsyncSession for facts.db (required)
+            session: Deprecated; unused (DuckDB-only)
         """
         self.config = config
         self._rng = random.Random(config.seed)
+        self._np_rng = np.random.default_rng(config.seed + 4242)
+        # Keep attribute for compatibility; DuckDB path ignores it
         self._session = session
+        # SQLite session deprecated; DuckDB used directly
+
+        # Use DuckDB for fast fact writes by default
+        self._use_duckdb = True
+        self._duckdb_conn = None
+        try:
+            from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
+            self._duckdb_conn = get_duckdb_conn()
+        except Exception:
+            self._use_duckdb = False
 
         # Buffer for database writes
         # Structure: {table_name: [list of records]}
         self._db_buffer: dict[str, list[dict]] = {}
+
+        # Precomputed sampling lists for hot-path customer selection
+        # Maps store_id -> (customers_list, weights_list)
+        self._store_customer_sampling: dict[int, tuple[list[Customer], list[float]]] = {}
 
         # Initialize patterns and simulators
         self.temporal_patterns = CompositeTemporalPatterns(config.seed)
@@ -416,51 +432,68 @@ class FactDataGenerator:
             "LaunchDate": parsed_launch_date,
         }
 
-    def _master_table_specs(self) -> list[MasterTableSpec]:
-        """Return specifications for all master tables that need loading."""
+    def load_master_data_from_duckdb(self) -> None:
+        """Load master data from DuckDB and initialize simulators."""
+        from retail_datagen.db.duck_master_reader import read_all_masters
 
-        return [
-            MasterTableSpec(
-                attr_name="geographies",
-                filename="geographies_master.csv",
-                model_cls=GeographyMaster,
-                dtype={"ZipCode": str},
-                row_adapter=self._normalize_geography_row,
-            ),
-            MasterTableSpec(
-                attr_name="stores",
-                filename="stores.csv",
-                model_cls=Store,
-            ),
-            MasterTableSpec(
-                attr_name="distribution_centers",
-                filename="distribution_centers.csv",
-                model_cls=DistributionCenter,
-            ),
-            MasterTableSpec(
-                attr_name="customers",
-                filename="customers.csv",
-                model_cls=Customer,
-            ),
-            MasterTableSpec(
-                attr_name="products",
-                filename="products_master.csv",
-                model_cls=ProductMaster,
-                row_adapter=self._normalize_product_row,
-            ),
-        ]
+        print("Loading master data from DuckDB for fact generation...")
+        (
+            self.geographies,
+            self.stores,
+            self.distribution_centers,
+            self.customers,
+            self.products,
+            self.trucks,
+        ) = read_all_masters()
+
+        # Initialize simulators with loaded data
+        self.customer_journey_sim = CustomerJourneySimulator(
+            self.customers, self.products, self.stores, self.config.seed + 1000
+        )
+
+        self.inventory_flow_sim = InventoryFlowSimulator(
+            self.distribution_centers,
+            self.stores,
+            self.products,
+            self.config.seed + 2000,
+            trucks=getattr(self, "trucks", None),
+        )
+
+        self.marketing_campaign_sim = MarketingCampaignSimulator(
+            self.customers, self.config.seed + 3000, self.config.marketing_cost
+        )
+
+        # Initialize customer geography and store selector
+        print("Assigning customer geographies and store affinities...")
+        geography_assigner = GeographyAssigner(
+            self.customers, self.stores, self.geographies, self.config.seed + 4000
+        )
+        customer_geographies = geography_assigner.assign_geographies()
+        self.store_selector = StoreSelector(
+            customer_geographies, self.stores, self.config.seed + 5000
+        )
+
+        # Build customer pools per store for efficient selection
+        print("Building customer pools for each store...")
+        self._build_store_customer_pools(customer_geographies)
+
+        print(
+            "Loaded master data (DuckDB): "
+            f"{len(self.geographies)} geographies, "
+            f"{len(self.stores)} stores, "
+            f"{len(self.distribution_centers)} DCs, "
+            f"{len(self.customers)} customers, "
+            f"{len(self.products)} products, "
+            f"{len(getattr(self, 'trucks', []))} trucks"
+        )
+
+    def _master_table_specs(self) -> list[MasterTableSpec]:
+        """Deprecated: No longer used (DuckDB-only)."""
+        return []
 
     def _load_master_table(self, master_path: Path, spec: MasterTableSpec) -> list[Any]:
-        """Load a master table based on the supplied specification."""
-
-        dataframe = pd.read_csv(master_path / spec.filename, dtype=spec.dtype)
-        records: list[Any] = []
-        for _, row in dataframe.iterrows():
-            row_dict = row.to_dict()
-            if spec.row_adapter:
-                row_dict = spec.row_adapter(row_dict)
-            records.append(spec.model_cls(**row_dict))
-        return records
+        """Deprecated: CSV master load removed."""
+        return []
 
     def _reset_table_states(self) -> None:
         """Reset table states using progress tracker."""
@@ -551,61 +584,11 @@ class FactDataGenerator:
         except Exception:
             pass
 
-    def load_master_data(self) -> None:
-        """Legacy CSV loader (retained for backward compatibility)."""
-        print("Loading master data for fact generation (CSV legacy path)...")
-
-        master_path = Path(self.config.paths.master)
-
-        loaded_counts: dict[str, int] = {}
-        for spec in self._master_table_specs():
-            records = self._load_master_table(master_path, spec)
-            setattr(self, spec.attr_name, records)
-            loaded_counts[spec.attr_name] = len(records)
-
-        # Initialize simulators with loaded data
-        self.customer_journey_sim = CustomerJourneySimulator(
-            self.customers, self.products, self.stores, self.config.seed + 1000
-        )
-
-        self.inventory_flow_sim = InventoryFlowSimulator(
-            self.distribution_centers,
-            self.stores,
-            self.products,
-            self.config.seed + 2000,
-            trucks=getattr(self, "trucks", None),
-        )
-
-        self.marketing_campaign_sim = MarketingCampaignSimulator(
-            self.customers, self.config.seed + 3000, self.config.marketing_cost
-        )
-
-        # Initialize customer geography and store selector
-        print("Assigning customer geographies and store affinities...")
-        geography_assigner = GeographyAssigner(
-            self.customers, self.stores, self.geographies, self.config.seed + 4000
-        )
-        customer_geographies = geography_assigner.assign_geographies()
-        self.store_selector = StoreSelector(
-            customer_geographies, self.stores, self.config.seed + 5000
-        )
-
-        # Build customer pools per store for efficient selection
-        print("Building customer pools for each store...")
-        self._build_store_customer_pools(customer_geographies)
-
-        print(
-            "Loaded master data (CSV): "
-            f"{loaded_counts.get('geographies', 0)} geographies, "
-            f"{loaded_counts.get('stores', 0)} stores, "
-            f"{loaded_counts.get('distribution_centers', 0)} DCs, "
-            f"{loaded_counts.get('customers', 0)} customers, "
-            f"{loaded_counts.get('products', 0)} products"
-        )
+    # Removed legacy CSV loader: DuckDB-only path is used for master data
 
     async def load_master_data_from_db(self) -> None:
-        """Load master data directly from SQLite master database."""
-        print("Loading master data for fact generation (SQLite)...")
+        """Deprecated SQLite path removed; DuckDB-only runtime."""
+        raise RuntimeError("SQLite master load is not supported. Use DuckDB loader.")
 
         # Import ORM models lazily to avoid circulars
         from retail_datagen.db.models.master import (
@@ -765,7 +748,7 @@ class FactDataGenerator:
         self._build_store_customer_pools(customer_geographies)
 
         print(
-            "Loaded master data (SQLite): "
+            "Loaded master data (legacy SQLite): "
             f"{len(self.geographies)} geographies, "
             f"{len(self.stores)} stores, "
             f"{len(self.distribution_centers)} DCs, "
@@ -807,6 +790,44 @@ class FactDataGenerator:
                 if weight > 0:  # Only add if there's a non-zero probability
                     self._store_customer_pools[store_id].append((customer, weight))
 
+        # Build precomputed sampling arrays (customers list + weights) per store
+        for store_id, pool in self._store_customer_pools.items():
+            if not pool:
+                # Fallback to global customers uniformly if pool is empty
+                self._store_customer_sampling[store_id] = (
+                    self.customers[:],
+                    [1.0] * len(self.customers),
+                )
+                continue
+
+            customers_list = [c for c, _ in pool]
+            weights_list = [w for _, w in pool]
+            total_w = sum(weights_list)
+            if total_w <= 0:
+                # Equal weights if all zero
+                weights_list = [1.0] * len(customers_list)
+            else:
+                # Normalize once to avoid hot-loop normalization
+                weights_list = [w / total_w for w in weights_list]
+
+            self._store_customer_sampling[store_id] = (customers_list, weights_list)
+        # Also cache NumPy-ready arrays for fast vector sampling
+        self._store_customer_sampling_np: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+        for sid, (clist, wlist) in self._store_customer_sampling.items():
+            try:
+                idx = np.arange(len(clist), dtype=np.int32)
+                p = np.asarray(wlist, dtype=np.float64)
+                # Ensure probabilities sum to 1
+                s = p.sum()
+                if s > 0:
+                    p = p / s
+                else:
+                    p.fill(1.0 / len(p))
+                self._store_customer_sampling_np[sid] = (idx, p)
+            except Exception:
+                # Fallback will use Python choices
+                pass
+
         # Log summary statistics
         pool_sizes = [len(pool) for pool in self._store_customer_pools.values()]
         avg_pool_size = sum(pool_sizes) / len(pool_sizes) if pool_sizes else 0
@@ -824,7 +845,7 @@ class FactDataGenerator:
         """
         Generate historical fact data for the specified date range.
 
-        Writes data directly to SQLite database.
+        Writes data directly to DuckDB.
 
         Args:
             start_date: Start of historical data generation
@@ -850,9 +871,9 @@ class FactDataGenerator:
         # Reset hourly progress tracker for new generation run
         self.hourly_tracker.reset()
 
-        # Ensure master data is loaded (from SQLite)
+        # Ensure master data is loaded (DuckDB only)
         if not self.stores:
-            await self.load_master_data_from_db()
+            self.load_master_data_from_duckdb()
 
         # Pre-check master readiness
         errors: list[str] = []
@@ -876,25 +897,27 @@ class FactDataGenerator:
         facts_generated = {t: 0 for t in active_tables}
         # Track records actually written to DB for live tile counts
         self._table_insert_counts: dict[str, int] = {t: 0 for t in active_tables}
-        # Track DB totals to verify deltas
+        # Track DB totals to verify deltas (DuckDB path computes from summaries)
         self._fact_db_counts: dict[str, int] = {}
-        try:
-            from sqlalchemy import func, select
-
-            # Read initial DB totals once for all active tables
-            for t in active_tables:
-                model = self._get_model_for_table(t)
-                total = (
-                    await self._session.execute(select(func.count()).select_from(model))
-                ).scalar() or 0
-                self._fact_db_counts[t] = int(total)
-        except Exception as e:
-            logger.debug(f"Initial DB count read failed (will verify per-hour): {e}")
 
         # NEW: Add table progress tracking
         table_progress = {table: 0.0 for table in active_tables}
 
         total_days = (end_date - start_date).days + 1
+
+        # Emit an early progress heartbeat so UIs show activity immediately
+        try:
+            self._send_throttled_progress_update(
+                day_counter=0,
+                message="Preparing historical data generation",
+                total_days=total_days,
+                table_progress=table_progress,
+                tables_completed=[],
+                tables_in_progress=active_tables,
+                tables_remaining=[],
+            )
+        except Exception:
+            pass
 
         # Calculate expected records per table for accurate progress tracking
         # NOTE: customers_per_day is configured PER STORE, not total
@@ -925,11 +948,7 @@ class FactDataGenerator:
         current_date = start_date
         day_counter = 0
 
-        # Generate data sequentially with managed retail session if not provided
-        from retail_datagen.db.session import retail_session_maker
-
-        if self._session is None:
-            SessionMaker = retail_session_maker()
+        # DuckDB-only runtime; no SQLAlchemy session
 
         async def _ensure_required_schema(session: AsyncSession) -> None:
             try:
@@ -986,7 +1005,30 @@ class FactDataGenerator:
         async def _run_with_session():
             nonlocal day_counter, current_date
             # Ensure schema is compatible (adds new columns/tables if missing)
-            await _ensure_required_schema(self._session)
+            if not self._use_duckdb:
+                await _ensure_required_schema(self._session)
+        # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
+            dropped_indexes: list[tuple[str, str]] = []
+            try:
+                if not self._use_duckdb:
+                    # Notify UI about pre-load DB optimization
+                    self._send_throttled_progress_update(
+                        0,
+                        "Optimizing database for bulk load (dropping indexes)",
+                        total_days,
+                        table_progress=table_progress,
+                    )
+                    dropped_indexes = await self._capture_and_drop_indexes(
+                        self._session, active_tables
+                    )
+                    self._send_throttled_progress_update(
+                        0,
+                        "Bulk load optimizations applied",
+                        total_days,
+                        table_progress=table_progress,
+                    )
+            except Exception:
+                dropped_indexes = []
             while current_date <= end_date:
                 day_counter += 1
 
@@ -1062,7 +1104,17 @@ class FactDataGenerator:
                 progress_reporter.update(1)
                 current_date += timedelta(days=1)
 
-        if self._session is None:
+            # Recreate any dropped indexes after generation completes for this run
+            try:
+                if (not self._use_duckdb) and dropped_indexes:
+                    await self._recreate_indexes(self._session, dropped_indexes)
+            except Exception:
+                pass
+
+        if self._use_duckdb:
+            # No async DB session needed for DuckDB path
+            await _run_with_session()
+        elif self._session is None:
             async with SessionMaker() as session:
                 self._session = session
                 await _run_with_session()
@@ -1101,8 +1153,8 @@ class FactDataGenerator:
         # Cache the counts for dashboard performance
         self._cache_fact_counts(facts_generated)
 
-        # Update watermarks if database session provided
-        if self._session:
+        # Update watermarks if database session provided (SQLite-only path)
+        if self._session and not self._use_duckdb:
             await self._update_watermarks_after_generation(
                 start_date, end_date, active_tables
             )
@@ -1152,15 +1204,12 @@ class FactDataGenerator:
             # Insert daily DC transactions immediately (not hourly)
             if dc_transactions:
                 try:
-                    import pandas as pd
-
-                    df_dc = pd.DataFrame(dc_transactions)
                     await self._insert_hourly_to_db(
                         self._session,
                         "dc_inventory_txn",
-                        df_dc,
+                        dc_transactions,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
@@ -1197,11 +1246,8 @@ class FactDataGenerator:
             # NEW: Insert marketing records for the day directly (not hourly)
             if marketing_records:
                 try:
-                    import pandas as pd
-
-                    df = pd.DataFrame(marketing_records)
                     await self._insert_hourly_to_db(
-                        self._session, "marketing", df, hour=0, commit_every_batches=1
+                        self._session, "marketing", marketing_records, hour=0, commit_every_batches=0
                     )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
@@ -1252,6 +1298,22 @@ class FactDataGenerator:
             hour_multiplier = self.temporal_patterns.get_overall_multiplier(
                 hour_datetime
             )
+
+            # Early heartbeat for this hour before heavy generation
+            try:
+                if self._progress_callback:
+                    progress_state = self.hourly_tracker.get_current_progress()
+                    self._send_throttled_progress_update(
+                        day_counter=day_index,
+                        message=(
+                            f"Preparing hour {hour_idx + 1}/24 for {date.strftime('%Y-%m-%d')}"
+                        ),
+                        total_days=total_days,
+                        table_progress=progress_state.get("per_table_progress", {}),
+                        tables_in_progress=progress_state.get("tables_in_progress", []),
+                    )
+            except Exception:
+                pass
 
             if hour_multiplier == 0:  # Store closed
                 hour_data = {
@@ -1347,15 +1409,12 @@ class FactDataGenerator:
                 daily_facts["dc_inventory_txn"].extend(dc_outbound_txn)
                 # Insert these lifecycle DC transactions immediately (daily batch)
                 try:
-                    import pandas as pd
-
-                    df_dc_lc = pd.DataFrame(dc_outbound_txn)
                     await self._insert_hourly_to_db(
                         self._session,
                         "dc_inventory_txn",
-                        df_dc_lc,
+                        dc_outbound_txn,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Mark hours complete for this table (lifecycle-generated)
                     for hour in range(24):
@@ -1372,15 +1431,12 @@ class FactDataGenerator:
                 daily_facts["store_inventory_txn"].extend(store_inbound_txn)
                 # Insert these lifecycle store transactions immediately (daily batch)
                 try:
-                    import pandas as pd
-
-                    df_store_lc = pd.DataFrame(store_inbound_txn)
                     await self._insert_hourly_to_db(
                         self._session,
                         "store_inventory_txn",
-                        df_store_lc,
+                        store_inbound_txn,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Mark hours complete for this table (lifecycle-generated)
                     for hour in range(24):
@@ -1396,15 +1452,12 @@ class FactDataGenerator:
             all_truck_moves = daily_facts.get("truck_moves", [])
             if all_truck_moves:
                 try:
-                    import pandas as pd
-
-                    df_tm = pd.DataFrame(all_truck_moves)
                     await self._insert_hourly_to_db(
                         self._session,
                         "truck_moves",
-                        df_tm,
+                        all_truck_moves,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
@@ -1464,15 +1517,12 @@ class FactDataGenerator:
             # First write online order headers (so lines can resolve order_id)
             if online_orders:
                 try:
-                    import pandas as pd
-
-                    df_oo = pd.DataFrame(online_orders)
                     await self._insert_hourly_to_db(
                         self._session,
                         "online_orders",
-                        df_oo,
+                        online_orders,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
@@ -1486,14 +1536,12 @@ class FactDataGenerator:
             # Then write online order lines (daily batch)
             if online_order_lines:
                 try:
-                    import pandas as pd
-                    df_ool = pd.DataFrame(online_order_lines)
                     await self._insert_hourly_to_db(
                         self._session,
                         "online_order_lines",
-                        df_ool,
+                        online_order_lines,
                         hour=0,
-                        commit_every_batches=1,
+                        commit_every_batches=0,
                     )
                     # Update progress for line items (treated as complete across hours)
                     for hour in range(24):
@@ -1811,47 +1859,47 @@ class FactDataGenerator:
             return hour_data
 
         # Generate customer transactions
-        # NEW: Use geography-based customer selection for this store
-        # Select customers who are likely to shop at this specific store
-        for _ in range(expected_customers):
-            # Select customer based on store affinity using pre-built pools
-            if store.ID in self._store_customer_pools and self._store_customer_pools[store.ID]:
-                # Use weighted random selection from this store's customer pool
-                customer_pool = self._store_customer_pools[store.ID]
-                customers_list = [c for c, w in customer_pool]
-                weights_list = [w for c, w in customer_pool]
-
-                # Normalize weights to sum to 1.0
-                total_weight = sum(weights_list)
-                if total_weight > 0:
-                    normalized_weights = [w / total_weight for w in weights_list]
-                    customer = self._rng.choices(customers_list, weights=normalized_weights)[0]
+        # Use precomputed per-store sampling to select customers for this hour in bulk
+        if expected_customers > 0:
+            if store.ID in self._store_customer_sampling_np:
+                # Vectorized sampling via NumPy over index array, then map back to customers
+                idx_arr, p = self._store_customer_sampling_np[store.ID]
+                if len(idx_arr) > 0:
+                    chosen_idx = self._np_rng.choice(
+                        idx_arr, size=expected_customers, replace=True, p=p
+                    )
+                    clist = self._store_customer_sampling[store.ID][0]
+                    selected_customers = [clist[i] for i in chosen_idx]
                 else:
-                    # Fallback if all weights are zero
-                    customer = self._rng.choice(self.customers)
+                    selected_customers = [self._rng.choice(self.customers) for _ in range(expected_customers)]
+            elif store.ID in self._store_customer_sampling:
+                customers_list, weights_list = self._store_customer_sampling[store.ID]
+                selected_customers = self._rng.choices(
+                    customers_list, weights=weights_list, k=expected_customers
+                )
             else:
-                # Fallback to random selection if pools not initialized
-                customer = self._rng.choice(self.customers)
+                selected_customers = [self._rng.choice(self.customers) for _ in range(expected_customers)]
 
-            # Generate shopping basket (pass store for format-based adjustments)
-            basket = self.customer_journey_sim.generate_shopping_basket(customer.ID, store=store)
-            # Apply holiday overlay to adjust basket composition/quantities
-            try:
-                self._apply_holiday_overlay_to_basket(hour_datetime, basket)
-            except Exception:
-                pass
+            for customer in selected_customers:
+                # Generate shopping basket (pass store for format-based adjustments)
+                basket = self.customer_journey_sim.generate_shopping_basket(customer.ID, store=store)
+                # Apply holiday overlay to adjust basket composition/quantities
+                try:
+                    self._apply_holiday_overlay_to_basket(hour_datetime, basket)
+                except Exception:
+                    pass
 
-            # Create receipt
-            receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
-            hour_data["receipts"].append(receipt_data["receipt"])
-            hour_data["receipt_lines"].extend(receipt_data["lines"])
-            hour_data["store_inventory_txn"].extend(
-                receipt_data["inventory_transactions"]
-            )
+                # Create receipt
+                receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
+                hour_data["receipts"].append(receipt_data["receipt"])
+                hour_data["receipt_lines"].extend(receipt_data["lines"])
+                hour_data["store_inventory_txn"].extend(
+                    receipt_data["inventory_transactions"]
+                )
 
-            # Generate BLE pings for this customer
-            ble_records = self._generate_ble_pings(store, customer, hour_datetime)
-            hour_data["ble_pings"].extend(ble_records)
+                # Generate BLE pings for this customer
+                ble_records = self._generate_ble_pings(store, customer, hour_datetime)
+                hour_data["ble_pings"].extend(ble_records)
 
         return hour_data
 
@@ -2052,13 +2100,29 @@ class FactDataGenerator:
                 transaction_date=transaction_time,
             )
         )
+        # Helpers for integer-cents math
+        from retail_datagen.shared.models import ProductTaxability
+        def _to_cents(d: Decimal) -> int:
+            return int((d * 100).quantize(Decimal("1")))
 
-        # Create receipt lines and inventory transactions
-        # Tax will be calculated per line based on product taxability
-        lines = []
-        inventory_transactions = []
-        subtotal = Decimal("0.00")
-        total_tax = Decimal("0.00")
+        def _fmt_cents(c: int) -> str:
+            sign = '-' if c < 0 else ''
+            c = abs(c)
+            return f"{sign}{c // 100}.{c % 100:02d}"
+
+        def _tax_cents(amount_cents: int, rate: Decimal, taxability: ProductTaxability) -> int:
+            # rate to basis points (1/100 of a percent), multiplier as integer percentage
+            rate_bps = int((rate * 10000).quantize(Decimal("1")))
+            mult_pct = 100 if taxability == ProductTaxability.TAXABLE else 50 if taxability == ProductTaxability.REDUCED_RATE else 0
+            # Compute rounded cents: (amount_cents * rate_bps * mult_pct) / 1_000_000
+            num = amount_cents * rate_bps * mult_pct
+            return (num + 500_000) // 1_000_000
+
+        # Create receipt lines and inventory transactions using integer cents
+        lines: list[dict] = []
+        inventory_transactions: list[dict] = []
+        subtotal_cents = 0
+        total_tax_cents = 0
 
         # Get store tax rate (with backward compatibility default)
         store_tax_rate = (
@@ -2067,41 +2131,22 @@ class FactDataGenerator:
 
         for line_num, item_data in enumerate(basket_items_with_promos, 1):
             product = item_data["product"]
-            qty = item_data["qty"]
-            line_subtotal = item_data["subtotal"]
+            qty = int(item_data["qty"])  # ensure int
             promo_code = item_data.get("promo_code")
-            line_discount = item_data.get("discount", Decimal("0.00"))
+            line_discount_cents = _to_cents(item_data.get("discount", Decimal("0.00")))
 
-            # Calculate unit price (original price before any discount)
-            unit_price = product.SalePrice
-
-            # Calculate extended price (pre-discount subtotal)
-            ext_price_before_discount = (unit_price * qty).quantize(Decimal("0.01"))
-
-            # Apply discount to get final extended price
-            ext_price = (ext_price_before_discount - line_discount).quantize(Decimal("0.01"))
+            # Calculate unit price and ext price in cents
+            unit_price_cents = _to_cents(product.SalePrice)
+            ext_before_cents = unit_price_cents * qty
+            ext_after_cents = max(0, ext_before_cents - line_discount_cents)
 
             # Calculate tax for this line item based on POST-DISCOUNT price
-            # Get taxability multiplier: TAXABLE=1.0, REDUCED_RATE=0.5, NON_TAXABLE=0.0
-            from retail_datagen.shared.models import ProductTaxability
-
             taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
-
-            if taxability == ProductTaxability.TAXABLE:
-                taxability_multiplier = Decimal("1.0")
-            elif taxability == ProductTaxability.REDUCED_RATE:
-                taxability_multiplier = Decimal("0.5")
-            else:  # NON_TAXABLE
-                taxability_multiplier = Decimal("0.0")
-
-            # Calculate line tax on POST-DISCOUNT price (tax on what customer pays)
-            line_tax = (ext_price * store_tax_rate * taxability_multiplier).quantize(
-                Decimal("0.01")
-            )
+            line_tax_cents = _tax_cents(ext_after_cents, store_tax_rate, taxability)
 
             # Accumulate totals
-            subtotal += ext_price
-            total_tax += line_tax
+            subtotal_cents += ext_after_cents
+            total_tax_cents += line_tax_cents
 
             line = {
                 "TraceId": trace_id,
@@ -2110,14 +2155,13 @@ class FactDataGenerator:
                 "Line": line_num,
                 "ProductID": product.ID,
                 "Qty": qty,
-                "UnitPrice": str(unit_price.quantize(Decimal("0.01"))),
-                "ExtPrice": str(ext_price),
+                "UnitPrice": _fmt_cents(unit_price_cents),
+                "ExtPrice": _fmt_cents(ext_after_cents),
                 "PromoCode": promo_code,
             }
             lines.append(line)
 
             # Create inventory transaction (sale)
-            # Update store inventory and get balance
             key = (store.ID, product.ID)
             current_balance = self.inventory_flow_sim._store_inventory.get(key, 0)
             new_balance = max(0, current_balance - qty)
@@ -2138,18 +2182,20 @@ class FactDataGenerator:
             }
             inventory_transactions.append(inventory_transaction)
 
-        # Calculate total with proper formula: Subtotal - Discount + Tax
-        # All values are already Decimal with 2 decimal places
-        total = (subtotal - discount_amount + total_tax).quantize(Decimal("0.01"))
+        # Header-level totals (preserve existing formula: Subtotal - Discount + Tax)
+        discount_amount_cents = _to_cents(discount_amount)
+        total_cents = subtotal_cents - discount_amount_cents + total_tax_cents
 
-        # Validate totals before creating receipt
-        # This should never fail, but catch any floating point edge cases
-        calculated_subtotal = sum(Decimal(line["ExtPrice"]) for line in lines)
-        if abs(calculated_subtotal - subtotal) > Decimal("0.01"):
-            logger.error(
-                f"Receipt {receipt_id}: Subtotal mismatch! "
-                f"Calculated={calculated_subtotal}, Recorded={subtotal}"
-            )
+        # Validate subtotal (sanity check)
+        try:
+            calculated_subtotal_cents = sum(_to_cents(Decimal(line["ExtPrice"])) for line in lines)
+            if abs(calculated_subtotal_cents - subtotal_cents) > 1:
+                logger.error(
+                    f"Receipt {receipt_id}: Subtotal mismatch! "
+                    f"Calculated={calculated_subtotal_cents}, Recorded={subtotal_cents}"
+                )
+        except Exception:
+            pass
 
         # Create receipt header
         receipt = {
@@ -2159,10 +2205,10 @@ class FactDataGenerator:
             "CustomerID": customer.ID,
             "ReceiptId": receipt_id,
             "ReceiptType": "SALE",
-            "Subtotal": str(subtotal),
-            "DiscountAmount": str(discount_amount),  # Phase 2.2: Promotional discounts
-            "Tax": str(total_tax),
-            "Total": str(total),
+            "Subtotal": _fmt_cents(subtotal_cents),
+            "DiscountAmount": _fmt_cents(discount_amount_cents),  # Phase 2.2: Promotional discounts
+            "Tax": _fmt_cents(total_tax_cents),
+            "Total": _fmt_cents(total_cents),
             "TenderType": tender_type.value,
         }
 
@@ -2175,154 +2221,151 @@ class FactDataGenerator:
     def _generate_foot_traffic(
         self, store: Store, hour_datetime: datetime, receipt_count: int
     ) -> list[dict]:
+        """Vectorized foot traffic generator using NumPy for per-sensor aggregates.
+
+        Builds a compact DataFrame and converts to records to minimize
+        Python per-row overhead.
         """
-        Generate foot traffic sensor records with aggregate hourly counts.
-
-        Args:
-            store: Store for which to generate foot traffic
-            hour_datetime: Hour timestamp
-            receipt_count: Number of receipts (customers who purchased) in this hour
-
-        Returns:
-            List of aggregate sensor records (one per sensor per hour)
-        """
-        traffic_records = []
-
         # If no receipts, still may have some foot traffic (browsers)
         if receipt_count == 0:
-            # Small chance of foot traffic even with no sales
             if self._rng.random() > 0.7:
-                return []  # No traffic this hour
-            receipt_count = 1  # Minimal browsing traffic
+                return []
+            receipt_count = 1
 
-        # Calculate conversion rate based on time of day and day of week
         hour = hour_datetime.hour
         is_weekend = hour_datetime.weekday() >= 5
 
-        # Base conversion rate: 20% (1 in 5 visitors make a purchase)
         base_conversion = 0.20
-
-        # Peak hours have higher conversion (shoppers on a mission)
-        if hour in [12, 13, 17, 18, 19]:  # Lunch and after-work peaks
-            conversion_adjustment = 1.3  # 26% conversion
-        elif hour in [10, 11, 14, 15, 16]:  # Moderate hours
-            conversion_adjustment = 1.0  # 20% conversion
-        elif hour in [8, 9, 20, 21]:  # Early/late hours
-            conversion_adjustment = 0.7  # 14% conversion (browsers)
-        else:  # Off hours
-            conversion_adjustment = 0.5  # 10% conversion (minimal traffic)
-
-        # Weekend conversion slightly lower (more browsing)
+        if hour in [12, 13, 17, 18, 19]:
+            conv_adj = 1.3
+        elif hour in [10, 11, 14, 15, 16]:
+            conv_adj = 1.0
+        elif hour in [8, 9, 20, 21]:
+            conv_adj = 0.7
+        else:
+            conv_adj = 0.5
         if is_weekend:
-            conversion_adjustment *= 0.9
+            conv_adj *= 0.9
+        conversion_rate = base_conversion * conv_adj
 
-        conversion_rate = base_conversion * conversion_adjustment
+        total_foot_traffic = max(
+            receipt_count + 1, int(receipt_count / max(conversion_rate, 1e-6))
+        )
 
-        # Calculate total foot traffic from receipts
-        # foot_traffic = receipts / conversion_rate
-        total_foot_traffic = int(receipt_count / conversion_rate)
-        total_foot_traffic = max(receipt_count + 1, total_foot_traffic)  # Always > receipts
+        zones = np.array([
+            "ENTRANCE_MAIN",
+            "ENTRANCE_SIDE",
+            "AISLES_A",
+            "AISLES_B",
+            "CHECKOUT",
+        ])
+        proportions = np.array([0.35, 0.15, 0.20, 0.15, 0.15], dtype=np.float64)
+        base_counts = np.floor(total_foot_traffic * proportions).astype(np.int32)
+        # Add ±10% variance per zone
+        variance = np.floor(base_counts * 0.1).astype(np.int32)
+        # Draw symmetric noise per zone
+        noise = np.array([
+            0 if v <= 0 else self._np_rng.integers(-v, v + 1)
+            for v in variance
+        ], dtype=np.int32)
+        counts = np.maximum(0, base_counts + noise)
 
-        # 5 sensors per store with different traffic proportions
-        # Entrance sensors see the most, aisle sensors see moderate, exit sees all
-        sensor_zones = [
-            ("ENTRANCE_MAIN", 0.35),    # Main entrance - highest traffic
-            ("ENTRANCE_SIDE", 0.15),    # Side entrance - lower traffic
-            ("AISLES_A", 0.20),         # Main shopping aisles
-            ("AISLES_B", 0.15),         # Secondary aisles
-            ("CHECKOUT", 0.15),         # Checkout area
-        ]
+        # Dwell ranges per zone
+        dwell_min = np.array([45, 30, 180, 120, 90], dtype=np.int32)
+        dwell_max = np.array([90, 75, 420, 300, 240], dtype=np.int32)
+        dwell = self._np_rng.integers(dwell_min, dwell_max + 1)
 
-        # Distribute total traffic across sensors based on proportions
-        for zone, proportion in sensor_zones:
-            sensor_id = f"SENSOR_{store.ID:03d}_{zone}"
+        try:
+            import pandas as _pd
 
-            # Calculate count for this sensor
-            sensor_count = int(total_foot_traffic * proportion)
-
-            # Add some randomness (±10%)
-            variance = int(sensor_count * 0.1)
-            if variance > 0:
-                sensor_count += self._rng.randint(-variance, variance)
-
-            # Ensure minimum of 0
-            sensor_count = max(0, sensor_count)
-
-            # Average dwell time varies by zone
-            dwell_times = {
-                "ENTRANCE_MAIN": (45, 90),    # Quick entry
-                "ENTRANCE_SIDE": (30, 75),    # Even quicker
-                "AISLES_A": (180, 420),       # Main shopping time (3-7 min)
-                "AISLES_B": (120, 300),       # Secondary browsing (2-5 min)
-                "CHECKOUT": (90, 240),        # Waiting in line (1.5-4 min)
-            }
-
-            min_dwell, max_dwell = dwell_times[zone]
-            avg_dwell = self._rng.randint(min_dwell, max_dwell)
-
-            # Create one aggregate record per sensor per hour
-            traffic_record = {
-                "TraceId": self._generate_trace_id(),
-                "EventTS": hour_datetime,  # Top of the hour for aggregate
-                "StoreID": store.ID,
-                "SensorId": sensor_id,
-                "Zone": zone,
-                "Dwell": avg_dwell,  # Average dwell time for this hour
-                "Count": sensor_count,  # Aggregate count for the hour
-            }
-            traffic_records.append(traffic_record)
-
-        return traffic_records
+            df = _pd.DataFrame(
+                {
+                    "TraceId": [self._generate_trace_id()] * len(zones),
+                    "EventTS": [hour_datetime] * len(zones),
+                    "StoreID": [store.ID] * len(zones),
+                    "SensorId": [f"SENSOR_{store.ID:03d}_{z}" for z in zones],
+                    "Zone": zones.astype(str),
+                    "Dwell": dwell.astype(int),
+                    "Count": counts.astype(int),
+                }
+            )
+            return df.to_dict("records")
+        except Exception:
+            # Fallback to simple list if pandas unavailable
+            return [
+                {
+                    "TraceId": self._generate_trace_id(),
+                    "EventTS": hour_datetime,
+                    "StoreID": store.ID,
+                    "SensorId": f"SENSOR_{store.ID:03d}_{zones[i]}",
+                    "Zone": str(zones[i]),
+                    "Dwell": int(dwell[i]),
+                    "Count": int(counts[i]),
+                }
+                for i in range(len(zones))
+            ]
 
     def _generate_ble_pings(
         self, store: Store, customer: Customer, transaction_time: datetime
     ) -> list[dict]:
-        """Generate BLE beacon pings for a customer visit.
+        """Generate BLE beacon pings for a customer visit (vectorized inner loop).
 
         30% of BLE pings will have customer_id resolved (customers with store app).
         70% remain anonymous (BLEId only).
         """
-        ble_records = []
-
-        # Simulate customer journey through store with BLE pings
-        zones = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
-        beacons = [f"BEACON_{store.ID:03d}_{zone}" for zone in zones]
-
-        # Customer visits 2-4 zones during their journey
-        visited_zones = self._rng.sample(
-            list(zip(zones, beacons)), self._rng.randint(2, 4)
-        )
-
-        # Determine if this customer has the store app (30% match rate)
+        zones_all = np.array(["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"], dtype=object)
+        beacons_all = np.array([f"BEACON_{store.ID:03d}_{z}" for z in zones_all], dtype=object)
+        # Choose 2-4 distinct zones
+        k = int(self._np_rng.integers(2, 5))
+        pick_idx = np.array(self._np_rng.choice(len(zones_all), size=k, replace=False))
         has_store_app = self._rng.random() < 0.30
 
-        for zone, beacon_id in visited_zones:
-            # Multiple pings per zone (2-5 pings)
-            ping_count = self._rng.randint(2, 5)
+        # Build per-zone ping counts and flatten
+        per_zone_counts = self._np_rng.integers(2, 6, size=k)  # 2-5 pings per chosen zone
+        total = int(per_zone_counts.sum())
+        if total <= 0:
+            return []
+        # Repeat per-zone attributes to match ping counts
+        zones_rep = np.repeat(zones_all[pick_idx], per_zone_counts)
+        beacons_rep = np.repeat(beacons_all[pick_idx], per_zone_counts)
+        rssi = self._np_rng.integers(-80, -29, size=total)
+        offsets = self._np_rng.integers(-15, 16, size=total)
 
-            for _ in range(ping_count):
-                # RSSI varies by distance/proximity
-                rssi = self._rng.randint(-80, -30)  # dBm
+        try:
+            import pandas as _pd
 
-                ping_time = transaction_time + timedelta(
-                    minutes=self._rng.randint(
-                        -15, 15
-                    )  # Within 15 minutes of transaction
-                )
-
-                ble_record = {
-                    "TraceId": self._generate_trace_id(),
-                    "EventTS": ping_time,
+            df = _pd.DataFrame(
+                {
+                    "TraceId": [self._generate_trace_id()] * total,
+                    "EventTS": [transaction_time] * total,
                     "StoreID": store.ID,
-                    "BeaconId": beacon_id,
+                    "BeaconId": beacons_rep,
                     "CustomerBLEId": customer.BLEId,
-                    "CustomerId": customer.ID if has_store_app else None,  # 30% resolution
-                    "RSSI": rssi,
-                    "Zone": zone,
+                    "CustomerId": customer.ID if has_store_app else None,
+                    "RSSI": rssi.astype(int),
+                    "Zone": zones_rep,
                 }
-                ble_records.append(ble_record)
-
-        return ble_records
+            )
+            # Apply offsets to timestamps efficiently
+            df["EventTS"] = df["EventTS"] + _pd.to_timedelta(offsets, unit="m")
+            return df.to_dict("records")
+        except Exception:
+            # Fallback to Python list
+            out = []
+            for i in range(total):
+                out.append(
+                    {
+                        "TraceId": self._generate_trace_id(),
+                        "EventTS": transaction_time + timedelta(minutes=int(offsets[i])),
+                        "StoreID": store.ID,
+                        "BeaconId": str(beacons_rep[i]),
+                        "CustomerBLEId": customer.BLEId,
+                        "CustomerId": customer.ID if has_store_app else None,
+                        "RSSI": int(rssi[i]),
+                        "Zone": str(zones_rep[i]),
+                    }
+                )
+            return out
 
     def _generate_truck_movements(
         self, date: datetime, store_transactions: list[dict]
@@ -2553,9 +2596,8 @@ class FactDataGenerator:
                 continue
 
             try:
-                # Convert records to DataFrame for database insertion
-                df = pd.DataFrame(records)
-                await self._insert_hourly_to_db(self._session, fact_table, df, hour)
+                # Insert records directly without DataFrame conversion
+                await self._insert_hourly_to_db(self._session, fact_table, records, hour)
             except Exception as e:
                 logger.error(
                     f"Failed to insert {fact_table} hour {hour} to database: {e}"
@@ -3003,14 +3045,13 @@ class FactDataGenerator:
                 }
             )
 
-        # Insert returns
-        import pandas as pd
+        # Insert returns in a single commit each (daily batch)
         if return_receipts:
-            await self._insert_hourly_to_db(self._session, "receipts", pd.DataFrame(return_receipts), hour=0, commit_every_batches=1)
+            await self._insert_hourly_to_db(self._session, "receipts", return_receipts, hour=0, commit_every_batches=0)
         if return_lines:
-            await self._insert_hourly_to_db(self._session, "receipt_lines", pd.DataFrame(return_lines), hour=0, commit_every_batches=1)
+            await self._insert_hourly_to_db(self._session, "receipt_lines", return_lines, hour=0, commit_every_batches=0)
         if return_store_txn and "store_inventory_txn" in active_tables:
-            await self._insert_hourly_to_db(self._session, "store_inventory_txn", pd.DataFrame(return_store_txn), hour=0, commit_every_batches=1)
+            await self._insert_hourly_to_db(self._session, "store_inventory_txn", return_store_txn, hour=0, commit_every_batches=0)
 
     def _map_field_names_for_db(self, table_name: str, record: dict) -> dict:
         """
@@ -3160,24 +3201,107 @@ class FactDataGenerator:
             db_field = mapping.get(gen_field, gen_field.lower())
             mapped_record[db_field] = value
 
+        # DuckDB fast-path: keep external linking keys on line tables to avoid FK lookups
+        if getattr(self, "_use_duckdb", False):
+            if table_name == "receipt_lines":
+                ext = record.get("ReceiptId")
+                if ext is not None and "receipt_id" not in mapped_record:
+                    mapped_record["receipt_id_ext"] = ext
+            elif table_name == "online_order_lines":
+                ext = record.get("OrderId")
+                if ext is not None and "order_id" not in mapped_record:
+                    mapped_record["order_id_ext"] = ext
+
         return mapped_record
+
+    async def _capture_and_drop_indexes(
+        self, session: AsyncSession, generator_table_names: list[str]
+    ) -> list[tuple[str, str]]:
+        """
+        Capture and drop nonessential indexes for specified tables to speed bulk inserts.
+
+        Returns a list of (index_name, create_sql) to recreate later.
+        Keeps indexes that are critical to linkage lookups (receipt_id_ext, order_id_ext).
+        """
+        from sqlalchemy import text
+
+        captured: list[tuple[str, str]] = []
+        try:
+            for gen_name in generator_table_names:
+                try:
+                    model = self._get_model_for_table(gen_name)
+                except Exception:
+                    continue
+                tbl = getattr(model, "__tablename__", None)
+                if not tbl:
+                    continue
+                rows = (
+                    await session.execute(
+                        text(
+                            "SELECT name, sql FROM sqlite_master "
+                            "WHERE type='index' AND tbl_name=:tbl AND sql IS NOT NULL"
+                        ),
+                        {"tbl": tbl},
+                    )
+                ).all()
+
+                for name, sql in rows:
+                    if not name or not sql:
+                        continue
+                    lname = str(name).lower()
+                    lsql = str(sql).lower()
+                    # Keep ext-id linkage indexes to avoid slow lookups during generation
+                    if (
+                        ("receipt" in lname and "ext" in lname)
+                        or ("order" in lname and "ext" in lname)
+                        or ("receipt_id_ext" in lsql)
+                        or ("order_id_ext" in lsql)
+                    ):
+                        continue
+                    captured.append((name, sql))
+                    try:
+                        await session.execute(text(f'DROP INDEX IF EXISTS "{name}"'))
+                    except Exception as e:
+                        logger.debug(f"Failed to drop index {name} on {tbl}: {e}")
+            await session.commit()
+        except Exception as e:
+            logger.debug(f"Index capture/drop skipped due to error: {e}")
+        return captured
+
+    async def _recreate_indexes(
+        self, session: AsyncSession, index_defs: list[tuple[str, str]]
+    ) -> None:
+        """Recreate previously captured indexes after bulk inserts complete."""
+        from sqlalchemy import text
+
+        if not index_defs:
+            return
+        try:
+            for name, sql in index_defs:
+                try:
+                    await session.execute(text(sql))
+                except Exception as e:
+                    logger.debug(f"Failed to recreate index {name}: {e}")
+            await session.commit()
+        except Exception as e:
+            logger.debug(f"Index recreation encountered an error: {e}")
 
     async def _insert_hourly_to_db(
         self,
         session: AsyncSession,
         table_name: str,
-        df: pd.DataFrame,
+        data: list[dict] | pd.DataFrame,
         hour: int,
         batch_size: int = 10000,
-        commit_every_batches: int = 1,
+        commit_every_batches: int = 0,
     ) -> None:
         """
-        Insert hourly data batch into SQLite.
+        Insert hourly data batch into the database (DuckDB fast-path).
 
         Args:
             session: Database session for facts.db
             table_name: Name of fact table (e.g., "receipts")
-            df: DataFrame with hourly data
+            data: List of dicts or DataFrame with hourly data
             hour: Hour index (0-23)
             batch_size: Rows per batch insert (default: 10000)
 
@@ -3186,19 +3310,95 @@ class FactDataGenerator:
             Individual batches are not committed to minimize I/O overhead.
             Field names are automatically mapped from PascalCase to snake_case.
         """
-        if df.empty:
+        # Normalize input into list of dict records
+        records: list[dict]
+        try:
+            import pandas as _pd
+            if isinstance(data, _pd.DataFrame):
+                if data.empty:
+                    logger.debug(f"No data to insert for {table_name} hour {hour}")
+                    return
+                records = data.to_dict("records")
+            else:
+                records = list(data or [])
+        except Exception:
+            # If pandas not available, assume list path
+            records = list(data or [])  # type: ignore[arg-type]
+        if not records:
             logger.debug(f"No data to insert for {table_name} hour {hour}")
             return
 
-        # Map table name to model
+        # DuckDB fast path
+        if getattr(self, "_use_duckdb", False) and getattr(self, "_duckdb_conn", None) is not None:
+            try:
+                # Map and normalize records for DuckDB
+                mapped_records = [self._map_field_names_for_db(table_name, r) for r in records]
+
+                # Normalize NaNs/NaT to None
+                try:
+                    import pandas as _pd
+
+                    df = _pd.DataFrame(mapped_records)
+                except Exception:
+                    import pandas as _pd  # fallback
+
+                    df = _pd.DataFrame.from_records(mapped_records)
+
+                # Create/insert into DuckDB table
+                from retail_datagen.db.duckdb_engine import insert_dataframe
+
+                # Map generator table name to DuckDB table (match existing naming)
+                duck_table = {
+                    "dc_inventory_txn": "fact_dc_inventory_txn",
+                    "truck_moves": "fact_truck_moves",
+                    "store_inventory_txn": "fact_store_inventory_txn",
+                    "receipts": "fact_receipts",
+                    "receipt_lines": "fact_receipt_lines",
+                    "foot_traffic": "fact_foot_traffic",
+                    "ble_pings": "fact_ble_pings",
+                    "marketing": "fact_marketing",
+                    "online_orders": "fact_online_order_headers",
+                    "online_order_lines": "fact_online_order_lines",
+                }.get(table_name, table_name)
+
+                inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
+
+                # Update per-table counts and emit progress
+                try:
+                    if not hasattr(self, "_table_insert_counts"):
+                        self._table_insert_counts = {}
+                    self._table_insert_counts[table_name] = (
+                        self._table_insert_counts.get(table_name, 0) + int(inserted)
+                    )
+
+                    tracker_state = self.hourly_tracker.get_current_progress()
+                    completed_hours = tracker_state.get("completed_hours", {}).get(
+                        table_name, 0
+                    )
+                    total_days = tracker_state.get("total_days") or 1
+                    total_hours_expected = max(1, total_days * 24)
+                    # Treat full batch as completing the hour for this table
+                    per_table_fraction = min(
+                        1.0, (completed_hours + 1.0) / total_hours_expected
+                    )
+                    self._emit_table_progress(
+                        table_name,
+                        per_table_fraction,
+                        f"Writing {table_name.replace('_', ' ')} ({self._table_insert_counts[table_name]:,})",
+                        {table_name: self._table_insert_counts[table_name]},
+                    )
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(f"DuckDB insert failed for {table_name}: {e}")
+            return
+
+        # Map table name to model (SQLite path)
         try:
             model_class = self._get_model_for_table(table_name)
         except ValueError as e:
             logger.error(f"Cannot insert data: {e}")
             return
-
-        # Convert DataFrame to records
-        records = df.to_dict("records")
 
         # Special handling: link receipt_lines to receipts by external id
         if table_name == "receipt_lines":
@@ -3277,7 +3477,7 @@ class FactDataGenerator:
                 self._map_field_names_for_db(table_name, record) for record in records
             ]
 
-        # Normalize pandas NaT/NaN values to None to satisfy SQLAlchemy/SQLite
+        # Normalize pandas NaT/NaN values to None for DB serialization
         # Pandas can produce NaT (datetime) and NaN (float) which fail for
         # INTEGER/DATETIME columns during bulk insert. Convert any pd.isna(x)
         # values to plain None so NULLs are written instead.

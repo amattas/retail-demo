@@ -5,17 +5,13 @@ This module provides reusable service components for data export,
 transformation, and other cross-cutting concerns.
 """
 
-from .db_reader import (
-    DEFAULT_CHUNK_SIZE,
+from .duckdb_reader import (
     FACT_TABLES,
     MASTER_TABLES,
-    get_all_fact_table_date_ranges,
-    get_fact_table_date_range,
-    get_table_row_count,
+    get_all_fact_table_date_ranges,  # type: ignore[attr-defined]
+    get_fact_table_date_range,  # type: ignore[attr-defined]
     read_all_fact_tables,
     read_all_master_tables,
-    read_fact_table,
-    read_master_table,
 )
 from .export_service import ExportService
 from .file_manager import ExportFileManager
@@ -30,18 +26,13 @@ __all__ = [
     "BaseWriter",
     "CSVWriter",
     "ParquetWriter",
-    # Master table reading
-    "read_master_table",
+    # Readers (DuckDB)
     "read_all_master_tables",
-    # Fact table reading
-    "read_fact_table",
     "read_all_fact_tables",
-    # Utility functions
-    "get_table_row_count",
+    # Date range helpers (DuckDB)
     "get_fact_table_date_range",
     "get_all_fact_table_date_ranges",
-    # Constants
+    # Constants (DuckDB)
     "MASTER_TABLES",
     "FACT_TABLES",
-    "DEFAULT_CHUNK_SIZE",
 ]

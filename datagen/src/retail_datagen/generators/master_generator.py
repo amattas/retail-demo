@@ -13,10 +13,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
-
 from retail_datagen.config.models import RetailConfig
+import numpy as np
 from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.dictionary_loader import DictionaryLoader
 from retail_datagen.shared.models import (
@@ -41,38 +39,18 @@ from retail_datagen.shared.validators import (
 )
 from retail_datagen.shared.store_profiles import StoreProfiler
 
-# Import SQLAlchemy models for database insertion
-try:
-    from retail_datagen.db.models.master import (
-        Customer as CustomerModel,
-    )
-    from retail_datagen.db.models.master import (
-        DistributionCenter as DistributionCenterModel,
-    )
-    from retail_datagen.db.models.master import (
-        Geography as GeographyModel,
-    )
-    from retail_datagen.db.models.master import (
-        Product as ProductModel,
-    )
-    from retail_datagen.db.models.master import (
-        Store as StoreModel,
-    )
-    from retail_datagen.db.models.master import (
-        Truck as TruckModel,
-    )
-    from retail_datagen.db.session import get_retail_session
+class _DuckModel:
+    def __init__(self, name: str):
+        self.__tablename__ = name
 
-    SQLALCHEMY_AVAILABLE = True
-except ImportError:
-    SQLALCHEMY_AVAILABLE = False
-    GeographyModel = None
-    StoreModel = None
-    DistributionCenterModel = None
-    TruckModel = None
-    CustomerModel = None
-    ProductModel = None
-    get_retail_session = None
+
+# Logical-to-physical mappings for DuckDB tables
+GeographyModel = _DuckModel("dim_geographies")
+StoreModel = _DuckModel("dim_stores")
+DistributionCenterModel = _DuckModel("dim_distribution_centers")
+TruckModel = _DuckModel("dim_trucks")
+CustomerModel = _DuckModel("dim_customers")
+ProductModel = _DuckModel("dim_products")
 
 from .progress_tracker import TableProgressTracker
 from .utils import (
@@ -109,6 +87,7 @@ class MasterDataGenerator:
 
         # Initialize random number generator with seed
         self._rng = random.Random(config.seed)
+        self._np_rng = np.random.default_rng(config.seed + 777)
 
         # Initialize utility classes
         self.dictionary_loader = DictionaryLoader(config.paths.dictionaries)
@@ -162,6 +141,16 @@ class MasterDataGenerator:
         # Table progress tracker for state management
         self._progress_tracker: TableProgressTracker | None = None
 
+        # Enable DuckDB fast path for master writes
+        self._use_duckdb = True
+        self._duckdb_conn = None
+        try:
+            from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
+            self._duckdb_conn = get_duckdb_conn()
+        except Exception:
+            self._use_duckdb = False
+
         print(f"MasterDataGenerator initialized with seed {config.seed}")
 
     def set_progress_callback(
@@ -185,11 +174,10 @@ class MasterDataGenerator:
         """Register or clear a callback for incremental progress updates."""
         self._progress_callback = callback
 
-    def _get_ui_table_name(self, model_class: type[DeclarativeBase]) -> str | None:
+    def _get_ui_table_name(self, model_class: Any) -> str | None:
         """Map ORM model to UI table key used by progress tiles."""
-        try:
-            tbl = model_class.__tablename__
-        except Exception:
+        tbl = getattr(model_class, "__tablename__", None)
+        if not tbl:
             return None
 
         mapping = {
@@ -204,8 +192,8 @@ class MasterDataGenerator:
 
     async def _insert_to_db(
         self,
-        session: AsyncSession,
-        model_class: type[DeclarativeBase],
+        session: Any | None,
+        model_class: Any,
         pydantic_models: list,
         batch_size: int = 10000,
         commit_every_batches: int = 5,
@@ -238,12 +226,30 @@ class MasterDataGenerator:
             # Convert Pydantic models to dictionaries
             records = []
             for model in pydantic_models:
-                # Convert Pydantic model to dict
                 record = model.model_dump()
-
-                # Map Pydantic field names to SQLAlchemy column names
                 mapped_record = self._map_pydantic_to_db_columns(record, model_class)
                 records.append(mapped_record)
+
+            # DuckDB fast path: write entire table via Arrow/Parquet buffers
+            if getattr(self, "_use_duckdb", False) and getattr(self, "_duckdb_conn", None) is not None:
+                import pandas as pd
+                from retail_datagen.db.duckdb_engine import insert_dataframe
+
+                df = pd.DataFrame.from_records(records)
+                inserted = insert_dataframe(self._duckdb_conn, table_name, df)
+
+                # Emit final progress as completed
+                if ui_table_name:
+                    self._emit_progress(
+                        ui_table_name,
+                        1.0,
+                        f"Writing {ui_table_name.replace('_', ' ')} ({inserted:,}/{total_records:,})",
+                        {ui_table_name: int(inserted)},
+                    )
+                logger.info(
+                    f"Inserted {inserted:,} / {total_records:,} rows into {table_name} (DuckDB)"
+                )
+                return
 
             # Insert in batches for performance and memory efficiency
             batch_index = 0
@@ -297,58 +303,18 @@ class MasterDataGenerator:
     def _map_pydantic_to_db_columns(
         self,
         pydantic_dict: dict[str, Any],
-        model_class: type[DeclarativeBase],
+        model_class: Any,
     ) -> dict[str, Any]:
-        """
-        Map Pydantic model field names to SQLAlchemy column names.
-
-        The Pydantic models use PascalCase field names (e.g., ID, City, State),
-        while SQLAlchemy models use the same column names in the database.
-        This method also handles type conversions as needed.
-
-        Args:
-            pydantic_dict: Dictionary from Pydantic model.model_dump()
-            model_class: SQLAlchemy model class for column mapping
-
-        Returns:
-            Dictionary with database column names and properly typed values
-        """
-        mapped = {}
-
-        # Build set of actual DB column names for simple key normalization
-        db_columns = {col.name for col in model_class.__table__.columns}
-
-        for key, value in pydantic_dict.items():
-            # Convert Decimal to float for SQLite
-            if isinstance(value, Decimal):
-                value = float(value)
-
-            # Convert datetime to date for SQLite Date columns (e.g., Product.LaunchDate)
-            # SQLite's Date type only accepts Python date objects.
-            elif isinstance(value, datetime):
-                value = value.date()
-
-            # Convert enums (like ProductTaxability) to their string value for SQLite
-            elif hasattr(value, 'value') and hasattr(value, '__class__') and hasattr(value.__class__, '__mro__'):
-                # Check if it's an enum by looking for the Enum base class
-                from enum import Enum
-                if any(base.__name__ == 'Enum' for base in value.__class__.__mro__):
-                    value = value.value
-
-            # Handle None values
-            elif value is None:
-                pass
-
-            # Map to correct column name
-            # Most Pydantic keys match DB column names exactly (PascalCase).
-            # For newly added optional columns like product 'tags', accept 'Tags' and map to 'tags'.
-            if key in db_columns:
-                mapped[key] = value
-            elif key.lower() in db_columns:
-                mapped[key.lower()] = value
-            else:
-                mapped[key] = value
-
+        """Identity mapping for DuckDB inserts via pandas DataFrame."""
+        mapped = dict(pydantic_dict)
+        # Normalize Decimal to float for DataFrame serialization
+        for k, v in list(mapped.items()):
+            if isinstance(v, Decimal):
+                mapped[k] = float(v)
+            # Convert datetime to date for date-typed columns if present
+            elif isinstance(v, datetime):
+                # Keep as datetime; DuckDB will coerce appropriately
+                mapped[k] = v
         return mapped
 
     def _emit_progress(
@@ -410,22 +376,19 @@ class MasterDataGenerator:
 
     async def generate_all_master_data_async(
         self,
-        session: AsyncSession,
+        session: Any | None,
     ) -> None:
         """
-        Generate all master data tables and write to SQLite database.
+        Generate all master data tables and write to DuckDB.
 
         Args:
-            session: AsyncSession for retail.db (required)
+            session: Unused; retained for backward compatibility
         """
-        if not SQLALCHEMY_AVAILABLE:
-            raise RuntimeError(
-                "SQLAlchemy models not available. Cannot write to database."
-            )
 
         print("Starting master data generation...")
 
         # Store session for later use
+        # DuckDB-only: session is unused; retain attribute for legacy checks
         self._db_session = session
 
         # Load dictionary data
@@ -465,15 +428,7 @@ class MasterDataGenerator:
         # Validate foreign key relationships
         self._validate_foreign_keys()
 
-        # NOTE: Do NOT commit here - let the calling context manager handle commit
-        # This prevents double-commit issues with get_retail_session() context manager
-
-        # Flush to ensure all changes are in the transaction
-        if session:
-            await session.flush()
-            logger.info(
-                "All master data flushed to session (commit will be handled by context manager)"
-            )
+        # DuckDB does not require explicit commits under this write pattern
 
         # Mark all tables as completed
         if self._progress_tracker:
@@ -616,11 +571,10 @@ class MasterDataGenerator:
 
         print(f"Generated {len(self.geography_master)} geography master records")
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(
-                self._db_session, GeographyModel, self.geography_master
-            )
+        # Write to DuckDB (DuckDB-only runtime)
+        await self._insert_to_db(
+            None, GeographyModel, self.geography_master
+        )
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("geographies_master")
         self._emit_progress("geographies_master", 1.0, "Geographies complete")
@@ -919,13 +873,12 @@ class MasterDataGenerator:
 
         print(f"Assigned profiles to {len(store_profiles)} stores")
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(self._db_session, StoreModel, self.stores)
-            # Now mark complete after DB write
-            if self._progress_tracker:
-                self._progress_tracker.mark_table_completed("stores")
-            self._emit_progress("stores", 1.0, "Stores complete")
+        # Write to DuckDB
+        await self._insert_to_db(None, StoreModel, self.stores)
+        # Now mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("stores")
+        self._emit_progress("stores", 1.0, "Stores complete")
 
         self._emit_progress(
             "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
@@ -1001,11 +954,10 @@ class MasterDataGenerator:
         # Call sync method for generation logic (without DB writes)
         self.generate_distribution_centers()
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(
-                self._db_session, DistributionCenterModel, self.distribution_centers
-            )
+        # Write to DuckDB
+        await self._insert_to_db(
+            None, DistributionCenterModel, self.distribution_centers
+        )
 
     def generate_trucks(self) -> None:
         """Generate trucks.csv with refrigeration capabilities and DC assignment."""
@@ -1291,13 +1243,12 @@ class MasterDataGenerator:
         # Call sync method for generation logic
         self.generate_trucks()
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(self._db_session, TruckModel, self.trucks)
-            # Mark complete after DB write
-            if self._progress_tracker:
-                self._progress_tracker.mark_table_completed("trucks")
-            self._emit_progress("trucks", 1.0, "Trucks complete")
+        # Write to DuckDB
+        await self._insert_to_db(None, TruckModel, self.trucks)
+        # Mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("trucks")
+        self._emit_progress("trucks", 1.0, "Trucks complete")
 
     def generate_customers(self) -> None:
         """Generate customers.csv with realistic geographic distribution."""
@@ -1353,27 +1304,50 @@ class MasterDataGenerator:
                 )
             )
 
-            for _ in range(count):
-                first_name, last_name = name_generator.generate_name_pair()
+            if count <= 0:
+                continue
 
-                customer = Customer(
-                    ID=current_id,
-                    FirstName=first_name,
-                    LastName=last_name,
-                    Address=address_generator.generate_address(geo, "residential"),
-                    GeographyID=geo_master.ID,
-                    LoyaltyCard=id_generator.generate_loyalty_card(current_id),
-                    Phone=id_generator.generate_phone_number(),
-                    BLEId=id_generator.generate_ble_id(current_id),
-                    AdId=id_generator.generate_ad_id(current_id),
-                )
+            # Vectorized first/last name sampling
+            firsts = self._np_rng.choice(self._first_names, size=count, replace=True)
+            lasts = self._np_rng.choice(self._last_names, size=count, replace=True)
 
-                self.customers.append(customer)
-                current_id += 1
+            # Pre-allocate IDs for this geography block
+            ids = list(range(current_id, current_id + count))
 
-                # Update internal reporter; UI progress will reflect DB insert
-                if len(self.customers) % 1000 == 0:
-                    progress_reporter.update(1000)
+            # Addresses (cannot fully vectorize due to generator logic)
+            addresses = [
+                address_generator.generate_address(geo, "residential") for _ in range(count)
+            ]
+
+            # Loyalty/Phone/BLE/Ad IDs
+            loyalty_cards = [id_generator.generate_loyalty_card(cid) for cid in ids]
+            phones = [id_generator.generate_phone_number() for _ in ids]
+            ble_ids = [id_generator.generate_ble_id(cid) for cid in ids]
+            ad_ids = [id_generator.generate_ad_id(cid) for cid in ids]
+
+            # Build Customer objects with list comprehension
+            self.customers.extend(
+                [
+                    Customer(
+                        ID=cid,
+                        FirstName=str(firsts[i]),
+                        LastName=str(lasts[i]),
+                        Address=addresses[i],
+                        GeographyID=geo_master.ID,
+                        LoyaltyCard=loyalty_cards[i],
+                        Phone=phones[i],
+                        BLEId=ble_ids[i],
+                        AdId=ad_ids[i],
+                    )
+                    for i, cid in enumerate(ids)
+                ]
+            )
+
+            current_id += count
+
+            # Update internal reporter; UI progress will reflect DB insert
+            if len(self.customers) % 5000 == 0:
+                progress_reporter.update(5000)
 
         progress_reporter.complete()
         # Don't mark complete yet; DB write progress will follow
@@ -1389,32 +1363,18 @@ class MasterDataGenerator:
         # Call sync method for generation logic
         self.generate_customers()
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(
-                self._db_session,
-                CustomerModel,
-                self.customers,
-                batch_size=5000,
-                commit_every_batches=1,
-            )
-            # Mark complete after DB write
-            if self._progress_tracker:
-                self._progress_tracker.mark_table_completed("customers")
-            self._emit_progress("customers", 1.0, "Customers complete")
-            # Verify DB count matches generated count for diagnostics
-            try:
-                from sqlalchemy import func, select
-
-                result = await self._db_session.execute(
-                    select(func.count()).select_from(CustomerModel)
-                )
-                db_count = int(result.scalar() or 0)
-                logger.info(
-                    f"Customer insert verification: expected={len(self.customers):,}, db={db_count:,}"
-                )
-            except Exception as e:
-                logger.warning(f"Could not verify customer DB count: {e}")
+        # Write to DuckDB
+        await self._insert_to_db(
+            None,
+            CustomerModel,
+            self.customers,
+            batch_size=5000,
+            commit_every_batches=1,
+        )
+        # Mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("customers")
+        self._emit_progress("customers", 1.0, "Customers complete")
 
     def generate_products_master(self) -> None:
         """Generate products_master.csv with realistic pricing and brand combinations.""" 
@@ -1491,19 +1451,16 @@ class MasterDataGenerator:
 
         print(f"Total valid category-matched combinations: {len(valid_combinations):,}")
 
-        # Sample exactly target_product_count combinations from valid ones
-        if len(valid_combinations) >= target_product_count:
-            selected_combinations = self._rng.sample(
-                valid_combinations, target_product_count
-            )
+        # Vectorized sampling of combinations using NumPy
+        vc_count = len(valid_combinations)
+        if vc_count == 0:
+            selected_combinations = []
         else:
-            # If we don't have enough valid combinations, use all and fill the rest by sampling with replacement
-            selected_combinations = valid_combinations.copy()
-            additional_needed = target_product_count - len(valid_combinations)
-            additional_combinations = self._rng.choices(
-                valid_combinations, k=additional_needed
+            replace = vc_count < target_product_count
+            idx = self._np_rng.choice(
+                vc_count, size=target_product_count, replace=replace
             )
-            selected_combinations.extend(additional_combinations)
+            selected_combinations = [valid_combinations[i] for i in idx]
 
         print(f"Selected {len(selected_combinations)} category-matched combinations")
 
@@ -1527,9 +1484,9 @@ class MasterDataGenerator:
                 print(
                     f"Exhausted combinations at {combination_idx} with {successful_products}/{target_product_count} successful products. Generating {batch_size} more combinations..."
                 )
-                additional_combinations = self._rng.choices(
-                    valid_combinations, k=batch_size
-                )
+                # Vectorized resample using NumPy for speed
+                add_idx = self._np_rng.integers(0, len(valid_combinations), size=batch_size)
+                additional_combinations = [valid_combinations[i] for i in add_idx]
                 selected_combinations.extend(additional_combinations)
 
             product_idx, brand_idx = selected_combinations[combination_idx]
@@ -1556,7 +1513,8 @@ class MasterDataGenerator:
             base_price = float(product.BasePrice)
 
             # Add brand-specific price variation (±5-15%)
-            price_variation = self._rng.uniform(0.85, 1.15)
+            # Draw brand-specific variation via NumPy RNG
+            price_variation = float(self._np_rng.uniform(0.85, 1.15))
             adjusted_base_price = base_price * price_variation
 
             # Convert to Decimal for pricing calculator
@@ -1678,32 +1636,18 @@ class MasterDataGenerator:
         # Call sync method for generation logic
         self.generate_products_master()
 
-        # Insert to database if session provided
-        if hasattr(self, "_db_session") and self._db_session:
-            await self._insert_to_db(
-                self._db_session,
-                ProductModel,
-                self.products_master,
-                batch_size=2000,
-                commit_every_batches=1,
-            )
-            # Mark complete after DB write
-            if self._progress_tracker:
-                self._progress_tracker.mark_table_completed("products_master")
-            self._emit_progress("products_master", 1.0, "Products master complete")
-            # Verify DB count matches generated count for diagnostics
-            try:
-                from sqlalchemy import func, select
-
-                result = await self._db_session.execute(
-                    select(func.count()).select_from(ProductModel)
-                )
-                db_count = int(result.scalar() or 0)
-                logger.info(
-                    f"Product insert verification: expected={len(self.products_master):,}, db={db_count:,}"
-                )
-            except Exception as e:
-                logger.warning(f"Could not verify product DB count: {e}")
+        # Write to DuckDB
+        await self._insert_to_db(
+            None,
+            ProductModel,
+            self.products_master,
+            batch_size=2000,
+            commit_every_batches=1,
+        )
+        # Mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("products_master")
+        self._emit_progress("products_master", 1.0, "Products master complete")
 
     def _map_product_to_brand_category(
         self, product_category: str, product_department: str
