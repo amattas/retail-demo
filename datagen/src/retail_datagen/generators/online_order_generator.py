@@ -166,6 +166,13 @@ def generate_online_orders_with_lifecycle(
         order_subtotal = Decimal("0.00")
         order_tax = Decimal("0.00")
 
+        # Decide if this order will be cancelled (small rate)
+        # 2% baseline cancellation rate
+        is_cancelled_order = rng.random() < 0.02
+
+        # Line-level promotion usage rate: 10%-30% of lines carry a promo
+        promo_line_rate = rng.uniform(0.10, 0.30)
+
         for product, qty in items:
             # Get product taxability
             taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
@@ -178,13 +185,30 @@ def generate_online_orders_with_lifecycle(
                 taxability_multiplier = Decimal("0.0")
 
             # Calculate line subtotal and tax
-            line_subtotal = (product.SalePrice * qty).quantize(Decimal("0.01"))
+            # Apply a simple promo on some lines (5%, 10%, 20%)
+            unit_price = product.SalePrice
+            apply_promo = rng.random() < promo_line_rate
+            promo_code = None
+            discount_mult = Decimal("1.0")
+            if apply_promo and not is_cancelled_order:
+                promo_pct = rng.choices([Decimal("0.05"), Decimal("0.10"), Decimal("0.20")], weights=[0.5, 0.35, 0.15])[0]
+                discount_mult = (Decimal("1.0") - promo_pct)
+                # Encode promo in a simple code
+                promo_code = f"PROMO{int(promo_pct * 100)}"
+
+            line_subtotal = (unit_price * qty * discount_mult).quantize(Decimal("0.01"))
             line_tax = (line_subtotal * fulfillment_tax_rate * taxability_multiplier).quantize(Decimal("0.01"))
 
             order_subtotal += line_subtotal
             order_tax += line_tax
 
         order_total = (order_subtotal + order_tax).quantize(Decimal("0.01"))
+        # Integer cents for numeric columns
+        def _cents(d: Decimal) -> int:
+            return int((d * 100).quantize(Decimal('1')))
+        order_sub_cents = _cents(order_subtotal)
+        order_tax_cents = _cents(order_tax)
+        order_total_cents = _cents(order_total)
 
         # Per-line routing assignments (omnichannel can split across nodes)
         line_routing = []  # (product_id, node_type, node_id, line_mode, line_status)
@@ -194,7 +218,19 @@ def generate_online_orders_with_lifecycle(
         for product, qty in items:
             line_num += 1
             unit_price = product.SalePrice
-            ext_price = (unit_price * qty).quantize(Decimal("0.01"))
+
+            # Recompute promo for this specific line consistent with header totals
+            apply_promo = rng.random() < promo_line_rate
+            promo_code = None
+            discount_mult = Decimal("1.0")
+            if apply_promo and not is_cancelled_order:
+                promo_pct = rng.choices([Decimal("0.05"), Decimal("0.10"), Decimal("0.20")], weights=[0.5, 0.35, 0.15])[0]
+                discount_mult = (Decimal("1.0") - promo_pct)
+                promo_code = f"PROMO{int(promo_pct * 100)}"
+
+            ext_price = (unit_price * qty * discount_mult).quantize(Decimal("0.01"))
+            unit_cents = _cents(unit_price)
+            ext_cents = _cents(ext_price)
 
             # Choose per-line routing (can differ from header)
             line_mode = rng.choices(["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10])[0]
@@ -228,7 +264,12 @@ def generate_online_orders_with_lifecycle(
                 import random as _r
                 return _r.triangular(min_h, max_h, mode_h)
 
-            if line_mode == "BOPIS":
+            if is_cancelled_order:
+                _picked_ts = None
+                _shipped_ts = None
+                _delivered_ts = None
+                line_status = "CANCELLED"
+            elif line_mode == "BOPIS":
                 pickup_h = max(4.0, _tri_h(4, 12, 24) * float(holiday_factor))
                 _picked_ts = created_ts + timedelta(hours=max(1, int(pickup_h // 2)))
                 _shipped_ts = None
@@ -263,7 +304,9 @@ def generate_online_orders_with_lifecycle(
                     "Qty": qty,
                     "UnitPrice": str(unit_price.quantize(Decimal("0.01"))),
                     "ExtPrice": str(ext_price),
-                    "PromoCode": None,
+                    "UnitCents": unit_cents,
+                    "ExtCents": ext_cents,
+                    "PromoCode": promo_code,
                     # Per-line fulfillment lifecycle
                     "PickedTS": _picked_ts,
                     "ShippedTS": _shipped_ts,
@@ -304,6 +347,15 @@ def generate_online_orders_with_lifecycle(
             if delivered_times:
                 completed_ts = max(delivered_times)
 
+        # If cancelled, zero out financials to reflect refund/void
+        if is_cancelled_order:
+            order_subtotal = Decimal("0.00")
+            order_tax = Decimal("0.00")
+            order_total = Decimal("0.00")
+            order_sub_cents = 0
+            order_tax_cents = 0
+            order_total_cents = 0
+
         orders.append(
             {
                 "TraceId": trace_id_created,
@@ -313,6 +365,9 @@ def generate_online_orders_with_lifecycle(
                 "Subtotal": str(order_subtotal),
                 "Tax": str(order_tax),
                 "Total": str(order_total),
+                "SubtotalCents": order_sub_cents,
+                "TaxCents": order_tax_cents,
+                "TotalCents": order_total_cents,
                 "TenderType": tender_type.value,
                 # Header completion timestamp; leave other lifecycle on lines
                 "CompletedTS": completed_ts,

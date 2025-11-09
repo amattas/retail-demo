@@ -365,6 +365,12 @@ class PerformanceConfig(BaseModel):
         gt=0,
         description="Override maximum number of parallel workers. If None, calculated from max_cpu_percent.",
     )
+    batch_hours: int = Field(
+        1,
+        ge=1,
+        le=24,
+        description="Batch N hours of data before inserting to DuckDB (1 = no batching)",
+    )
 
     def get_max_workers(self) -> int:
         """Calculate maximum workers based on CPU limit."""

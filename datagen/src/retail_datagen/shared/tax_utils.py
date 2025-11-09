@@ -80,11 +80,11 @@ class TaxCalculator:
                 missing = required_columns - set(self.tax_rates.columns)
                 raise ValueError(f"Missing required columns in tax_rates.csv: {missing}")
 
-            # Build (StateCode, City) -> CombinedRate cache
-            for _, row in self.tax_rates.iterrows():
-                state = str(row["StateCode"]).strip().upper()
-                city = str(row["City"]).strip()
-                rate = Decimal(str(row["CombinedRate"]))
+            # Build (StateCode, City) -> CombinedRate cache (use itertuples for speed)
+            for row in self.tax_rates.itertuples(index=False):
+                state = str(getattr(row, "StateCode")).strip().upper()
+                city = str(getattr(row, "City")).strip()
+                rate = Decimal(str(getattr(row, "CombinedRate")))
 
                 # Validate rate is in valid range (0-15%)
                 if not (Decimal("0") <= rate <= Decimal("0.15")):

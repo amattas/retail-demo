@@ -386,6 +386,9 @@ class FactDataGenerator:
         self.hourly_tracker = HourlyProgressTracker(self.FACT_TABLES)
         logger.info("Initialized HourlyProgressTracker for progress reporting")
 
+        # Fast CRM join map: AdId -> CustomerID (populated after master load)
+        self._adid_to_customer_id: dict[str, int] = {}
+
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
     @staticmethod
@@ -487,6 +490,14 @@ class FactDataGenerator:
             f"{len(getattr(self, 'trucks', []))} trucks"
         )
 
+        # Build fast AdId -> CustomerID map for marketing join
+        try:
+            self._adid_to_customer_id = {
+                c.AdId: c.ID for c in self.customers if getattr(c, "AdId", None)
+            }
+        except Exception:
+            self._adid_to_customer_id = {}
+
     def _master_table_specs(self) -> list[MasterTableSpec]:
         """Deprecated: No longer used (DuckDB-only)."""
         return []
@@ -500,6 +511,8 @@ class FactDataGenerator:
         active_tables = self._active_fact_tables()
         self._progress_tracker = TableProgressTracker(active_tables)
         self._progress_history = []
+        # Initialize batch buffers for batched inserts (by hour)
+        self._batch_buffers: dict[str, list[dict]] = {t: [] for t in self.FACT_TABLES}
 
     def set_included_tables(self, tables: list[str] | None) -> None:
         """Restrict generation to a subset of FACT_TABLES, or clear filter if None."""
@@ -755,6 +768,13 @@ class FactDataGenerator:
             f"{len(self.customers)} customers, "
             f"{len(self.products)} products"
         )
+        # Build fast AdId -> CustomerID map for marketing join
+        try:
+            self._adid_to_customer_id = {
+                c.AdId: c.ID for c in self.customers if getattr(c, "AdId", None)
+            }
+        except Exception:
+            self._adid_to_customer_id = {}
 
     def _build_store_customer_pools(self, customer_geographies: dict) -> None:
         """
@@ -1581,9 +1601,54 @@ class FactDataGenerator:
                     }
                 )
 
-        # 8. Generate return receipts and inventory effects (baseline + holiday spikes)
+        # 8. Small store inventory adjustments for audit realism
         try:
-            await self._generate_and_insert_returns(date, active_tables)
+            if "store_inventory_txn" in active_tables:
+                adjustments: list[dict] = []
+                # Create a few random adjustments per day across the network
+                # ~0.02% of store-product combinations touched (bounded)
+                num_stores = len(self.stores)
+                samples = max(1, int(num_stores * 0.10))  # ~10% of stores per day
+                sampled_stores = self._rng.sample(self.stores, min(samples, num_stores)) if self.stores else []
+                for st in sampled_stores:
+                    # Pick 1-3 random products to adjust
+                    k = self._rng.randint(1, 3)
+                    prods = self._rng.sample(self.products, k) if self.products else []
+                    for p in prods:
+                        # ±1 to ±5 units
+                        delta = self._rng.randint(-5, 5)
+                        if delta == 0:
+                            continue
+                        # Update in-memory balance
+                        key = (st.ID, p.ID)
+                        cur = self.inventory_flow_sim._store_inventory.get(key, 0)
+                        new_bal = max(0, cur + delta)
+                        self.inventory_flow_sim._store_inventory[key] = new_bal
+                        adjustments.append(
+                            {
+                                "TraceId": self._generate_trace_id(),
+                                "EventTS": date.replace(hour=22, minute=0, second=0),
+                                "StoreID": st.ID,
+                                "ProductID": p.ID,
+                                "QtyDelta": delta,
+                                "Reason": InventoryReason.ADJUSTMENT.value,
+                                "Source": "CYCLE_COUNT",
+                                "Balance": new_bal,
+                            }
+                        )
+                if adjustments:
+                    await self._insert_hourly_to_db(self._session, "store_inventory_txn", adjustments, hour=22, commit_every_batches=0)
+                    for hour in range(22, 24):
+                        self.hourly_tracker.update_hourly_progress("store_inventory_txn", day_index, hour, total_days)
+        except Exception as e:
+            logger.warning(f"Adjustment generation failed for {date.strftime('%Y-%m-%d')}: {e}")
+
+        # 9. Generate return receipts and inventory effects (baseline + holiday spikes)
+        try:
+            if getattr(self, "_use_duckdb", False):
+                await self._generate_and_insert_returns_duckdb(date, active_tables)
+            else:
+                await self._generate_and_insert_returns(date, active_tables)
         except Exception as e:
             logger.warning(f"Return generation failed for {date.strftime('%Y-%m-%d')}: {e}")
 
@@ -1775,41 +1840,90 @@ class FactDataGenerator:
                 )
 
             # Note: Zero impressions are acceptable - campaign continues if not expired
-            for impression in impressions:
-                logger.debug(
-                    f"      Creating marketing record: {impression.get('channel', 'unknown')}"
-                )
-
-                # Resolve customer_id from AdId (5% of the time - CRM join / authenticated users)
-                customer_id = None
-                if self._rng.random() < 0.05:
-                    # Find customer with this AdId
-                    customer_ad_id = impression["CustomerAdId"]
-                    for customer in self.customers:
-                        if customer.AdId == customer_ad_id:
-                            customer_id = customer.ID
+            try:
+                import pandas as _pd
+                if impressions:
+                    df = _pd.DataFrame(impressions)
+                    if not df.empty:
+                        n = len(df)
+                        # CRM resolution mask (5%)
+                        crm_mask = self._np_rng.random(n) < 0.05
+                        # Map AdId -> CustomerID for known subset
+                        adids = df.get("CustomerAdId")
+                        cust_ids = [None] * n
+                        if adids is not None and len(self._adid_to_customer_id) > 0:
+                            mapped = [self._adid_to_customer_id.get(a) for a in adids]
+                            for i in range(n):
+                                if crm_mask[i]:
+                                    cust_ids[i] = mapped[i]
+                        # Event timestamps and trace ids
+                        event_ts = [self._randomize_time_within_day(date) for _ in range(n)]
+                        trace_ids = [self._generate_trace_id() for _ in range(n)]
+                        # Build output records
+                        out = _pd.DataFrame(
+                            {
+                                "TraceId": trace_ids,
+                                "EventTS": event_ts,
+                                "Channel": df["Channel"].apply(lambda c: c.value),
+                                "CampaignId": df["CampaignId"],
+                                "CreativeId": df["CreativeId"],
+                                "CustomerAdId": df["CustomerAdId"],
+                                "CustomerId": cust_ids,
+                                "ImpressionId": df["ImpressionId"],
+                                "Cost": df["Cost"].apply(lambda d: str(d)),
+                                "CostCents": df["Cost"].apply(
+                                    lambda d: int((d * 100).quantize(Decimal("1")))
+                                ),
+                                "Device": df["Device"].apply(lambda d: d.value),
+                            }
+                        )
+                        recs = out.to_dict("records")
+                        # Apply daily cap
+                        take = max(0, min(daily_cap - emitted, len(recs)))
+                        if take > 0:
+                            marketing_records.extend(recs[:take])
+                            emitted += take
+                        if emitted >= daily_cap:
+                            logger.warning(
+                                f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                            )
                             break
-
-                marketing_records.append(
-                    {
-                        "TraceId": self._generate_trace_id(),
-                        "EventTS": self._randomize_time_within_day(date),
-                        "Channel": impression["Channel"].value,
-                        "CampaignId": impression["CampaignId"],
-                        "CreativeId": impression["CreativeId"],
-                        "CustomerAdId": impression["CustomerAdId"],
-                        "CustomerId": customer_id,  # 5% resolution
-                        "ImpressionId": impression["ImpressionId"],
-                        "Cost": str(impression["Cost"]),
-                        "Device": impression["Device"].value,
-                    }
-                )
-                emitted += 1
-                if emitted >= daily_cap:
+                else:
                     logger.warning(
-                        f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                        f"    No impressions generated for campaign {campaign_id}"
                     )
-                    break
+            except Exception:
+                # Fallback to original loop
+                for impression in impressions:
+                    logger.debug(
+                        f"      Creating marketing record: {impression.get('channel', 'unknown')}"
+                    )
+                    customer_id = None
+                    if self._rng.random() < 0.05:
+                        customer_id = self._adid_to_customer_id.get(
+                            impression.get("CustomerAdId")
+                        )
+                    marketing_records.append(
+                        {
+                            "TraceId": self._generate_trace_id(),
+                            "EventTS": self._randomize_time_within_day(date),
+                            "Channel": impression["Channel"].value,
+                            "CampaignId": impression["CampaignId"],
+                            "CreativeId": impression["CreativeId"],
+                            "CustomerAdId": impression["CustomerAdId"],
+                            "CustomerId": customer_id,
+                            "ImpressionId": impression["ImpressionId"],
+                            "Cost": str(impression["Cost"]),
+                            "CostCents": int((impression["Cost"] * 100).quantize(Decimal("1"))),
+                            "Device": impression["Device"].value,
+                        }
+                    )
+                    emitted += 1
+                    if emitted >= daily_cap:
+                        logger.warning(
+                            f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                        )
+                        break
 
             if emitted >= daily_cap:
                 break
@@ -2157,6 +2271,8 @@ class FactDataGenerator:
                 "Qty": qty,
                 "UnitPrice": _fmt_cents(unit_price_cents),
                 "ExtPrice": _fmt_cents(ext_after_cents),
+                "UnitCents": unit_price_cents,
+                "ExtCents": ext_after_cents,
                 "PromoCode": promo_code,
             }
             lines.append(line)
@@ -2209,6 +2325,9 @@ class FactDataGenerator:
             "DiscountAmount": _fmt_cents(discount_amount_cents),  # Phase 2.2: Promotional discounts
             "Tax": _fmt_cents(total_tax_cents),
             "Total": _fmt_cents(total_cents),
+            "SubtotalCents": subtotal_cents,
+            "TaxCents": total_tax_cents,
+            "TotalCents": total_cents,
             "TenderType": tender_type.value,
         }
 
@@ -2259,10 +2378,20 @@ class FactDataGenerator:
             "AISLES_B",
             "CHECKOUT",
         ])
-        proportions = np.array([0.35, 0.15, 0.20, 0.15, 0.15], dtype=np.float64)
+        # Zone mix varies by store format for more realistic distributions
+        fmt = getattr(store, 'store_format', 'standard') or 'standard'
+        base_prop = {
+            'hypermarket': np.array([0.20, 0.10, 0.35, 0.25, 0.10]),
+            'superstore':  np.array([0.25, 0.10, 0.30, 0.25, 0.10]),
+            'standard':    np.array([0.30, 0.15, 0.25, 0.15, 0.15]),
+            'neighborhood':np.array([0.35, 0.15, 0.20, 0.10, 0.20]),
+            'express':     np.array([0.45, 0.15, 0.10, 0.05, 0.25]),
+        }
+        proportions = base_prop.get(fmt, base_prop['standard']).astype(np.float64)
         base_counts = np.floor(total_foot_traffic * proportions).astype(np.int32)
-        # Add ±10% variance per zone
-        variance = np.floor(base_counts * 0.1).astype(np.int32)
+        # Add variance by format (±10% to ±20%)
+        var_mult = {'hypermarket': 0.20, 'superstore': 0.15, 'standard': 0.10, 'neighborhood': 0.12, 'express': 0.10}.get(fmt, 0.10)
+        variance = np.floor(base_counts * var_mult).astype(np.int32)
         # Draw symmetric noise per zone
         noise = np.array([
             0 if v <= 0 else self._np_rng.integers(-v, v + 1)
@@ -2308,59 +2437,92 @@ class FactDataGenerator:
     def _generate_ble_pings(
         self, store: Store, customer: Customer, transaction_time: datetime
     ) -> list[dict]:
-        """Generate BLE beacon pings for a customer visit (vectorized inner loop).
+        """Generate BLE beacon pings with store-format variability and anonymity.
 
-        30% of BLE pings will have customer_id resolved (customers with store app).
-        70% remain anonymous (BLEId only).
+        - 30% known devices (BLEId linked to customer, include customer_id)
+        - 70% anonymous devices (random BLE IDs not present in customer master)
+        - Pings per visit scale by store format and traffic multiplier
         """
         zones_all = np.array(["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"], dtype=object)
         beacons_all = np.array([f"BEACON_{store.ID:03d}_{z}" for z in zones_all], dtype=object)
-        # Choose 2-4 distinct zones
+        # Choose 2-4 distinct zones with format-specific weights
+        fmt = getattr(store, 'store_format', 'standard') or 'standard'
+        zone_weights_map = {
+            'hypermarket': np.array([0.20, 0.25, 0.30, 0.15, 0.10]),
+            'superstore':  np.array([0.25, 0.20, 0.30, 0.15, 0.10]),
+            'standard':    np.array([0.30, 0.15, 0.25, 0.15, 0.15]),
+            'neighborhood':np.array([0.35, 0.10, 0.25, 0.10, 0.20]),
+            'express':     np.array([0.40, 0.05, 0.20, 0.05, 0.30]),
+        }
+        w = zone_weights_map.get(fmt, zone_weights_map['standard'])
         k = int(self._np_rng.integers(2, 5))
-        pick_idx = np.array(self._np_rng.choice(len(zones_all), size=k, replace=False))
-        has_store_app = self._rng.random() < 0.30
+        pick_idx = np.array(self._np_rng.choice(len(zones_all), size=k, replace=False, p=(w / w.sum())))
 
-        # Build per-zone ping counts and flatten
+        # Base per-zone pings and multiplier by format and traffic
         per_zone_counts = self._np_rng.integers(2, 6, size=k)  # 2-5 pings per chosen zone
+        fmt_mult_map = {'hypermarket': 1.6, 'superstore': 1.3, 'standard': 1.0, 'neighborhood': 0.85, 'express': 0.65}
+        traffic_mult = float(getattr(store, 'daily_traffic_multiplier', Decimal("1.0")))
+        ble_mult = fmt_mult_map.get(fmt, 1.0) * max(0.6, min(1.8, traffic_mult))
+        per_zone_counts = np.maximum(1, (per_zone_counts.astype(float) * ble_mult)).astype(np.int32)
+
         total = int(per_zone_counts.sum())
         if total <= 0:
             return []
-        # Repeat per-zone attributes to match ping counts
         zones_rep = np.repeat(zones_all[pick_idx], per_zone_counts)
         beacons_rep = np.repeat(beacons_all[pick_idx], per_zone_counts)
         rssi = self._np_rng.integers(-80, -29, size=total)
         offsets = self._np_rng.integers(-15, 16, size=total)
 
+        # Vectorized record assembly
         try:
             import pandas as _pd
 
+            # Known vs anonymous device mask
+            known_mask = self._np_rng.random(total) < 0.30
+            # Anonymous BLE IDs
+            anon_suffix = self._np_rng.integers(100000, 1000000, size=total)
+            anon_ids = np.array(
+                [f"ANON-{store.ID}-{int(x)}" for x in anon_suffix], dtype=object
+            )
+            ble_ids = np.where(known_mask, customer.BLEId, anon_ids)
+            cust_ids = np.where(known_mask, customer.ID, None)
+
+            event_ts_list = [
+                transaction_time + timedelta(minutes=int(m)) for m in offsets
+            ]
+
             df = _pd.DataFrame(
                 {
-                    "TraceId": [self._generate_trace_id()] * total,
-                    "EventTS": [transaction_time] * total,
-                    "StoreID": store.ID,
-                    "BeaconId": beacons_rep,
-                    "CustomerBLEId": customer.BLEId,
-                    "CustomerId": customer.ID if has_store_app else None,
+                    "TraceId": [self._generate_trace_id() for _ in range(total)],
+                    "EventTS": event_ts_list,
+                    "StoreID": np.repeat(store.ID, total),
+                    "BeaconId": beacons_rep.astype(object),
+                    "CustomerBLEId": ble_ids.astype(object),
+                    "CustomerId": cust_ids,
                     "RSSI": rssi.astype(int),
-                    "Zone": zones_rep,
+                    "Zone": zones_rep.astype(object),
                 }
             )
-            # Apply offsets to timestamps efficiently
-            df["EventTS"] = df["EventTS"] + _pd.to_timedelta(offsets, unit="m")
             return df.to_dict("records")
         except Exception:
-            # Fallback to Python list
-            out = []
+            # Fallback loop if pandas unavailable
+            out: list[dict] = []
             for i in range(total):
+                is_known = self._rng.random() < 0.30
+                if is_known:
+                    ble_id = customer.BLEId
+                    cust_id = customer.ID
+                else:
+                    ble_id = f"ANON-{store.ID}-{self._rng.randint(100000, 999999)}"
+                    cust_id = None
                 out.append(
                     {
                         "TraceId": self._generate_trace_id(),
                         "EventTS": transaction_time + timedelta(minutes=int(offsets[i])),
                         "StoreID": store.ID,
                         "BeaconId": str(beacons_rep[i]),
-                        "CustomerBLEId": customer.BLEId,
-                        "CustomerId": customer.ID if has_store_app else None,
+                        "CustomerBLEId": ble_id,
+                        "CustomerId": cust_id,
                         "RSSI": int(rssi[i]),
                         "Zone": str(zones_rep[i]),
                     }
@@ -2377,19 +2539,44 @@ class FactDataGenerator:
         """
         truck_movements = []
 
-        # Analyze store inventory needs
-        store_demands = {}
-        for transaction in store_transactions:
-            if transaction["QtyDelta"] < 0:  # Sales
-                store_id = transaction["StoreID"]
-                if store_id not in store_demands:
-                    store_demands[store_id] = 0
-                store_demands[store_id] += abs(transaction["QtyDelta"])
+        # Analyze store inventory needs (vectorized when possible)
+        store_demands: dict[int, int] = {}
+        if not store_transactions:
+            store_demands = {}
+        else:
+            try:
+                import pandas as _pd
+
+                df = _pd.DataFrame(store_transactions)
+                if not df.empty and {"StoreID", "QtyDelta"}.issubset(df.columns):
+                    demands = (
+                        df.loc[df["QtyDelta"] < 0, ["StoreID", "QtyDelta"]]
+                        .assign(QtyDelta=lambda x: x["QtyDelta"].abs())
+                        .groupby("StoreID", as_index=False)["QtyDelta"]
+                        .sum()
+                    )
+                    store_demands = {
+                        int(row.StoreID): int(row.QtyDelta) for row in demands.itertuples(index=False)
+                    }
+                else:
+                    # Fallback to loop if schema unexpected
+                    for tr in store_transactions:
+                        if tr.get("QtyDelta", 0) < 0:
+                            sid = tr.get("StoreID")
+                            if sid is None:
+                                continue
+                            store_demands[sid] = store_demands.get(sid, 0) + abs(int(tr["QtyDelta"]))
+            except Exception:
+                for tr in store_transactions:
+                    if tr.get("QtyDelta", 0) < 0:
+                        sid = tr.get("StoreID")
+                        if sid is None:
+                            continue
+                        store_demands[sid] = store_demands.get(sid, 0) + abs(int(tr["QtyDelta"]))
 
         # Generate truck shipments for stores with high demand
         for store_id, demand in store_demands.items():
             if demand > 100:  # Threshold for triggering shipment
-                next(s for s in self.stores if s.ID == store_id)
 
                 # Find nearest DC (simplified - use first DC)
                 dc = self.distribution_centers[0]
@@ -2515,6 +2702,22 @@ class FactDataGenerator:
                                 "Source": txn["Source"],
                                 "Balance": txn["Balance"],
                             })
+                    elif current_status == TruckStatus.ARRIVED:
+                        # Also emit store INBOUND at ARRIVED to guarantee receipt at store
+                        store_txn = self.inventory_flow_sim.generate_store_inbound_transactions(
+                            updated_info, check_time
+                        )
+                        for txn in store_txn:
+                            store_inbound_txn.append({
+                                "TraceId": self._generate_trace_id(),
+                                "EventTS": txn["EventTS"],
+                                "StoreID": txn["StoreID"],
+                                "ProductID": txn["ProductID"],
+                                "QtyDelta": txn["QtyDelta"],
+                                "Reason": txn["Reason"].value,
+                                "Source": txn["Source"],
+                                "Balance": txn["Balance"],
+                            })
 
                     previous_status = current_status
 
@@ -2590,17 +2793,35 @@ class FactDataGenerator:
             "ble_pings",
             "online_orders",
         ]
+        batch_hours = 1
+        try:
+            batch_hours = max(1, int(getattr(self.config.performance, 'batch_hours', 1)))
+        except Exception:
+            batch_hours = 1
+
+        flush_now = ((hour + 1) % batch_hours == 0) or (hour == 23)
+
         for fact_table in preferred_order:
             records = hourly_facts.get(fact_table) or []
-            if not records:
+            if records:
+                # Accumulate into batch buffer
+                self._batch_buffers.setdefault(fact_table, []).extend(records)
+
+            if not flush_now:
+                continue
+
+            # Flush this table's buffer if any
+            buf = self._batch_buffers.get(fact_table) or []
+            if not buf:
                 continue
 
             try:
-                # Insert records directly without DataFrame conversion
-                await self._insert_hourly_to_db(self._session, fact_table, records, hour)
+                await self._insert_hourly_to_db(self._session, fact_table, buf, hour)
+                # Clear buffer after successful insert
+                self._batch_buffers[fact_table] = []
             except Exception as e:
                 logger.error(
-                    f"Failed to insert {fact_table} hour {hour} to database: {e}"
+                    f"Failed to insert {fact_table} batched up to hour {hour}: {e}"
                 )
                 raise
 
@@ -2841,6 +3062,183 @@ class FactDataGenerator:
             "frozen",
         ]
         return any(k in dept or k in cat for k in food_keywords)
+
+    async def _generate_and_insert_returns_duckdb(self, date: datetime, active_tables: list[str]) -> None:
+        """DuckDB-native returns generator using external receipt IDs for linkage.
+
+        Samples same-day SALE receipts, creates RETURN headers/lines, and emits corresponding
+        store inventory transactions including dispositions (damaged/RTV/restock).
+        """
+        if "receipts" not in active_tables or "receipt_lines" not in active_tables:
+            return
+
+        if not getattr(self, "_duckdb_conn", None):
+            return
+
+        # Spike factor for Dec 26 (day after Christmas)
+        spike = 6.0 if (date.month == 12 and date.day == 26) else 1.0
+        target_pct = 0.01 * spike
+
+        date_str = date.strftime('%Y-%m-%d')
+        q = (
+            "SELECT receipt_id_ext, store_id FROM fact_receipts "
+            "WHERE date(event_ts)=? AND (receipt_type IS NULL OR receipt_type='SALE')"
+        )
+        rows = self._duckdb_conn.execute(q, [date_str]).fetchall()
+        if not rows:
+            return
+
+        import random as _r
+        max_returns = max(1, int(len(rows) * min(0.10, target_pct)))
+        sampled = _r.sample(rows, min(max_returns, len(rows)))
+
+        return_receipts: list[dict] = []
+        return_lines: list[dict] = []
+        return_store_txn: list[dict] = []
+
+        store_rates = {s.ID: (s.tax_rate if s.tax_rate is not None else Decimal("0.07407")) for s in self.stores}
+        products_by_id = {p.ID: p for p in self.products}
+
+        for (orig_receipt_ext, store_id) in sampled:
+            lq = (
+                "SELECT product_id, quantity, unit_price, ext_price, line_num "
+                "FROM fact_receipt_lines WHERE receipt_id_ext=?"
+            )
+            line_rows = self._duckdb_conn.execute(lq, [orig_receipt_ext]).fetchall()
+            if not line_rows:
+                continue
+
+            return_id_ext = f"RET{date.strftime('%Y%m%d')}{int(store_id):03d}{self._rng.randint(1000,9999)}"
+            trace_id = self._generate_trace_id()
+            store_tax_rate = store_rates.get(int(store_id), Decimal("0.07407"))
+            subtotal = Decimal("0.00")
+            total_tax = Decimal("0.00")
+
+            for (product_id, qty, unit_price, ext_price, line_num) in line_rows:
+                product = products_by_id.get(int(product_id))
+                if not product:
+                    continue
+                nqty = int(qty) * -1
+                unit_price_dec = self._to_decimal(unit_price)
+                neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
+
+                from retail_datagen.shared.models import ProductTaxability
+                taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
+                tax_mult = Decimal("1.0") if taxability == ProductTaxability.TAXABLE else (Decimal("0.5") if taxability == ProductTaxability.REDUCED_RATE else Decimal("0.0"))
+                line_tax = (neg_ext * store_tax_rate * tax_mult).quantize(Decimal("0.01"))
+
+                subtotal += neg_ext
+                total_tax += line_tax
+
+                return_lines.append(
+                    {
+                        "TraceId": trace_id,
+                        "EventTS": date.replace(hour=12, minute=0, second=0),
+                        "ReceiptId": return_id_ext,
+                        "Line": int(line_num),
+                        "ProductID": int(product_id),
+                        "Qty": nqty,
+                        "UnitPrice": str(unit_price_dec.quantize(Decimal("0.01"))),
+                        "ExtPrice": str(neg_ext),
+                        "PromoCode": "RETURN",
+                    }
+                )
+
+                # Store inventory add for return
+                key = (int(store_id), int(product_id))
+                cur = self.inventory_flow_sim._store_inventory.get(key, 0)
+                self.inventory_flow_sim._store_inventory[key] = cur + (-nqty)
+                balance = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                return_store_txn.append(
+                    {
+                        "TraceId": trace_id,
+                        "EventTS": date.replace(hour=12, minute=30, second=0),
+                        "StoreID": int(store_id),
+                        "ProductID": int(product_id),
+                        "QtyDelta": -nqty,
+                        "Reason": InventoryReason.RETURN.value,
+                        "Source": return_id_ext,
+                        "Balance": balance,
+                    }
+                )
+
+                # Dispositions
+                if self._is_food_product(product):
+                    self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                    balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                    return_store_txn.append(
+                        {
+                            "TraceId": trace_id,
+                            "EventTS": date.replace(hour=12, minute=45, second=0),
+                            "StoreID": int(store_id),
+                            "ProductID": int(product_id),
+                            "QtyDelta": nqty,
+                            "Reason": InventoryReason.DAMAGED.value,
+                            "Source": "RETURN_DESTROY",
+                            "Balance": balance2,
+                        }
+                    )
+                else:
+                    r = self._rng.random()
+                    if r < 0.40:
+                        pass
+                    elif r < 0.60:
+                        pass
+                    elif r < 0.90:
+                        self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                        balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                        return_store_txn.append(
+                            {
+                                "TraceId": trace_id,
+                                "EventTS": date.replace(hour=13, minute=0, second=0),
+                                "StoreID": int(store_id),
+                                "ProductID": int(product_id),
+                                "QtyDelta": nqty,
+                                "Reason": InventoryReason.OUTBOUND_SHIPMENT.value,
+                                "Source": "RTV",
+                                "Balance": balance2,
+                            }
+                        )
+                    else:
+                        self.inventory_flow_sim._store_inventory[key] = max(0, self.inventory_flow_sim._store_inventory[key] - (-nqty))
+                        balance2 = self.inventory_flow_sim.get_store_balance(int(store_id), int(product_id))
+                        return_store_txn.append(
+                            {
+                                "TraceId": trace_id,
+                                "EventTS": date.replace(hour=13, minute=15, second=0),
+                                "StoreID": int(store_id),
+                                "ProductID": int(product_id),
+                                "QtyDelta": nqty,
+                                "Reason": InventoryReason.DAMAGED.value,
+                                "Source": "RETURN_DESTROY",
+                                "Balance": balance2,
+                            }
+                        )
+
+            total = (subtotal + total_tax).quantize(Decimal("0.01"))
+            return_receipts.append(
+                {
+                    "TraceId": trace_id,
+                    "EventTS": date.replace(hour=12, minute=0, second=0),
+                    "StoreID": int(store_id),
+                    "CustomerID": None,
+                    "ReceiptId": return_id_ext,
+                    "ReceiptType": "RETURN",
+                    "ReturnForReceiptIdExt": str(orig_receipt_ext),
+                    "Subtotal": str(subtotal),
+                    "DiscountAmount": str(Decimal("0.00")),
+                    "Tax": str(total_tax),
+                    "Total": str(total),
+                    "TenderType": TenderType.CREDIT_CARD.value,
+                }
+            )
+
+        if return_receipts:
+            await self._insert_hourly_to_db(self._session, "receipts", return_receipts, hour=0, commit_every_batches=0)
+        if return_lines:
+            await self._insert_hourly_to_db(self._session, "receipt_lines", return_lines, hour=0, commit_every_batches=0)
+        if return_store_txn and "store_inventory_txn" in active_tables:
+            await self._insert_hourly_to_db(self._session, "store_inventory_txn", return_store_txn, hour=0, commit_every_batches=0)
 
     async def _generate_and_insert_returns(self, date: datetime, active_tables: list[str]) -> None:
         """Generate return receipts for this date (baseline + Dec 26 spike) and insert into DB.
@@ -3086,6 +3484,7 @@ class FactDataGenerator:
                 "ReceiptId": "receipt_id_ext",
                 "ReceiptType": "receipt_type",
                 "ReturnForReceiptId": "return_for_receipt_id",
+                "ReturnForReceiptIdExt": "return_for_receipt_id_ext",
                 # Note: Subtotal field in generator is not stored (can be calculated)
                 "DiscountAmount": "discount_amount",
                 "Tax": "tax_amount",
@@ -3331,36 +3730,112 @@ class FactDataGenerator:
         # DuckDB fast path
         if getattr(self, "_use_duckdb", False) and getattr(self, "_duckdb_conn", None) is not None:
             try:
-                # Map and normalize records for DuckDB
-                mapped_records = [self._map_field_names_for_db(table_name, r) for r in records]
+                import pandas as _pd
+                # Struct-of-Arrays build for high-volume tables
+                hot_tables = {
+                    'receipt_lines','store_inventory_txn','online_order_lines',
+                    'receipts','dc_inventory_txn','truck_moves',
+                    'foot_traffic','ble_pings','marketing','online_orders'
+                }
+                if table_name in hot_tables and isinstance(records, list) and records and isinstance(records[0], dict):
+                    # Build dict-of-lists for existing keys across a small sample to avoid missing columns
+                    sample_keys = set()
+                    for r in records[:10]:
+                        sample_keys.update(r.keys())
+                    cols: dict[str, list] = {k: [] for k in sample_keys}
+                    for r in records:
+                        for k in cols.keys():
+                            cols[k].append(r.get(k))
+                    df = _pd.DataFrame(cols)
+                else:
+                    # Fallback AoS -> DataFrame
+                    df = _pd.DataFrame.from_records(records)
+                if df.empty:
+                    return
+                if 'TraceId' in df.columns:
+                    df = df.drop(columns=['TraceId'])
 
-                # Normalize NaNs/NaT to None
-                try:
-                    import pandas as _pd
+                # Table-specific rename mapping (generator -> DB)
+                common = {'EventTS': 'event_ts'}
+                mapping_tbl = {
+                    'receipts': {
+                        **common,
+                        'StoreID': 'store_id', 'CustomerID': 'customer_id',
+                        'ReceiptId': 'receipt_id_ext', 'ReceiptType': 'receipt_type',
+                        'SubtotalCents': 'subtotal_cents', 'TaxCents': 'tax_cents', 'TotalCents': 'total_cents',
+                        'ReturnForReceiptId': 'return_for_receipt_id', 'ReturnForReceiptIdExt': 'return_for_receipt_id_ext',
+                        'DiscountAmount': 'discount_amount', 'Tax': 'tax_amount', 'Total': 'total_amount',
+                        'TenderType': 'payment_method',
+                    },
+                    'receipt_lines': {
+                        **common,
+                        'ProductID': 'product_id', 'Line': 'line_num', 'Qty': 'quantity',
+                        'UnitPrice': 'unit_price', 'ExtPrice': 'ext_price', 'UnitCents': 'unit_cents', 'ExtCents': 'ext_cents', 'PromoCode': 'promo_code',
+                    },
+                    'dc_inventory_txn': {
+                        **common,
+                        'DCID': 'dc_id', 'ProductID': 'product_id', 'QtyDelta': 'quantity', 'Reason': 'txn_type', 'Balance': 'balance',
+                    },
+                    'truck_moves': {
+                        **common,
+                        'TruckId': 'truck_id', 'DCID': 'dc_id', 'StoreID': 'store_id', 'ProductID': 'product_id', 'Status': 'status',
+                        'ShipmentId': 'shipment_id', 'ETA': 'eta', 'ETD': 'etd',
+                    },
+                    'store_inventory_txn': {
+                        **common,
+                        'StoreID': 'store_id', 'ProductID': 'product_id', 'QtyDelta': 'quantity', 'Reason': 'txn_type', 'Source': 'source', 'Balance': 'balance',
+                    },
+                    'foot_traffic': {
+                        **common,
+                        'StoreID': 'store_id', 'SensorId': 'sensor_id', 'Zone': 'zone', 'Dwell': 'dwell_seconds', 'Count': 'count',
+                    },
+                    'ble_pings': {
+                        **common,
+                        'StoreID': 'store_id', 'CustomerBLEId': 'customer_ble_id', 'BeaconId': 'beacon_id', 'RSSI': 'rssi', 'Zone': 'zone',
+                    },
+                    'marketing': {
+                        **common,
+                        'CampaignId': 'campaign_id', 'CreativeId': 'creative_id', 'ImpressionId': 'impression_id_ext', 'CustomerAdId': 'customer_ad_id',
+                        'Channel': 'channel', 'Device': 'device', 'Cost': 'cost',
+                    },
+                    'online_orders': {
+                        **common,
+                        'CustomerID': 'customer_id', 'Subtotal': 'subtotal_amount', 'Tax': 'tax_amount', 'Total': 'total_amount',
+                        'SubtotalCents': 'subtotal_cents', 'TaxCents': 'tax_cents', 'TotalCents': 'total_cents',
+                        'TenderType': 'payment_method', 'CompletedTS': 'completed_ts', 'OrderId': 'order_id_ext',
+                    },
+                    'online_order_lines': {
+                        **common,
+                        'OrderId': 'order_id', 'ProductID': 'product_id', 'Line': 'line_num', 'Qty': 'quantity', 'UnitPrice': 'unit_price',
+                        'ExtPrice': 'ext_price', 'UnitCents': 'unit_cents', 'ExtCents': 'ext_cents', 'PromoCode': 'promo_code', 'PickedTS': 'picked_ts', 'ShippedTS': 'shipped_ts',
+                        'DeliveredTS': 'delivered_ts', 'FulfillmentStatus': 'fulfillment_status', 'FulfillmentMode': 'fulfillment_mode',
+                        'NodeType': 'node_type', 'NodeID': 'node_id',
+                    },
+                }
+                mp = mapping_tbl.get(table_name, common)
+                rename_map = {k: v for k, v in mp.items() if k in df.columns and k != v}
+                if rename_map:
+                    df = df.rename(columns=rename_map)
+                # Ensure external IDs on line tables
+                if table_name == 'receipt_lines' and 'receipt_id_ext' not in df.columns and 'ReceiptId' in df.columns:
+                    df['receipt_id_ext'] = df['ReceiptId']
+                    df = df.drop(columns=['ReceiptId'])
+                if table_name == 'online_order_lines' and 'order_id_ext' not in df.columns and 'OrderId' in df.columns:
+                    df['order_id_ext'] = df['OrderId']
 
-                    df = _pd.DataFrame(mapped_records)
-                except Exception:
-                    import pandas as _pd  # fallback
-
-                    df = _pd.DataFrame.from_records(mapped_records)
-
-                # Create/insert into DuckDB table
-                from retail_datagen.db.duckdb_engine import insert_dataframe
-
-                # Map generator table name to DuckDB table (match existing naming)
                 duck_table = {
-                    "dc_inventory_txn": "fact_dc_inventory_txn",
-                    "truck_moves": "fact_truck_moves",
-                    "store_inventory_txn": "fact_store_inventory_txn",
-                    "receipts": "fact_receipts",
-                    "receipt_lines": "fact_receipt_lines",
-                    "foot_traffic": "fact_foot_traffic",
-                    "ble_pings": "fact_ble_pings",
-                    "marketing": "fact_marketing",
-                    "online_orders": "fact_online_order_headers",
-                    "online_order_lines": "fact_online_order_lines",
+                    'dc_inventory_txn': 'fact_dc_inventory_txn',
+                    'truck_moves': 'fact_truck_moves',
+                    'store_inventory_txn': 'fact_store_inventory_txn',
+                    'receipts': 'fact_receipts',
+                    'receipt_lines': 'fact_receipt_lines',
+                    'foot_traffic': 'fact_foot_traffic',
+                    'ble_pings': 'fact_ble_pings',
+                    'marketing': 'fact_marketing',
+                    'online_orders': 'fact_online_order_headers',
+                    'online_order_lines': 'fact_online_order_lines',
                 }.get(table_name, table_name)
-
+                from retail_datagen.db.duckdb_engine import insert_dataframe
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
 
                 # Update per-table counts and emit progress
@@ -3372,15 +3847,10 @@ class FactDataGenerator:
                     )
 
                     tracker_state = self.hourly_tracker.get_current_progress()
-                    completed_hours = tracker_state.get("completed_hours", {}).get(
-                        table_name, 0
-                    )
+                    completed_hours = tracker_state.get("completed_hours", {}).get(table_name, 0)
                     total_days = tracker_state.get("total_days") or 1
                     total_hours_expected = max(1, total_days * 24)
-                    # Treat full batch as completing the hour for this table
-                    per_table_fraction = min(
-                        1.0, (completed_hours + 1.0) / total_hours_expected
-                    )
+                    per_table_fraction = min(1.0, (completed_hours + 1.0) / total_hours_expected)
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,

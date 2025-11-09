@@ -606,11 +606,14 @@ class MasterDataGenerator:
 
         store_count = count if count is not None else self.config.volume.stores
 
+        # Fast lookups for geography
+        geo_by_id = {gm.ID: gm for gm in self.geography_master}
         # Get states where DCs exist to constrain store placement
         dc_states = set()
         for dc in self.distribution_centers:
-            dc_geo = next(gm for gm in self.geography_master if gm.ID == dc.GeographyID)
-            dc_states.add(dc_geo.State)
+            dc_geo = geo_by_id.get(dc.GeographyID)
+            if dc_geo:
+                dc_states.add(dc_geo.State)
 
         print(
             f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
@@ -655,18 +658,17 @@ class MasterDataGenerator:
         self.stores = []
         current_id = 1
 
+        # Build a fast key index for (City, State, Zip)
+        geo_key_index = {
+            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in self.geography_master
+        }
+
         # Place at least one store in each strategic location
         for geo in strategic_geos:
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for store placement")
 
             # Look up tax rate for this store's location
             tax_rate_key = (geo_master.State, geo_master.City)
@@ -688,15 +690,9 @@ class MasterDataGenerator:
         # Add additional stores based on distribution
         for geo, count in additional_distribution:
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for additional store placement")
 
             for _ in range(count):
                 if current_id > store_count:
@@ -740,11 +736,14 @@ class MasterDataGenerator:
 
         store_count = count if count is not None else self.config.volume.stores
 
+        # Fast lookups for geography
+        geo_by_id = {gm.ID: gm for gm in self.geography_master}
         # Get states where DCs exist to constrain store placement
         dc_states = set()
         for dc in self.distribution_centers:
-            dc_geo = next(gm for gm in self.geography_master if gm.ID == dc.GeographyID)
-            dc_states.add(dc_geo.State)
+            dc_geo = geo_by_id.get(dc.GeographyID)
+            if dc_geo:
+                dc_states.add(dc_geo.State)
 
         print(
             f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
@@ -789,18 +788,17 @@ class MasterDataGenerator:
         self.stores = []
         current_id = 1
 
+        # Build a fast key index for (City, State, Zip)
+        geo_key_index = {
+            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in self.geography_master
+        }
+
         # Place at least one store in each strategic location
         for geo in strategic_geos:
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for store placement")
 
             # Look up tax rate for this store's location
             tax_rate_key = (geo_master.State, geo_master.City)
@@ -821,15 +819,9 @@ class MasterDataGenerator:
         # Add additional stores based on distribution
         for geo, count_per_geo in additional_distribution:
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for additional store placement")
 
             for _ in range(count_per_geo):
                 if current_id > store_count:
@@ -915,17 +907,16 @@ class MasterDataGenerator:
 
         self.distribution_centers = []
 
+        # Build a fast key index for (City, State, Zip) -> geo master
+        geo_key_index = {
+            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in self.geography_master
+        }
+
         for i, geo in enumerate(strategic_geos, 1):
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for distribution center placement")
 
             dc = DistributionCenter(
                 ID=i,
@@ -1280,6 +1271,11 @@ class MasterDataGenerator:
         )
         id_generator = IdentifierGenerator(self.config.seed + 2000)
 
+        # Build a fast key index for (City, State, Zip) -> geo master
+        geo_key_index = {
+            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in self.geography_master
+        }
+
         # Distribute customers across geographies
         customer_distribution = geo_distribution.distribute_entities_across_geographies(
             customer_count
@@ -1294,15 +1290,9 @@ class MasterDataGenerator:
 
         for geo, count in customer_distribution:
             # Find matching geography master record
-            geo_master = next(
-                gm
-                for gm in self.geography_master
-                if (
-                    gm.City == geo.City
-                    and gm.State == geo.State
-                    and gm.ZipCode == geo.Zip
-                )
-            )
+            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
+            if geo_master is None:
+                raise ValueError("Geography key not found for customer placement")
 
             if count <= 0:
                 continue
@@ -1922,6 +1912,17 @@ class MasterDataGenerator:
         ):
             return ProductTaxability.REDUCED_RATE
 
+        # Small portion of non-food, non-clothing items receive reduced rate (jurisdictional quirks)
+        # Target ~10% of remaining products to diversify datasets
+        try:
+            # Use deterministic hash on (department, category) to keep stable across runs
+            key = f"{department_lower}:{category_lower}"
+            h = hash(key) % 100
+            if h < 10:
+                return ProductTaxability.REDUCED_RATE
+        except Exception:
+            pass
+
         # Everything else is fully taxable
         return ProductTaxability.TAXABLE
 
@@ -1976,37 +1977,51 @@ class MasterDataGenerator:
                 "DCs and products must be generated before inventory snapshots"
             )
 
+        # Vectorized implementation
         self.dc_inventory_snapshots = []
         current_time = datetime.now()
 
-        total_records = len(self.distribution_centers) * len(self.products_master)
-        print(f"Generating {total_records:,} DC inventory records...")
+        dcs = np.array([dc.ID for dc in self.distribution_centers], dtype=np.int32)
+        prods = np.array([p.ID for p in self.products_master], dtype=np.int32)
 
-        for dc in self.distribution_centers:
-            for product in self.products_master:
-                # DCs have higher inventory levels than stores (500-5000 vs 20-200)
-                current_qty = random.randint(
-                    self.config.volume.dc_initial_inventory_min,
-                    self.config.volume.dc_initial_inventory_max,
-                )
+        D = len(dcs)
+        P = len(prods)
+        total_records = D * P
+        print(f"Generating {total_records:,} DC inventory records (vectorized)...")
 
-                # Reorder point is typically 10-20% of current inventory
-                reorder_point = random.randint(
-                    self.config.volume.dc_reorder_point_min,
-                    min(self.config.volume.dc_reorder_point_max, current_qty // 5),
-                )
+        # Cartesian product of DC x Product
+        dc_ids = np.repeat(dcs, P)
+        prod_ids = np.tile(prods, D)
 
-                inventory_record = DCInventorySnapshot(
-                    DCID=dc.ID,
-                    ProductID=product.ID,
-                    CurrentQuantity=current_qty,
-                    ReorderPoint=reorder_point,
+        # Quantities
+        q_min = int(self.config.volume.dc_initial_inventory_min)
+        q_max = int(self.config.volume.dc_initial_inventory_max)
+        qty = self._np_rng.integers(q_min, q_max + 1, size=total_records, dtype=np.int32)
+
+        # Reorder point bounds (10-20% typical, cap against qty//5)
+        rp_min = int(self.config.volume.dc_reorder_point_min)
+        rp_cfg_max = int(self.config.volume.dc_reorder_point_max)
+        # High bound per row: min(config_max, qty//5) and at least 1
+        rp_hi = np.minimum(rp_cfg_max, np.maximum(1, qty // 5))
+        # Sample uniformly in [1, rp_hi], then enforce rp_min when feasible
+        base_rp = self._np_rng.integers(1, rp_hi + 1, size=total_records, dtype=np.int32)
+        rp = np.where(rp_hi >= rp_min, np.maximum(base_rp, rp_min), rp_hi)
+
+        # Build Pydantic models (lightweight loop just for object construction)
+        snapshots: list[DCInventorySnapshot] = []
+        for i in range(total_records):
+            snapshots.append(
+                DCInventorySnapshot(
+                    DCID=int(dc_ids[i]),
+                    ProductID=int(prod_ids[i]),
+                    CurrentQuantity=int(qty[i]),
+                    ReorderPoint=int(rp[i]),
                     LastUpdated=current_time,
                 )
+            )
 
-                self.dc_inventory_snapshots.append(inventory_record)
-
-        print(f"Generated {len(self.dc_inventory_snapshots):,} DC inventory records")
+        self.dc_inventory_snapshots = snapshots
+        print(f"Generated {len(self.dc_inventory_snapshots):,} DC inventory records (vectorized)")
         self._emit_progress(
             "dc_inventory_snapshots",
             1.0,
@@ -2033,39 +2048,45 @@ class MasterDataGenerator:
                 "Stores and products must be generated before inventory snapshots"
             )
 
+        # Vectorized implementation
         self.store_inventory_snapshots = []
         current_time = datetime.now()
 
-        total_records = len(self.stores) * len(self.products_master)
-        print(f"Generating {total_records:,} store inventory records...")
+        stores = np.array([s.ID for s in self.stores], dtype=np.int32)
+        prods = np.array([p.ID for p in self.products_master], dtype=np.int32)
 
-        for store in self.stores:
-            for product in self.products_master:
-                # Stores have lower inventory levels than DCs (20-200 vs 500-5000)
-                current_qty = random.randint(
-                    self.config.volume.store_initial_inventory_min,
-                    self.config.volume.store_initial_inventory_max,
-                )
+        S = len(stores)
+        P = len(prods)
+        total_records = S * P
+        print(f"Generating {total_records:,} store inventory records (vectorized)...")
 
-                # Store reorder points are typically lower than DCs
-                reorder_point = random.randint(
-                    self.config.volume.store_reorder_point_min,
-                    min(self.config.volume.store_reorder_point_max, current_qty // 3),
-                )
+        store_ids = np.repeat(stores, P)
+        prod_ids = np.tile(prods, S)
 
-                inventory_record = StoreInventorySnapshot(
-                    StoreID=store.ID,
-                    ProductID=product.ID,
-                    CurrentQuantity=current_qty,
-                    ReorderPoint=reorder_point,
+        q_min = int(self.config.volume.store_initial_inventory_min)
+        q_max = int(self.config.volume.store_initial_inventory_max)
+        qty = self._np_rng.integers(q_min, q_max + 1, size=total_records, dtype=np.int32)
+
+        rp_min = int(self.config.volume.store_reorder_point_min)
+        rp_cfg_max = int(self.config.volume.store_reorder_point_max)
+        rp_hi = np.minimum(rp_cfg_max, np.maximum(1, qty // 3))
+        base_rp = self._np_rng.integers(1, rp_hi + 1, size=total_records, dtype=np.int32)
+        rp = np.where(rp_hi >= rp_min, np.maximum(base_rp, rp_min), rp_hi)
+
+        snapshots: list[StoreInventorySnapshot] = []
+        for i in range(total_records):
+            snapshots.append(
+                StoreInventorySnapshot(
+                    StoreID=int(store_ids[i]),
+                    ProductID=int(prod_ids[i]),
+                    CurrentQuantity=int(qty[i]),
+                    ReorderPoint=int(rp[i]),
                     LastUpdated=current_time,
                 )
+            )
 
-                self.store_inventory_snapshots.append(inventory_record)
-
-        print(
-            f"Generated {len(self.store_inventory_snapshots):,} store inventory records"
-        )
+        self.store_inventory_snapshots = snapshots
+        print(f"Generated {len(self.store_inventory_snapshots):,} store inventory records (vectorized)")
         self._emit_progress(
             "store_inventory_snapshots",
             1.0,

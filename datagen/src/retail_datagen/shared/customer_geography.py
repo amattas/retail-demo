@@ -141,6 +141,18 @@ class GeographyAssigner:
         # Generate synthetic coordinates for geographies (for distance calculation)
         self._generate_synthetic_coordinates()
 
+        # Precompute store coordinate arrays for vectorized distance calculation
+        try:
+            self._store_ids_arr = np.array([s.ID for s in stores], dtype=np.int32)
+            self._store_coords = np.array(
+                [self._geo_coordinates.get(s.GeographyID, (np.nan, np.nan)) for s in stores],
+                dtype=np.float64,
+            )
+        except Exception:
+            # Fallbacks if numpy conversion fails; methods will use per-store path
+            self._store_ids_arr = None
+            self._store_coords = None
+
         logger.info(
             f"GeographyAssigner initialized: {len(customers)} customers, "
             f"{len(stores)} stores, {len(geographies)} geographies"
@@ -216,21 +228,48 @@ class GeographyAssigner:
         if not customer_coords:
             return {}
 
-        customer_lat, customer_lon = customer_coords
-        distances = {}
+        # Vectorized path if precomputed arrays exist
+        if getattr(self, "_store_coords", None) is not None and isinstance(
+            self._store_coords, np.ndarray
+        ):
+            lat1, lon1 = float(customer_coords[0]), float(customer_coords[1])
 
+            coords = self._store_coords  # shape (N, 2)
+            lats = coords[:, 0]
+            lons = coords[:, 1]
+
+            valid = ~np.isnan(lats) & ~np.isnan(lons)
+            if not valid.any():
+                return {}
+
+            lat1_rad = np.deg2rad(lat1)
+            lat2_rad = np.deg2rad(lats[valid])
+            dlat = np.deg2rad(lats[valid] - lat1)
+            dlon = np.deg2rad(lons[valid] - lon1)
+
+            a = (
+                np.sin(dlat / 2.0) ** 2
+                + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2.0) ** 2
+            )
+            c = 2.0 * np.arctan2(np.sqrt(a), np.sqrt(1.0 - a))
+            dist = 3959.0 * c  # Earth radius in miles
+
+            ids = self._store_ids_arr[valid].astype(int)
+            return {int(ids[i]): float(dist[i]) for i in range(dist.shape[0])}
+
+        # Fallback per-store calculation
+        customer_lat, customer_lon = customer_coords
+        distances: Dict[int, float] = {}
         for store in self.stores:
             store_geo_id = store.GeographyID
             store_coords = self._geo_coordinates.get(store_geo_id)
             if not store_coords:
                 continue
-
             store_lat, store_lon = store_coords
             distance = self._calculate_distance(
                 customer_lat, customer_lon, store_lat, store_lon
             )
             distances[store.ID] = distance
-
         return distances
 
     def _determine_customer_segment(self, customer: Customer) -> str:
