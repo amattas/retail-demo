@@ -75,6 +75,23 @@ class CircuitBreaker:
             self._on_failure()
             raise e
 
+    async def call_async(self, func):
+        """Execute coroutine function with circuit breaker protection."""
+        if self.state == "OPEN":
+            if self._should_attempt_reset():
+                self.state = "HALF_OPEN"
+                self.metrics.update_circuit_breaker_state(self.state)
+            else:
+                raise EventHubError("Circuit breaker is OPEN")
+
+        try:
+            result = await func()
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+
     def _should_attempt_reset(self) -> bool:
         """Check if enough time has passed to attempt reset."""
         if self.last_failure_time is None:
@@ -183,12 +200,11 @@ class AzureEventHubClient:
             self._client = EventHubProducerClient.from_connection_string(
                 conn_str=self.connection_string, eventhub_name=self.hub_name
             )
-            self._is_connected = True
             # Log sanitized connection string to avoid exposing keys
             sanitized = sanitize_connection_string(self.connection_string)
             logger.info(
                 f"Azure Event Hub client initialized for hub: {self.hub_name} "
-                f"(connection: {sanitized})"
+                f"(connection configured: {sanitized})"
             )
         except Exception as e:
             logger.error(f"Failed to initialize Event Hub client: {e}")
@@ -328,7 +344,7 @@ class AzureEventHubClient:
         while attempt < self.retry_attempts:
             try:
                 if self.circuit_breaker:
-                    success = self.circuit_breaker.call(
+                    success = await self.circuit_breaker.call_async(
                         lambda: self._send_batch_direct(events)
                     )
                 else:

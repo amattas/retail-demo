@@ -1307,8 +1307,14 @@ class TestConnectionTest:
             pytest.skip("Azure SDK not available")
 
         with patch("retail_datagen.streaming.azure_client.AZURE_AVAILABLE", True):
+            # Use a connection string without EntityPath to force failure
+            conn_no_entity = (
+                "Endpoint=sb://test.servicebus.windows.net/;"
+                "SharedAccessKeyName=RootManageSharedAccessKey;"
+                "SharedAccessKey=dGVzdGtleTEyM3Rlc3RrZXkxMjN0ZXN0a2V5MTIzZGVzdGtleTE="
+            )
             client = AzureEventHubClient(
-                connection_string=valid_connection_string, hub_name=""
+                connection_string=conn_no_entity, hub_name=""
             )
 
             success, message, metadata = await client.test_connection()

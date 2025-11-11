@@ -4,6 +4,18 @@ Pytest configuration and fixtures for retail data generator tests.
 Provides common test fixtures, sample data, and test utilities.
 """
 
+# Explicitly enable pytest-asyncio with plugin autoload disabled
+pytest_plugins = ("pytest_asyncio.plugin",)
+
+def pytest_configure(config):
+    # Ensure pytest-asyncio plugin is registered when autoload is disabled
+    try:
+        import pytest_asyncio
+        config.pluginmanager.register(pytest_asyncio.plugin, name="pytest_asyncio")
+    except Exception:
+        # If plugin registration fails, tests that require it will be skipped/fail
+        pass
+
 # CRITICAL: Mock Prometheus BEFORE any imports to prevent registry conflicts
 import sys
 from unittest.mock import MagicMock

@@ -1,4 +1,4 @@
-# Historical Fact Data Generation System
+# Fact Data Generation System
 
 ## Overview
 
@@ -41,7 +41,7 @@ The Historical Fact Data Generation System creates realistic retail transaction 
 - **Reproducible Results**: Seed-based deterministic generation
 
 ### ✅ **Production-Ready Output**
-- **Partitioned Storage**: Date-based partitions (`dt=YYYY-MM-DD`)
+- **Partitioned Storage**: Monthly Parquet files under `data/export/<table>`
 - **Scalable Generation**: Handle millions of transactions efficiently
 - **Progress Reporting**: Real-time feedback with table completion counter, ETA estimation, and throttled updates
 - **Configurable Volumes**: Adjust store count, customer traffic, basket sizes
@@ -78,7 +78,7 @@ Daily Generation Loop:
    - Process inventory deductions
 5. Analyze inventory needs → Generate truck movements
 6. Process truck deliveries → Update store inventory
-7. Validate business rules and export to partitioned CSV
+7. Validate business rules and export to monthly Parquet files
 ```
 
 ## 🚀 Quick Start
@@ -93,10 +93,10 @@ from retail_datagen.generators.fact_generator import FactDataGenerator
 # Load configuration
 config = RetailConfig.from_file("config.json")
 
-# Initialize generator (loads master data automatically)
+# Initialize generator (loads dimension data automatically)
 generator = FactDataGenerator(config)
 
-# Generate 30 days of historical data
+# Generate 30 days of fact data
 start_date = datetime(2024, 1, 1)
 end_date = datetime(2024, 1, 30)
 
@@ -122,9 +122,7 @@ print(f"Generated {summary.total_records} records in {summary.generation_time_se
     "burst": 100
   },
   "paths": {
-    "dict": "data/dictionaries",
-    "master": "data/master",
-    "facts": "data/facts"
+    "dict": "data/dictionaries"
   },
   "stream": {
     "hub": "retail-events"
@@ -135,27 +133,29 @@ print(f"Generated {summary.total_records} records in {summary.generation_time_se
 ### 3. Output Structure
 
 ```
-data/facts/
-├── receipts/
-│   ├── dt=2024-01-01/
-│   │   └── receipts_20240101.csv
-│   ├── dt=2024-01-02/
-│   │   └── receipts_20240102.csv
-├── receipt_lines/
-│   ├── dt=2024-01-01/
-│   │   └── receipt_lines_20240101.csv
-├── store_inventory_txn/
-│   ├── dt=2024-01-01/
-│   │   └── store_inventory_txn_20240101.csv
-├── truck_moves/
-├── dc_inventory_txn/
-├── foot_traffic/
-├── ble_pings/
-├── marketing/
-└── online_orders/
+data/export/
+├── fact_receipts/
+│   ├── fact_receipts_2024-01.parquet
+│   ├── fact_receipts_2024-02.parquet
+├── fact_receipt_lines/
+│   ├── fact_receipt_lines_2024-01.parquet
+├── fact_store_inventory_txn/
+│   ├── fact_store_inventory_txn_2024-01.parquet
+├── fact_truck_moves/
+│   ├── fact_truck_moves_2024-01.parquet
+├── fact_dc_inventory_txn/
+│   ├── fact_dc_inventory_txn_2024-01.parquet
+├── fact_foot_traffic/
+│   ├── fact_foot_traffic_2024-01.parquet
+├── fact_ble_pings/
+│   ├── fact_ble_pings_2024-01.parquet
+├── fact_marketing/
+│   ├── fact_marketing_2024-01.parquet
+└── fact_online_order_lines/
+    ├── fact_online_order_lines_2024-01.parquet
 ```
 
-## 📊 Generated Fact Tables
+## 📊 Generated Fact Tables (Example Rows)
 
 ### 1. DC Inventory Transactions
 ```csv
@@ -303,9 +303,9 @@ python -m pytest tests/unit/test_fact_generation.py
 
 ### Common Issues
 
-**1. "Master data not found"**
-- Ensure master data CSV files exist in configured path
-- Run master data generation first
+**1. "Dimension data not found"**
+- Ensure dimension data exists in DuckDB (dim_* tables) or export files under `data/export/<table>`
+- Run dimension data generation first
 
 **2. "Negative inventory"**
 - Check inventory reorder logic

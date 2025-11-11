@@ -55,7 +55,7 @@ POST /stream/start
 **Error Responses:**
 
 - **409 Conflict**: Streaming already active
-- **400 Bad Request**: Invalid event types or missing historical data
+- **400 Bad Request**: Invalid event types or missing fact data
 - **400 Bad Request**: Azure connection string not configured
 
 **Example:**

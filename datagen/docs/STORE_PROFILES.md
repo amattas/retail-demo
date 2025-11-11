@@ -59,7 +59,7 @@ shared/store_profiles.py
 
 ## Integration Points
 
-### 1. Master Data Generation
+### 1. Dimension Data Generation
 
 **File**: `generators/master_generator.py`
 
@@ -278,7 +278,7 @@ Store profiling is deterministic and uses the same seed as master generation:
 
 ```python
 # In RetailConfig
-seed: 42  # Controls both master data AND profile assignment
+seed: 42  # Controls both dimension data AND profile assignment
 
 # In MasterDataGenerator
 profiler = StoreProfiler(stores, geographies, seed=self.config.seed)
@@ -311,7 +311,7 @@ Potential improvements to the profile system:
 
 **Cause**: Database schema not updated after adding profile fields.
 
-**Fix**: Drop and regenerate master database, or run migration to add columns.
+**Fix**: Regenerate dimension data (dim_* tables) in DuckDB, or run a migration to add missing columns.
 
 ### Profile fields are None in fact generation
 

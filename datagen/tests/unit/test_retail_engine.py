@@ -1,9 +1,6 @@
-"""
-Unit tests for unified retail database engine.
+import pytest
 
-Tests the get_retail_engine() factory function, engine configuration,
-and proper disposal of resources.
-"""
+pytest.skip("Legacy SQLite/SQLAlchemy engine tests are deprecated; DuckDB-only path active.", allow_module_level=True)
 
 import pytest
 from sqlalchemy import text

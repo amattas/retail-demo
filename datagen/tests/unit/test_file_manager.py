@@ -44,25 +44,12 @@ class TestExportFileManagerInit:
 
 
 class TestGetMasterTablePath:
-    """Test get_master_table_path method."""
-
-    def test_get_master_table_path_csv(self, tmp_path):
-        """Should return correct path for CSV master table."""
-        manager = ExportFileManager(base_dir=tmp_path)
-
-        path = manager.get_master_table_path("dim_stores", "csv")
-
-        assert path == tmp_path / "master" / "dim_stores.csv"
-        assert path.suffix == ".csv"
-        assert path.parent.name == "master"
-
     def test_get_master_table_path_parquet(self, tmp_path):
         """Should return correct path for Parquet master table."""
         manager = ExportFileManager(base_dir=tmp_path)
 
         path = manager.get_master_table_path("dim_customers", "parquet")
-
-        assert path == tmp_path / "master" / "dim_customers.parquet"
+        assert path == tmp_path / "export" / "dim_customers" / "dim_customers.parquet"
         assert path.suffix == ".parquet"
 
     def test_get_master_table_path_various_names(self, tmp_path):
@@ -70,90 +57,31 @@ class TestGetMasterTablePath:
         manager = ExportFileManager(base_dir=tmp_path)
 
         paths = [
-            manager.get_master_table_path("dim_geographies", "csv"),
-            manager.get_master_table_path("dim_products", "csv"),
+            manager.get_master_table_path("dim_geographies", "parquet"),
+            manager.get_master_table_path("dim_products", "parquet"),
             manager.get_master_table_path("dim_trucks", "parquet"),
         ]
 
-        # All should be under master directory
+        # All should be under export/<table>/
         for path in paths:
-            assert path.parent.name == "master"
-            assert path.parent.parent == tmp_path
+            assert path.parent.parent.name == "export"
+            assert path.parent.parent.parent == tmp_path
 
     def test_get_master_table_path_validates_security(self, tmp_path):
         """Should validate path is within base directory."""
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Normal path should work
-        path = manager.get_master_table_path("dim_stores", "csv")
+        path = manager.get_master_table_path("dim_stores", "parquet")
         assert path  # No exception
 
 
-class TestGetFactTablePath:
-    """Test get_fact_table_path method."""
-
-    def test_get_fact_table_path_csv(self, tmp_path):
-        """Should return correct partitioned path for CSV fact table."""
+class TestGetFactTableMonthPath:
+    def test_get_fact_table_month_path(self, tmp_path):
         manager = ExportFileManager(base_dir=tmp_path)
-        partition_date = date(2024, 1, 15)
-
-        path = manager.get_fact_table_path("fact_receipts", partition_date, "csv")
-
-        expected = tmp_path / "facts" / "fact_receipts" / "dt=2024-01-15" / "fact_receipts_2024-01-15.csv"
-        assert path == expected
-        assert path.suffix == ".csv"
-        assert "dt=2024-01-15" in str(path)
-
-    def test_get_fact_table_path_parquet(self, tmp_path):
-        """Should return correct partitioned path for Parquet fact table."""
-        manager = ExportFileManager(base_dir=tmp_path)
-        partition_date = date(2024, 2, 28)
-
-        path = manager.get_fact_table_path("fact_truck_moves", partition_date, "parquet")
-
+        path = manager.get_fact_table_month_path("fact_receipts", 2024, 1, "parquet")
+        assert path == tmp_path / "export" / "fact_receipts" / "fact_receipts_2024-01.parquet"
         assert path.suffix == ".parquet"
-        assert "dt=2024-02-28" in str(path)
-        assert "fact_truck_moves_2024-02-28.parquet" in str(path)
-
-    def test_get_fact_table_path_various_dates(self, tmp_path):
-        """Should handle various partition dates correctly."""
-        manager = ExportFileManager(base_dir=tmp_path)
-
-        dates = [
-            date(2024, 1, 1),
-            date(2024, 6, 15),
-            date(2024, 12, 31),
-        ]
-
-        for partition_date in dates:
-            path = manager.get_fact_table_path("fact_receipts", partition_date, "csv")
-
-            # Verify date is in path
-            date_str = partition_date.strftime("%Y-%m-%d")
-            assert f"dt={date_str}" in str(path)
-            assert f"fact_receipts_{date_str}.csv" in str(path)
-
-    def test_get_fact_table_path_nested_structure(self, tmp_path):
-        """Should create properly nested directory structure."""
-        manager = ExportFileManager(base_dir=tmp_path)
-        partition_date = date(2024, 1, 1)
-
-        path = manager.get_fact_table_path("fact_inventory", partition_date, "csv")
-
-        # Should be: base_dir / facts / table_name / dt=date / filename
-        parts = path.parts
-        assert "facts" in parts
-        assert "fact_inventory" in parts
-        assert any("dt=" in part for part in parts)
-
-    def test_get_fact_table_path_validates_security(self, tmp_path):
-        """Should validate path is within base directory."""
-        manager = ExportFileManager(base_dir=tmp_path)
-        partition_date = date(2024, 1, 1)
-
-        # Normal path should work
-        path = manager.get_fact_table_path("fact_receipts", partition_date, "csv")
-        assert path  # No exception
 
 
 class TestEnsureDirectory:
@@ -185,7 +113,7 @@ class TestEnsureDirectory:
     def test_ensure_directory_for_file_path(self, tmp_path):
         """Should create parent directory when given file path."""
         manager = ExportFileManager(base_dir=tmp_path)
-        file_path = tmp_path / "dir1" / "dir2" / "file.csv"
+        file_path = tmp_path / "dir1" / "dir2" / "file.parquet"
 
         manager.ensure_directory(file_path)
 
@@ -204,7 +132,7 @@ class TestEnsureDirectory:
             manager.ensure_directory(outside_path)
 
     def test_ensure_directory_handles_permission_error(self, tmp_path):
-        """Should raise OSError with helpful message on permission error."""
+        """Should raise an error on permission issues (message may vary by OS)."""
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Create read-only parent directory
@@ -215,7 +143,8 @@ class TestEnsureDirectory:
         nested_dir = readonly_dir / "nested"
 
         try:
-            with pytest.raises(OSError, match="Failed to create directory"):
+            # Some OS/filesystems raise PermissionError during path stat, others on mkdir
+            with pytest.raises((PermissionError, OSError)):
                 manager.ensure_directory(nested_dir)
         finally:
             # Cleanup: restore permissions
@@ -228,7 +157,7 @@ class TestTrackFile:
     def test_track_file_adds_to_list(self, tmp_path):
         """Should add file to tracking list."""
         manager = ExportFileManager(base_dir=tmp_path)
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
 
         manager.track_file(file_path)
 
@@ -240,9 +169,9 @@ class TestTrackFile:
         manager = ExportFileManager(base_dir=tmp_path)
 
         files = [
-            tmp_path / "file1.csv",
-            tmp_path / "file2.csv",
-            tmp_path / "file3.csv",
+            tmp_path / "file1.parquet",
+            tmp_path / "file2.parquet",
+            tmp_path / "file3.parquet",
         ]
 
         for file_path in files:
@@ -254,7 +183,7 @@ class TestTrackFile:
     def test_track_file_no_duplicates(self, tmp_path):
         """Should not add duplicate files."""
         manager = ExportFileManager(base_dir=tmp_path)
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
 
         manager.track_file(file_path)
         manager.track_file(file_path)  # Track again
@@ -265,7 +194,7 @@ class TestTrackFile:
     def test_track_file_converts_to_absolute(self, tmp_path):
         """Should convert relative paths to absolute."""
         manager = ExportFileManager(base_dir=tmp_path)
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
 
         manager.track_file(file_path)
 
@@ -278,7 +207,7 @@ class TestTrackFile:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Path outside base directory should raise ValueError
-        outside_path = Path("/tmp/outside.csv")
+        outside_path = Path("/tmp/outside.parquet")
 
         with pytest.raises(ValueError, match="outside allowed base directory"):
             manager.track_file(outside_path)
@@ -293,9 +222,9 @@ class TestCleanup:
 
         # Create and track files
         files = [
-            tmp_path / "file1.csv",
-            tmp_path / "file2.csv",
-            tmp_path / "file3.csv",
+            tmp_path / "file1.parquet",
+            tmp_path / "file2.parquet",
+            tmp_path / "file3.parquet",
         ]
 
         for file_path in files:
@@ -317,7 +246,7 @@ class TestCleanup:
         removal_order = []
 
         # Create files
-        files = [tmp_path / f"file{i}.csv" for i in range(3)]
+        files = [tmp_path / f"file{i}.parquet" for i in range(3)]
         for f in files:
             f.write_text("data")
             manager.track_file(f)
@@ -329,7 +258,8 @@ class TestCleanup:
             removal_order.append(self)
             return original_unlink(self, *args, **kwargs)
 
-        with pytest.mock.patch.object(Path, 'unlink', tracked_unlink):
+        from unittest import mock
+        with mock.patch.object(Path, 'unlink', tracked_unlink):
             manager.cleanup()
 
         # Should remove in reverse order (last tracked removed first)
@@ -342,7 +272,7 @@ class TestCleanup:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Track some files
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
         file_path.write_text("data")
         manager.track_file(file_path)
 
@@ -359,7 +289,7 @@ class TestCleanup:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Track file that doesn't exist
-        file_path = tmp_path / "missing.csv"
+        file_path = tmp_path / "missing.parquet"
         manager.track_file(file_path)
 
         # Cleanup should not raise exception
@@ -372,8 +302,8 @@ class TestCleanup:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Create files
-        file1 = tmp_path / "file1.csv"
-        file2 = tmp_path / "file2.csv"
+        file1 = tmp_path / "file1.parquet"
+        file2 = tmp_path / "file2.parquet"
 
         file1.write_text("data")
         file2.write_text("data")
@@ -413,7 +343,7 @@ class TestResetTracking:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Create and track files
-        files = [tmp_path / f"file{i}.csv" for i in range(3)]
+        files = [tmp_path / f"file{i}.parquet" for i in range(3)]
         for f in files:
             f.write_text("data")
             manager.track_file(f)
@@ -434,7 +364,7 @@ class TestResetTracking:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Track file
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
         file_path.write_text("data")
         manager.track_file(file_path)
 
@@ -462,7 +392,7 @@ class TestGetTrackedFileCount:
 
         # Track files
         for i in range(5):
-            manager.track_file(tmp_path / f"file{i}.csv")
+            manager.track_file(tmp_path / f"file{i}.parquet")
 
         assert manager.get_tracked_file_count() == 5
 
@@ -475,14 +405,14 @@ class TestGetTrackedFiles:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Track a file
-        file_path = tmp_path / "test.csv"
+        file_path = tmp_path / "test.parquet"
         manager.track_file(file_path)
 
         # Get copy
         tracked_copy = manager.get_tracked_files()
 
         # Modify copy
-        tracked_copy.append(tmp_path / "extra.csv")
+        tracked_copy.append(tmp_path / "extra.parquet")
 
         # Original should be unchanged
         assert len(manager.written_files) == 1
@@ -507,9 +437,9 @@ class TestValidatePath:
 
         # Valid paths within base
         valid_paths = [
-            tmp_path / "file.csv",
-            tmp_path / "subdir" / "file.csv",
-            tmp_path / "deep" / "nested" / "path" / "file.csv",
+            tmp_path / "file.parquet",
+            tmp_path / "subdir" / "file.parquet",
+            tmp_path / "deep" / "nested" / "path" / "file.parquet",
         ]
 
         for path in valid_paths:
@@ -522,9 +452,9 @@ class TestValidatePath:
 
         # Paths outside base directory
         invalid_paths = [
-            Path("/tmp/outside.csv"),
+            Path("/tmp/outside.parquet"),
             Path("/etc/passwd"),
-            tmp_path.parent / "sibling" / "file.csv",
+            tmp_path.parent / "sibling" / "file.parquet",
         ]
 
         for path in invalid_paths:
@@ -550,7 +480,7 @@ class TestExportFileManagerIntegration:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Simulate export process
-        master_path = manager.get_master_table_path("dim_stores", "csv")
+        master_path = manager.get_master_table_path("dim_stores", "parquet")
         manager.ensure_directory(master_path.parent)
 
         # Write file
@@ -558,10 +488,11 @@ class TestExportFileManagerIntegration:
         manager.track_file(master_path)
 
         # Add fact table
-        fact_path = manager.get_fact_table_path(
+        fact_path = manager.get_fact_table_month_path(
             "fact_receipts",
-            date(2024, 1, 1),
-            "csv"
+            2024,
+            1,
+            "parquet",
         )
         manager.ensure_directory(fact_path.parent)
         fact_path.write_text("TraceId,Total\ntrace1,100.00")
@@ -585,8 +516,8 @@ class TestExportFileManagerIntegration:
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Start export
-        file1 = tmp_path / "file1.csv"
-        file2 = tmp_path / "file2.csv"
+        file1 = tmp_path / "file1.parquet"
+        file2 = tmp_path / "file2.parquet"
 
         file1.write_text("data1")
         manager.track_file(file1)

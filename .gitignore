@@ -86,3 +86,6 @@ bandit_report.json
 /datagen/data/cache
 *.duckdb
 *.duckdb
+/datagen/data/export
+datagen/data/retail.duckdb
+datagen/data/retail.duckdb

@@ -119,7 +119,7 @@ class RetailDataGenerator {
                 const item = e.target.closest('.table-item');
                 if (!item || !masterGrid.contains(item)) return;
                 const table = item.dataset.table;
-                if (table) this.previewTable(table, 'Master Data');
+                if (table) this.previewTable(table, 'Dimension Data');
             });
         }
         const histGrid = document.querySelector('#historical .table-grid');
@@ -128,7 +128,7 @@ class RetailDataGenerator {
                 const item = e.target.closest('.table-item');
                 if (!item || !histGrid.contains(item)) return;
                 const table = item.dataset.table;
-                if (table) this.previewTable(table, 'Historical Data');
+                if (table) this.previewTable(table, 'Fact Data');
             });
         }
     }
@@ -213,14 +213,14 @@ class RetailDataGenerator {
 
         if (hasFactData) {
             statusInfo.innerHTML = `
-                <p><strong>Historical Data:</strong> ✅ Generated</p>
+                <p><strong>Fact Data:</strong> ✅ Generated</p>
                 ${state.last_generated_timestamp ? `<p><strong>Last Generated:</strong> ${new Date(state.last_generated_timestamp).toLocaleString()}</p>` : ''}
                 <p><strong>Real-time Ready:</strong> ${state.can_start_realtime ? '✅ Yes' : '❌ No'}</p>
                 ${state.last_historical_run ? `<p><strong>Last Run:</strong> ${new Date(state.last_historical_run).toLocaleString()}</p>` : ''}
             `;
         } else {
             statusInfo.innerHTML = `
-                <p><strong>Historical Data:</strong> ❌ Not generated yet</p>
+                <p><strong>Fact Data:</strong> ❌ Not generated yet</p>
                 <p><strong>Status:</strong> Run historical generation first</p>
                 <p><strong>Real-time Ready:</strong> ❌ No</p>
             `;
@@ -683,28 +683,28 @@ class RetailDataGenerator {
 
             const allTables = [];
 
-            // Master data tables
+            // Dimension data tables
             const masterTables = [
-                { name: 'geographies_master', displayName: 'Geographies', icon: 'fas fa-map-marker-alt', type: 'Master Data' },
-                { name: 'stores', displayName: 'Stores', icon: 'fas fa-store', type: 'Master Data' },
-                { name: 'distribution_centers', displayName: 'Distribution Centers', icon: 'fas fa-warehouse', type: 'Master Data' },
-                { name: 'trucks', displayName: 'Trucks', icon: 'fas fa-truck', type: 'Master Data' },
-                { name: 'customers', displayName: 'Customers', icon: 'fas fa-users', type: 'Master Data' },
-                { name: 'products_master', displayName: 'Products', icon: 'fas fa-box', type: 'Master Data' }
+                { name: 'geographies_master', displayName: 'Geographies', icon: 'fas fa-map-marker-alt', type: 'Dimension Data' },
+                { name: 'stores', displayName: 'Stores', icon: 'fas fa-store', type: 'Dimension Data' },
+                { name: 'distribution_centers', displayName: 'Distribution Centers', icon: 'fas fa-warehouse', type: 'Dimension Data' },
+                { name: 'trucks', displayName: 'Trucks', icon: 'fas fa-truck', type: 'Dimension Data' },
+                { name: 'customers', displayName: 'Customers', icon: 'fas fa-users', type: 'Dimension Data' },
+                { name: 'products_master', displayName: 'Products', icon: 'fas fa-box', type: 'Dimension Data' }
             ];
 
             // Fact tables
             const factTables = [
-                { name: 'receipts', displayName: 'Receipts', icon: 'fas fa-receipt', type: 'Historical Data' },
-                { name: 'receipt_lines', displayName: 'Receipt Lines', icon: 'fas fa-list', type: 'Historical Data' },
-                { name: 'store_inventory_txn', displayName: 'Store Inventory', icon: 'fas fa-boxes', type: 'Historical Data' },
-                { name: 'dc_inventory_txn', displayName: 'DC Inventory', icon: 'fas fa-warehouse', type: 'Historical Data' },
-                { name: 'truck_moves', displayName: 'Truck Moves', icon: 'fas fa-truck-moving', type: 'Historical Data' },
-                { name: 'foot_traffic', displayName: 'Foot Traffic', icon: 'fas fa-walking', type: 'Historical Data' },
-                { name: 'ble_pings', displayName: 'BLE Pings', icon: 'fas fa-wifi', type: 'Historical Data' },
-                { name: 'marketing', displayName: 'Marketing', icon: 'fas fa-bullhorn', type: 'Historical Data' },
-                { name: 'online_orders', displayName: 'Online Orders', icon: 'fas fa-shopping-bag', type: 'Historical Data' },
-                { name: 'online_order_lines', displayName: 'Online Order Lines', icon: 'fas fa-list', type: 'Historical Data' }
+                { name: 'receipts', displayName: 'Receipts', icon: 'fas fa-receipt', type: 'Fact Data' },
+                { name: 'receipt_lines', displayName: 'Receipt Lines', icon: 'fas fa-list', type: 'Fact Data' },
+                { name: 'store_inventory_txn', displayName: 'Store Inventory', icon: 'fas fa-boxes', type: 'Fact Data' },
+                { name: 'dc_inventory_txn', displayName: 'DC Inventory', icon: 'fas fa-warehouse', type: 'Fact Data' },
+                { name: 'truck_moves', displayName: 'Truck Moves', icon: 'fas fa-truck-moving', type: 'Fact Data' },
+                { name: 'foot_traffic', displayName: 'Foot Traffic', icon: 'fas fa-walking', type: 'Fact Data' },
+                { name: 'ble_pings', displayName: 'BLE Pings', icon: 'fas fa-wifi', type: 'Fact Data' },
+                { name: 'marketing', displayName: 'Marketing', icon: 'fas fa-bullhorn', type: 'Fact Data' },
+                { name: 'online_orders', displayName: 'Online Orders', icon: 'fas fa-shopping-bag', type: 'Fact Data' },
+                { name: 'online_order_lines', displayName: 'Online Order Lines', icon: 'fas fa-list', type: 'Fact Data' }
             ];
 
             // Try to use cached data first (fast path)
@@ -723,9 +723,9 @@ class RetailDataGenerator {
                         });
                     }
 
-                    // Backfill missing master table counts directly if cache empty
+                    // Backfill missing dimension table counts directly if cache empty
                     const missingMasterTables = allTables.filter(
-                        table => table.type === 'Master Data' && table.status !== 'Generated'
+                        table => table.type === 'Dimension Data' && table.status !== 'Generated'
                     );
                     for (const table of missingMasterTables) {
                         try {
@@ -1141,8 +1141,7 @@ class RetailDataGenerator {
         const masterExportBtn = document.getElementById('exportMasterBtn');
         if (masterExportBtn) {
             masterExportBtn.addEventListener('click', () => {
-                const format = document.getElementById('masterExportFormat')?.value || 'csv';
-                this.exportMasterData(format);
+                this.exportMasterData();
             });
         }
 
@@ -1150,17 +1149,15 @@ class RetailDataGenerator {
         const historicalExportBtn = document.getElementById('exportFactBtn');
         if (historicalExportBtn) {
             historicalExportBtn.addEventListener('click', () => {
-                const format = document.getElementById('factExportFormat')?.value || 'csv';
-                this.exportFactData(format);
+                this.exportFactData();
             });
         }
     }
 
     /**
-     * Export master data tables
-     * @param {string} format - Export format ('csv' or 'parquet')
+     * Export master data tables (Parquet-only)
      */
-    async exportMasterData(format) {
+    async exportMasterData() {
         const exportBtn = document.getElementById('exportMasterBtn');
         if (!exportBtn) return;
 
@@ -1182,7 +1179,7 @@ class RetailDataGenerator {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ format })
+                body: JSON.stringify({ format: 'parquet' })
             });
 
             if (!response.ok) {
@@ -1202,7 +1199,7 @@ class RetailDataGenerator {
 
             // Handle completion
             if (finalStatus?.status === 'completed') {
-                this.showNotification(`Master data exported successfully to ${format.toUpperCase()}!`, 'success');
+                this.showNotification('Dimension data exported successfully to PARQUET!', 'success');
             } else if (finalStatus?.status === 'failed') {
                 this.showNotification(
                     `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
@@ -1223,10 +1220,9 @@ class RetailDataGenerator {
     }
 
     /**
-     * Export fact data tables
-     * @param {string} format - Export format ('csv' or 'parquet')
+     * Export fact data tables (Parquet-only)
      */
-    async exportFactData(format) {
+    async exportFactData() {
         const exportBtn = document.getElementById('exportFactBtn');
         if (!exportBtn) return;
 
@@ -1248,7 +1244,7 @@ class RetailDataGenerator {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ format })
+                body: JSON.stringify({ format: 'parquet' })
             });
 
             if (!response.ok) {
@@ -1268,10 +1264,7 @@ class RetailDataGenerator {
 
             // Handle completion
             if (finalStatus?.status === 'completed') {
-                this.showNotification(
-                    `Historical data exported successfully to ${format.toUpperCase()}!`,
-                    'success'
-                );
+                this.showNotification('Fact data exported successfully to PARQUET!', 'success');
             } else if (finalStatus?.status === 'failed') {
                 this.showNotification(
                     `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
@@ -1688,6 +1681,26 @@ class RetailDataGenerator {
         }
     }
 
+    async drainOutbox() {
+        try {
+            const intervalEl = document.getElementById('emitInterval');
+            const override = intervalEl ? parseInt(intervalEl.value) : null;
+            const body = override ? { emit_interval_ms: override } : {};
+            const response = await fetch('/api/stream/outbox/drain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            this.showNotification('Outbox drain started', 'info');
+        } catch (error) {
+            console.error('Failed to drain outbox:', error);
+            this.showNotification(`Failed to drain outbox: ${error.message}`, 'error');
+        }
+    }
+
     updateStreamingUI(isStreaming) {
         const status = document.getElementById('streamStatus');
         const startBtn = document.getElementById('startStreamBtn');
@@ -1908,7 +1921,7 @@ class RetailDataGenerator {
         }
     }
 
-    async previewTable(tableName, tableType = 'Master Data') {
+    async previewTable(tableName, tableType = 'Dimension Data') {
         const modal = document.getElementById('previewModal');
         const title = document.getElementById('previewTitle');
         const content = document.getElementById('previewContent');
@@ -1937,7 +1950,7 @@ class RetailDataGenerator {
             const headers = result.columns || Object.keys(data[0]);
             const tableHtml = `
                 <div class="table-container">
-                    ${tableType === 'Historical Data' && result.most_recent_date ?
+                    ${tableType === 'Fact Data' && result.most_recent_date ?
                         `<p class="preview-note">Most recent partition: ${result.most_recent_date}</p>` : ''}
                     <table class="preview-table">
                         <thead>
@@ -2602,6 +2615,10 @@ function startStreaming() {
 
 function stopStreaming() {
     app.stopStreaming();
+}
+
+function drainOutbox() {
+    app.drainOutbox();
 }
 
 function saveConfig() {

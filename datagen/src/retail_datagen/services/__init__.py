@@ -15,7 +15,7 @@ from .duckdb_reader import (
 )
 from .export_service import ExportService
 from .file_manager import ExportFileManager
-from .writers import BaseWriter, CSVWriter, ParquetWriter
+from .writers import BaseWriter, ParquetWriter
 
 __all__ = [
     # Export service
@@ -24,7 +24,6 @@ __all__ = [
     "ExportFileManager",
     # Writers
     "BaseWriter",
-    "CSVWriter",
     "ParquetWriter",
     # Readers (DuckDB)
     "read_all_master_tables",

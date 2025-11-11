@@ -209,7 +209,7 @@ curl -X POST http://localhost:8000/api/stream/test
 
 ### Verify Prerequisites
 
-Check that historical data exists (required for streaming):
+Check that fact data exists (required for streaming):
 
 ```bash
 curl http://localhost:8000/api/generators/state
@@ -218,13 +218,13 @@ curl http://localhost:8000/api/generators/state
 Expected response:
 ```json
 {
-  "has_historical_data": true,
+  "has_fact_data": true,
   "last_generated_timestamp": "2024-01-15T10:30:00",
   ...
 }
 ```
 
-If `has_historical_data` is `false`, generate historical data first:
+If `has_fact_data` is `false`, generate fact data first:
 
 ```bash
 curl -X POST http://localhost:8000/api/generators/historical/start
@@ -296,10 +296,10 @@ Key configuration options in `config.json`:
 **Solution:** Generate historical data before starting streaming:
 
 ```bash
-# Generate master data
+# Generate dimension data
 curl -X POST http://localhost:8000/api/generators/master/start
 
-# Generate historical data
+# Generate fact data
 curl -X POST http://localhost:8000/api/generators/historical/start
 ```
 

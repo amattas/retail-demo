@@ -33,11 +33,11 @@
                     </button>
                     <button class="nav-tab" data-tab="master-data">
                         <i class="fas fa-database"></i>
-                        Master Data
+                        Dimension Data
                     </button>
                     <button class="nav-tab" data-tab="historical">
                         <i class="fas fa-chart-line"></i>
-                        Historical
+                        Fact Data
                     </button>
                     <button class="nav-tab" data-tab="streaming">
                         <i class="fas fa-stream"></i>
@@ -77,7 +77,7 @@
         <div id="dashboard" class="tab-content">
             <div class="welcome-section">
                 <h2>Welcome to Retail Data Generator</h2>
-                <p>Generate synthetic but realistic retail data for analytics POCs. Create master data, simulate historical transactions, and stream real-time events to Azure Event Hub.</p>
+                <p>Generate synthetic but realistic retail data for analytics POCs. Create dimension data, generate fact tables, and stream real-time events to Azure Event Hub.</p>
             </div>
 
             <div class="stats-grid">
@@ -129,10 +129,10 @@
             </div>
         </div>
 
-        <!-- Master Data Tab -->
+        <!-- Dimension Data Tab -->
         <div id="master-data" class="tab-content">
             <div class="section-header">
-                <h2>Master Data Generation</h2>
+                <h2>Dimension Data Generation</h2>
                 <p>Generate dimension tables from dictionary data</p>
             </div>
 
@@ -191,18 +191,14 @@
             </div>
 
             <div class="card">
-                <h3>Generate Master Data</h3>
+                <h3>Generate Dimension Data</h3>
                 <div class="generation-controls">
                     <button class="btn primary large" onclick="generateMasterData()">
                         <i class="fas fa-play"></i>
-                        Generate All Master Data
+                        Generate All Dimension Data
                     </button>
 
                     <div class="export-controls">
-                        <select id="masterExportFormat" class="format-selector">
-                            <option value="csv">CSV</option>
-                            <option value="parquet">Parquet</option>
-                        </select>
                         <button id="exportMasterBtn" class="btn secondary large" disabled>
                             <i class="fas fa-file-export"></i> Export
                         </button>
@@ -230,10 +226,10 @@
             </div>
         </div>
 
-        <!-- Historical Data Tab -->
+        <!-- Fact Data Tab -->
         <div id="historical" class="tab-content">
             <div class="section-header">
-                <h2>Historical Data Generation</h2>
+                <h2>Fact Data Generation</h2>
                 <p>Generate fact tables with realistic retail patterns</p>
             </div>
 
@@ -258,14 +254,10 @@
                 <div class="generation-controls">
                     <button class="btn primary large" onclick="generateHistoricalData()">
                         <i class="fas fa-chart-bar"></i>
-                        Generate Historical Data
+                        Generate Fact Data
                     </button>
 
                     <div class="export-controls">
-                        <select id="factExportFormat" class="format-selector">
-                            <option value="csv">CSV</option>
-                            <option value="parquet">Parquet</option>
-                        </select>
                         <button id="exportFactBtn" class="btn secondary large" disabled>
                             <i class="fas fa-file-export"></i> Export
                         </button>
@@ -398,7 +390,7 @@
                 <h2>Real-Time Event Streaming</h2>
                 <p>Stream events to Azure Event Hub</p>
                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 16px 0; font-size: 0.9em;">
-                    <strong>Note:</strong> Historical data must be generated first before starting real-time streaming.
+                    <strong>Note:</strong> Fact data must be generated first before starting real-time streaming.
                 </div>
             </div>
 
@@ -423,6 +415,10 @@
                         <button class="btn danger" id="stopStreamBtn" onclick="stopStreaming()" disabled>
                             <i class="fas fa-stop"></i>
                             Stop Stream
+                        </button>
+                        <button class="btn secondary" id="drainOutboxBtn" onclick="drainOutbox()">
+                            <i class="fas fa-download"></i>
+                            Drain Outbox
                         </button>
                     </div>
                 </div>
@@ -588,7 +584,7 @@
                         <div style="padding: 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
                             <p style="margin: 0 0 8px 0; font-weight: 500; color: #721c24;">Delete All Data</p>
                             <p style="margin: 0 0 12px 0; font-size: 0.9em; color: #721c24;">
-                                Removes ALL generated data including master data, historical data, and generation state.
+                                Removes ALL generated data including dimension data, fact data, and generation state.
                             </p>
                             <button class="btn danger" onclick="app.clearAllData()">
                                 <i class="fas fa-trash-alt"></i>

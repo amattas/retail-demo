@@ -6,7 +6,7 @@ format writing, and file management to perform complete export operations.
 
 The ExportService brings together:
 - DuckDB reader (duckdb_reader) for reading master and fact tables
-- Format writers (CSVWriter, ParquetWriter) for writing data
+- Parquet writer for writing data (Parquet-only)
 - File manager (ExportFileManager) for path resolution and cleanup
 
 Usage:
@@ -15,10 +15,10 @@ Usage:
     # Initialize service
     service = ExportService(base_dir=Path("data"))
 
-    # Export master tables to CSV
+    # Export master tables to Parquet
     master_files = await service.export_master_tables(
         None,
-        format="csv",
+        format="parquet",
         progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
     )
 
@@ -40,12 +40,12 @@ from typing import Literal
 import pandas as pd
 from retail_datagen.services import duckdb_reader
 from retail_datagen.services.file_manager import ExportFileManager
-from retail_datagen.services.writers import BaseWriter, CSVWriter, ParquetWriter
+from retail_datagen.services.writers import BaseWriter, ParquetWriter
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for clarity
-ExportFormat = Literal["csv", "parquet"]
+ExportFormat = Literal["parquet"]
 ProgressCallback = Callable[[str, int, int], None]
 
 
@@ -59,7 +59,7 @@ class ExportService:
     Features:
     - Export all master dimension tables
     - Export all fact tables with optional date filtering
-    - Support for CSV and Parquet formats
+    - Parquet-only format (monthly for facts)
     - Progress callbacks for UI integration
     - Automatic cleanup on failure (rollback)
 
@@ -87,25 +87,16 @@ class ExportService:
         Get appropriate writer instance for the specified format.
 
         Args:
-            format: Output format ("csv" or "parquet")
+            format: Output format ("parquet")
 
         Returns:
-            BaseWriter instance (CSVWriter or ParquetWriter)
-
-        Example:
-            >>> writer = service._get_writer("csv")
-            >>> isinstance(writer, CSVWriter)
-            True
+            BaseWriter instance (ParquetWriter)
         """
-        if format == "csv":
-            logger.debug("Creating CSVWriter instance")
-            return CSVWriter(index=False)
-        elif format == "parquet":
+        if format == "parquet":
             logger.debug("Creating ParquetWriter instance")
             return ParquetWriter(engine="pyarrow", compression="snappy")
         else:
-            # This should never happen due to Literal type, but included for safety
-            raise ValueError(f"Unsupported format: {format}")
+            raise ValueError("Only 'parquet' export is supported")
 
     async def export_master_tables(
         self,
@@ -117,31 +108,23 @@ class ExportService:
         Export all master dimension tables.
 
         Reads all 6 master tables from the database and writes them to files
-        in the data/master/ directory. Format: data/master/<table>.<ext>
+        under data/export/<table>/<table>.parquet.
 
         Args:
             session: Unused; kept for backward compatibility (DuckDB-only)
-            format: Output format ("csv" or "parquet")
+            format: Output format ("parquet")
             progress_callback: Optional callback for progress updates
                 Signature: callback(message: str, current: int, total: int)
 
         Returns:
             Dictionary mapping table names to output file paths:
-            {
-                "dim_geographies": Path("data/master/dim_geographies.csv"),
-                "dim_stores": Path("data/master/dim_stores.csv"),
-                ...
-            }
+            { "dim_stores": Path("data/export/dim_stores/dim_stores.parquet"), ... }
 
         Raises:
             Exception: If export fails (after attempting cleanup)
 
         Example:
-            >>> files = await service.export_master_tables(
-            ...     None,
-            ...     format="csv",
-            ...     progress_callback=lambda msg, curr, total: print(f"{msg}: {curr}/{total}")
-            ... )
+            >>> files = await service.export_master_tables(None, format="parquet")
         """
         logger.info(f"Starting master table export (format={format})")
 
@@ -202,10 +185,7 @@ class ExportService:
             # Success - reset file tracking (don't cleanup)
             self.file_manager.reset_tracking()
 
-            logger.info(
-                f"Master table export complete: {len(result)} tables, "
-                f"{sum(len(pd.read_csv(p) if format == 'csv' else pd.read_parquet(p)) for p in result.values() if p.exists())} total rows"
-            )
+            logger.info(f"Master table export complete: {len(result)} tables")
 
             return result
 
@@ -230,28 +210,19 @@ class ExportService:
         """
         Export all fact tables with optional date filtering.
 
-        Reads all 9 fact tables from the database and writes them to partitioned
-        files in the data/facts/ directory. Format:
-        data/facts/<table>/dt=YYYY-MM-DD/<table>_YYYY-MM-DD.<ext>
+        Reads all fact tables from the database and writes monthly Parquet files
+        to data/export/<table>/<table>_YYYY-MM.parquet.
 
         Args:
             session: Unused; kept for backward compatibility (DuckDB-only)
-            format: Output format ("csv" or "parquet")
+            format: Output format ("parquet")
             start_date: Optional start date for filtering (inclusive)
             end_date: Optional end date for filtering (inclusive)
             progress_callback: Optional callback for progress updates
                 Signature: callback(message: str, current: int, total: int)
 
         Returns:
-            Dictionary mapping table names to lists of partition file paths:
-            {
-                "fact_receipts": [
-                    Path("data/facts/fact_receipts/dt=2024-01-01/fact_receipts_2024-01-01.csv"),
-                    Path("data/facts/fact_receipts/dt=2024-01-02/fact_receipts_2024-01-02.csv"),
-                    ...
-                ],
-                ...
-            }
+            Dictionary mapping table names to lists of monthly Parquet files.
 
         Raises:
             Exception: If export fails (after attempting cleanup)
@@ -305,58 +276,55 @@ class ExportService:
                     result[table_name] = []
                     continue
 
-                # Extract partition dates from event_ts column
-                # Convert datetime to date for partitioning
-                if "event_ts" not in df.columns:
-                    logger.error(f"Fact table {table_name} missing event_ts column")
+                # Identify a timestamp column for partitioning
+                ts_candidates = [
+                    "event_ts",
+                    "picked_ts",
+                    "shipped_ts",
+                    "delivered_ts",
+                    "completed_ts",
+                    "eta",
+                    "etd",
+                ]
+                ts_col = next((c for c in ts_candidates if c in df.columns), None)
+                if not ts_col:
                     raise ValueError(
-                        f"Fact table {table_name} must have event_ts column"
+                        f"Cannot determine timestamp column for table {table_name}; columns={list(df.columns)}"
                     )
 
-                # Add date partition column
-                df["dt"] = pd.to_datetime(df["event_ts"]).dt.date
+                # Normalize timestamp dtype
+                df[ts_col] = pd.to_datetime(df[ts_col])
 
-                # Get unique dates for partition tracking
-                unique_dates = sorted(df["dt"].unique())
-                logger.info(
-                    f"Table {table_name} contains {len(df):,} rows "
-                    f"across {len(unique_dates)} date partitions"
-                )
-
-                # Write partitioned data
                 partition_files: list[Path] = []
 
-                for partition_date in unique_dates:
-                    # Filter data for this partition
-                    partition_df = df[df["dt"] == partition_date].copy()
-
-                    # Remove the temporary dt column before writing
-                    partition_df = partition_df.drop(columns=["dt"])
-
-                    # Get output path from file manager
-                    output_path = self.file_manager.get_fact_table_path(
-                        table_name, partition_date, format
+                if format == "parquet":
+                    # Monthly partition for Parquet
+                    df["ym"] = df[ts_col].dt.to_period("M")
+                    months = sorted(df["ym"].unique())
+                    logger.info(
+                        f"Table {table_name} contains {len(df):,} rows across {len(months)} month partitions"
                     )
+                    for per in months:
+                        month_mask = df["ym"] == per
+                        part_df = df.loc[month_mask].copy().drop(columns=["ym"])
+                        year = int(str(per).split("-")[0])
+                        month = int(str(per).split("-")[1])
+                        output_path = self.file_manager.get_fact_table_month_path(
+                            table_name, year, month, format
+                        )
+                        self.file_manager.ensure_directory(output_path.parent)
+                        logger.debug(
+                            f"Writing {len(part_df):,} rows to {output_path} (monthly)"
+                        )
+                        writer.write(part_df, output_path)
+                        self.file_manager.track_file(output_path)
+                        partition_files.append(output_path)
+                else:
+                    raise ValueError("Only 'parquet' export is supported")
 
-                    # Ensure directory exists
-                    self.file_manager.ensure_directory(output_path.parent)
-
-                    # Write partition data
-                    logger.debug(f"Writing {len(partition_df):,} rows to {output_path}")
-                    writer.write(partition_df, output_path)
-
-                    # Track file for potential rollback
-                    self.file_manager.track_file(output_path)
-
-                    # Add to partition files
-                    partition_files.append(output_path)
-
-                # Add to results
                 result[table_name] = partition_files
-
                 logger.info(
-                    f"Successfully exported {table_name}: "
-                    f"{len(df):,} rows across {len(partition_files)} partitions"
+                    f"Successfully exported {table_name}: {len(df):,} rows across {len(partition_files)} partitions"
                 )
 
             # Success - reset file tracking (don't cleanup)

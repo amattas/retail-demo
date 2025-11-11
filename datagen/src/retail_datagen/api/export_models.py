@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # TYPE DEFINITIONS
 # ================================
 
-ExportFormat = Literal["csv", "parquet"]
+ExportFormat = Literal["parquet"]
 ExportStatus = Literal["pending", "running", "completed", "failed"]
 TableCategory = Literal["master", "facts"]
 
@@ -28,7 +28,7 @@ class ExportRequest(BaseModel):
     """Base request model for data export operations."""
 
     format: ExportFormat = Field(
-        ..., description="Output format for exported data (csv or parquet)"
+        ..., description="Output format for exported data (parquet only)"
     )
     tables: list[str] | Literal["all"] = Field(
         default="all",

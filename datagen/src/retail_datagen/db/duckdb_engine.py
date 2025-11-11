@@ -44,6 +44,12 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                 _conn.execute("PRAGMA temp_directory=':memory:'")
             except Exception:
                 pass
+            # Ensure streaming outbox exists for outbox-driven streaming
+            try:
+                _ensure_outbox_table(_conn)
+            except Exception:
+                # Non-fatal if creation fails here; callers may retry
+                pass
     return _conn
 
 
@@ -160,3 +166,122 @@ def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFra
 def insert_records(conn: duckdb.DuckDBPyConnection, table: str, records: Iterable[dict]) -> int:
     df = pd.DataFrame.from_records(list(records))
     return insert_dataframe(conn, table, df)
+
+
+# ================================
+# Outbox helpers (DuckDB)
+# ================================
+
+def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create a simple outbox table if it does not exist.
+
+    Uses VARCHAR for JSON payload to keep compatibility with pandas-based inserts.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS streaming_outbox (
+            outbox_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+            event_ts TIMESTAMP,
+            message_type VARCHAR,
+            payload VARCHAR,          -- JSON text
+            status VARCHAR DEFAULT 'pending',
+            attempts INT DEFAULT 0,
+            last_attempt_ts TIMESTAMP,
+            sent_ts TIMESTAMP,
+            partition_key VARCHAR,
+            trace_id VARCHAR,
+            correlation_id VARCHAR,
+            schema_version VARCHAR DEFAULT '1.0',
+            source VARCHAR DEFAULT 'retail-datagen'
+        );
+        """
+    )
+    # Lightweight indexes for draining
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_outbox_status_ts ON streaming_outbox(status, event_ts)"
+        )
+    except Exception:
+        pass
+
+
+def outbox_counts(conn: duckdb.DuckDBPyConnection) -> dict:
+    """Return counts by status for streaming_outbox."""
+    _ensure_outbox_table(conn)
+    rows = conn.execute(
+        "SELECT status, COUNT(*) FROM streaming_outbox GROUP BY status"
+    ).fetchall()
+    result = {str(r[0]): int(r[1]) for r in rows}
+    result.setdefault("pending", 0)
+    result.setdefault("processing", 0)
+    result.setdefault("sent", 0)
+    # Oldest pending for UI
+    row = conn.execute(
+        "SELECT MIN(event_ts) FROM streaming_outbox WHERE status='pending'"
+    ).fetchone()
+    result["oldest_pending_ts"] = row[0] if row else None
+    row2 = conn.execute(
+        "SELECT MAX(sent_ts) FROM streaming_outbox WHERE status='sent'"
+    ).fetchone()
+    result["latest_sent_ts"] = row2[0] if row2 else None
+    return result
+
+
+def outbox_has_pending(conn: duckdb.DuckDBPyConnection) -> bool:
+    _ensure_outbox_table(conn)
+    row = conn.execute(
+        "SELECT 1 FROM streaming_outbox WHERE status='pending' LIMIT 1"
+    ).fetchone()
+    return bool(row)
+
+
+def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
+    """Lease the next pending outbox row (oldest-first).
+
+    Returns the row as a dict with keys: outbox_id, event_ts, message_type, payload, partition_key, trace_id.
+    """
+    _ensure_outbox_table(conn)
+    # Select candidate id
+    row = conn.execute(
+        "SELECT outbox_id FROM streaming_outbox WHERE status='pending' ORDER BY event_ts, outbox_id LIMIT 1"
+    ).fetchone()
+    if not row:
+        return None
+    oid = int(row[0])
+    # Try to mark as processing with guard
+    updated = conn.execute(
+        "UPDATE streaming_outbox SET status='processing', last_attempt_ts=now(), attempts=attempts+1 WHERE outbox_id=? AND status='pending'",
+        [oid],
+    ).rowcount
+    if updated != 1:
+        return None
+    # Fetch full row
+    cur = conn.execute(
+        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id FROM streaming_outbox WHERE outbox_id=?",
+        [oid],
+    )
+    r = cur.fetchone()
+    if not r:
+        return None
+    cols = [d[0] for d in (cur.description or [])]
+    return {cols[i]: r[i] for i in range(len(cols))}
+
+
+def outbox_ack_sent(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
+    conn.execute(
+        "UPDATE streaming_outbox SET status='sent', sent_ts=now() WHERE outbox_id=?",
+        [outbox_id],
+    )
+
+
+def outbox_nack_retry(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
+    """Return a processing row to pending for retry."""
+    conn.execute(
+        "UPDATE streaming_outbox SET status='pending' WHERE outbox_id=? AND status='processing'",
+        [outbox_id],
+    )
+
+
+def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dict]) -> int:
+    """Insert a list of outbox rows (event_ts, message_type, payload, partition_key?, trace_id?)."""
+    return insert_records(conn, "streaming_outbox", records)

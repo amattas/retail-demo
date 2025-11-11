@@ -71,6 +71,8 @@ async def export_master_data(
     logger.info(
         f"Master export request received: format={request.format}, tables={request.tables}"
     )
+    if request.format.lower() != "parquet":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only 'parquet' export is supported")
 
     # Validate table names
     try:
@@ -139,17 +141,8 @@ async def export_master_data(
                 for path in result.values()
             ]
 
-            # Count total rows exported (approximate from file sizes)
-            for path in result.values():
-                if path.exists():
-                    # For CSV, count lines; for Parquet, this is approximate
-                    if request.format == "csv":
-                        with open(path) as f:
-                            total_rows += sum(1 for _ in f) - 1  # Subtract header
-                    else:
-                        # For Parquet, we'd need to read the file - skip for performance
-                        # This will be None in the final result
-                        pass
+            # Row counting skipped for Parquet to avoid heavy reads
+            total_rows = None
 
             # Update final progress
             update_task_progress(
@@ -165,8 +158,8 @@ async def export_master_data(
             return {
                 "files_written": files_written,
                 "total_files": total_files,
-                "total_rows": total_rows if request.format == "csv" else None,
-                "output_directory": str(base_dir / "master"),
+                "total_rows": None,
+                "output_directory": str(base_dir / "export"),
             }
 
         except Exception as e:
@@ -229,6 +222,8 @@ async def export_fact_data(
         f"Fact export request received: format={request.format}, "
         f"tables={request.tables}, date_range={request.start_date} to {request.end_date}"
     )
+    if request.format.lower() != "parquet":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only 'parquet' export is supported")
 
     # Validate table names
     try:
@@ -341,18 +336,8 @@ async def export_fact_data(
                     f"Chunk {chunk_idx}/{total_chunks} complete: {len(result)} tables, {sum(len(files) for files in result.values())} files"
                 )
 
-            # Skip row counting for large exports (too slow)
-            if request.format == "csv" and total_files < 100:
-                # Only count rows for small exports
-                logger.info("Counting rows in exported files...")
-                for file_path_str in all_files:
-                    full_path = base_dir / file_path_str
-                    if full_path.exists():
-                        with open(full_path) as f:
-                            total_rows += sum(1 for _ in f) - 1
-            else:
-                logger.info("Skipping row count (too many files)")
-                total_rows = None
+            # Row counting disabled for Parquet exports
+            total_rows = None
 
             # Update final progress
             update_task_progress(
@@ -369,7 +354,7 @@ async def export_fact_data(
                 "files_written": all_files,
                 "total_files": total_files,
                 "total_rows": total_rows,
-                "output_directory": str(base_dir / "facts"),
+                "output_directory": str(base_dir / "export"),
                 "date_range": f"{start_date} to {end_date}",
                 "chunks_exported": total_chunks,
             }
@@ -500,16 +485,10 @@ async def get_export_formats():
     return {
         "formats": [
             {
-                "name": "csv",
-                "description": "Comma-separated values (universal compatibility)",
-                "extension": ".csv",
-                "compression": None,
-            },
-            {
                 "name": "parquet",
                 "description": "Apache Parquet (columnar, compressed, efficient)",
                 "extension": ".parquet",
                 "compression": "snappy",
-            },
+            }
         ]
     }

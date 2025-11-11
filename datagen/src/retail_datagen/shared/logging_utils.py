@@ -60,6 +60,11 @@ class StructuredLogger:
         entry = self._format_message("DEBUG", message, **kwargs)
         self.logger.debug(json.dumps(entry))
 
+    def critical(self, message: str, **kwargs):
+        """Log critical with structured data."""
+        entry = self._format_message("CRITICAL", message, **kwargs)
+        self.logger.critical(json.dumps(entry))
+
 
 def get_structured_logger(name: str) -> StructuredLogger:
     """Get or create structured logger."""

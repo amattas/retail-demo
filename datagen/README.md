@@ -1,6 +1,6 @@
 # Retail Big Data Generator
 
-A comprehensive synthetic retail data generator that produces **realistic but entirely synthetic** retail data for analytics POCs, supporting bulk CSV generation and real-time Azure Event Hub streaming.
+A comprehensive synthetic retail data generator that produces **realistic but entirely synthetic** retail data for analytics POCs, supporting Parquet exports and real-time Azure Event Hub streaming.
 
 ## Purpose
 
@@ -8,13 +8,13 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 
 ## Generation Modes
 
-1. **Master Data**: Build dimension tables from dictionary CSV files → generate master CSVs
-2. **Historical Data**: Generate fact data between configurable timestamps → partitioned CSVs  
+1. **Dimension Data**: Build dimension tables from dictionary CSV inputs → persisted in DuckDB; optional Parquet export under `data/export/<table>/<table>.parquet`
+2. **Fact Data**: Generate fact tables between configurable timestamps → monthly Parquet files `data/export/<table>/<table>_YYYY-MM.parquet`  
 3. **Real-Time Data**: Stream incremental events to Azure Event Hubs with intelligent state tracking
 
 ## Key Features
 
-### 🏗️ **Master Data Generation**
+### 🏗️ **Dimension Data Generation**
 - **Geographic Distribution**: Realistic store/DC placement across 100 selected geographies
 - **Product Hierarchy**: Department → Category → Subcategory classification
 - **Pricing Intelligence**: MSRP = Base ±15%, SalePrice with 40% discount probability, Cost = 50-85% of SalePrice
@@ -30,7 +30,7 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 - **Customer Session Orchestrator**: Maintains consistency across foot traffic, BLE pings, and receipts
 - **Marketing Attribution**: Industry-standard conversion tracking from ads to in-store purchases
 - **Truck Logistics**: Full supply chain simulation with refrigerated transport capabilities
-- **State-Aware**: Only starts after historical data exists, continues from last generated timestamp
+- **State-Aware**: Only starts after fact data exists, continues from last generated timestamp
 - **Event Bursts**: Configurable mixed event streams to Azure Event Hub
 - **Circuit Breaker**: Built-in resilience with retry logic and dead letter queuing
 - **Data Consistency**: Enforces foot traffic ≥ BLE customers ≥ receipt customers
@@ -167,16 +167,16 @@ A comprehensive code review and fix initiative has addressed all data quality an
 - **Realistic Behavior Patterns**: Marketing customers stay 20% longer with higher purchase intent
 
 ### 🎛️ **Enhanced User Interface**
-- **Truck Management**: Trucks table added to Master Data tab with preview functionality
-- **Unified Data Controls**: Clear All Data button added to Master Data tab for better UX
+- **Truck Management**: Trucks table added to Dimension Data tab with preview functionality
+- **Unified Data Controls**: Clear All Data button added to Dimension Data tab for better UX
 - **Real-time Status**: Improved tracking of customer sessions and marketing conversions
-- **Data Preview**: Enhanced table preview system for all master data including trucks
+- **Data Preview**: Enhanced table preview system for all dimension data including trucks
 
 For implementation details and full data contracts, see `AGENTS.md`.
 
 ### Online Orders (Unified)
 - Configure daily volume via `volume.online_orders_per_day` in `config.json` or the UI.
-- Historical: generated in `facts/online_orders/dt=YYYY-MM-DD/online_orders_YYYYMMDD.csv` and inventory effects applied to `store_inventory_txn`/`dc_inventory_txn` with `Source=ONLINE`.
+- Fact (historical): exported monthly to `data/export/fact_online_orders/fact_online_orders_YYYY-MM.parquet` and inventory effects applied to `store_inventory_txn`/`dc_inventory_txn` with `Source=ONLINE`.
 - Streaming: emits `online_order_created` followed by `online_order_picked` and `online_order_shipped`, plus an `inventory_updated` SALE for the fulfillment node.
 - Seasonality/Holidays: applied to online orders in both historical and streaming modes.
 
@@ -189,7 +189,7 @@ src/retail_datagen/
 ├── config/           # Configuration management
 ├── generators/       # Core generation engines
 │   ├── master_generator.py    # Dimension table generation
-│   ├── fact_generator.py      # Historical fact generation  
+│   ├── fact_generator.py      # Fact generation  
 │   ├── generation_state.py    # State tracking for incremental generation
 │   ├── retail_patterns.py     # Business logic patterns
 │   └── seasonal_patterns.py   # Seasonality and temporal patterns
@@ -206,14 +206,8 @@ src/retail_datagen/
 - **product_brands.csv**: 629 synthetic brand-company mappings (current repo)
 - **products.csv**: 599 base products with `(ProductName, BasePrice, Department, Category, Subcategory)` spanning 10+ categories
 
-### Generated Dimensions (Master Data Outputs)
-- **geographies_master.csv**: `ID, City, State, ZipCode, District, Region`
-- **stores.csv**: `ID, StoreNumber, Address, GeographyID` 
-- **distribution_centers.csv**: `ID, DCNumber, Address, GeographyID`
-- **trucks.csv**: `ID, LicensePlate, Refrigeration, DCID` ⭐ **NEW**
-- **customers.csv**: `ID, FirstName, LastName, Address, GeographyID, LoyaltyCard, Phone, BLEId, AdId`
-- **products_master.csv**: `ID, ProductName, Brand, Company, Department, Category, Subcategory, Cost, MSRP, SalePrice, RequiresRefrigeration, LaunchDate` ⭐ **ENHANCED**
-  - Inventory snapshots also exported: `dc_inventory_snapshots.csv`, `store_inventory_snapshots.csv`
+### Generated Dimensions (Parquet Exports)
+Dimension tables are persisted in DuckDB (`dim_*`) and can be exported to Parquet under `data/export/<table>/<table>.parquet`.
 
 ### Fact Tables (Historical & Real-Time)
 - **dc_inventory_txn**: `TraceId, EventTS, DCID, ProductID, QtyDelta, Reason`
@@ -265,7 +259,7 @@ python -m uvicorn src.retail_datagen.main:app --host 0.0.0.0 --port 8000 --reloa
 
 ### 🎯 Programmatic Usage
 
-#### Generate Master Data
+#### Generate Dimension Data
 ```python
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.generators.master_generator import MasterDataGenerator
@@ -275,7 +269,7 @@ generator = MasterDataGenerator(config)
 generator.generate_all_master_data()
 ```
 
-#### Generate Historical Data (Intelligent Date Ranges)
+#### Generate Fact Data (Intelligent Date Ranges)
 ```python
 from retail_datagen.generators.fact_generator import FactDataGenerator
 
@@ -293,9 +287,9 @@ import asyncio
 from retail_datagen.streaming.event_streamer import EventStreamer
 
 async def main():
-    # Requires historical data to exist first
+    # Requires fact data to exist first
     streamer = EventStreamer(config)
-    await streamer.start_streaming()
+    await streamer.start()
 
 asyncio.run(main())
 ```
@@ -568,8 +562,8 @@ The system tracks generation state in `data/generation_state.json`:
 ```json
 {
   "last_generated_timestamp": "2024-01-15T10:30:00",
-  "historical_start_date": "2024-01-01T00:00:00", 
-  "has_historical_data": true,
+  "historical_start_date": "2024-01-01T00:00:00",
+  "has_fact_data": true,
   "last_historical_run": "2024-01-15T10:30:15",
   "last_realtime_run": "2024-01-15T11:45:22"
 }
@@ -610,20 +604,15 @@ Real-time events use consistent envelope format (see AGENTS.md for full spec):
 
 ```
 data/
-├── dictionaries/           # Input CSV files
-├── master/                 # Generated dimension tables
-│   ├── geographies_master.csv
-│   ├── stores.csv
-│   ├── distribution_centers.csv
-│   ├── trucks.csv          # ⭐ NEW - Truck fleet with refrigeration
-│   ├── customers.csv
-│   └── products_master.csv
-├── facts/                  # Generated fact tables (partitioned by date)
-│   ├── receipts/dt=2024-01-01/
-│   ├── receipt_lines/dt=2024-01-01/
-│   ├── store_inventory_txn/dt=2024-01-01/
+├── dictionaries/                 # Input CSV files (dictionaries)
+├── export/                       # Parquet exports
+│   ├── dim_stores/dim_stores.parquet
+│   ├── dim_customers/dim_customers.parquet
+│   ├── fact_receipts/fact_receipts_2024-01.parquet
+│   ├── fact_receipt_lines/fact_receipt_lines_2024-01.parquet
+│   ├── fact_store_inventory_txn/fact_store_inventory_txn_2024-01.parquet
 │   └── ...
-└── generation_state.json   # State tracking for incremental generation
+└── retail.duckdb                 # DuckDB with dimension/fact tables
 ```
 
 ## Important Notes
@@ -635,11 +624,11 @@ data/
 
 ### Performance Considerations
 - **Memory Usage**: Large customer bases (>100k) require sufficient RAM
-- **Disk Space**: Historical fact generation can produce significant CSV output
+- **Disk Space**: Fact generation can produce significant Parquet output
 - **Generation Time**: 10,000 products + 50,000 customers takes ~2-5 minutes
 
 ### Prerequisites for Streaming
-- Real-time streaming requires historical data to be generated first
+- Real-time streaming requires fact data to be generated first
 - Azure Event Hub connection string must be configured (see [Secure Credential Management](#-secure-credential-management))
 - Supports Azure Event Hub and Microsoft Fabric Real-Time Intelligence
 - Streaming picks up from the last generated timestamp automatically

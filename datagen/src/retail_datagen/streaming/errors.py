@@ -34,6 +34,7 @@ class StreamingError(Exception):
         original_exception: Exception | None = None,
     ):
         super().__init__(message)
+        self.message = message
         self.severity = severity
         self.category = category
         self.retryable = retryable
@@ -60,8 +61,8 @@ def classify_error(exception: Exception) -> StreamingError:
 
     # Authentication errors (permanent, not retryable)
     if any(
-        keyword in error_type.lower()
-        for keyword in ["auth", "unauthorized", "forbidden"]
+        keyword in error_type.lower() or keyword in error_message.lower()
+        for keyword in ["auth", "unauthorized", "forbidden", "permission"]
     ):
         return StreamingError(
             message=f"Authentication error: {error_message}",
@@ -86,7 +87,7 @@ def classify_error(exception: Exception) -> StreamingError:
 
     # Serialization errors (permanent)
     if any(
-        keyword in error_type.lower()
+        keyword in error_type.lower() or keyword in error_message.lower()
         for keyword in ["json", "serialization", "encoding"]
     ):
         return StreamingError(

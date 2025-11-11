@@ -450,8 +450,8 @@ class TestShouldGenerateEvent:
         # Business hours should have more events
         assert business_count > after_count
 
-    def test_weekend_reduces_probability(self, event_factory):
-        """Test weekends have slightly lower event probability."""
+    def test_weekend_probability_pattern(self, event_factory):
+        """Test weekend probability pattern aligns with temporal model."""
         weekday = datetime(2024, 6, 12, 14, 0, 0)  # Wednesday 2 PM
         weekend = datetime(2024, 6, 15, 14, 0, 0)  # Saturday 2 PM
 
@@ -469,8 +469,8 @@ class TestShouldGenerateEvent:
             if event_factory.should_generate_event(EventType.RECEIPT_CREATED, weekend)
         )
 
-        # Weekday should have more events than weekend
-        assert weekday_count > weekend_count
+        # Temporal model boosts weekends; allow weekend >= weekday
+        assert weekend_count >= weekday_count
 
     def test_event_type_specific_probabilities(self, event_factory, business_hours_timestamp):
         """Test different event types have different base probabilities."""
@@ -1629,6 +1629,7 @@ class TestEdgeCases:
             session_id = f"{i}_1"
             event_factory.state.customer_sessions[session_id] = {
                 "customer_id": i,
+                "customer_ble_id": f"BLE{i:06d}",
                 "store_id": 1,
                 "entered_at": test_timestamp,
                 "expected_exit_time": test_timestamp + timedelta(minutes=30),

@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import json
 
 from retail_datagen.generators.online_order_generator import (
     generate_online_orders_with_lifecycle,
@@ -3045,6 +3046,111 @@ class FactDataGenerator:
 
         return mapping[table_name]
 
+    def _build_outbox_rows_from_df(self, table_name: str, df: pd.DataFrame) -> list[dict]:
+        """Build streaming_outbox rows for a given fact table batch.
+
+        Each outbox row includes: event_ts, message_type, payload (JSON text),
+        partition_key (store/DC if available), and trace_id where appropriate.
+        """
+        rows: list[dict] = []
+        if df is None or df.empty:
+            return rows
+
+        # Normalize columns to lower for dictionary extraction safety
+        cols = [str(c) for c in df.columns]
+
+        # Helper to get a field ignoring case
+        def get_field(rec: dict, name: str):
+            if name in rec:
+                return rec[name]
+            lname = name.lower()
+            for k in rec.keys():
+                if str(k).lower() == lname:
+                    return rec[k]
+            return None
+
+        # Event type mapping (default fallbacks handled per-record)
+        base_type_map = {
+            "receipts": "receipt_created",
+            "receipt_lines": "receipt_line_added",
+            "dc_inventory_txn": "inventory_updated",
+            "store_inventory_txn": "inventory_updated",
+            "truck_moves": "truck_arrived",  # may change based on status
+            "foot_traffic": "customer_entered",
+            "ble_pings": "ble_ping_detected",
+            "marketing": "ad_impression",
+            "online_orders": "online_order_created",
+            "online_order_lines": "online_order_picked",  # may change based on timestamps
+        }
+
+        default_type = base_type_map.get(table_name, "receipt_created")
+
+        # Iterate records
+        for rec in df.to_dict(orient="records"):
+            # Determine message_type and event timestamp
+            message_type = default_type
+            event_ts = get_field(rec, "event_ts")
+            if table_name == "online_order_lines":
+                picked = get_field(rec, "picked_ts")
+                shipped = get_field(rec, "shipped_ts")
+                delivered = get_field(rec, "delivered_ts")
+                if picked:
+                    message_type = "online_order_picked"
+                    event_ts = picked
+                elif shipped:
+                    message_type = "online_order_shipped"
+                    event_ts = shipped
+                elif delivered and not event_ts:
+                    # Only use delivered if no other ts present
+                    message_type = "online_order_shipped"
+                    event_ts = delivered
+            elif table_name == "truck_moves":
+                status = (get_field(rec, "status") or "").upper()
+                if status == "ARRIVED":
+                    message_type = "truck_arrived"
+                elif status in ("LOADING", "IN_TRANSIT"):
+                    message_type = "truck_departed"
+
+            # Partition key preference: store_id -> dc_id
+            store_id = get_field(rec, "store_id")
+            dc_id = get_field(rec, "dc_id")
+            partition_key = str(store_id or dc_id or "")
+
+            # Trace ID preference per type
+            trace_id = None
+            if table_name == "receipts":
+                trace_id = get_field(rec, "receipt_id_ext")
+            elif table_name == "receipt_lines":
+                rid = get_field(rec, "receipt_id_ext") or get_field(rec, "receipt_id")
+                ln = get_field(rec, "line_num")
+                trace_id = f"{rid}-{ln}" if rid is not None and ln is not None else None
+            elif table_name == "online_orders":
+                trace_id = get_field(rec, "order_id_ext")
+            elif table_name == "online_order_lines":
+                oid = get_field(rec, "order_id_ext") or get_field(rec, "order_id")
+                ln = get_field(rec, "line_num")
+                trace_id = f"{oid}-{ln}" if oid is not None and ln is not None else None
+            elif table_name == "marketing":
+                trace_id = get_field(rec, "impression_id_ext")
+
+            try:
+                payload_json = json.dumps(rec, default=str)
+            except Exception:
+                # Fallback: stringify non-serializable values crudely
+                payload_json = json.dumps({k: str(v) for k, v in rec.items()})
+
+            rows.append(
+                {
+                    "event_ts": event_ts,
+                    "message_type": message_type,
+                    "payload": payload_json,
+                    "partition_key": partition_key,
+                    "trace_id": trace_id or "",
+                }
+            )
+
+        return rows
+
     def _is_food_product(self, product: ProductMaster) -> bool:
         dept = (product.Department or "").lower()
         cat = (product.Category or "").lower()
@@ -3835,8 +3941,15 @@ class FactDataGenerator:
                     'online_orders': 'fact_online_order_headers',
                     'online_order_lines': 'fact_online_order_lines',
                 }.get(table_name, table_name)
-                from retail_datagen.db.duckdb_engine import insert_dataframe
+                from retail_datagen.db.duckdb_engine import insert_dataframe, outbox_insert_records
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
+                # Also mirror to streaming outbox so streaming drains in sync with historical loads
+                try:
+                    outbox_rows = self._build_outbox_rows_from_df(table_name, df)
+                    if outbox_rows:
+                        outbox_insert_records(self._duckdb_conn, outbox_rows)
+                except Exception as _outbox_exc:
+                    logger.debug(f"Outbox insert skipped for {table_name} hour {hour}: {_outbox_exc}")
 
                 # Update per-table counts and emit progress
                 try:

@@ -31,8 +31,8 @@ def test_constants():
 def test_export_request():
     """Test ExportRequest model."""
     # Test with 'all' tables
-    req1 = ExportRequest(format="csv", tables="all")
-    assert req1.format == "csv"
+    req1 = ExportRequest(format="parquet", tables="all")
+    assert req1.format == "parquet"
     assert req1.tables == "all"
     print(f"✓ ExportRequest created: format={req1.format}, tables={req1.tables}")
 
@@ -62,7 +62,7 @@ def test_date_range_validation():
     try:
         # This should fail - end date before start date
         FactExportRequest(
-            format="csv",
+            format="parquet",
             tables="all",
             start_date=date(2024, 1, 31),
             end_date=date(2024, 1, 1)

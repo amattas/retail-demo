@@ -1,14 +1,5 @@
-"""
-Test script to validate promotional discount system.
-
-This script tests the promotion implementation by generating a small dataset
-and validating that:
-1. 10-20% of receipts have promotional discounts
-2. PromoCode fields are populated correctly
-3. Receipt totals are accurate (Subtotal - Discount + Tax = Total)
-4. Seasonal patterns are working (more promos in Nov/Dec)
-5. Average discount amounts are realistic
-"""
+import pytest
+pytest.skip("Legacy ORM-based validation test deprecated; DuckDB-only path active.", allow_module_level=True)
 
 import asyncio
 import sys

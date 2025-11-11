@@ -68,10 +68,17 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
             if start_dt is None:
                 df = conn.execute(f"SELECT * FROM {table}").df()
             else:
-                df = conn.execute(
-                    f"SELECT * FROM {table} WHERE event_ts >= ? AND event_ts < ?",
-                    [start_dt, end_dt],
-                ).df()
+                # Special-case tables without event_ts
+                if table == "fact_online_order_lines":
+                    df = conn.execute(
+                        f"SELECT * FROM {table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
+                        [start_dt, end_dt],
+                    ).df()
+                else:
+                    df = conn.execute(
+                        f"SELECT * FROM {table} WHERE event_ts >= ? AND event_ts < ?",
+                        [start_dt, end_dt],
+                    ).df()
         except Exception:
             df = pd.DataFrame()
         result[table] = df

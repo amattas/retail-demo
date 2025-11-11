@@ -44,10 +44,23 @@ from ..shared.dependencies import (
     rate_limit,
     update_config,
     update_task_progress,
+    get_fact_generator,
 )
 from ..shared.logging_utils import get_structured_logger
 from ..streaming.event_streamer import EventStreamer
-from ..streaming.schemas import EventType
+from ..streaming.schemas import EventType, EventEnvelope
+from ..db.duckdb_engine import (
+    get_duckdb_conn,
+    outbox_counts,
+    outbox_has_pending,
+    outbox_lease_next,
+    outbox_ack_sent,
+    outbox_nack_retry,
+)
+from ..streaming.azure_client import AzureEventHubClient
+import json as _json
+from uuid import uuid4 as _uuid4
+import asyncio as _asyncio
 
 logger = logging.getLogger(__name__)
 log = get_structured_logger(__name__)
@@ -282,8 +295,118 @@ async def start_streaming(
             global _streaming_session_id
             _streaming_session_id = None
 
+    async def streaming_task_outbox():
+        """Background task: drain outbox with pacing; generate next day when empty."""
+        try:
+            update_task_progress(session_id, 0.0, "Initializing outbox streaming")
+
+            client = AzureEventHubClient(
+                connection_string=config.realtime.get_connection_string(),
+                hub_name=config.stream.hub,
+                max_batch_size=config.realtime.max_batch_size,
+                batch_timeout_ms=config.realtime.batch_timeout_ms,
+                retry_attempts=config.realtime.retry_attempts,
+                backoff_multiplier=config.realtime.backoff_multiplier,
+                circuit_breaker_enabled=config.realtime.circuit_breaker_enabled,
+            )
+            await client.connect()
+
+            base_interval_ms = (
+                request.emit_interval_override
+                if getattr(request, "emit_interval_override", None)
+                else config.realtime.emit_interval_ms
+            )
+            jitter_pct = 0.2
+            end_at = (
+                datetime.now() + timedelta(minutes=request.duration_minutes)
+                if request.duration_minutes
+                else None
+            )
+
+            conn = get_duckdb_conn()
+            fact_gen = await get_fact_generator(config)
+            state_mgr = GenerationStateManager()
+            total_sent = 0
+
+            while True:
+                if end_at and datetime.now() >= end_at:
+                    break
+
+                item = outbox_lease_next(conn)
+                if item:
+                    try:
+                        mtype = str(item.get("message_type") or "receipt_created")
+                        try:
+                            etype = EventType(mtype)
+                        except Exception:
+                            etype = EventType.RECEIPT_CREATED
+                        payload = {}
+                        try:
+                            payload = _json.loads(item.get("payload") or "{}")
+                        except Exception:
+                            payload = {"raw": str(item.get("payload"))}
+                        stamp = item.get("event_ts") or datetime.now()
+                        env = EventEnvelope(
+                            event_type=etype,
+                            payload=payload,
+                            trace_id=str(item.get("trace_id") or f"TR_{_uuid4().hex[:12]}"),
+                            ingest_timestamp=stamp,
+                            schema_version="1.0",
+                            source="retail-datagen-outbox",
+                            partition_key=str(item.get("partition_key") or ""),
+                        )
+                        ok = await client.send_event(env)
+                        _update_streaming_statistics({"event_type": etype.value}, success=ok)
+                        if ok:
+                            outbox_ack_sent(conn, int(item["outbox_id"]))
+                            total_sent += 1
+                        else:
+                            outbox_nack_retry(conn, int(item["outbox_id"]))
+                    except Exception as send_err:
+                        logger.error(f"Outbox send error: {send_err}")
+                        try:
+                            outbox_nack_retry(conn, int(item["outbox_id"]))
+                        except Exception:
+                            pass
+
+                    # Delay with jitter for simulation pacing
+                    interval = base_interval_ms / 1000.0
+                    jitter = interval * (jitter_pct * (2 * random.random() - 1))
+                    await _asyncio.sleep(max(0.0, interval + jitter))
+                    continue
+
+                # Outbox is empty: generate the next day of data and continue
+                try:
+                    st = state_mgr.load_state()
+                    if st.last_generated_timestamp:
+                        next_day = (st.last_generated_timestamp.date() + timedelta(days=1))
+                    else:
+                        next_day = datetime.strptime(config.historical.start_date, "%Y-%m-%d").date()
+                    start_dt = datetime.combine(next_day, datetime.min.time())
+                    end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
+                    update_task_progress(session_id, 0.05, f"Generating {start_dt.date().isoformat()}")
+                    await fact_gen.generate_historical_data(start_dt, end_dt)
+                    state_mgr.update_historical_generation(end_dt)
+                except Exception as gen_err:
+                    logger.error(f"Generation failed: {gen_err}")
+                    await _asyncio.sleep(1.0)
+
+            await client.disconnect()
+            update_task_progress(session_id, 1.0, "Streaming completed")
+            return {"events_sent": total_sent, "end_reason": "completed", "mode": "outbox"}
+        except _asyncio.CancelledError:
+            update_task_progress(session_id, 1.0, "Streaming cancelled")
+            return {"events_sent": 0, "end_reason": "cancelled"}
+        except Exception as e:
+            logger.error(f"Streaming task failed: {e}")
+            _streaming_statistics["connection_failures"] += 1
+            raise
+        finally:
+            global _streaming_session_id
+            _streaming_session_id = None
+
     create_background_task(
-        session_id, streaming_task(), f"Stream events: {request.event_types or 'all'}"
+        session_id, streaming_task_outbox(), f"Stream events: {request.event_types or 'all'}"
     )
 
     log.info(
@@ -472,6 +595,106 @@ async def get_pause_status(
         }
 
     return event_streamer.get_pause_statistics()
+
+
+# ================================
+# OUTBOX CONTROL ENDPOINTS
+# ================================
+
+
+@router.get(
+    "/stream/outbox/status",
+    summary="Get outbox status",
+    description="Return counts by status for the streaming outbox",
+)
+async def get_outbox_status():
+    conn = get_duckdb_conn()
+    counts = outbox_counts(conn)
+    return counts
+
+
+@router.post(
+    "/stream/outbox/drain",
+    response_model=OperationResult,
+    summary="Drain outbox",
+    description="Drain all pending outbox events with pacing until empty",
+)
+async def drain_outbox(
+    emit_interval_ms: int | None = Body(
+        default=None, description="Override emit interval in milliseconds"
+    ),
+    config: RetailConfig = Depends(get_config),
+):
+    task_id = f"drain_outbox_{uuid4().hex[:8]}"
+
+    async def _drain_task():
+        try:
+            update_task_progress(task_id, 0.0, "Starting outbox drain")
+            client = AzureEventHubClient(
+                connection_string=config.realtime.get_connection_string(),
+                hub_name=config.stream.hub,
+                max_batch_size=config.realtime.max_batch_size,
+                batch_timeout_ms=config.realtime.batch_timeout_ms,
+                retry_attempts=config.realtime.retry_attempts,
+                backoff_multiplier=config.realtime.backoff_multiplier,
+                circuit_breaker_enabled=config.realtime.circuit_breaker_enabled,
+            )
+            await client.connect()
+            base_interval = (emit_interval_ms or config.realtime.emit_interval_ms) / 1000.0
+            jitter_pct = 0.2
+            conn = get_duckdb_conn()
+            sent = 0
+            while True:
+                item = outbox_lease_next(conn)
+                if not item:
+                    break
+                try:
+                    mtype = str(item.get("message_type") or "receipt_created")
+                    try:
+                        etype = EventType(mtype)
+                    except Exception:
+                        etype = EventType.RECEIPT_CREATED
+                    payload = {}
+                    try:
+                        payload = _json.loads(item.get("payload") or "{}")
+                    except Exception:
+                        payload = {"raw": str(item.get("payload"))}
+                    stamp = item.get("event_ts") or datetime.now()
+                    env = EventEnvelope(
+                        event_type=etype,
+                        payload=payload,
+                        trace_id=str(item.get("trace_id") or f"TR_{_uuid4().hex[:12]}"),
+                        ingest_timestamp=stamp,
+                        schema_version="1.0",
+                        source="retail-datagen-outbox",
+                        partition_key=str(item.get("partition_key") or ""),
+                    )
+                    ok = await client.send_event(env)
+                    _update_streaming_statistics({"event_type": etype.value}, success=ok)
+                    if ok:
+                        outbox_ack_sent(conn, int(item["outbox_id"]))
+                        sent += 1
+                    else:
+                        outbox_nack_retry(conn, int(item["outbox_id"]))
+                finally:
+                    # pacing
+                    jitter = base_interval * (jitter_pct * (2 * random.random() - 1))
+                    await _asyncio.sleep(max(0.0, base_interval + jitter))
+
+            await client.disconnect()
+            update_task_progress(task_id, 1.0, f"Drained outbox ({sent} events)")
+            return {"events_sent": sent}
+        except Exception as e:
+            logger.error(f"Outbox drain failed: {e}")
+            raise
+
+    create_background_task(task_id, _drain_task(), "Drain outbox")
+    return OperationResult(
+        success=True,
+        message="Outbox drain started",
+        operation_id=task_id,
+        started_at=datetime.now(),
+    )
 
 
 # ================================

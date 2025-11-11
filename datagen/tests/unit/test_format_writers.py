@@ -1,287 +1,55 @@
 """
-Unit tests for format writers (CSV and Parquet).
-
-Tests CSVWriter and ParquetWriter implementations with support
-for simple and partitioned writes.
+Unit tests for Parquet format writer.
 """
 
 import pytest
-from pathlib import Path
 import pandas as pd
-from datetime import date
 
-from retail_datagen.services.writers import CSVWriter, ParquetWriter
-
-
-class TestCSVWriterInit:
-    """Test CSVWriter initialization."""
-
-    def test_init_default_params(self):
-        """Should initialize with default parameters."""
-        writer = CSVWriter()
-
-        assert writer.index is False
-        assert writer.default_kwargs == {}
-
-    def test_init_custom_index(self):
-        """Should initialize with custom index setting."""
-        writer = CSVWriter(index=True)
-
-        assert writer.index is True
-
-    def test_init_with_default_kwargs(self):
-        """Should store default kwargs for pandas to_csv."""
-        writer = CSVWriter(sep=";", encoding="utf-8")
-
-        assert writer.default_kwargs["sep"] == ";"
-        assert writer.default_kwargs["encoding"] == "utf-8"
+from retail_datagen.services.writers import ParquetWriter
 
 
-class TestCSVWriterWrite:
-    """Test CSVWriter.write method."""
+class TestParquetWriter:
+    def test_init_defaults(self):
+        w = ParquetWriter()
+        assert w.engine == "pyarrow"
+        assert w.compression == "snappy"
 
-    @pytest.fixture
-    def sample_df(self):
-        """Create sample DataFrame for testing."""
-        return pd.DataFrame({
-            "ID": [1, 2, 3],
-            "Name": ["Alice", "Bob", "Charlie"],
-            "Amount": [10.5, 20.0, 15.75],
-        })
+    def test_write_simple_success(self, tmp_path):
+        w = ParquetWriter()
+        df = pd.DataFrame({"ID": [1, 2, 3], "Name": ["A", "B", "C"]})
+        out = tmp_path / "out.parquet"
+        w.write(df, out)
+        assert out.exists()
+        df2 = pd.read_parquet(out)
+        assert len(df2) == 3
+        assert df2["Name"].tolist() == ["A", "B", "C"]
 
-    def test_write_simple_success(self, tmp_path, sample_df):
-        """Should write DataFrame to CSV file successfully."""
-        writer = CSVWriter()
-        output_path = tmp_path / "output.csv"
+    def test_write_empty_dataframe_raises(self, tmp_path):
+        w = ParquetWriter()
+        out = tmp_path / "empty.parquet"
+        with pytest.raises(ValueError):
+            w.write(pd.DataFrame(), out)
 
-        writer.write(sample_df, output_path)
+    def test_write_creates_parent(self, tmp_path):
+        w = ParquetWriter()
+        out = tmp_path / "nested" / "dir" / "file.parquet"
+        w.write(pd.DataFrame({"A": [1]}), out)
+        assert out.exists()
+        assert out.parent.exists()
 
-        # Verify file exists
-        assert output_path.exists()
-
-        # Verify content
-        df_read = pd.read_csv(output_path)
-        assert len(df_read) == 3
-        assert list(df_read.columns) == ["ID", "Name", "Amount"]
-        assert df_read["Name"].tolist() == ["Alice", "Bob", "Charlie"]
-
-    def test_write_with_index(self, tmp_path, sample_df):
-        """Should write DataFrame with index when configured."""
-        writer = CSVWriter(index=True)
-        output_path = tmp_path / "with_index.csv"
-
-        writer.write(sample_df, output_path)
-
-        # Read and verify index column exists
-        df_read = pd.read_csv(output_path, index_col=0)
-        assert df_read.index.tolist() == [0, 1, 2]
-
-    def test_write_empty_dataframe(self, tmp_path):
-        """Should raise ValueError for empty DataFrame."""
-        writer = CSVWriter()
-        output_path = tmp_path / "empty.csv"
-        empty_df = pd.DataFrame()
-
-        with pytest.raises(ValueError, match="Cannot write empty DataFrame"):
-            writer.write(empty_df, output_path)
-
-    def test_write_creates_parent_directory(self, tmp_path):
-        """Should create parent directories if they don't exist."""
-        writer = CSVWriter()
-        output_path = tmp_path / "nested" / "dir" / "output.csv"
-
-        df = pd.DataFrame({"A": [1, 2]})
-        writer.write(df, output_path)
-
-        assert output_path.exists()
-        assert output_path.parent.exists()
-
-    def test_write_with_custom_kwargs(self, tmp_path, sample_df):
-        """Should apply custom kwargs to pandas to_csv."""
-        writer = CSVWriter()
-        output_path = tmp_path / "custom.csv"
-
-        # Write with custom separator
-        writer.write(sample_df, output_path, sep=";")
-
-        # Verify custom separator was used
-        with open(output_path) as f:
-            first_line = f.readline()
-            assert ";" in first_line
-            assert "," not in first_line
-
-    def test_write_overwrites_existing_file(self, tmp_path, sample_df):
-        """Should overwrite existing file."""
-        writer = CSVWriter()
-        output_path = tmp_path / "overwrite.csv"
-
-        # Write first time
-        writer.write(sample_df, output_path)
-        original_content = output_path.read_text()
-
-        # Write second time with different data
-        new_df = pd.DataFrame({"X": [99]})
-        writer.write(new_df, output_path)
-
-        # Verify file was overwritten
-        new_content = output_path.read_text()
-        assert new_content != original_content
-        assert "99" in new_content
-
-    def test_write_handles_special_characters(self, tmp_path):
-        """Should handle special characters in data."""
-        writer = CSVWriter()
-        output_path = tmp_path / "special.csv"
-
+    def test_write_partitioned(self, tmp_path):
+        w = ParquetWriter()
         df = pd.DataFrame({
-            "Name": ["John, Jr.", "O'Brien", 'Quote"Test'],
-            "Description": ["Line1\nLine2", "Tab\tSeparated", "Normal"],
+            "Month": ["2024-01", "2024-01", "2024-02"],
+            "Amount": [10, 20, 30],
         })
-
-        writer.write(df, output_path)
-
-        # Verify data can be read back correctly
-        df_read = pd.read_csv(output_path)
-        assert df_read["Name"].tolist() == ["John, Jr.", "O'Brien", 'Quote"Test']
-
-    def test_write_io_error(self, tmp_path):
-        """Should raise IOError on write failure."""
-        writer = CSVWriter()
-
-        # Create a directory with the output file name to force error
-        output_path = tmp_path / "invalid.csv"
-        output_path.mkdir()
-
-        df = pd.DataFrame({"A": [1, 2]})
-
-        with pytest.raises(IOError, match="Failed to write CSV file"):
-            writer.write(df, output_path)
-
-
-class TestCSVWriterWritePartitioned:
-    """Test CSVWriter.write_partitioned method."""
-
-    @pytest.fixture
-    def partitioned_df(self):
-        """Create DataFrame suitable for partitioning."""
-        return pd.DataFrame({
-            "ID": [1, 2, 3, 4, 5, 6],
-            "Date": ["2024-01-01", "2024-01-01", "2024-01-02",
-                     "2024-01-02", "2024-01-03", "2024-01-03"],
-            "Amount": [10, 20, 30, 40, 50, 60],
-        })
-
-    def test_write_partitioned_success(self, tmp_path, partitioned_df):
-        """Should write partitioned files correctly."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-
-        result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date",
-            table_name="sales"
-        )
-
-        # Should create 3 partition files (3 unique dates)
-        assert len(result) == 3
-
-        # Verify partition structure
-        for file_path in result:
-            assert file_path.exists()
-            assert "Date=" in str(file_path.parent)
-            assert file_path.name.startswith("sales_")
-            assert file_path.suffix == ".csv"
-
-        # Verify partition contents
-        date1_files = [p for p in result if "Date=2024-01-01" in str(p)]
-        assert len(date1_files) == 1
-        df1 = pd.read_csv(date1_files[0])
-        assert len(df1) == 2  # Two records for 2024-01-01
-
-    def test_write_partitioned_default_table_name(self, tmp_path, partitioned_df):
-        """Should use default table name when not provided."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-
-        result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date"
-        )
-
-        # Files should use "data" as default name
-        for file_path in result:
-            assert file_path.name.startswith("data_")
-
-    def test_write_partitioned_empty_dataframe(self, tmp_path):
-        """Should raise ValueError for empty DataFrame."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-        empty_df = pd.DataFrame()
-
-        with pytest.raises(ValueError, match="Cannot write empty DataFrame"):
-            writer.write_partitioned(
-                empty_df,
-                output_dir,
-                partition_col="Date"
-            )
-
-    def test_write_partitioned_missing_column(self, tmp_path, partitioned_df):
-        """Should raise ValueError if partition column doesn't exist."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-
-        with pytest.raises(ValueError, match="Partition column 'InvalidCol' not found"):
-            writer.write_partitioned(
-                partitioned_df,
-                output_dir,
-                partition_col="InvalidCol"
-            )
-
-    def test_write_partitioned_single_partition(self, tmp_path):
-        """Should handle DataFrame with single partition value."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-
-        df = pd.DataFrame({
-            "ID": [1, 2, 3],
-            "Category": ["A", "A", "A"],
-            "Value": [10, 20, 30],
-        })
-
-        result = writer.write_partitioned(
-            df,
-            output_dir,
-            partition_col="Category",
-            table_name="test"
-        )
-
-        # Should create single partition
-        assert len(result) == 1
-        assert "Category=A" in str(result[0].parent)
-
-    def test_write_partitioned_preserves_data(self, tmp_path, partitioned_df):
-        """Should preserve all data across partitions."""
-        writer = CSVWriter()
-        output_dir = tmp_path / "partitioned"
-
-        result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date"
-        )
-
-        # Read all partitions and combine
-        all_data = []
-        for file_path in result:
-            df = pd.read_csv(file_path)
-            all_data.append(df)
-
-        combined_df = pd.concat(all_data, ignore_index=True)
-
-        # Should have same number of rows as original
-        assert len(combined_df) == len(partitioned_df)
+        outdir = tmp_path / "parts"
+        files = w.write_partitioned(df, outdir, partition_col="Month", table_name="sales")
+        # Two months -> two files
+        assert len(files) == 2
+        for p in files:
+            assert p.exists()
+            assert p.suffix == ".parquet"
 
 
 class TestParquetWriterInit:
@@ -506,67 +274,21 @@ class TestParquetWriterWritePartitioned:
         assert len(combined_df) == len(partitioned_df)
 
 
-class TestWriterComparison:
-    """Compare behavior between CSV and Parquet writers."""
+class TestParquetCompression:
+    """Basic check that Parquet files are produced and non-empty."""
 
     @pytest.fixture
     def test_df(self):
-        """Create test DataFrame."""
         return pd.DataFrame({
             "ID": range(1, 101),
             "Category": ["A", "B", "C", "D"] * 25,
             "Value": [x * 1.5 for x in range(1, 101)],
         })
 
-    def test_both_writers_produce_same_row_count(self, tmp_path, test_df):
-        """Should produce same number of rows regardless of format."""
-        csv_writer = CSVWriter()
-        parquet_writer = ParquetWriter()
-
-        csv_path = tmp_path / "data.csv"
+    def test_parquet_non_empty(self, tmp_path, test_df):
+        writer = ParquetWriter()
         parquet_path = tmp_path / "data.parquet"
-
-        csv_writer.write(test_df, csv_path)
-        parquet_writer.write(test_df, parquet_path)
-
-        csv_df = pd.read_csv(csv_path)
-        parquet_df = pd.read_parquet(parquet_path)
-
-        assert len(csv_df) == len(parquet_df) == len(test_df)
-
-    def test_both_writers_support_partitioning(self, tmp_path, test_df):
-        """Should both support partitioned writes."""
-        csv_writer = CSVWriter()
-        parquet_writer = ParquetWriter()
-
-        csv_dir = tmp_path / "csv_partitioned"
-        parquet_dir = tmp_path / "parquet_partitioned"
-
-        csv_files = csv_writer.write_partitioned(
-            test_df, csv_dir, partition_col="Category"
-        )
-        parquet_files = parquet_writer.write_partitioned(
-            test_df, parquet_dir, partition_col="Category"
-        )
-
-        # Should create same number of partitions
-        assert len(csv_files) == len(parquet_files) == 4  # 4 unique categories
-
-    def test_parquet_typically_smaller_than_csv(self, tmp_path, test_df):
-        """Should verify Parquet compression is effective."""
-        csv_writer = CSVWriter()
-        parquet_writer = ParquetWriter()
-
-        csv_path = tmp_path / "data.csv"
-        parquet_path = tmp_path / "data.parquet"
-
-        csv_writer.write(test_df, csv_path)
-        parquet_writer.write(test_df, parquet_path)
-
-        csv_size = csv_path.stat().st_size
+        writer.write(test_df, parquet_path)
+        assert parquet_path.exists()
         parquet_size = parquet_path.stat().st_size
-
-        # Parquet with compression should typically be smaller
-        # (Not always guaranteed for very small datasets, so this is informational)
-        print(f"CSV size: {csv_size}, Parquet size: {parquet_size}")
-        assert parquet_size > 0  # Just verify file was created
+        assert parquet_size > 0

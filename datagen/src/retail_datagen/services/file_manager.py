@@ -18,8 +18,9 @@ class ExportFileManager:
     Manages file paths and directories for data export operations.
 
     Responsibilities:
-    - Resolve output paths for master tables (data/master/<table>.<ext>)
-    - Resolve output paths for fact tables (data/facts/<table>/dt=YYYY-MM-DD/<table>_YYYY-MM-DD.<ext>)
+    - Resolve output paths for master tables (data/export/<table>/<table>.parquet)
+    - Resolve output paths for fact tables (Parquet monthly files):
+        data/export/<table>/<table>_YYYY-MM.parquet
     - Create necessary directories including partitions
     - Track files written during export for potential rollback
     - Validate paths are within allowed directories
@@ -28,7 +29,7 @@ class ExportFileManager:
         manager = ExportFileManager(base_dir=Path("data"))
 
         # Get path for master table
-        path = manager.get_master_table_path("stores", "csv")
+        path = manager.get_master_table_path("stores", "parquet")
         manager.ensure_directory(path.parent)
 
         # Write file and track it
@@ -55,28 +56,26 @@ class ExportFileManager:
         logger.debug(f"ExportFileManager initialized with base_dir: {self.base_dir}")
 
     def get_master_table_path(
-        self, table_name: str, format: Literal["csv", "parquet"]
+        self, table_name: str, format: Literal["parquet"]
     ) -> Path:
         """
         Get output path for a master table.
 
-        Path pattern: data/master/<table>.<ext>
+        Path pattern: data/export/<table>/<table>.parquet
 
         Args:
             table_name: Name of the master table (e.g., "stores", "products_master")
-            format: Output format ("csv" or "parquet")
+            format: Output format ("parquet")
 
         Returns:
             Path object for the master table file
 
         Example:
-            >>> manager.get_master_table_path("stores", "csv")
-            Path("data/master/stores.csv")
             >>> manager.get_master_table_path("products_master", "parquet")
-            Path("data/master/products_master.parquet")
+            Path("data/export/products_master/products_master.parquet")
         """
         extension = f".{format}"
-        path = self.base_dir / "master" / f"{table_name}{extension}"
+        path = self.base_dir / "export" / table_name / f"{table_name}{extension}"
 
         # Validate path is within base directory
         self._validate_path(path)
@@ -84,38 +83,29 @@ class ExportFileManager:
         logger.debug(f"Resolved master table path: {path}")
         return path
 
-    def get_fact_table_path(
-        self, table_name: str, partition_date: date, format: Literal["csv", "parquet"]
+    def get_fact_table_month_path(
+        self, table_name: str, year: int, month: int, format: Literal["parquet"]
     ) -> Path:
         """
-        Get output path for a fact table partition.
+        Get output path for a fact table monthly file (primarily for Parquet).
 
-        Path pattern: data/facts/<table>/dt=YYYY-MM-DD/<table>_YYYY-MM-DD.<ext>
+        Path pattern: data/export/<table>/<table>_YYYY-MM.parquet
 
         Args:
-            table_name: Name of the fact table (e.g., "receipts", "store_inventory_txn")
-            partition_date: Date partition for the data
-            format: Output format ("csv" or "parquet")
+            table_name: Fact table name
+            year: Year component
+            month: Month component (1-12)
+            format: Output format ("parquet")
 
         Returns:
-            Path object for the fact table partition file
-
-        Example:
-            >>> manager.get_fact_table_path("receipts", date(2024, 1, 1), "csv")
-            Path("data/facts/receipts/dt=2024-01-01/receipts_2024-01-01.csv")
-            >>> manager.get_fact_table_path("fact_online_orders", date(2024, 12, 31), "parquet")
-            Path("data/facts/fact_online_orders/dt=2024-12-31/fact_online_orders_2024-12-31.parquet")
+            Path object for the monthly file
         """
-        date_str = partition_date.strftime("%Y-%m-%d")
-        partition_dir = f"dt={date_str}"
-        filename = f"{table_name}_{date_str}.{format}"
-
-        path = self.base_dir / "facts" / table_name / partition_dir / filename
-
-        # Validate path is within base directory
+        ym = f"{year:04d}-{month:02d}"
+        extension = f".{format}"
+        filename = f"{table_name}_{ym}{extension}"
+        path = self.base_dir / "export" / table_name / filename
         self._validate_path(path)
-
-        logger.debug(f"Resolved fact table path: {path}")
+        logger.debug(f"Resolved monthly fact table path: {path}")
         return path
 
     def ensure_directory(self, path: Path) -> None:
@@ -132,8 +122,8 @@ class ExportFileManager:
             ValueError: If path is not within base directory
 
         Example:
-            >>> path = manager.get_fact_table_path("receipts", date(2024, 1, 1), "csv")
-            >>> manager.ensure_directory(path.parent)  # Creates data/facts/receipts/dt=2024-01-01/
+            >>> path = manager.get_fact_table_month_path("receipts", 2024, 1, "parquet")
+            >>> manager.ensure_directory(path.parent)  # Creates data/export/receipts/
         """
         # Validate path is within base directory
         self._validate_path(path)
@@ -162,7 +152,7 @@ class ExportFileManager:
             file_path: Path to the file to track
 
         Example:
-            >>> path = manager.get_master_table_path("stores", "csv")
+            >>> path = manager.get_master_table_path("stores", "parquet")
             >>> write_data(path)
             >>> manager.track_file(path)
         """
@@ -253,7 +243,7 @@ class ExportFileManager:
             ValueError: If path is outside base directory
 
         Example:
-            >>> manager._validate_path(Path("data/master/stores.csv"))  # OK
+            >>> manager._validate_path(Path("data/export/stores/stores.parquet"))  # OK
             >>> manager._validate_path(Path("/etc/passwd"))  # Raises ValueError
         """
         try:
