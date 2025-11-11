@@ -386,7 +386,7 @@ async def start_streaming(
                     end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
                     update_task_progress(session_id, 0.05, f"Generating {start_dt.date().isoformat()}")
                     await fact_gen.generate_historical_data(start_dt, end_dt)
-                    state_mgr.update_historical_generation(end_dt)
+                    state_mgr.update_fact_generation(end_dt)
                 except Exception as gen_err:
                     logger.error(f"Generation failed: {gen_err}")
                     await _asyncio.sleep(1.0)

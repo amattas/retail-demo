@@ -20,7 +20,7 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 - **Pricing Intelligence**: MSRP = Base ±15%, SalePrice with 40% discount probability, Cost = 50-85% of SalePrice
 - **Synthetic Safety**: Generated names, addresses, phone numbers, loyalty cards, BLE IDs, Ad IDs
 
-### 📊 **Historical Fact Generation**
+### 📊 **Fact Generation**
 - **Intelligent Date Ranges**: First run uses config start → current, subsequent runs use last generated → current
 - **Retail Transaction Flows**: Receipts → Lines → Inventory Updates → Truck/DC Flows
 - **Multi-Fact Tables**: 9 interconnected fact tables with full referential integrity
@@ -510,7 +510,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/integration/   # Integra
 
 ### Validate Data Generation
 ```bash
-# Test master data generation
+# Test dimension data generation
 python test_master_generation.py
 
 # Test fact data generation  

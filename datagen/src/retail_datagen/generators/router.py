@@ -97,7 +97,7 @@ FACT_TABLES = [
 
 
 @router.post(
-    "/generate/master",
+    "/generate/dimensions",
     response_model=OperationResult,
     summary="Generate all master data",
     description="Generate all dimension tables (master data) from dictionary sources",
@@ -373,7 +373,7 @@ async def generate_all_master_data(
 
 
 @router.get(
-    "/generate/master/status",
+    "/generate/dimensions/status",
     response_model=GenerationStatusResponse,
     summary="Get master data generation status",
     description="Get the status of master data generation operations",
@@ -429,7 +429,7 @@ async def get_master_generation_status(
 
 
 @router.post(
-    "/generate/master/{table_name}",
+    "/generate/dimensions/{table_name}",
     response_model=OperationResult,
     summary="Generate specific master table",
     description="Generate a specific dimension table",
@@ -521,7 +521,7 @@ async def generate_specific_master_table(
 
 
 @router.post(
-    "/generate/historical",
+    "/generate/fact",
     response_model=OperationResult,
     summary="Generate historical fact data",
     description="Generate fact tables using intelligent date range logic",
@@ -563,7 +563,7 @@ async def generate_historical_data(
     else:
         # Use intelligent date range logic
         config_start_date = datetime.strptime(config.historical.start_date, "%Y-%m-%d")
-        start_date, end_date = state_manager.get_historical_date_range(
+        start_date, end_date = state_manager.get_fact_date_range(
             config_start_date
         )
         logger.info(f"Using intelligent date range: {start_date} to {end_date}")
@@ -574,12 +574,12 @@ async def generate_historical_data(
     for table in tables_to_generate:
         validate_table_name(table, "fact")
 
-    task_id = f"historical_generation_{uuid4().hex[:8]}"
+    task_id = f"fact_generation_{uuid4().hex[:8]}"
 
     async def generation_task():
         """Background task for historical data generation."""
         try:
-            update_task_progress(task_id, 0.0, "Starting historical data generation")
+            update_task_progress(task_id, 0.0, "Starting fact data generation")
 
             # Pre-check: validate DuckDB has required rows for historical generation
             try:
@@ -599,7 +599,7 @@ async def generate_historical_data(
                 update_task_progress(
                     task_id,
                     0.01,
-                    f"Master ready: {geo_cnt} geos, {store_cnt} stores, {dc_cnt} DCs, {cust_cnt} customers, {prod_cnt} products",
+                    f"Dimensions ready: {geo_cnt} geos, {store_cnt} stores, {dc_cnt} DCs, {cust_cnt} customers, {prod_cnt} products",
                 )
 
                 if store_cnt == 0 or cust_cnt == 0 or prod_cnt == 0:
@@ -780,7 +780,7 @@ async def generate_historical_data(
             )
 
             # Update generation state with the end timestamp
-            state_manager.update_historical_generation(end_date)
+            state_manager.update_fact_generation(end_date)
 
             # Final table counts from summary for accuracy
             final_counts = summary.facts_generated
@@ -830,7 +830,7 @@ async def generate_historical_data(
 
 
 @router.get(
-    "/generate/historical/status",
+    "/generate/fact/status",
     response_model=GenerationStatusResponse,
     summary="Get historical data generation status",
     description="Get the status of historical data generation operations",
@@ -883,7 +883,7 @@ async def get_historical_generation_status(
 
 
 @router.post(
-    "/generate/historical/{table_name}",
+    "/generate/fact/{table_name}",
     response_model=OperationResult,
     summary="Generate specific historical table",
     description="Generate a specific fact table using intelligent date range logic",
@@ -914,7 +914,7 @@ async def generate_specific_historical_table(
     else:
         # Use intelligent date range logic
         config_start_date = datetime.strptime(config.historical.start_date, "%Y-%m-%d")
-        start_date, end_date = state_manager.get_historical_date_range(
+        start_date, end_date = state_manager.get_fact_date_range(
             config_start_date
         )
         logger.info(f"Using intelligent date range: {start_date} to {end_date}")
@@ -932,7 +932,7 @@ async def generate_specific_historical_table(
             )
 
             # Update generation state with the end timestamp
-            state_manager.update_historical_generation(end_date)
+            state_manager.update_fact_generation(end_date)
 
             update_task_progress(task_id, 1.0, f"Generated {table_name} for date range")
 

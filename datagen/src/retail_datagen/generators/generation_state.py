@@ -19,14 +19,14 @@ class GenerationState(BaseModel):
     last_generated_timestamp: datetime | None = Field(
         None, description="Last generated data timestamp"
     )
-    historical_start_date: datetime | None = Field(
-        None, description="Configured historical start date"
+    fact_start_date: datetime | None = Field(
+        None, description="Configured fact (historical) start date"
     )
-    has_historical_data: bool = Field(
-        False, description="Whether historical data has been generated"
+    has_fact_data: bool = Field(
+        False, description="Whether fact (historical) data has been generated"
     )
-    last_historical_run: datetime | None = Field(
-        None, description="Last historical generation run time"
+    last_fact_run: datetime | None = Field(
+        None, description="Last fact generation run time"
     )
     last_realtime_run: datetime | None = Field(
         None, description="Last real-time generation run time"
@@ -57,11 +57,20 @@ class GenerationStateManager:
                     for field in [
                         "last_generated_timestamp",
                         "historical_start_date",
+                        "fact_start_date",
                         "last_historical_run",
+                        "last_fact_run",
                         "last_realtime_run",
                     ]:
                         if data.get(field):
                             data[field] = datetime.fromisoformat(data[field])
+                    # Backward compatibility: map legacy keys to new ones
+                    if "has_historical_data" in data and "has_fact_data" not in data:
+                        data["has_fact_data"] = bool(data.get("has_historical_data"))
+                    if "historical_start_date" in data and "fact_start_date" not in data:
+                        data["fact_start_date"] = data.get("historical_start_date")
+                    if "last_historical_run" in data and "last_fact_run" not in data:
+                        data["last_fact_run"] = data.get("last_historical_run")
                     self._state = GenerationState(**data)
             except Exception as e:
                 print(f"Warning: Could not load generation state: {e}")
@@ -82,7 +91,7 @@ class GenerationStateManager:
         except Exception as e:
             print(f"Warning: Could not save generation state: {e}")
 
-    def get_historical_date_range(
+    def get_fact_date_range(
         self, config_start_date: datetime
     ) -> tuple[datetime, datetime]:
         """
@@ -96,29 +105,29 @@ class GenerationStateManager:
         state = self.load_state()
         current_time = datetime.now()
 
-        if state.has_historical_data and state.last_generated_timestamp:
+        if state.has_fact_data and state.last_generated_timestamp:
             # Subsequent run: start from last generated timestamp
             start_date = state.last_generated_timestamp
         else:
             # First run: use configured start date
             start_date = config_start_date
-            state.historical_start_date = config_start_date
+            state.fact_start_date = config_start_date
 
         return start_date, current_time
 
-    def update_historical_generation(self, end_timestamp: datetime) -> None:
-        """Update state after historical data generation."""
+    def update_fact_generation(self, end_timestamp: datetime) -> None:
+        """Update state after fact (historical) data generation."""
         state = self.load_state()
         state.last_generated_timestamp = end_timestamp
-        state.has_historical_data = True
-        state.last_historical_run = datetime.now()
+        state.has_fact_data = True
+        state.last_fact_run = datetime.now()
         self._state = state
         self.save_state()
 
     def can_start_realtime(self) -> bool:
         """Check if real-time generation can start (requires historical data)."""
         state = self.load_state()
-        return state.has_historical_data and state.last_generated_timestamp is not None
+        return state.has_fact_data and state.last_generated_timestamp is not None
 
     def get_realtime_start_timestamp(self) -> datetime | None:
         """Get the starting timestamp for real-time generation."""
@@ -140,20 +149,20 @@ class GenerationStateManager:
         """Get current generation status for API/UI display."""
         state = self.load_state()
         return {
-            "has_historical_data": state.has_historical_data,
+            "has_fact_data": state.has_fact_data,
             "last_generated_timestamp": (
                 state.last_generated_timestamp.isoformat()
                 if state.last_generated_timestamp
                 else None
             ),
-            "historical_start_date": (
-                state.historical_start_date.isoformat()
-                if state.historical_start_date
+            "fact_start_date": (
+                state.fact_start_date.isoformat()
+                if state.fact_start_date
                 else None
             ),
-            "last_historical_run": (
-                state.last_historical_run.isoformat()
-                if state.last_historical_run
+            "last_fact_run": (
+                state.last_fact_run.isoformat()
+                if state.last_fact_run
                 else None
             ),
             "last_realtime_run": (

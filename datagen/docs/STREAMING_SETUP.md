@@ -292,8 +292,8 @@ Key configuration options in `config.json`:
 
 ### Prerequisite Errors
 
-**Problem:** "Historical data must be generated first"
-**Solution:** Generate historical data before starting streaming:
+**Problem:** "Fact data must be generated first"
+**Solution:** Generate fact data before starting streaming:
 
 ```bash
 # Generate dimension data

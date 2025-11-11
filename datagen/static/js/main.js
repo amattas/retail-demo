@@ -188,8 +188,22 @@ class RetailDataGenerator {
 
         const statusInfo = statusDiv.querySelector('.status-info');
 
+        // Guard: ensure new API contract fields are present
+        if (!Object.prototype.hasOwnProperty.call(state, 'has_fact_data')) {
+            const msg = 'API contract mismatch: missing has_fact_data from /api/generation/status. Please update the server.';
+            console.error(msg, state);
+            if (typeof this.showNotification === 'function') {
+                this.showNotification(msg, 'error');
+            }
+            statusInfo.innerHTML = `
+                <p><strong>Error:</strong> ${msg}</p>
+                <p>Expected fields: <code>has_fact_data</code>, <code>fact_start_date</code>, <code>last_fact_run</code>.</p>
+            `;
+            return;
+        }
+
         // Check if we have fact data by querying the cache
-        let hasFactData = state.has_historical_data;
+        let hasFactData = state.has_fact_data;
         if (!hasFactData) {
             try {
                 const cacheResponse = await fetch('/api/dashboard/counts');
@@ -216,7 +230,7 @@ class RetailDataGenerator {
                 <p><strong>Fact Data:</strong> ✅ Generated</p>
                 ${state.last_generated_timestamp ? `<p><strong>Last Generated:</strong> ${new Date(state.last_generated_timestamp).toLocaleString()}</p>` : ''}
                 <p><strong>Real-time Ready:</strong> ${state.can_start_realtime ? '✅ Yes' : '❌ No'}</p>
-                ${state.last_historical_run ? `<p><strong>Last Run:</strong> ${new Date(state.last_historical_run).toLocaleString()}</p>` : ''}
+                ${state.last_fact_run ? `<p><strong>Last Run:</strong> ${new Date(state.last_fact_run).toLocaleString()}</p>` : ''}
             `;
         } else {
             statusInfo.innerHTML = `
@@ -1137,7 +1151,7 @@ class RetailDataGenerator {
         // Note: Export buttons will be added to HTML separately
         // This method sets up event listeners once the DOM is ready
 
-        // Master data export button
+        // Dimension data export button
         const masterExportBtn = document.getElementById('exportMasterBtn');
         if (masterExportBtn) {
             masterExportBtn.addEventListener('click', () => {
@@ -1145,7 +1159,7 @@ class RetailDataGenerator {
             });
         }
 
-        // Historical data export button (note: button ID is 'exportFactBtn' not 'exportHistoricalBtn')
+        // Fact data export button (note: button ID is 'exportFactBtn')
         const historicalExportBtn = document.getElementById('exportFactBtn');
         if (historicalExportBtn) {
             historicalExportBtn.addEventListener('click', () => {
@@ -1155,7 +1169,7 @@ class RetailDataGenerator {
     }
 
     /**
-     * Export master data tables (Parquet-only)
+     * Export dimension data tables (Parquet-only)
      */
     async exportMasterData() {
         const exportBtn = document.getElementById('exportMasterBtn');
@@ -1374,7 +1388,7 @@ class RetailDataGenerator {
         // Master data export button
         const masterExportBtn = document.getElementById('exportMasterBtn');
         if (masterExportBtn) {
-            // Check if master data exists by looking at table counts
+            // Check if dimension data exists by looking at table counts
             const storesCount = document.getElementById('count-stores');
             const hasMasterData = storesCount && storesCount.dataset.countValue &&
                                   Number(storesCount.dataset.countValue) > 0;
@@ -1382,16 +1396,16 @@ class RetailDataGenerator {
             masterExportBtn.disabled = !hasMasterData;
 
             if (!hasMasterData) {
-                masterExportBtn.title = 'Generate master data first';
+                masterExportBtn.title = 'Generate dimension data first';
             } else {
-                masterExportBtn.title = 'Export master data';
+                masterExportBtn.title = 'Export dimension data';
             }
         }
 
-        // Historical data export button
+        // Fact data export button
         const factExportBtn = document.getElementById('exportFactBtn');
         if (factExportBtn) {
-            // Check if historical data exists
+            // Check if fact data exists
             const receiptsCount = document.getElementById('count-receipts');
             const hasFactData = receiptsCount && receiptsCount.dataset.countValue &&
                                 Number(receiptsCount.dataset.countValue) > 0;
@@ -1399,9 +1413,9 @@ class RetailDataGenerator {
             factExportBtn.disabled = !hasFactData;
 
             if (!hasFactData) {
-                factExportBtn.title = 'Generate historical data first';
+                factExportBtn.title = 'Generate fact data first';
             } else {
-                factExportBtn.title = 'Export historical data';
+                factExportBtn.title = 'Export fact data';
             }
         }
     }
@@ -1425,7 +1439,7 @@ class RetailDataGenerator {
         this.showProgress('masterDataProgress', 'masterProgressFill', 'masterProgressText');
 
         try {
-            const response = await fetch('/api/generate/master', {
+            const response = await fetch('/api/generate/dimensions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1440,7 +1454,7 @@ class RetailDataGenerator {
             const result = await response.json();
 
             // Poll for progress updates using the operation_id
-            await this.pollProgress(`/api/generate/master/status?operation_id=${result.operation_id}`, 'masterProgressFill', 'masterProgressText');
+            await this.pollProgress(`/api/generate/dimensions/status?operation_id=${result.operation_id}`, 'masterProgressFill', 'masterProgressText');
 
             this.showNotification('Master data generation completed successfully!', 'success');
             await this.updateDashboardStats();
@@ -1507,7 +1521,7 @@ class RetailDataGenerator {
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    response = await fetch('/api/generate/historical', {
+                    response = await fetch('/api/generate/fact', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
