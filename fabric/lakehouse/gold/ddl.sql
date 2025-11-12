@@ -43,3 +43,55 @@ AS SELECT CAST(NULL AS STRING) AS campaign_id, CAST(NULL AS DATE) AS day,
           CAST(NULL AS DOUBLE) AS revenue
 WHERE 1=0;
 
+-- Online sales daily (headers)
+CREATE TABLE IF NOT EXISTS gold_online_sales_daily
+USING DELTA
+LOCATION '/Tables/gold/online_sales_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS BIGINT) AS orders,
+         CAST(NULL AS DOUBLE) AS subtotal,
+         CAST(NULL AS DOUBLE) AS tax,
+         CAST(NULL AS DOUBLE) AS total,
+         CAST(NULL AS DOUBLE) AS avg_order_value
+WHERE 1=0;
+
+-- Fulfillment performance (daily)
+CREATE TABLE IF NOT EXISTS gold_fulfillment_daily
+USING DELTA
+LOCATION '/Tables/gold/fulfillment_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS STRING) AS fulfillment_mode,
+         CAST(NULL AS STRING) AS fulfillment_status,
+         CAST(NULL AS BIGINT) AS orders,
+         CAST(NULL AS BIGINT) AS units
+WHERE 1=0;
+
+-- Zone dwell per minute (store, zone)
+CREATE TABLE IF NOT EXISTS gold_zone_dwell_minute
+USING DELTA
+LOCATION '/Tables/gold/zone_dwell_minute'
+AS SELECT CAST(NULL AS BIGINT) AS store_id,
+         CAST(NULL AS STRING) AS zone,
+         CAST(NULL AS TIMESTAMP) AS ts,
+         CAST(NULL AS DOUBLE) AS avg_dwell,
+         CAST(NULL AS BIGINT) AS customers
+WHERE 1=0;
+
+-- BLE presence per minute (unique devices)
+CREATE TABLE IF NOT EXISTS gold_ble_presence_minute
+USING DELTA
+LOCATION '/Tables/gold/ble_presence_minute'
+AS SELECT CAST(NULL AS BIGINT) AS store_id,
+         CAST(NULL AS TIMESTAMP) AS ts,
+         CAST(NULL AS BIGINT) AS devices
+WHERE 1=0;
+
+-- Marketing cost daily
+CREATE TABLE IF NOT EXISTS gold_marketing_cost_daily
+USING DELTA
+LOCATION '/Tables/gold/marketing_cost_daily'
+AS SELECT CAST(NULL AS STRING) AS campaign_id,
+         CAST(NULL AS DATE) AS day,
+         CAST(NULL AS BIGINT) AS impressions,
+         CAST(NULL AS DOUBLE) AS cost
+WHERE 1=0;

@@ -33,7 +33,6 @@ SELECT
   o.fulfillment_status AS payment_or_status,
   'SALE'            AS receipt_type,
   NULL              AS return_for_id
-FROM fact_online_orders o
+FROM fact_online_order_headers o
 JOIN fact_online_order_lines ol ON ol.order_id = o.order_id
 WHERE o.fulfillment_status = 'created';
-

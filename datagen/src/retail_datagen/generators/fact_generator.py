@@ -499,6 +499,11 @@ class FactDataGenerator:
         except Exception:
             self._adid_to_customer_id = {}
 
+    # Backwards-compatible alias for tests expecting sync loader name
+    def load_master_data(self) -> None:
+        """Synchronous alias that loads master data from DuckDB."""
+        return self.load_master_data_from_duckdb()
+
     def _master_table_specs(self) -> list[MasterTableSpec]:
         """Deprecated: No longer used (DuckDB-only)."""
         return []

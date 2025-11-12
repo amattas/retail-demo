@@ -5,9 +5,15 @@ Lakehouse for persistent storage and medallion flows. Receives raw events (Bronz
 Bronze:
 - Raw JSON from Eventstream, partitioned by `event_type` and `date=YYYY-MM-DD`
 
-Silver (Delta tables aligned to historical facts in datagen):
-- `dc_inventory_txn`, `store_inventory_txn`, `truck_moves`
-- `receipts`, `receipt_lines`, `foot_traffic`, `ble_pings`, `marketing`
+Silver (Delta tables aligned to datagen DuckDB facts):
+- `dc_inventory_txn`, `store_inventory_txn` (now include `txn_type`, `quantity`, `balance`)
+- `truck_moves` (includes `eta`, `etd`, `status`)
+- `receipts` (now includes `receipt_id_ext`, `payment_method`, `_cents` fields)
+- `receipt_lines` (now includes `line_num`, `_cents` fields, `receipt_id_ext`)
+- `foot_traffic` (now includes `dwell_seconds`)
+- `ble_pings` (now includes `CustomerId`)
+- `marketing` (now includes `impression_id_ext`, `CostCents`, `CustomerId`)
+- `online_order_headers`, `online_order_lines` (split headers/lines)
 - Dimensions: `stores`, `distribution_centers`, `trucks`, `customers`, `products_master`, `geographies_master`
 
 Gold:
@@ -15,6 +21,7 @@ Gold:
 - Inventory position current and days-of-supply
 - Logistics dwell and SLA metrics
 - Marketing attribution and promo lift
+- Online sales daily, fulfillment performance, zone dwell, BLE presence, marketing cost
 
 Artifacts
 - Silver DDL: `silver/ddl.sql`

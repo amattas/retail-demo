@@ -68,7 +68,22 @@ class TaxCalculator:
             ValueError: If CSV has missing or invalid columns
         """
         if not self.tax_rates_path.exists():
-            raise FileNotFoundError(f"Tax rates file not found: {self.tax_rates_path}")
+            # Try repo-relative fallback only for default relative path usage
+            path_str = str(self.tax_rates_path)
+            if "data/dictionaries" in path_str or "data\\dictionaries" in path_str:
+                try:
+                    repo_datagen = Path(__file__).resolve().parents[3]
+                    fallback = repo_datagen / "data" / "dictionaries" / self.tax_rates_path.name
+                    if fallback.exists():
+                        self.tax_rates_path = fallback
+                    else:
+                        raise FileNotFoundError(
+                            f"Tax rates file not found: {self.tax_rates_path} (also tried {fallback})"
+                        )
+                except Exception:
+                    raise FileNotFoundError(f"Tax rates file not found: {self.tax_rates_path}")
+            else:
+                raise FileNotFoundError(f"Tax rates file not found: {self.tax_rates_path}")
 
         try:
             # Load CSV with pandas for efficient parsing

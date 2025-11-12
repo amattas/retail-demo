@@ -7,6 +7,7 @@ error handling, and performance optimization.
 """
 
 import asyncio
+import os
 import signal
 import threading
 import time
@@ -198,7 +199,7 @@ class EventStreamer:
         self._products = products
         self._distribution_centers = distribution_centers
 
-        # DuckDB fast path for batch streaming
+        # DuckDB fast path for batch streaming (disabled in test mode)
         self._use_duckdb = True
         self._duckdb_conn = None
         try:
@@ -207,6 +208,11 @@ class EventStreamer:
             self._duckdb_conn = get_duckdb_conn()
         except Exception:
             self._use_duckdb = False
+
+        # In unit-test mode, force in-memory streaming loop (no DuckDB batch path)
+        if os.getenv("RETAIL_DATAGEN_TEST_MODE", "").strip().lower() in {"1", "true", "yes"}:
+            self._use_duckdb = False
+            self._duckdb_conn = None
 
         # Components
         self._azure_client: AzureEventHubClient | None = None

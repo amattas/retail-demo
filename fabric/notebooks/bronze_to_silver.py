@@ -13,61 +13,60 @@ def read_bronze(event_type: str):
 def write_delta(df, path, mode="append"):
     (df.write.format("delta").mode(mode).option("mergeSchema", "true").save(path))
 
-# Envelope columns
-envelope_cols = [
-    F.col("event_type"),
-    F.col("trace_id"),
-    F.to_timestamp("ingest_timestamp").alias("ingest_timestamp"),
-    F.col("schema_version"),
-    F.col("source"),
-]
+# No legacy/envelope passthrough: Silver uses canonical columns only
 
-# 1) Receipts
+# 1) Receipts (canonical columns only)
 rc = read_bronze("receipt_created")
 df_receipts = (
     rc.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.store_id").cast("bigint").alias("store_id"),
+        F.col("payload.receipt_id").alias("receipt_id_ext"),
+        F.lit(None).cast("string").alias("payment_method"),
+        F.lit(None).cast("string").alias("discount_amount"),
+        F.round(F.col("payload.tax") * 100).cast("bigint").alias("tax_cents"),
+        F.col("payload.subtotal").cast("string").alias("Subtotal"),
+        F.col("payload.total").cast("string").alias("total_amount"),
+        F.round(F.col("payload.total") * 100).cast("bigint").alias("total_cents"),
+        F.lit(None).cast("string").alias("receipt_type"),
+        F.round(F.col("payload.subtotal") * 100).cast("bigint").alias("subtotal_cents"),
+        F.col("payload.tax").cast("string").alias("tax_amount"),
         F.col("payload.customer_id").cast("bigint").alias("customer_id"),
-        F.col("payload.receipt_id").alias("receipt_id"),
-        F.col("payload.subtotal").cast("double").alias("subtotal"),
-        F.col("payload.tax").cast("double").alias("tax"),
-        F.col("payload.total").cast("double").alias("total"),
-        F.col("payload.tender_type").alias("tender_type"),
+        F.col("payload.store_id").cast("bigint").alias("store_id"),
+        F.lit(None).cast("string").alias("return_for_receipt_id_ext"),
     )
 )
 write_delta(df_receipts, "/Tables/silver/receipts")
 
-# 2) Receipt lines
+# 2) Receipt lines (canonical columns only)
 rl = read_bronze("receipt_line_added")
 df_receipt_lines = (
     rl.select(
-        F.col("trace_id").alias("trace_id"),
+        F.round(F.col("payload.unit_price") * 100).cast("bigint").alias("unit_cents"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.receipt_id").alias("receipt_id"),
-        F.col("payload.line_number").cast("int").alias("line"),
+        F.col("payload.unit_price").cast("string").alias("unit_price"),
         F.col("payload.product_id").cast("bigint").alias("product_id"),
-        F.col("payload.quantity").cast("int").alias("qty"),
-        F.col("payload.unit_price").cast("double").alias("unit_price"),
-        F.col("payload.extended_price").cast("double").alias("ext_price"),
+        F.col("payload.quantity").cast("bigint").alias("quantity"),
+        F.col("payload.extended_price").cast("string").alias("ext_price"),
+        F.col("payload.line_number").cast("bigint").alias("line_num"),
         F.col("payload.promo_code").alias("promo_code"),
+        F.round(F.col("payload.extended_price") * 100).cast("bigint").alias("ext_cents"),
+        F.col("payload.receipt_id").alias("receipt_id_ext"),
     )
 )
 write_delta(df_receipt_lines, "/Tables/silver/receipt_lines")
 
-# 3) Store/DC inventory transactions (split by store_id vs dc_id)
+# 3) Store/DC inventory transactions (canonical)
 inv = read_bronze("inventory_updated")
 df_store_inv = (
     inv.where(F.col("payload.store_id").isNotNull())
     .select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.product_id").cast("bigint").alias("product_id"),
-        F.col("payload.quantity_delta").cast("int").alias("qty_delta"),
-        F.col("payload.reason").alias("reason"),
+        F.col("payload.reason").alias("txn_type"),
+        F.col("payload.quantity_delta").cast("bigint").alias("quantity"),
         F.col("payload.source").alias("source"),
+        F.col("payload.store_id").cast("bigint").alias("store_id"),
+        F.lit(None).cast("bigint").alias("balance"),
     )
 )
 write_delta(df_store_inv, "/Tables/silver/store_inventory_txn")
@@ -75,88 +74,87 @@ write_delta(df_store_inv, "/Tables/silver/store_inventory_txn")
 df_dc_inv = (
     inv.where(F.col("payload.dc_id").isNotNull())
     .select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.dc_id").cast("bigint").alias("dc_id"),
         F.col("payload.product_id").cast("bigint").alias("product_id"),
-        F.col("payload.quantity_delta").cast("int").alias("qty_delta"),
-        F.col("payload.reason").alias("reason"),
+        F.col("payload.reason").alias("txn_type"),
+        F.col("payload.quantity_delta").cast("bigint").alias("quantity"),
+        F.col("payload.dc_id").cast("bigint").alias("dc_id"),
+        F.lit(None).cast("bigint").alias("balance"),
+        F.col("payload.source").alias("Source"),
     )
 )
 write_delta(df_dc_inv, "/Tables/silver/dc_inventory_txn")
 
-# 4) Foot traffic
+# 4) Foot traffic (canonical)
 ft = read_bronze("customer_entered")
 df_foot = (
     ft.select(
-        F.col("trace_id").alias("trace_id"),
-        F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.store_id").cast("bigint").alias("store_id"),
-        F.col("payload.sensor_id").alias("sensor_id"),
+        F.col("payload.customer_count").cast("bigint").alias("count"),
         F.col("payload.zone").alias("zone"),
-        F.col("payload.dwell_time").cast("int").alias("dwell"),
-        F.col("payload.customer_count").cast("int").alias("count"),
+        F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
+        F.col("payload.sensor_id").alias("sensor_id"),
+        F.col("payload.dwell_time").cast("bigint").alias("dwell_seconds"),
+        F.col("payload.store_id").cast("bigint").alias("store_id"),
     )
 )
 write_delta(df_foot, "/Tables/silver/foot_traffic")
 
-# 5) BLE pings
+# 5) BLE pings (canonical)
 ble = read_bronze("ble_ping_detected")
 df_ble = (
     ble.select(
-        F.col("trace_id").alias("trace_id"),
+        F.col("payload.zone").alias("zone"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
+        F.col("payload.rssi").cast("bigint").alias("rssi"),
+        F.col("payload.customer_ble_id").alias("customer_ble_id"),
+        F.lit(None).cast("double").alias("CustomerId"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.beacon_id").alias("beacon_id"),
-        F.col("payload.customer_ble_id").alias("customer_ble_id"),
-        F.col("payload.rssi").cast("int").alias("rssi"),
-        F.col("payload.zone").alias("zone"),
     )
 )
 write_delta(df_ble, "/Tables/silver/ble_pings")
 
-# 6) Marketing (ad impressions)
+# 6) Marketing (ad impressions; canonical)
 mk = read_bronze("ad_impression")
 df_mkt = (
     mk.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.channel").alias("channel"),
         F.col("payload.campaign_id").alias("campaign_id"),
+        F.col("payload.device_type").alias("device"),
         F.col("payload.creative_id").alias("creative_id"),
         F.col("payload.customer_ad_id").alias("customer_ad_id"),
-        F.col("payload.impression_id").alias("impression_id"),
-        F.col("payload.cost").cast("double").alias("cost"),
-        F.col("payload.device_type").alias("device"),
+        F.col("payload.impression_id").alias("impression_id_ext"),
+        F.col("payload.cost").cast("string").alias("cost"),
+        F.round(F.col("payload.cost") * 100).cast("bigint").alias("CostCents"),
+        F.lit(None).cast("double").alias("CustomerId"),
+        F.col("payload.channel").alias("channel"),
     )
 )
 write_delta(df_mkt, "/Tables/silver/marketing")
 
-# 7) Online orders (created)
+# 7) Online orders (created → headers only; canonical)
 oo = read_bronze("online_order_created")
-df_oo = (
+df_oo_hdr = (
     oo.select(
-        F.col("trace_id").alias("trace_id"),
+        F.lit(None).cast("timestamp").alias("completed_ts"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
-        F.col("payload.order_id").alias("order_id"),
+        F.col("payload.order_id").alias("order_id_ext"),
+        F.round(F.col("payload.tax") * 100).cast("bigint").alias("tax_cents"),
+        F.col("payload.subtotal").cast("string").alias("subtotal_amount"),
+        F.col("payload.total").cast("string").alias("total_amount"),
+        F.round(F.col("payload.total") * 100).cast("bigint").alias("total_cents"),
+        F.round(F.col("payload.subtotal") * 100).cast("bigint").alias("subtotal_cents"),
+        F.col("payload.tax").cast("string").alias("tax_amount"),
         F.col("payload.customer_id").cast("bigint").alias("customer_id"),
-        F.col("payload.fulfillment_mode").alias("fulfillment_mode"),
-        F.col("payload.node_type").alias("fulfillment_node_type"),
-        F.col("payload.node_id").cast("bigint").alias("fulfillment_node_id"),
-        F.col("payload.item_count").cast("int").alias("item_count"),
-        F.col("payload.subtotal").cast("double").alias("subtotal"),
-        F.col("payload.tax").cast("double").alias("tax"),
-        F.col("payload.total").cast("double").alias("total"),
-        F.col("payload.tender_type").alias("tender_type"),
+        F.lit(None).cast("string").alias("payment_method"),
     )
 )
-write_delta(df_oo, "/Tables/silver/online_orders")
+write_delta(df_oo_hdr, "/Tables/silver/online_order_headers")
 
-# 8) Promotions applied
+# 8) Promotions applied (no legacy)
 pr = read_bronze("promotion_applied")
 df_promos = (
     pr.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.receipt_id").alias("receipt_id"),
         F.col("payload.promo_code").alias("promo_code"),
@@ -170,7 +168,6 @@ write_delta(df_promos, "/Tables/silver/promotions")
 # 8b) Promotion lines (explode product_ids)
 df_promo_lines = (
     pr.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.receipt_id").alias("receipt_id"),
         F.col("payload.promo_code").alias("promo_code"),
@@ -186,7 +183,6 @@ write_delta(df_promo_lines, "/Tables/silver/promo_lines")
 so = read_bronze("stockout_detected")
 df_stockouts = (
     so.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.dc_id").cast("bigint").alias("dc_id"),
@@ -201,7 +197,6 @@ write_delta(df_stockouts, "/Tables/silver/stockouts")
 ro = read_bronze("reorder_triggered")
 df_reorders = (
     ro.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.dc_id").cast("bigint").alias("dc_id"),
@@ -218,7 +213,6 @@ write_delta(df_reorders, "/Tables/silver/reorders")
 pp = read_bronze("payment_processed")
 df_payments = (
     pp.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.receipt_id").alias("receipt_id"),
         F.col("payload.payment_method").alias("payment_method"),
@@ -235,7 +229,6 @@ so_open = read_bronze("store_opened")
 so_closed = read_bronze("store_closed")
 df_store_ops = (
     so_open.select(
-        F.col("trace_id").alias("trace_id"),
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.operation_time").cast("timestamp").alias("operation_time"),
@@ -243,7 +236,6 @@ df_store_ops = (
     )
     .unionByName(
         so_closed.select(
-            F.col("trace_id").alias("trace_id"),
             F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
             F.col("payload.store_id").cast("bigint").alias("store_id"),
             F.col("payload.operation_time").cast("timestamp").alias("operation_time"),
@@ -253,29 +245,27 @@ df_store_ops = (
 )
 write_delta(df_store_ops, "/Tables/silver/store_ops")
 
-# 13) Truck moves (arrived/departed)
+# 13) Truck moves (arrived/departed) — canonical columns
 arr = read_bronze("truck_arrived").select(
-    F.col("trace_id"),
-    F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
+    F.col("payload.arrival_time").cast("timestamp").alias("event_ts"),
     F.col("payload.truck_id").alias("truck_id"),
     F.col("payload.dc_id").cast("bigint").alias("dc_id"),
     F.col("payload.store_id").cast("bigint").alias("store_id"),
     F.col("payload.shipment_id").alias("shipment_id"),
     F.lit("ARRIVED").alias("status"),
-    F.col("payload.arrival_time").cast("timestamp").alias("arrival_time"),
-    F.lit(None).cast("timestamp").alias("departure_time"),
+    F.lit(None).cast("timestamp").alias("eta"),
+    F.lit(None).cast("timestamp").alias("etd"),
 )
 
 dep = read_bronze("truck_departed").select(
-    F.col("trace_id"),
-    F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
+    F.col("payload.departure_time").cast("timestamp").alias("event_ts"),
     F.col("payload.truck_id").alias("truck_id"),
     F.col("payload.dc_id").cast("bigint").alias("dc_id"),
     F.col("payload.store_id").cast("bigint").alias("store_id"),
     F.col("payload.shipment_id").alias("shipment_id"),
     F.lit("DEPARTED").alias("status"),
-    F.lit(None).cast("timestamp").alias("arrival_time"),
-    F.col("payload.departure_time").cast("timestamp").alias("departure_time"),
+    F.lit(None).cast("timestamp").alias("eta"),
+    F.lit(None).cast("timestamp").alias("etd"),
 )
 
 df_truck_moves = arr.unionByName(dep)

@@ -1,0 +1,7 @@
+// Marketing cost per campaign in last 24h
+let window = 24h;
+ad_impression
+| where ingest_timestamp > ago(window)
+| summarize impressions = count(), cost = sum(cost) by campaign_id
+| order by cost desc
+

@@ -203,9 +203,22 @@ app.add_middleware(
 # Add request body fix middleware for historical data endpoint
 # app.add_middleware(RequestBodyFixMiddleware)  # Temporarily disabled for debugging
 
-# Mount static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Mount static files and templates using repository-relative paths
+_repo_root = Path(__file__).resolve().parents[2]
+_static_dir = _repo_root / "static"
+_templates_dir = _repo_root / "templates"
+
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+else:
+    logger.warning(f"Static directory not found at {_static_dir}; skipping mount")
+
+if _templates_dir.exists():
+    templates = Jinja2Templates(directory=str(_templates_dir))
+else:
+    logger.warning(f"Templates directory not found at {_templates_dir}; some routes may be disabled")
+    # Fallback empty templates to avoid import-time errors in tests
+    templates = Jinja2Templates(directory=str(_repo_root))
 
 
 # ================================

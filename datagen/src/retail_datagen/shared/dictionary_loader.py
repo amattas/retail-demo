@@ -245,6 +245,12 @@ class DictionaryLoader:
             Path.cwd() / "data" / "dictionaries" / filename,
             Path.cwd() / filename,
         ]
+        # Also try repo-relative fallback to datagen/data/dictionaries
+        try:
+            repo_datagen = Path(__file__).resolve().parents[3]
+            search_paths.append(repo_datagen / "data" / "dictionaries" / filename)
+        except Exception:
+            pass
 
         # Also try without .csv extension if filename doesn't have it
         if not filename.endswith(".csv"):

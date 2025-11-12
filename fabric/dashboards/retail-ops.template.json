@@ -12,6 +12,30 @@
       "query": "mv_store_sales_minute | where ts > ago(60m) | summarize total_sales=sum(total_sales) by store_id | top 10 by total_sales desc"
     },
     {
+      "title": "Online Orders (15m)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let window=15m; online_order_created | where ingest_timestamp > ago(window) | summarize orders=count(), subtotal=sum(subtotal), tax=sum(tax), total=sum(total) | extend aov=toreal(total)/toreal(orders) | project orders, aov, total"
+    },
+    {
+      "title": "Fulfillment Pipeline (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let window=24h; let c=online_order_created | where ingest_timestamp > ago(window) | summarize created=count(); let p=online_order_picked | where ingest_timestamp > ago(window) | summarize picked=count(); let s=online_order_shipped | where ingest_timestamp > ago(window) | summarize shipped=count(); c | join kind=fullouter p on 1==1 | join kind=fullouter s on 1==1 | extend created=coalesce(created,0), picked=coalesce(picked,0), shipped=coalesce(shipped,0) | project created, picked, shipped"
+    },
+    {
+      "title": "BLE Presence (30m)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let window=30m; ble_ping_detected | where ingest_timestamp > ago(window) | summarize devices=dcount(customer_ble_id) by store_id | top 10 by devices desc"
+    },
+    {
+      "title": "Marketing Cost (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let window=24h; ad_impression | where ingest_timestamp > ago(window) | summarize impressions=count(), cost=sum(cost) by campaign_id | top 10 by cost desc"
+    },
+    {
       "title": "Tender Mix (15m)",
       "type": "kql",
       "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },

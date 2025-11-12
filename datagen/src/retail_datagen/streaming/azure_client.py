@@ -190,8 +190,13 @@ class AzureEventHubClient:
             max_batch_size=max_batch_size,
         )
 
-        # Initialize client if Azure SDK is available
-        if AZURE_AVAILABLE and connection_string and hub_name:
+        # Determine mock mode: either Azure SDK missing or explicit mock scheme
+        self._is_mock = (not AZURE_AVAILABLE) or (
+            isinstance(connection_string, str) and connection_string.startswith("mock://")
+        )
+
+        # Initialize client only for real (non-mock) connections
+        if (not self._is_mock) and connection_string and hub_name:
             self._initialize_client()
 
     def _initialize_client(self):
@@ -218,7 +223,7 @@ class AzureEventHubClient:
         Returns:
             bool: True if connection successful, False otherwise
         """
-        if not AZURE_AVAILABLE:
+        if self._is_mock:
             logger.info("Mock Azure client - connection simulated")
             self._is_connected = True
             metrics_collector.update_connection_status(True)

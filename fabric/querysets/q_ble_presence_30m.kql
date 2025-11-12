@@ -1,0 +1,7 @@
+// Unique BLE devices seen per store in last 30 minutes
+let window = 30m;
+ble_ping_detected
+| where ingest_timestamp > ago(window)
+| summarize devices = dcount(customer_ble_id) by store_id
+| order by devices desc
+

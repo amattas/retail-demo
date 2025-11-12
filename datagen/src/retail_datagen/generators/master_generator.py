@@ -440,6 +440,12 @@ class MasterDataGenerator:
 
         print("Master data generation complete!")
 
+    # Synchronous wrapper for tests/integration callers
+    def generate_all_master_data(self, session: Any | None = None) -> None:
+        """Synchronous entrypoint that delegates to the async implementation."""
+        import asyncio
+        return asyncio.run(self.generate_all_master_data_async(session))
+
     def _load_dictionary_data(self) -> None:
         """Load all required dictionary data from CSV files."""
         print("Loading dictionary data...")

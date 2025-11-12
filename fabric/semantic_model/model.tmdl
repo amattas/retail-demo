@@ -97,17 +97,22 @@ perspectives:
       - gold_sales_minute_store
       - gold_inventory_position_current
       - dim_stores
+      - gold_zone_dwell_minute
+      - gold_ble_presence_minute
   - name: Merchandising
     tables:
       - gold_top_products_15m
       - gold_inventory_position_current
       - dim_products
+      - gold_online_sales_daily
+      - gold_fulfillment_daily
   - name: Logistics
     tables:
       - gold_truck_dwell_daily
   - name: Marketing
     tables:
       - gold_campaign_revenue_daily
+      - gold_marketing_cost_daily
 
 measures:
   - table: gold_campaign_revenue_daily
@@ -116,3 +121,57 @@ measures:
   - table: gold_sales_minute_store
     name: Sales (Last 60m)
     expression: CALCULATE([Total Sales], KEEPFILTERS(DATESINPERIOD('gold_sales_minute_store'[ts], MAX('gold_sales_minute_store'[ts]), -60, MINUTE)))
+  - name: gold_online_sales_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/online_sales_daily
+    measures:
+      - name: Orders
+        expression: SUM('gold_online_sales_daily'[orders])
+      - name: Online Total
+        expression: SUM('gold_online_sales_daily'[total])
+      - name: AOV
+        expression: DIVIDE([Online Total], [Orders])
+
+  - name: gold_fulfillment_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/fulfillment_daily
+    measures:
+      - name: Fulfillment Orders
+        expression: SUM('gold_fulfillment_daily'[orders])
+      - name: Fulfillment Units
+        expression: SUM('gold_fulfillment_daily'[units])
+
+  - name: gold_zone_dwell_minute
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/zone_dwell_minute
+    measures:
+      - name: Avg Dwell (sec)
+        expression: AVERAGE('gold_zone_dwell_minute'[avg_dwell])
+      - name: Customers (Minute)
+        expression: SUM('gold_zone_dwell_minute'[customers])
+
+  - name: gold_ble_presence_minute
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/ble_presence_minute
+    measures:
+      - name: Devices (Minute)
+        expression: SUM('gold_ble_presence_minute'[devices])
+
+  - name: gold_marketing_cost_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/gold/marketing_cost_daily
+    measures:
+      - name: Impressions
+        expression: SUM('gold_marketing_cost_daily'[impressions])
+      - name: Cost
+        expression: SUM('gold_marketing_cost_daily'[cost])
