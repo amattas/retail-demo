@@ -160,6 +160,19 @@ async def update_config(new_config: RetailConfig) -> None:
     _event_streamer = EventStreamer(new_config)
 
 
+def reset_generators() -> None:
+    """
+    Reset cached generator instances.
+
+    Used when the underlying DuckDB database is reset so that subsequent
+    requests get fresh generators with a valid connection.
+    """
+    global _master_generator, _fact_generator, _event_streamer
+    _master_generator = None
+    _fact_generator = None
+    _event_streamer = None
+
+
 # ================================
 # GENERATOR DEPENDENCIES
 # ================================

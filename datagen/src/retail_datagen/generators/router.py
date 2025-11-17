@@ -35,6 +35,7 @@ from ..shared.dependencies import (
     get_master_generator,
     get_task_status,
     rate_limit,
+    reset_generators,
     update_task_progress,
     validate_date_range,
     validate_table_name,
@@ -1039,6 +1040,12 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
             deleted_files.append(str(path))
         except Exception as e:
             logger.warning(f"Failed to reset DuckDB: {e}")
+
+        # Reset cached generators so new DuckDB connections are used
+        try:
+            reset_generators()
+        except Exception as e:
+            logger.warning(f"Failed to reset generators after clear_all_data: {e}")
 
         # Reset generation state and clean any legacy file artifacts
         config_paths = {"master": config.paths.master, "facts": config.paths.facts}

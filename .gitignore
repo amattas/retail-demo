@@ -93,3 +93,4 @@ datagen/data/retail.duckdb
 datagen/data/retail.duckdb
 datagen/data/retail.duckdb
 *.duckdb
+*.wal

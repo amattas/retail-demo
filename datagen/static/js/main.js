@@ -200,14 +200,23 @@ class RetailDataGenerator {
             return;
         }
 
-        // Check if we have fact data by querying the cache
+        // Check if we have fact data. Prefer the backend flag, but
+        // fall back to live counts only if any fact table has rows.
         let hasFactData = state.has_fact_data;
         if (!hasFactData) {
             try {
                 const cacheResponse = await fetch('/api/dashboard/counts');
                 if (cacheResponse.ok) {
                     const cachedData = await cacheResponse.json();
-                    hasFactData = cachedData.fact_tables && Object.keys(cachedData.fact_tables).length > 0;
+                    if (cachedData.fact_tables && typeof cachedData.fact_tables === 'object') {
+                        const counts = Object.values(cachedData.fact_tables);
+                        hasFactData = counts.some((entry) => {
+                            const count = this.resolveCountValue
+                                ? this.resolveCountValue(entry)
+                                : (typeof entry === 'number' ? entry : Number(entry));
+                            return typeof count === 'number' && count > 0;
+                        });
+                    }
                 }
             } catch (err) {
                 // Fallback to checking fact tables directly
@@ -215,7 +224,7 @@ class RetailDataGenerator {
                     const factTablesResponse = await fetch('/api/facts/tables');
                     if (factTablesResponse.ok) {
                         const factTablesData = await factTablesResponse.json();
-                        hasFactData = factTablesData.tables && factTablesData.tables.length > 0;
+                        hasFactData = Array.isArray(factTablesData.tables) && factTablesData.tables.length > 0;
                     }
                 } catch (err2) {
                     // Could not determine fact data status
@@ -1475,7 +1484,18 @@ class RetailDataGenerator {
             const result = await response.json();
 
             // Poll for progress updates using the operation_id
-            await this.pollProgress(`/api/generate/dimensions/status?operation_id=${result.operation_id}`, 'masterProgressFill', 'masterProgressText');
+            const finalStatus = await this.pollProgress(
+                `/api/generate/dimensions/status?operation_id=${result.operation_id}`,
+                'masterProgressFill',
+                'masterProgressText'
+            );
+
+            if (!finalStatus || finalStatus.status !== 'completed') {
+                const msg = (finalStatus && (finalStatus.error_message || finalStatus.message))
+                    ? finalStatus.error_message || finalStatus.message
+                    : 'Master data generation failed';
+                throw new Error(msg);
+            }
 
             this.showNotification('Master data generation completed successfully!', 'success');
             await this.updateDashboardStats();
