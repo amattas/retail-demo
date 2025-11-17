@@ -887,6 +887,9 @@ class FactDataGenerator:
             ```
         """
         generation_start_time = datetime.now()
+        # Remember outbox preference for this run so helpers
+        # (e.g., _insert_hourly_to_db) can mirror to streaming_outbox
+        self._publish_to_outbox = bool(publish_to_outbox)
         print(
             f"Starting historical fact data generation from {start_date} to {end_date}"
         )
@@ -3949,7 +3952,7 @@ class FactDataGenerator:
                 from retail_datagen.db.duckdb_engine import insert_dataframe, outbox_insert_records
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
                 # Optionally mirror to streaming outbox (only for outbox-driven realtime)
-                if publish_to_outbox:
+                if getattr(self, "_publish_to_outbox", False):
                     try:
                         outbox_rows = self._build_outbox_rows_from_df(table_name, df)
                         if outbox_rows:
