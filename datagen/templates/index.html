@@ -31,13 +31,9 @@
                         <i class="fas fa-tachometer-alt"></i>
                         Dashboard
                     </button>
-                    <button class="nav-tab" data-tab="master-data">
-                        <i class="fas fa-database"></i>
-                        Dimension Data
-                    </button>
-                    <button class="nav-tab" data-tab="historical">
-                        <i class="fas fa-chart-line"></i>
-                        Fact Data
+                    <button class="nav-tab" data-tab="local-data">
+                        <i class="fas fa-hdd"></i>
+                        Local Data
                     </button>
                     <button class="nav-tab" data-tab="streaming">
                         <i class="fas fa-stream"></i>
@@ -129,16 +125,94 @@
             </div>
         </div>
 
-        <!-- Dimension Data Tab -->
-        <div id="master-data" class="tab-content">
+        <!-- Local Data Tab (Dimensions + Facts consolidated) -->
+        <div id="local-data" class="tab-content">
             <div class="section-header">
-                <h2>Dimension Data Generation</h2>
-                <p>Generate dimension tables from dictionary data</p>
+                <h2>Local Data</h2>
+                <p>Generate and explore dimension and fact data stored locally</p>
             </div>
 
+            <div class="card" id="local-generate-card">
+                <h3>Generate Data</h3>
+                <p class="help-text" id="local-generate-help">
+                    One-click generation creates dimensions first, then historical facts. You can optionally set a date range for facts on first run.
+                </p>
+                <div id="local-date-container">
+                    <div class="section-subtitle">Date Range (Optional)</div>
+                    <div class="date-inputs" id="local-date-inputs">
+                        <div class="form-group">
+                            <label for="startDate">Start Date (Manual Override)</label>
+                            <input type="date" id="startDate" name="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">End Date (Manual Override)</label>
+                            <input type="date" id="endDate" name="endDate">
+                        </div>
+                    </div>
+                    <div id="local-date-summary" style="display:none; font-size:0.95em; color:#333;">
+                        <p><strong>Database Range:</strong> <span id="factsFirstDate">—</span> → <span id="factsLastDate">—</span></p>
+                        <p style="margin-top:6px; color:#666;">New days are inserted via the Real-Time streaming capability.</p>
+                    </div>
+                </div>
+
+                <div class="generation-controls">
+                    <button id="generateLocalBtn" class="btn primary large" onclick="app.generateLocalData()">
+                        <i class="fas fa-play"></i>
+                        Generate Dimensions + Facts
+                    </button>
+
+                    <div class="export-controls">
+                        <button id="exportMasterBtn" class="btn secondary large" disabled>
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Dimensions
+                        </button>
+                        <button id="exportFactBtn" class="btn secondary large" disabled>
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Facts
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="masterDataProgress" class="progress-section" style="display: none;">
+                <h3>Dimension Generation Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="masterProgressFill"></div>
+                </div>
+                <div class="progress-text" id="masterProgressText">Initializing...</div>
+                <div id="masterTableProgressCounter" class="table-counter" style="display: none;"></div>
+                <div id="masterProgressETA" class="progress-eta" style="display: none;"></div>
+                <div id="masterProgressDetails" class="progress-details"></div>
+            </div>
+
+            <div id="historicalProgress" class="progress-section" style="display: none;">
+                <h3>Fact Generation Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="historicalProgressFill"></div>
+                </div>
+                <div class="progress-text" id="historicalProgressText">Initializing...</div>
+                <div id="currentHourDisplay" class="hour-display" style="display: none; margin-top: 10px;"></div>
+                <div id="tableProgressCounter" class="table-counter" style="display: none;"></div>
+                <div id="historicalProgressDetails" class="progress-details"></div>
+                <div id="tableProgressContainer" class="table-progress-container" style="display: none; margin-top: 15px;"></div>
+                <div class="progress-footer">
+                    <div id="totalHoursDisplay" class="hours-display" style="display: none;"></div>
+                    <div id="progressETA" class="progress-eta" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div id="masterExportProgress" class="progress-section" style="display: none;">
+                <h3>Dimension Export Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="masterExportProgressFill"></div>
+                </div>
+                <div class="progress-text" id="masterExportProgressText">Preparing export...</div>
+            </div>
+
+            <div class="section-header" style="margin-top:24px;">
+                <h2>Dimension Tables</h2>
+                <p>Click a tile to preview</p>
+            </div>
             <div class="card">
-                <h3>Available Tables</h3>
-                    <div class="table-grid">
+                <div class="table-grid" id="local-master-grid">
                     <div class="table-item" data-table="geographies_master">
                         <i class="fas fa-map-marker-alt"></i>
                         <div>
@@ -190,84 +264,12 @@
                 </div>
             </div>
 
+            <div class="section-header" style="margin-top:24px;">
+                <h2>Fact Tables</h2>
+                <p>Click a tile to preview</p>
+            </div>
             <div class="card">
-                <h3>Generate Dimension Data</h3>
-                <div class="generation-controls">
-                    <button class="btn primary large" onclick="generateMasterData()">
-                        <i class="fas fa-play"></i>
-                        Generate All Dimension Data
-                    </button>
-
-                    <div class="export-controls">
-                        <button id="exportMasterBtn" class="btn secondary large" disabled>
-                            <i class="fas fa-file-export"></i> Export
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="masterDataProgress" class="progress-section" style="display: none;">
-                <h3>Generation Progress</h3>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="masterProgressFill"></div>
-                </div>
-                <div class="progress-text" id="masterProgressText">Initializing...</div>
-                <div id="masterTableProgressCounter" class="table-counter" style="display: none;"></div>
-                <div id="masterProgressETA" class="progress-eta" style="display: none;"></div>
-                <div id="masterProgressDetails" class="progress-details"></div>
-            </div>
-
-            <div id="masterExportProgress" class="progress-section" style="display: none;">
-                <h3>Export Progress</h3>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="masterExportProgressFill"></div>
-                </div>
-                <div class="progress-text" id="masterExportProgressText">Preparing export...</div>
-            </div>
-        </div>
-
-        <!-- Fact Data Tab -->
-        <div id="historical" class="tab-content">
-            <div class="section-header">
-                <h2>Fact Data Generation</h2>
-                <p>Generate fact tables with realistic retail patterns</p>
-            </div>
-
-            <div class="card">
-                <h3>Date Range (Optional)</h3>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 16px;">
-                    Leave dates blank to use intelligent date logic: 
-                    <br>• First run: uses configured start date to current date
-                    <br>• Subsequent runs: continues from last generated timestamp
-                </p>
-                <div class="date-inputs">
-                    <div class="form-group">
-                        <label for="startDate">Start Date (Manual Override)</label>
-                        <input type="date" id="startDate" name="startDate">
-                    </div>
-                    <div class="form-group">
-                        <label for="endDate">End Date (Manual Override)</label>
-                        <input type="date" id="endDate" name="endDate">
-                    </div>
-                </div>
-
-                <div class="generation-controls">
-                    <button class="btn primary large" onclick="generateHistoricalData()">
-                        <i class="fas fa-chart-bar"></i>
-                        Generate Fact Data
-                    </button>
-
-                    <div class="export-controls">
-                        <button id="exportFactBtn" class="btn secondary large" disabled>
-                            <i class="fas fa-file-export"></i> Export
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-                <div class="card">
-                <h3>Available Fact Tables</h3>
-                <div class="table-grid">
+                <div class="table-grid" id="local-fact-grid">
                     <div class="table-item" data-table="dc_inventory_txn">
                         <i class="fas fa-warehouse"></i>
                         <div>
@@ -350,31 +352,6 @@
                     </div>
                 </div>
             </div>
-
-            <div id="historicalProgress" class="progress-section" style="display: none;">
-                <h3>Generation Progress</h3>
-
-                <!-- Current day display (hour hidden for daily updates) -->
-                <div id="currentHourDisplay" class="hour-display" style="display: none; margin-top: 10px;"></div>
-
-                <!-- Table counter -->
-                <div id="tableProgressCounter" class="table-counter" style="display: none;"></div>
-
-                
-
-                <!-- Progress details -->
-                <div id="historicalProgressDetails" class="progress-details"></div>
-
-                <!-- Per-table progress container -->
-                <div id="tableProgressContainer" class="table-progress-container" style="display: none; margin-top: 15px;"></div>
-
-                <!-- Footer row: hours generated + ETA -->
-                <div class="progress-footer">
-                    <div id="totalHoursDisplay" class="hours-display" style="display: none;"></div>
-                    <div id="progressETA" class="progress-eta" style="display: none;"></div>
-                </div>
-            </div>
-
             <div id="factExportProgress" class="progress-section" style="display: none;">
                 <h3>Export Progress</h3>
                 <div class="progress-bar">
@@ -382,16 +359,43 @@
                 </div>
                 <div class="progress-text" id="factExportProgressText">Preparing export...</div>
             </div>
+
+            <div class="card" style="margin-top:24px;">
+                <h3>Streaming Output Queue</h3>
+                <div class="stats-row">
+                    <div class="stat">
+                        <span class="stat-label">Pending</span>
+                        <span class="stat-value" id="outboxPending">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Processing</span>
+                        <span class="stat-value" id="outboxProcessing">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Sent</span>
+                        <span class="stat-value" id="outboxSent">0</span>
+                    </div>
+                </div>
+                <div style="margin-top:12px; color:#666; font-size:0.9em;">
+                    Oldest pending: <span id="outboxOldest">—</span>
+                </div>
+                <div style="margin-top:12px;">
+                    <button class="btn secondary" onclick="app.previewOutbox()">
+                        <i class="fas fa-eye"></i> Preview Outbox
+                    </button>
+                    <button class="btn danger" style="margin-left:8px;" onclick="app.clearOutbox()">
+                        <i class="fas fa-trash"></i> Clear Outbox
+                    </button>
+                </div>
+            </div>
+        </div>
         </div>
 
         <!-- Streaming Tab -->
         <div id="streaming" class="tab-content">
             <div class="section-header">
                 <h2>Real-Time Event Streaming</h2>
-                <p>Stream events to Azure Event Hub</p>
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 16px 0; font-size: 0.9em;">
-                    <strong>Note:</strong> Fact data must be generated first before starting real-time streaming.
-                </div>
+                <p class="help-text">Stream events to Azure Event Hub. Fact data must be generated first.</p>
             </div>
 
             <div class="streaming-controls">
@@ -498,7 +502,7 @@
         <div id="config" class="tab-content">
             <div class="section-header">
                 <h2>Configuration</h2>
-                <p>Manage system settings and parameters</p>
+                <p class="help-text">Manage system settings and parameters</p>
             </div>
 
             <div class="config-sections">
@@ -633,7 +637,7 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js?v=20251029b"></script>
+    <script src="/static/js/main.js?v=20251112a"></script>
     <script>
         // Minimal header scroll behavior for subtle shadow
         (function() {

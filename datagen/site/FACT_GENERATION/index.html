@@ -1,0 +1,1700 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/FACT_GENERATION/">
+      
+      
+        <link rel="prev" href="../STREAMING_SETUP/">
+      
+      
+        <link rel="next" href="../STORE_PROFILES/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Fact Generation - Retail Datagen</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fact-data-generation-system" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Retail Datagen" class="md-header__button md-logo" aria-label="Retail Datagen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Datagen
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Fact Generation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Retail Datagen" class="md-nav__button md-logo" aria-label="Retail Datagen" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Retail Datagen
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOCAL_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPLOAD_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMING_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Generation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Key Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Key Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#complete-fact-table-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Complete Fact Table Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#realistic-temporal-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Realistic Temporal Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-retail-behavior-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Advanced Retail Behavior Simulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supply-chain-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Supply Chain Coordination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-quality-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Data Quality &amp; Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-ready-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Production-Ready Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🏗️ System Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ System Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configuration-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configuration Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-output-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Output Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generated-fact-tables-example-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Generated Fact Tables (Example Rows)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Generated Fact Tables (Example Rows)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dc-inventory-transactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. DC Inventory Transactions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-truck-movements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Truck Movements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-store-inventory-transactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Store Inventory Transactions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Receipts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-receipt-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Receipt Lines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-foot-traffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Foot Traffic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-ble-pings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. BLE Pings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-marketing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Marketing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#realistic-behavior-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Realistic Behavior Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Realistic Behavior Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#seasonal-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seasonal Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#daily-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Daily Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customer Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supply-chain-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supply Chain Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Advanced Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Advanced Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#temporal-pattern-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporal Pattern Customization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-journey-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customer Journey Customization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#business-rules-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Business Rules Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Performance &amp; Scaling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Performance &amp; Scaling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-specifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Specifications
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Tips
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧪 Testing &amp; Validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧪 Testing &amp; Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-verification-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Verification Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-demonstration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Demonstration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔍 Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debug-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debug Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📚 Related Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STORE_PROFILES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Streaming
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMING_API/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMING_OPERATIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CREDENTIALS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credentials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../VALIDATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="fact-data-generation-system">Fact Data Generation System<a class="headerlink" href="#fact-data-generation-system" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The Historical Fact Data Generation System creates realistic retail transaction data for analytics and testing purposes. It generates all fact tables specified in AGENTS.md with proper temporal patterns, business logic coordination, and partitioned output, including unified online orders.</p>
+<h2 id="key-features">🎯 Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
+<h3 id="complete-fact-table-generation">✅ <strong>Complete Fact Table Generation</strong><a class="headerlink" href="#complete-fact-table-generation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>DC Inventory Transactions</strong>: Supplier deliveries, adjustments, outbound shipments</li>
+<li><strong>Truck Movements</strong>: Realistic logistics with status progression and timing</li>
+<li><strong>Store Inventory Transactions</strong>: Receiving, sales, adjustments with proper sourcing</li>
+<li><strong>Receipts &amp; Receipt Lines</strong>: Customer transactions with realistic basket composition</li>
+<li><strong>Foot Traffic</strong>: Sensor data with zone-based movement patterns</li>
+<li><strong>BLE Pings</strong>: Beacon interactions with realistic RSSI values</li>
+<li><strong>Marketing</strong>: Multi-channel campaigns with targeting and cost tracking</li>
+<li><strong>Online Orders</strong>: Unified online order facts with inventory impacts on stores/DCs</li>
+</ul>
+<h3 id="realistic-temporal-patterns">✅ <strong>Realistic Temporal Patterns</strong><a class="headerlink" href="#realistic-temporal-patterns" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Seasonal Effects</strong>: Holiday spikes, back-to-school, weather impacts</li>
+<li><strong>Daily Patterns</strong>: Peak hours, lunch rushes, weekend vs weekday differences</li>
+<li><strong>Store Hours</strong>: Realistic operating schedules with closed-time handling</li>
+<li><strong>Event-Driven</strong>: Promotional periods, flash sales, special events</li>
+</ul>
+<h3 id="advanced-retail-behavior-simulation">✅ <strong>Advanced Retail Behavior Simulation</strong><a class="headerlink" href="#advanced-retail-behavior-simulation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Customer Segments</strong>: Budget-conscious, convenience-focused, quality-seekers, brand-loyal</li>
+<li><strong>Shopping Behaviors</strong>: Quick trips, grocery runs, family shopping, bulk purchases</li>
+<li><strong>Realistic Baskets</strong>: Category-based product combinations with segment preferences</li>
+<li><strong>Geographic Logic</strong>: Customer-store proximity affects shopping patterns</li>
+</ul>
+<h3 id="supply-chain-coordination">✅ <strong>Supply Chain Coordination</strong><a class="headerlink" href="#supply-chain-coordination" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Inventory Flow</strong>: DC → Truck → Store → Customer with realistic timing</li>
+<li><strong>Demand-Driven Reordering</strong>: Automatic shipment triggers based on sales</li>
+<li><strong>Capacity Constraints</strong>: Truck limits, store capacity, DC throughput</li>
+<li><strong>Business Rules</strong>: No negative inventory, proper pricing validation</li>
+</ul>
+<h3 id="data-quality-validation">✅ <strong>Data Quality &amp; Validation</strong><a class="headerlink" href="#data-quality-validation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Referential Integrity</strong>: All foreign keys validated across tables</li>
+<li><strong>Business Rule Compliance</strong>: Receipt totals, pricing constraints, timing logic</li>
+<li><strong>Synthetic Data Safety</strong>: No real personal information generated</li>
+<li><strong>Reproducible Results</strong>: Seed-based deterministic generation</li>
+</ul>
+<h3 id="production-ready-output">✅ <strong>Production-Ready Output</strong><a class="headerlink" href="#production-ready-output" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Partitioned Storage</strong>: Monthly Parquet files under <code>data/export/&lt;table&gt;</code></li>
+<li><strong>Scalable Generation</strong>: Handle millions of transactions efficiently</li>
+<li><strong>Progress Reporting</strong>: Real-time feedback with table completion counter, ETA estimation, and throttled updates</li>
+<li><strong>Configurable Volumes</strong>: Adjust store count, customer traffic, basket sizes</li>
+</ul>
+<h2 id="system-architecture">🏗️ System Architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────────────────────────┐
+│                    FactDataGenerator                            │
+│  ┌─────────────────┬──────────────────┬──────────────────────┐  │
+│  │ SeasonalPatterns│ CustomerJourney  │  InventoryFlow       │  │
+│  │ TemporalPatterns│ Simulator        │  Simulator           │  │
+│  │ EventPatterns   │                  │                      │  │
+│  └─────────────────┴──────────────────┴──────────────────────┘  │
+│  ┌─────────────────┬──────────────────┬──────────────────────┐  │
+│  │ MarketingCampaign│ BusinessRules   │  Cross-Fact          │  │
+│  │ Simulator        │ Engine          │  Coordination        │  │
+│  └─────────────────┴──────────────────┴──────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<h3 id="data-flow">Data Flow<a class="headerlink" href="#data-flow" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Daily</span><span class="w"> </span><span class="n">Generation</span><span class="w"> </span><span class="n">Loop</span><span class="p">:</span>
+<span class="mf">1.</span><span class="w"> </span><span class="n">Calculate</span><span class="w"> </span><span class="n">temporal</span><span class="w"> </span><span class="n">multipliers</span><span class="w"> </span><span class="p">(</span><span class="n">seasonal</span><span class="p">,</span><span class="w"> </span><span class="n">daily</span><span class="p">,</span><span class="w"> </span><span class="n">hourly</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Generate</span><span class="w"> </span><span class="n">DC</span><span class="w"> </span><span class="n">inventory</span><span class="w"> </span><span class="n">transactions</span><span class="w"> </span><span class="p">(</span><span class="n">supplier</span><span class="w"> </span><span class="n">deliveries</span><span class="p">)</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Generate</span><span class="w"> </span><span class="n">marketing</span><span class="w"> </span><span class="n">campaigns</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">impressions</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">For</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">hour</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">day</span><span class="p">:</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Generate</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="n">transactions</span><span class="w"> </span><span class="p">(</span><span class="n">receipts</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">lines</span><span class="p">)</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Generate</span><span class="w"> </span><span class="n">foot</span><span class="w"> </span><span class="n">traffic</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">BLE</span><span class="w"> </span><span class="n">pings</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Process</span><span class="w"> </span><span class="n">inventory</span><span class="w"> </span><span class="n">deductions</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Analyze</span><span class="w"> </span><span class="n">inventory</span><span class="w"> </span><span class="n">needs</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Generate</span><span class="w"> </span><span class="n">truck</span><span class="w"> </span><span class="n">movements</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Process</span><span class="w"> </span><span class="n">truck</span><span class="w"> </span><span class="n">deliveries</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Update</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="n">inventory</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">Validate</span><span class="w"> </span><span class="n">business</span><span class="w"> </span><span class="n">rules</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="k">export</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">monthly</span><span class="w"> </span><span class="n">Parquet</span><span class="w"> </span><span class="n">files</span>
+</code></pre></div>
+
+<h2 id="quick-start">🚀 Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<h3 id="1-basic-usage">1. Basic Usage<a class="headerlink" href="#1-basic-usage" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.config.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetailConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.generators.fact_generator</span><span class="w"> </span><span class="kn">import</span> <span class="n">FactDataGenerator</span>
+
+<span class="c1"># Load configuration</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">RetailConfig</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Initialize generator (loads dimension data automatically)</span>
+<span class="n">generator</span> <span class="o">=</span> <span class="n">FactDataGenerator</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+<span class="c1"># Generate 30 days of fact data</span>
+<span class="n">start_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">end_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+
+<span class="n">summary</span> <span class="o">=</span> <span class="n">generator</span><span class="o">.</span><span class="n">generate_historical_data</span><span class="p">(</span><span class="n">start_date</span><span class="p">,</span> <span class="n">end_date</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated </span><span class="si">{</span><span class="n">summary</span><span class="o">.</span><span class="n">total_records</span><span class="si">}</span><span class="s2"> records in </span><span class="si">{</span><span class="n">summary</span><span class="o">.</span><span class="n">generation_time_seconds</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="2-configuration-example">2. Configuration Example<a class="headerlink" href="#2-configuration-example" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;seed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;volume&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;stores&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">250</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;dcs&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;customers_per_day&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;items_per_ticket_mean&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">4.2</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;online_orders_per_day&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;realtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;emit_interval_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;burst&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;paths&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;dict&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;data/dictionaries&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;hub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="3-output-structure">3. Output Structure<a class="headerlink" href="#3-output-structure" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">data</span><span class="o">/</span><span class="k">export</span><span class="o">/</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_receipts</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_receipts_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_receipts_2024</span><span class="o">-</span><span class="mf">02.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_receipt_lines</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_receipt_lines_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_store_inventory_txn</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_store_inventory_txn_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_truck_moves</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_truck_moves_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_dc_inventory_txn</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_dc_inventory_txn_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_foot_traffic</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_foot_traffic_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_ble_pings</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_ble_pings_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">fact_marketing</span><span class="o">/</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_marketing_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">fact_online_order_lines</span><span class="o">/</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">fact_online_order_lines_2024</span><span class="o">-</span><span class="mf">01.</span><span class="n">parquet</span>
+</code></pre></div>
+
+<h2 id="generated-fact-tables-example-rows">📊 Generated Fact Tables (Example Rows)<a class="headerlink" href="#generated-fact-tables-example-rows" title="Permanent link">&para;</a></h2>
+<h3 id="1-dc-inventory-transactions">1. DC Inventory Transactions<a class="headerlink" href="#1-dc-inventory-transactions" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,DCID,ProductID,QtyDelta,Reason
+TRC0000000001,2024-01-01 08:30:45,1,1001,500,INBOUND_SHIPMENT
+TRC0000000002,2024-01-01 09:15:22,1,1002,-250,OUTBOUND_SHIPMENT
+</code></pre></div>
+
+<h3 id="2-truck-movements">2. Truck Movements<a class="headerlink" href="#2-truck-movements" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,TruckId,DCID,StoreID,ShipmentId,Status,ETA,ETD
+TRC0000000003,2024-01-01 06:00:00,TRK1001,1,15,SHIP20240101,SCHEDULED,2024-01-01 14:00:00,2024-01-01 15:00:00
+</code></pre></div>
+
+<h3 id="3-store-inventory-transactions">3. Store Inventory Transactions<a class="headerlink" href="#3-store-inventory-transactions" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,StoreID,ProductID,QtyDelta,Reason,Source
+TRC0000000004,2024-01-01 14:30:15,15,1001,100,INBOUND_SHIPMENT,TRK1001
+TRC0000000005,2024-01-01 15:45:30,15,1001,-2,SALE,CUSTOMER_PURCHASE
+</code></pre></div>
+
+<h3 id="4-receipts">4. Receipts<a class="headerlink" href="#4-receipts" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,StoreID,CustomerID,ReceiptId,Subtotal,Tax,Total,TenderType
+TRC0000000006,2024-01-01 15:45:30,15,5001,RCP202401011545015,25.98,2.08,28.06,CREDIT_CARD
+</code></pre></div>
+
+<h3 id="5-receipt-lines">5. Receipt Lines<a class="headerlink" href="#5-receipt-lines" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,ReceiptId,Line,ProductID,Qty,UnitPrice,ExtPrice,PromoCode
+TRC0000000006,2024-01-01 15:45:30,RCP202401011545015,1,1001,2,12.99,25.98,
+</code></pre></div>
+
+<h3 id="6-foot-traffic">6. Foot Traffic<a class="headerlink" href="#6-foot-traffic" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,StoreID,SensorId,Zone,Dwell,Count
+TRC0000000007,2024-01-01 15:42:18,15,SENSOR_015_ENTRANCE,ENTRANCE,45,1
+</code></pre></div>
+
+<h3 id="7-ble-pings">7. BLE Pings<a class="headerlink" href="#7-ble-pings" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,StoreID,BeaconId,CustomerBLEId,RSSI,Zone
+TRC0000000008,2024-01-01 15:43:25,15,BEACON_015_GROCERY,BLE500123,-65,GROCERY
+</code></pre></div>
+
+<h3 id="8-marketing">8. Marketing<a class="headerlink" href="#8-marketing" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>TraceId,EventTS,Channel,CampaignId,CreativeId,CustomerAdId,ImpressionId,Cost,Device
+TRC0000000009,2024-01-01 10:15:30,FACEBOOK,CAMP20240101,CREAT001FB01,AD500123,IMP20240101234567,0.15,MOBILE
+</code></pre></div>
+
+<h2 id="realistic-behavior-examples">🎯 Realistic Behavior Examples<a class="headerlink" href="#realistic-behavior-examples" title="Permanent link">&para;</a></h2>
+<h3 id="seasonal-patterns">Seasonal Patterns<a class="headerlink" href="#seasonal-patterns" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Black Friday</strong>: 3.5x normal traffic with extended hours</li>
+<li><strong>Christmas</strong>: 2x normal traffic with gift-focused purchases</li>
+<li><strong>Back-to-School</strong>: Electronics and clothing surge in August</li>
+<li><strong>Summer</strong>: Outdoor and BBQ products increase</li>
+</ul>
+<h3 id="daily-patterns">Daily Patterns<a class="headerlink" href="#daily-patterns" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Monday</strong>: 70% of baseline traffic (slow start)</li>
+<li><strong>Friday</strong>: 120% of baseline (weekend prep)</li>
+<li><strong>Saturday</strong>: 140% of baseline (peak shopping)</li>
+<li><strong>Lunch Rush</strong>: 11:30 AM - 1:30 PM traffic spike</li>
+<li><strong>After Work</strong>: 5:00 PM - 8:00 PM peak period</li>
+</ul>
+<h3 id="customer-behavior">Customer Behavior<a class="headerlink" href="#customer-behavior" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Budget-Conscious</strong>: Bulk shopping, promotional focus, longer baskets</li>
+<li><strong>Convenience-Focused</strong>: Quick trips, premium for convenience</li>
+<li><strong>Quality-Seekers</strong>: Higher-priced items, selective shopping</li>
+<li><strong>Brand-Loyal</strong>: Consistent brand preferences, moderate baskets</li>
+</ul>
+<h3 id="supply-chain-logic">Supply Chain Logic<a class="headerlink" href="#supply-chain-logic" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Sales reduce store inventory</strong></li>
+<li><strong>Inventory hits reorder point → Triggers truck shipment</strong></li>
+<li><strong>Truck travels realistic time → Delivers to store</strong></li>
+<li><strong>Store receives inventory → Ready for more sales</strong></li>
+</ol>
+<h2 id="advanced-configuration">🔧 Advanced Configuration<a class="headerlink" href="#advanced-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="temporal-pattern-customization">Temporal Pattern Customization<a class="headerlink" href="#temporal-pattern-customization" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.generators.seasonal_patterns</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompositeTemporalPatterns</span>
+
+<span class="c1"># Override seasonal multipliers</span>
+<span class="n">patterns</span> <span class="o">=</span> <span class="n">CompositeTemporalPatterns</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">custom_multiplier</span> <span class="o">=</span> <span class="n">patterns</span><span class="o">.</span><span class="n">get_overall_multiplier</span><span class="p">(</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">25</span><span class="p">))</span>
+</code></pre></div>
+
+<h3 id="customer-journey-customization">Customer Journey Customization<a class="headerlink" href="#customer-journey-customization" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.generators.retail_patterns</span><span class="w"> </span><span class="kn">import</span> <span class="n">CustomerJourneySimulator</span>
+
+<span class="c1"># Generate specific shopping behavior</span>
+<span class="n">simulator</span> <span class="o">=</span> <span class="n">CustomerJourneySimulator</span><span class="p">(</span><span class="n">customers</span><span class="p">,</span> <span class="n">products</span><span class="p">,</span> <span class="n">stores</span><span class="p">)</span>
+<span class="n">basket</span> <span class="o">=</span> <span class="n">simulator</span><span class="o">.</span><span class="n">generate_shopping_basket</span><span class="p">(</span>
+    <span class="n">customer_id</span><span class="o">=</span><span class="mi">123</span><span class="p">,</span> 
+    <span class="n">behavior_type</span><span class="o">=</span><span class="n">ShoppingBehaviorType</span><span class="o">.</span><span class="n">FAMILY_SHOPPING</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<h3 id="business-rules-validation">Business Rules Validation<a class="headerlink" href="#business-rules-validation" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.generators.retail_patterns</span><span class="w"> </span><span class="kn">import</span> <span class="n">BusinessRulesEngine</span>
+
+<span class="n">rules</span> <span class="o">=</span> <span class="n">BusinessRulesEngine</span><span class="p">()</span>
+<span class="n">is_valid</span> <span class="o">=</span> <span class="n">rules</span><span class="o">.</span><span class="n">validate_receipt_totals</span><span class="p">(</span><span class="n">receipt_lines</span><span class="p">,</span> <span class="n">total_amount</span><span class="p">)</span>
+<span class="n">validation_summary</span> <span class="o">=</span> <span class="n">rules</span><span class="o">.</span><span class="n">get_validation_summary</span><span class="p">()</span>
+</code></pre></div>
+
+<h2 id="performance-scaling">🚀 Performance &amp; Scaling<a class="headerlink" href="#performance-scaling" title="Permanent link">&para;</a></h2>
+<h3 id="recommended-specifications">Recommended Specifications<a class="headerlink" href="#recommended-specifications" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Store Count</th>
+<th>Daily Customers</th>
+<th>Generation Time</th>
+<th>Memory Usage</th>
+<th>Storage/Day</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10 stores</td>
+<td>1,000</td>
+<td>30 seconds</td>
+<td>100 MB</td>
+<td>50 MB</td>
+</tr>
+<tr>
+<td>100 stores</td>
+<td>10,000</td>
+<td>5 minutes</td>
+<td>500 MB</td>
+<td>500 MB</td>
+</tr>
+<tr>
+<td>1,000 stores</td>
+<td>100,000</td>
+<td>45 minutes</td>
+<td>2 GB</td>
+<td>5 GB</td>
+</tr>
+</tbody>
+</table>
+<h3 id="optimization-tips">Optimization Tips<a class="headerlink" href="#optimization-tips" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Use appropriate date ranges</strong>: Start with small ranges for testing</li>
+<li><strong>Monitor memory usage</strong>: Large customer bases require more memory</li>
+<li><strong>Configure customer density</strong>: Adjust <code>customers_per_day</code> for your needs</li>
+</ol>
+<h2 id="testing-validation">🧪 Testing &amp; Validation<a class="headerlink" href="#testing-validation" title="Permanent link">&para;</a></h2>
+<h3 id="run-verification-script">Run Verification Script<a class="headerlink" href="#run-verification-script" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>verify_fact_generation.py
+</code></pre></div>
+
+<h3 id="run-demonstration">Run Demonstration<a class="headerlink" href="#run-demonstration" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>demo_fact_generation.py
+</code></pre></div>
+
+<h3 id="unit-tests">Unit Tests<a class="headerlink" href="#unit-tests" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/unit/test_fact_generation.py
+</code></pre></div>
+
+<h2 id="troubleshooting">🔍 Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h3>
+<p><strong>1. "Dimension data not found"</strong>
+- Ensure dimension data exists in DuckDB (dim_* tables) or export files under <code>data/export/&lt;table&gt;</code>
+- Run dimension data generation first</p>
+<p><strong>2. "Negative inventory"</strong>
+- Check inventory reorder logic
+- Verify business rules are properly applied</p>
+<p><strong>3. "Large memory usage"</strong>
+- Reduce <code>customers_per_day</code> in config
+- Generate smaller date ranges
+- Use incremental generation</p>
+<p><strong>4. "Slow generation"</strong>
+- Check disk I/O performance<br />
+- Reduce fact table complexity
+- Use SSD storage for output</p>
+<h3 id="debug-mode">Debug Mode<a class="headerlink" href="#debug-mode" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">generator</span> <span class="o">=</span> <span class="n">FactDataGenerator</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">generator</span><span class="o">.</span><span class="n">business_rules</span><span class="o">.</span><span class="n">clear_validation_results</span><span class="p">()</span>  <span class="c1"># Clear previous validations</span>
+
+<span class="c1"># Enable detailed logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+</code></pre></div>
+
+<h2 id="next-steps">🎯 Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Integration</strong>: Incorporate into your data pipeline</li>
+<li><strong>Customization</strong>: Modify patterns for your specific retail scenario</li>
+<li><strong>Real-time</strong>: Extend to real-time event streaming</li>
+<li><strong>Analytics</strong>: Use generated data for BI/ML model training</li>
+<li><strong>Scale</strong>: Generate production-volume datasets</li>
+</ol>
+<h2 id="related-files">📚 Related Files<a class="headerlink" href="#related-files" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>/src/retail_datagen/generators/fact_generator.py</code> - Main generation engine</li>
+<li><code>/src/retail_datagen/generators/seasonal_patterns.py</code> - Temporal modeling</li>
+<li><code>/src/retail_datagen/generators/retail_patterns.py</code> - Behavior simulation</li>
+<li><code>/src/retail_datagen/shared/models.py</code> - Data models and validation</li>
+<li><code>/tests/unit/test_fact_generation.py</code> - Unit tests</li>
+<li><code>/demo_fact_generation.py</code> - Complete demonstration</li>
+<li><code>/verify_fact_generation.py</code> - System verification</li>
+</ul>
+<p>The historical fact data generation system provides a comprehensive, realistic, and scalable solution for generating retail transaction data that follows real-world patterns and business rules.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.integrate"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

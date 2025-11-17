@@ -55,6 +55,9 @@
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-quick: all 0.2s ease;
+
+    /* Safe area for bottom insets (iOS/Safari) */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -76,7 +79,7 @@ body {
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 var(--spacing-md);
+    padding: 0 var(--spacing-md) calc(var(--spacing-xl) + var(--safe-bottom) + 24px);
 }
 
 /* Header – sticky bar with SVG background */
@@ -220,6 +223,14 @@ body {
 .tab-content {
     display: none;
     animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Add comfortable breathing room and consistent gutters for all tabs */
+    padding-top: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-xl) * 2 + var(--safe-bottom) + 32px);
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .tab-content.active {
@@ -477,6 +488,15 @@ body {
 }
 
 .section-header h2 {
+    font-size: 36px;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-primary);
+    font-weight: 900;
+    letter-spacing: -0.5px;
+}
+
+/* Support h3 inside section headers (for consistency if used) */
+.section-header h3 {
     font-size: 36px;
     margin-bottom: var(--spacing-xs);
     color: var(--text-primary);
@@ -881,6 +901,14 @@ input[type="checkbox"] {
     margin-top: var(--spacing-md);
 }
 
+.progress-section h3 {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+    font-weight: 900;
+    font-size: 24px;
+    letter-spacing: -0.3px;
+}
+
 .progress-bar {
     background: var(--surface-inset);
     border-radius: 12px;
@@ -916,6 +944,29 @@ input[type="checkbox"] {
     color: var(--text-secondary);
     font-weight: 700;
     font-size: 15px;
+}
+
+/* Borderless key/value table for status display */
+.status-table { width: 100%; border-collapse: collapse; }
+.status-table td { padding: 6px 4px; vertical-align: top; border: none; }
+.status-table td.k { width: 200px; color: var(--text-secondary); font-weight: 800; }
+.status-table td.v { color: var(--text-primary); font-weight: 700; }
+
+/* Helper text under headings */
+.help-text {
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Small subtitle used inside cards/sections */
+.section-subtitle {
+    color: var(--text-secondary);
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: var(--spacing-xs);
 }
 
 .table-counter {

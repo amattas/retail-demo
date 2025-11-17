@@ -866,7 +866,7 @@ class FactDataGenerator:
         logger.info(f"  Max pool size: {max_pool_size}")
 
     async def generate_historical_data(
-        self, start_date: datetime, end_date: datetime
+        self, start_date: datetime, end_date: datetime, *, publish_to_outbox: bool = False
     ) -> FactGenerationSummary:
         """
         Generate historical fact data for the specified date range.
@@ -3948,13 +3948,16 @@ class FactDataGenerator:
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import insert_dataframe, outbox_insert_records
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
-                # Also mirror to streaming outbox so streaming drains in sync with historical loads
-                try:
-                    outbox_rows = self._build_outbox_rows_from_df(table_name, df)
-                    if outbox_rows:
-                        outbox_insert_records(self._duckdb_conn, outbox_rows)
-                except Exception as _outbox_exc:
-                    logger.debug(f"Outbox insert skipped for {table_name} hour {hour}: {_outbox_exc}")
+                # Optionally mirror to streaming outbox (only for outbox-driven realtime)
+                if publish_to_outbox:
+                    try:
+                        outbox_rows = self._build_outbox_rows_from_df(table_name, df)
+                        if outbox_rows:
+                            outbox_insert_records(self._duckdb_conn, outbox_rows)
+                    except Exception as _outbox_exc:
+                        logger.debug(
+                            f"Outbox insert skipped for {table_name} hour {hour}: {_outbox_exc}"
+                        )
 
                 # Update per-table counts and emit progress
                 try:

@@ -104,6 +104,7 @@ Monitoring Policy (Listen Only):
 | Azure Key Vault | High | Medium | Production, Enterprise |
 | Configuration Files | Low | Low | Local development only |
 | Managed Identity | Highest | Medium | Azure deployments |
+| Azure Storage (Upload) | Medium | Low | Optional upload after export |
 
 ---
 
@@ -144,6 +145,20 @@ source ~/.bashrc
 ```bash
 echo $AZURE_EVENTHUB_CONNECTION_STRING
 ```
+
+### Azure Storage for Uploads (Optional)
+
+Used by the "Upload Dimensions/Facts" actions after export.
+
+```bash
+# Account URI (optionally include container/prefix)
+export AZURE_STORAGE_ACCOUNT_URI="https://<account>.blob.core.windows.net[/<container>[/<prefix>]]"
+
+# Account key
+export AZURE_STORAGE_ACCOUNT_KEY="<storage-account-key>"
+```
+
+You may also set these in `config.json` under `storage`.
 
 #### Windows (PowerShell)
 

@@ -328,6 +328,63 @@ class StreamConfig(BaseModel):
         return v.strip()
 
 
+class StorageConfig(BaseModel):
+    """Configuration for Azure Storage (Blob/Data Lake) access.
+
+    These fields are optional and not required for local CSV/Parquet export.
+    If provided, they can be used by services that upload generated data to
+    Azure Storage. Values can be supplied via config file or environment vars.
+
+    Environment overrides (checked if field empty/None):
+    - account_uri: AZURE_STORAGE_ACCOUNT_URI or AZURE_STORAGE_ACCOUNT_URL
+    - account_key: AZURE_STORAGE_ACCOUNT_KEY
+    """
+
+    account_uri: str | None = Field(
+        default=None,
+        description="Azure Storage account URI (e.g., https://<account>.blob.core.windows.net)",
+    )
+    account_key: str | None = Field(
+        default=None,
+        description="Azure Storage account key (sensitive)",
+    )
+
+    @field_validator("account_uri", mode="before")
+    @classmethod
+    def load_account_uri_from_env(cls, v: str | None) -> str | None:
+        # Prefer explicit value if provided
+        if v and str(v).strip():
+            return str(v).strip()
+
+        # Environment fallbacks
+        env_uri = os.getenv("AZURE_STORAGE_ACCOUNT_URI") or os.getenv(
+            "AZURE_STORAGE_ACCOUNT_URL"
+        )
+        return env_uri.strip() if env_uri else None
+
+    @field_validator("account_key", mode="before")
+    @classmethod
+    def load_account_key_from_env(cls, v: str | None) -> str | None:
+        if v and str(v).strip():
+            return str(v).strip()
+        env_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+        return env_key.strip() if env_key else None
+
+    @model_validator(mode="after")
+    def validate_uri_format(self) -> "StorageConfig":
+        # Basic sanity checks only; support various Azure clouds/domains
+        if self.account_uri is not None:
+            uri = self.account_uri.strip()
+            if not (uri.startswith("https://") or uri.startswith("http://")):
+                raise ValueError(
+                    "Storage account URI must start with http:// or https://"
+                )
+            # Prevent obviously invalid bare values
+            if "." not in uri and "/" not in uri:
+                raise ValueError("Storage account URI appears invalid")
+        return self
+
+
 class HistoricalConfig(BaseModel):
     """Configuration for historical data generation."""
 
@@ -563,6 +620,10 @@ class RetailConfig(BaseModel):
     marketing_cost: MarketingCostConfig = Field(
         default_factory=MarketingCostConfig,
         description="Marketing impression cost configuration",
+    )
+    storage: StorageConfig = Field(
+        default_factory=StorageConfig,
+        description="Azure Storage configuration (optional)",
     )
 
     @classmethod

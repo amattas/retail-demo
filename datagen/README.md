@@ -10,7 +10,7 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 
 1. **Dimension Data**: Build dimension tables from dictionary CSV inputs → persisted in DuckDB; optional Parquet export under `data/export/<table>/<table>.parquet`
 2. **Fact Data**: Generate fact tables between configurable timestamps → monthly Parquet files `data/export/<table>/<table>_YYYY-MM.parquet`  
-3. **Real-Time Data**: Stream incremental events to Azure Event Hubs with intelligent state tracking
+3. **Real-Time Data**: Stream incremental events to Azure Event Hubs with intelligent state tracking (outbox mode only queues the daily slice)
 
 ## Key Features
 
@@ -36,11 +36,11 @@ Generate synthetic but realistic retail data that simulates real-world retail be
 - **Data Consistency**: Enforces foot traffic ≥ BLE customers ≥ receipt customers
 
 ### 🌐 **FastAPI Web Interface**
-- **Interactive UI**: Complete web interface for all operations
-- **REST API**: Full programmatic access with OpenAPI documentation
-- **Data Management**: Clear all data functionality with triple confirmation safety
-- **Real-time Status**: Generation state monitoring and progress tracking
-- **Enhanced Progress Display**: Table completion counter, ETA estimation, and smooth throttled updates
+- **Local Data tab**: One-click generation for Dimensions + Facts. After generation, the section hides and a Status card shows the Database Range and last run info.
+- **Upload Data**: Export Parquet and (optionally) upload to Azure Storage when `storage.account_uri` + `storage.account_key` are configured.
+- **Streaming**: Start/stop realtime, view stats, and manage the streaming outbox (status, drain, clear).
+- **Config**: Update volume/stream settings and clear all data.
+- **REST API**: Full programmatic access with OpenAPI documentation.
 
 ### 🔒 **Data Integrity & Safety**
 - **FK Validation**: Complete foreign key relationship validation across all tables
@@ -483,7 +483,7 @@ Store connection string directly in `config.json` (only for testing with tempora
 - ✅ Fabric RTI format auto-detection
 - ✅ `.env` files automatically ignored by git
 
-**See [CREDENTIALS.md](CREDENTIALS.md) for complete credential management documentation.**
+**See [CREDENTIALS.md](CREDENTIALS.md) for complete credential and storage upload documentation.**
 
 ## Testing & Validation
 
@@ -637,3 +637,9 @@ data/
 ## License
 
 This project generates synthetic data only for development and analytics purposes. No real personal information is used, generated, or exposed.
+4. **Configure Azure Storage** (optional, for uploads):
+   - Set in `config.json`:
+     ```json
+     { "storage": { "account_uri": "https://<account>.blob.core.windows.net/<container>/<prefix>", "account_key": "<key>" } }
+     ```
+   - Or via env vars: `AZURE_STORAGE_ACCOUNT_URI`, `AZURE_STORAGE_ACCOUNT_KEY`

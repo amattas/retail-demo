@@ -90,6 +90,37 @@ FACT_TABLES = [
     "online_order_lines",
 ]
 
+@router.get(
+    "/facts/date-range",
+    summary="Get overall fact date range",
+    description="Return the earliest and latest event_ts across all fact tables",
+)
+async def get_overall_fact_date_range():
+    """Compute overall min and max event_ts across all fact tables."""
+    try:
+        from retail_datagen.services import get_all_fact_table_date_ranges
+        ranges = get_all_fact_table_date_ranges()
+        mins = [r[0] for r in ranges.values() if r and r[0] is not None]
+        maxs = [r[1] for r in ranges.values() if r and r[1] is not None]
+        min_ts = min(mins) if mins else None
+        max_ts = max(maxs) if maxs else None
+        return {
+            "min_event_ts": min_ts.isoformat() if min_ts else None,
+            "max_event_ts": max_ts.isoformat() if max_ts else None,
+            "per_table": {
+                k: {
+                    "min_event_ts": (v[0].isoformat() if v and v[0] else None),
+                    "max_event_ts": (v[1].isoformat() if v and v[1] else None),
+                }
+                for k, v in ranges.items()
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to compute fact date range: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compute fact date range: {str(e)}",
+        )
 
 # ================================
 # MASTER DATA GENERATION ENDPOINTS
@@ -776,7 +807,7 @@ async def generate_historical_data(
             # Generate historical data using the fact generator
             # Historical generation runs sequentially to manage memory
             summary = await fact_generator.generate_historical_data(
-                start_date, end_date
+                start_date, end_date, publish_to_outbox=False
             )
 
             # Update generation state with the end timestamp
@@ -928,7 +959,7 @@ async def generate_specific_historical_table(
 
             # Generate historical data using the fact generator (async)
             summary = await fact_generator.generate_historical_data(
-                start_date, end_date
+                start_date, end_date, publish_to_outbox=False
             )
 
             # Update generation state with the end timestamp
@@ -1501,3 +1532,7 @@ async def get_dashboard_counts():
         "fact_tables": fact_counts,
         "last_updated": datetime.utcnow().isoformat() + "Z",
     }
+
+
+# (moved) facts/date-range route is defined above FACT_TABLES to avoid
+# conflicts with the dynamic '/facts/{table_name}' route

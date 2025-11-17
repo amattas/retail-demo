@@ -385,7 +385,7 @@ async def start_streaming(
                     start_dt = datetime.combine(next_day, datetime.min.time())
                     end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
                     update_task_progress(session_id, 0.05, f"Generating {start_dt.date().isoformat()}")
-                    await fact_gen.generate_historical_data(start_dt, end_dt)
+                    await fact_gen.generate_historical_data(start_dt, end_dt, publish_to_outbox=True)
                     state_mgr.update_fact_generation(end_dt)
                 except Exception as gen_err:
                     logger.error(f"Generation failed: {gen_err}")
@@ -613,6 +613,66 @@ async def get_outbox_status():
     return counts
 
 
+@router.get(
+    "/stream/outbox/preview",
+    summary="Preview streaming outbox",
+    description="Return a preview of rows from the streaming_outbox table",
+)
+async def preview_outbox(
+    status_filter: str | None = Query(
+        default=None,
+        description="Optional status to filter by (pending, processing, sent)",
+    ),
+    limit: int = Query(100, ge=1, le=1000, description="Number of rows to return"),
+):
+    """Preview rows from the streaming_outbox table for UI diagnostics."""
+    try:
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        from retail_datagen.api.models import TablePreviewResponse
+
+        conn = get_duckdb_conn()
+
+        base_query = (
+            "SELECT outbox_id, event_ts, message_type, status, attempts, last_attempt_ts, sent_ts, partition_key, trace_id "
+            "FROM streaming_outbox"
+        )
+        params: list = []
+        if status_filter:
+            base_query += " WHERE status = ?"
+            params.append(status_filter)
+        base_query += " ORDER BY event_ts DESC, outbox_id DESC LIMIT ?"
+        params.append(int(limit))
+
+        total_count = 0
+        try:
+            total_count = int(
+                conn.execute("SELECT COUNT(*) FROM streaming_outbox").fetchone()[0]
+            )
+        except Exception:
+            total_count = 0
+
+        cur = conn.execute(base_query, params)
+        columns = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        preview_rows = [
+            {columns[i]: rows[j][i] for i in range(len(columns))}
+            for j in range(len(rows))
+        ]
+
+        return TablePreviewResponse(
+            table_name="streaming_outbox",
+            columns=columns,
+            row_count=total_count,
+            preview_rows=preview_rows,
+        )
+    except Exception as e:
+        logger.error(f"Failed to preview streaming_outbox: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview outbox: {str(e)}",
+        )
+
+
 @router.post(
     "/stream/outbox/drain",
     response_model=OperationResult,
@@ -695,6 +755,29 @@ async def drain_outbox(
         operation_id=task_id,
         started_at=datetime.now(),
     )
+
+
+@router.delete(
+    "/stream/outbox/clear",
+    response_model=OperationResult,
+    summary="Clear outbox",
+    description="Drop and recreate the streaming_outbox table (fast reset)",
+)
+async def clear_outbox():
+    try:
+        conn = get_duckdb_conn()
+        # Fast reset: drop and recreate table
+        conn.execute("DROP TABLE IF EXISTS streaming_outbox")
+        # Recreate via ensure helper
+        from retail_datagen.db.duckdb_engine import _ensure_outbox_table as _ensure
+
+        _ensure(conn)
+        return OperationResult(success=True, message="Outbox cleared")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear outbox: {str(e)}",
+        )
 
 
 # ================================

@@ -66,7 +66,7 @@ class RetailDataGenerator {
         let initialTab = 'dashboard';
         try {
             const saved = localStorage.getItem('activeTab');
-            const validTabs = new Set(['dashboard','master-data','historical','streaming','config']);
+            const validTabs = new Set(['dashboard','local-data','streaming','config']);
             if (saved && validTabs.has(saved)) initialTab = saved;
         } catch (_) { /* ignore */ }
 
@@ -80,12 +80,10 @@ class RetailDataGenerator {
         await this.updateTableCounts();
         if (initialTab === 'dashboard') {
             await this.updateDashboardStats();
-        } else if (initialTab === 'master-data') {
+        } else if (initialTab === 'local-data') {
             await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
-            await this.updateAllTablesData();
-        } else if (initialTab === 'historical') {
-            // already updated counts above
             await this.initializeTableStatuses();
+            this.updateExportButtonStates();
         } else if (initialTab === 'streaming') {
             await this.updateStreamingStatus();
         }
@@ -113,7 +111,7 @@ class RetailDataGenerator {
         });
 
         // Clickable cards: event delegation so clicks on any child trigger preview
-        const masterGrid = document.querySelector('#master-data .table-grid');
+        const masterGrid = document.querySelector('#local-master-grid');
         if (masterGrid) {
             masterGrid.addEventListener('click', (e) => {
                 const item = e.target.closest('.table-item');
@@ -122,7 +120,7 @@ class RetailDataGenerator {
                 if (table) this.previewTable(table, 'Dimension Data');
             });
         }
-        const histGrid = document.querySelector('#historical .table-grid');
+        const histGrid = document.querySelector('#local-fact-grid');
         if (histGrid) {
             histGrid.addEventListener('click', (e) => {
                 const item = e.target.closest('.table-item');
@@ -171,14 +169,14 @@ class RetailDataGenerator {
 
     async displayGenerationState(state) {
         // Find or create a status display area in the historical tab
-        const historicalTab = document.getElementById('historical');
+        const historicalTab = document.getElementById('local-data');
         let statusDiv = historicalTab.querySelector('.generation-status');
 
         if (!statusDiv) {
             statusDiv = document.createElement('div');
             statusDiv.className = 'generation-status card';
             statusDiv.innerHTML = `
-                <h3>Generation Status</h3>
+                <h3>Status</h3>
                 <div class="status-info"></div>
             `;
             // Insert after the section header
@@ -226,18 +224,45 @@ class RetailDataGenerator {
         }
 
         if (hasFactData) {
+            // Fetch DB date range for aligned display
+            let minTs = null, maxTs = null;
+            try {
+                const r = await fetch('/api/facts/date-range');
+                if (r.ok) {
+                    const data = await r.json();
+                    minTs = data.min_event_ts ? new Date(data.min_event_ts).toLocaleDateString() : null;
+                    maxTs = data.max_event_ts ? new Date(data.max_event_ts).toLocaleDateString() : null;
+                }
+            } catch (_) { /* ignore */ }
+
+            const rows = [
+                `<tr><td class=\"k\">Fact Data</td><td class=\"v\">✅ Generated</td></tr>`,
+                state.last_generated_timestamp ? `<tr><td class=\"k\">Last Generated</td><td class=\"v\">${new Date(state.last_generated_timestamp).toLocaleString()}</td></tr>` : '',
+                `<tr><td class=\"k\">Real-time Ready</td><td class=\"v\">${state.can_start_realtime ? '✅ Yes' : '❌ No'}</td></tr>`,
+                state.last_fact_run ? `<tr><td class=\"k\">Last Run</td><td class=\"v\">${new Date(state.last_fact_run).toLocaleString()}</td></tr>` : '',
+                (minTs || maxTs) ? `<tr><td class=\"k\">Database Range</td><td class=\"v\">${minTs || '—'} → ${maxTs || '—'}</td></tr>` : ''
+            ].filter(Boolean);
             statusInfo.innerHTML = `
-                <p><strong>Fact Data:</strong> ✅ Generated</p>
-                ${state.last_generated_timestamp ? `<p><strong>Last Generated:</strong> ${new Date(state.last_generated_timestamp).toLocaleString()}</p>` : ''}
-                <p><strong>Real-time Ready:</strong> ${state.can_start_realtime ? '✅ Yes' : '❌ No'}</p>
-                ${state.last_fact_run ? `<p><strong>Last Run:</strong> ${new Date(state.last_fact_run).toLocaleString()}</p>` : ''}
+                <table class=\"status-table\"><tbody>${rows.join('')}</tbody></table>
             `;
+            // Hide entire generate section; show DB range section handled above
+            const genCard = document.getElementById('local-generate-card');
+            if (genCard) genCard.style.display = 'none';
         } else {
             statusInfo.innerHTML = `
-                <p><strong>Fact Data:</strong> ❌ Not generated yet</p>
-                <p><strong>Status:</strong> Run historical generation first</p>
-                <p><strong>Real-time Ready:</strong> ❌ No</p>
+                <table class=\"status-table\"><tbody>
+                  <tr><td class=\"k\">Fact Data</td><td class=\"v\">❌ Not generated yet</td></tr>
+                  <tr><td class=\"k\">Status</td><td class=\"v\">Run historical generation first</td></tr>
+                  <tr><td class=\"k\">Real-time Ready</td><td class=\"v\">❌ No</td></tr>
+                </tbody></table>
             `;
+            // Show generate button and date inputs
+            const genCard = document.getElementById('local-generate-card');
+            if (genCard) genCard.style.display = '';
+            const dateInputs = document.getElementById('local-date-inputs');
+            if (dateInputs) dateInputs.style.display = '';
+            const summary = document.getElementById('local-date-summary');
+            if (summary) summary.style.display = 'none';
         }
     }
 
@@ -1032,17 +1057,17 @@ class RetailDataGenerator {
     }
 
     async reconnectToHistoricalTask(taskId) {
-        // First, switch to the historical tab so button is visible
-        await this.switchTab('historical');
+        // Switch to Local Data tab so progress and controls are visible
+        await this.switchTab('local-data');
 
         // Wait for DOM to update
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        const generateBtn = document.querySelector('#historical button.btn.primary.large');
+        const generateBtn = document.getElementById('generateLocalBtn');
 
         // Verify button exists before proceeding
         if (!generateBtn) {
-            console.error('Historical generate button not found after tab switch');
+            console.error('Local generate button not found after tab switch');
             return;
         }
 
@@ -1123,20 +1148,16 @@ class RetailDataGenerator {
             await this.updateStreamingStatus();
         } else if (tabName === 'dashboard') {
             await this.updateDashboardStats();
-        } else if (tabName === 'master-data') {
-            await this.updateTableCounts();
-            await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
-            await this.updateAllTablesData();
-            this.updateExportButtonStates();
-        } else if (tabName === 'historical') {
-            // Only restore from localStorage if this is NOT the initial page load
+        } else if (tabName === 'local-data') {
             if (!wasInitialLoad) {
                 this.loadCompletedTables();
             }
             await this.updateTableCounts();
-            // Apply saved completion states to table tiles
+            await Promise.all(this.masterTableNames.map(name => this.ensureTableCount(name)));
             await this.initializeTableStatuses();
             this.updateExportButtonStates();
+            await this.loadGenerationState();
+            await this.refreshOutboxStatus();
         }
     }
 
@@ -1151,7 +1172,7 @@ class RetailDataGenerator {
         // Note: Export buttons will be added to HTML separately
         // This method sets up event listeners once the DOM is ready
 
-        // Dimension data export button
+        // Dimension data upload/export button
         const masterExportBtn = document.getElementById('exportMasterBtn');
         if (masterExportBtn) {
             masterExportBtn.addEventListener('click', () => {
@@ -1159,7 +1180,7 @@ class RetailDataGenerator {
             });
         }
 
-        // Fact data export button (note: button ID is 'exportFactBtn')
+        // Fact data upload/export button (note: button ID is 'exportFactBtn')
         const historicalExportBtn = document.getElementById('exportFactBtn');
         if (historicalExportBtn) {
             historicalExportBtn.addEventListener('click', () => {
@@ -1181,13 +1202,13 @@ class RetailDataGenerator {
         try {
             // Disable button and show loading state
             exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
             this.disableExportButtons();
 
             // Show progress section
             this.showProgress('masterExportProgress', 'masterExportProgressFill', 'masterExportProgressText');
 
-            // Start export
+            // Start export (server will also upload if configured)
             const response = await fetch('/api/export/master', {
                 method: 'POST',
                 headers: {
@@ -1246,13 +1267,13 @@ class RetailDataGenerator {
         try {
             // Disable button and show loading state
             exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting all data (chunked)...';
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading all data (chunked)...';
             this.disableExportButtons();
 
             // Show progress section
             this.showProgress('factExportProgress', 'factExportProgressFill', 'factExportProgressText');
 
-            // Start export (no date range = export all data in 7-day chunks)
+            // Start export (server will also upload if configured). No date range = export all data in 7-day chunks
             const response = await fetch('/api/export/facts', {
                 method: 'POST',
                 headers: {
@@ -1472,8 +1493,8 @@ class RetailDataGenerator {
     }
 
     async generateHistoricalData() {
-        // Get button reference
-        const generateBtn = document.querySelector('#historical button.btn.primary.large');
+        // Get button reference (supports Local Data layout)
+        const generateBtn = document.getElementById('generateLocalBtn') || document.querySelector('#historical button.btn.primary.large');
         if (!generateBtn) {
             console.error('Generate button not found');
             return;
@@ -1614,6 +1635,19 @@ class RetailDataGenerator {
         }
     }
 
+    async generateLocalData() {
+        // Orchestrate dimensions first, then facts
+        try {
+            await this.generateMasterData();
+        } catch (e) {
+            console.error('Dimension generation failed; aborting facts.', e);
+            this.showNotification('Dimension generation failed; aborting facts.', 'error');
+            return;
+        }
+        await this.generateHistoricalData();
+        await this.refreshOutboxStatus();
+    }
+
     async startStreaming() {
         const duration = document.getElementById('streamDuration').value;
         
@@ -1712,6 +1746,75 @@ class RetailDataGenerator {
         } catch (error) {
             console.error('Failed to drain outbox:', error);
             this.showNotification(`Failed to drain outbox: ${error.message}`, 'error');
+        }
+    }
+
+    async refreshOutboxStatus() {
+        try {
+            const r = await fetch('/api/stream/outbox/status');
+            if (!r.ok) return;
+            const data = await r.json();
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = (val ?? 0).toLocaleString(); };
+            setVal('outboxPending', data.pending || 0);
+            setVal('outboxProcessing', data.processing || 0);
+            setVal('outboxSent', data.sent || 0);
+            const oldest = document.getElementById('outboxOldest');
+            if (oldest) oldest.textContent = data.oldest_pending_ts ? new Date(data.oldest_pending_ts).toLocaleString() : '—';
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    async previewOutbox() {
+        try {
+            const r = await fetch('/api/stream/outbox/preview?status=pending&limit=100');
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const result = await r.json();
+            const modal = document.getElementById('previewModal');
+            const titleEl = document.getElementById('previewTitle');
+            const content = document.getElementById('previewContent');
+            titleEl.textContent = `Outbox Preview (${(result.row_count || 0).toLocaleString()} total)`;
+            const headers = result.columns || [];
+            const rows = result.preview_rows || [];
+            const tableHtml = `
+                <div class="table-container">
+                    <table class="preview-table">
+                        <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                        <tbody>
+                            ${rows.map(row => `<tr>${headers.map(h => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            content.innerHTML = tableHtml;
+            modal.style.display = 'block';
+        } catch (e) {
+            console.error('Failed to preview outbox', e);
+            this.showNotification('Failed to preview outbox', 'error');
+        }
+    }
+
+    async updateFactDateSummary() {
+        try {
+            const r = await fetch('/api/facts/date-range');
+            if (!r.ok) return;
+            const data = await r.json();
+            const fd = document.getElementById('factsFirstDate');
+            const ld = document.getElementById('factsLastDate');
+            if (fd) fd.textContent = data.min_event_ts ? new Date(data.min_event_ts).toLocaleDateString() : '—';
+            if (ld) ld.textContent = data.max_event_ts ? new Date(data.max_event_ts).toLocaleDateString() : '—';
+        } catch (e) { /* ignore */ }
+    }
+
+    async clearOutbox() {
+        if (!confirm('This will delete all pending/processing/sent entries in the outbox. Proceed?')) return;
+        try {
+            const r = await fetch('/api/stream/outbox/clear', { method: 'DELETE' });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            this.showNotification('Outbox cleared', 'success');
+            await this.refreshOutboxStatus();
+        } catch (e) {
+            console.error('Failed to clear outbox', e);
+            this.showNotification('Failed to clear outbox', 'error');
         }
     }
 
@@ -2621,6 +2724,11 @@ function generateMasterData() {
 
 function generateHistoricalData() {
     app.generateHistoricalData();
+}
+
+// New unified generate handler used by Local Data tab
+function generateLocalData() {
+    app.generateLocalData();
 }
 
 function startStreaming() {

@@ -1,0 +1,32 @@
+site_name: Retail Datagen
+site_url: https://amattas.github.io/retail-demo/
+use_directory_urls: true
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+nav:
+  - Home: index.md
+  - Local Data: LOCAL_DATA.md
+  - Upload Data: UPLOAD_DATA.md
+  - Getting Started:
+    - Streaming Setup: STREAMING_SETUP.md
+    - Fact Generation: FACT_GENERATION.md
+    - Store Profiles: STORE_PROFILES.md
+  - Streaming:
+    - API Reference: STREAMING_API.md
+    - Operations: STREAMING_OPERATIONS.md
+  - Security:
+    - Credentials: CREDENTIALS.md
+  - Validation: VALIDATION.md
+  - SQL: sql/
+docs_dir: docs
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - admonition
+  - codehilite

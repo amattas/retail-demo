@@ -155,11 +155,36 @@ async def export_master_data(
 
             logger.info(f"Master export task {task_id} completed successfully")
 
+            # Optional: upload to Azure Storage if configured
+            uploaded_summary = None
+            try:
+                if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    from ..services.azure_uploader import upload_paths_to_blob
+                    # Build absolute paths for upload
+                    abs_paths = [base_dir / f for f in files_written]
+                    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    uploaded_summary = upload_paths_to_blob(
+                        config.storage.account_uri,
+                        config.storage.account_key,
+                        abs_paths,
+                        default_container="retail",
+                        blob_prefix=f"datagen/export/master/{ts}",
+                    )
+                    logger.info(
+                        f"Uploaded master export: {uploaded_summary.get('uploaded')} files to "
+                        f"{uploaded_summary.get('container')}/{uploaded_summary.get('prefix')}"
+                    )
+            except ImportError as e:
+                logger.warning(str(e))
+            except Exception as e:
+                logger.error(f"Upload failed: {e}")
+
             return {
                 "files_written": files_written,
                 "total_files": total_files,
                 "total_rows": None,
                 "output_directory": str(base_dir / "export"),
+                "uploaded": uploaded_summary,
             }
 
         except Exception as e:
@@ -350,6 +375,29 @@ async def export_fact_data(
 
             logger.info(f"Fact export task {task_id} completed successfully")
 
+            # Optional: upload to Azure Storage if configured
+            uploaded_summary = None
+            try:
+                if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    from ..services.azure_uploader import upload_paths_to_blob
+                    abs_paths = [base_dir / f for f in all_files]
+                    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    uploaded_summary = upload_paths_to_blob(
+                        config.storage.account_uri,
+                        config.storage.account_key,
+                        abs_paths,
+                        default_container="retail",
+                        blob_prefix=f"datagen/export/facts/{ts}",
+                    )
+                    logger.info(
+                        f"Uploaded fact export: {uploaded_summary.get('uploaded')} files to "
+                        f"{uploaded_summary.get('container')}/{uploaded_summary.get('prefix')}"
+                    )
+            except ImportError as e:
+                logger.warning(str(e))
+            except Exception as e:
+                logger.error(f"Upload failed: {e}")
+
             return {
                 "files_written": all_files,
                 "total_files": total_files,
@@ -357,6 +405,7 @@ async def export_fact_data(
                 "output_directory": str(base_dir / "export"),
                 "date_range": f"{start_date} to {end_date}",
                 "chunks_exported": total_chunks,
+                "uploaded": uploaded_summary,
             }
 
         except Exception as e:

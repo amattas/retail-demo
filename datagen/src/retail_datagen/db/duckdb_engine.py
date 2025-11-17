@@ -180,7 +180,7 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS streaming_outbox (
-            outbox_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+            outbox_id BIGINT PRIMARY KEY,
             event_ts TIMESTAMP,
             message_type VARCHAR,
             payload VARCHAR,          -- JSON text
@@ -196,6 +196,40 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
         );
         """
     )
+    # Backward compatibility: add any missing columns if the table pre-existed
+    try:
+        existing = _current_columns(conn, "streaming_outbox")
+
+        def _ensure(col: str, type_sql: str, default_sql: str | None = None) -> None:
+            if col not in existing:
+                try:
+                    if default_sql is not None:
+                        conn.execute(
+                            f"ALTER TABLE streaming_outbox ADD COLUMN {col} {type_sql} DEFAULT {default_sql}"
+                        )
+                    else:
+                        conn.execute(
+                            f"ALTER TABLE streaming_outbox ADD COLUMN {col} {type_sql}"
+                        )
+                    existing.add(col)
+                except Exception:
+                    pass
+
+        _ensure("status", "VARCHAR", "'pending'")
+        _ensure("attempts", "INT", "0")
+        _ensure("last_attempt_ts", "TIMESTAMP", None)
+        _ensure("sent_ts", "TIMESTAMP", None)
+        _ensure("partition_key", "VARCHAR", None)
+        _ensure("payload", "VARCHAR", None)
+        _ensure("trace_id", "VARCHAR", None)
+        _ensure("correlation_id", "VARCHAR", None)
+        _ensure("schema_version", "VARCHAR", "'1.0'")
+        _ensure("source", "VARCHAR", "'retail-datagen'")
+        _ensure("outbox_id", "BIGINT", None)
+        _ensure("event_ts", "TIMESTAMP", None)
+        _ensure("message_type", "VARCHAR", None)
+    except Exception:
+        pass
     # Lightweight indexes for draining
     try:
         conn.execute(
@@ -283,5 +317,27 @@ def outbox_nack_retry(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
 
 
 def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dict]) -> int:
-    """Insert a list of outbox rows (event_ts, message_type, payload, partition_key?, trace_id?)."""
-    return insert_records(conn, "streaming_outbox", records)
+    """Insert outbox rows, assigning monotonically increasing outbox_id values.
+
+    Ensures compatibility with DuckDB versions lacking IDENTITY columns by
+    generating outbox_id in Python.
+    """
+    _ensure_outbox_table(conn)
+    try:
+        row = conn.execute("SELECT COALESCE(MAX(outbox_id), 0) FROM streaming_outbox").fetchone()
+        max_id = int(row[0] or 0)
+    except Exception:
+        max_id = 0
+
+    prepared: list[dict] = []
+    next_id = max_id
+    for rec in records:
+        if rec is None:
+            continue
+        rec_copy = dict(rec)
+        if rec_copy.get("outbox_id") is None:
+            next_id += 1
+            rec_copy["outbox_id"] = next_id
+        prepared.append(rec_copy)
+
+    return insert_records(conn, "streaming_outbox", prepared)
