@@ -4,7 +4,7 @@
   {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
   {"column":"quantity_delta","path":"$.payload.quantity_delta","datatype":"long"},
   {"column":"reason","path":"$.payload.reason","datatype":"string"},
-  {"column":"source_override","path":"$.payload.source_override","datatype":"string"},
+  {"column":"payload_source","path":"$.payload.source","datatype":"string"},
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},

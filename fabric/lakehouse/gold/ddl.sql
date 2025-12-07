@@ -95,3 +95,70 @@ AS SELECT CAST(NULL AS STRING) AS campaign_id,
          CAST(NULL AS BIGINT) AS impressions,
          CAST(NULL AS DOUBLE) AS cost
 WHERE 1=0;
+
+-- DC inventory position current (dc-product)
+CREATE TABLE IF NOT EXISTS gold_dc_inventory_position_current
+USING DELTA
+LOCATION '/Tables/gold/dc_inventory_position_current'
+AS SELECT CAST(NULL AS BIGINT) AS dc_id,
+         CAST(NULL AS BIGINT) AS product_id,
+         CAST(NULL AS INT) AS on_hand,
+         CAST(NULL AS TIMESTAMP) AS as_of
+WHERE 1=0;
+
+-- Stockouts daily (by store/dc)
+CREATE TABLE IF NOT EXISTS gold_stockouts_daily
+USING DELTA
+LOCATION '/Tables/gold/stockouts_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS BIGINT) AS store_id,
+         CAST(NULL AS BIGINT) AS dc_id,
+         CAST(NULL AS BIGINT) AS stockout_count,
+         CAST(NULL AS BIGINT) AS products_affected
+WHERE 1=0;
+
+-- Reorders daily (by store/dc and priority)
+CREATE TABLE IF NOT EXISTS gold_reorders_daily
+USING DELTA
+LOCATION '/Tables/gold/reorders_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS BIGINT) AS store_id,
+         CAST(NULL AS BIGINT) AS dc_id,
+         CAST(NULL AS STRING) AS priority,
+         CAST(NULL AS BIGINT) AS reorder_count,
+         CAST(NULL AS BIGINT) AS total_units_ordered
+WHERE 1=0;
+
+-- Tender mix daily (payments by method)
+CREATE TABLE IF NOT EXISTS gold_tender_mix_daily
+USING DELTA
+LOCATION '/Tables/gold/tender_mix_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS STRING) AS payment_method,
+         CAST(NULL AS BIGINT) AS transactions,
+         CAST(NULL AS DOUBLE) AS total_amount
+WHERE 1=0;
+
+-- Store operations daily (opens/closes)
+CREATE TABLE IF NOT EXISTS gold_store_ops_daily
+USING DELTA
+LOCATION '/Tables/gold/store_ops_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS BIGINT) AS store_id,
+         CAST(NULL AS STRING) AS operation_type,
+         CAST(NULL AS BIGINT) AS operation_count,
+         CAST(NULL AS TIMESTAMP) AS first_operation,
+         CAST(NULL AS TIMESTAMP) AS last_operation
+WHERE 1=0;
+
+-- Promotion performance daily
+CREATE TABLE IF NOT EXISTS gold_promo_performance_daily
+USING DELTA
+LOCATION '/Tables/gold/promo_performance_daily'
+AS SELECT CAST(NULL AS DATE) AS day,
+         CAST(NULL AS STRING) AS promo_code,
+         CAST(NULL AS STRING) AS discount_type,
+         CAST(NULL AS BIGINT) AS times_applied,
+         CAST(NULL AS DOUBLE) AS total_discount,
+         CAST(NULL AS BIGINT) AS products_discounted
+WHERE 1=0;

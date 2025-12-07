@@ -153,9 +153,127 @@ df_mkt_cost = (
     .groupBy(F.col("campaign_id"), F.to_date("event_ts").alias("day"))
     .agg(
         F.count("*").alias("impressions"),
-        (F.sum("CostCents")/F.lit(100.0)).alias("cost")
+        (F.sum("cost_cents")/F.lit(100.0)).alias("cost")
     )
 )
 df_mkt_cost.write.format("delta").mode("overwrite").save("/Tables/gold/marketing_cost_daily")
+
+# DC inventory position current (dc-product)
+df_dc_inv = spark.read.format("delta").load("/Tables/silver/dc_inventory_txn")
+w_dc = Window.partitionBy("dc_id", "product_id").orderBy(F.col("event_ts").desc())
+df_dc_inv_latest = (
+    df_dc_inv
+    .withColumn("rn", F.row_number().over(w_dc))
+    .where(F.col("rn") == 1)
+    .select("dc_id", "product_id", F.col("balance").alias("on_hand"))
+)
+df_dc_inv_fallback = (
+    df_dc_inv
+    .groupBy("dc_id", "product_id")
+    .agg(F.sum(F.col("quantity").cast("bigint")).alias("on_hand"))
+)
+df_dc_inv_pos = (
+    df_dc_inv_latest.unionByName(df_dc_inv_fallback)
+    .groupBy("dc_id", "product_id")
+    .agg(F.max("on_hand").alias("on_hand"))
+    .withColumn("as_of", F.current_timestamp())
+)
+df_dc_inv_pos.write.format("delta").mode("overwrite").save("/Tables/gold/dc_inventory_position_current")
+
+# Stockouts daily (by store/dc)
+df_stockouts = spark.read.format("delta").load("/Tables/silver/stockouts")
+df_stockouts_daily = (
+    df_stockouts
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("store_id"),
+        F.col("dc_id")
+    )
+    .agg(
+        F.count("*").alias("stockout_count"),
+        F.countDistinct("product_id").alias("products_affected")
+    )
+)
+df_stockouts_daily.write.format("delta").mode("overwrite").save("/Tables/gold/stockouts_daily")
+
+# Reorders daily (by store/dc and priority)
+df_reorders = spark.read.format("delta").load("/Tables/silver/reorders")
+df_reorders_daily = (
+    df_reorders
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("store_id"),
+        F.col("dc_id"),
+        F.col("priority")
+    )
+    .agg(
+        F.count("*").alias("reorder_count"),
+        F.sum("reorder_quantity").alias("total_units_ordered")
+    )
+)
+df_reorders_daily.write.format("delta").mode("overwrite").save("/Tables/gold/reorders_daily")
+
+# Tender mix daily (payments by method)
+df_payments = spark.read.format("delta").load("/Tables/silver/payments")
+df_tender_mix_daily = (
+    df_payments
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("payment_method")
+    )
+    .agg(
+        F.count("*").alias("transactions"),
+        F.sum("amount").alias("total_amount")
+    )
+)
+df_tender_mix_daily.write.format("delta").mode("overwrite").save("/Tables/gold/tender_mix_daily")
+
+# Store operations daily (opens/closes)
+df_store_ops = spark.read.format("delta").load("/Tables/silver/store_ops")
+df_store_ops_daily = (
+    df_store_ops
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("store_id"),
+        F.col("operation_type")
+    )
+    .agg(
+        F.count("*").alias("operation_count"),
+        F.min("operation_time").alias("first_operation"),
+        F.max("operation_time").alias("last_operation")
+    )
+)
+df_store_ops_daily.write.format("delta").mode("overwrite").save("/Tables/gold/store_ops_daily")
+
+# Promotion performance daily
+df_promos = spark.read.format("delta").load("/Tables/silver/promotions")
+df_promo_lines = spark.read.format("delta").load("/Tables/silver/promo_lines")
+df_promo_performance_daily = (
+    df_promos
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("promo_code"),
+        F.col("discount_type")
+    )
+    .agg(
+        F.count("*").alias("times_applied"),
+        F.sum("discount_amount").alias("total_discount")
+    )
+)
+# Add products_discounted from promo_lines
+df_promo_products = (
+    df_promo_lines
+    .groupBy(
+        F.to_date(F.col("event_ts")).alias("day"),
+        F.col("promo_code")
+    )
+    .agg(F.countDistinct("product_id").alias("products_discounted"))
+)
+df_promo_performance_daily = (
+    df_promo_performance_daily
+    .join(df_promo_products, ["day", "promo_code"], "left")
+    .fillna(0, subset=["products_discounted"])
+)
+df_promo_performance_daily.write.format("delta").mode("overwrite").save("/Tables/gold/promo_performance_daily")
 
 print("Silver → Gold completed")

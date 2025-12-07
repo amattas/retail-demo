@@ -69,7 +69,7 @@
     product_id:long,
     quantity_delta:long,
     reason:string,
-    source_override:string,
+    payload_source:string,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

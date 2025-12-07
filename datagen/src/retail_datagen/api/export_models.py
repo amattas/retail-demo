@@ -37,12 +37,20 @@ class ExportRequest(BaseModel):
             "Table names must match existing master or fact tables."
         ),
     )
+    skip_upload: bool = Field(
+        default=False,
+        description=(
+            "If true, skip uploading to Azure Storage even if credentials are configured. "
+            "Useful for local-only exports."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "format": "parquet",
                 "tables": ["stores", "customers", "products_master"],
+                "skip_upload": False,
             }
         }
     )

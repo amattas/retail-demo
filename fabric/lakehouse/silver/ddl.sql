@@ -5,19 +5,19 @@
 CREATE TABLE IF NOT EXISTS silver_receipts
 USING DELTA
 LOCATION '/Tables/silver/receipts'
-AS SELECT 
+AS SELECT
           -- canonical fields from DuckDB fact_receipts
           CAST(NULL AS TIMESTAMP) AS event_ts,
           CAST(NULL AS STRING)    AS receipt_id_ext,
           CAST(NULL AS STRING)    AS payment_method,
           CAST(NULL AS STRING)    AS discount_amount,
           CAST(NULL AS BIGINT)    AS tax_cents,
-          CAST(NULL AS STRING)    AS Subtotal,
-          CAST(NULL AS STRING)    AS total_amount,
+          CAST(NULL AS STRING)    AS subtotal,
+          CAST(NULL AS STRING)    AS total,
           CAST(NULL AS BIGINT)    AS total_cents,
           CAST(NULL AS STRING)    AS receipt_type,
           CAST(NULL AS BIGINT)    AS subtotal_cents,
-          CAST(NULL AS STRING)    AS tax_amount,
+          CAST(NULL AS STRING)    AS tax,
           CAST(NULL AS BIGINT)    AS customer_id,
           CAST(NULL AS BIGINT)    AS store_id,
           CAST(NULL AS STRING)    AS return_for_receipt_id_ext
@@ -60,7 +60,7 @@ WHERE 1=0;
 CREATE TABLE IF NOT EXISTS silver_dc_inventory_txn
 USING DELTA
 LOCATION '/Tables/silver/dc_inventory_txn'
-AS SELECT 
+AS SELECT
           -- canonical fields from DuckDB fact_dc_inventory_txn
           CAST(NULL AS TIMESTAMP) AS event_ts,
           CAST(NULL AS BIGINT)    AS product_id,
@@ -68,7 +68,7 @@ AS SELECT
           CAST(NULL AS BIGINT)    AS quantity,
           CAST(NULL AS BIGINT)    AS dc_id,
           CAST(NULL AS BIGINT)    AS balance,
-          CAST(NULL AS STRING)    AS Source
+          CAST(NULL AS STRING)    AS source
 WHERE 1=0;
 
 -- Foot traffic
@@ -89,13 +89,13 @@ WHERE 1=0;
 CREATE TABLE IF NOT EXISTS silver_ble_pings
 USING DELTA
 LOCATION '/Tables/silver/ble_pings'
-AS SELECT 
+AS SELECT
           -- canonical fields from DuckDB fact_ble_pings
           CAST(NULL AS STRING)    AS zone,
           CAST(NULL AS TIMESTAMP) AS event_ts,
           CAST(NULL AS BIGINT)    AS rssi,
           CAST(NULL AS STRING)    AS customer_ble_id,
-          CAST(NULL AS DOUBLE)    AS CustomerId,
+          CAST(NULL AS BIGINT)    AS customer_id,
           CAST(NULL AS BIGINT)    AS store_id,
           CAST(NULL AS STRING)    AS beacon_id
 WHERE 1=0;
@@ -104,7 +104,7 @@ WHERE 1=0;
 CREATE TABLE IF NOT EXISTS silver_marketing
 USING DELTA
 LOCATION '/Tables/silver/marketing'
-AS SELECT 
+AS SELECT
           -- canonical fields from DuckDB fact_marketing
           CAST(NULL AS TIMESTAMP) AS event_ts,
           CAST(NULL AS STRING)    AS campaign_id,
@@ -113,8 +113,8 @@ AS SELECT
           CAST(NULL AS STRING)    AS customer_ad_id,
           CAST(NULL AS STRING)    AS impression_id_ext,
           CAST(NULL AS STRING)    AS cost,
-          CAST(NULL AS BIGINT)    AS CostCents,
-          CAST(NULL AS DOUBLE)    AS CustomerId,
+          CAST(NULL AS BIGINT)    AS cost_cents,
+          CAST(NULL AS BIGINT)    AS customer_id,
           CAST(NULL AS STRING)    AS channel
 WHERE 1=0;
 
@@ -142,16 +142,16 @@ WHERE 1=0;
 CREATE TABLE IF NOT EXISTS silver_online_order_headers
 USING DELTA
 LOCATION '/Tables/silver/online_order_headers'
-AS SELECT 
+AS SELECT
           CAST(NULL AS TIMESTAMP) AS completed_ts,
           CAST(NULL AS TIMESTAMP) AS event_ts,
           CAST(NULL AS STRING)    AS order_id_ext,
           CAST(NULL AS BIGINT)    AS tax_cents,
-          CAST(NULL AS STRING)    AS subtotal_amount,
-          CAST(NULL AS STRING)    AS total_amount,
+          CAST(NULL AS STRING)    AS subtotal,
+          CAST(NULL AS STRING)    AS total,
           CAST(NULL AS BIGINT)    AS total_cents,
           CAST(NULL AS BIGINT)    AS subtotal_cents,
-          CAST(NULL AS STRING)    AS tax_amount,
+          CAST(NULL AS STRING)    AS tax,
           CAST(NULL AS BIGINT)    AS customer_id,
           CAST(NULL AS STRING)    AS payment_method
 WHERE 1=0;

@@ -254,9 +254,13 @@ class RetailDataGenerator {
             statusInfo.innerHTML = `
                 <table class=\"status-table\"><tbody>${rows.join('')}</tbody></table>
             `;
-            // Hide entire generate section; show DB range section handled above
+            // Hide generate section, show export section
             const genCard = document.getElementById('local-generate-card');
             if (genCard) genCard.style.display = 'none';
+            const exportCard = document.getElementById('local-export-card');
+            if (exportCard) exportCard.style.display = '';
+            // Update export button states now that the card is visible
+            this.updateExportButtonStates();
         } else {
             statusInfo.innerHTML = `
                 <table class=\"status-table\"><tbody>
@@ -265,9 +269,11 @@ class RetailDataGenerator {
                   <tr><td class=\"k\">Real-time Ready</td><td class=\"v\">❌ No</td></tr>
                 </tbody></table>
             `;
-            // Show generate button and date inputs
+            // Show generate button and date inputs, hide export section
             const genCard = document.getElementById('local-generate-card');
             if (genCard) genCard.style.display = '';
+            const exportCard = document.getElementById('local-export-card');
+            if (exportCard) exportCard.style.display = 'none';
             const dateInputs = document.getElementById('local-date-inputs');
             if (dateInputs) dateInputs.style.display = '';
             const summary = document.getElementById('local-date-summary');
@@ -1181,7 +1187,22 @@ class RetailDataGenerator {
         // Note: Export buttons will be added to HTML separately
         // This method sets up event listeners once the DOM is ready
 
-        // Dimension data upload/export button
+        // Local export buttons (export to Parquet only, no upload)
+        const masterExportLocalBtn = document.getElementById('exportMasterLocalBtn');
+        if (masterExportLocalBtn) {
+            masterExportLocalBtn.addEventListener('click', () => {
+                this.exportMasterDataLocal();
+            });
+        }
+
+        const factExportLocalBtn = document.getElementById('exportFactLocalBtn');
+        if (factExportLocalBtn) {
+            factExportLocalBtn.addEventListener('click', () => {
+                this.exportFactDataLocal();
+            });
+        }
+
+        // Upload buttons (export to Parquet + upload to Azure)
         const masterExportBtn = document.getElementById('exportMasterBtn');
         if (masterExportBtn) {
             masterExportBtn.addEventListener('click', () => {
@@ -1189,12 +1210,113 @@ class RetailDataGenerator {
             });
         }
 
-        // Fact data upload/export button (note: button ID is 'exportFactBtn')
         const historicalExportBtn = document.getElementById('exportFactBtn');
         if (historicalExportBtn) {
             historicalExportBtn.addEventListener('click', () => {
                 this.exportFactData();
             });
+        }
+    }
+
+    /**
+     * Export dimension data tables locally (Parquet-only, no upload)
+     */
+    async exportMasterDataLocal() {
+        const exportBtn = document.getElementById('exportMasterLocalBtn');
+        if (!exportBtn) return;
+
+        const originalHTML = exportBtn.innerHTML;
+        const originalDisabled = exportBtn.disabled;
+
+        try {
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            this.disableExportButtons();
+
+            this.showProgress('masterExportProgress', 'masterExportProgressFill', 'masterExportProgressText');
+
+            const response = await fetch('/api/export/master', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ format: 'parquet', skip_upload: true })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const taskId = result.task_id;
+
+            const finalStatus = await this.pollExportProgress(
+                taskId, 'masterExportProgressFill', 'masterExportProgressText'
+            );
+
+            if (finalStatus?.status === 'completed') {
+                this.showNotification('Dimension data exported to Parquet!', 'success');
+            } else if (finalStatus?.status === 'failed') {
+                this.showNotification(`Export failed: ${finalStatus.error_message || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('Master data local export failed:', error);
+            this.showNotification(`Export failed: ${error.message}`, 'error');
+        } finally {
+            exportBtn.disabled = originalDisabled;
+            exportBtn.innerHTML = originalHTML;
+            this.enableExportButtons();
+            this.hideProgress('masterExportProgress');
+        }
+    }
+
+    /**
+     * Export fact data tables locally (Parquet-only, no upload)
+     */
+    async exportFactDataLocal() {
+        const exportBtn = document.getElementById('exportFactLocalBtn');
+        if (!exportBtn) return;
+
+        const originalHTML = exportBtn.innerHTML;
+        const originalDisabled = exportBtn.disabled;
+
+        try {
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            this.disableExportButtons();
+
+            this.showProgress('factExportProgress', 'factExportProgressFill', 'factExportProgressText');
+
+            const response = await fetch('/api/export/facts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ format: 'parquet', skip_upload: true })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const taskId = result.task_id;
+
+            const finalStatus = await this.pollExportProgress(
+                taskId, 'factExportProgressFill', 'factExportProgressText'
+            );
+
+            if (finalStatus?.status === 'completed') {
+                this.showNotification('Fact data exported to Parquet!', 'success');
+            } else if (finalStatus?.status === 'failed') {
+                this.showNotification(`Export failed: ${finalStatus.error_message || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('Fact data local export failed:', error);
+            this.showNotification(`Export failed: ${error.message}`, 'error');
+        } finally {
+            exportBtn.disabled = originalDisabled;
+            exportBtn.innerHTML = originalHTML;
+            this.enableExportButtons();
+            this.hideProgress('factExportProgress');
         }
     }
 
@@ -1399,9 +1521,13 @@ class RetailDataGenerator {
     disableExportButtons() {
         const masterExportBtn = document.getElementById('exportMasterBtn');
         const factExportBtn = document.getElementById('exportFactBtn');
+        const masterExportLocalBtn = document.getElementById('exportMasterLocalBtn');
+        const factExportLocalBtn = document.getElementById('exportFactLocalBtn');
 
         if (masterExportBtn) masterExportBtn.disabled = true;
         if (factExportBtn) factExportBtn.disabled = true;
+        if (masterExportLocalBtn) masterExportLocalBtn.disabled = true;
+        if (factExportLocalBtn) factExportLocalBtn.disabled = true;
     }
 
     /**
@@ -1415,38 +1541,40 @@ class RetailDataGenerator {
      * Update export button states based on data availability
      */
     async updateExportButtonStates() {
-        // Master data export button
+        // Check if dimension data exists by looking at table counts
+        const storesCount = document.getElementById('count-stores');
+        const hasMasterData = storesCount && storesCount.dataset.countValue &&
+                              Number(storesCount.dataset.countValue) > 0;
+
+        // Check if fact data exists
+        const receiptsCount = document.getElementById('count-receipts');
+        const hasFactData = receiptsCount && receiptsCount.dataset.countValue &&
+                            Number(receiptsCount.dataset.countValue) > 0;
+
+        // Master data export buttons (local + upload)
         const masterExportBtn = document.getElementById('exportMasterBtn');
+        const masterExportLocalBtn = document.getElementById('exportMasterLocalBtn');
+
         if (masterExportBtn) {
-            // Check if dimension data exists by looking at table counts
-            const storesCount = document.getElementById('count-stores');
-            const hasMasterData = storesCount && storesCount.dataset.countValue &&
-                                  Number(storesCount.dataset.countValue) > 0;
-
             masterExportBtn.disabled = !hasMasterData;
-
-            if (!hasMasterData) {
-                masterExportBtn.title = 'Generate dimension data first';
-            } else {
-                masterExportBtn.title = 'Export dimension data';
-            }
+            masterExportBtn.title = hasMasterData ? 'Upload dimension data to Azure' : 'Generate dimension data first';
+        }
+        if (masterExportLocalBtn) {
+            masterExportLocalBtn.disabled = !hasMasterData;
+            masterExportLocalBtn.title = hasMasterData ? 'Export dimension data to Parquet' : 'Generate dimension data first';
         }
 
-        // Fact data export button
+        // Fact data export buttons (local + upload)
         const factExportBtn = document.getElementById('exportFactBtn');
+        const factExportLocalBtn = document.getElementById('exportFactLocalBtn');
+
         if (factExportBtn) {
-            // Check if fact data exists
-            const receiptsCount = document.getElementById('count-receipts');
-            const hasFactData = receiptsCount && receiptsCount.dataset.countValue &&
-                                Number(receiptsCount.dataset.countValue) > 0;
-
             factExportBtn.disabled = !hasFactData;
-
-            if (!hasFactData) {
-                factExportBtn.title = 'Generate fact data first';
-            } else {
-                factExportBtn.title = 'Export fact data';
-            }
+            factExportBtn.title = hasFactData ? 'Upload fact data to Azure' : 'Generate fact data first';
+        }
+        if (factExportLocalBtn) {
+            factExportLocalBtn.disabled = !hasFactData;
+            factExportLocalBtn.title = hasFactData ? 'Export fact data to Parquet' : 'Generate fact data first';
         }
     }
 

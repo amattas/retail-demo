@@ -24,12 +24,12 @@ df_receipts = (
         F.lit(None).cast("string").alias("payment_method"),
         F.lit(None).cast("string").alias("discount_amount"),
         F.round(F.col("payload.tax") * 100).cast("bigint").alias("tax_cents"),
-        F.col("payload.subtotal").cast("string").alias("Subtotal"),
-        F.col("payload.total").cast("string").alias("total_amount"),
+        F.col("payload.subtotal").cast("string").alias("subtotal"),
+        F.col("payload.total").cast("string").alias("total"),
         F.round(F.col("payload.total") * 100).cast("bigint").alias("total_cents"),
         F.lit(None).cast("string").alias("receipt_type"),
         F.round(F.col("payload.subtotal") * 100).cast("bigint").alias("subtotal_cents"),
-        F.col("payload.tax").cast("string").alias("tax_amount"),
+        F.col("payload.tax").cast("string").alias("tax"),
         F.col("payload.customer_id").cast("bigint").alias("customer_id"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.lit(None).cast("string").alias("return_for_receipt_id_ext"),
@@ -80,7 +80,7 @@ df_dc_inv = (
         F.col("payload.quantity_delta").cast("bigint").alias("quantity"),
         F.col("payload.dc_id").cast("bigint").alias("dc_id"),
         F.lit(None).cast("bigint").alias("balance"),
-        F.col("payload.source").alias("Source"),
+        F.col("payload.source").alias("source"),
     )
 )
 write_delta(df_dc_inv, "/Tables/silver/dc_inventory_txn")
@@ -107,7 +107,7 @@ df_ble = (
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.rssi").cast("bigint").alias("rssi"),
         F.col("payload.customer_ble_id").alias("customer_ble_id"),
-        F.lit(None).cast("double").alias("CustomerId"),
+        F.lit(None).cast("bigint").alias("customer_id"),
         F.col("payload.store_id").cast("bigint").alias("store_id"),
         F.col("payload.beacon_id").alias("beacon_id"),
     )
@@ -125,8 +125,8 @@ df_mkt = (
         F.col("payload.customer_ad_id").alias("customer_ad_id"),
         F.col("payload.impression_id").alias("impression_id_ext"),
         F.col("payload.cost").cast("string").alias("cost"),
-        F.round(F.col("payload.cost") * 100).cast("bigint").alias("CostCents"),
-        F.lit(None).cast("double").alias("CustomerId"),
+        F.round(F.col("payload.cost") * 100).cast("bigint").alias("cost_cents"),
+        F.lit(None).cast("bigint").alias("customer_id"),
         F.col("payload.channel").alias("channel"),
     )
 )
@@ -140,11 +140,11 @@ df_oo_hdr = (
         F.col("ingest_timestamp").cast("timestamp").alias("event_ts"),
         F.col("payload.order_id").alias("order_id_ext"),
         F.round(F.col("payload.tax") * 100).cast("bigint").alias("tax_cents"),
-        F.col("payload.subtotal").cast("string").alias("subtotal_amount"),
-        F.col("payload.total").cast("string").alias("total_amount"),
+        F.col("payload.subtotal").cast("string").alias("subtotal"),
+        F.col("payload.total").cast("string").alias("total"),
         F.round(F.col("payload.total") * 100).cast("bigint").alias("total_cents"),
         F.round(F.col("payload.subtotal") * 100).cast("bigint").alias("subtotal_cents"),
-        F.col("payload.tax").cast("string").alias("tax_amount"),
+        F.col("payload.tax").cast("string").alias("tax"),
         F.col("payload.customer_id").cast("bigint").alias("customer_id"),
         F.lit(None).cast("string").alias("payment_method"),
     )

@@ -1316,10 +1316,22 @@ input[type="checkbox"] {
 }
 
 .export-controls {
-    display: inline-flex;
+    display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.generation-controls .export-controls {
     margin-left: auto;
+}
+
+.export-controls .btn {
+    white-space: nowrap;
+}
+
+#local-export-card .export-controls {
+    justify-content: flex-start;
 }
 
 .format-selector {
