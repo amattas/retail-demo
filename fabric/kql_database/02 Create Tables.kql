@@ -1,10 +1,22 @@
-.set-or-replace cluster policy caching hot_cache_period = 7d, hot_ingest = true
+// 02 Tables
+// Purpose: Create event tables for streaming ingestion from Eventstream
+// Run this entire script at once using .execute database script
+// ============================================================================
 
-// Standard envelope columns for all tables
-// event_type:string, trace_id:string, ingest_timestamp:datetime, schema_version:string,
-// source:string, correlation_id:string, partition_key:string, session_id:string, parent_event_id:string
+.execute database script with (ContinueOnErrors=true) <|
 
-// Transaction Events
+// ----------------------------------------------------------------------------
+// CLUSTER POLICY
+// ----------------------------------------------------------------------------
+
+.alter cluster policy caching hot = 7d
+
+// ============================================================================
+// TABLE DEFINITIONS
+// ============================================================================
+
+// TRANSACTION EVENTS
+
 .create-merge table receipt_created (
     store_id:long,
     customer_id:long,
@@ -62,7 +74,8 @@
     parent_event_id:string
 )
 
-// Inventory Events
+// INVENTORY EVENTS
+
 .create-merge table inventory_updated (
     store_id:long,
     dc_id:long,
@@ -117,7 +130,8 @@
     parent_event_id:string
 )
 
-// Customer Events
+// CUSTOMER EVENTS
+
 .create-merge table customer_entered (
     store_id:long,
     sensor_id:string,
@@ -169,7 +183,8 @@
     parent_event_id:string
 )
 
-// Operational Events
+// OPERATIONAL EVENTS
+
 .create-merge table truck_arrived (
     truck_id:string,
     dc_id:long,
@@ -236,7 +251,8 @@
     parent_event_id:string
 )
 
-// Marketing Events
+// MARKETING EVENTS
+
 .create-merge table ad_impression (
     channel:string,
     campaign_id:string,
@@ -273,7 +289,8 @@
     parent_event_id:string
 )
 
-// Omnichannel / Online Orders
+// OMNICHANNEL / ONLINE ORDERS
+
 .create-merge table online_order_created (
     order_id:string,
     customer_id:long,
@@ -330,23 +347,42 @@
     parent_event_id:string
 )
 
-// Retention policy: 14 days default for hot tables
-.alter-merge table receipt_created policy retention softdelete = 14d
-.alter-merge table receipt_line_added policy retention softdelete = 14d
-.alter-merge table payment_processed policy retention softdelete = 14d
-.alter-merge table inventory_updated policy retention softdelete = 14d
-.alter-merge table stockout_detected policy retention softdelete = 14d
-.alter-merge table reorder_triggered policy retention softdelete = 14d
-.alter-merge table customer_entered policy retention softdelete = 14d
-.alter-merge table customer_zone_changed policy retention softdelete = 14d
-.alter-merge table ble_ping_detected policy retention softdelete = 14d
-.alter-merge table truck_arrived policy retention softdelete = 14d
-.alter-merge table truck_departed policy retention softdelete = 14d
-.alter-merge table store_opened policy retention softdelete = 14d
-.alter-merge table store_closed policy retention softdelete = 14d
-.alter-merge table ad_impression policy retention softdelete = 14d
-.alter-merge table promotion_applied policy retention softdelete = 14d
-.alter-merge table online_order_created policy retention softdelete = 14d
-.alter-merge table online_order_picked policy retention softdelete = 14d
-.alter-merge table online_order_shipped policy retention softdelete = 14d
+// ============================================================================
+// RETENTION POLICIES (14 days softdelete)
+// ============================================================================
 
+.alter-merge table receipt_created policy retention softdelete = 14d
+
+.alter-merge table receipt_line_added policy retention softdelete = 14d
+
+.alter-merge table payment_processed policy retention softdelete = 14d
+
+.alter-merge table inventory_updated policy retention softdelete = 14d
+
+.alter-merge table stockout_detected policy retention softdelete = 14d
+
+.alter-merge table reorder_triggered policy retention softdelete = 14d
+
+.alter-merge table customer_entered policy retention softdelete = 14d
+
+.alter-merge table customer_zone_changed policy retention softdelete = 14d
+
+.alter-merge table ble_ping_detected policy retention softdelete = 14d
+
+.alter-merge table truck_arrived policy retention softdelete = 14d
+
+.alter-merge table truck_departed policy retention softdelete = 14d
+
+.alter-merge table store_opened policy retention softdelete = 14d
+
+.alter-merge table store_closed policy retention softdelete = 14d
+
+.alter-merge table ad_impression policy retention softdelete = 14d
+
+.alter-merge table promotion_applied policy retention softdelete = 14d
+
+.alter-merge table online_order_created policy retention softdelete = 14d
+
+.alter-merge table online_order_picked policy retention softdelete = 14d
+
+.alter-merge table online_order_shipped policy retention softdelete = 14d

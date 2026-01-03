@@ -15,7 +15,7 @@ See each folder's README for details and next steps.
 
 Deployment
 - See `docs/deploy-fabric.md` to provision the KQL DB, Eventstream, and Lakehouse based on datagen schemas.
-- KQL assets: `fabric/kql_database/tables.kql`, `materialized_views.kql`, `functions.kql`, and JSON ingestion mappings under `fabric/kql_database/ingestion_mappings/`.
+- KQL assets: `fabric/kql_database/02 tables.kql`, `03 OneLake to EventHouse.kql`, `04 functions.kql`, `05 materialized_views.kql`, `06 more_materialized_views.kql`, and JSON ingestion mappings under `fabric/kql_database/ingestion_mappings/`.
 - Querysets added for new KPIs: `q_online_orders_15m.kql`, `q_fulfillment_pipeline_24h.kql`, `q_ble_presence_30m.kql`, `q_marketing_cost_24h.kql` under `fabric/querysets/`.
 - Eventstream mapping spec: `fabric/eventstream/mapping_spec.md` plus a template export in `fabric/eventstream/template.export.json`.
 - Querysets to seed dashboards: `fabric/querysets/*.kql`.

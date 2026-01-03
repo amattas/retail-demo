@@ -1,0 +1,45 @@
+// 04 Functions
+// Purpose: Helper functions for KQL queries
+// Run this entire script at once using .execute database script
+// ============================================================================
+
+.execute database script with (ContinueOnErrors=true) <|
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+.create-or-alter function with (folder = "helpers") fn_json_payload()
+{
+    // Usage: parse raw JSON string if needed
+    // Not required when Eventstream maps payload fields directly
+    print not_implemented = "Eventstream maps JSON → columns; no-op"
+}
+
+.create-or-alter function with (folder = "helpers") fn_attribution_window(target_campaign_id:string, windowHours:int)
+{
+    // Example: join ad_impression to receipt_created within window
+    let impressions = ad_impression | where campaign_id == target_campaign_id;
+    impressions
+    | join kind=leftouter (
+        receipt_created
+        | project trace_id, ingest_timestamp, store_id, total
+    ) on trace_id
+    | where ingest_timestamp1 between (ingest_timestamp .. (ingest_timestamp + windowHours * 1h))
+}
+
+// ============================================================================
+// KPI FUNCTIONS (for queries that can't be materialized views)
+// ============================================================================
+
+// NOTE: Materialized views don't support joins. Use this function instead.
+.create-or-alter function with (folder = "kpis") fn_truck_sla()
+{
+    truck_arrived
+    | project truck_id, dc_id, store_id, shipment_id, arrival_time, trace_id
+    | join kind=leftouter (
+        truck_departed
+        | project truck_id, dc_id, store_id, shipment_id, departure_time
+    ) on truck_id, dc_id, store_id, shipment_id
+    | extend dwell_seconds = iif(isnull(departure_time), real(null), toreal(datetime_diff('second', departure_time, arrival_time)))
+}

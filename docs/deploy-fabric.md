@@ -9,8 +9,9 @@ Prereqs
 
 1) Create KQL Database
 - In Fabric, create a Real-Time Analytics KQL database (e.g., `retail_rti_kql`).
-- Open the database editor and run: `fabric/kql_database/tables.kql`.
-- Run: `fabric/kql_database/materialized_views.kql` and `fabric/kql_database/functions.kql`.
+- Open the database editor and run: `fabric/kql_database/02 tables.kql`.
+- Optional backfill from OneLake: `fabric/kql_database/03 OneLake to EventHouse.kql`.
+- Run: `fabric/kql_database/04 functions.kql`, `fabric/kql_database/05 materialized_views.kql`, and `fabric/kql_database/06 more_materialized_views.kql`.
 
 2) Add JSON ingestion mappings (per table)
 - For each file under `fabric/kql_database/ingestion_mappings/*.json`:
