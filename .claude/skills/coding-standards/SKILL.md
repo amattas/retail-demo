@@ -5,26 +5,37 @@ description: Coding style and structural conventions for this codebase.
 
 # Coding Standards
 
-## Structure
+General principles that apply across all languages in this project.
 
-- Prefer small, focused functions.
-- Avoid deeply nested conditionals; use early returns.
-- Extract reusable logic into shared modules.
+## Language-Specific Guidelines
 
-## Comments & Documentation
+- **Python**: See [PYTHON.md](./PYTHON.md) for PEP 8 & PEP 20 conventions
+- **KQL**: See [KQL.md](./KQL.md) for Kusto Query Language conventions
 
-- Write comments to explain *why*, not *what*.
-- Keep docstrings in sync with behavior; avoid outdated comments.
+## Universal Principles
 
-## Error & Logging
+### Structure & Modularity
+- **Single Responsibility**: Each function/module does one thing well
+- **Small units**: Keep functions focused and concise
+- **Avoid deep nesting**: Use early returns, guard clauses
+- **Extract reusable logic**: If you copy-paste, refactor
 
-- Use structured logging with consistent fields:
-  - `requestId`, `userId`, `component`, `severity`
-- Never log secrets, tokens, or sensitive PII.
+### Comments & Documentation
+- Write comments to explain *why*, not *what*
+- Keep documentation in sync with behavior
+- Remove outdated comments promptly
 
-## Misc
+### Error Handling
+- Use specific error types, not generic catches
+- Fail fast with clear error messages
+- Log errors with context
 
-- Avoid long parameter lists; group related values into objects.
-- Prefer pure functions where practical.
-- Add TODOs with owner and context, e.g.:
-  - `// TODO [owner]: [short description] ([ticket link])`
+### Logging
+- Use structured logging with consistent fields
+- Never log secrets, tokens, or sensitive PII
+- Use appropriate log levels
+
+### TODOs
+- Include owner and context
+- Link to tickets when applicable
+- Clean up when resolved

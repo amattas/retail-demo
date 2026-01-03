@@ -5,36 +5,57 @@ description: Describes the primary technologies, frameworks, libraries, and lang
 
 # Tech Stack Overview
 
+## Language-Specific Conventions
+
+- **Python**: See [PYTHON.md](./PYTHON.md) for detailed conventions and examples
+
 ## Primary Languages
-- Backend: Python (datagen, notebooks)
-- Data Processing: PySpark (Fabric notebooks)
-- Query Language: KQL (Kusto Query Language for Eventhouse)
-- Infrastructure: JSON/YAML (Fabric item definitions)
+
+| Language | Usage | Version |
+|----------|-------|---------|
+| Python | datagen, notebooks | 3.10+ |
+| PySpark | Fabric notebooks | Spark 3.x |
+| KQL | Eventhouse queries | N/A |
+| JSON/YAML | Fabric item definitions | N/A |
 
 ## Frameworks & Libraries
-- Data Generation: DuckDB, Faker, Pydantic
-- Lakehouse: Delta Lake, PySpark
-- Real-Time Analytics: Microsoft Fabric Eventhouse (KQL)
-- Streaming: Azure Event Hubs, Fabric Eventstream
 
-## Language Conventions
+### Data Generation (datagen)
+- **DuckDB**: Local analytical database for historical data
+- **Faker**: Synthetic data generation
+- **Pydantic**: Data validation and event schemas
+- **azure-eventhub**: Event streaming to Azure
 
-### Python
-- Follow PEP 8 for formatting
-- Use type hints for function signatures
-- Prefer dataclasses or Pydantic models for data structures
+### Lakehouse
+- **Delta Lake**: ACID transactions, schema enforcement
+- **PySpark**: Distributed data processing
 
-### KQL
-- Use `.execute database script` for batch operations
-- Prefix table names with domain (e.g., `receipt_created`, `inventory_updated`)
-- Use materialized views for pre-aggregated KPIs
+### Real-Time Analytics
+- **Microsoft Fabric Eventhouse**: KQL-based analytics
+- **Eventstream**: Event routing and transformation
 
-### Naming
-- Tables: snake_case (e.g., `fact_receipts`, `dim_stores`)
-- Functions: snake_case for Python, PascalCase for KQL functions
-- Files: snake_case for Python, numbered prefix for KQL scripts
+## Project Architecture
 
-## Project-Specific Notes
-- Event tables are streaming-only (from Eventstream)
-- Historical dimension/fact tables are loaded from Lakehouse via shortcuts
-- Gold layer aggregations are built in PySpark notebooks
+```
+Event Flow:
+  datagen (Python)
+    → Azure Event Hubs
+    → Eventstream
+    → KQL Tables + Lakehouse Bronze
+
+Data Layers:
+  Bronze (raw JSON)
+    → Silver (typed Delta)
+    → Gold (aggregated Delta)
+    → Semantic Model (Power BI)
+```
+
+## Key Dependencies
+
+See `datagen/pyproject.toml` for Python dependencies.
+
+Core packages:
+- `pydantic` - Schema validation
+- `duckdb` - Local analytics
+- `faker` - Data generation
+- `azure-eventhub` - Event streaming
