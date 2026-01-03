@@ -64,6 +64,10 @@ class ParquetWriter(BaseWriter):
             write_kwargs["engine"] = self.engine
         if "compression" not in write_kwargs:
             write_kwargs["compression"] = self.compression
+        if "coerce_timestamps" not in write_kwargs:
+            write_kwargs["coerce_timestamps"] = "us"
+        if "allow_truncated_timestamps" not in write_kwargs:
+            write_kwargs["allow_truncated_timestamps"] = True
 
         try:
             df.to_parquet(output_path, **write_kwargs)

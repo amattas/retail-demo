@@ -7,4 +7,4 @@ Initial Notebooks:
 - Sales attribution analysis
 - Inventory forecasting (baseline)
 - Truck dwell SLA analysis
-
+- ADLS Parquet copy → Lakehouse Files
