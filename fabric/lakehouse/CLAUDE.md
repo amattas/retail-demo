@@ -1,11 +1,9 @@
-# CLAUDE.md — Lakehouse
+# CLAUDE.md — Notebooks
 
 Objectives:
-- Define Delta schemas for Silver aligned to datagen facts
-- Build transformations from Bronze JSON to typed Silver tables
-- Create Gold aggregates backing dashboards/semantic model
+- Create initial transformation notebooks for Bronze → Silver
+- Add analysis notebooks that demonstrate use cases
 
 Deliverables:
-- Notebook/SQL scripts for transforms (added here as they’re created)
-- Table list and lineage diagrams
+- Notebook files (.ipynb or .py) added here as implemented
 
