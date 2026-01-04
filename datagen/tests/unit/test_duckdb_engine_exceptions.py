@@ -24,9 +24,11 @@ def test_reset_duckdb_handles_close_failure(caplog):
 
 def test_reset_duckdb_handles_file_deletion_failure(caplog):
     """Test that file deletion failures are logged during reset."""
+    from pathlib import Path
+
     with patch('retail_datagen.db.duckdb_engine._conn', None):
-        with patch('retail_datagen.db.duckdb_engine.os.path.exists', return_value=True):
-            with patch('retail_datagen.db.duckdb_engine.os.remove', side_effect=OSError("Permission denied")):
+        with patch.object(Path, 'exists', return_value=True):
+            with patch.object(Path, 'unlink', side_effect=OSError("Permission denied")):
                 # Should not raise, but should log warning
                 duckdb_engine.reset_duckdb()
 
