@@ -1,4 +1,4 @@
-// 05 Materialized Views
+// 04 Materialized Views
 // Purpose: Materialized views for hot KPIs (aligned to datagen payloads)
 // Run this entire script at once using .execute database script
 // ============================================================================
