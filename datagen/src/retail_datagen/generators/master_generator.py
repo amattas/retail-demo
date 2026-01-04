@@ -51,22 +51,22 @@ class TruckAllocationStrategy:
     """Result of truck allocation strategy calculation."""
 
     assignment_strategy: str  # "fixed" or "percentage"
-    num_assigned_trucks: int
-    num_pool_trucks: int
-    assigned_refrigerated: int
-    assigned_non_refrigerated: int
-    pool_refrigerated: int
-    pool_non_refrigerated: int
-    trucks_per_dc: int
-    total_dc_trucks: int
+    num_assigned_trucks: int  # Trucks assigned to specific DCs
+    num_pool_trucks: int  # Trucks in shared pool (DCID=NULL)
+    assigned_refrigerated: int  # Refrigerated trucks in assigned group
+    assigned_non_refrigerated: int  # Non-refrigerated trucks in assigned group
+    pool_refrigerated: int  # Refrigerated trucks in pool
+    pool_non_refrigerated: int  # Non-refrigerated trucks in pool
+    trucks_per_dc: int  # Fixed trucks per DC (0 if percentage-based)
+    total_dc_trucks: int  # Total DC trucks (refrigerated + non-refrigerated)
 
 
 @dataclass
 class AssignedTrucksResult:
     """Result of assigned trucks generation."""
 
-    next_id: int
-    trucks_generated: int
+    next_id: int  # Next available truck ID after generation
+    trucks_generated: int  # Count of trucks created in this batch
     dc_assignment_list: list[tuple[int, int, bool]]  # (truck_id, dc_id, is_refrigerated)
 
 
@@ -74,18 +74,18 @@ class AssignedTrucksResult:
 class PoolTrucksResult:
     """Result of pool trucks generation."""
 
-    next_id: int
-    trucks_generated: int
+    next_id: int  # Next available truck ID after generation
+    trucks_generated: int  # Count of pool trucks created
 
 
 @dataclass
 class ProductCategoryData:
     """Organized product and brand data by category."""
 
-    companies_by_category: dict[str, list[str]]
-    company_names: list[str]
-    brands_by_category: dict[str, list[tuple[int, Any]]]  # (idx, brand)
-    products_by_category: dict[str, list[tuple[int, Any]]]  # (idx, product)
+    companies_by_category: dict[str, list[str]]  # Category -> list of company names
+    company_names: list[str]  # All unique company names
+    brands_by_category: dict[str, list[tuple[int, Any]]]  # Category -> [(idx, brand), ...]
+    products_by_category: dict[str, list[tuple[int, Any]]]  # Category -> [(idx, product), ...]
 
 
 class _DuckModel:
@@ -956,6 +956,10 @@ class MasterDataGenerator:
             print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
 
         # Calculate refrigeration splits (use round for more accurate distribution)
+        # Note: Pool calculation uses subtraction from totals, which guarantees
+        # exact totals match config regardless of rounding in assigned counts.
+        # e.g., pool_refrigerated = refrigerated_count - assigned_refrigerated
+        #       ensures total refrigerated = assigned + pool = refrigerated_count
         if num_assigned_trucks > 0 and total_dc_trucks > 0:
             assigned_refrigerated = round(
                 num_assigned_trucks * (refrigerated_count / total_dc_trucks)
