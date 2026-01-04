@@ -1733,7 +1733,12 @@ class FactDataGenerator:
     def _generate_marketing_activity(
         self, date: datetime, multiplier: float
     ) -> list[dict]:
-        """Generate marketing impressions and campaign activity."""
+        """Generate marketing impressions and campaign activity.
+
+        Uses pandas DataFrame optimization when available, falls back to
+        loop-based processing if pandas operations fail. Fallback is logged
+        at warning level for operational visibility.
+        """
 
         # Defensive check: Verify simulator exists
         if self.marketing_campaign_sim is None:
@@ -1907,7 +1912,7 @@ class FactDataGenerator:
                     )
             except Exception as e:
                 # Fallback to original loop
-                logger.debug(f"Failed to process impressions via optimized path, using fallback: {e}")
+                logger.warning(f"Failed to process impressions via optimized path, using fallback: {e}")
                 for impression in impressions:
                     logger.debug(
                         f"      Creating marketing record: {impression.get('channel', 'unknown')}"
@@ -2357,7 +2362,8 @@ class FactDataGenerator:
         """Vectorized foot traffic generator using NumPy for per-sensor aggregates.
 
         Builds a compact DataFrame and converts to records to minimize
-        Python per-row overhead.
+        Python per-row overhead. Falls back to loop-based generation if
+        pandas is unavailable (logged at warning level).
         """
         # If no receipts, still may have some foot traffic (browsers)
         if receipt_count == 0:
@@ -2435,7 +2441,7 @@ class FactDataGenerator:
             return df.to_dict("records")
         except Exception as e:
             # Fallback to simple list if pandas unavailable
-            logger.debug(f"Failed to create BLE pings via pandas, using fallback: {e}")
+            logger.warning(f"Failed to create BLE pings via pandas, using fallback: {e}")
             return [
                 {
                     "TraceId": self._generate_trace_id(),
@@ -2457,6 +2463,9 @@ class FactDataGenerator:
         - 30% known devices (BLEId linked to customer, include customer_id)
         - 70% anonymous devices (random BLE IDs not present in customer master)
         - Pings per visit scale by store format and traffic multiplier
+
+        Falls back to loop-based generation if pandas DataFrame operations
+        fail (logged at warning level for operational monitoring).
         """
         zones_all = np.array(["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"], dtype=object)
         beacons_all = np.array([f"BEACON_{store.ID:03d}_{z}" for z in zones_all], dtype=object)
@@ -2521,7 +2530,7 @@ class FactDataGenerator:
             return df.to_dict("records")
         except Exception as e:
             # Fallback loop if pandas unavailable
-            logger.debug(f"Failed to create foot traffic via pandas, using fallback: {e}")
+            logger.warning(f"Failed to create foot traffic via pandas, using fallback: {e}")
             out: list[dict] = []
             for i in range(total):
                 is_known = self._rng.random() < 0.30
@@ -3833,6 +3842,9 @@ class FactDataGenerator:
             Commits once after all batches are inserted for performance.
             Individual batches are not committed to minimize I/O overhead.
             Field names are automatically mapped from PascalCase to snake_case.
+
+            Falls back to list processing if pandas is unavailable (logged at
+            warning level for environment diagnostics).
         """
         # Normalize input into list of dict records
         records: list[dict]
@@ -3847,7 +3859,7 @@ class FactDataGenerator:
                 records = list(data or [])
         except (ImportError, AttributeError) as e:
             # If pandas not available, assume list path
-            logger.debug(f"Failed to process data via pandas for {table_name}, using fallback: {e}")
+            logger.warning(f"Failed to process data via pandas for {table_name}, using fallback: {e}")
             records = list(data or [])  # type: ignore[arg-type]
         if not records:
             logger.debug(f"No data to insert for {table_name} hour {hour}")
