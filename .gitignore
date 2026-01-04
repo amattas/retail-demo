@@ -52,6 +52,7 @@ cover/
 # Virtual environments
 .env
 .venv
+.venv*/
 env/
 venv/
 ENV/
@@ -80,17 +81,17 @@ data/facts/**/*.csv
 !data/dictionaries/*.csv
 *.log
 .env.local
-bandit_report.json
+
+# DuckDB files
+*.duckdb
+*.wal
+
+# Generated documentation and reports
+datagen/site/
+*_report.json
+
+# Data directories
 /datagen/data/*.db*
 /datagen/data/*.json
 /datagen/data/cache
-*.duckdb
-*.duckdb
 /datagen/data/export
-datagen/data/retail.duckdb
-datagen/data/retail.duckdb
-*.duckdb
-datagen/data/retail.duckdb
-datagen/data/retail.duckdb
-*.duckdb
-*.wal
