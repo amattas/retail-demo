@@ -1171,7 +1171,6 @@ class MasterDataGenerator:
 
             # Print detailed generation summary
             total_trucks = len(self.trucks)
-            pool_trucks_generated + supplier_total_trucks
 
             print("\n=== Truck Generation Summary ===")
             print(f"Total trucks generated: {total_trucks}")

@@ -59,35 +59,37 @@ def reset_duckdb() -> None:
     Subsequent calls to get_duckdb_conn() will recreate a fresh database.
     """
     global _conn
-    try:
-        if _conn is not None:
-            try:
-                _conn.close()
-            except Exception:
-                pass
-            _conn = None
-    finally:
-        path = get_duckdb_path()
+    with _lock:
         try:
-            if path.exists():
-                path.unlink()
-        except Exception:
-            # Ignore delete failures; caller can handle
-            pass
+            if _conn is not None:
+                try:
+                    _conn.close()
+                except Exception:
+                    pass
+                _conn = None
+        finally:
+            path = get_duckdb_path()
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                # Ignore delete failures; caller can handle
+                pass
 
 
 def close_duckdb() -> None:
     """Close the global DuckDB connection without deleting the DB file."""
     global _conn
-    try:
-        if _conn is not None:
-            try:
-                _conn.close()
-            except Exception:
-                pass
-            _conn = None
-    except Exception:
-        pass
+    with _lock:
+        try:
+            if _conn is not None:
+                try:
+                    _conn.close()
+                except Exception:
+                    pass
+                _conn = None
+        except Exception:
+            pass
 
 
 def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
