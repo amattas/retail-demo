@@ -8,6 +8,7 @@ tables from dictionary data as specified in AGENTS.md.
 import logging
 import random
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -38,6 +39,54 @@ from retail_datagen.shared.validators import (
     SyntheticDataValidator,
 )
 from retail_datagen.shared.store_profiles import StoreProfiler
+
+
+# -------------------------------------------------------------------------
+# Dataclasses for Helper Method Return Types
+# -------------------------------------------------------------------------
+
+
+@dataclass
+class TruckAllocationStrategy:
+    """Result of truck allocation strategy calculation."""
+
+    assignment_strategy: str  # "fixed" or "percentage"
+    num_assigned_trucks: int
+    num_pool_trucks: int
+    assigned_refrigerated: int
+    assigned_non_refrigerated: int
+    pool_refrigerated: int
+    pool_non_refrigerated: int
+    trucks_per_dc: int
+    total_dc_trucks: int
+
+
+@dataclass
+class AssignedTrucksResult:
+    """Result of assigned trucks generation."""
+
+    next_id: int
+    trucks_generated: int
+    dc_assignment_list: list[tuple[int, int, bool]]  # (truck_id, dc_id, is_refrigerated)
+
+
+@dataclass
+class PoolTrucksResult:
+    """Result of pool trucks generation."""
+
+    next_id: int
+    trucks_generated: int
+
+
+@dataclass
+class ProductCategoryData:
+    """Organized product and brand data by category."""
+
+    companies_by_category: dict[str, list[str]]
+    company_names: list[str]
+    brands_by_category: dict[str, list[tuple[int, Any]]]  # (idx, brand)
+    products_by_category: dict[str, list[tuple[int, Any]]]  # (idx, product)
+
 
 class _DuckModel:
     def __init__(self, name: str):
@@ -841,22 +890,36 @@ class MasterDataGenerator:
     # Truck Generation Helper Methods
     # -------------------------------------------------------------------------
 
-    def _calculate_truck_allocation_strategy(
+    def _create_truck(
         self,
-    ) -> tuple[str, int, int, int, int, int, int, int, int]:
+        truck_id: int,
+        id_generator: IdentifierGenerator,
+        is_refrigerated: bool,
+        dc_id: int | None,
+    ) -> Truck:
+        """Create a single truck instance.
+
+        Args:
+            truck_id: Unique truck ID
+            id_generator: Generator for license plates
+            is_refrigerated: Whether truck has refrigeration
+            dc_id: Distribution center ID (None for pool trucks)
+
+        Returns:
+            Truck instance
+        """
+        return Truck(
+            ID=truck_id,
+            LicensePlate=id_generator.generate_license_plate(truck_id),
+            Refrigeration=is_refrigerated,
+            DCID=dc_id,
+        )
+
+    def _calculate_truck_allocation_strategy(self) -> TruckAllocationStrategy:
         """Calculate truck allocation strategy and refrigeration splits.
 
         Returns:
-            Tuple containing:
-            - assignment_strategy: "fixed" or "percentage"
-            - num_assigned_trucks: Number of trucks assigned to DCs
-            - num_pool_trucks: Number of pool trucks
-            - assigned_refrigerated: Refrigerated trucks assigned to DCs
-            - assigned_non_refrigerated: Non-refrigerated trucks assigned to DCs
-            - pool_refrigerated: Refrigerated pool trucks
-            - pool_non_refrigerated: Non-refrigerated pool trucks
-            - trucks_per_dc_config: Trucks per DC (if fixed strategy)
-            - total_dc_trucks: Total DC-to-store trucks
+            TruckAllocationStrategy dataclass with all allocation parameters.
         """
         refrigerated_count = self.config.volume.refrigerated_trucks
         non_refrigerated_count = self.config.volume.non_refrigerated_trucks
@@ -888,9 +951,9 @@ class MasterDataGenerator:
             print(f"  - Assigned trucks: {num_assigned_trucks}")
             print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
 
-        # Calculate refrigeration splits
+        # Calculate refrigeration splits (use round for more accurate distribution)
         if num_assigned_trucks > 0:
-            assigned_refrigerated = int(
+            assigned_refrigerated = round(
                 num_assigned_trucks * (refrigerated_count / total_dc_trucks)
             )
             assigned_non_refrigerated = num_assigned_trucks - assigned_refrigerated
@@ -901,34 +964,28 @@ class MasterDataGenerator:
         pool_refrigerated = refrigerated_count - assigned_refrigerated
         pool_non_refrigerated = non_refrigerated_count - assigned_non_refrigerated
 
-        return (
-            assignment_strategy,
-            num_assigned_trucks,
-            num_pool_trucks,
-            assigned_refrigerated,
-            assigned_non_refrigerated,
-            pool_refrigerated,
-            pool_non_refrigerated,
-            trucks_per_dc_config if trucks_per_dc_config else 0,
-            total_dc_trucks,
+        return TruckAllocationStrategy(
+            assignment_strategy=assignment_strategy,
+            num_assigned_trucks=num_assigned_trucks,
+            num_pool_trucks=num_pool_trucks,
+            assigned_refrigerated=assigned_refrigerated,
+            assigned_non_refrigerated=assigned_non_refrigerated,
+            pool_refrigerated=pool_refrigerated,
+            pool_non_refrigerated=pool_non_refrigerated,
+            trucks_per_dc=trucks_per_dc_config if trucks_per_dc_config else 0,
+            total_dc_trucks=total_dc_trucks,
         )
 
     def _generate_assigned_trucks(
         self,
         id_generator: IdentifierGenerator,
         start_id: int,
-        assignment_strategy: str,
-        trucks_per_dc: int,
-        assigned_refrigerated: int,
-        assigned_non_refrigerated: int,
-    ) -> tuple[int, int, list[tuple[int, int, bool]]]:
+        strategy: TruckAllocationStrategy,
+    ) -> AssignedTrucksResult:
         """Generate trucks assigned to specific DCs.
 
         Returns:
-            Tuple containing:
-            - next_id: Next available truck ID
-            - trucks_generated: Number of trucks generated
-            - dc_assignment_list: List of (truck_id, dc_id, is_refrigerated) tuples
+            AssignedTrucksResult with next_id, trucks_generated, and dc_assignment_list.
         """
         current_id = start_id
         trucks_generated = 0
@@ -936,22 +993,19 @@ class MasterDataGenerator:
         dc_assignment_list: list[tuple[int, int, bool]] = []
         dc_count = len(self.distribution_centers)
 
-        if assignment_strategy == "fixed" and trucks_per_dc > 0:
+        if strategy.assignment_strategy == "fixed" and strategy.trucks_per_dc > 0:
             # Fixed assignment: exactly trucks_per_dc per DC
             for dc in self.distribution_centers:
                 dc_refrigerated = min(
-                    trucks_per_dc,
-                    assigned_refrigerated - refrigerated_assigned,
+                    strategy.trucks_per_dc,
+                    strategy.assigned_refrigerated - refrigerated_assigned,
                 )
-                dc_non_refrigerated = trucks_per_dc - dc_refrigerated
+                dc_non_refrigerated = strategy.trucks_per_dc - dc_refrigerated
 
                 # Create refrigerated trucks for this DC
                 for _ in range(dc_refrigerated):
-                    truck = Truck(
-                        ID=current_id,
-                        LicensePlate=id_generator.generate_license_plate(current_id),
-                        Refrigeration=True,
-                        DCID=dc.ID,
+                    truck = self._create_truck(
+                        current_id, id_generator, is_refrigerated=True, dc_id=dc.ID
                     )
                     self.trucks.append(truck)
                     dc_assignment_list.append((current_id, dc.ID, True))
@@ -961,11 +1015,8 @@ class MasterDataGenerator:
 
                 # Create non-refrigerated trucks for this DC
                 for _ in range(dc_non_refrigerated):
-                    truck = Truck(
-                        ID=current_id,
-                        LicensePlate=id_generator.generate_license_plate(current_id),
-                        Refrigeration=False,
-                        DCID=dc.ID,
+                    truck = self._create_truck(
+                        current_id, id_generator, is_refrigerated=False, dc_id=dc.ID
                     )
                     self.trucks.append(truck)
                     dc_assignment_list.append((current_id, dc.ID, False))
@@ -976,13 +1027,10 @@ class MasterDataGenerator:
             dc_index = 0
 
             # Generate refrigerated assigned trucks
-            for _ in range(assigned_refrigerated):
+            for _ in range(strategy.assigned_refrigerated):
                 dc = self.distribution_centers[dc_index % dc_count]
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=True,
-                    DCID=dc.ID,
+                truck = self._create_truck(
+                    current_id, id_generator, is_refrigerated=True, dc_id=dc.ID
                 )
                 self.trucks.append(truck)
                 dc_assignment_list.append((current_id, dc.ID, True))
@@ -991,13 +1039,10 @@ class MasterDataGenerator:
                 trucks_generated += 1
 
             # Generate non-refrigerated assigned trucks
-            for _ in range(assigned_non_refrigerated):
+            for _ in range(strategy.assigned_non_refrigerated):
                 dc = self.distribution_centers[dc_index % dc_count]
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=False,
-                    DCID=dc.ID,
+                truck = self._create_truck(
+                    current_id, id_generator, is_refrigerated=False, dc_id=dc.ID
                 )
                 self.trucks.append(truck)
                 dc_assignment_list.append((current_id, dc.ID, False))
@@ -1005,50 +1050,45 @@ class MasterDataGenerator:
                 dc_index += 1
                 trucks_generated += 1
 
-        return current_id, trucks_generated, dc_assignment_list
+        return AssignedTrucksResult(
+            next_id=current_id,
+            trucks_generated=trucks_generated,
+            dc_assignment_list=dc_assignment_list,
+        )
 
     def _generate_pool_trucks(
         self,
         id_generator: IdentifierGenerator,
         start_id: int,
-        pool_refrigerated: int,
-        pool_non_refrigerated: int,
-    ) -> tuple[int, int]:
+        strategy: TruckAllocationStrategy,
+    ) -> PoolTrucksResult:
         """Generate pool trucks (DCID=None).
 
         Returns:
-            Tuple containing:
-            - next_id: Next available truck ID
-            - trucks_generated: Number of trucks generated
+            PoolTrucksResult with next_id and trucks_generated.
         """
         current_id = start_id
         trucks_generated = 0
 
         # Pool refrigerated trucks
-        for _ in range(pool_refrigerated):
-            truck = Truck(
-                ID=current_id,
-                LicensePlate=id_generator.generate_license_plate(current_id),
-                Refrigeration=True,
-                DCID=None,
+        for _ in range(strategy.pool_refrigerated):
+            truck = self._create_truck(
+                current_id, id_generator, is_refrigerated=True, dc_id=None
             )
             self.trucks.append(truck)
             current_id += 1
             trucks_generated += 1
 
         # Pool non-refrigerated trucks
-        for _ in range(pool_non_refrigerated):
-            truck = Truck(
-                ID=current_id,
-                LicensePlate=id_generator.generate_license_plate(current_id),
-                Refrigeration=False,
-                DCID=None,
+        for _ in range(strategy.pool_non_refrigerated):
+            truck = self._create_truck(
+                current_id, id_generator, is_refrigerated=False, dc_id=None
             )
             self.trucks.append(truck)
             current_id += 1
             trucks_generated += 1
 
-        return current_id, trucks_generated
+        return PoolTrucksResult(next_id=current_id, trucks_generated=trucks_generated)
 
     def _generate_supplier_trucks(
         self,
@@ -1072,22 +1112,16 @@ class MasterDataGenerator:
 
         # Generate supplier refrigerated trucks
         for _ in range(supplier_refrigerated):
-            truck = Truck(
-                ID=current_id,
-                LicensePlate=id_generator.generate_license_plate(current_id),
-                Refrigeration=True,
-                DCID=None,
+            truck = self._create_truck(
+                current_id, id_generator, is_refrigerated=True, dc_id=None
             )
             self.trucks.append(truck)
             current_id += 1
 
         # Generate supplier non-refrigerated trucks
         for _ in range(supplier_non_refrigerated):
-            truck = Truck(
-                ID=current_id,
-                LicensePlate=id_generator.generate_license_plate(current_id),
-                Refrigeration=False,
-                DCID=None,
+            truck = self._create_truck(
+                current_id, id_generator, is_refrigerated=False, dc_id=None
             )
             self.trucks.append(truck)
             current_id += 1
@@ -1096,16 +1130,9 @@ class MasterDataGenerator:
 
     def _print_truck_generation_summary(
         self,
-        total_dc_trucks: int,
-        assigned_trucks_generated: int,
-        assigned_refrigerated: int,
-        assigned_non_refrigerated: int,
-        pool_trucks_generated: int,
-        pool_refrigerated: int,
-        pool_non_refrigerated: int,
-        assignment_strategy: str,
-        trucks_per_dc: int,
-        dc_assignment_list: list[tuple[int, int, bool]],
+        strategy: TruckAllocationStrategy,
+        assigned_result: AssignedTrucksResult,
+        pool_result: PoolTrucksResult,
     ) -> None:
         """Print detailed truck generation summary."""
         supplier_refrigerated = self.config.volume.supplier_refrigerated_trucks
@@ -1114,27 +1141,27 @@ class MasterDataGenerator:
 
         print("\n=== Truck Generation Summary ===")
         print(f"Total trucks generated: {len(self.trucks)}")
-        print(f"\nDC-to-Store Fleet ({total_dc_trucks} trucks):")
-        print(f"  - Assigned to DCs: {assigned_trucks_generated}")
-        print(f"    • Refrigerated: {assigned_refrigerated}")
-        print(f"    • Non-refrigerated: {assigned_non_refrigerated}")
-        print(f"  - Pool trucks (DCID=NULL): {pool_trucks_generated}")
-        print(f"    • Refrigerated: {pool_refrigerated}")
-        print(f"    • Non-refrigerated: {pool_non_refrigerated}")
+        print(f"\nDC-to-Store Fleet ({strategy.total_dc_trucks} trucks):")
+        print(f"  - Assigned to DCs: {assigned_result.trucks_generated}")
+        print(f"    • Refrigerated: {strategy.assigned_refrigerated}")
+        print(f"    • Non-refrigerated: {strategy.assigned_non_refrigerated}")
+        print(f"  - Pool trucks (DCID=NULL): {pool_result.trucks_generated}")
+        print(f"    • Refrigerated: {strategy.pool_refrigerated}")
+        print(f"    • Non-refrigerated: {strategy.pool_non_refrigerated}")
         print(f"\nSupplier-to-DC Fleet ({supplier_total} trucks):")
         print("  - All pool trucks (DCID=NULL)")
         print(f"    • Refrigerated: {supplier_refrigerated}")
         print(f"    • Non-refrigerated: {supplier_non_refrigerated}")
 
         # Show per-DC distribution for assigned trucks
-        if dc_assignment_list:
-            if assignment_strategy == "fixed":
-                print(f"\nPer-DC Assignment (fixed: {trucks_per_dc} trucks/DC):")
+        if assigned_result.dc_assignment_list:
+            if strategy.assignment_strategy == "fixed":
+                print(f"\nPer-DC Assignment (fixed: {strategy.trucks_per_dc} trucks/DC):")
             else:
                 print("\nPer-DC Assignment (round-robin distribution):")
 
             dc_truck_counts: dict[int, dict[str, int]] = {}
-            for _, dc_id, is_ref in dc_assignment_list:
+            for _, dc_id, is_ref in assigned_result.dc_assignment_list:
                 if dc_id not in dc_truck_counts:
                     dc_truck_counts[dc_id] = {"refrigerated": 0, "non_refrigerated": 0}
                 if is_ref:
@@ -1177,17 +1204,7 @@ class MasterDataGenerator:
             )
 
             # Calculate allocation strategy
-            (
-                assignment_strategy,
-                _num_assigned,
-                _num_pool,
-                assigned_refrigerated,
-                assigned_non_refrigerated,
-                pool_refrigerated,
-                pool_non_refrigerated,
-                trucks_per_dc,
-                total_dc_trucks,
-            ) = self._calculate_truck_allocation_strategy()
+            strategy = self._calculate_truck_allocation_strategy()
 
             # Initialize
             id_generator = IdentifierGenerator(self.config.seed + 3000)
@@ -1195,21 +1212,16 @@ class MasterDataGenerator:
             current_id = 1
 
             # Generate assigned trucks
-            current_id, assigned_trucks_generated, dc_assignment_list = (
-                self._generate_assigned_trucks(
-                    id_generator,
-                    current_id,
-                    assignment_strategy,
-                    trucks_per_dc,
-                    assigned_refrigerated,
-                    assigned_non_refrigerated,
-                )
+            assigned_result = self._generate_assigned_trucks(
+                id_generator, current_id, strategy
             )
+            current_id = assigned_result.next_id
 
             # Generate pool trucks
-            current_id, pool_trucks_generated = self._generate_pool_trucks(
-                id_generator, current_id, pool_refrigerated, pool_non_refrigerated
+            pool_result = self._generate_pool_trucks(
+                id_generator, current_id, strategy
             )
+            current_id = pool_result.next_id
 
             # Generate supplier trucks
             current_id = self._generate_supplier_trucks(id_generator, current_id)
@@ -1219,18 +1231,7 @@ class MasterDataGenerator:
             self.fk_validator.register_truck_ids(truck_ids)
 
             # Print summary
-            self._print_truck_generation_summary(
-                total_dc_trucks,
-                assigned_trucks_generated,
-                assigned_refrigerated,
-                assigned_non_refrigerated,
-                pool_trucks_generated,
-                pool_refrigerated,
-                pool_non_refrigerated,
-                assignment_strategy,
-                trucks_per_dc,
-                dc_assignment_list,
-            )
+            self._print_truck_generation_summary(strategy, assigned_result, pool_result)
 
             # Do not mark complete here; async method will finalize after DB write
         except Exception as e:
@@ -1381,17 +1382,11 @@ class MasterDataGenerator:
     # Product Generation Helper Methods
     # -------------------------------------------------------------------------
 
-    def _organize_products_and_brands_by_category(
-        self,
-    ) -> tuple[dict[str, list[str]], list[str], dict[str, list[tuple[int, Any]]], dict[str, list[tuple[int, Any]]]]:
+    def _organize_products_and_brands_by_category(self) -> ProductCategoryData:
         """Organize products, brands, and companies by category for smart matching.
 
         Returns:
-            Tuple containing:
-            - companies_by_category: Dict mapping category to list of company names
-            - company_names: List of all company names
-            - brands_by_category: Dict mapping category to list of (idx, brand) tuples
-            - products_by_category: Dict mapping category to list of (idx, product) tuples
+            ProductCategoryData dataclass with all organized category mappings.
         """
         # Group companies by category
         companies_by_category: dict[str, list[str]] = {}
@@ -1424,12 +1419,16 @@ class MasterDataGenerator:
         print(f"Brand categories: {sorted(brands_by_category.keys())}")
         print(f"Product categories mapped to: {sorted(products_by_category.keys())}")
 
-        return companies_by_category, company_names, brands_by_category, products_by_category
+        return ProductCategoryData(
+            companies_by_category=companies_by_category,
+            company_names=company_names,
+            brands_by_category=brands_by_category,
+            products_by_category=products_by_category,
+        )
 
     def _create_valid_brand_product_combinations(
         self,
-        brands_by_category: dict[str, list[tuple[int, Any]]],
-        products_by_category: dict[str, list[tuple[int, Any]]],
+        category_data: ProductCategoryData,
     ) -> list[tuple[int, int]]:
         """Create valid category-matched brand-product combinations.
 
@@ -1438,10 +1437,10 @@ class MasterDataGenerator:
         """
         valid_combinations: list[tuple[int, int]] = []
 
-        for category in brands_by_category.keys():
-            if category in products_by_category:
-                category_brands = brands_by_category[category]
-                category_products = products_by_category[category]
+        for category in category_data.brands_by_category.keys():
+            if category in category_data.products_by_category:
+                category_brands = category_data.brands_by_category[category]
+                category_products = category_data.products_by_category[category]
 
                 for product_idx, _ in category_products:
                     for brand_idx, _ in category_brands:
@@ -1460,8 +1459,7 @@ class MasterDataGenerator:
         product_id: int,
         product_idx: int,
         brand_idx: int,
-        companies_by_category: dict[str, list[str]],
-        company_names: list[str],
+        category_data: ProductCategoryData,
         target_product_count: int,
     ) -> ProductMaster | None:
         """Generate a single product with validation retry logic.
@@ -1476,10 +1474,13 @@ class MasterDataGenerator:
 
         # Match company to brand by category
         brand_category = brand.Category
-        if brand_category in companies_by_category and companies_by_category[brand_category]:
-            company = self._rng.choice(companies_by_category[brand_category])
+        if (
+            brand_category in category_data.companies_by_category
+            and category_data.companies_by_category[brand_category]
+        ):
+            company = self._rng.choice(category_data.companies_by_category[brand_category])
         else:
-            company = self._rng.choice(company_names)
+            company = self._rng.choice(category_data.company_names)
 
         base_price = float(product.BasePrice)
         max_retries = 5
@@ -1570,17 +1571,10 @@ class MasterDataGenerator:
 
         # Organize data by category
         print("Creating category-aware brand-product combinations...")
-        (
-            companies_by_category,
-            company_names,
-            brands_by_category,
-            products_by_category,
-        ) = self._organize_products_and_brands_by_category()
+        category_data = self._organize_products_and_brands_by_category()
 
         # Create valid combinations
-        valid_combinations = self._create_valid_brand_product_combinations(
-            brands_by_category, products_by_category
-        )
+        valid_combinations = self._create_valid_brand_product_combinations(category_data)
 
         # Sample combinations
         vc_count = len(valid_combinations)
@@ -1623,8 +1617,7 @@ class MasterDataGenerator:
                 product_id,
                 product_idx,
                 brand_idx,
-                companies_by_category,
-                company_names,
+                category_data,
                 target_product_count,
             )
 
