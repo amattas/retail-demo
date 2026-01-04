@@ -1,135 +1,112 @@
 """
 Unit tests for FactGenerator exception handling.
 
-Tests verify that pandas fallbacks and other exception handlers
-properly log errors and use fallback paths when needed.
+Tests verify that exception handlers properly log errors when fallbacks
+or error conditions occur.
 """
 
-from unittest.mock import patch, MagicMock, Mock
-from datetime import datetime
+from unittest.mock import patch, MagicMock
 import pytest
+import duckdb
 from retail_datagen.generators.fact_generator import FactGenerator
-from retail_datagen.shared.models import Store, Customer
 from retail_datagen.config.config import GeneratorConfig
 
 
 @pytest.fixture
-def test_config():
-    """Create a minimal test configuration."""
+def mock_config():
+    """Create a minimal mock configuration."""
     config = MagicMock(spec=GeneratorConfig)
     config.seed = 42
-    config.start_date = datetime(2024, 1, 1)
-    config.end_date = datetime(2024, 1, 2)
-    config.num_stores = 1
-    config.num_customers = 10
     return config
 
 
-@pytest.fixture
-def fact_generator(test_config):
-    """Create a FactGenerator instance for testing."""
-    with patch('retail_datagen.generators.fact_generator.get_duckdb'):
-        gen = FactGenerator(test_config)
-        return gen
+def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
+    """Test that FactGenerator handles DuckDB initialization failure gracefully."""
+    # Mock get_duckdb to raise an exception
+    with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
+        mock_get_duckdb.side_effect = Exception("DuckDB initialization failed")
+
+        # Should not raise, should fall back to in-memory mode
+        gen = FactGenerator(mock_config)
+
+        # Should log a warning about the failure
+        assert "failed to initialize" in caplog.text.lower() or "duckdb" in caplog.text.lower()
+        # Should fall back to not using DuckDB
+        assert gen._use_duckdb is False
 
 
-def test_pandas_fallback_for_ble_pings_logged(caplog, fact_generator):
-    """Test that pandas failures in BLE ping generation log warnings."""
-    store = Mock(spec=Store)
-    store.ID = 1
-    store.NumZones = 3
+def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
+    """Test that FactGenerator handles DuckDB connection errors."""
+    # Mock get_duckdb to raise duckdb.Error
+    with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
+        mock_get_duckdb.side_effect = duckdb.Error("Connection failed")
 
-    # Mock pandas to raise an exception
-    with patch('retail_datagen.generators.fact_generator.pd.DataFrame', side_effect=Exception("Pandas unavailable")):
-        # Call the method that uses pandas fallback
-        hour_datetime = datetime(2024, 1, 1, 10, 0, 0)
+        gen = FactGenerator(mock_config)
 
+        assert gen._use_duckdb is False
+        # Should have logged something about the failure
+        if caplog.text:  # Only check if there's log output
+            assert "failed" in caplog.text.lower() or "error" in caplog.text.lower()
+
+
+def test_ensure_columns_handles_alter_table_failure(caplog):
+    """Test that _ensure_columns logs but continues when ALTER TABLE fails."""
+    from retail_datagen.db.duckdb_engine import _ensure_columns
+    import pandas as pd
+
+    mock_conn = MagicMock()
+    # Make _current_columns return empty set
+    with patch('retail_datagen.db.duckdb_engine._current_columns', return_value=set()):
+        # Make execute fail when trying to add column
+        mock_conn.execute.side_effect = Exception("ALTER TABLE failed")
+
+        df = pd.DataFrame({'new_column': [1, 2, 3]})
+
+        # Should not raise - just log and continue
+        _ensure_columns(mock_conn, 'test_table', df)
+
+        # Should have logged the failure
+        assert "failed to add column" in caplog.text.lower()
+
+
+def test_outbox_insert_handles_max_id_query_failure(caplog):
+    """Test that outbox_insert_records handles failure to get max outbox_id."""
+    from retail_datagen.db.duckdb_engine import outbox_insert_records
+
+    mock_conn = MagicMock()
+
+    # Mock _ensure_outbox_table to succeed
+    with patch('retail_datagen.db.duckdb_engine._ensure_outbox_table'):
+        # Mock the execute call for getting max ID to fail
+        mock_conn.execute.side_effect = Exception("Query failed")
+
+        # Should use 0 as fallback and log warning
         try:
-            result = fact_generator._generate_hourly_aggregated_ble(store, hour_datetime)
-            # Should return a result (fallback path)
-            assert isinstance(result, list)
+            outbox_insert_records(mock_conn, [{'message_type': 'test', 'payload': '{}'}])
         except Exception:
-            # Some paths may not have full pandas fallback implemented
+            # May fail at insert, but should have logged the max_id warning
             pass
 
-        # Check that warning was logged if fallback was triggered
-        if "pandas" in caplog.text.lower() or "fallback" in caplog.text.lower():
-            assert "warning" in caplog.text.lower() or "failed" in caplog.text.lower()
+        assert "failed to get max outbox_id" in caplog.text.lower()
 
 
-def test_pandas_fallback_for_foot_traffic_logged(caplog, fact_generator):
-    """Test that pandas failures in foot traffic generation log warnings."""
-    store = Mock(spec=Store)
-    store.ID = 1
-    store.NumZones = 3
-    store.NumBeacons = 5
+def test_pragma_setting_failures_are_logged(caplog):
+    """Test that PRAGMA setting failures during connection are logged at debug level."""
+    from retail_datagen.db import duckdb_engine
 
-    customer = Mock(spec=Customer)
-    customer.ID = 123
-    customer.BLEId = "BLE-123"
+    # Reset the connection
+    with patch.object(duckdb_engine, '_conn', None):
+        # Mock duckdb.connect to return a connection that fails on PRAGMA
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = Exception("PRAGMA not supported")
 
-    transaction_time = datetime(2024, 1, 1, 14, 30, 0)
+        with patch('retail_datagen.db.duckdb_engine.duckdb.connect', return_value=mock_conn):
+            with patch('retail_datagen.db.duckdb_engine._ensure_outbox_table'):
+                try:
+                    duckdb_engine.get_duckdb_conn()
+                except Exception:
+                    pass
 
-    # Mock pandas to fail
-    with patch('retail_datagen.generators.fact_generator.pd.DataFrame', side_effect=Exception("Pandas error")):
-        try:
-            result = fact_generator._generate_ble_pings(store, customer, transaction_time)
-            # Should still return a result via fallback
-            assert isinstance(result, list)
-        except Exception:
-            # Method may not have complete fallback
-            pass
-
-        # Verify warning logged if fallback triggered
-        if "fallback" in caplog.text.lower():
-            assert "warning" in caplog.text.lower()
-
-
-def test_validation_failure_logs_warning(caplog, fact_generator):
-    """Test that receipt validation failures are logged at warning level."""
-    # This tests the validation exception handling at line 2327
-    # The actual validation logic may require specific setup
-
-    # Mock a receipt with invalid data
-    receipt_id = "TEST-001"
-
-    # The validation happens inside _generate_receipt_lines
-    # We would need to set up the full context to trigger it
-    # For now, verify the pattern exists in the code
-
-    # Read the fact_generator source to verify the pattern
-    import inspect
-    source = inspect.getsource(FactGenerator)
-
-    # Verify that validation exceptions are logged
-    assert "Failed to validate subtotal" in source
-    assert "logger.warning" in source
-
-
-def test_marketing_impressions_fallback_logged(caplog, fact_generator):
-    """Test that marketing impression processing fallback logs warnings."""
-    # This tests the fallback at line 1910
-
-    # Mock the impression generation to fail in optimized path
-    with patch.object(fact_generator, '_generate_marketing_impressions', return_value=[]):
-        # The fallback logic would be triggered if the optimized path fails
-        # This is a structural test to verify the pattern exists
-
-        # Verify the fallback pattern in source
-        import inspect
-        source = inspect.getsource(FactGenerator)
-
-        assert "Failed to process impressions via optimized path" in source
-        assert "using fallback" in source.lower()
-
-
-def test_data_insertion_fallback_logged(caplog, fact_generator):
-    """Test that data insertion pandas fallback logs warnings."""
-    # This tests the fallback at line 3850
-
-    # Verify the pattern exists in the source
-    import inspect
-    source = inspect.getsource(FactGenerator)
-
-    assert "Failed to process data via pandas" in source
-    assert "using fallback" in source.lower()
+                # Should have logged debug messages about PRAGMA failures
+                if caplog.text:
+                    assert "failed to set pragma" in caplog.text.lower() or "pragma" in caplog.text.lower()

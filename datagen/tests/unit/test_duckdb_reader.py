@@ -42,45 +42,81 @@ def test_get_all_fact_table_date_ranges_shape():
 # ================================
 
 
-def test_read_table_handles_catalog_exception(caplog):
-    """Test that CatalogException for missing table is logged appropriately."""
-    with patch('retail_datagen.services.duckdb_reader.duckdb.connect') as mock_connect:
-        mock_conn = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
+def test_read_all_master_tables_handles_catalog_exception(caplog):
+    """Test that CatalogException for missing master table is logged appropriately."""
+    # Mock get_duckdb_conn to return a connection that raises CatalogException
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-        # Should return empty DataFrame instead of raising
-        result = db_reader.read_table("nonexistent_table")
-
-        assert isinstance(result, pd.DataFrame)
-        assert result.empty
-        assert "does not exist" in caplog.text.lower() or "catalog" in caplog.text.lower()
-
-
-def test_read_master_table_handles_missing_table(caplog):
-    """Test that missing master table is handled gracefully."""
-    with patch('retail_datagen.services.duckdb_reader.duckdb.connect') as mock_connect:
-        mock_conn = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.side_effect = duckdb.CatalogException("Table 'dim_geographies' does not exist")
-
-        # Should return empty dict or handle gracefully
+    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+        # Should return dict with empty DataFrames instead of raising
         result = db_reader.read_all_master_tables()
 
-        # At minimum, should not crash
         assert isinstance(result, dict)
+        # Should have entries for all master tables
+        for table_name in db_reader.MASTER_TABLES:
+            assert table_name in result
+            assert isinstance(result[table_name], pd.DataFrame)
+            assert result[table_name].empty
+
+        # Should log debug message about missing tables
+        assert "does not exist" in caplog.text.lower()
 
 
-def test_read_fact_table_handles_missing_table(caplog):
-    """Test that missing fact table is handled gracefully."""
-    with patch('retail_datagen.services.duckdb_reader.duckdb.connect') as mock_connect:
-        mock_conn = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
+def test_read_all_master_tables_handles_unexpected_exception(caplog):
+    """Test that unexpected exceptions are handled gracefully."""
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = RuntimeError("Unexpected database error")
 
-        # Should return empty DataFrame instead of crashing
-        result = db_reader.read_table("fact_sales")
+    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+        result = db_reader.read_all_master_tables()
 
-        assert isinstance(result, pd.DataFrame)
-        assert result.empty
+        assert isinstance(result, dict)
+        for table_name in db_reader.MASTER_TABLES:
+            assert table_name in result
+            assert isinstance(result[table_name], pd.DataFrame)
+            assert result[table_name].empty
 
+        # Should log warning for unexpected errors
+        assert "failed to read table" in caplog.text.lower()
+
+
+def test_read_all_fact_tables_handles_catalog_exception(caplog):
+    """Test that missing fact tables are handled gracefully."""
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
+
+    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+        result = db_reader.read_all_fact_tables()
+
+        assert isinstance(result, dict)
+        for table_name in db_reader.FACT_TABLES:
+            assert table_name in result
+            assert isinstance(result[table_name], pd.DataFrame)
+            assert result[table_name].empty
+
+        assert "does not exist" in caplog.text.lower()
+
+
+def test_get_fact_table_date_range_handles_catalog_exception(caplog):
+    """Test that date range query for missing table returns None."""
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
+
+    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+        result = db_reader.get_fact_table_date_range("nonexistent_table")
+
+        assert result == (None, None)
+        assert "does not exist" in caplog.text.lower()
+
+
+def test_get_fact_table_date_range_handles_unexpected_exception(caplog):
+    """Test that unexpected exceptions in date range query are logged."""
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = RuntimeError("Unexpected error")
+
+    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+        result = db_reader.get_fact_table_date_range("test_table")
+
+        assert result == (None, None)
+        assert "failed to get date range" in caplog.text.lower()
