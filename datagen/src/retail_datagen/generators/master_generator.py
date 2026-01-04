@@ -535,8 +535,8 @@ class MasterDataGenerator:
 
         print("Dictionary data loading complete")
 
-    async def generate_geography_master_async(self) -> None:
-        """Generate geographies_master data with optional database insertion."""
+    def generate_geography_master(self) -> None:
+        """Generate geography master data."""
         print("Generating geography master data...")
         if self._progress_tracker:
             self._progress_tracker.mark_table_started("geographies_master")
@@ -579,20 +579,21 @@ class MasterDataGenerator:
         self.fk_validator.register_geography_ids(geography_ids)
 
         print(f"Generated {len(self.geography_master)} geography master records")
+        # Do not mark complete here; async method will finalize after DB write
 
-        # Write to DuckDB (DuckDB-only runtime)
+    async def generate_geography_master_async(self) -> None:
+        """Generate geography master data with database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_geography_master()
+
+        # Write to DuckDB
         await self._insert_to_db(
             None, GeographyModel, self.geography_master
         )
+        # Mark complete after DB write
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("geographies_master")
         self._emit_progress("geographies_master", 1.0, "Geographies complete")
-
-    def generate_geography_master(self) -> None:
-        """Generate geographies_master.csv from geography dictionary (legacy sync wrapper)."""
-        import asyncio
-
-        asyncio.run(self.generate_geography_master_async())
 
     def generate_stores(self, count: int | None = None) -> None:
         """Generate stores.csv with strategic geographic distribution.
@@ -728,135 +729,6 @@ class MasterDataGenerator:
         self.fk_validator.register_store_ids(store_ids)
 
         print(f"Generated {len(self.stores)} store records")
-        # Do not mark complete here; async method will finalize after DB write
-
-    async def generate_stores_async(self, count: int | None = None) -> None:
-        """Generate stores data with optional database insertion (async version)."""
-        print("Generating store data...")
-        self._emit_progress("stores", 0.0, "Generating stores")
-
-        if not self.geography_master:
-            raise ValueError("Geography master data must be generated first")
-
-        if not self.distribution_centers:
-            raise ValueError(
-                "Distribution centers must be generated before stores for supply chain constraint"
-            )
-
-        store_count = count if count is not None else self.config.volume.stores
-
-        # Fast lookups for geography
-        geo_by_id = {gm.ID: gm for gm in self.geography_master}
-        # Get states where DCs exist to constrain store placement
-        dc_states = set()
-        for dc in self.distribution_centers:
-            dc_geo = geo_by_id.get(dc.GeographyID)
-            if dc_geo:
-                dc_states.add(dc_geo.State)
-
-        print(
-            f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
-        )
-
-        # Filter geography data to only include states with DCs
-        selected_geography_data = getattr(
-            self, "_selected_geography_data", self._geography_data
-        )
-        dc_constrained_geo_data = [
-            geo for geo in selected_geography_data if geo.State in dc_states
-        ]
-
-        if not dc_constrained_geo_data:
-            raise ValueError(
-                "No geography data found in states with distribution centers"
-            )
-
-        # Initialize geographic distribution using DC-constrained geographies
-        geo_distribution = GeographicDistribution(
-            dc_constrained_geo_data, self.config.seed
-        )
-        address_generator = AddressGenerator(dc_constrained_geo_data, self.config.seed)
-        id_generator = IdentifierGenerator(self.config.seed)
-
-        # Get strategic locations for stores (high-weight geographies in DC states only)
-        strategic_geos = geo_distribution.get_strategic_locations(
-            min(store_count, len(dc_constrained_geo_data))
-        )
-
-        # If we need more stores than strategic locations, distribute remainder
-        if store_count > len(strategic_geos):
-            remaining_stores = store_count - len(strategic_geos)
-            additional_distribution = (
-                geo_distribution.distribute_entities_across_geographies(
-                    remaining_stores
-                )
-            )
-        else:
-            additional_distribution = []
-
-        self.stores = []
-        current_id = 1
-
-        # Build a fast key index for (City, State, Zip)
-        geo_key_index = {
-            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in self.geography_master
-        }
-
-        # Place at least one store in each strategic location
-        for geo in strategic_geos:
-            # Find matching geography master record
-            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
-            if geo_master is None:
-                raise ValueError("Geography key not found for store placement")
-
-            # Look up tax rate for this store's location
-            tax_rate_key = (geo_master.State, geo_master.City)
-            tax_rate = self._tax_rate_mapping.get(tax_rate_key)
-            if tax_rate is None:
-                tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
-
-            store = Store(
-                ID=current_id,
-                StoreNumber=id_generator.generate_store_number(current_id),
-                Address=address_generator.generate_address(geo, "commercial"),
-                GeographyID=geo_master.ID,
-                tax_rate=tax_rate,
-            )
-            self.stores.append(store)
-            current_id += 1
-
-        # Add additional stores based on distribution
-        for geo, count_per_geo in additional_distribution:
-            # Find matching geography master record
-            geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
-            if geo_master is None:
-                raise ValueError("Geography key not found for additional store placement")
-
-            for _ in range(count_per_geo):
-                if current_id > store_count:
-                    break
-
-                # Look up tax rate for this store's location
-                tax_rate_key = (geo_master.State, geo_master.City)
-                tax_rate = self._tax_rate_mapping.get(tax_rate_key)
-                if tax_rate is None:
-                    tax_rate = self._state_tax_avg.get(geo_master.State, Decimal("0.07407"))
-
-                store = Store(
-                    ID=current_id,
-                    StoreNumber=id_generator.generate_store_number(current_id),
-                    Address=address_generator.generate_address(geo, "commercial"),
-                    GeographyID=geo_master.ID,
-                    tax_rate=tax_rate,
-                )
-                self.stores.append(store)
-                current_id += 1
-
-        # Register store IDs with FK validator
-        store_ids = [store.ID for store in self.stores]
-        self.fk_validator.register_store_ids(store_ids)
-
-        print(f"Generated {len(self.stores)} store records")
 
         # Assign store profiles for realistic variability
         print("Assigning store profiles for realistic variability...")
@@ -873,14 +745,18 @@ class MasterDataGenerator:
                 store.daily_traffic_multiplier = profile.daily_traffic_multiplier
 
         print(f"Assigned profiles to {len(store_profiles)} stores")
+        # Do not mark complete here; async method will finalize after DB write
+
+    async def generate_stores_async(self, count: int | None = None) -> None:
+        """Generate stores data with optional database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_stores(count)
 
         # Write to DuckDB
         await self._insert_to_db(None, StoreModel, self.stores)
-        # Now mark complete after DB write
+        # Mark complete after DB write
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("stores")
-        self._emit_progress("stores", 1.0, "Stores complete")
-
         self._emit_progress(
             "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
         )
@@ -940,23 +816,25 @@ class MasterDataGenerator:
         self.fk_validator.register_dc_ids(dc_ids)
 
         print(f"Generated {len(self.distribution_centers)} distribution center records")
-        self._emit_progress(
-            "distribution_centers",
-            1.0,
-            "Distribution centers complete",
-            {"distribution_centers": len(self.distribution_centers)},
-        )
-        if self._progress_tracker:
-            self._progress_tracker.mark_table_completed("distribution_centers")
+        # Do not mark complete here; async method will finalize after DB write
 
     async def generate_distribution_centers_async(self) -> None:
         """Generate distribution centers with optional database insertion (async version)."""
-        # Call sync method for generation logic (without DB writes)
+        # Call sync method for generation logic
         self.generate_distribution_centers()
 
         # Write to DuckDB
         await self._insert_to_db(
             None, DistributionCenterModel, self.distribution_centers
+        )
+        # Mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("distribution_centers")
+        self._emit_progress(
+            "distribution_centers",
+            1.0,
+            "Distribution centers complete",
+            {"distribution_centers": len(self.distribution_centers)},
         )
 
     def generate_trucks(self) -> None:
@@ -1976,6 +1854,8 @@ class MasterDataGenerator:
     def generate_dc_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for distribution centers."""
         print("Generating DC inventory snapshots...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("dc_inventory_snapshots")
         self._emit_progress(
             "dc_inventory_snapshots", 0.0, "Generating DC inventory snapshots"
         )
@@ -2030,11 +1910,7 @@ class MasterDataGenerator:
 
         self.dc_inventory_snapshots = snapshots
         print(f"Generated {len(self.dc_inventory_snapshots):,} DC inventory records (vectorized)")
-        self._emit_progress(
-            "dc_inventory_snapshots",
-            1.0,
-            "DC inventory snapshots complete",
-        )
+        # Do not mark complete here; async method will finalize
 
     async def generate_dc_inventory_snapshots_async(self) -> None:
         """Generate DC inventory snapshots with optional database insertion (async version)."""
@@ -2043,10 +1919,17 @@ class MasterDataGenerator:
 
         # Note: Inventory snapshots don't have DB models yet - CSV only for now
         # When DB models are added, insert logic would go here
+        self._emit_progress(
+            "dc_inventory_snapshots",
+            1.0,
+            "DC inventory snapshots complete",
+        )
 
     def generate_store_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for stores."""
         print("Generating store inventory snapshots...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("store_inventory_snapshots")
         self._emit_progress(
             "store_inventory_snapshots", 0.0, "Generating store inventory snapshots"
         )
@@ -2095,11 +1978,7 @@ class MasterDataGenerator:
 
         self.store_inventory_snapshots = snapshots
         print(f"Generated {len(self.store_inventory_snapshots):,} store inventory records (vectorized)")
-        self._emit_progress(
-            "store_inventory_snapshots",
-            1.0,
-            "Store inventory snapshots complete",
-        )
+        # Do not mark complete here; async method will finalize
 
     async def generate_store_inventory_snapshots_async(self) -> None:
         """Generate store inventory snapshots with optional database insertion (async version)."""
@@ -2108,6 +1987,11 @@ class MasterDataGenerator:
 
         # Note: Inventory snapshots don't have DB models yet - CSV only for now
         # When DB models are added, insert logic would go here
+        self._emit_progress(
+            "store_inventory_snapshots",
+            1.0,
+            "Store inventory snapshots complete",
+        )
 
     def _cache_master_counts(self) -> None:
         """Cache master table counts for dashboard performance."""
