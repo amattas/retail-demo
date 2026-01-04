@@ -112,6 +112,10 @@ from .utils import (
 
 logger = logging.getLogger(__name__)
 
+# Constants for product generation
+_MAX_COMBINATION_BATCH_SIZE = 1000  # Maximum combinations to generate per batch
+_COMBINATION_SAFETY_MULTIPLIER = 2  # Generate 2x needed to account for validation failures
+
 
 class MasterDataGenerator:
     """
@@ -952,7 +956,7 @@ class MasterDataGenerator:
             print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
 
         # Calculate refrigeration splits (use round for more accurate distribution)
-        if num_assigned_trucks > 0:
+        if num_assigned_trucks > 0 and total_dc_trucks > 0:
             assigned_refrigerated = round(
                 num_assigned_trucks * (refrigerated_count / total_dc_trucks)
             )
@@ -1600,7 +1604,10 @@ class MasterDataGenerator:
             # Replenish combinations if exhausted
             if combination_idx >= len(selected_combinations):
                 remaining_needed = target_product_count - successful_products
-                batch_size = min(1000, remaining_needed * 2)
+                batch_size = min(
+                    _MAX_COMBINATION_BATCH_SIZE,
+                    remaining_needed * _COMBINATION_SAFETY_MULTIPLIER,
+                )
                 print(
                     f"Exhausted combinations at {combination_idx} with "
                     f"{successful_products}/{target_product_count} successful. "
