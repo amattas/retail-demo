@@ -338,3 +338,64 @@ class TestEdgeCases:
 
             # 10 trucks per DC * 1 DC = 10 assigned
             assert strategy.num_assigned_trucks == 10
+
+
+class TestProductGenerationSafeguards:
+    """Tests for product generation error handling and safeguards."""
+
+    @pytest.fixture
+    def product_generator(self, mock_config):
+        """Create a generator with all required attributes for product generation."""
+        import numpy as np
+
+        with patch.object(MasterDataGenerator, '__init__', lambda self, config: None):
+            gen = MasterDataGenerator(mock_config)
+            gen.config = mock_config
+            gen.config.volume.total_products = 100
+            gen._progress_tracker = None
+            gen._emit_progress = MagicMock()
+            gen._product_data = [MagicMock()]
+            gen._brand_data = [MagicMock()]
+            gen._company_data = [MagicMock()]
+            gen._np_rng = np.random.default_rng(42)
+            gen.products_master = []
+            gen.fk_validator = MagicMock()
+            return gen
+
+    def test_empty_valid_combinations_raises_error(self, product_generator):
+        """Test that empty valid_combinations raises ValueError."""
+        # Mock the helper methods to return empty combinations
+        product_generator._organize_products_and_brands_by_category = MagicMock(
+            return_value=ProductCategoryData(
+                companies_by_category={},
+                company_names=[],
+                brands_by_category={},
+                products_by_category={},
+            )
+        )
+        product_generator._create_valid_brand_product_combinations = MagicMock(return_value=[])
+
+        with pytest.raises(ValueError, match="No valid brand-product combinations"):
+            product_generator.generate_products_master()
+
+    def test_max_attempts_safeguard(self, product_generator):
+        """Test that max attempts prevents infinite loop."""
+        # Set a small target so the test runs quickly
+        product_generator.config.volume.total_products = 10
+
+        # Mock to return valid combinations but always fail product generation
+        product_generator._organize_products_and_brands_by_category = MagicMock(
+            return_value=ProductCategoryData(
+                companies_by_category={"Test": ["TestCo"]},
+                company_names=["TestCo"],
+                brands_by_category={"Test": [(0, MagicMock())]},
+                products_by_category={"Test": [(0, MagicMock())]},
+            )
+        )
+        product_generator._create_valid_brand_product_combinations = MagicMock(
+            return_value=[(0, 0)]  # One valid combination
+        )
+        product_generator._generate_single_product = MagicMock(return_value=None)  # Always fail
+
+        with pytest.raises(RuntimeError, match="Failed to generate .* products after"):
+            product_generator.generate_products_master()

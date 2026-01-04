@@ -948,7 +948,7 @@ class MasterDataGenerator:
             num_assigned_trucks = int(total_dc_trucks * truck_dc_assignment_rate)
             num_pool_trucks = total_dc_trucks - num_assigned_trucks
             assignment_strategy = "percentage"
-            trucks_per_dc_config = 0  # Not used in percentage mode
+            trucks_per_dc_config = 0  # Set to 0 for percentage mode (used in return value)
             print(
                 f"Using percentage-based assignment: {truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
             )
@@ -1603,8 +1603,26 @@ class MasterDataGenerator:
         successful_products = 0
         failed_validations = 0
 
+        # Guard clause: ensure we have valid combinations to work with
+        if len(valid_combinations) == 0:
+            raise ValueError(
+                "No valid brand-product combinations available. "
+                "Check that brand and product data have matching categories."
+            )
+
+        # Max attempts to prevent infinite loop if all products fail validation
+        max_total_attempts = target_product_count * 10
+
         # Generate products until we reach target count
         while successful_products < target_product_count:
+            # Safety check: prevent infinite loop
+            if combination_idx >= max_total_attempts:
+                raise RuntimeError(
+                    f"Failed to generate {target_product_count} products after "
+                    f"{max_total_attempts} attempts. Generated {successful_products} products, "
+                    f"{failed_validations} failed validations."
+                )
+
             # Replenish combinations if exhausted
             if combination_idx >= len(selected_combinations):
                 remaining_needed = target_product_count - successful_products
