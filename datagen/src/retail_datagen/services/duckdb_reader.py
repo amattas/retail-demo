@@ -7,6 +7,7 @@ date filtering for fact tables.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from typing import Dict, Tuple
 
@@ -14,6 +15,8 @@ import duckdb
 import pandas as pd
 
 from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
+logger = logging.getLogger(__name__)
 
 
 MASTER_TABLES = [
@@ -53,7 +56,11 @@ def read_all_master_tables() -> Dict[str, pd.DataFrame]:
     for table in MASTER_TABLES:
         try:
             df = conn.execute(f"SELECT * FROM {table}").df()
-        except Exception:
+        except duckdb.CatalogException:
+            logger.debug(f"Table {table} does not exist, returning empty DataFrame")
+            df = pd.DataFrame()
+        except Exception as e:
+            logger.warning(f"Failed to read table {table}: {e}, returning empty DataFrame")
             df = pd.DataFrame()
         result[table] = df
     return result
@@ -79,7 +86,11 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
                         f"SELECT * FROM {table} WHERE event_ts >= ? AND event_ts < ?",
                         [start_dt, end_dt],
                     ).df()
-        except Exception:
+        except duckdb.CatalogException:
+            logger.debug(f"Table {table} does not exist, returning empty DataFrame")
+            df = pd.DataFrame()
+        except Exception as e:
+            logger.warning(f"Failed to read table {table}: {e}, returning empty DataFrame")
             df = pd.DataFrame()
         result[table] = df
     return result
@@ -99,7 +110,11 @@ def get_fact_table_date_range(table_name: str) -> Tuple[datetime | None, datetim
         if not row:
             return None, None
         return row[0], row[1]
-    except Exception:
+    except duckdb.CatalogException:
+        logger.debug(f"Table {table_name} does not exist")
+        return None, None
+    except Exception as e:
+        logger.warning(f"Failed to get date range for table {table_name}: {e}")
         return None, None
 
 

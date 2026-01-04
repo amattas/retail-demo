@@ -324,7 +324,8 @@ class FactDataGenerator:
             from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
             self._duckdb_conn = get_duckdb_conn()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}")
             self._use_duckdb = False
 
         # Buffer for database writes
@@ -496,7 +497,8 @@ class FactDataGenerator:
             self._adid_to_customer_id = {
                 c.AdId: c.ID for c in self.customers if getattr(c, "AdId", None)
             }
-        except Exception:
+        except (AttributeError, TypeError) as e:
+            logger.warning(f"Failed to build AdId to CustomerID map: {e}")
             self._adid_to_customer_id = {}
 
     # Backwards-compatible alias for tests expecting sync loader name
@@ -600,8 +602,8 @@ class FactDataGenerator:
         try:
             clamped = max(0.0, min(1.0, progress))
             self._table_progress_callback(table_name, clamped, message, table_counts)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Progress callback failed for table {table_name}: {e}")
 
     # Removed legacy CSV loader: DuckDB-only path is used for master data
 
@@ -779,7 +781,8 @@ class FactDataGenerator:
             self._adid_to_customer_id = {
                 c.AdId: c.ID for c in self.customers if getattr(c, "AdId", None)
             }
-        except Exception:
+        except (AttributeError, TypeError) as e:
+            logger.warning(f"Failed to build AdId to CustomerID map: {e}")
             self._adid_to_customer_id = {}
 
     def _build_store_customer_pools(self, customer_geographies: dict) -> None:
@@ -850,9 +853,9 @@ class FactDataGenerator:
                 else:
                     p.fill(1.0 / len(p))
                 self._store_customer_sampling_np[sid] = (idx, p)
-            except Exception:
+            except Exception as e:
                 # Fallback will use Python choices
-                pass
+                logger.debug(f"Failed to precompute numpy sampling for store {sid}: {e}")
 
         # Log summary statistics
         pool_sizes = [len(pool) for pool in self._store_customer_pools.values()]
@@ -945,8 +948,8 @@ class FactDataGenerator:
                 tables_in_progress=active_tables,
                 tables_remaining=[],
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send initial progress update: {e}")
 
         # Calculate expected records per table for accurate progress tracking
         # NOTE: customers_per_day is configured PER STORE, not total
@@ -1056,7 +1059,8 @@ class FactDataGenerator:
                         total_days,
                         table_progress=table_progress,
                     )
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to drop indexes for bulk load optimization: {e}")
                 dropped_indexes = []
             while current_date <= end_date:
                 day_counter += 1
@@ -1137,8 +1141,8 @@ class FactDataGenerator:
             try:
                 if (not self._use_duckdb) and dropped_indexes:
                     await self._recreate_indexes(self._session, dropped_indexes)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to recreate indexes after generation: {e}")
 
         if self._use_duckdb:
             # No async DB session needed for DuckDB path
@@ -1257,8 +1261,8 @@ class FactDataGenerator:
             marketing_boost = 1.0
             try:
                 marketing_boost = self._compute_marketing_multiplier(date)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to compute marketing multiplier for {date}, using default 1.0: {e}")
             marketing_records = self._generate_marketing_activity(date, marketing_boost)
             if marketing_records:
                 logger.debug(
@@ -1341,8 +1345,8 @@ class FactDataGenerator:
                         table_progress=progress_state.get("per_table_progress", {}),
                         tables_in_progress=progress_state.get("tables_in_progress", []),
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to send progress update during hourly generation: {e}")
 
             if hour_multiplier == 0:  # Store closed
                 hour_data = {
@@ -1901,8 +1905,9 @@ class FactDataGenerator:
                     logger.warning(
                         f"    No impressions generated for campaign {campaign_id}"
                     )
-            except Exception:
+            except Exception as e:
                 # Fallback to original loop
+                logger.debug(f"Failed to process impressions via optimized path, using fallback: {e}")
                 for impression in impressions:
                     logger.debug(
                         f"      Creating marketing record: {impression.get('channel', 'unknown')}"
@@ -2009,8 +2014,8 @@ class FactDataGenerator:
                 # Apply holiday overlay to adjust basket composition/quantities
                 try:
                     self._apply_holiday_overlay_to_basket(hour_datetime, basket)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to apply holiday overlay to basket: {e}")
 
                 # Create receipt
                 receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
@@ -2319,8 +2324,8 @@ class FactDataGenerator:
                     f"Receipt {receipt_id}: Subtotal mismatch! "
                     f"Calculated={calculated_subtotal_cents}, Recorded={subtotal_cents}"
                 )
-        except Exception:
-            pass
+        except (ValueError, TypeError, ArithmeticError) as e:
+            logger.warning(f"Failed to validate subtotal for receipt {receipt_id}: {e}")
 
         # Create receipt header
         receipt = {
@@ -2428,8 +2433,9 @@ class FactDataGenerator:
                 }
             )
             return df.to_dict("records")
-        except Exception:
+        except Exception as e:
             # Fallback to simple list if pandas unavailable
+            logger.debug(f"Failed to create BLE pings via pandas, using fallback: {e}")
             return [
                 {
                     "TraceId": self._generate_trace_id(),
@@ -2513,8 +2519,9 @@ class FactDataGenerator:
                 }
             )
             return df.to_dict("records")
-        except Exception:
+        except Exception as e:
             # Fallback loop if pandas unavailable
+            logger.debug(f"Failed to create foot traffic via pandas, using fallback: {e}")
             out: list[dict] = []
             for i in range(total):
                 is_known = self._rng.random() < 0.30
@@ -2575,7 +2582,8 @@ class FactDataGenerator:
                             if sid is None:
                                 continue
                             store_demands[sid] = store_demands.get(sid, 0) + abs(int(tr["QtyDelta"]))
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to aggregate store demands via pandas, using fallback: {e}")
                 for tr in store_transactions:
                     if tr.get("QtyDelta", 0) < 0:
                         sid = tr.get("StoreID")
@@ -2805,7 +2813,8 @@ class FactDataGenerator:
         batch_hours = 1
         try:
             batch_hours = max(1, int(getattr(self.config.performance, 'batch_hours', 1)))
-        except Exception:
+        except (AttributeError, ValueError, TypeError) as e:
+            logger.debug(f"Failed to get batch_hours from config, using default 1: {e}")
             batch_hours = 1
 
         flush_now = ((hour + 1) % batch_hours == 0) or (hour == 23)
@@ -3143,8 +3152,9 @@ class FactDataGenerator:
 
             try:
                 payload_json = json.dumps(rec, default=str)
-            except Exception:
+            except (TypeError, ValueError) as e:
                 # Fallback: stringify non-serializable values crudely
+                logger.debug(f"Failed to JSON serialize record, using fallback: {e}")
                 payload_json = json.dumps({k: str(v) for k, v in rec.items()})
 
             rows.append(
@@ -3743,7 +3753,8 @@ class FactDataGenerator:
             for gen_name in generator_table_names:
                 try:
                     model = self._get_model_for_table(gen_name)
-                except Exception:
+                except (KeyError, AttributeError) as e:
+                    logger.debug(f"Failed to get model for table {gen_name}: {e}")
                     continue
                 tbl = getattr(model, "__tablename__", None)
                 if not tbl:
@@ -3834,8 +3845,9 @@ class FactDataGenerator:
                 records = data.to_dict("records")
             else:
                 records = list(data or [])
-        except Exception:
+        except (ImportError, AttributeError) as e:
             # If pandas not available, assume list path
+            logger.debug(f"Failed to process data via pandas for {table_name}, using fallback: {e}")
             records = list(data or [])  # type: ignore[arg-type]
         if not records:
             logger.debug(f"No data to insert for {table_name} hour {hour}")
@@ -3981,8 +3993,8 @@ class FactDataGenerator:
                         f"Writing {table_name.replace('_', ' ')} ({self._table_insert_counts[table_name]:,})",
                         {table_name: self._table_insert_counts[table_name]},
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to emit progress for {table_name}: {e}")
             except Exception as e:
                 logger.error(f"DuckDB insert failed for {table_name}: {e}")
             return
@@ -4089,9 +4101,9 @@ class FactDataGenerator:
                         clean[k] = v
                 normalized.append(clean)
             mapped_records = normalized
-        except Exception:
+        except (ImportError, AttributeError) as e:
             # If pandas isn't available or any issue occurs, proceed without normalization
-            pass
+            logger.debug(f"Failed to normalize pandas NA values for {table_name}: {e}")
 
         # Filter out any keys that are not actual columns in the target table
         try:
@@ -4101,9 +4113,9 @@ class FactDataGenerator:
                 filtered = {k: v for k, v in rec.items() if k in allowed_cols}
                 filtered_records.append(filtered)
             mapped_records = filtered_records
-        except Exception:
+        except (AttributeError, TypeError) as e:
             # Defensive: if column introspection fails, proceed without filtering
-            pass
+            logger.debug(f"Failed to filter columns for {table_name}: {e}")
 
         # Batch insert using bulk operations
         try:

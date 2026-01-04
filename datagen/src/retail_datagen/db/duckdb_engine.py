@@ -7,6 +7,7 @@ table creation/insert utilities optimized for batch loads.
 
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 import os
@@ -15,6 +16,8 @@ from typing import Iterable
 import duckdb
 import pandas as pd
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _conn: duckdb.DuckDBPyConnection | None = None
@@ -37,19 +40,19 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
             try:
                 threads = os.cpu_count() or 2
                 _conn.execute(f"PRAGMA threads={threads}")
-            except Exception:
+            except Exception as e:
                 # Older DuckDB may not support PRAGMA threads
-                pass
+                logger.debug(f"Failed to set PRAGMA threads={threads}: {e}")
             try:
                 _conn.execute("PRAGMA temp_directory=':memory:'")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to set PRAGMA temp_directory: {e}")
             # Ensure streaming outbox exists for outbox-driven streaming
             try:
                 _ensure_outbox_table(_conn)
-            except Exception:
+            except Exception as e:
                 # Non-fatal if creation fails here; callers may retry
-                pass
+                logger.warning(f"Failed to create outbox table during connection initialization: {e}")
     return _conn
 
 
@@ -64,39 +67,40 @@ def reset_duckdb() -> None:
             if _conn is not None:
                 try:
                     _conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to close DuckDB connection: {e}")
                 _conn = None
         finally:
             path = get_duckdb_path()
             try:
                 if path.exists():
                     path.unlink()
-            except Exception:
+            except (OSError, PermissionError) as e:
                 # Ignore delete failures; caller can handle
-                pass
+                logger.warning(f"Failed to delete DuckDB file at {path}: {e}")
 
 
 def close_duckdb() -> None:
     """Close the global DuckDB connection without deleting the DB file."""
     global _conn
     with _lock:
-        try:
-            if _conn is not None:
-                try:
-                    _conn.close()
-                except Exception:
-                    pass
-                _conn = None
-        except Exception:
-            pass
+        if _conn is not None:
+            try:
+                _conn.close()
+            except Exception as e:
+                logger.warning(f"Failed to close DuckDB connection: {e}")
+            _conn = None
 
 
 def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
     try:
         conn.execute(f"SELECT * FROM {table} LIMIT 0")
         return True
-    except Exception:
+    except duckdb.CatalogException:
+        # Table doesn't exist
+        return False
+    except Exception as e:
+        logger.warning(f"Unexpected error checking if table {table} exists: {e}")
         return False
 
 
@@ -105,7 +109,11 @@ def _current_columns(conn: duckdb.DuckDBPyConnection, table: str) -> set[str]:
         cur = conn.execute(f"PRAGMA table_info('{table}')")
         rows = cur.fetchall()
         return {str(r[1]).lower() for r in rows}  # name at index 1
-    except Exception:
+    except duckdb.CatalogException:
+        # Table doesn't exist
+        return set()
+    except Exception as e:
+        logger.warning(f"Failed to get columns for table {table}: {e}")
         return set()
 
 
@@ -136,9 +144,9 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
             duck_type = _duck_type_from_series(df[col])
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {duck_type}")
-            except Exception:
+            except Exception as e:
                 # Best-effort; if it races or fails, proceed and let INSERT surface issues
-                pass
+                logger.debug(f"Failed to add column {col} to {table}: {e}")
     # No need to drop extra table columns; INSERT will only specify df columns
 
 
@@ -214,8 +222,8 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
                             f"ALTER TABLE streaming_outbox ADD COLUMN {col} {type_sql}"
                         )
                     existing.add(col)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to add column {col} to streaming_outbox: {e}")
 
         _ensure("status", "VARCHAR", "'pending'")
         _ensure("attempts", "INT", "0")
@@ -230,15 +238,15 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
         _ensure("outbox_id", "BIGINT", None)
         _ensure("event_ts", "TIMESTAMP", None)
         _ensure("message_type", "VARCHAR", None)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to ensure backward compatibility columns on streaming_outbox: {e}")
     # Lightweight indexes for draining
     try:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_outbox_status_ts ON streaming_outbox(status, event_ts)"
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to create index on streaming_outbox: {e}")
 
 
 def outbox_counts(conn: duckdb.DuckDBPyConnection) -> dict:
@@ -328,7 +336,8 @@ def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dic
     try:
         row = conn.execute("SELECT COALESCE(MAX(outbox_id), 0) FROM streaming_outbox").fetchone()
         max_id = int(row[0] or 0)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to get max outbox_id, using 0: {e}")
         max_id = 0
 
     prepared: list[dict] = []
