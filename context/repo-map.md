@@ -33,9 +33,9 @@ Documentation for deployment and architecture
 - `CLAUDE.md` - Claude orchestrator configuration
 - `STATUS.md` - Development progress tracking
 - `datagen/src/retail_datagen/streaming/schemas.py` - Event schema definitions
-- `fabric/kql_database/02 tables.kql` - Event table definitions
-- `fabric/notebooks/02 OneLake to Silver.ipynb` - Bronze to Silver transforms
-- `fabric/notebooks/03 Silver to Gold.ipynb` - Silver to Gold aggregations
+- `fabric/kql_database/02-create-tables.kql` - Event table definitions
+- `fabric/lakehouse/02-onelake-to-silver.ipynb` - Bronze to Silver transforms
+- `fabric/lakehouse/03-silver-to-gold.ipynb` - Silver to Gold aggregations
 
 ## Patterns & Conventions
 

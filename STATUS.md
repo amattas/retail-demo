@@ -24,8 +24,8 @@
 - [x] OneLake to Eventhouse shortcut approach
 - [x] Functions (04 functions.kql)
 - [x] Materialized views (05, 06 .kql files)
-- [x] 02 OneLake to Silver.ipynb
-- [x] 03 Silver to Gold.ipynb (created, pending datagen updates)
+- [x] 02-onelake-to-silver.ipynb
+- [x] 03-silver-to-gold.ipynb (created, pending datagen updates)
 - [ ] Eventstream configuration
 - [ ] Real-time dashboards
 - [ ] Semantic model
