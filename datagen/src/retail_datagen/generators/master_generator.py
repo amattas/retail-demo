@@ -816,23 +816,25 @@ class MasterDataGenerator:
         self.fk_validator.register_dc_ids(dc_ids)
 
         print(f"Generated {len(self.distribution_centers)} distribution center records")
-        self._emit_progress(
-            "distribution_centers",
-            1.0,
-            "Distribution centers complete",
-            {"distribution_centers": len(self.distribution_centers)},
-        )
-        if self._progress_tracker:
-            self._progress_tracker.mark_table_completed("distribution_centers")
+        # Do not mark complete here; async method will finalize after DB write
 
     async def generate_distribution_centers_async(self) -> None:
         """Generate distribution centers with optional database insertion (async version)."""
-        # Call sync method for generation logic (without DB writes)
+        # Call sync method for generation logic
         self.generate_distribution_centers()
 
         # Write to DuckDB
         await self._insert_to_db(
             None, DistributionCenterModel, self.distribution_centers
+        )
+        # Mark complete after DB write
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_completed("distribution_centers")
+        self._emit_progress(
+            "distribution_centers",
+            1.0,
+            "Distribution centers complete",
+            {"distribution_centers": len(self.distribution_centers)},
         )
 
     def generate_trucks(self) -> None:
@@ -1906,11 +1908,7 @@ class MasterDataGenerator:
 
         self.dc_inventory_snapshots = snapshots
         print(f"Generated {len(self.dc_inventory_snapshots):,} DC inventory records (vectorized)")
-        self._emit_progress(
-            "dc_inventory_snapshots",
-            1.0,
-            "DC inventory snapshots complete",
-        )
+        # Do not mark complete here; async method will finalize
 
     async def generate_dc_inventory_snapshots_async(self) -> None:
         """Generate DC inventory snapshots with optional database insertion (async version)."""
@@ -1919,6 +1917,11 @@ class MasterDataGenerator:
 
         # Note: Inventory snapshots don't have DB models yet - CSV only for now
         # When DB models are added, insert logic would go here
+        self._emit_progress(
+            "dc_inventory_snapshots",
+            1.0,
+            "DC inventory snapshots complete",
+        )
 
     def generate_store_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for stores."""
@@ -1971,11 +1974,7 @@ class MasterDataGenerator:
 
         self.store_inventory_snapshots = snapshots
         print(f"Generated {len(self.store_inventory_snapshots):,} store inventory records (vectorized)")
-        self._emit_progress(
-            "store_inventory_snapshots",
-            1.0,
-            "Store inventory snapshots complete",
-        )
+        # Do not mark complete here; async method will finalize
 
     async def generate_store_inventory_snapshots_async(self) -> None:
         """Generate store inventory snapshots with optional database insertion (async version)."""
@@ -1984,6 +1983,11 @@ class MasterDataGenerator:
 
         # Note: Inventory snapshots don't have DB models yet - CSV only for now
         # When DB models are added, insert logic would go here
+        self._emit_progress(
+            "store_inventory_snapshots",
+            1.0,
+            "Store inventory snapshots complete",
+        )
 
     def _cache_master_counts(self) -> None:
         """Cache master table counts for dashboard performance."""
