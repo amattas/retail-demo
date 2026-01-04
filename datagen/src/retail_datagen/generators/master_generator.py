@@ -148,7 +148,8 @@ class MasterDataGenerator:
             from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
             self._duckdb_conn = get_duckdb_conn()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}")
             self._use_duckdb = False
 
         print(f"MasterDataGenerator initialized with seed {config.seed}")
@@ -287,9 +288,9 @@ class MasterDataGenerator:
                         logger.info(
                             f"Committed after {batch_index} batches for {table_name}"
                         )
-                    except Exception:
+                    except Exception as e:
                         logger.warning(
-                            f"Commit failed after batch {batch_index} for {table_name}; continuing with session context manager"
+                            f"Commit failed after batch {batch_index} for {table_name}: {e}; continuing with session context manager"
                         )
 
             logger.info(
@@ -497,7 +498,8 @@ class MasterDataGenerator:
             self._product_tags_overlay = overlay
             if overlay:
                 print(f"Loaded {len(overlay)} product tag overlays")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to load product tag overlays: {e}")
             self._product_tags_overlay = {}
 
         # Load tax rates
@@ -519,8 +521,9 @@ class MasterDataGenerator:
             for state, rates in state_groups.items():
                 try:
                     avg = sum(rates) / Decimal(str(len(rates)))
-                except Exception:
+                except (ZeroDivisionError, ArithmeticError) as e:
                     # Fallback to default if any arithmetic issue
+                    logger.warning(f"Failed to calculate average tax rate for {state}: {e}, using default")
                     avg = Decimal("0.07407")
                 self._state_tax_avg[state] = avg
             print(f"Computed state-level tax averages for {len(self._state_tax_avg)} states")
@@ -1925,8 +1928,8 @@ class MasterDataGenerator:
             h = hash(key) % 100
             if h < 10:
                 return ProductTaxability.REDUCED_RATE
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to compute hash for taxability on {department_lower}:{category_lower}: {e}")
 
         # Everything else is fully taxable
         return ProductTaxability.TAXABLE

@@ -75,9 +75,9 @@ def upload_paths_to_blob(
     container_client = bsc.get_container_client(container)
     try:
         container_client.create_container()
-    except Exception:
+    except Exception as e:
         # Already exists or cannot create; continue
-        pass
+        logger.debug(f"Container {container} already exists or cannot create: {e}")
 
     uploaded = 0
     for p in paths:
