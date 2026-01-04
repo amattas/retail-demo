@@ -535,8 +535,8 @@ class MasterDataGenerator:
 
         print("Dictionary data loading complete")
 
-    async def generate_geography_master_async(self) -> None:
-        """Generate geographies_master data with optional database insertion."""
+    def generate_geography_master(self) -> None:
+        """Generate geography master data."""
         print("Generating geography master data...")
         if self._progress_tracker:
             self._progress_tracker.mark_table_started("geographies_master")
@@ -579,20 +579,21 @@ class MasterDataGenerator:
         self.fk_validator.register_geography_ids(geography_ids)
 
         print(f"Generated {len(self.geography_master)} geography master records")
+        # Do not mark complete here; async method will finalize after DB write
 
-        # Write to DuckDB (DuckDB-only runtime)
+    async def generate_geography_master_async(self) -> None:
+        """Generate geography master data with database insertion (async version)."""
+        # Call sync method for generation logic
+        self.generate_geography_master()
+
+        # Write to DuckDB
         await self._insert_to_db(
             None, GeographyModel, self.geography_master
         )
+        # Mark complete after DB write
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("geographies_master")
         self._emit_progress("geographies_master", 1.0, "Geographies complete")
-
-    def generate_geography_master(self) -> None:
-        """Generate geographies_master.csv from geography dictionary (legacy sync wrapper)."""
-        import asyncio
-
-        asyncio.run(self.generate_geography_master_async())
 
     def generate_stores(self, count: int | None = None) -> None:
         """Generate stores.csv with strategic geographic distribution.
