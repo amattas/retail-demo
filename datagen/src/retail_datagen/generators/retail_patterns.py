@@ -4,6 +4,22 @@ Retail behavior simulation patterns for realistic data generation.
 This module provides simulators for various retail behaviors including
 customer shopping patterns, inventory flows, marketing campaigns,
 and cross-table business logic coordination.
+
+Naming Conventions:
+    This module follows a consistent naming convention to distinguish between
+    internal Python code and output data schemas:
+
+    - **Python variables/parameters**: snake_case (PEP 8)
+      Examples: dc_id, store_id, product_id, truck_id, shipment_id
+
+    - **Output dictionary keys**: PascalCase (matching Pydantic model schemas)
+      Examples: DCID, StoreID, ProductID, TruckId, ShipmentId
+
+    This dual convention is intentional. Internal Python code uses snake_case for
+    readability and PEP 8 compliance, while output dictionaries use PascalCase to
+    match the fact table schemas defined in shared/models.py. The conversion happens
+    explicitly when constructing output dictionaries, with inline comments marking
+    these conversion points for clarity.
 """
 
 import logging
@@ -689,11 +705,11 @@ class InventoryFlowSimulator:
         Simulate DC receiving shipments from suppliers.
 
         Args:
-            dc_id: Distribution center ID
+            dc_id: Distribution center ID (Python variable uses snake_case)
             date: Date of receiving
 
         Returns:
-            List of inventory transaction records
+            List of inventory transaction records (dict keys use PascalCase per schema)
         """
         transactions = []
 
@@ -721,6 +737,7 @@ class InventoryFlowSimulator:
                 key = (dc_id, product.ID)
                 self._dc_inventory[key] = self._dc_inventory.get(key, 0) + receive_qty
 
+                # Output dict: keys use PascalCase to match DCInventoryTransaction schema
                 transactions.append(
                     {
                         "DCID": dc_id,
@@ -740,12 +757,12 @@ class InventoryFlowSimulator:
         Simulate store demand and generate inventory deductions.
 
         Args:
-            store_id: Store ID
+            store_id: Store ID (Python variable uses snake_case)
             date: Date of demand
             traffic_multiplier: Multiplier for demand based on traffic patterns
 
         Returns:
-            List of store inventory transactions
+            List of store inventory transactions (dict keys use PascalCase per schema)
         """
         transactions = []
 
@@ -780,6 +797,7 @@ class InventoryFlowSimulator:
                 # Update inventory
                 self._store_inventory[key] = current_inventory - sale_qty
 
+                # Output dict: keys use PascalCase to match StoreInventoryTransaction schema
                 transactions.append(
                     {
                         "StoreID": store_id,
@@ -979,15 +997,20 @@ class InventoryFlowSimulator:
         Generate truck loading events for inventory tracking.
 
         Args:
-            shipment_info: Shipment information from generate_truck_shipment
+            shipment_info: Shipment information with snake_case keys (internal format)
             load_time: When loading occurs
 
         Returns:
-            List of truck inventory loading records
+            List of truck inventory loading records (dict keys use PascalCase per TruckInventory schema)
+
+        Note:
+            Converts from internal snake_case keys (truck_id, shipment_id, dc_id) to
+            schema PascalCase keys (TruckId, ShipmentId, ProductID, LocationID).
         """
         truck_inventory_events = []
 
         for product_id, quantity in shipment_info["products"]:
+            # Output dict: keys use PascalCase to match TruckInventory schema
             truck_inventory_events.append(
                 {
                     "TruckId": shipment_info["truck_id"],
@@ -1013,11 +1036,11 @@ class InventoryFlowSimulator:
         creating an audit trail from DC → Truck → Store.
 
         Args:
-            shipment_info: Shipment information from generate_truck_shipment
+            shipment_info: Shipment information with snake_case keys (internal format)
             load_time: When loading occurs (truck status = LOADING)
 
         Returns:
-            List of DC inventory transaction records
+            List of DC inventory transaction records (dict keys use PascalCase per schema)
         """
         dc_transactions = []
         dc_id = shipment_info["dc_id"]
@@ -1030,6 +1053,7 @@ class InventoryFlowSimulator:
             self._dc_inventory[dc_key] = max(0, current_inventory - quantity)
             new_balance = self._dc_inventory[dc_key]
 
+            # Output dict: keys use PascalCase to match DCInventoryTransaction schema
             dc_transactions.append(
                 {
                     "DCID": dc_id,
@@ -1054,11 +1078,11 @@ class InventoryFlowSimulator:
         creating an audit trail from DC → Truck → Store.
 
         Args:
-            shipment_info: Shipment information from generate_truck_shipment
+            shipment_info: Shipment information with snake_case keys (internal format)
             unload_time: When unloading occurs (truck status = UNLOADING)
 
         Returns:
-            List of store inventory transaction records
+            List of store inventory transaction records (dict keys use PascalCase per schema)
         """
         store_transactions = []
         store_id = shipment_info["store_id"]
@@ -1073,6 +1097,7 @@ class InventoryFlowSimulator:
             # Get balance after transaction
             balance = self._store_inventory[store_key]
 
+            # Output dict: keys use PascalCase to match StoreInventoryTransaction schema
             store_transactions.append(
                 {
                     "StoreID": store_id,
@@ -1094,15 +1119,20 @@ class InventoryFlowSimulator:
         Generate truck unloading events for inventory tracking.
 
         Args:
-            shipment_info: Shipment information from generate_truck_shipment
+            shipment_info: Shipment information with snake_case keys (internal format)
             unload_time: When unloading occurs
 
         Returns:
-            List of truck inventory unloading records
+            List of truck inventory unloading records (dict keys use PascalCase per TruckInventory schema)
+
+        Note:
+            Converts from internal snake_case keys (truck_id, shipment_id, store_id) to
+            schema PascalCase keys (TruckId, ShipmentId, ProductID, LocationID).
         """
         truck_inventory_events = []
 
         for product_id, quantity in shipment_info["products"]:
+            # Output dict: keys use PascalCase to match TruckInventory schema
             truck_inventory_events.append(
                 {
                     "TruckId": shipment_info["truck_id"],
