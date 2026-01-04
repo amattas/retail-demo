@@ -837,6 +837,323 @@ class MasterDataGenerator:
             {"distribution_centers": len(self.distribution_centers)},
         )
 
+    # -------------------------------------------------------------------------
+    # Truck Generation Helper Methods
+    # -------------------------------------------------------------------------
+
+    def _calculate_truck_allocation_strategy(
+        self,
+    ) -> tuple[str, int, int, int, int, int, int, int, int]:
+        """Calculate truck allocation strategy and refrigeration splits.
+
+        Returns:
+            Tuple containing:
+            - assignment_strategy: "fixed" or "percentage"
+            - num_assigned_trucks: Number of trucks assigned to DCs
+            - num_pool_trucks: Number of pool trucks
+            - assigned_refrigerated: Refrigerated trucks assigned to DCs
+            - assigned_non_refrigerated: Non-refrigerated trucks assigned to DCs
+            - pool_refrigerated: Refrigerated pool trucks
+            - pool_non_refrigerated: Non-refrigerated pool trucks
+            - trucks_per_dc_config: Trucks per DC (if fixed strategy)
+            - total_dc_trucks: Total DC-to-store trucks
+        """
+        refrigerated_count = self.config.volume.refrigerated_trucks
+        non_refrigerated_count = self.config.volume.non_refrigerated_trucks
+        total_dc_trucks = refrigerated_count + non_refrigerated_count
+
+        dc_count = len(self.distribution_centers)
+        trucks_per_dc_config = self.config.volume.trucks_per_dc
+        truck_dc_assignment_rate = self.config.volume.truck_dc_assignment_rate
+
+        if trucks_per_dc_config is not None:
+            # Fixed assignment: exactly N trucks per DC
+            num_assigned_trucks = trucks_per_dc_config * dc_count
+            num_pool_trucks = max(0, total_dc_trucks - num_assigned_trucks)
+            assignment_strategy = "fixed"
+            print(f"Using fixed assignment: {trucks_per_dc_config} trucks per DC")
+            print(
+                f"  - Assigned trucks: {num_assigned_trucks} ({trucks_per_dc_config} × {dc_count} DCs)"
+            )
+            print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
+        else:
+            # Percentage-based assignment
+            num_assigned_trucks = int(total_dc_trucks * truck_dc_assignment_rate)
+            num_pool_trucks = total_dc_trucks - num_assigned_trucks
+            assignment_strategy = "percentage"
+            trucks_per_dc_config = 0  # Not used in percentage mode
+            print(
+                f"Using percentage-based assignment: {truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
+            )
+            print(f"  - Assigned trucks: {num_assigned_trucks}")
+            print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
+
+        # Calculate refrigeration splits
+        if num_assigned_trucks > 0:
+            assigned_refrigerated = int(
+                num_assigned_trucks * (refrigerated_count / total_dc_trucks)
+            )
+            assigned_non_refrigerated = num_assigned_trucks - assigned_refrigerated
+        else:
+            assigned_refrigerated = 0
+            assigned_non_refrigerated = 0
+
+        pool_refrigerated = refrigerated_count - assigned_refrigerated
+        pool_non_refrigerated = non_refrigerated_count - assigned_non_refrigerated
+
+        return (
+            assignment_strategy,
+            num_assigned_trucks,
+            num_pool_trucks,
+            assigned_refrigerated,
+            assigned_non_refrigerated,
+            pool_refrigerated,
+            pool_non_refrigerated,
+            trucks_per_dc_config if trucks_per_dc_config else 0,
+            total_dc_trucks,
+        )
+
+    def _generate_assigned_trucks(
+        self,
+        id_generator: IdentifierGenerator,
+        start_id: int,
+        assignment_strategy: str,
+        trucks_per_dc: int,
+        assigned_refrigerated: int,
+        assigned_non_refrigerated: int,
+    ) -> tuple[int, int, list[tuple[int, int, bool]]]:
+        """Generate trucks assigned to specific DCs.
+
+        Returns:
+            Tuple containing:
+            - next_id: Next available truck ID
+            - trucks_generated: Number of trucks generated
+            - dc_assignment_list: List of (truck_id, dc_id, is_refrigerated) tuples
+        """
+        current_id = start_id
+        trucks_generated = 0
+        refrigerated_assigned = 0
+        dc_assignment_list: list[tuple[int, int, bool]] = []
+        dc_count = len(self.distribution_centers)
+
+        if assignment_strategy == "fixed" and trucks_per_dc > 0:
+            # Fixed assignment: exactly trucks_per_dc per DC
+            for dc in self.distribution_centers:
+                dc_refrigerated = min(
+                    trucks_per_dc,
+                    assigned_refrigerated - refrigerated_assigned,
+                )
+                dc_non_refrigerated = trucks_per_dc - dc_refrigerated
+
+                # Create refrigerated trucks for this DC
+                for _ in range(dc_refrigerated):
+                    truck = Truck(
+                        ID=current_id,
+                        LicensePlate=id_generator.generate_license_plate(current_id),
+                        Refrigeration=True,
+                        DCID=dc.ID,
+                    )
+                    self.trucks.append(truck)
+                    dc_assignment_list.append((current_id, dc.ID, True))
+                    current_id += 1
+                    refrigerated_assigned += 1
+                    trucks_generated += 1
+
+                # Create non-refrigerated trucks for this DC
+                for _ in range(dc_non_refrigerated):
+                    truck = Truck(
+                        ID=current_id,
+                        LicensePlate=id_generator.generate_license_plate(current_id),
+                        Refrigeration=False,
+                        DCID=dc.ID,
+                    )
+                    self.trucks.append(truck)
+                    dc_assignment_list.append((current_id, dc.ID, False))
+                    current_id += 1
+                    trucks_generated += 1
+        else:
+            # Percentage-based: round-robin distribution
+            dc_index = 0
+
+            # Generate refrigerated assigned trucks
+            for _ in range(assigned_refrigerated):
+                dc = self.distribution_centers[dc_index % dc_count]
+                truck = Truck(
+                    ID=current_id,
+                    LicensePlate=id_generator.generate_license_plate(current_id),
+                    Refrigeration=True,
+                    DCID=dc.ID,
+                )
+                self.trucks.append(truck)
+                dc_assignment_list.append((current_id, dc.ID, True))
+                current_id += 1
+                dc_index += 1
+                trucks_generated += 1
+
+            # Generate non-refrigerated assigned trucks
+            for _ in range(assigned_non_refrigerated):
+                dc = self.distribution_centers[dc_index % dc_count]
+                truck = Truck(
+                    ID=current_id,
+                    LicensePlate=id_generator.generate_license_plate(current_id),
+                    Refrigeration=False,
+                    DCID=dc.ID,
+                )
+                self.trucks.append(truck)
+                dc_assignment_list.append((current_id, dc.ID, False))
+                current_id += 1
+                dc_index += 1
+                trucks_generated += 1
+
+        return current_id, trucks_generated, dc_assignment_list
+
+    def _generate_pool_trucks(
+        self,
+        id_generator: IdentifierGenerator,
+        start_id: int,
+        pool_refrigerated: int,
+        pool_non_refrigerated: int,
+    ) -> tuple[int, int]:
+        """Generate pool trucks (DCID=None).
+
+        Returns:
+            Tuple containing:
+            - next_id: Next available truck ID
+            - trucks_generated: Number of trucks generated
+        """
+        current_id = start_id
+        trucks_generated = 0
+
+        # Pool refrigerated trucks
+        for _ in range(pool_refrigerated):
+            truck = Truck(
+                ID=current_id,
+                LicensePlate=id_generator.generate_license_plate(current_id),
+                Refrigeration=True,
+                DCID=None,
+            )
+            self.trucks.append(truck)
+            current_id += 1
+            trucks_generated += 1
+
+        # Pool non-refrigerated trucks
+        for _ in range(pool_non_refrigerated):
+            truck = Truck(
+                ID=current_id,
+                LicensePlate=id_generator.generate_license_plate(current_id),
+                Refrigeration=False,
+                DCID=None,
+            )
+            self.trucks.append(truck)
+            current_id += 1
+            trucks_generated += 1
+
+        return current_id, trucks_generated
+
+    def _generate_supplier_trucks(
+        self,
+        id_generator: IdentifierGenerator,
+        start_id: int,
+    ) -> int:
+        """Generate supplier-to-DC trucks (always pool trucks with DCID=None).
+
+        Returns:
+            next_id: Next available truck ID
+        """
+        current_id = start_id
+        supplier_refrigerated = self.config.volume.supplier_refrigerated_trucks
+        supplier_non_refrigerated = self.config.volume.supplier_non_refrigerated_trucks
+        supplier_total = supplier_refrigerated + supplier_non_refrigerated
+
+        print(
+            f"\nGenerating {supplier_total} supplier trucks "
+            f"({supplier_refrigerated} refrigerated, {supplier_non_refrigerated} non-refrigerated)"
+        )
+
+        # Generate supplier refrigerated trucks
+        for _ in range(supplier_refrigerated):
+            truck = Truck(
+                ID=current_id,
+                LicensePlate=id_generator.generate_license_plate(current_id),
+                Refrigeration=True,
+                DCID=None,
+            )
+            self.trucks.append(truck)
+            current_id += 1
+
+        # Generate supplier non-refrigerated trucks
+        for _ in range(supplier_non_refrigerated):
+            truck = Truck(
+                ID=current_id,
+                LicensePlate=id_generator.generate_license_plate(current_id),
+                Refrigeration=False,
+                DCID=None,
+            )
+            self.trucks.append(truck)
+            current_id += 1
+
+        return current_id
+
+    def _print_truck_generation_summary(
+        self,
+        total_dc_trucks: int,
+        assigned_trucks_generated: int,
+        assigned_refrigerated: int,
+        assigned_non_refrigerated: int,
+        pool_trucks_generated: int,
+        pool_refrigerated: int,
+        pool_non_refrigerated: int,
+        assignment_strategy: str,
+        trucks_per_dc: int,
+        dc_assignment_list: list[tuple[int, int, bool]],
+    ) -> None:
+        """Print detailed truck generation summary."""
+        supplier_refrigerated = self.config.volume.supplier_refrigerated_trucks
+        supplier_non_refrigerated = self.config.volume.supplier_non_refrigerated_trucks
+        supplier_total = supplier_refrigerated + supplier_non_refrigerated
+
+        print("\n=== Truck Generation Summary ===")
+        print(f"Total trucks generated: {len(self.trucks)}")
+        print(f"\nDC-to-Store Fleet ({total_dc_trucks} trucks):")
+        print(f"  - Assigned to DCs: {assigned_trucks_generated}")
+        print(f"    • Refrigerated: {assigned_refrigerated}")
+        print(f"    • Non-refrigerated: {assigned_non_refrigerated}")
+        print(f"  - Pool trucks (DCID=NULL): {pool_trucks_generated}")
+        print(f"    • Refrigerated: {pool_refrigerated}")
+        print(f"    • Non-refrigerated: {pool_non_refrigerated}")
+        print(f"\nSupplier-to-DC Fleet ({supplier_total} trucks):")
+        print("  - All pool trucks (DCID=NULL)")
+        print(f"    • Refrigerated: {supplier_refrigerated}")
+        print(f"    • Non-refrigerated: {supplier_non_refrigerated}")
+
+        # Show per-DC distribution for assigned trucks
+        if dc_assignment_list:
+            if assignment_strategy == "fixed":
+                print(f"\nPer-DC Assignment (fixed: {trucks_per_dc} trucks/DC):")
+            else:
+                print("\nPer-DC Assignment (round-robin distribution):")
+
+            dc_truck_counts: dict[int, dict[str, int]] = {}
+            for _, dc_id, is_ref in dc_assignment_list:
+                if dc_id not in dc_truck_counts:
+                    dc_truck_counts[dc_id] = {"refrigerated": 0, "non_refrigerated": 0}
+                if is_ref:
+                    dc_truck_counts[dc_id]["refrigerated"] += 1
+                else:
+                    dc_truck_counts[dc_id]["non_refrigerated"] += 1
+
+            for dc_id in sorted(dc_truck_counts.keys()):
+                counts = dc_truck_counts[dc_id]
+                total_dc = counts["refrigerated"] + counts["non_refrigerated"]
+                print(
+                    f"  DC {dc_id}: {total_dc} trucks "
+                    f"({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
+                )
+
+    # -------------------------------------------------------------------------
+    # Main Truck Generation Method
+    # -------------------------------------------------------------------------
+
     def generate_trucks(self) -> None:
         """Generate trucks.csv with refrigeration capabilities and DC assignment."""
         try:
@@ -855,257 +1172,65 @@ class MasterDataGenerator:
             non_refrigerated_count = self.config.volume.non_refrigerated_trucks
             total_dc_trucks = refrigerated_count + non_refrigerated_count
             print(
-                f"DC-to-Store trucks to generate: {total_dc_trucks} ({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
+                f"DC-to-Store trucks to generate: {total_dc_trucks} "
+                f"({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
             )
 
-            # Determine truck-to-DC assignment strategy
-            dc_count = len(self.distribution_centers)
-            trucks_per_dc_config = self.config.volume.trucks_per_dc
-            truck_dc_assignment_rate = self.config.volume.truck_dc_assignment_rate
+            # Calculate allocation strategy
+            (
+                assignment_strategy,
+                _num_assigned,
+                _num_pool,
+                assigned_refrigerated,
+                assigned_non_refrigerated,
+                pool_refrigerated,
+                pool_non_refrigerated,
+                trucks_per_dc,
+                total_dc_trucks,
+            ) = self._calculate_truck_allocation_strategy()
 
-            if trucks_per_dc_config is not None:
-                # Fixed assignment: exactly N trucks per DC
-                num_assigned_trucks = trucks_per_dc_config * dc_count
-                num_pool_trucks = max(0, total_dc_trucks - num_assigned_trucks)
-                assignment_strategy = "fixed"
-                print(f"Using fixed assignment: {trucks_per_dc_config} trucks per DC")
-                print(
-                    f"  - Assigned trucks: {num_assigned_trucks} ({trucks_per_dc_config} × {dc_count} DCs)"
-                )
-                print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
-            else:
-                # Percentage-based assignment
-                num_assigned_trucks = int(total_dc_trucks * truck_dc_assignment_rate)
-                num_pool_trucks = total_dc_trucks - num_assigned_trucks
-                assignment_strategy = "percentage"
-                print(
-                    f"Using percentage-based assignment: {truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
-                )
-                print(f"  - Assigned trucks: {num_assigned_trucks}")
-                print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
-
+            # Initialize
             id_generator = IdentifierGenerator(self.config.seed + 3000)
             self.trucks = []
             current_id = 1
 
-            # Determine refrigerated/non-refrigerated split for assigned trucks
-            if num_assigned_trucks > 0:
-                # Maintain same refrigeration ratio as overall fleet
-                assigned_refrigerated = int(
-                    num_assigned_trucks * (refrigerated_count / total_dc_trucks)
+            # Generate assigned trucks
+            current_id, assigned_trucks_generated, dc_assignment_list = (
+                self._generate_assigned_trucks(
+                    id_generator,
+                    current_id,
+                    assignment_strategy,
+                    trucks_per_dc,
+                    assigned_refrigerated,
+                    assigned_non_refrigerated,
                 )
-                assigned_non_refrigerated = num_assigned_trucks - assigned_refrigerated
-            else:
-                assigned_refrigerated = 0
-                assigned_non_refrigerated = 0
-
-            # Pool trucks get the remainder
-            pool_refrigerated = refrigerated_count - assigned_refrigerated
-            pool_non_refrigerated = non_refrigerated_count - assigned_non_refrigerated
-
-            # Generate assigned trucks (round-robin across DCs)
-            assigned_trucks_generated = 0
-            refrigerated_assigned = 0
-            dc_assignment_list = []  # Track which trucks are assigned to which DCs
-
-            if assignment_strategy == "fixed" and trucks_per_dc_config is not None:
-                # Fixed assignment: exactly trucks_per_dc per DC
-                for dc in self.distribution_centers:
-                    # Calculate refrigeration split for this DC
-                    dc_refrigerated = min(
-                        trucks_per_dc_config,
-                        assigned_refrigerated - refrigerated_assigned,
-                    )
-                    dc_non_refrigerated = trucks_per_dc_config - dc_refrigerated
-
-                    # Create refrigerated trucks for this DC
-                    for _ in range(dc_refrigerated):
-                        truck = Truck(
-                            ID=current_id,
-                            LicensePlate=id_generator.generate_license_plate(
-                                current_id
-                            ),
-                            Refrigeration=True,
-                            DCID=dc.ID,
-                        )
-                        self.trucks.append(truck)
-                        dc_assignment_list.append((current_id, dc.ID, True))
-                        current_id += 1
-                        refrigerated_assigned += 1
-                        assigned_trucks_generated += 1
-
-                    # Create non-refrigerated trucks for this DC
-                    for _ in range(dc_non_refrigerated):
-                        truck = Truck(
-                            ID=current_id,
-                            LicensePlate=id_generator.generate_license_plate(
-                                current_id
-                            ),
-                            Refrigeration=False,
-                            DCID=dc.ID,
-                        )
-                        self.trucks.append(truck)
-                        dc_assignment_list.append((current_id, dc.ID, False))
-                        current_id += 1
-                        assigned_trucks_generated += 1
-
-            else:
-                # Percentage-based: round-robin distribution
-                dc_index = 0
-                # Generate refrigerated assigned trucks
-                for _ in range(assigned_refrigerated):
-                    dc = self.distribution_centers[dc_index % dc_count]
-                    truck = Truck(
-                        ID=current_id,
-                        LicensePlate=id_generator.generate_license_plate(current_id),
-                        Refrigeration=True,
-                        DCID=dc.ID,
-                    )
-                    self.trucks.append(truck)
-                    dc_assignment_list.append((current_id, dc.ID, True))
-                    current_id += 1
-                    dc_index += 1
-                    assigned_trucks_generated += 1
-
-                # Generate non-refrigerated assigned trucks
-                for _ in range(assigned_non_refrigerated):
-                    dc = self.distribution_centers[dc_index % dc_count]
-                    truck = Truck(
-                        ID=current_id,
-                        LicensePlate=id_generator.generate_license_plate(current_id),
-                        Refrigeration=False,
-                        DCID=dc.ID,
-                    )
-                    self.trucks.append(truck)
-                    dc_assignment_list.append((current_id, dc.ID, False))
-                    current_id += 1
-                    dc_index += 1
-                    assigned_trucks_generated += 1
-
-            # Generate pool trucks (DCID = None)
-            pool_trucks_generated = 0
-
-            # Pool refrigerated trucks
-            for _ in range(pool_refrigerated):
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=True,
-                    DCID=None,
-                )
-                self.trucks.append(truck)
-                current_id += 1
-                pool_trucks_generated += 1
-
-            # Pool non-refrigerated trucks
-            for _ in range(pool_non_refrigerated):
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=False,
-                    DCID=None,
-                )
-                self.trucks.append(truck)
-                current_id += 1
-                pool_trucks_generated += 1
-
-            # Generate supplier-to-DC trucks (always pool trucks with DCID=None)
-            supplier_refrigerated_count = (
-                self.config.volume.supplier_refrigerated_trucks
-            )
-            supplier_non_refrigerated_count = (
-                self.config.volume.supplier_non_refrigerated_trucks
-            )
-            supplier_total_trucks = (
-                supplier_refrigerated_count + supplier_non_refrigerated_count
             )
 
-            print(
-                f"\nGenerating {supplier_total_trucks} supplier trucks ({supplier_refrigerated_count} refrigerated, {supplier_non_refrigerated_count} non-refrigerated)"
+            # Generate pool trucks
+            current_id, pool_trucks_generated = self._generate_pool_trucks(
+                id_generator, current_id, pool_refrigerated, pool_non_refrigerated
             )
 
-            # Generate supplier refrigerated trucks
-            for _ in range(supplier_refrigerated_count):
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=True,
-                    DCID=None,
-                )
-                self.trucks.append(truck)
-                current_id += 1
-
-            # Generate supplier non-refrigerated trucks
-            for _ in range(supplier_non_refrigerated_count):
-                truck = Truck(
-                    ID=current_id,
-                    LicensePlate=id_generator.generate_license_plate(current_id),
-                    Refrigeration=False,
-                    DCID=None,
-                )
-                self.trucks.append(truck)
-                current_id += 1
+            # Generate supplier trucks
+            current_id = self._generate_supplier_trucks(id_generator, current_id)
 
             # Register truck IDs with FK validator
             truck_ids = [truck.ID for truck in self.trucks]
             self.fk_validator.register_truck_ids(truck_ids)
 
-            # Print detailed generation summary
-            total_trucks = len(self.trucks)
-
-            print("\n=== Truck Generation Summary ===")
-            print(f"Total trucks generated: {total_trucks}")
-            print(f"\nDC-to-Store Fleet ({total_dc_trucks} trucks):")
-            print(f"  - Assigned to DCs: {assigned_trucks_generated}")
-            print(f"    • Refrigerated: {assigned_refrigerated}")
-            print(f"    • Non-refrigerated: {assigned_non_refrigerated}")
-            print(f"  - Pool trucks (DCID=NULL): {pool_trucks_generated}")
-            print(f"    • Refrigerated: {pool_refrigerated}")
-            print(f"    • Non-refrigerated: {pool_non_refrigerated}")
-            print(f"\nSupplier-to-DC Fleet ({supplier_total_trucks} trucks):")
-            print("  - All pool trucks (DCID=NULL)")
-            print(f"    • Refrigerated: {supplier_refrigerated_count}")
-            print(f"    • Non-refrigerated: {supplier_non_refrigerated_count}")
-
-            # Show per-DC distribution for assigned trucks
-            if assignment_strategy == "fixed" and trucks_per_dc_config is not None:
-                print(f"\nPer-DC Assignment (fixed: {trucks_per_dc_config} trucks/DC):")
-                dc_truck_counts = {}
-                for truck_id, dc_id, is_ref in dc_assignment_list:
-                    if dc_id not in dc_truck_counts:
-                        dc_truck_counts[dc_id] = {
-                            "refrigerated": 0,
-                            "non_refrigerated": 0,
-                        }
-                    if is_ref:
-                        dc_truck_counts[dc_id]["refrigerated"] += 1
-                    else:
-                        dc_truck_counts[dc_id]["non_refrigerated"] += 1
-                for dc_id in sorted(dc_truck_counts.keys()):
-                    counts = dc_truck_counts[dc_id]
-                    total_dc = counts["refrigerated"] + counts["non_refrigerated"]
-                    print(
-                        f"  DC {dc_id}: {total_dc} trucks ({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
-                    )
-            elif assignment_strategy == "percentage":
-                print("\nPer-DC Assignment (round-robin distribution):")
-                dc_truck_counts = {}
-                for truck_id, dc_id, is_ref in dc_assignment_list:
-                    if dc_id not in dc_truck_counts:
-                        dc_truck_counts[dc_id] = {
-                            "refrigerated": 0,
-                            "non_refrigerated": 0,
-                        }
-                    if is_ref:
-                        dc_truck_counts[dc_id]["refrigerated"] += 1
-                    else:
-                        dc_truck_counts[dc_id]["non_refrigerated"] += 1
-                for dc_id in sorted(dc_truck_counts.keys()):
-                    counts = dc_truck_counts[dc_id]
-                    total_dc = counts["refrigerated"] + counts["non_refrigerated"]
-                    print(
-                        f"  DC {dc_id}: {total_dc} trucks ({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
-                    )
+            # Print summary
+            self._print_truck_generation_summary(
+                total_dc_trucks,
+                assigned_trucks_generated,
+                assigned_refrigerated,
+                assigned_non_refrigerated,
+                pool_trucks_generated,
+                pool_refrigerated,
+                pool_non_refrigerated,
+                assignment_strategy,
+                trucks_per_dc,
+                dc_assignment_list,
+            )
 
             # Do not mark complete here; async method will finalize after DB write
         except Exception as e:
@@ -1252,19 +1377,24 @@ class MasterDataGenerator:
             self._progress_tracker.mark_table_completed("customers")
         self._emit_progress("customers", 1.0, "Customers complete")
 
-    def generate_products_master(self) -> None:
-        """Generate products_master.csv with realistic pricing and brand combinations.""" 
-        print("Generating product master data with brand combinations...")
-        if self._progress_tracker:
-            self._progress_tracker.mark_table_started("products_master")
-        self._emit_progress("products_master", 0.0, "Generating products")
+    # -------------------------------------------------------------------------
+    # Product Generation Helper Methods
+    # -------------------------------------------------------------------------
 
-        if not self._product_data or not self._brand_data or not self._company_data:
-            raise ValueError("Product dictionary data not loaded")
+    def _organize_products_and_brands_by_category(
+        self,
+    ) -> tuple[dict[str, list[str]], list[str], dict[str, list[tuple[int, Any]]], dict[str, list[tuple[int, Any]]]]:
+        """Organize products, brands, and companies by category for smart matching.
 
-        # Create brand-company mapping by category
-        # Group companies by category for smart matching
-        companies_by_category = {}
+        Returns:
+            Tuple containing:
+            - companies_by_category: Dict mapping category to list of company names
+            - company_names: List of all company names
+            - brands_by_category: Dict mapping category to list of (idx, brand) tuples
+            - products_by_category: Dict mapping category to list of (idx, product) tuples
+        """
+        # Group companies by category
+        companies_by_category: dict[str, list[str]] = {}
         for company in self._company_data:
             category = company.Category
             if category not in companies_by_category:
@@ -1273,32 +1403,17 @@ class MasterDataGenerator:
 
         company_names = [company.Company for company in self._company_data]
 
-        # Target product count
-        target_product_count = self.config.volume.total_products
-
-        print(f"Target products: {target_product_count}")
-        print(f"Available base products: {len(self._product_data)}")
-        print(f"Available brands: {len(self._brand_data)}")
-        print(f"Available companies: {len(company_names)}")
-
-        self.products_master = []
-        product_id = 1
-
-        # Create category-aware brand-product combinations
-        print("Creating category-aware brand-product combinations...")
-
-        # Group brands by category for smart pairing
-        brands_by_category = {}
+        # Group brands by category
+        brands_by_category: dict[str, list[tuple[int, Any]]] = {}
         for brand_idx, brand in enumerate(self._brand_data):
             category = brand.Category
             if category not in brands_by_category:
                 brands_by_category[category] = []
             brands_by_category[category].append((brand_idx, brand))
 
-        # Group products by category for smart pairing
-        products_by_category = {}
+        # Group products by category (mapped to brand categories)
+        products_by_category: dict[str, list[tuple[int, Any]]] = {}
         for product_idx, product in enumerate(self._product_data):
-            # Map product categories to brand categories
             product_category = self._map_product_to_brand_category(
                 product.Category, product.Department
             )
@@ -1309,160 +1424,210 @@ class MasterDataGenerator:
         print(f"Brand categories: {sorted(brands_by_category.keys())}")
         print(f"Product categories mapped to: {sorted(products_by_category.keys())}")
 
-        # Create realistic combinations within each category
-        valid_combinations = []
+        return companies_by_category, company_names, brands_by_category, products_by_category
+
+    def _create_valid_brand_product_combinations(
+        self,
+        brands_by_category: dict[str, list[tuple[int, Any]]],
+        products_by_category: dict[str, list[tuple[int, Any]]],
+    ) -> list[tuple[int, int]]:
+        """Create valid category-matched brand-product combinations.
+
+        Returns:
+            List of (product_idx, brand_idx) tuples representing valid combinations
+        """
+        valid_combinations: list[tuple[int, int]] = []
+
         for category in brands_by_category.keys():
             if category in products_by_category:
                 category_brands = brands_by_category[category]
                 category_products = products_by_category[category]
 
-                # Create combinations within this category
-                for product_idx, product in category_products:
-                    for brand_idx, brand in category_brands:
+                for product_idx, _ in category_products:
+                    for brand_idx, _ in category_brands:
                         valid_combinations.append((product_idx, brand_idx))
 
                 print(
-                    f"Category '{category}': {len(category_brands)} brands × {len(category_products)} products = {len(category_brands) * len(category_products)} combinations"
+                    f"Category '{category}': {len(category_brands)} brands × "
+                    f"{len(category_products)} products = {len(category_brands) * len(category_products)} combinations"
                 )
 
         print(f"Total valid category-matched combinations: {len(valid_combinations):,}")
+        return valid_combinations
 
-        # Vectorized sampling of combinations using NumPy
-        vc_count = len(valid_combinations)
-        if vc_count == 0:
-            selected_combinations = []
+    def _generate_single_product(
+        self,
+        product_id: int,
+        product_idx: int,
+        brand_idx: int,
+        companies_by_category: dict[str, list[str]],
+        company_names: list[str],
+        target_product_count: int,
+    ) -> ProductMaster | None:
+        """Generate a single product with validation retry logic.
+
+        Returns:
+            ProductMaster instance if successful, None if all retries failed
+        """
+        from decimal import Decimal
+
+        product = self._product_data[product_idx]
+        brand = self._brand_data[brand_idx]
+
+        # Match company to brand by category
+        brand_category = brand.Category
+        if brand_category in companies_by_category and companies_by_category[brand_category]:
+            company = self._rng.choice(companies_by_category[brand_category])
         else:
-            replace = vc_count < target_product_count
-            idx = self._np_rng.choice(
-                vc_count, size=target_product_count, replace=replace
-            )
-            selected_combinations = [valid_combinations[i] for i in idx]
+            company = self._rng.choice(company_names)
 
-        print(f"Selected {len(selected_combinations)} category-matched combinations")
+        base_price = float(product.BasePrice)
+        max_retries = 5
 
-        progress_reporter = ProgressReporter(
-            target_product_count, "Generating product combinations"
-        )
-
-        # Generate products from selected combinations - keep generating until we have exactly target_product_count
-        combination_idx = 0
-        successful_products = 0
-        failed_validations = 0
-
-        # Use infinite loop with break condition instead of relying on combination list length
-        while successful_products < target_product_count:
-            # If we've exhausted our combinations, generate more
-            if combination_idx >= len(selected_combinations):
-                remaining_needed = target_product_count - successful_products
-                batch_size = min(
-                    1000, remaining_needed * 2
-                )  # Generate extra to account for validation failures
-                print(
-                    f"Exhausted combinations at {combination_idx} with {successful_products}/{target_product_count} successful products. Generating {batch_size} more combinations..."
-                )
-                # Vectorized resample using NumPy for speed
-                add_idx = self._np_rng.integers(0, len(valid_combinations), size=batch_size)
-                additional_combinations = [valid_combinations[i] for i in add_idx]
-                selected_combinations.extend(additional_combinations)
-
-            product_idx, brand_idx = selected_combinations[combination_idx]
-            combination_idx += 1
-            product = self._product_data[product_idx]
-            brand = self._brand_data[brand_idx]
-
-            # Match company to brand by category
-            brand_category = brand.Category
-            if (
-                brand_category in companies_by_category
-                and companies_by_category[brand_category]
-            ):
-                # Choose a company from the same category
-                company = self._rng.choice(companies_by_category[brand_category])
+        for retry in range(max_retries):
+            # Calculate pricing with variation
+            if retry == 0:
+                price_variation = float(self._np_rng.uniform(0.85, 1.15))
             else:
-                # Fallback to a random company if no category match
-                company = self._rng.choice(company_names)
+                price_variation = self._rng.uniform(0.9, 1.1)  # Narrower for retries
 
-            # Calculate pricing structure with slight variation per brand
-            # Base pricing on the product's BasePrice with brand-specific adjustments
-            from decimal import Decimal
-
-            base_price = float(product.BasePrice)
-
-            # Add brand-specific price variation (±5-15%)
-            # Draw brand-specific variation via NumPy RNG
-            price_variation = float(self._np_rng.uniform(0.85, 1.15))
             adjusted_base_price = base_price * price_variation
-
-            # Convert to Decimal for pricing calculator
             pricing = self.pricing_calculator.calculate_full_pricing(
                 Decimal(str(adjusted_base_price))
             )
 
-            # Determine if product requires refrigeration based on category
-            requires_refrigeration = self._requires_refrigeration(
-                product.Category, product.Subcategory
-            )
+            try:
+                # Determine tags
+                _tags = getattr(product, "Tags", None)
+                if not _tags:
+                    _tags = getattr(self, "_product_tags_overlay", {}).get(product.ProductName)
 
-            # Calculate product launch date based on historical start date and product sequence
-            launch_date = self._calculate_product_launch_date(
-                product_id, target_product_count
-            )
-
-            # Determine product taxability based on category/department
-            # Business logic: groceries/food = NON_TAXABLE (25%), clothing = REDUCED_RATE (10%), rest = TAXABLE (65%)
-            taxability = self._determine_product_taxability(
-                product.Department, product.Category
-            )
-
-            # Use brand as provided without blocklist-based screening
-
-            # Try to create ProductMaster with validation retry
-            max_retries = 5
-            product_master = None
-
-            for retry in range(max_retries):
-                try:
-                    # Determine tags from product or overlay
-                    _tags = getattr(product, "Tags", None)
-                    if not _tags:
-                        _tags = getattr(self, "_product_tags_overlay", {}).get(product.ProductName)
-
-                    product_master = ProductMaster(
-                        ID=product_id,
-                        ProductName=product.ProductName,
-                        Brand=brand.Brand,
-                        Company=company,
-                        Department=product.Department,
-                        Category=product.Category,
-                        Subcategory=product.Subcategory,
-                        Cost=pricing["Cost"],
-                        MSRP=pricing["MSRP"],
-                        SalePrice=pricing["SalePrice"],
-                        RequiresRefrigeration=requires_refrigeration,
-                        LaunchDate=launch_date,
-                        taxability=taxability,
-                        Tags=_tags,
+                return ProductMaster(
+                    ID=product_id,
+                    ProductName=product.ProductName,
+                    Brand=brand.Brand,
+                    Company=company,
+                    Department=product.Department,
+                    Category=product.Category,
+                    Subcategory=product.Subcategory,
+                    Cost=pricing["Cost"],
+                    MSRP=pricing["MSRP"],
+                    SalePrice=pricing["SalePrice"],
+                    RequiresRefrigeration=self._requires_refrigeration(
+                        product.Category, product.Subcategory
+                    ),
+                    LaunchDate=self._calculate_product_launch_date(
+                        product_id, target_product_count
+                    ),
+                    taxability=self._determine_product_taxability(
+                        product.Department, product.Category
+                    ),
+                    Tags=_tags,
+                )
+            except ValueError as e:
+                if retry == max_retries - 1:
+                    print(
+                        f"Warning: Failed to generate valid pricing for "
+                        f"{product.ProductName} + {brand.Brand} after {max_retries} attempts: {e}"
                     )
-                    break  # Success - exit retry loop
-                except ValueError as e:
-                    if retry < max_retries - 1:
-                        # Recalculate pricing with different variation
-                        price_variation = self._rng.uniform(
-                            0.9, 1.1
-                        )  # Narrower range for retry
-                        adjusted_base_price = base_price * price_variation
-                        pricing = self.pricing_calculator.calculate_full_pricing(
-                            Decimal(str(adjusted_base_price))
-                        )
-                    else:
-                        # Final retry failed - log and skip this combination
-                        print(
-                            f"Warning: Failed to generate valid pricing for product {product.ProductName} + {brand.Brand} after {max_retries} attempts: {e}"
-                        )
-                        failed_validations += 1
-                        break
 
-            # Only add if we successfully created the product
+        return None
+
+    def _print_product_generation_summary(
+        self,
+        target_count: int,
+        combinations_processed: int,
+        successful: int,
+        failed: int,
+    ) -> None:
+        """Print detailed product generation summary."""
+        print("\n=== Product Generation Summary ===")
+        print(f"Target products: {target_count}")
+        print(f"Total combinations processed: {combinations_processed}")
+        print(f"Successful products: {successful}")
+        print(f"Failed validations: {failed}")
+        print(f"Final product count: {len(self.products_master)}")
+
+    # -------------------------------------------------------------------------
+    # Main Product Generation Method
+    # -------------------------------------------------------------------------
+
+    def generate_products_master(self) -> None:
+        """Generate products_master.csv with realistic pricing and brand combinations."""
+        print("Generating product master data with brand combinations...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("products_master")
+        self._emit_progress("products_master", 0.0, "Generating products")
+
+        if not self._product_data or not self._brand_data or not self._company_data:
+            raise ValueError("Product dictionary data not loaded")
+
+        target_product_count = self.config.volume.total_products
+        print(f"Target products: {target_product_count}")
+        print(f"Available base products: {len(self._product_data)}")
+        print(f"Available brands: {len(self._brand_data)}")
+        print(f"Available companies: {len(self._company_data)}")
+
+        # Organize data by category
+        print("Creating category-aware brand-product combinations...")
+        (
+            companies_by_category,
+            company_names,
+            brands_by_category,
+            products_by_category,
+        ) = self._organize_products_and_brands_by_category()
+
+        # Create valid combinations
+        valid_combinations = self._create_valid_brand_product_combinations(
+            brands_by_category, products_by_category
+        )
+
+        # Sample combinations
+        vc_count = len(valid_combinations)
+        if vc_count == 0:
+            selected_combinations: list[tuple[int, int]] = []
+        else:
+            replace = vc_count < target_product_count
+            idx = self._np_rng.choice(vc_count, size=target_product_count, replace=replace)
+            selected_combinations = [valid_combinations[i] for i in idx]
+
+        print(f"Selected {len(selected_combinations)} category-matched combinations")
+
+        # Initialize generation
+        self.products_master = []
+        progress_reporter = ProgressReporter(target_product_count, "Generating product combinations")
+        product_id = 1
+        combination_idx = 0
+        successful_products = 0
+        failed_validations = 0
+
+        # Generate products until we reach target count
+        while successful_products < target_product_count:
+            # Replenish combinations if exhausted
+            if combination_idx >= len(selected_combinations):
+                remaining_needed = target_product_count - successful_products
+                batch_size = min(1000, remaining_needed * 2)
+                print(
+                    f"Exhausted combinations at {combination_idx} with "
+                    f"{successful_products}/{target_product_count} successful. "
+                    f"Generating {batch_size} more..."
+                )
+                add_idx = self._np_rng.integers(0, len(valid_combinations), size=batch_size)
+                selected_combinations.extend([valid_combinations[i] for i in add_idx])
+
+            product_idx, brand_idx = selected_combinations[combination_idx]
+            combination_idx += 1
+
+            # Generate single product
+            product_master = self._generate_single_product(
+                product_id,
+                product_idx,
+                brand_idx,
+                companies_by_category,
+                company_names,
+                target_product_count,
+            )
+
             if product_master:
                 self.products_master.append(product_master)
                 successful_products += 1
@@ -1471,27 +1636,21 @@ class MasterDataGenerator:
 
             product_id += 1
 
-            # Update internal progress reporter every 500
+            # Progress update every 500 products
             if successful_products % 500 == 0 and successful_products > 0:
                 progress_reporter.update(500)
 
-        # Final progress update for internal reporter only
+        # Final progress update
         remaining_progress = target_product_count - (successful_products // 500) * 500
         if remaining_progress > 0:
             progress_reporter.update(remaining_progress)
-
         progress_reporter.complete()
-        # Don't mark complete yet; DB write progress will follow
 
-        # Detailed generation summary
-        print("\n=== Product Generation Summary ===")
-        print(f"Target products: {target_product_count}")
-        print(f"Total combinations processed: {combination_idx}")
-        print(f"Successful products: {successful_products}")
-        print(f"Failed validations: {failed_validations}")
-        print(f"Final product count: {len(self.products_master)}")
+        # Print summary and validate
+        self._print_product_generation_summary(
+            target_product_count, combination_idx, successful_products, failed_validations
+        )
 
-        # The loop above should have guaranteed exactly target_product_count products
         assert successful_products == target_product_count, (
             f"Expected {target_product_count} products, got {successful_products}"
         )
@@ -1503,9 +1662,7 @@ class MasterDataGenerator:
         product_ids = [product.ID for product in self.products_master]
         self.fk_validator.register_product_ids(product_ids)
 
-        print(
-            f"Generated {len(self.products_master)} product master records with brand combinations"
-        )
+        print(f"Generated {len(self.products_master)} product master records with brand combinations")
 
     async def generate_products_master_async(self) -> None:
         """Generate products with optional database insertion (async version)."""
