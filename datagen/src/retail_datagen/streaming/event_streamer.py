@@ -247,6 +247,9 @@ class EventStreamer:
 
         # Pause statistics
         self._pause_count = 0
+
+        # Session attribute (deprecated - kept for backward compatibility)
+        self._session = None
         self._total_pause_duration = 0.0
         self._last_pause_time: float | None = None
 
@@ -1143,12 +1146,13 @@ class EventStreamer:
             event_weights=weights,
         )
 
-        # Update daily counts for pacing
-        for ev in events:
-            if ev.event_type in self._daily_targets:
-                self._daily_counts[ev.event_type] = (
-                    self._daily_counts.get(ev.event_type, 0) + 1
-                )
+        # Update daily counts for pacing (protected by stats lock)
+        async with self._stats_lock:
+            for ev in events:
+                if ev.event_type in self._daily_targets:
+                    self._daily_counts[ev.event_type] = (
+                        self._daily_counts.get(ev.event_type, 0) + 1
+                    )
 
         return events
 

@@ -629,6 +629,13 @@ class InventoryFlowSimulator:
             for key in self._trucks_by_dc.keys():
                 self._truck_rr_index[key] = 0
 
+        # Reorder points and quantities
+        self._reorder_points = self._calculate_reorder_points()
+
+        # Supply chain disruptions tracking
+        self._active_disruptions: dict[int, dict] = {}  # dc_id -> disruption_info
+        self._disruption_counter = 1
+
     def _select_truck_for_shipment(self, dc_id: int) -> int | str:
         """Select a truck for a shipment, preferring trucks assigned to the DC.
 
@@ -650,13 +657,6 @@ class InventoryFlowSimulator:
 
         # Final fallback: synthetic truck code (kept for resilience)
         return f"TRK{self._rng.randint(1000, 9999)}"
-
-        # Reorder points and quantities
-        self._reorder_points = self._calculate_reorder_points()
-
-        # Supply chain disruptions tracking
-        self._active_disruptions: dict[int, dict] = {}  # dc_id -> disruption_info
-        self._disruption_counter = 1
 
     def _initialize_inventory(self):
         """Initialize baseline inventory levels."""
