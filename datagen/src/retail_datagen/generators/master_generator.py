@@ -1854,6 +1854,8 @@ class MasterDataGenerator:
     def generate_dc_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for distribution centers."""
         print("Generating DC inventory snapshots...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("dc_inventory_snapshots")
         self._emit_progress(
             "dc_inventory_snapshots", 0.0, "Generating DC inventory snapshots"
         )
@@ -1926,6 +1928,8 @@ class MasterDataGenerator:
     def generate_store_inventory_snapshots(self) -> None:
         """Generate realistic initial inventory snapshots for stores."""
         print("Generating store inventory snapshots...")
+        if self._progress_tracker:
+            self._progress_tracker.mark_table_started("store_inventory_snapshots")
         self._emit_progress(
             "store_inventory_snapshots", 0.0, "Generating store inventory snapshots"
         )
