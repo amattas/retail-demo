@@ -1,12 +1,27 @@
 #!/usr/bin/env python3
 """
-Validation script for foot traffic conversion rates.
+Validate foot traffic generation and conversion rate logic.
 
-This script generates sample foot traffic data and validates:
-1. Aggregate counts (not individual pings with Count=1)
-2. Traffic > receipts with proper conversion rates (10-30%)
-3. Temporal patterns (peak vs off-peak hours)
-4. Sensor distribution (5 sensors per store with proportional traffic)
+Purpose:
+    Validates that foot traffic data generation produces realistic
+    aggregate counts with proper receipt-to-traffic conversion rates.
+
+Checks:
+    1. Aggregate counts (not individual pings with Count=1)
+    2. Traffic > receipts with proper conversion rates (10-35%)
+    3. Temporal patterns (peak vs off-peak hours)
+    4. Sensor distribution (5 sensors per store with proportional traffic)
+
+Usage:
+    python validate_foot_traffic.py
+
+When to run:
+    After modifying _generate_foot_traffic() in src/retail_datagen/generators/fact_generator.py.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All validation checks passed
+    1 - Some validation checks failed
 """
 
 import sys

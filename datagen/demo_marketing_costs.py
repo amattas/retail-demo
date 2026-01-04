@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 """
-Demonstration script showing marketing cost calculation variation.
+Demonstrate marketing impression cost calculation.
 
-This script demonstrates how marketing impression costs vary by:
-- Channel (EMAIL, DISPLAY, SOCIAL, SEARCH, VIDEO, FACEBOOK, GOOGLE, INSTAGRAM, YOUTUBE)
-- Device (MOBILE, TABLET, DESKTOP)
+Purpose:
+    Interactive demonstration showing how marketing costs vary by
+    channel and device type. Useful for understanding the cost model
+    before running full data generation.
 
-Costs are calculated as: base_cost (random within channel range) * device_multiplier
+Displays:
+    - Configuration (channel cost ranges, device multipliers)
+    - Sample costs for each channel/device combination
+    - Cost calculation observations
+
+Channels:
+    EMAIL, DISPLAY, SOCIAL, SEARCH, VIDEO, FACEBOOK, GOOGLE, INSTAGRAM, YOUTUBE
+
+Devices:
+    MOBILE (lowest multiplier), TABLET, DESKTOP (highest multiplier)
+
+Usage:
+    python demo_marketing_costs.py
+
+Note:
+    This is a demonstration/educational script. It does not generate
+    or persist any data.
 """
 
 import sys

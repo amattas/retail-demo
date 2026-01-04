@@ -555,6 +555,45 @@ The `examples/` directory contains runnable examples and demo scripts to explore
 - Lint/format: `ruff check .`
 - Type-check: `mypy src`
 
+### Development Utility Scripts
+
+The datagen root directory contains utility scripts for verification and validation during development. These are **development artifacts** (not CI/CD integrated) for ad-hoc testing after code changes.
+
+#### Verification Scripts
+Run these after modifying specific components to ensure implementations are correct:
+
+| Script | Purpose | When to Run |
+|--------|---------|-------------|
+| `verify_models.py` | Check API model fields for hourly progress tracking | After modifying `api/models.py` |
+| `verify_phase_3a.py` | Validate async MasterDataGenerator methods | After modifying async generator methods |
+| `verify_retail_engine.py` | Test database engine singleton and configuration | After modifying `db/` config |
+| `verify_hourly_tracker.py` | Test HourlyProgressTracker thread safety | After modifying fact generator progress |
+| `verify_tax_implementation.py` | End-to-end tax rate infrastructure test | After modifying tax rates or `tax_utils.py` |
+
+#### Validation Scripts
+Run these to validate data generation produces realistic, consistent output:
+
+| Script | Purpose | When to Run |
+|--------|---------|-------------|
+| `validate_foot_traffic.py` | Check conversion rates and sensor distribution | After modifying `_generate_foot_traffic()` |
+| `validate_taxability.py` | Verify product taxability flag distribution | After modifying taxability logic |
+
+#### Other Utilities
+
+| Script | Purpose | Notes |
+|--------|---------|-------|
+| `add_async_methods.py` | Code generation helper (one-time use) | Development artifact from Phase 3A |
+| `demo_marketing_costs.py` | Interactive marketing cost demonstration | Educational - does not persist data |
+
+**Usage:** Run from the `datagen/` directory:
+```bash
+cd datagen
+python verify_models.py
+python validate_foot_traffic.py
+```
+
+All scripts exit with code 0 on success, 1 on failure.
+
 ## Advanced Features
 
 ### State Management

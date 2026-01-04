@@ -1,8 +1,28 @@
 #!/usr/bin/env python3
 """
-Quick verification script for unified retail engine implementation.
+Verify unified retail database engine implementation.
 
-Tests basic functionality of get_retail_engine() without running full test suite.
+Purpose:
+    Tests the get_retail_engine() singleton, database configuration,
+    and connection health without running the full test suite.
+
+Checks:
+    1. Engine creation and singleton pattern
+    2. Query execution
+    3. PRAGMA configuration (foreign keys, WAL, synchronous)
+    4. Engine health check
+    5. Disposal and re-initialization
+
+Usage:
+    python verify_retail_engine.py
+
+When to run:
+    After modifying database configuration in src/retail_datagen/db/.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All tests passed
+    1 - Some tests failed
 """
 
 import asyncio

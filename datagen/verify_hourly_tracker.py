@@ -1,7 +1,28 @@
 #!/usr/bin/env python3
 """
-Quick verification script for HourlyProgressTracker implementation.
-Tests basic functionality and thread safety without requiring pytest.
+Verify HourlyProgressTracker implementation for fact generation.
+
+Purpose:
+    Tests the HourlyProgressTracker class for thread safety, progress
+    calculation accuracy, and edge case handling without pytest.
+
+Checks:
+    1. Basic progress tracking functionality
+    2. Reset functionality
+    3. Thread-safe concurrent updates
+    4. Edge cases (invalid hours, unknown tables, duplicates)
+    5. Tables-in-progress tracking
+
+Usage:
+    python verify_hourly_tracker.py
+
+When to run:
+    After modifying HourlyProgressTracker in src/retail_datagen/generators/fact_generator.py.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All tests passed
+    1 - Some tests failed
 """
 
 import sys

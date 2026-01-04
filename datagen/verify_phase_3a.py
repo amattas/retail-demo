@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
 """
-Verification script for Phase 3A implementation.
+Verify Phase 3A implementation: async MasterDataGenerator methods.
+
+Purpose:
+    Validates the Phase 3A async method additions to MasterDataGenerator,
+    ensuring backward compatibility with existing sync methods.
 
 Checks:
-1. File syntax is valid (imports correctly)
-2. All async methods exist
-3. Backward compatibility maintained
+    1. File syntax is valid (imports correctly)
+    2. All async methods exist (generate_*_async variants)
+    3. Backward compatibility maintained (original sync methods still work)
+    4. Method signatures are correct
+
+Usage:
+    python verify_phase_3a.py
+
+When to run:
+    After modifying MasterDataGenerator async methods.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All checks passed
+    1 - Some checks failed
 """
 
 import sys

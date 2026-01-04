@@ -1,13 +1,31 @@
 #!/usr/bin/env python3
 """
-Comprehensive verification script for Phase 1.3 Tax Rate Implementation.
+Verify Phase 1.3 tax rate implementation end-to-end.
 
-This script verifies:
-1. Tax rates CSV structure and content
-2. TaxJurisdiction Pydantic model validation
-3. DictionaryLoader integration
-4. MasterDataGenerator tax rate mapping
-5. TaxCalculator utility class functionality
+Purpose:
+    Comprehensive verification of the tax rate infrastructure, from
+    CSV loading through to tax calculation in receipt generation.
+
+Checks:
+    1. Tax rates CSV structure and content (data/dictionaries/tax_rates.csv)
+    2. TaxJurisdiction Pydantic model validation
+    3. DictionaryLoader integration
+    4. MasterDataGenerator tax rate mapping
+    5. TaxCalculator utility class functionality
+
+Usage:
+    python verify_tax_implementation.py
+
+When to run:
+    After modifying tax rates CSV or tax-related code in:
+    - data/dictionaries/tax_rates.csv
+    - src/retail_datagen/shared/tax_utils.py
+    - src/retail_datagen/shared/dictionary_loader.py
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All verifications passed
+    1 - Some verifications failed
 """
 
 import sys

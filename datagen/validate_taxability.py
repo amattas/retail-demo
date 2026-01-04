@@ -1,9 +1,28 @@
 #!/usr/bin/env python3
 """
-Validation script for Phase 1.4: Product Taxability Implementation
+Validate Phase 1.4 product taxability flag assignment.
 
-This script validates that product taxability flags are correctly assigned
-during product generation and provides distribution statistics.
+Purpose:
+    Validates that products receive correct taxability flags (TAXABLE,
+    NON_TAXABLE, REDUCED_RATE) during generation, with appropriate
+    distribution by department.
+
+Checks:
+    1. All products have taxability assigned
+    2. Grocery products are marked NON_TAXABLE (>95%)
+    3. Overall distribution is reasonable (50-80% taxable, 15-40% non-taxable)
+    4. No null/None taxability values
+
+Usage:
+    python validate_taxability.py
+
+When to run:
+    After modifying product taxability logic in MasterDataGenerator.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All validation checks passed
+    1 - Some validation checks failed
 """
 
 import asyncio

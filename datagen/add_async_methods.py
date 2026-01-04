@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
 """
-Helper script to add async method wrappers to master_generator.py.
+Code generation helper for async method wrappers (ONE-TIME USE).
 
-This script adds async versions of remaining generation methods that:
-1. Call the existing sync method for data generation
-2. Insert to database if session provided
-3. Handle CSV export based on flags
+Purpose:
+    Generates boilerplate async method wrappers for MasterDataGenerator.
+    This is a one-time code generation tool, not a runtime utility.
+
+Output:
+    Prints Python code for async versions of generation methods that:
+    1. Call the existing sync method for data generation
+    2. Insert to database if session provided
+    3. Handle CSV export based on flags
+
+Usage:
+    python add_async_methods.py > async_methods.py
+    # Then manually integrate into master_generator.py
+
+Note:
+    This is a development artifact used during Phase 3A implementation.
+    It should NOT be run as part of normal workflows.
 """
 
 import re

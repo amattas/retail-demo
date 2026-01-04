@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
-"""Quick syntax verification for API models."""
+"""
+Verify API model field updates for hourly progress tracking.
+
+Purpose:
+    Quick syntax verification that GenerationStatusResponse includes
+    the new hourly progress fields (current_day, current_hour,
+    hourly_progress, total_hours_completed).
+
+Usage:
+    python verify_models.py
+
+When to run:
+    After modifying API model fields in src/retail_datagen/api/models.py.
+    Development artifact - not integrated into CI/CD.
+
+Exit codes:
+    0 - All fields present and correct
+    1 - Fields missing or incorrect types
+"""
 
 try:
     from src.retail_datagen.api.models import GenerationStatusResponse
