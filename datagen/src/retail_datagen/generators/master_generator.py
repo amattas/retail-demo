@@ -115,6 +115,7 @@ logger = logging.getLogger(__name__)
 # Constants for product generation
 _MAX_COMBINATION_BATCH_SIZE = 1000  # Maximum combinations to generate per batch
 _COMBINATION_SAFETY_MULTIPLIER = 2  # Generate 2x needed to account for validation failures
+_MAX_GENERATION_ATTEMPTS_MULTIPLIER = 10  # Max attempts = target_count * this multiplier
 
 
 class MasterDataGenerator:
@@ -1004,10 +1005,11 @@ class MasterDataGenerator:
         if strategy.assignment_strategy == "fixed" and strategy.trucks_per_dc > 0:
             # Fixed assignment: exactly trucks_per_dc per DC
             for dc in self.distribution_centers:
-                dc_refrigerated = min(
+                # Use max(0, ...) to guard against edge cases where remaining could be negative
+                dc_refrigerated = max(0, min(
                     strategy.trucks_per_dc,
                     strategy.assigned_refrigerated - refrigerated_assigned,
-                )
+                ))
                 dc_non_refrigerated = strategy.trucks_per_dc - dc_refrigerated
 
                 # Create refrigerated trucks for this DC
@@ -1611,7 +1613,7 @@ class MasterDataGenerator:
             )
 
         # Max attempts to prevent infinite loop if all products fail validation
-        max_total_attempts = target_product_count * 10
+        max_total_attempts = target_product_count * _MAX_GENERATION_ATTEMPTS_MULTIPLIER
 
         # Generate products until we reach target count
         while successful_products < target_product_count:
