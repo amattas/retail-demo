@@ -399,3 +399,98 @@ class TestProductGenerationSafeguards:
 
         with pytest.raises(RuntimeError, match="Failed to generate .* products after"):
             product_generator.generate_products_master()
+
+
+class TestSupplierTrucksGeneration:
+    """Tests for _generate_supplier_trucks helper."""
+
+    def test_generates_supplier_trucks_with_null_dcid(self, generator):
+        """Test that supplier trucks have DCID=None."""
+        id_gen = MagicMock()
+        id_gen.generate_license_plate.side_effect = lambda x: f"SUPPLIER-{x}"
+
+        generator.trucks = []
+        next_id = generator._generate_supplier_trucks(id_gen, 1)
+
+        # 5 refrigerated + 5 non-refrigerated = 10 total
+        assert len(generator.trucks) == 10
+        assert next_id == 11
+        # All supplier trucks should have DCID=None
+        assert all(truck.DCID is None for truck in generator.trucks)
+
+    def test_supplier_trucks_refrigeration_split(self, generator):
+        """Test that supplier trucks have correct refrigeration split."""
+        id_gen = MagicMock()
+        id_gen.generate_license_plate.side_effect = lambda x: f"SUPPLIER-{x}"
+
+        generator.trucks = []
+        generator._generate_supplier_trucks(id_gen, 1)
+
+        refrigerated = sum(1 for t in generator.trucks if t.Refrigeration)
+        non_refrigerated = sum(1 for t in generator.trucks if not t.Refrigeration)
+
+        assert refrigerated == 5  # config.volume.supplier_refrigerated_trucks
+        assert non_refrigerated == 5  # config.volume.supplier_non_refrigerated_trucks
+
+
+class TestGenerateTrucksIntegration:
+    """Integration tests for complete generate_trucks workflow."""
+
+    @pytest.fixture
+    def full_generator(self, mock_config):
+        """Create a generator with full setup for integration testing."""
+        import numpy as np
+
+        with patch.object(MasterDataGenerator, '__init__', lambda self, config: None):
+            gen = MasterDataGenerator(mock_config)
+            gen.config = mock_config
+            gen.distribution_centers = [
+                MagicMock(ID=1),
+                MagicMock(ID=2),
+                MagicMock(ID=3),
+            ]
+            gen.trucks = []
+            gen._rng = MagicMock()
+            gen._np_rng = np.random.default_rng(42)
+            gen._progress_tracker = None
+            gen._emit_progress = MagicMock()
+            gen.fk_validator = MagicMock()
+            return gen
+
+    def test_generate_trucks_total_count(self, full_generator):
+        """Test that generate_trucks produces correct total count."""
+        full_generator.generate_trucks()
+
+        # Total = DC trucks (60 + 40) + supplier trucks (5 + 5) = 110
+        expected_total = 60 + 40 + 5 + 5
+        assert len(full_generator.trucks) == expected_total
+
+    def test_generate_trucks_refrigeration_totals(self, full_generator):
+        """Test that refrigeration totals match config."""
+        full_generator.generate_trucks()
+
+        refrigerated = sum(1 for t in full_generator.trucks if t.Refrigeration)
+        non_refrigerated = sum(1 for t in full_generator.trucks if not t.Refrigeration)
+
+        # DC refrigerated (60) + supplier refrigerated (5) = 65
+        expected_refrigerated = 60 + 5
+        # DC non-refrigerated (40) + supplier non-refrigerated (5) = 45
+        expected_non_refrigerated = 40 + 5
+
+        assert refrigerated == expected_refrigerated
+        assert non_refrigerated == expected_non_refrigerated
+
+    def test_generate_trucks_unique_ids(self, full_generator):
+        """Test that all trucks have unique IDs."""
+        full_generator.generate_trucks()
+
+        truck_ids = [t.ID for t in full_generator.trucks]
+        assert len(truck_ids) == len(set(truck_ids)), "Truck IDs should be unique"
+
+    def test_generate_trucks_valid_license_plates(self, full_generator):
+        """Test that all trucks have non-empty license plates."""
+        full_generator.generate_trucks()
+
+        for truck in full_generator.trucks:
+            assert truck.LicensePlate is not None
+            assert len(truck.LicensePlate) > 0
