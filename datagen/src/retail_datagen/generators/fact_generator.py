@@ -2689,6 +2689,20 @@ class FactDataGenerator:
                         "ETA": updated_info["eta"],
                         "ETD": updated_info["etd"],
                     }
+
+                    # Add departure fields for COMPLETED status (truck_departed event)
+                    if current_status == TruckStatus.COMPLETED:
+                        # Departure time is when the truck leaves after unloading
+                        truck_record["DepartureTime"] = check_time
+                        # Calculate actual unload duration in minutes
+                        # (from ARRIVED/UNLOADING start to COMPLETED)
+                        eta = updated_info["eta"]
+                        if eta:
+                            unload_duration_minutes = int((check_time - eta).total_seconds() / 60)
+                            truck_record["ActualUnloadDuration"] = max(30, unload_duration_minutes)  # min 30 min
+                        else:
+                            truck_record["ActualUnloadDuration"] = 60  # default 60 min
+
                     truck_lifecycle_records.append(truck_record)
 
                     # Generate inventory transactions at specific lifecycle stages
@@ -3133,9 +3147,13 @@ class FactDataGenerator:
             elif table_name == "truck_moves":
                 status = (get_field(rec, "status") or "").upper()
                 if status == "ARRIVED":
+                    # Truck arrived at destination (store or DC)
                     message_type = "truck_arrived"
-                elif status in ("LOADING", "IN_TRANSIT"):
+                elif status == "COMPLETED":
+                    # Truck departed after completing unloading
                     message_type = "truck_departed"
+                # Note: LOADING and IN_TRANSIT are internal states and don't
+                # generate separate streaming events - they're tracked in fact table only
 
             # Partition key preference: store_id -> dc_id
             store_id = get_field(rec, "store_id")
@@ -3652,6 +3670,8 @@ class FactDataGenerator:
                 "ShipmentId": "shipment_id",
                 "ETA": "eta",
                 "ETD": "etd",
+                "DepartureTime": "departure_time",
+                "ActualUnloadDuration": "actual_unload_duration",
             },
             "store_inventory_txn": {
                 **common_mappings,
@@ -3918,6 +3938,7 @@ class FactDataGenerator:
                         **common,
                         'TruckId': 'truck_id', 'DCID': 'dc_id', 'StoreID': 'store_id', 'ProductID': 'product_id', 'Status': 'status',
                         'ShipmentId': 'shipment_id', 'ETA': 'eta', 'ETD': 'etd',
+                        'DepartureTime': 'departure_time', 'ActualUnloadDuration': 'actual_unload_duration',
                     },
                     'store_inventory_txn': {
                         **common,
