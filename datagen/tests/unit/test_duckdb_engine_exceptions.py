@@ -281,3 +281,50 @@ def test_get_duckdb_conn_tolerates_outbox_creation_failure(caplog):
 
             # Warning should be logged for outbox failure
             assert "outbox" in caplog.text.lower()
+
+
+def test_ensure_columns_validates_column_names():
+    """Test that _ensure_columns validates column names before adding them."""
+    import pandas as pd
+
+    mock_conn = MagicMock()
+    # Mock _current_columns to return empty set (no existing columns)
+    mock_conn.execute.return_value.fetchall.return_value = []
+
+    # Create a DataFrame with a malicious column name
+    malicious_df = pd.DataFrame({
+        "valid_col": [1, 2, 3],
+        "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
+    })
+
+    # Should raise ValueError when trying to add malicious column
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine._ensure_columns(mock_conn, "dim_geographies", malicious_df)
+
+    assert "Invalid column name" in str(exc_info.value)
+
+
+def test_ensure_columns_allows_valid_column_names():
+    """Test that _ensure_columns allows valid column names to be added."""
+    import pandas as pd
+
+    mock_conn = MagicMock()
+    # Mock PRAGMA table_info to return empty (no existing columns)
+    mock_cur = MagicMock()
+    mock_cur.fetchall.return_value = []
+    mock_conn.execute.return_value = mock_cur
+
+    # Create a DataFrame with valid column names only
+    valid_df = pd.DataFrame({
+        "new_column_1": [1, 2, 3],
+        "AnotherColumn": [4, 5, 6],
+        "_private_col": [7, 8, 9],
+    })
+
+    # Should not raise - columns are valid
+    duckdb_engine._ensure_columns(mock_conn, "dim_geographies", valid_df)
+
+    # Verify ALTER TABLE was called for each column
+    alter_calls = [call for call in mock_conn.execute.call_args_list
+                   if "ALTER TABLE" in str(call)]
+    assert len(alter_calls) == 3

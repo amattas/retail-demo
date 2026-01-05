@@ -82,8 +82,10 @@ data/facts/**/*.csv
 *.log
 .env.local
 
-# Secret-containing config files (prefer env vars or Key Vault)
-# Note: config.json should not contain secrets; use environment variables instead
+# Secret-containing config files (prefer env vars)
+# Use config.example.json as a template; copy to config.json and customize
+**/config.json
+!**/config.example.json
 **/config.local.json
 **/config.secrets.json
 **/.secrets/
