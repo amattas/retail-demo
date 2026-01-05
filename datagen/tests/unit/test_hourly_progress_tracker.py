@@ -8,7 +8,7 @@ from threading import Barrier, Thread
 
 import pytest
 
-from src.retail_datagen.generators.fact_generator import HourlyProgressTracker
+from src.retail_datagen.generators.fact_generators import HourlyProgressTracker
 
 
 @pytest.fixture

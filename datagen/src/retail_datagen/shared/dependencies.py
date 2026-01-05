@@ -19,9 +19,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from ..config.models import RetailConfig
-from ..generators.fact_generator import FactDataGenerator
-from ..generators.master_generator import MasterDataGenerator
-from ..streaming.event_streamer import EventStreamer
+from ..generators.fact_generators import FactDataGenerator
+from ..generators.master_generators import MasterDataGenerator
+from ..streaming.event_streaming import EventStreamer
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.generators.fact_generators import FactDataGenerator
 
 
 async def test_online_orders():

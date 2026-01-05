@@ -23,7 +23,7 @@ from retail_datagen.shared.models import (
 )
 from retail_datagen.streaming.azure_client import AzureEventHubClient, CircuitBreaker
 from retail_datagen.streaming.event_factory import EventFactory
-from retail_datagen.streaming.event_streamer import EventStreamer
+from retail_datagen.streaming.event_streaming import EventStreamer
 from retail_datagen.streaming.schemas import EventEnvelope, EventType
 
 # ================================

@@ -11,7 +11,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.master_generator import MasterDataGenerator
+from retail_datagen.generators.master_generators import MasterDataGenerator
 
 
 def test_store_tax_rates():

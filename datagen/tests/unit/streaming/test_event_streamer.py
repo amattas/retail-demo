@@ -25,7 +25,7 @@ from retail_datagen.shared.models import (
     ProductMaster,
     Store,
 )
-from retail_datagen.streaming.event_streamer import (
+from retail_datagen.streaming.event_streaming import (
     EventStreamer,
     StreamingConfig,
     StreamingStatistics,
@@ -296,10 +296,10 @@ class TestEventStreamerInitialization:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             success = await streamer.initialize()
@@ -331,7 +331,7 @@ class TestEventStreamerInitialization:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_failing_client,
         ):
             success = await streamer.initialize()
@@ -495,10 +495,10 @@ class TestStreamingLoopAndTiming:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming with very short duration
@@ -531,10 +531,10 @@ class TestStreamingLoopAndTiming:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))
@@ -566,10 +566,10 @@ class TestStreamingLoopAndTiming:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Run for duration that should allow multiple bursts
@@ -600,10 +600,10 @@ class TestStreamingLoopAndTiming:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming task
@@ -667,10 +667,10 @@ class TestStreamingLoopAndTiming:
         mock_factory.generate_mixed_events = Mock(side_effect=generate_with_error)
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=400))
@@ -719,10 +719,10 @@ class TestDeadLetterQueue:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_failing_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Configure to force flush
@@ -767,10 +767,10 @@ class TestDeadLetterQueue:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_failing_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Force small batch size to trigger more flushes
@@ -813,10 +813,10 @@ class TestDeadLetterQueue:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_failing_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             streamer.streaming_config.max_batch_size = 5
@@ -855,10 +855,10 @@ class TestMonitoringAndStatistics:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))
@@ -894,10 +894,10 @@ class TestMonitoringAndStatistics:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))
@@ -932,10 +932,10 @@ class TestMonitoringAndStatistics:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(seconds=2))
@@ -964,10 +964,10 @@ class TestMonitoringAndStatistics:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.initialize()
@@ -1019,10 +1019,10 @@ class TestEventHooks:
         streamer.add_event_generated_hook(capture_event)
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))
@@ -1059,10 +1059,10 @@ class TestEventHooks:
         streamer.add_batch_sent_hook(capture_batch)
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Force small batch size to trigger sends
@@ -1107,10 +1107,10 @@ class TestEventHooks:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))
@@ -1148,10 +1148,10 @@ class TestSessionManagement:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             async with streamer.streaming_session(duration=timedelta(milliseconds=500)):
@@ -1183,10 +1183,10 @@ class TestSessionManagement:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             try:
@@ -1278,10 +1278,10 @@ class TestEdgeCasesAndErrorHandling:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Should handle high rate without errors
@@ -1311,10 +1311,10 @@ class TestEdgeCasesAndErrorHandling:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming
@@ -1359,10 +1359,10 @@ class TestEdgeCasesAndErrorHandling:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Set very large batch size to prevent auto-flush
@@ -1380,7 +1380,7 @@ class TestEdgeCasesAndErrorHandling:
 
         # Mock event factory to raise exception
         with patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             side_effect=Exception("Factory creation failed"),
         ):
             success = await streamer.initialize()
@@ -1417,10 +1417,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming task
@@ -1477,10 +1477,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming
@@ -1526,10 +1526,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming
@@ -1579,10 +1579,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming without pausing
@@ -1635,10 +1635,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming
@@ -1695,10 +1695,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             # Start streaming
@@ -1758,10 +1758,10 @@ class TestPauseResume:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.initialize()
@@ -1812,10 +1812,10 @@ class TestSignalHandling:
         )
 
         with patch(
-            "retail_datagen.streaming.event_streamer.AzureEventHubClient",
+            "retail_datagen.streaming.event_streaming.streamer.AzureEventHubClient",
             return_value=mock_azure_client,
         ), patch(
-            "retail_datagen.streaming.event_streamer.EventFactory",
+            "retail_datagen.streaming.event_streaming.streamer.EventFactory",
             return_value=mock_event_factory,
         ):
             await streamer.start(duration=timedelta(milliseconds=300))

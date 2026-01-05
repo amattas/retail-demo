@@ -6,13 +6,13 @@ to ensure correct behavior and edge case handling.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from retail_datagen.generators.master_generator import (
-    MasterDataGenerator,
+from retail_datagen.generators.master_generators import MasterDataGenerator
+from retail_datagen.generators.master_generators.distribution_generator import (
     TruckAllocationStrategy,
     AssignedTrucksResult,
     PoolTrucksResult,
-    ProductCategoryData,
 )
+from retail_datagen.generators.master_generators.product_generator import ProductCategoryData
 
 
 @pytest.fixture

@@ -13,7 +13,7 @@ from src.retail_datagen.streaming.errors import (
     StreamingError,
     classify_error,
 )
-from src.retail_datagen.streaming.event_streamer import DLQEntry, EventStreamer
+from src.retail_datagen.streaming.event_streaming import DLQEntry, EventStreamer
 from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
 
 

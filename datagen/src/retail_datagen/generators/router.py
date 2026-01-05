@@ -23,9 +23,9 @@ from ..api.models import (
     TablePreviewResponse,
 )
 from ..config.models import RetailConfig
-from ..generators.fact_generator import FactDataGenerator
+from ..generators.fact_generators import FactDataGenerator
 from ..generators.generation_state import GenerationStateManager
-from ..generators.master_generator import MasterDataGenerator
+from ..generators.master_generators import MasterDataGenerator
 from ..shared.cache import CacheManager
 from ..shared.dependencies import (
     cancel_task,

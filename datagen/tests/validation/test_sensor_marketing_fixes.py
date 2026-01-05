@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.generators.fact_generators import FactDataGenerator
 from retail_datagen.shared.models import (
     Customer,
     DistributionCenter,

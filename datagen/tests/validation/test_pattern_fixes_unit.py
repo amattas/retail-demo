@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from retail_datagen.config.models import MarketingCostConfig, RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.generators.fact_generators import FactDataGenerator
 from retail_datagen.generators.retail_patterns import MarketingCampaignSimulator
 from retail_datagen.shared.models import (
     Customer,

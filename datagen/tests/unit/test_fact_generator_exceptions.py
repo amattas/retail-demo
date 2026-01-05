@@ -11,7 +11,7 @@ import duckdb
 import pytest
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.generators.fact_generators import FactDataGenerator
 
 
 @pytest.fixture
