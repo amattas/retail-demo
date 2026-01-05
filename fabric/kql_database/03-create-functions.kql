@@ -26,6 +26,9 @@
 // ============================================================================
 
 // NOTE: Materialized views don't support joins. Use this function instead.
+// Validates dwell time by filtering:
+//   - Unmatched arrivals (no corresponding departure)
+//   - Invalid records where departure_time < arrival_time (data quality issue)
 .create-or-alter function with (folder = "kpis") fn_truck_sla()
 {
     truck_arrived
@@ -39,5 +42,5 @@
         toreal(datetime_diff('second', departure_time, arrival_time)),
         real(null)
       )
-    | where isnotnull(dwell_seconds)  // Filter out unmatched or invalid records
+    | where isnotnull(dwell_seconds)  // Filter out unmatched arrivals and negative dwell times
 }
