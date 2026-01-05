@@ -2213,6 +2213,15 @@ class FactDataGenerator:
             See issue #78 for implementation details. Real-time streaming already
             supports campaign_id via event_factory.py.
         """
+        # TODO(#78): Implement campaign_id attribution for historical data generation.
+        # This requires:
+        # 1. Track ad impressions per customer during marketing generation
+        # 2. When generating receipts, check if customer had impression within attribution window
+        # 3. If yes, pass campaign_id to receipt record
+        # For now, campaign_id parameter is accepted but not used in historical generation.
+        # Real-time streaming (event_factory.py) already implements this logic.
+        _ = campaign_id  # Explicitly mark as intentionally unused for now
+
         # CRITICAL: Validate basket has at least 1 item
         # Empty receipts violate business rules and should never be generated
         if not basket.items or len(basket.items) == 0:

@@ -26,7 +26,6 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
-          pip install -r requirements-dev.txt
 
       - name: Run unit tests
         run: |
@@ -63,3 +62,7 @@ jobs:
       - name: Run ruff format check
         run: |
           ruff format --check src/
+
+      - name: Run mypy type checking
+        run: |
+          mypy src/ --ignore-missing-imports

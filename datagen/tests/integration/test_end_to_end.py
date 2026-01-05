@@ -269,6 +269,156 @@ class TestPayloadValidation:
         assert payload.quantity_delta == -5
 
 
+class TestCampaignAttribution:
+    """Test campaign attribution logic in event generation."""
+
+    @pytest.mark.integration
+    def test_campaign_id_populated_for_marketing_driven_purchase(self):
+        """Test that campaign_id is populated when customer was marketing-driven."""
+        from retail_datagen.streaming.event_factory import EventFactory, EventGenerationState
+
+        # Create minimal test data
+        from retail_datagen.shared.models import (
+            Customer, Store, ProductMaster, DistributionCenter
+        )
+        from decimal import Decimal
+
+        store = Store(
+            ID=1, StoreNumber="ST001", Address="123 Test St",
+            GeographyID=1, tax_rate=Decimal("0.08")
+        )
+        customer = Customer(
+            ID=100, FirstName="Test", LastName="User",
+            GeographyID=1, LoyaltyCard="LC001", BLEId="BLE001", AdId="AD001"
+        )
+        product = ProductMaster(
+            ID=1, ProductName="Test Product", Brand="TestBrand",
+            Company="TestCo", Department="Test", Category="Test",
+            Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00")
+        )
+        dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
+
+        factory = EventFactory(
+            stores=[store], customers=[customer], products=[product],
+            distribution_centers=[dc], seed=42
+        )
+
+        # Simulate a marketing conversion
+        factory.state.marketing_conversions["IMP001"] = {
+            "customer_id": 100,
+            "customer_ad_id": "AD001",
+            "campaign_id": "CAMP_TEST_001",
+            "channel": "SOCIAL",
+            "scheduled_visit_time": datetime.now(),
+            "converted": True,
+        }
+
+        # Create a customer session that is marketing-driven
+        factory.state.customer_sessions["100_1"] = {
+            "customer_id": 100,
+            "customer_ble_id": "BLE001",
+            "store_id": 1,
+            "entered_at": datetime.now() - timedelta(minutes=10),
+            "current_zone": "ELECTRONICS",
+            "has_made_purchase": False,
+            "expected_exit_time": datetime.now() + timedelta(minutes=20),
+            "marketing_driven": True,
+            "purchase_likelihood": 0.8,
+        }
+
+        # Generate a receipt - should include campaign_id
+        result = factory._generate_receipt_created(datetime.now())
+
+        if result is not None:
+            payload, correlation_id, partition_key = result
+            # Marketing-driven customer should have campaign_id
+            assert payload.campaign_id == "CAMP_TEST_001", \
+                f"Expected campaign_id 'CAMP_TEST_001', got '{payload.campaign_id}'"
+
+    @pytest.mark.integration
+    def test_campaign_id_null_for_non_marketing_purchase(self):
+        """Test that campaign_id is None when customer was not marketing-driven."""
+        from retail_datagen.streaming.event_factory import EventFactory
+
+        from retail_datagen.shared.models import (
+            Customer, Store, ProductMaster, DistributionCenter
+        )
+        from decimal import Decimal
+
+        store = Store(
+            ID=1, StoreNumber="ST001", Address="123 Test St",
+            GeographyID=1, tax_rate=Decimal("0.08")
+        )
+        customer = Customer(
+            ID=200, FirstName="Regular", LastName="Customer",
+            GeographyID=1, LoyaltyCard="LC002", BLEId="BLE002", AdId="AD002"
+        )
+        product = ProductMaster(
+            ID=1, ProductName="Test Product", Brand="TestBrand",
+            Company="TestCo", Department="Test", Category="Test",
+            Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00")
+        )
+        dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
+
+        factory = EventFactory(
+            stores=[store], customers=[customer], products=[product],
+            distribution_centers=[dc], seed=42
+        )
+
+        # Create a non-marketing-driven customer session
+        factory.state.customer_sessions["200_1"] = {
+            "customer_id": 200,
+            "customer_ble_id": "BLE002",
+            "store_id": 1,
+            "entered_at": datetime.now() - timedelta(minutes=10),
+            "current_zone": "GROCERY",
+            "has_made_purchase": False,
+            "expected_exit_time": datetime.now() + timedelta(minutes=20),
+            "marketing_driven": False,  # Not marketing-driven
+            "purchase_likelihood": 0.4,
+        }
+
+        # Generate a receipt - should NOT have campaign_id
+        result = factory._generate_receipt_created(datetime.now())
+
+        if result is not None:
+            payload, correlation_id, partition_key = result
+            # Non-marketing customer should have no campaign_id
+            assert payload.campaign_id is None, \
+                f"Expected campaign_id None, got '{payload.campaign_id}'"
+
+    @pytest.mark.integration
+    def test_backward_compatibility_with_null_campaign_id(self):
+        """Test that receipts without campaign_id are valid (backward compatibility)."""
+        from retail_datagen.streaming.schemas import ReceiptCreatedPayload, EventEnvelope, EventType
+
+        # Create receipt without campaign_id (like old events)
+        payload = ReceiptCreatedPayload(
+            store_id=1,
+            customer_id=100,
+            receipt_id="RCP_OLD_001",
+            subtotal=50.0,
+            tax=4.0,
+            total=54.0,
+            tender_type="CASH",
+            item_count=3,
+            # campaign_id intentionally omitted
+        )
+
+        # Should be able to create envelope with this payload
+        envelope = EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload=payload.model_dump(),
+            trace_id="TR_TEST_001",
+            ingest_timestamp=datetime.now(),
+        )
+
+        assert envelope.payload["campaign_id"] is None
+        assert envelope.event_type == EventType.RECEIPT_CREATED
+
+
 class TestTemporalPatterns:
     """Test temporal pattern generation."""
 
