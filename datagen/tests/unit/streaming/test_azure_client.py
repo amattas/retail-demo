@@ -17,10 +17,8 @@ Python Version: 3.11+
 
 import asyncio
 import json
-import time
-from datetime import UTC, datetime, timedelta
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -31,7 +29,6 @@ from retail_datagen.streaming.azure_client import (
     CircuitBreaker,
 )
 from retail_datagen.streaming.schemas import EventEnvelope, EventType
-
 
 # =============================================================================
 # Test Fixtures

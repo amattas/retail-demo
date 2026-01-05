@@ -6,10 +6,10 @@ Tests the relaxed validation mode for test scenarios.
 
 import os
 
-import pytest
-
 from src.retail_datagen.config.models import RetailConfig
-from src.retail_datagen.shared.credential_utils import validate_eventhub_connection_string
+from src.retail_datagen.shared.credential_utils import (
+    validate_eventhub_connection_string,
+)
 from tests.test_utils import (
     FABRIC_RTI_CONNECTION_STRING,
     MOCK_CONNECTION_STRING,

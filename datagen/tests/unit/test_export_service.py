@@ -5,12 +5,12 @@ Tests the main export service that coordinates database reading,
 format writing, and file management for master and fact table exports.
 """
 
-import pytest
 import asyncio
 from datetime import date
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch, call
+from unittest.mock import AsyncMock, Mock, patch
+
 import pandas as pd
+import pytest
 
 from retail_datagen.services.export_service import ExportService
 
@@ -180,7 +180,7 @@ class TestExportMasterTables:
                 mock_writer = Mock()
                 mock_writer.write.side_effect = [
                     None,  # First table succeeds
-                    IOError("Disk full"),  # Second table fails
+                    OSError("Disk full"),  # Second table fails
                 ]
                 mock_get_writer.return_value = mock_writer
 
@@ -431,7 +431,7 @@ class TestExportFactTables:
             # Mock writer to fail during processing
             with patch.object(service, '_get_writer') as mock_get_writer:
                 mock_writer = Mock()
-                mock_writer.write.side_effect = IOError("Write failed")
+                mock_writer.write.side_effect = OSError("Write failed")
                 mock_get_writer.return_value = mock_writer
 
                 with pytest.raises(IOError):

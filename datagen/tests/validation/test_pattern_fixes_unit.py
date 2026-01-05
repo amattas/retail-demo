@@ -5,20 +5,19 @@ Unit tests for BLE and marketing data pattern fixes.
 Tests the logic without requiring full master data generation.
 """
 
-import random
 from datetime import datetime
 from decimal import Decimal
 
-from retail_datagen.config.models import RetailConfig, MarketingCostConfig
+from retail_datagen.config.models import MarketingCostConfig, RetailConfig
 from retail_datagen.generators.fact_generator import FactDataGenerator
 from retail_datagen.generators.retail_patterns import MarketingCampaignSimulator
 from retail_datagen.shared.models import (
     Customer,
+    DeviceType,
     DistributionCenter,
+    MarketingChannel,
     ProductMaster,
     Store,
-    MarketingChannel,
-    DeviceType,
 )
 
 
@@ -134,14 +133,14 @@ def test_ble_customer_matching():
     )
     match_rate = (pings_with_customer_id / total_pings * 100) if total_pings > 0 else 0
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Total BLE pings generated: {total_pings}")
     print(f"  Pings with customer_id: {pings_with_customer_id}")
     print(f"  Match rate: {match_rate:.1f}%")
-    print(f"  Expected: 25-40% (target: 30%)")
+    print("  Expected: 25-40% (target: 30%)")
 
     # Sample data
-    print(f"\nSample BLE pings (first 10):")
+    print("\nSample BLE pings (first 10):")
     for i, ping in enumerate(ble_pings[:10]):
         has_customer = "✓" if ping.get("CustomerId") else "✗"
         customer_id_str = str(ping.get("CustomerId", "None")).rjust(6)
@@ -161,7 +160,7 @@ def test_ble_customer_matching():
             f"\n❌ FAIL: Match rate {match_rate:.1f}% is outside expected range (25-40%)"
         )
         print(
-            f"   Note: With RNG seed=42 and 100 customers, some variance is expected."
+            "   Note: With RNG seed=42 and 100 customers, some variance is expected."
         )
         return False
 
@@ -247,14 +246,14 @@ def test_marketing_customer_resolution():
         else 0
     )
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Total marketing impressions: {total_impressions}")
     print(f"  Impressions with customer_id: {impressions_with_customer_id}")
     print(f"  Resolution rate: {resolution_rate:.1f}%")
-    print(f"  Expected: 3-7% (target: 5%)")
+    print("  Expected: 3-7% (target: 5%)")
 
     # Sample data
-    print(f"\nSample marketing impressions (first 10 with customer_id):")
+    print("\nSample marketing impressions (first 10 with customer_id):")
     resolved_samples = [
         rec for rec in marketing_records if rec.get("CustomerId") is not None
     ][:10]
@@ -266,7 +265,7 @@ def test_marketing_customer_resolution():
 
     # Validation (with statistical tolerance)
     if total_impressions == 0:
-        print(f"\n⚠️  SKIP: No marketing impressions generated")
+        print("\n⚠️  SKIP: No marketing impressions generated")
         return None
     elif 3 <= resolution_rate <= 7:
         print(
@@ -278,7 +277,7 @@ def test_marketing_customer_resolution():
             f"\n❌ FAIL: Resolution rate {resolution_rate:.1f}% is outside expected range (3-7%)"
         )
         print(
-            f"   Note: With RNG and small sample, some variance is expected. Target is 5%."
+            "   Note: With RNG and small sample, some variance is expected. Target is 5%."
         )
         return False
 
@@ -306,7 +305,7 @@ def test_marketing_cost_ranges():
         "SEARCH": (cost_config.search_cost_min, cost_config.search_cost_max),
     }
 
-    print(f"\nConfiguration Ranges:")
+    print("\nConfiguration Ranges:")
     all_match = True
 
     for channel, (expected_min, expected_max) in expected_ranges.items():
@@ -323,7 +322,7 @@ def test_marketing_cost_ranges():
             all_match = False
 
     # Test actual cost calculation
-    print(f"\n\nSample Cost Calculations:")
+    print("\n\nSample Cost Calculations:")
     simulator = MarketingCampaignSimulator(
         customers=create_test_data()[1], seed=42, cost_config=cost_config
     )
@@ -361,10 +360,10 @@ def test_marketing_cost_ranges():
 
     # Overall validation
     if all_match:
-        print(f"\n✅ PASS: All marketing cost ranges match expected values")
+        print("\n✅ PASS: All marketing cost ranges match expected values")
         return True
     else:
-        print(f"\n❌ FAIL: Some marketing cost ranges don't match expected values")
+        print("\n❌ FAIL: Some marketing cost ranges don't match expected values")
         return False
 
 

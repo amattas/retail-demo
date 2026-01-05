@@ -2,10 +2,12 @@
 Unit tests for DuckDB reader service.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import duckdb
 import pandas as pd
 import pytest
-import duckdb
+
 from retail_datagen.services import duckdb_reader as db_reader
 
 

@@ -8,22 +8,23 @@ Tests the complete order lifecycle including:
 - Tender type distribution
 """
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
+
+import pytest
 
 from retail_datagen.generators.online_order_generator import (
     generate_online_orders_with_lifecycle,
 )
 from retail_datagen.shared.models import (
     Customer,
-    GeographyMaster,
-    Store,
     DistributionCenter,
+    GeographyMaster,
     ProductMaster,
-    TenderType,
     ProductTaxability,
+    Store,
+    TenderType,
 )
 
 

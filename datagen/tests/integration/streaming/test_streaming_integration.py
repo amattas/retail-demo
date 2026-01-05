@@ -7,14 +7,11 @@ state management, and API endpoints.
 """
 
 import asyncio
-import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-import pytest_asyncio
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.generators.generation_state import GenerationStateManager
@@ -28,7 +25,6 @@ from retail_datagen.streaming.azure_client import AzureEventHubClient, CircuitBr
 from retail_datagen.streaming.event_factory import EventFactory
 from retail_datagen.streaming.event_streamer import EventStreamer
 from retail_datagen.streaming.schemas import EventEnvelope, EventType
-
 
 # ================================
 # FIXTURES

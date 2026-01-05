@@ -9,18 +9,17 @@ This script verifies that:
 """
 
 import sys
-from pathlib import Path
-from decimal import Decimal
 from collections import Counter
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from retail_datagen.shared.models import Store, GeographyMaster
+from retail_datagen.shared.models import GeographyMaster, Store
 from retail_datagen.shared.store_profiles import (
+    StoreFormat,
     StoreProfiler,
     StoreVolumeClass,
-    StoreFormat,
 )
 
 
@@ -160,7 +159,7 @@ def main():
         else:
             print(f"   ✗ Flagship multipliers: min={min_flagship:.3f} (expected >= 2.0)")
     else:
-        print(f"   - Flagship multipliers: No flagship stores in dataset")
+        print("   - Flagship multipliers: No flagship stores in dataset")
         # Don't count this check
         total_checks -= 1
 
@@ -179,7 +178,7 @@ def main():
         else:
             print(f"   ✗ Kiosk multipliers: max={max_kiosk:.3f} (expected <= 0.5)")
     else:
-        print(f"   - Kiosk multipliers: No kiosk stores in dataset")
+        print("   - Kiosk multipliers: No kiosk stores in dataset")
         # Don't count this check
         total_checks -= 1
 

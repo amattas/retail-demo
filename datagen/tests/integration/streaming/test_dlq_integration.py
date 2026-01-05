@@ -1,13 +1,14 @@
 """
 Integration tests for DLQ error recovery with full streaming system.
 """
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
+import pytest
+
+from src.retail_datagen.config.models import RetailConfig
 from src.retail_datagen.streaming.event_streamer import EventStreamer
 from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
-from src.retail_datagen.config.models import RetailConfig
 
 
 @pytest.fixture

@@ -8,15 +8,14 @@ table creation/insert utilities optimized for batch loads.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
+from collections.abc import Iterable
 from pathlib import Path
-import os
-from typing import Iterable
 
 import duckdb
 import pandas as pd
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +151,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     logger.warning(f"Failed to create outbox table during connection initialization: {e}")
                 # Only assign to global after successful initialization
                 _conn = new_conn
-            except Exception as e:
+            except Exception:
                 # Clean up connection if any critical initialization fails
                 try:
                     new_conn.close()

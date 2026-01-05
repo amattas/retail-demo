@@ -1,19 +1,20 @@
 """
 Unit tests for DLQ error recovery and error classification.
 """
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from src.retail_datagen.config.models import RetailConfig
 from src.retail_datagen.streaming.errors import (
-    ErrorSeverity,
     ErrorCategory,
+    ErrorSeverity,
     StreamingError,
     classify_error,
 )
 from src.retail_datagen.streaming.event_streamer import DLQEntry, EventStreamer
 from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
-from src.retail_datagen.config.models import RetailConfig
 
 
 class TestErrorClassification:

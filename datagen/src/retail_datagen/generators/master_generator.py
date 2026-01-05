@@ -14,8 +14,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from retail_datagen.config.models import RetailConfig
 import numpy as np
+
+from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.dictionary_loader import DictionaryLoader
 from retail_datagen.shared.models import (
@@ -33,13 +34,12 @@ from retail_datagen.shared.models import (
     StoreInventorySnapshot,
     Truck,
 )
+from retail_datagen.shared.store_profiles import StoreProfiler
 from retail_datagen.shared.validators import (
     ForeignKeyValidator,
     PricingCalculator,
     SyntheticDataValidator,
 )
-from retail_datagen.shared.store_profiles import StoreProfiler
-
 
 # -------------------------------------------------------------------------
 # Dataclasses for Helper Method Return Types
@@ -291,6 +291,7 @@ class MasterDataGenerator:
             # DuckDB fast path: write entire table via Arrow/Parquet buffers
             if getattr(self, "_use_duckdb", False) and getattr(self, "_duckdb_conn", None) is not None:
                 import pandas as pd
+
                 from retail_datagen.db.duckdb_engine import insert_dataframe
 
                 df = pd.DataFrame.from_records(records)

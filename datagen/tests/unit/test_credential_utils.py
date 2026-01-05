@@ -5,7 +5,6 @@ Tests validation, sanitization, and metadata extraction for
 Event Hub connection strings.
 """
 
-import pytest
 
 from retail_datagen.shared.credential_utils import (
     get_connection_string_metadata,

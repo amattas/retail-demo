@@ -9,16 +9,16 @@ Tests ensure that:
 5. Master data generator successfully assigns profiles
 """
 
-import pytest
-from decimal import Decimal
 from collections import Counter
+from decimal import Decimal
 
-from retail_datagen.shared.models import Store, GeographyMaster
+import pytest
+
+from retail_datagen.shared.models import GeographyMaster, Store
 from retail_datagen.shared.store_profiles import (
+    StoreFormat,
     StoreProfiler,
     StoreVolumeClass,
-    StoreFormat,
-    OperatingHours,
 )
 
 

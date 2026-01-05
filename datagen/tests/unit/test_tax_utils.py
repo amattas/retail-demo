@@ -1,8 +1,9 @@
 """Unit tests for tax_utils module."""
 
-import pytest
 from decimal import Decimal
 from pathlib import Path
+
+import pytest
 
 from retail_datagen.shared.tax_utils import TaxCalculator
 

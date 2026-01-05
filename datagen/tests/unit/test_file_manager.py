@@ -5,9 +5,9 @@ Tests file system management for data exports including path resolution,
 directory creation, file tracking, and cleanup operations.
 """
 
-import pytest
 from pathlib import Path
-from datetime import date
+
+import pytest
 
 from retail_datagen.services.file_manager import ExportFileManager
 

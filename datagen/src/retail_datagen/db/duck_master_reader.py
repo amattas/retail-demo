@@ -7,7 +7,9 @@ generator and streaming modules.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time as dt_time, date as dt_date
+from datetime import UTC, datetime
+from datetime import date as dt_date
+from datetime import time as dt_time
 from decimal import Decimal
 from typing import Any
 

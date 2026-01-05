@@ -9,7 +9,6 @@ Tests:
 """
 
 import asyncio
-import json
 import statistics
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -17,7 +16,12 @@ from pathlib import Path
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.generators.fact_generator import FactDataGenerator
-from retail_datagen.shared.models import Customer, ProductMaster, Store, DistributionCenter
+from retail_datagen.shared.models import (
+    Customer,
+    DistributionCenter,
+    ProductMaster,
+    Store,
+)
 
 
 def load_master_data():
@@ -150,14 +154,14 @@ async def test_ble_customer_matching():
     pings_with_customer_id = sum(1 for ping in ble_pings if ping.get('CustomerId') is not None)
     match_rate = (pings_with_customer_id / total_pings * 100) if total_pings > 0 else 0
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Total BLE pings generated: {total_pings}")
     print(f"  Pings with customer_id: {pings_with_customer_id}")
     print(f"  Match rate: {match_rate:.1f}%")
-    print(f"  Expected: 25-40% (target: 30%)")
+    print("  Expected: 25-40% (target: 30%)")
 
     # Sample data
-    print(f"\nSample BLE pings (first 5):")
+    print("\nSample BLE pings (first 5):")
     for i, ping in enumerate(ble_pings[:5]):
         has_customer = "✓" if ping.get('CustomerId') else "✗"
         print(f"  {i+1}. BLEId: {ping['CustomerBLEId'][:20]}... | CustomerId: {ping.get('CustomerId', 'None'):>6} {has_customer}")
@@ -206,21 +210,21 @@ async def test_marketing_customer_resolution():
     impressions_with_customer_id = sum(1 for rec in marketing_records if rec.get('CustomerId') is not None)
     resolution_rate = (impressions_with_customer_id / total_impressions * 100) if total_impressions > 0 else 0
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Total marketing impressions: {total_impressions}")
     print(f"  Impressions with customer_id: {impressions_with_customer_id}")
     print(f"  Resolution rate: {resolution_rate:.1f}%")
-    print(f"  Expected: 3-7% (target: 5%)")
+    print("  Expected: 3-7% (target: 5%)")
 
     # Sample data
-    print(f"\nSample marketing impressions (first 5 with customer_id):")
+    print("\nSample marketing impressions (first 5 with customer_id):")
     resolved_samples = [rec for rec in marketing_records if rec.get('CustomerId') is not None][:5]
     for i, rec in enumerate(resolved_samples):
         print(f"  {i+1}. AdId: {rec['CustomerAdId'][:20]}... | CustomerId: {rec['CustomerId']} | Channel: {rec['Channel']}")
 
     # Validation
     if total_impressions == 0:
-        print(f"\n⚠️  SKIP: No marketing impressions generated (campaigns may not be active)")
+        print("\n⚠️  SKIP: No marketing impressions generated (campaigns may not be active)")
         return None
     elif 3 <= resolution_rate <= 7:
         print(f"\n✅ PASS: Resolution rate {resolution_rate:.1f}% is within expected range (3-7%)")
@@ -300,7 +304,7 @@ async def test_marketing_cost_ranges():
             # Check if costs are within expected range
             within_range = all(expected_min <= cost <= expected_max for cost in costs)
             if within_range:
-                print(f"    ✅ All costs within expected range")
+                print("    ✅ All costs within expected range")
             else:
                 out_of_range = sum(1 for cost in costs if cost < expected_min or cost > expected_max)
                 print(f"    ❌ {out_of_range}/{len(costs)} costs outside expected range")
@@ -308,13 +312,13 @@ async def test_marketing_cost_ranges():
 
     # Overall validation
     if len(marketing_records) == 0:
-        print(f"\n⚠️  SKIP: No marketing impressions generated")
+        print("\n⚠️  SKIP: No marketing impressions generated")
         return None
     elif all_pass:
-        print(f"\n✅ PASS: All marketing costs within expected ranges")
+        print("\n✅ PASS: All marketing costs within expected ranges")
         return True
     else:
-        print(f"\n❌ FAIL: Some marketing costs outside expected ranges")
+        print("\n❌ FAIL: Some marketing costs outside expected ranges")
         return False
 
 

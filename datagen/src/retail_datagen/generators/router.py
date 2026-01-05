@@ -616,11 +616,11 @@ async def generate_historical_data(
             # Pre-check: validate DuckDB has required rows for historical generation
             try:
                 from retail_datagen.db.duck_master_reader import (
-                    read_geographies,
-                    read_stores,
-                    read_distribution_centers,
                     read_customers,
+                    read_distribution_centers,
+                    read_geographies,
                     read_products,
+                    read_stores,
                 )
                 geo_cnt = len(read_geographies())
                 store_cnt = len(read_stores())
@@ -1033,7 +1033,7 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         # Reset DuckDB by closing any connection and deleting the DB file
         deleted_files: list[str] = []
         try:
-            from ..db.duckdb_engine import reset_duckdb, get_duckdb_path
+            from ..db.duckdb_engine import get_duckdb_path, reset_duckdb
 
             path = get_duckdb_path()
             reset_duckdb()

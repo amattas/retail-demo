@@ -6,12 +6,15 @@ to Azure Event Hub with comprehensive monitoring and control capabilities.
 """
 
 import asyncio
+import asyncio as _asyncio
+import json as _json
 import logging
 import random
 from collections import deque
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
+from uuid import uuid4 as _uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 
@@ -28,6 +31,13 @@ from ..api.models import (
     StreamingStatusResponse,
 )
 from ..config.models import RetailConfig
+from ..db.duckdb_engine import (
+    get_duckdb_conn,
+    outbox_ack_sent,
+    outbox_counts,
+    outbox_lease_next,
+    outbox_nack_retry,
+)
 from ..generators.generation_state import GenerationStateManager
 from ..shared.credential_utils import (
     get_connection_string_metadata,
@@ -40,27 +50,16 @@ from ..shared.dependencies import (
     create_background_task,
     get_config,
     get_event_streamer,
+    get_fact_generator,
     get_task_status,
     rate_limit,
     update_config,
     update_task_progress,
-    get_fact_generator,
 )
 from ..shared.logging_utils import get_structured_logger
-from ..streaming.event_streamer import EventStreamer
-from ..streaming.schemas import EventType, EventEnvelope
-from ..db.duckdb_engine import (
-    get_duckdb_conn,
-    outbox_counts,
-    outbox_has_pending,
-    outbox_lease_next,
-    outbox_ack_sent,
-    outbox_nack_retry,
-)
 from ..streaming.azure_client import AzureEventHubClient
-import json as _json
-from uuid import uuid4 as _uuid4
-import asyncio as _asyncio
+from ..streaming.event_streamer import EventStreamer
+from ..streaming.schemas import EventEnvelope, EventType
 
 logger = logging.getLogger(__name__)
 log = get_structured_logger(__name__)
@@ -627,8 +626,8 @@ async def preview_outbox(
 ):
     """Preview rows from the streaming_outbox table for UI diagnostics."""
     try:
-        from retail_datagen.db.duckdb_engine import get_duckdb_conn
         from retail_datagen.api.models import TablePreviewResponse
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
         conn = get_duckdb_conn()
 

@@ -9,16 +9,17 @@ Tests ensure that:
 5. Balance values are non-negative and numeric
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
+
+import pytest
 
 from retail_datagen.generators.retail_patterns import InventoryFlowSimulator
 from retail_datagen.shared.models import (
     DistributionCenter,
-    Store,
-    ProductMaster,
     InventoryReason,
+    ProductMaster,
+    Store,
 )
 
 

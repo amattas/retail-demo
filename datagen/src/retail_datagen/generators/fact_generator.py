@@ -8,6 +8,7 @@ business logic coordination, and DuckDB-backed storage.
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 import random
 import threading
@@ -23,7 +24,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import json
 
 from retail_datagen.generators.online_order_generator import (
     generate_online_orders_with_lifecycle,
@@ -2125,7 +2125,6 @@ class FactDataGenerator:
 
     def _apply_holiday_overlay_to_basket(self, date: datetime, basket) -> None:
         """Adjust basket in-place based on holiday overlay (qty boosts + occasional extra lines)."""
-        from decimal import Decimal
         if not getattr(basket, 'items', None):
             return
         # Increase quantity for existing targeted items
@@ -4020,7 +4019,10 @@ class FactDataGenerator:
                     'online_orders': 'fact_online_order_headers',
                     'online_order_lines': 'fact_online_order_lines',
                 }.get(table_name, table_name)
-                from retail_datagen.db.duckdb_engine import insert_dataframe, outbox_insert_records
+                from retail_datagen.db.duckdb_engine import (
+                    insert_dataframe,
+                    outbox_insert_records,
+                )
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
                 # Optionally mirror to streaming outbox (only for outbox-driven realtime)
                 if getattr(self, "_publish_to_outbox", False):

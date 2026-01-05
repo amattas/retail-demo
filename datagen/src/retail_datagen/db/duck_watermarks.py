@@ -7,8 +7,7 @@ previous watermark logic with a minimal schema.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from datetime import datetime, timedelta
 
 import duckdb
 
@@ -33,7 +32,7 @@ def _ensure_watermark_table(conn: duckdb.DuckDBPyConnection) -> None:
 
 def get_unpublished_data_range(
     conn: duckdb.DuckDBPyConnection, fact_table_name: str
-) -> Tuple[datetime | None, datetime | None]:
+) -> tuple[datetime | None, datetime | None]:
     """
     Return (earliest_unpublished, latest_unpublished) for a DuckDB fact table.
     If no watermark exists, compute from data. Returns (None, None) if no data.

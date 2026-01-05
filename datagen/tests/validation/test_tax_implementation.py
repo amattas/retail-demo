@@ -1,14 +1,15 @@
 """Test script to verify tax rate implementation."""
 
 import sys
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.dictionary_loader import DictionaryLoader
+
 
 def test_tax_rate_loading():
     """Test that tax rates load correctly."""

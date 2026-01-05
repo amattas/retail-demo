@@ -12,12 +12,8 @@ interface that could be used for future improvements.
 import logging
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
-from pydantic import ValidationError
-
-from .models import TaxJurisdiction
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +158,7 @@ class TaxCalculator:
             raise ValueError(f"Error loading tax rates: {e}")
 
     def get_tax_rate(
-        self, state: str, county: Optional[str] = None, city: Optional[str] = None
+        self, state: str, county: str | None = None, city: str | None = None
     ) -> Decimal:
         """Get combined tax rate for a location.
 

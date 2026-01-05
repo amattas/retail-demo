@@ -9,18 +9,19 @@ Tests verify the following implementations:
 - Issue #13: Truck departed events in fact_truck_moves
 """
 
-import pytest
+import os
+import tempfile
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
-import tempfile
-import os
 
-from retail_datagen.shared.models import (
-    TruckStatus,
-    TruckMove,
-)
+import pytest
+
 from retail_datagen.generators.retail_patterns import CustomerSegment
+from retail_datagen.shared.models import (
+    TruckMove,
+    TruckStatus,
+)
 
 
 class TestTaxFallbackChain:

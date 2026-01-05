@@ -4,8 +4,10 @@ Unit tests for HourlyProgressTracker class.
 Tests thread-safety, progress calculation, state management, and edge cases.
 """
 
+from threading import Barrier, Thread
+
 import pytest
-from threading import Thread, Barrier
+
 from src.retail_datagen.generators.fact_generator import HourlyProgressTracker
 
 

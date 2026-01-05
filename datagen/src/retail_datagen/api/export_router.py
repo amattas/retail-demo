@@ -69,10 +69,13 @@ async def export_master_data(
         }
     """
     logger.info(
-        f"Master export request received: format={request.format}, tables={request.tables}"
+        f"Master export: format={request.format}, tables={request.tables}"
     )
     if request.format.lower() != "parquet":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only 'parquet' export is supported")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only 'parquet' export is supported",
+        )
 
     # Validate table names
     try:
@@ -99,9 +102,7 @@ async def export_master_data(
 
             # Track progress
             completed_tables = []
-            len(tables_to_export)
             total_files = 0
-            total_rows = 0
 
             # Progress callback for export service
             def progress_callback(message: str, current: int, total: int):
@@ -135,14 +136,14 @@ async def export_master_data(
 
             # Calculate results
             total_files = len(result)
-            # Convert paths to strings (resolve both to absolute for relative_to to work)
+            # Convert paths to strings (resolve both to absolute)
             files_written = [
                 str(path.resolve().relative_to(base_dir.resolve()))
                 for path in result.values()
             ]
 
             # Row counting skipped for Parquet to avoid heavy reads
-            total_rows = None
+            _ = None  # Reserved for future row counting
 
             # Update final progress
             update_task_progress(
@@ -159,7 +160,9 @@ async def export_master_data(
             uploaded_summary = None
             if not request.skip_upload:
                 try:
-                    if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    storage = getattr(config, "storage", None)
+                    has_storage = storage and storage.account_uri and storage.account_key
+                    if has_storage:
                         from ..services.azure_uploader import upload_paths_to_blob
                         # Build absolute paths for upload
                         abs_paths = [base_dir / f for f in files_written]
@@ -380,7 +383,9 @@ async def export_fact_data(
             uploaded_summary = None
             if not request.skip_upload:
                 try:
-                    if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    storage = getattr(config, "storage", None)
+                    has_storage = storage and storage.account_uri and storage.account_key
+                    if has_storage:
                         from ..services.azure_uploader import upload_paths_to_blob
                         abs_paths = [base_dir / f for f in all_files]
                         ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")

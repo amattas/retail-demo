@@ -19,7 +19,6 @@ from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
 
-
 from ..config.models import RetailConfig
 from ..shared.logging_utils import get_structured_logger
 from ..shared.metrics import event_generation_duration_seconds, metrics_collector
@@ -438,10 +437,10 @@ class EventStreamer:
         self.log.info("Loading master data for streaming from DuckDB", session_id=self._session_id)
         try:
             from retail_datagen.db.duck_master_reader import (
-                read_stores,
                 read_customers,
-                read_products,
                 read_distribution_centers,
+                read_products,
+                read_stores,
             )
 
             if not self._stores:
@@ -465,11 +464,12 @@ class EventStreamer:
                 session_id=self._session_id,
             )
             from decimal import Decimal
+
             from retail_datagen.shared.models import (
-                Store,
                 Customer,
-                ProductMaster,
                 DistributionCenter,
+                ProductMaster,
+                Store,
             )
             now = datetime.now(UTC)
             if not self._stores:
@@ -799,7 +799,10 @@ class EventStreamer:
                 )
 
             # Get streaming window from watermarks
-            from retail_datagen.db.duck_watermarks import get_unpublished_data_range, update_publication_watermark
+            from retail_datagen.db.duck_watermarks import (
+                get_unpublished_data_range,
+                update_publication_watermark,
+            )
 
             try:
                 # Compute global window across all tables: earliest min, latest max

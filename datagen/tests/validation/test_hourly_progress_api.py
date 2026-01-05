@@ -2,9 +2,9 @@
 """Test script to verify hourly progress fields are sent via API."""
 
 import time
+
 import requests
-import json
-from datetime import datetime
+
 
 def test_hourly_progress():
     """Test that hourly progress fields appear in API responses."""
@@ -87,7 +87,7 @@ def test_hourly_progress():
 
     if found_hourly_fields:
         print(f"✅ Found hourly progress fields in {len(hourly_updates)} status updates")
-        print(f"\nSample updates:")
+        print("\nSample updates:")
         for update in hourly_updates[:5]:  # Show first 5
             print(f"  - Poll {update['poll']}: Day {update['current_day']}, Hour {update['current_hour']}")
             print(f"    Message: {update['message']}")

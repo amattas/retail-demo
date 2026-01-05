@@ -13,15 +13,15 @@ Key Test Areas:
     4. Integration: Simulate calls from fact_generator with tracker states
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from src.retail_datagen.shared.dependencies import (
-    update_task_progress,
-    get_task_status,
     TaskStatus,
     _task_status,
+    get_task_status,
+    update_task_progress,
 )
 
 

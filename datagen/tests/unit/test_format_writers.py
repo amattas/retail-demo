@@ -2,8 +2,8 @@
 Unit tests for Parquet format writer.
 """
 
-import pytest
 import pandas as pd
+import pytest
 
 from retail_datagen.services.writers import ParquetWriter
 

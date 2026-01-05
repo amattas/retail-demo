@@ -14,7 +14,7 @@ Tests cover:
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 

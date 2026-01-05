@@ -16,7 +16,6 @@ Test Requirements:
 import random
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -32,24 +31,9 @@ from retail_datagen.shared.models import (
 )
 from retail_datagen.streaming.event_factory import EventFactory, EventGenerationState
 from retail_datagen.streaming.schemas import (
-    AdImpressionPayload,
-    BLEPingDetectedPayload,
-    CustomerEnteredPayload,
-    CustomerZoneChangedPayload,
     EventEnvelope,
     EventType,
-    InventoryUpdatedPayload,
-    PaymentProcessedPayload,
-    PromotionAppliedPayload,
-    ReceiptCreatedPayload,
-    ReceiptLineAddedPayload,
-    ReorderTriggeredPayload,
-    StockoutDetectedPayload,
-    StoreOperationPayload,
-    TruckArrivedPayload,
-    TruckDepartedPayload,
 )
-
 
 # ================================
 # TEST FIXTURES

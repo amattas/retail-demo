@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Dict, Tuple
 
 import duckdb
 import pandas as pd
@@ -50,9 +49,9 @@ def _date_bounds(start_date: date | None, end_date: date | None) -> tuple[dateti
     return start_dt, end_dt
 
 
-def read_all_master_tables() -> Dict[str, pd.DataFrame]:
+def read_all_master_tables() -> dict[str, pd.DataFrame]:
     conn = get_duckdb_conn()
-    result: Dict[str, pd.DataFrame] = {}
+    result: dict[str, pd.DataFrame] = {}
     for table in MASTER_TABLES:
         try:
             validated_table = validate_table_name(table)
@@ -67,10 +66,10 @@ def read_all_master_tables() -> Dict[str, pd.DataFrame]:
     return result
 
 
-def read_all_fact_tables(start_date: date | None = None, end_date: date | None = None) -> Dict[str, pd.DataFrame]:
+def read_all_fact_tables(start_date: date | None = None, end_date: date | None = None) -> dict[str, pd.DataFrame]:
     conn = get_duckdb_conn()
     start_dt, end_dt = _date_bounds(start_date, end_date)
-    result: Dict[str, pd.DataFrame] = {}
+    result: dict[str, pd.DataFrame] = {}
     for table in FACT_TABLES:
         try:
             validated_table = validate_table_name(table)
@@ -98,7 +97,7 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
     return result
 
 
-def get_fact_table_date_range(table_name: str) -> Tuple[datetime | None, datetime | None]:
+def get_fact_table_date_range(table_name: str) -> tuple[datetime | None, datetime | None]:
     """Return (min_event_ts, max_event_ts) for a DuckDB fact table.
 
     If the table does not exist or has no rows, returns (None, None).
@@ -121,9 +120,9 @@ def get_fact_table_date_range(table_name: str) -> Tuple[datetime | None, datetim
         return None, None
 
 
-def get_all_fact_table_date_ranges() -> Dict[str, Tuple[datetime | None, datetime | None]]:
+def get_all_fact_table_date_ranges() -> dict[str, tuple[datetime | None, datetime | None]]:
     """Return date ranges for all known fact tables from DuckDB."""
-    ranges: Dict[str, Tuple[datetime | None, datetime | None]] = {}
+    ranges: dict[str, tuple[datetime | None, datetime | None]] = {}
     for tbl in FACT_TABLES:
         ranges[tbl] = get_fact_table_date_range(tbl)
     return ranges

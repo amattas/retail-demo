@@ -1,10 +1,11 @@
 """Test script to verify stores have proper tax rates assigned."""
 
 import sys
-from pathlib import Path
 from decimal import Decimal
-import pandas as pd
+from pathlib import Path
+
 import duckdb
+import pandas as pd
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -56,7 +57,7 @@ def test_store_tax_rates():
 
     if has_rate > 0:
         tax_rates = stores_df["tax_rate"].dropna()
-        print(f"\n   Tax Rate Statistics:")
+        print("\n   Tax Rate Statistics:")
         print(f"     Min: {tax_rates.min():.4f} ({tax_rates.min() * 100:.2f}%)")
         print(f"     Max: {tax_rates.max():.4f} ({tax_rates.max() * 100:.2f}%)")
         print(f"     Mean: {tax_rates.mean():.4f} ({tax_rates.mean() * 100:.2f}%)")

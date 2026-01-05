@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
+
 from retail_datagen.services import duckdb_reader
 from retail_datagen.services.file_manager import ExportFileManager
 from retail_datagen.services.writers import BaseWriter, ParquetWriter

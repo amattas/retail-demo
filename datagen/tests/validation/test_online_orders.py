@@ -11,15 +11,15 @@ This script generates a small sample of online orders and validates:
 """
 
 import asyncio
-import random
-from datetime import datetime, timedelta
+
+# Add src to path
+import sys
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 import pandas as pd
 
-# Add src to path
-import sys
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from retail_datagen.config.models import RetailConfig
@@ -76,7 +76,7 @@ async def test_online_orders():
     unique_orders = len(order_counts.unique())
     products_per_order = df.groupby(['OrderId', 'FulfillmentStatus']).ProductID.nunique()
     print(f"   - Unique orders: {len(order_counts) // 4}")  # Divide by 4 statuses
-    print(f"   - Products per order (at created status):")
+    print("   - Products per order (at created status):")
     created_df = df[df['FulfillmentStatus'] == 'created']
     products_in_orders = created_df.groupby('OrderId')['ProductID'].count()
     print(f"     Min: {products_in_orders.min()}, Max: {products_in_orders.max()}, Mean: {products_in_orders.mean():.2f}")
@@ -84,7 +84,7 @@ async def test_online_orders():
     # 2. Status progression
     print("\n2. STATUS PROGRESSION:")
     status_counts = df['FulfillmentStatus'].value_counts()
-    print(f"   Status distribution:")
+    print("   Status distribution:")
     for status, count in status_counts.items():
         print(f"     - {status}: {count} records")
 
@@ -92,7 +92,7 @@ async def test_online_orders():
     expected_statuses = {'created', 'picked', 'shipped', 'delivered'}
     actual_statuses = set(df['FulfillmentStatus'].unique())
     if expected_statuses == actual_statuses:
-        print(f"   ✓ All expected statuses present")
+        print("   ✓ All expected statuses present")
     else:
         print(f"   ✗ Missing statuses: {expected_statuses - actual_statuses}")
 
@@ -118,7 +118,7 @@ async def test_online_orders():
     print("\n4. TENDER TYPE DISTRIBUTION:")
     tender_counts = df[df['FulfillmentStatus'] == 'created']['TenderType'].value_counts()
     total_orders = len(df[df['FulfillmentStatus'] == 'created'])
-    print(f"   Tender type distribution:")
+    print("   Tender type distribution:")
     for tender, count in tender_counts.items():
         pct = (count / total_orders) * 100
         print(f"     - {tender}: {count} ({pct:.1f}%)")
@@ -127,7 +127,7 @@ async def test_online_orders():
     expected_tenders = {'CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'OTHER'}
     actual_tenders = set(df['TenderType'].unique())
     if actual_tenders.issubset(expected_tenders):
-        print(f"   ✓ All tender types are valid")
+        print("   ✓ All tender types are valid")
     else:
         print(f"   ✗ Unexpected tender types: {actual_tenders - expected_tenders}")
 
@@ -155,7 +155,7 @@ async def test_online_orders():
                 timing_errors.append(f"{order_id}: delivered not after shipped")
 
     if not timing_errors:
-        print(f"   ✓ All order statuses follow correct time progression")
+        print("   ✓ All order statuses follow correct time progression")
     else:
         print(f"   ✗ {len(timing_errors)} timing errors found:")
         for error in timing_errors[:5]:
@@ -174,13 +174,13 @@ async def test_online_orders():
         print(f"  Fulfillment: {order_df.iloc[0]['FulfillmentMode']} from {order_df.iloc[0]['NodeType']} {order_df.iloc[0]['NodeID']}")
         print(f"  Tender: {order_df.iloc[0]['TenderType']}")
         print(f"  Subtotal: ${order_df.iloc[0]['Subtotal']}, Tax: ${order_df.iloc[0]['Tax']}, Total: ${order_df.iloc[0]['Total']}")
-        print(f"  Products:")
+        print("  Products:")
 
         created_records = order_df[order_df['FulfillmentStatus'] == 'created']
         for _, row in created_records.iterrows():
             print(f"    - Product {row['ProductID']}: Qty {row['Qty']}")
 
-        print(f"  Status progression:")
+        print("  Status progression:")
         for status in ['created', 'picked', 'shipped', 'delivered']:
             status_records = order_df[order_df['FulfillmentStatus'] == status]
             if not status_records.empty:
@@ -195,11 +195,11 @@ async def test_online_orders():
     print(f"DC transactions: {len(dc_txn)}")
 
     if store_txn:
-        print(f"\nSample store transaction:")
+        print("\nSample store transaction:")
         print(f"  {store_txn[0]}")
 
     if dc_txn:
-        print(f"\nSample DC transaction:")
+        print("\nSample DC transaction:")
         print(f"  {dc_txn[0]}")
 
     print("\n" + "="*80)

@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from retail_datagen.shared.customer_geography import GeographyAssigner, StoreSelector
 from retail_datagen.shared.models import Customer, GeographyMaster, Store
 
+
 # Create test data
 def create_test_geographies():
     """Create sample geographies for testing."""
@@ -133,7 +134,7 @@ def main():
     secondary_visits = store_visit_counts[test_customer_geo.secondary_store_id]
     top_two_pct = ((primary_visits + secondary_visits) / 100) * 100
 
-    print(f"\n   Validation:")
+    print("\n   Validation:")
     print(f"      Primary store visits: {primary_visits}% (target: ~50%)")
     print(f"      Top 2 stores combined: {top_two_pct:.0f}% (target: ≥60%)")
 
