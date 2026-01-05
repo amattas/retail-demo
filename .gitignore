@@ -82,6 +82,15 @@ data/facts/**/*.csv
 *.log
 .env.local
 
+# Secret-containing config files (prefer env vars)
+# Use config.example.json as a template; copy to config.json and customize
+**/config.json
+!**/config.example.json
+**/config.local.json
+**/config.secrets.json
+**/.secrets/
+**/secrets.json
+
 # DuckDB files
 *.duckdb
 *.wal

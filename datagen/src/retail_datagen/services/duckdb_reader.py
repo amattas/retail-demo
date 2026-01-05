@@ -14,7 +14,7 @@ from typing import Dict, Tuple
 import duckdb
 import pandas as pd
 
-from retail_datagen.db.duckdb_engine import get_duckdb_conn
+from retail_datagen.db.duckdb_engine import get_duckdb_conn, validate_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,8 @@ def read_all_master_tables() -> Dict[str, pd.DataFrame]:
     result: Dict[str, pd.DataFrame] = {}
     for table in MASTER_TABLES:
         try:
-            df = conn.execute(f"SELECT * FROM {table}").df()
+            validated_table = validate_table_name(table)
+            df = conn.execute(f"SELECT * FROM {validated_table}").df()
         except duckdb.CatalogException:
             logger.debug(f"Table {table} does not exist, returning empty DataFrame")
             df = pd.DataFrame()
@@ -72,18 +73,19 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
     result: Dict[str, pd.DataFrame] = {}
     for table in FACT_TABLES:
         try:
+            validated_table = validate_table_name(table)
             if start_dt is None:
-                df = conn.execute(f"SELECT * FROM {table}").df()
+                df = conn.execute(f"SELECT * FROM {validated_table}").df()
             else:
                 # Special-case tables without event_ts
                 if table == "fact_online_order_lines":
                     df = conn.execute(
-                        f"SELECT * FROM {table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
+                        f"SELECT * FROM {validated_table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
                         [start_dt, end_dt],
                     ).df()
                 else:
                     df = conn.execute(
-                        f"SELECT * FROM {table} WHERE event_ts >= ? AND event_ts < ?",
+                        f"SELECT * FROM {validated_table} WHERE event_ts >= ? AND event_ts < ?",
                         [start_dt, end_dt],
                     ).df()
         except duckdb.CatalogException:
@@ -101,20 +103,21 @@ def get_fact_table_date_range(table_name: str) -> Tuple[datetime | None, datetim
 
     If the table does not exist or has no rows, returns (None, None).
     """
+    validated_table = validate_table_name(table_name)
     conn = get_duckdb_conn()
     try:
         cur = conn.execute(
-            f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts FROM {table_name}"
+            f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts FROM {validated_table}"
         )
         row = cur.fetchone()
         if not row:
             return None, None
         return row[0], row[1]
     except duckdb.CatalogException:
-        logger.debug(f"Table {table_name} does not exist")
+        logger.debug(f"Table {validated_table} does not exist")
         return None, None
     except Exception as e:
-        logger.warning(f"Failed to get date range for table {table_name}: {e}")
+        logger.warning(f"Failed to get date range for table {validated_table}: {e}")
         return None, None
 
 

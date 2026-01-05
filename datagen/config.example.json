@@ -1,4 +1,6 @@
 {
+  "_comment": "Copy this file to config.json and customize. Never commit secrets to config.json!",
+  "_security_note": "For azure_connection_string, use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead of putting secrets here.",
   "seed": 42,
   "volume": {
     "stores": 86,
@@ -36,10 +38,7 @@
     "circuit_breaker_enabled": true,
     "monitoring_interval": 30,
     "max_buffer_size": 10000,
-    "enable_dead_letter_queue": true,
-    "use_keyvault": false,
-    "keyvault_url": null,
-    "keyvault_secret_name": "eventhub-connection-string"
+    "enable_dead_letter_queue": true
   },
   "paths": {
     "dictionaries": "data/dictionaries",

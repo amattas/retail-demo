@@ -102,25 +102,6 @@ class TestCredentialIntegration:
             connection = config.get_connection_string()
             assert connection == config_conn_str
 
-    def test_keyvault_enabled_requires_url(self):
-        """Test that enabling Key Vault without URL raises error."""
-        config = RealtimeConfig(
-            emit_interval_ms=500,
-            burst=100,
-            use_keyvault=True,
-            keyvault_url=None,  # Missing URL
-        )
-
-        with pytest.raises(ValueError, match="keyvault_url required"):
-            config.get_connection_string()
-
-    @pytest.mark.skip(reason="Requires azure-keyvault-secrets package")
-    def test_keyvault_loading_integration(self):
-        """Test Key Vault integration (requires azure-keyvault-secrets)."""
-        # This test would require actual Key Vault setup
-        # Skip in CI/CD unless Key Vault is available
-        pass
-
     def test_retail_config_loads_connection_string(self):
         """Test that full RetailConfig properly loads connection string."""
         test_conn_str = (
@@ -192,14 +173,69 @@ class TestCredentialIntegration:
             connection = config.get_connection_string()
             assert connection == ""
 
-    def test_keyvault_fields_optional(self):
-        """Test that Key Vault fields are optional."""
-        config = RealtimeConfig(
-            emit_interval_ms=500,
-            burst=100,
-            # Key Vault fields not specified - should use defaults
+
+class TestSecurityWarnings:
+    """Tests for security warning behavior."""
+
+    def test_security_warning_fires_when_credential_in_config_only(self, caplog):
+        """Test that security warning fires when credential is in config but not env var."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
+        config_conn_str = (
+            "Endpoint=sb://config.servicebus.windows.net/;"
+            "SharedAccessKeyName=ConfigKey;"
+            "SharedAccessKey=Q29uZmlnU2VjcmV0Q29uZmlnU2VjcmV0Q29uZmlnU2VjcmV0Q29uZmlnU2VjcmV0;"
+            "EntityPath=config-hub"
         )
 
-        assert config.use_keyvault is False
-        assert config.keyvault_url is None
-        assert config.keyvault_secret_name == "eventhub-connection-string"
+        # No env var set - credential must be from config
+        with patch.dict(os.environ, {}, clear=True):
+            RealtimeConfig(
+                emit_interval_ms=500,
+                burst=100,
+                azure_connection_string=config_conn_str,
+            )
+
+            # Security warning should be logged
+            assert "SECURITY WARNING" in caplog.text
+            assert "azure_connection_string" in caplog.text.lower() or "connection string" in caplog.text.lower()
+
+    def test_no_security_warning_when_credential_from_env_var(self, caplog):
+        """Test that no security warning fires when credential comes from env var."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
+        env_conn_str = (
+            "Endpoint=sb://env.servicebus.windows.net/;"
+            "SharedAccessKeyName=EnvKey;"
+            "SharedAccessKey=RW52U2VjcmV0RW52U2VjcmV0RW52U2VjcmV0RW52U2VjcmV0RW52U2VjcmV0;"
+            "EntityPath=env-hub"
+        )
+
+        # Env var set, config empty - credential from env var (safe)
+        with patch.dict(os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": env_conn_str}):
+            RealtimeConfig(
+                emit_interval_ms=500,
+                burst=100,
+                azure_connection_string="",  # Empty - will load from env
+            )
+
+            # No security warning should be logged
+            assert "SECURITY WARNING" not in caplog.text
+
+    def test_no_security_warning_when_empty_credential(self, caplog):
+        """Test that no security warning fires when no credential is set."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
+        # No credential set anywhere
+        with patch.dict(os.environ, {}, clear=True):
+            RealtimeConfig(
+                emit_interval_ms=500,
+                burst=100,
+                azure_connection_string="",
+            )
+
+            # No security warning should be logged (nothing to warn about)
+            assert "SECURITY WARNING" not in caplog.text

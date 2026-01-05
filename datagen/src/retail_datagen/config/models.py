@@ -115,7 +115,12 @@ class VolumeConfig(BaseModel):
 
 
 class RealtimeConfig(BaseModel):
-    """Configuration for real-time streaming settings."""
+    """Configuration for real-time streaming settings.
+
+    SECURITY NOTE: Prefer environment variable AZURE_EVENTHUB_CONNECTION_STRING
+    over storing connection strings in config.json to avoid accidental exposure
+    in version control.
+    """
 
     emit_interval_ms: int = Field(
         ..., gt=0, description="Interval between event emissions in milliseconds"
@@ -156,19 +161,6 @@ class RealtimeConfig(BaseModel):
     )
     enable_dead_letter_queue: bool = Field(
         default=True, description="Enable dead letter queue for failed events"
-    )
-
-    # Optional Azure Key Vault configuration
-    use_keyvault: bool = Field(
-        default=False, description="Load connection string from Azure Key Vault"
-    )
-    keyvault_url: str | None = Field(
-        default=None,
-        description="Azure Key Vault URL (e.g., https://your-vault.vault.azure.net/)",
-    )
-    keyvault_secret_name: str = Field(
-        default="eventhub-connection-string",
-        description="Secret name in Azure Key Vault",
     )
 
     @field_validator("azure_connection_string", mode="before")
@@ -235,6 +227,22 @@ class RealtimeConfig(BaseModel):
                     f"Detected Fabric RTI connection to: {metadata.get('entity_path')}"
                 )
 
+        # Security warning: Only warn if connection string appears to be hardcoded in config
+        # (not loaded from environment variable). Compare against env var to detect source.
+        if self.azure_connection_string:
+            env_value = os.getenv("AZURE_EVENTHUB_CONNECTION_STRING", "")
+            # Only warn if the value differs from env var (meaning it came from config)
+            # If env var is empty, the value must have come from config
+            # If env var matches, the value was safely loaded from env var
+            if not env_value or self.azure_connection_string != env_value:
+                logger.warning(
+                    "SECURITY WARNING: Azure Event Hub connection string is configured in the model. "
+                    "If this value comes from config.json, it may be accidentally committed to version control. "
+                    "Recommended: Use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead. "
+                    "To suppress this warning, leave azure_connection_string empty in config.json "
+                    "and set the AZURE_EVENTHUB_CONNECTION_STRING environment variable."
+                )
+
         return self
 
     def get_connection_string(self) -> str:
@@ -242,54 +250,19 @@ class RealtimeConfig(BaseModel):
         Get connection string from the appropriate source.
 
         Priority order:
-        1. Azure Key Vault (if use_keyvault=True)
-        2. Environment variable (AZURE_EVENTHUB_CONNECTION_STRING)
-        3. Configuration file value
+        1. Environment variable (AZURE_EVENTHUB_CONNECTION_STRING)
+        2. Configuration file value
 
         Returns:
             str: Connection string
-
-        Raises:
-            ValueError: If Key Vault is enabled but URL is not provided
-            ImportError: If Key Vault libraries are not installed
         """
-        # Load from Key Vault if enabled
-        if self.use_keyvault:
-            if not self.keyvault_url:
-                raise ValueError("keyvault_url required when use_keyvault=true")
-            return self._load_from_keyvault()
-
-        # Try environment variable first (already loaded by validator)
+        # Try environment variable first
         env_conn = os.getenv("AZURE_EVENTHUB_CONNECTION_STRING")
         if env_conn:
             return env_conn
 
         # Fall back to config value
         return self.azure_connection_string or ""
-
-    def _load_from_keyvault(self) -> str:
-        """
-        Load connection string from Azure Key Vault.
-
-        Returns:
-            str: Connection string from Key Vault
-
-        Raises:
-            ImportError: If azure-keyvault-secrets or azure-identity not installed
-        """
-        try:
-            from azure.identity import DefaultAzureCredential
-            from azure.keyvault.secrets import SecretClient
-
-            credential = DefaultAzureCredential()
-            client = SecretClient(vault_url=self.keyvault_url, credential=credential)
-            secret = client.get_secret(self.keyvault_secret_name)
-            return secret.value
-        except ImportError as e:
-            raise ImportError(
-                "Azure Key Vault support requires: "
-                "pip install azure-keyvault-secrets azure-identity"
-            ) from e
 
 
 class PathsConfig(BaseModel):
@@ -335,6 +308,9 @@ class StorageConfig(BaseModel):
     If provided, they can be used by services that upload generated data to
     Azure Storage. Values can be supplied via config file or environment vars.
 
+    SECURITY NOTE: Prefer environment variables (AZURE_STORAGE_ACCOUNT_KEY)
+    over storing keys in config.json to avoid accidental exposure in version control.
+
     Environment overrides (checked if field empty/None):
     - account_uri: AZURE_STORAGE_ACCOUNT_URI or AZURE_STORAGE_ACCOUNT_URL
     - account_key: AZURE_STORAGE_ACCOUNT_KEY
@@ -346,7 +322,7 @@ class StorageConfig(BaseModel):
     )
     account_key: str | None = Field(
         default=None,
-        description="Azure Storage account key (sensitive)",
+        description="Azure Storage account key (sensitive - prefer environment variable)",
     )
 
     @field_validator("account_uri", mode="before")
@@ -382,6 +358,22 @@ class StorageConfig(BaseModel):
             # Prevent obviously invalid bare values
             if "." not in uri and "/" not in uri:
                 raise ValueError("Storage account URI appears invalid")
+
+        # Security warning: Only warn if account_key appears to be hardcoded in config
+        # (not loaded from environment variable). Compare against env var to detect source.
+        if self.account_key:
+            env_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
+            # Only warn if the value differs from env var (meaning it came from config)
+            # If env var is empty, the value must have come from config
+            # If env var matches, the value was safely loaded from env var
+            if not env_key or self.account_key != env_key:
+                logger.warning(
+                    "SECURITY WARNING: Azure Storage account key is configured in the model. "
+                    "If this value comes from config.json, it may be accidentally committed to version control. "
+                    "Recommended: Use environment variable AZURE_STORAGE_ACCOUNT_KEY instead. "
+                    "To suppress this warning, leave account_key empty in config.json "
+                    "and set the AZURE_STORAGE_ACCOUNT_KEY environment variable."
+                )
         return self
 
 
