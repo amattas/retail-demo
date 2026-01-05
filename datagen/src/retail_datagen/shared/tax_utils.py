@@ -29,9 +29,17 @@ class TaxCalculator:
     methods for looking up rates based on geographic location and
     calculating tax amounts with proper decimal precision.
 
+    Implements hierarchical tax rate fallback:
+    1. Exact match: State + County + City
+    2. County fallback: State + County (average of cities in county)
+    3. State fallback: State only (average of all cities in state)
+    4. Default fallback: Uses default_rate
+
     Attributes:
         tax_rates: DataFrame containing all loaded tax rates
         rate_cache: Dictionary cache of (state, city) -> rate lookups
+        county_cache: Dictionary cache of (state, county) -> average rate
+        state_cache: Dictionary cache of state -> average rate
         default_rate: Fallback rate when no match is found (7.407%)
     """
 
@@ -51,11 +59,15 @@ class TaxCalculator:
         self.tax_rates_path = Path(tax_rates_path)
         self.default_rate = default_rate
         self.rate_cache: dict[tuple[str, str], Decimal] = {}
+        self.county_cache: dict[tuple[str, str], Decimal] = {}
+        self.state_cache: dict[str, Decimal] = {}
 
         # Load and validate tax rates
         self._load_tax_rates()
         logger.info(
-            f"Loaded {len(self.rate_cache)} tax rate entries from {self.tax_rates_path}"
+            f"Loaded {len(self.rate_cache)} city rates, "
+            f"{len(self.county_cache)} county rates, "
+            f"{len(self.state_cache)} state rates from {self.tax_rates_path}"
         )
 
     def _load_tax_rates(self) -> None:
@@ -96,8 +108,13 @@ class TaxCalculator:
                 raise ValueError(f"Missing required columns in tax_rates.csv: {missing}")
 
             # Build (StateCode, City) -> CombinedRate cache (use itertuples for speed)
+            # Also collect rates by county and state for fallback calculations
+            county_rates: dict[tuple[str, str], list[Decimal]] = {}
+            state_rates: dict[str, list[Decimal]] = {}
+
             for row in self.tax_rates.itertuples(index=False):
                 state = str(getattr(row, "StateCode")).strip().upper()
+                county = str(getattr(row, "County")).strip()
                 city = str(getattr(row, "City")).strip()
                 rate = Decimal(str(getattr(row, "CombinedRate")))
 
@@ -109,8 +126,35 @@ class TaxCalculator:
                     )
                     continue
 
-                key = (state, city)
-                self.rate_cache[key] = rate
+                # City-level cache (primary lookup)
+                city_key = (state, city)
+                self.rate_cache[city_key] = rate
+
+                # Collect rates for county aggregation
+                if county:
+                    county_key = (state, county)
+                    if county_key not in county_rates:
+                        county_rates[county_key] = []
+                    county_rates[county_key].append(rate)
+
+                # Collect rates for state aggregation
+                if state not in state_rates:
+                    state_rates[state] = []
+                state_rates[state].append(rate)
+
+            # Build county cache (average of city rates in each county)
+            # Use Decimal.quantize() for consistent precision without float conversion
+            # 5 decimal places: tax rates are typically 4 decimals (e.g., 0.0825 = 8.25%)
+            # but averaging can produce more; extra precision avoids rounding artifacts
+            precision = Decimal("0.00001")
+            for county_key, rates in county_rates.items():
+                avg_rate = sum(rates) / len(rates)
+                self.county_cache[county_key] = avg_rate.quantize(precision)
+
+            # Build state cache (average of all city rates in each state)
+            for state_code, rates in state_rates.items():
+                avg_rate = sum(rates) / len(rates)
+                self.state_cache[state_code] = avg_rate.quantize(precision)
 
         except pd.errors.EmptyDataError:
             raise ValueError(f"Tax rates file is empty: {self.tax_rates_path}")
@@ -122,19 +166,16 @@ class TaxCalculator:
     ) -> Decimal:
         """Get combined tax rate for a location.
 
-        Implements hierarchical lookup:
-        1. Try to find City tax rate (if city provided)
-        2. Fall back to County tax rate (if county provided) - NOT IMPLEMENTED YET
-        3. Fall back to State tax rate - NOT IMPLEMENTED YET
+        Implements hierarchical lookup with fallback chain:
+        1. Try exact City match (State + City)
+        2. Fall back to County average (State + County)
+        3. Fall back to State average
         4. Fall back to default rate
-
-        Current implementation uses (State, City) mapping which matches
-        the tax_rates.csv structure where each row has a specific city.
 
         Args:
             state: Two-letter state code (e.g., "CA", "TX")
-            county: County name (optional, not currently used)
-            city: City name (optional, used for lookup)
+            county: County name (optional, used for fallback)
+            city: City name (optional, primary lookup key)
 
         Returns:
             Tax rate as Decimal (e.g., Decimal("0.0950") for 9.5%)
@@ -145,31 +186,42 @@ class TaxCalculator:
             Decimal('0.0950')
             >>> calc.get_tax_rate("TX", city="Houston")
             Decimal('0.0825')
+            >>> calc.get_tax_rate("CA", county="Los Angeles")  # County fallback
+            Decimal('0.09250')  # Average of LA county cities
+            >>> calc.get_tax_rate("CA")  # State fallback
+            Decimal('0.08500')  # Average of all CA cities
             >>> calc.get_tax_rate("ZZ", city="Unknown")  # Falls back to default
             Decimal('0.07407')
         """
         state = state.strip().upper()
 
-        # Try City lookup first (primary method)
+        # Step 1: Try City lookup first (primary method - exact match)
         if city:
             city = city.strip()
-            key = (state, city)
-            if key in self.rate_cache:
-                return self.rate_cache[key]
-            else:
+            city_key = (state, city)
+            if city_key in self.rate_cache:
+                logger.debug(f"Tax rate found for {city}, {state}: {self.rate_cache[city_key]}")
+                return self.rate_cache[city_key]
+            logger.debug(f"No city-level tax rate for {city}, {state}. Trying county fallback.")
+
+        # Step 2: Try County fallback (average of cities in county)
+        if county:
+            county = county.strip()
+            county_key = (state, county)
+            if county_key in self.county_cache:
                 logger.debug(
-                    f"No tax rate found for {city}, {state}. Using default: {self.default_rate}"
+                    f"Using county-level tax rate for {county}, {state}: {self.county_cache[county_key]}"
                 )
+                return self.county_cache[county_key]
+            logger.debug(f"No county-level tax rate for {county}, {state}. Trying state fallback.")
 
-        # TODO: Implement County fallback
-        # Currently tax_rates.csv has city-level rates, so county lookup
-        # would require aggregation or separate county-only entries
+        # Step 3: Try State-only fallback (average of all cities in state)
+        if state in self.state_cache:
+            logger.debug(f"Using state-level tax rate for {state}: {self.state_cache[state]}")
+            return self.state_cache[state]
 
-        # TODO: Implement State-only fallback
-        # Would require state-level rates in tax_rates.csv or
-        # computing average/median of all cities in state
-
-        # Return default if no match found
+        # Step 4: Return default if no match found at any level
+        logger.debug(f"No tax rate found for {state}. Using default: {self.default_rate}")
         return self.default_rate
 
     def calculate_tax(self, amount: Decimal, tax_rate: Decimal) -> Decimal:

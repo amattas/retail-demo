@@ -360,7 +360,25 @@ class InventoryReason(str, Enum):
 
 
 class TruckStatus(str, Enum):
-    """Truck movement status."""
+    """Truck movement status.
+
+    State machine lifecycle for truck shipments:
+        SCHEDULED -> LOADING -> IN_TRANSIT -> ARRIVED -> UNLOADING -> COMPLETED
+
+    Streaming event mapping (only ARRIVED and COMPLETED emit events):
+        - ARRIVED: truck_arrived (truck reached destination store)
+        - COMPLETED: truck_departed (truck left store after unloading)
+
+    Note: "truck_departed" fires at COMPLETED because it represents the truck
+    departing FROM THE STORE after finishing delivery, not departing from DC.
+    LOADING and IN_TRANSIT are internal states tracked in fact tables only.
+
+    Inventory transaction triggers:
+        - LOADING: DC outbound inventory transaction
+        - UNLOADING: Store inbound inventory transaction
+
+    See InventoryFlowSimulator.VALID_STATE_TRANSITIONS for allowed transitions.
+    """
 
     SCHEDULED = "SCHEDULED"
     LOADING = "LOADING"
@@ -445,7 +463,14 @@ class DCInventoryTransaction(BaseModel):
 
 
 class TruckMove(BaseModel):
-    """Truck movement fact."""
+    """Truck movement fact.
+
+    Tracks truck lifecycle through states: SCHEDULED -> LOADING -> IN_TRANSIT ->
+    ARRIVED -> UNLOADING -> COMPLETED.
+
+    The DepartureTime and ActualUnloadDuration fields are populated only for
+    COMPLETED status records, supporting the truck_departed streaming event.
+    """
 
     TraceId: str = Field(..., description="Unique trace identifier")
     EventTS: datetime = Field(..., description="Event timestamp")
@@ -456,6 +481,13 @@ class TruckMove(BaseModel):
     Status: TruckStatus = Field(..., description="Truck status")
     ETA: datetime = Field(..., description="Estimated time of arrival")
     ETD: datetime = Field(..., description="Estimated time of departure")
+    # Departure fields - populated only for COMPLETED status (truck_departed event)
+    DepartureTime: datetime | None = Field(
+        None, description="Actual departure time after unloading (COMPLETED status only)"
+    )
+    ActualUnloadDuration: int | None = Field(
+        None, ge=0, description="Actual unload duration in minutes (COMPLETED status only)"
+    )
 
 
 class TruckInventory(BaseModel):

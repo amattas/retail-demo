@@ -24,6 +24,7 @@ Naming Conventions:
 
 import logging
 import random
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -396,15 +397,18 @@ class CustomerJourneySimulator:
             },
         }
 
-        # Segment price preferences
+        # Segment price preferences - used to filter product selection
+        # Values < 1.0: prefer lower prices (use bottom X% of price range)
+        # Values = 1.0: no price filtering (all products equally likely)
+        # Values > 1.0: prefer higher prices (use top X% of price range)
         price_modifiers = {
-            CustomerSegment.BUDGET_CONSCIOUS: 0.7,  # Prefer lower prices
-            CustomerSegment.CONVENIENCE_FOCUSED: 1.0,  # Price neutral
-            CustomerSegment.QUALITY_SEEKER: 1.3,  # Prefer higher prices
-            CustomerSegment.BRAND_LOYAL: 1.1,  # Slight price premium
+            CustomerSegment.BUDGET_CONSCIOUS: 0.7,  # Prefer bottom 70% of prices
+            CustomerSegment.CONVENIENCE_FOCUSED: 1.0,  # No price filtering
+            CustomerSegment.QUALITY_SEEKER: 1.3,  # Prefer top 30% of prices
+            CustomerSegment.BRAND_LOYAL: 1.1,  # Prefer top 50% of prices
         }
 
-        price_modifiers[segment]
+        price_modifier = price_modifiers[segment]
         preferences = category_preferences[behavior]
 
         # Select products from preferred categories
@@ -421,27 +425,42 @@ class CustomerJourneySimulator:
             ):
                 available_products = self._product_categories[category]
 
-                # Filter products by price preference
-                if segment == CustomerSegment.BUDGET_CONSCIOUS:
-                    # Prefer products in bottom 60% of price range
-                    price_threshold = sorted([p.SalePrice for p in available_products])[
-                        int(len(available_products) * 0.6)
-                    ]
+                # Filter products by price preference using the price_modifier
+                if price_modifier < 1.0:
+                    # Budget-conscious: prefer lower-priced products
+                    # Use bottom (price_modifier * 100)% of price range
+                    # e.g., modifier=0.7 means include bottom 70% of prices
+                    sorted_prices = sorted([p.SalePrice for p in available_products])
+                    # Subtract 1 to convert count to 0-based index: for 10 items at 70%,
+                    # int(10*0.7)=7 items means indices 0-6, so threshold is at index 6
+                    threshold_idx = max(0, int(len(sorted_prices) * price_modifier) - 1)
+                    price_threshold = sorted_prices[threshold_idx]
                     preferred_products = [
                         p for p in available_products if p.SalePrice <= price_threshold
                     ]
-                elif segment == CustomerSegment.QUALITY_SEEKER:
-                    # Prefer products in top 40% of price range
-                    price_threshold = sorted([p.SalePrice for p in available_products])[
-                        int(len(available_products) * 0.6)
-                    ]
+                elif price_modifier > 1.0:
+                    # Quality/premium seekers: prefer higher-priced products
+                    # Use explicit percentile mapping to match documented behavior
+                    top_percentile_map = {
+                        CustomerSegment.QUALITY_SEEKER: 0.3,   # Top 30% of prices
+                        CustomerSegment.BRAND_LOYAL: 0.5,      # Top 50% of prices
+                    }
+                    top_percentile = top_percentile_map.get(segment, 0.3)
+                    sorted_prices = sorted([p.SalePrice for p in available_products])
+                    threshold_idx = min(
+                        len(sorted_prices) - 1,
+                        int(len(sorted_prices) * (1.0 - top_percentile))
+                    )
+                    price_threshold = sorted_prices[threshold_idx]
                     preferred_products = [
                         p for p in available_products if p.SalePrice >= price_threshold
                     ]
                 else:
+                    # Convenience-focused (modifier=1.0): no price filtering
                     preferred_products = available_products
 
                 if not preferred_products:
+                    # Fallback: if filtering left no products, use all available
                     preferred_products = available_products
 
                 # Select products from category
@@ -848,6 +867,10 @@ class InventoryFlowSimulator:
         """
         Generate truck shipment from DC to store.
 
+        Enforces truck capacity constraints. If the reorder list exceeds
+        truck capacity, items are truncated to fit. For orders requiring
+        multiple trucks, use generate_truck_shipments() instead.
+
         Args:
             dc_id: Source distribution center ID
             store_id: Destination store ID
@@ -856,7 +879,45 @@ class InventoryFlowSimulator:
 
         Returns:
             Shipment information dictionary
+
+        Raises:
+            ValueError: If any quantity in reorder_list is negative
         """
+        # Validate quantities are non-negative
+        for product_id, qty in reorder_list:
+            if qty < 0:
+                raise ValueError(
+                    f"Invalid negative quantity {qty} for product {product_id} in shipment"
+                )
+
+        # Enforce truck capacity - truncate if necessary
+        capacity = self._truck_capacity
+        total_requested = sum(qty for _, qty in reorder_list)
+
+        if total_requested > capacity:
+            logger.warning(
+                f"Shipment to store {store_id} exceeds truck capacity "
+                f"({total_requested} > {capacity}). Truncating to fit. "
+                f"Consider using generate_truck_shipments() for multi-truck support."
+            )
+            warnings.warn(
+                "Order exceeds truck capacity and will be truncated. "
+                "Use generate_truck_shipments() for automatic multi-truck splitting "
+                "to avoid data loss.",
+                UserWarning,
+                stacklevel=2,
+            )
+            # Truncate items to fit within capacity
+            truncated_list = []
+            remaining_capacity = capacity
+            for product_id, qty in reorder_list:
+                if remaining_capacity <= 0:
+                    break
+                actual_qty = min(qty, remaining_capacity)
+                truncated_list.append((product_id, actual_qty))
+                remaining_capacity -= actual_qty
+            reorder_list = truncated_list
+
         # Generate unique shipment ID
         shipment_id = f"SHIP{departure_time.strftime('%Y%m%d')}{dc_id:02d}{store_id:03d}{self._rng.randint(100, 999)}"
         # Choose a real truck when available to maintain referential integrity
@@ -871,7 +932,9 @@ class InventoryFlowSimulator:
         travel_hours = int(base_travel_hours * delay_multiplier)
 
         eta = departure_time + timedelta(hours=travel_hours)
-        etd = eta + timedelta(hours=1)  # 1 hour unloading time
+        # Unload duration scales with shipment size (30min - 2hrs)
+        unload_hours = self._calculate_unload_duration(sum(qty for _, qty in reorder_list))
+        etd = eta + timedelta(hours=unload_hours)
 
         shipment_info = {
             "shipment_id": shipment_id,
@@ -884,6 +947,7 @@ class InventoryFlowSimulator:
             "status": TruckStatus.SCHEDULED,
             "products": reorder_list,
             "total_items": sum(qty for _, qty in reorder_list),
+            "unload_duration_hours": unload_hours,  # Store for later reference
         }
 
         # Track active shipment
@@ -891,19 +955,217 @@ class InventoryFlowSimulator:
 
         return shipment_info
 
+    def generate_truck_shipments(
+        self,
+        dc_id: int,
+        store_id: int,
+        reorder_list: list[tuple[int, int]],
+        departure_time: datetime,
+    ) -> list[dict]:
+        """
+        Generate one or more truck shipments from DC to store, respecting capacity.
+
+        If the reorder list exceeds a single truck's capacity, the order is
+        split across multiple trucks with staggered departure times.
+
+        Args:
+            dc_id: Source distribution center ID
+            store_id: Destination store ID
+            reorder_list: List of (product_id, quantity) to ship
+            departure_time: Base departure time for first truck
+
+        Returns:
+            List of shipment information dictionaries
+
+        Raises:
+            ValueError: If any quantity in reorder_list is negative
+        """
+        # Guard against empty reorder list
+        if not reorder_list:
+            return []
+
+        # Validate quantities are non-negative (same check as generate_truck_shipment)
+        for product_id, qty in reorder_list:
+            if qty < 0:
+                raise ValueError(
+                    f"Invalid negative quantity {qty} for product {product_id} in shipment"
+                )
+
+        capacity = self._truck_capacity
+        total_items = sum(qty for _, qty in reorder_list)
+
+        # If fits in one truck, use simple method
+        if total_items <= capacity:
+            return [self.generate_truck_shipment(dc_id, store_id, reorder_list, departure_time)]
+
+        # Split order across multiple trucks
+        shipments = []
+        current_truck_items: list[tuple[int, int]] = []
+        current_truck_total = 0
+        truck_number = 0
+
+        for product_id, qty in reorder_list:
+            remaining_qty = qty
+
+            while remaining_qty > 0:
+                space_available = capacity - current_truck_total
+                qty_to_add = min(remaining_qty, space_available)
+
+                if qty_to_add > 0:
+                    current_truck_items.append((product_id, qty_to_add))
+                    current_truck_total += qty_to_add
+                    remaining_qty -= qty_to_add
+
+                # If truck is full, dispatch it
+                if current_truck_total >= capacity:
+                    # Stagger departure times by 30 minutes per truck
+                    truck_departure = departure_time + timedelta(minutes=30 * truck_number)
+                    shipment = self.generate_truck_shipment(
+                        dc_id, store_id, current_truck_items, truck_departure
+                    )
+                    shipments.append(shipment)
+                    truck_number += 1
+                    current_truck_items = []
+                    current_truck_total = 0
+
+        # Dispatch any remaining items in the last truck
+        if current_truck_items:
+            truck_departure = departure_time + timedelta(minutes=30 * truck_number)
+            shipment = self.generate_truck_shipment(
+                dc_id, store_id, current_truck_items, truck_departure
+            )
+            shipments.append(shipment)
+
+        logger.info(
+            f"Large order for store {store_id} split across {len(shipments)} trucks "
+            f"(total items: {total_items}, capacity per truck: {capacity})"
+        )
+
+        return shipments
+
+    def _calculate_unload_duration(self, total_items: int) -> float:
+        """
+        Calculate unload duration based on shipment size.
+
+        Args:
+            total_items: Total number of items in shipment
+
+        Returns:
+            Unload duration in hours (0.5 to 2.0 hours)
+        """
+        # Scale from 30 min (small shipment) to 2 hours (full truck)
+        # Linear scale based on percentage of truck capacity
+        capacity = self._truck_capacity
+        load_percentage = min(1.0, total_items / capacity)
+        # 0.5 hours base + up to 1.5 hours for full load
+        return 0.5 + (load_percentage * 1.5)
+
+    # Maximum number of state transitions to attempt when recovering from stuck states
+    # Set to 6 (the number of states in the lifecycle) to ensure we can reach any state
+    MAX_RECOVERY_STEPS = 6
+
+    # Valid state transitions for truck lifecycle
+    # Each state maps to the set of valid next states
+    VALID_STATE_TRANSITIONS: dict[TruckStatus, set[TruckStatus]] = {
+        TruckStatus.SCHEDULED: {TruckStatus.LOADING, TruckStatus.COMPLETED},  # Can skip to COMPLETED on timeout
+        TruckStatus.LOADING: {TruckStatus.IN_TRANSIT, TruckStatus.COMPLETED},
+        TruckStatus.IN_TRANSIT: {TruckStatus.ARRIVED, TruckStatus.COMPLETED},
+        TruckStatus.ARRIVED: {TruckStatus.UNLOADING, TruckStatus.COMPLETED},
+        TruckStatus.UNLOADING: {TruckStatus.COMPLETED},
+        TruckStatus.COMPLETED: set(),  # Terminal state - no further transitions
+    }
+
+    # Maximum time a shipment can be in any state before being considered stuck (hours)
+    STATE_TIMEOUT_HOURS: dict[TruckStatus, int] = {
+        TruckStatus.SCHEDULED: 24,   # Max 24 hours waiting to load
+        TruckStatus.LOADING: 8,      # Max 8 hours loading
+        TruckStatus.IN_TRANSIT: 48,  # Max 48 hours in transit
+        TruckStatus.ARRIVED: 4,      # Max 4 hours waiting to unload
+        TruckStatus.UNLOADING: 8,    # Max 8 hours unloading
+    }
+
+    def _validate_state_transition(
+        self, shipment_id: str, current_state: TruckStatus, new_state: TruckStatus
+    ) -> bool:
+        """
+        Validate that a state transition is allowed.
+
+        Args:
+            shipment_id: Shipment ID for logging
+            current_state: Current truck status
+            new_state: Proposed new status
+
+        Returns:
+            True if transition is valid, False otherwise
+        """
+        if new_state == current_state:
+            return True  # No change is always valid
+
+        valid_next_states = self.VALID_STATE_TRANSITIONS.get(current_state, set())
+        if new_state in valid_next_states:
+            return True
+
+        # Log warning for invalid transition
+        logger.warning(
+            f"Invalid state transition for shipment {shipment_id}: "
+            f"{current_state.value} -> {new_state.value}. "
+            f"Valid transitions from {current_state.value}: {[s.value for s in valid_next_states]}"
+        )
+        return False
+
+    def _check_state_timeout(
+        self, shipment: dict, current_time: datetime
+    ) -> TruckStatus | None:
+        """
+        Check if a shipment has exceeded state timeout and needs recovery.
+
+        Args:
+            shipment: Shipment information dictionary
+            current_time: Current simulation time
+
+        Returns:
+            TruckStatus.COMPLETED if timed out and needs recovery, None otherwise
+        """
+        current_status = shipment.get("status", TruckStatus.SCHEDULED)
+
+        # Track when we entered the current state
+        state_entry_key = f"_state_entered_{current_status.value}"
+        if state_entry_key not in shipment:
+            # First time seeing this state - record entry time
+            shipment[state_entry_key] = current_time
+            return None
+
+        state_entry_time = shipment[state_entry_key]
+        timeout_hours = self.STATE_TIMEOUT_HOURS.get(current_status, 24)
+        max_time_in_state = timedelta(hours=timeout_hours)
+
+        if current_time - state_entry_time > max_time_in_state:
+            logger.warning(
+                f"Shipment {shipment['shipment_id']} stuck in {current_status.value} "
+                f"for over {timeout_hours} hours. Forcing completion for recovery."
+            )
+            return TruckStatus.COMPLETED
+
+        return None
+
     def update_shipment_status(
         self, shipment_id: str, current_time: datetime
     ) -> dict | None:
         """
         Update shipment status based on current time.
 
-        Implements complete truck lifecycle state machine:
+        Implements complete truck lifecycle state machine with validation:
         - SCHEDULED (T+0): Initial state when shipment is created
         - LOADING (T+2hrs): Truck is being loaded at DC
         - IN_TRANSIT (T+4hrs): Truck is traveling to destination
-        - ARRIVED (T+8hrs): Truck has arrived at destination
-        - UNLOADING (T+9hrs): Truck is being unloaded at store
-        - COMPLETED (T+10hrs): Delivery is complete
+        - ARRIVED (ETA): Truck has arrived at destination
+        - UNLOADING (ETA+1hr): Truck is being unloaded at store
+        - COMPLETED (ETD): Delivery is complete
+
+        Features:
+        - Validates all state transitions
+        - Logs warnings for unexpected transitions
+        - Implements timeout recovery for stuck states
 
         Args:
             shipment_id: Shipment to update
@@ -917,29 +1179,116 @@ class InventoryFlowSimulator:
 
         shipment = self._active_shipments[shipment_id]
         departure_time = shipment["departure_time"]
+        current_status = shipment.get("status", TruckStatus.SCHEDULED)
+
+        # Check for timeout recovery first
+        recovery_status = self._check_state_timeout(shipment, current_time)
+        if recovery_status == TruckStatus.COMPLETED:
+            if self._validate_state_transition(shipment_id, current_status, TruckStatus.COMPLETED):
+                logger.info(f"Shipment {shipment_id} recovered from stuck state via timeout")
+                shipment["status"] = TruckStatus.COMPLETED
+                shipment["_recovered_via_timeout"] = True
+                del self._active_shipments[shipment_id]
+                return shipment
 
         # Calculate transition times
         loading_start = departure_time + timedelta(hours=2)
         transit_start = departure_time + timedelta(hours=4)
         arrived_time = shipment["eta"]  # ETA calculated in generate_truck_shipment
         unloading_start = arrived_time + timedelta(hours=1)
-        completion_time = shipment["etd"]  # ETD is arrival + 2 hours
+        completion_time = shipment["etd"]  # ETD is based on shipment size
 
-        # Update status based on time progression
-        # Move through states in order as time progresses
+        # Determine target state based on time
         if current_time >= completion_time:
-            shipment["status"] = TruckStatus.COMPLETED
-            # Remove from active tracking after completion
-            del self._active_shipments[shipment_id]
+            target_status = TruckStatus.COMPLETED
         elif current_time >= unloading_start:
-            shipment["status"] = TruckStatus.UNLOADING
+            target_status = TruckStatus.UNLOADING
         elif current_time >= arrived_time:
-            shipment["status"] = TruckStatus.ARRIVED
+            target_status = TruckStatus.ARRIVED
         elif current_time >= transit_start:
-            shipment["status"] = TruckStatus.IN_TRANSIT
+            target_status = TruckStatus.IN_TRANSIT
         elif current_time >= loading_start:
-            shipment["status"] = TruckStatus.LOADING
-        # else: remains SCHEDULED
+            target_status = TruckStatus.LOADING
+        else:
+            target_status = TruckStatus.SCHEDULED
+
+        # Only update if state is changing
+        if target_status != current_status:
+            # Validate the transition
+            if self._validate_state_transition(shipment_id, current_status, target_status):
+                old_status = current_status
+                shipment["status"] = target_status
+
+                # Clear old state entry time and set new one
+                for key in list(shipment.keys()):
+                    if key.startswith("_state_entered_"):
+                        del shipment[key]
+                shipment[f"_state_entered_{target_status.value}"] = current_time
+
+                # Log state transitions for debugging
+                logger.debug(
+                    f"Shipment {shipment_id} transitioned: {old_status.value} -> {target_status.value}"
+                )
+
+                # Remove from active tracking if completed
+                if target_status == TruckStatus.COMPLETED:
+                    del self._active_shipments[shipment_id]
+            else:
+                # Invalid transition - try to recover by stepping through states
+                # This handles cases where time jumps and we skip states
+                # Keep stepping until we reach the target or can't progress anymore
+                state_order = [
+                    TruckStatus.SCHEDULED, TruckStatus.LOADING, TruckStatus.IN_TRANSIT,
+                    TruckStatus.ARRIVED, TruckStatus.UNLOADING, TruckStatus.COMPLETED
+                ]
+                stepping_status = current_status
+                steps_taken = 0
+                max_steps = self.MAX_RECOVERY_STEPS  # Prevent infinite loops
+
+                while stepping_status != target_status and steps_taken < max_steps:
+                    next_valid_states = self.VALID_STATE_TRANSITIONS.get(stepping_status, set())
+                    if not next_valid_states:
+                        break
+
+                    # Find the next state in order that's valid from current position
+                    next_state = None
+                    for state in state_order:
+                        if state in next_valid_states:
+                            next_state = state
+                            break
+
+                    if next_state is None:
+                        break
+
+                    stepping_status = next_state
+                    steps_taken += 1
+
+                if stepping_status != current_status:
+                    logger.info(
+                        f"Shipment {shipment_id} recovered by stepping through {steps_taken} states: "
+                        f"{current_status.value} -> {stepping_status.value} (target was {target_status.value})"
+                    )
+                    shipment["status"] = stepping_status
+
+                    # Warn if we couldn't reach the target state
+                    if stepping_status != target_status:
+                        logger.warning(
+                            f"Shipment {shipment_id} recovery stopped at {stepping_status.value}, "
+                            f"could not reach target {target_status.value}. May need manual intervention."
+                        )
+
+                    # Clear old state entry times and set new one.
+                    # Note: Only current state entry time is tracked; historical times are
+                    # discarded to keep shipment dict lightweight. For state duration analysis,
+                    # use the truck_moves event stream which records each transition.
+                    for key in list(shipment.keys()):
+                        if key.startswith("_state_entered_"):
+                            del shipment[key]
+                    shipment[f"_state_entered_{stepping_status.value}"] = current_time
+
+                    # Remove from active tracking if completed
+                    if stepping_status == TruckStatus.COMPLETED:
+                        del self._active_shipments[shipment_id]
 
         return shipment
 
