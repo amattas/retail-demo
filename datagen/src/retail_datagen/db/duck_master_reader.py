@@ -7,7 +7,7 @@ generator and streaming modules.
 
 from __future__ import annotations
 
-from datetime import datetime, time as dt_time, date as dt_date
+from datetime import UTC, datetime, time as dt_time, date as dt_date
 from decimal import Decimal
 from typing import Any
 
@@ -42,7 +42,7 @@ def _to_decimal(v: Any) -> Decimal | None:
 
 def _to_datetime_from_date(d: dt_date | datetime | None) -> datetime:
     if d is None:
-        return datetime.now()
+        return datetime.now(UTC)
     if isinstance(d, datetime):
         return d
     return datetime.combine(d, dt_time(0, 0))

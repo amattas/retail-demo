@@ -7,7 +7,7 @@ historical and real-time modes.
 """
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -103,7 +103,7 @@ class GenerationStateManager:
             - end_date: Current datetime
         """
         state = self.load_state()
-        current_time = datetime.now()
+        current_time = datetime.now(UTC)
 
         if state.has_fact_data and state.last_generated_timestamp:
             # Subsequent run: start from last generated timestamp
@@ -120,7 +120,7 @@ class GenerationStateManager:
         state = self.load_state()
         state.last_generated_timestamp = end_timestamp
         state.has_fact_data = True
-        state.last_fact_run = datetime.now()
+        state.last_fact_run = datetime.now(UTC)
         self._state = state
         self.save_state()
 
@@ -141,7 +141,7 @@ class GenerationStateManager:
         """Update state during real-time generation."""
         state = self.load_state()
         state.last_generated_timestamp = timestamp
-        state.last_realtime_run = datetime.now()
+        state.last_realtime_run = datetime.now(UTC)
         self._state = state
         self.save_state()
 

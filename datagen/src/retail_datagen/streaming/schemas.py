@@ -102,6 +102,7 @@ class ReceiptCreatedPayload(BaseModel):
     total: float = Field(..., ge=0)
     tender_type: str = Field(..., min_length=1)
     item_count: int = Field(..., gt=0)
+    campaign_id: str | None = Field(None, description="Optional campaign ID for attribution tracking")
 
 
 class ReceiptLineAddedPayload(BaseModel):

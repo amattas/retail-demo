@@ -8,7 +8,7 @@ or error conditions occur.
 from unittest.mock import patch, MagicMock
 import pytest
 import duckdb
-from retail_datagen.generators.fact_generator import FactGenerator
+from retail_datagen.generators.fact_generator import FactDataGenerator
 from retail_datagen.config.config import GeneratorConfig
 
 
@@ -21,13 +21,13 @@ def mock_config():
 
 
 def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
-    """Test that FactGenerator handles DuckDB initialization failure gracefully."""
+    """Test that FactDataGenerator handles DuckDB initialization failure gracefully."""
     # Mock get_duckdb to raise an exception
     with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
         mock_get_duckdb.side_effect = Exception("DuckDB initialization failed")
 
         # Should not raise, should fall back to in-memory mode
-        gen = FactGenerator(mock_config)
+        gen = FactDataGenerator(mock_config)
 
         # Should log a warning about the failure
         assert "failed to initialize" in caplog.text.lower() or "duckdb" in caplog.text.lower()
@@ -36,12 +36,12 @@ def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
 
 
 def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
-    """Test that FactGenerator handles DuckDB connection errors."""
+    """Test that FactDataGenerator handles DuckDB connection errors."""
     # Mock get_duckdb to raise duckdb.Error
     with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
         mock_get_duckdb.side_effect = duckdb.Error("Connection failed")
 
-        gen = FactGenerator(mock_config)
+        gen = FactDataGenerator(mock_config)
 
         assert gen._use_duckdb is False
         # Should have logged something about the failure

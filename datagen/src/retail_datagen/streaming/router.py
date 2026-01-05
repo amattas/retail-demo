@@ -9,7 +9,7 @@ import asyncio
 import logging
 import random
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -124,7 +124,7 @@ def _update_streaming_statistics(event_data: dict[str, Any], success: bool = Tru
     global _streaming_statistics
 
     _streaming_statistics["events_generated"] += 1
-    _streaming_statistics["last_event_time"] = datetime.now()
+    _streaming_statistics["last_event_time"] = datetime.now(UTC)
 
     if success:
         _streaming_statistics["events_sent_successfully"] += 1
@@ -141,7 +141,7 @@ def _update_streaming_statistics(event_data: dict[str, Any], success: bool = Tru
 
     # Calculate events per second
     if _streaming_start_time:
-        elapsed = (datetime.now() - _streaming_start_time).total_seconds()
+        elapsed = (datetime.now(UTC) - _streaming_start_time).total_seconds()
         if elapsed > 0:
             _streaming_statistics["events_per_second"] = (
                 _streaming_statistics["events_generated"] / elapsed
@@ -227,7 +227,7 @@ async def start_streaming(
 
     session_id = f"streaming_{uuid4().hex[:8]}"
     _streaming_session_id = session_id
-    _streaming_start_time = datetime.now()
+    _streaming_start_time = datetime.now(UTC)
     _reset_streaming_state()
 
     async def streaming_task():
@@ -318,7 +318,7 @@ async def start_streaming(
             )
             jitter_pct = 0.2
             end_at = (
-                datetime.now() + timedelta(minutes=request.duration_minutes)
+                datetime.now(UTC) + timedelta(minutes=request.duration_minutes)
                 if request.duration_minutes
                 else None
             )
@@ -329,7 +329,7 @@ async def start_streaming(
             total_sent = 0
 
             while True:
-                if end_at and datetime.now() >= end_at:
+                if end_at and datetime.now(UTC) >= end_at:
                     break
 
                 item = outbox_lease_next(conn)
@@ -345,7 +345,7 @@ async def start_streaming(
                             payload = _json.loads(item.get("payload") or "{}")
                         except Exception:
                             payload = {"raw": str(item.get("payload"))}
-                        stamp = item.get("event_ts") or datetime.now()
+                        stamp = item.get("event_ts") or datetime.now(UTC)
                         env = EventEnvelope(
                             event_type=etype,
                             payload=payload,
@@ -421,7 +421,7 @@ async def start_streaming(
         success=True,
         message="Event streaming started",
         operation_id=session_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -472,7 +472,7 @@ async def get_streaming_status():
     uptime_seconds = 0.0
 
     if is_streaming and _streaming_start_time:
-        uptime_seconds = (datetime.now() - _streaming_start_time).total_seconds()
+        uptime_seconds = (datetime.now(UTC) - _streaming_start_time).total_seconds()
 
         # Check actual task status
         task_status = get_task_status(_streaming_session_id)
@@ -719,7 +719,7 @@ async def drain_outbox(
                         payload = _json.loads(item.get("payload") or "{}")
                     except Exception:
                         payload = {"raw": str(item.get("payload"))}
-                    stamp = item.get("event_ts") or datetime.now()
+                    stamp = item.get("event_ts") or datetime.now(UTC)
                     env = EventEnvelope(
                         event_type=etype,
                         payload=payload,
@@ -753,7 +753,7 @@ async def drain_outbox(
         success=True,
         message="Outbox drain started",
         operation_id=task_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -900,7 +900,7 @@ async def test_azure_connection(
         )
 
     try:
-        start_time = datetime.now()
+        start_time = datetime.now(UTC)
 
         # Create temporary client for testing
         # Hub name can be empty if EntityPath is in the connection string
@@ -914,7 +914,7 @@ async def test_azure_connection(
         success, message, metadata = await test_client.test_connection()
 
         # Clean up (no connection to close since we used async context manager)
-        end_time = datetime.now()
+        end_time = datetime.now(UTC)
         response_time = (end_time - start_time).total_seconds() * 1000
 
         # Sanitize connection string for logging
@@ -930,13 +930,13 @@ async def test_azure_connection(
             details={
                 "connection_metadata": metadata,
                 "hub_configured": config.stream.hub,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
     except Exception as e:
         logger.error(f"Connection test error: {e}", exc_info=True)
-        end_time = datetime.now()
+        end_time = datetime.now(UTC)
         response_time = (end_time - start_time).total_seconds() * 1000
 
         return ConnectionTestResponse(
@@ -945,7 +945,7 @@ async def test_azure_connection(
             response_time_ms=response_time,
             details={
                 "exception_type": type(e).__name__,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -1201,7 +1201,7 @@ async def get_recent_events(
         )
 
     return RecentEventsResponse(
-        events=formatted_events, count=len(formatted_events), timestamp=datetime.now()
+        events=formatted_events, count=len(formatted_events), timestamp=datetime.now(UTC)
     )
 
 
@@ -1224,7 +1224,7 @@ async def stream_health_check(config: RetailConfig = Depends(get_config)):
                 "status": "active",
                 "task_status": task_status["status"],
                 "uptime_seconds": (
-                    (datetime.now() - _streaming_start_time).total_seconds()
+                    (datetime.now(UTC) - _streaming_start_time).total_seconds()
                     if _streaming_start_time
                     else 0
                 ),
@@ -1259,7 +1259,7 @@ async def stream_health_check(config: RetailConfig = Depends(get_config)):
         ),
     }
 
-    return {"status": overall_status, "timestamp": datetime.now(), "checks": checks}
+    return {"status": overall_status, "timestamp": datetime.now(UTC), "checks": checks}
 
 
 # ================================
@@ -1289,7 +1289,7 @@ async def list_event_types():
 def _cleanup_expired_disruptions():
     """Remove expired disruptions from active list."""
     global _active_disruptions
-    now = datetime.now()
+    now = datetime.now(UTC)
     expired_keys = [
         disruption_id
         for disruption_id, data in _active_disruptions.items()
@@ -1314,7 +1314,7 @@ async def create_disruption(request: DisruptionRequest):
 
     # Generate disruption ID
     disruption_id = f"disruption_{uuid4().hex[:8]}"
-    active_until = datetime.now() + timedelta(minutes=request.duration_minutes)
+    active_until = datetime.now(UTC) + timedelta(minutes=request.duration_minutes)
 
     # Create disruption data
     disruption_data = {
@@ -1323,7 +1323,7 @@ async def create_disruption(request: DisruptionRequest):
         "target_id": request.target_id,
         "severity": request.severity,
         "product_ids": request.product_ids or [],
-        "created_at": datetime.now(),
+        "created_at": datetime.now(UTC),
         "active_until": active_until,
         "events_affected": 0,
         "status": "active",
@@ -1367,7 +1367,7 @@ async def list_active_disruptions():
             "created_at": data["created_at"],
             "active_until": data["active_until"],
             "time_remaining_minutes": max(
-                0, (data["active_until"] - datetime.now()).total_seconds() / 60
+                0, (data["active_until"] - datetime.now(UTC)).total_seconds() / 60
             ),
             "events_affected": data.get("events_affected", 0),
             "status": data["status"],
@@ -1375,7 +1375,7 @@ async def list_active_disruptions():
         disruptions.append(disruption_info)
 
     return ActiveDisruptionsResponse(
-        disruptions=disruptions, count=len(disruptions), timestamp=datetime.now()
+        disruptions=disruptions, count=len(disruptions), timestamp=datetime.now(UTC)
     )
 
 

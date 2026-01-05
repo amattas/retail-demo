@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -224,7 +224,7 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
     _background_tasks[task_id] = task
     _task_status[task_id] = TaskStatus(
         status="running",
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
         description=description,
         progress=0.0,
         message="Task started",
@@ -239,7 +239,7 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
                     exclude={"status", "completed_at", "progress", "message", "result"}
                 ),
                 status="completed",
-                completed_at=datetime.now(),
+                completed_at=datetime.now(UTC),
                 progress=1.0,
                 message="Task completed successfully",
                 result=result,
@@ -251,7 +251,7 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
                     exclude={"status", "completed_at", "message", "error"}
                 ),
                 status="failed",
-                completed_at=datetime.now(),
+                completed_at=datetime.now(UTC),
                 message=f"Task failed: {str(e)}",
                 error=str(e),
             )
@@ -280,7 +280,7 @@ def cancel_task(task_id: str) -> bool:
                 exclude={"status", "completed_at", "message"}
             ),
             status="cancelled",
-            completed_at=datetime.now(),
+            completed_at=datetime.now(UTC),
             message="Task was cancelled",
         )
         return True
@@ -338,8 +338,8 @@ def update_task_progress(
         updated_fields = {
             "progress": clamped_progress,
             "message": message,
-            "last_updated": datetime.now(),
-            "last_update_timestamp": datetime.now(),
+            "last_updated": datetime.now(UTC),
+            "last_update_timestamp": datetime.now(UTC),
         }
 
         # Update table-level progress if provided (merge with max to avoid regressions)
@@ -546,7 +546,7 @@ def validate_date_range(start_date: datetime, end_date: datetime) -> None:
         )
 
     # Check dates are not too far in the future
-    max_future = datetime.now() + timedelta(days=365)
+    max_future = datetime.now(UTC) + timedelta(days=365)
     if end_date > max_future:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

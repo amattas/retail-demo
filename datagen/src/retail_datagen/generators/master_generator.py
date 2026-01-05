@@ -9,7 +9,7 @@ import logging
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -1678,12 +1678,14 @@ class MasterDataGenerator:
             target_product_count, combination_idx, successful_products, failed_validations
         )
 
-        assert successful_products == target_product_count, (
-            f"Expected {target_product_count} products, got {successful_products}"
-        )
-        assert len(self.products_master) == target_product_count, (
-            f"Expected {target_product_count} products in list, got {len(self.products_master)}"
-        )
+        if successful_products != target_product_count:
+            raise ValueError(
+                f"Expected {target_product_count} products, got {successful_products}"
+            )
+        if len(self.products_master) != target_product_count:
+            raise ValueError(
+                f"Expected {target_product_count} products in list, got {len(self.products_master)}"
+            )
 
         # Register product IDs with FK validator
         product_ids = [product.ID for product in self.products_master]
@@ -2051,7 +2053,7 @@ class MasterDataGenerator:
 
         # Vectorized implementation
         self.dc_inventory_snapshots = []
-        current_time = datetime.now()
+        current_time = datetime.now(UTC)
 
         dcs = np.array([dc.ID for dc in self.distribution_centers], dtype=np.int32)
         prods = np.array([p.ID for p in self.products_master], dtype=np.int32)
@@ -2125,7 +2127,7 @@ class MasterDataGenerator:
 
         # Vectorized implementation
         self.store_inventory_snapshots = []
-        current_time = datetime.now()
+        current_time = datetime.now(UTC)
 
         stores = np.array([s.ID for s in self.stores], dtype=np.int32)
         prods = np.array([p.ID for p in self.products_master], dtype=np.int32)

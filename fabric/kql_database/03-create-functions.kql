@@ -16,9 +16,9 @@
     impressions
     | join kind=leftouter (
         receipt_created
-        | project trace_id, ingest_timestamp, store_id, total
-    ) on trace_id
-    | where ingest_timestamp1 between (ingest_timestamp .. (ingest_timestamp + windowHours * 1h))
+        | project receipt_trace_id = trace_id, receipt_ts = ingest_timestamp, store_id, total
+    ) on $left.trace_id == $right.receipt_trace_id
+    | where receipt_ts between (ingest_timestamp .. (ingest_timestamp + windowHours * 1h))
 }
 
 // ============================================================================
@@ -34,5 +34,10 @@
         truck_departed
         | project truck_id, dc_id, store_id, shipment_id, departure_time
     ) on truck_id, dc_id, store_id, shipment_id
-    | extend dwell_seconds = iif(isnull(departure_time), real(null), toreal(datetime_diff('second', departure_time, arrival_time)))
+    | extend dwell_seconds = iif(
+        isnotnull(departure_time) and datetime_diff('second', departure_time, arrival_time) >= 0,
+        toreal(datetime_diff('second', departure_time, arrival_time)),
+        real(null)
+      )
+    | where isnotnull(dwell_seconds)  // Filter out unmatched or invalid records
 }
