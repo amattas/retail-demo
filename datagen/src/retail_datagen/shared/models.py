@@ -360,7 +360,21 @@ class InventoryReason(str, Enum):
 
 
 class TruckStatus(str, Enum):
-    """Truck movement status."""
+    """Truck movement status.
+
+    State machine lifecycle for truck shipments:
+        SCHEDULED -> LOADING -> IN_TRANSIT -> ARRIVED -> UNLOADING -> COMPLETED
+
+    Event type mapping (for streaming/fact generation):
+        - SCHEDULED: truck_scheduled
+        - LOADING: truck_loading (triggers DC outbound inventory txn)
+        - IN_TRANSIT: truck_departed
+        - ARRIVED: truck_arrived
+        - UNLOADING: truck_unloading (triggers store inbound inventory txn)
+        - COMPLETED: truck_completed
+
+    See InventoryFlowSimulator.VALID_STATE_TRANSITIONS for allowed transitions.
+    """
 
     SCHEDULED = "SCHEDULED"
     LOADING = "LOADING"

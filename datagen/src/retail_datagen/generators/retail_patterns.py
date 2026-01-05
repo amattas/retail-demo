@@ -24,6 +24,7 @@ Naming Conventions:
 
 import logging
 import random
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -896,7 +897,14 @@ class InventoryFlowSimulator:
         if total_requested > capacity:
             logger.warning(
                 f"Shipment to store {store_id} exceeds truck capacity "
-                f"({total_requested} > {capacity}). Truncating to fit."
+                f"({total_requested} > {capacity}). Truncating to fit. "
+                f"Consider using generate_truck_shipments() for multi-truck support."
+            )
+            warnings.warn(
+                "generate_truck_shipment() truncates orders exceeding truck capacity. "
+                "Use generate_truck_shipments() for automatic multi-truck splitting.",
+                DeprecationWarning,
+                stacklevel=2,
             )
             # Truncate items to fit within capacity
             truncated_list = []
@@ -1050,6 +1058,10 @@ class InventoryFlowSimulator:
         load_percentage = min(1.0, total_items / capacity)
         # 0.5 hours base + up to 1.5 hours for full load
         return 0.5 + (load_percentage * 1.5)
+
+    # Maximum number of state transitions to attempt when recovering from stuck states
+    # Set to 6 (the number of states in the lifecycle) to ensure we can reach any state
+    MAX_RECOVERY_STEPS = 6
 
     # Valid state transitions for truck lifecycle
     # Each state maps to the set of valid next states
@@ -1230,7 +1242,7 @@ class InventoryFlowSimulator:
                 ]
                 stepping_status = current_status
                 steps_taken = 0
-                max_steps = len(state_order)  # Prevent infinite loops
+                max_steps = self.MAX_RECOVERY_STEPS  # Prevent infinite loops
 
                 while stepping_status != target_status and steps_taken < max_steps:
                     next_valid_states = self.VALID_STATE_TRANSITIONS.get(stepping_status, set())
