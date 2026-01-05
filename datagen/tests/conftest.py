@@ -2,6 +2,42 @@
 Pytest configuration and fixtures for retail data generator tests.
 
 Provides common test fixtures, sample data, and test utilities.
+
+SKIPPED TESTS DOCUMENTATION
+===========================
+This test suite uses pytest.skip() in several categories. All skips are
+intentional and documented:
+
+1. LEGACY ORM TESTS (module-level skip)
+   - Pattern: `pytest.skip("Legacy ORM-based ... test deprecated; DuckDB-only path active.")`
+   - Files: test_retail_engine.py, test_promotions.py, test_truck_lifecycle.py,
+            test_master_generation_small.py, test_export_endpoints.py
+   - Reason: The codebase migrated from SQLite/SQLAlchemy to DuckDB-only.
+             These tests are preserved for reference but skipped.
+   - Status: DEPRECATED - safe to delete when DuckDB migration is complete
+
+2. AZURE SDK CONDITIONAL SKIPS
+   - Pattern: `pytest.skip("Azure SDK not available")`
+   - Files: test_azure_client.py (40+ occurrences)
+   - Reason: Tests require azure-eventhub SDK which is optional for development.
+             Tests run when SDK is installed; skip gracefully when not available.
+   - Status: EXPECTED - tests run in CI with SDK installed
+
+3. DATA-DEPENDENT CONDITIONAL SKIPS
+   - Pattern: `pytest.skip("No marketing data generated...")` or similar
+   - Files: test_marketing_generation_integration.py, test_balance_restoration.py
+   - Reason: Integration tests skip when randomized data generation doesn't
+             produce the specific data patterns being tested.
+   - Status: EXPECTED - probabilistic tests that may skip on some seeds
+
+4. INFRASTRUCTURE-DEPENDENT SKIPS
+   - Pattern: `@pytest.mark.skip(reason="Requires full application setup...")`
+   - Files: test_historical_generation_flow.py
+   - Reason: Tests require full FastAPI TestClient or external services.
+   - Status: TODO - implement proper fixtures for these tests
+
+To run tests excluding skipped categories:
+    pytest tests/ -v --ignore=tests/validation/ --ignore=tests/unit/test_retail_engine.py
 """
 
 # Explicitly enable pytest-asyncio

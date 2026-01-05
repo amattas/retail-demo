@@ -2187,7 +2187,8 @@ class FactDataGenerator:
         return 1.0
 
     def _create_receipt(
-        self, store: Store, customer: Customer, basket: Any, transaction_time: datetime
+        self, store: Store, customer: Customer, basket: Any, transaction_time: datetime,
+        _campaign_id: str | None = None,  # noqa: ARG002 - intentionally unused, see TODO below
     ) -> dict[str, list[dict]]:
         """Create receipt, receipt lines, and inventory transactions.
 
@@ -2196,13 +2197,32 @@ class FactDataGenerator:
             customer: Customer making purchase
             basket: ShoppingBasket with items to purchase
             transaction_time: Timestamp of transaction
+            _campaign_id: Optional marketing campaign ID for attribution tracking.
+                When provided, indicates this purchase was influenced by a marketing
+                campaign. Used by fn_attribution_window KQL function for ROI analysis.
+                NOTE: Parameter prefixed with underscore to indicate it's intentionally
+                unused in this implementation (see TODO below).
 
         Returns:
             Dictionary with receipt, lines, and inventory_transactions
 
         Raises:
             ValueError: If basket has no items (business rule violation)
+
+        Note:
+            campaign_id population for historical data requires attribution window
+            analysis (matching ad impressions to purchases within a time window).
+            See issue #78 for implementation details. Real-time streaming already
+            supports campaign_id via event_factory.py.
         """
+        # TODO(#78): Implement campaign_id attribution for historical data generation.
+        # This requires:
+        # 1. Track ad impressions per customer during marketing generation
+        # 2. When generating receipts, check if customer had impression within attribution window
+        # 3. If yes, pass campaign_id to receipt record
+        # For now, _campaign_id parameter is accepted but not used in historical generation.
+        # Real-time streaming (event_factory.py) already implements this logic.
+
         # CRITICAL: Validate basket has at least 1 item
         # Empty receipts violate business rules and should never be generated
         if not basket.items or len(basket.items) == 0:
