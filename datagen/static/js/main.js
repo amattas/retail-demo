@@ -1201,21 +1201,6 @@ class RetailDataGenerator {
                 this.exportFactDataLocal();
             });
         }
-
-        // Upload buttons (export to Parquet + upload to Azure)
-        const masterExportBtn = document.getElementById('exportMasterBtn');
-        if (masterExportBtn) {
-            masterExportBtn.addEventListener('click', () => {
-                this.exportMasterData();
-            });
-        }
-
-        const historicalExportBtn = document.getElementById('exportFactBtn');
-        if (historicalExportBtn) {
-            historicalExportBtn.addEventListener('click', () => {
-                this.exportFactData();
-            });
-        }
     }
 
     /**
@@ -1321,136 +1306,6 @@ class RetailDataGenerator {
     }
 
     /**
-     * Export dimension data tables (Parquet-only)
-     */
-    async exportMasterData() {
-        const exportBtn = document.getElementById('exportMasterBtn');
-        if (!exportBtn) return;
-
-        const originalHTML = exportBtn.innerHTML;
-        const originalDisabled = exportBtn.disabled;
-
-        try {
-            // Disable button and show loading state
-            exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-            this.disableExportButtons();
-
-            // Show progress section
-            this.showProgress('masterExportProgress', 'masterExportProgressFill', 'masterExportProgressText');
-
-            // Start export (server will also upload if configured)
-            const response = await fetch('/api/export/master', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ format: 'parquet' })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            const taskId = result.task_id;
-
-            // Poll for progress
-            const finalStatus = await this.pollExportProgress(
-                taskId,
-                'masterExportProgressFill',
-                'masterExportProgressText'
-            );
-
-            // Handle completion
-            if (finalStatus?.status === 'completed') {
-                this.showNotification('Dimension data exported successfully to PARQUET!', 'success');
-            } else if (finalStatus?.status === 'failed') {
-                this.showNotification(
-                    `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
-                    'error'
-                );
-            }
-
-        } catch (error) {
-            console.error('Master data export failed:', error);
-            this.showNotification(`Export failed: ${error.message}`, 'error');
-        } finally {
-            // Restore button state
-            exportBtn.disabled = originalDisabled;
-            exportBtn.innerHTML = originalHTML;
-            this.enableExportButtons();
-            this.hideProgress('masterExportProgress');
-        }
-    }
-
-    /**
-     * Export fact data tables (Parquet-only)
-     */
-    async exportFactData() {
-        const exportBtn = document.getElementById('exportFactBtn');
-        if (!exportBtn) return;
-
-        const originalHTML = exportBtn.innerHTML;
-        const originalDisabled = exportBtn.disabled;
-
-        try {
-            // Disable button and show loading state
-            exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading all data (chunked)...';
-            this.disableExportButtons();
-
-            // Show progress section
-            this.showProgress('factExportProgress', 'factExportProgressFill', 'factExportProgressText');
-
-            // Start export (server will also upload if configured). No date range = export all data in 7-day chunks
-            const response = await fetch('/api/export/facts', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ format: 'parquet' })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            const taskId = result.task_id;
-
-            // Poll for progress
-            const finalStatus = await this.pollExportProgress(
-                taskId,
-                'factExportProgressFill',
-                'factExportProgressText'
-            );
-
-            // Handle completion
-            if (finalStatus?.status === 'completed') {
-                this.showNotification('Fact data exported successfully to PARQUET!', 'success');
-            } else if (finalStatus?.status === 'failed') {
-                this.showNotification(
-                    `Export failed: ${finalStatus.error_message || 'Unknown error'}`,
-                    'error'
-                );
-            }
-
-        } catch (error) {
-            console.error('Historical data export failed:', error);
-            this.showNotification(`Export failed: ${error.message}`, 'error');
-        } finally {
-            // Restore button state
-            exportBtn.disabled = originalDisabled;
-            exportBtn.innerHTML = originalHTML;
-            this.enableExportButtons();
-            this.hideProgress('factExportProgress');
-        }
-    }
-
-    /**
      * Poll export progress endpoint
      * @param {string} taskId - Export task ID
      * @param {string} progressFillId - Progress bar fill element ID
@@ -1519,13 +1374,9 @@ class RetailDataGenerator {
      * Disable all export buttons
      */
     disableExportButtons() {
-        const masterExportBtn = document.getElementById('exportMasterBtn');
-        const factExportBtn = document.getElementById('exportFactBtn');
         const masterExportLocalBtn = document.getElementById('exportMasterLocalBtn');
         const factExportLocalBtn = document.getElementById('exportFactLocalBtn');
 
-        if (masterExportBtn) masterExportBtn.disabled = true;
-        if (factExportBtn) factExportBtn.disabled = true;
         if (masterExportLocalBtn) masterExportLocalBtn.disabled = true;
         if (factExportLocalBtn) factExportLocalBtn.disabled = true;
     }
@@ -1551,27 +1402,15 @@ class RetailDataGenerator {
         const hasFactData = receiptsCount && receiptsCount.dataset.countValue &&
                             Number(receiptsCount.dataset.countValue) > 0;
 
-        // Master data export buttons (local + upload)
-        const masterExportBtn = document.getElementById('exportMasterBtn');
+        // Master data export button (local only)
         const masterExportLocalBtn = document.getElementById('exportMasterLocalBtn');
-
-        if (masterExportBtn) {
-            masterExportBtn.disabled = !hasMasterData;
-            masterExportBtn.title = hasMasterData ? 'Upload dimension data to Azure' : 'Generate dimension data first';
-        }
         if (masterExportLocalBtn) {
             masterExportLocalBtn.disabled = !hasMasterData;
             masterExportLocalBtn.title = hasMasterData ? 'Export dimension data to Parquet' : 'Generate dimension data first';
         }
 
-        // Fact data export buttons (local + upload)
-        const factExportBtn = document.getElementById('exportFactBtn');
+        // Fact data export button (local only)
         const factExportLocalBtn = document.getElementById('exportFactLocalBtn');
-
-        if (factExportBtn) {
-            factExportBtn.disabled = !hasFactData;
-            factExportBtn.title = hasFactData ? 'Upload fact data to Azure' : 'Generate fact data first';
-        }
         if (factExportLocalBtn) {
             factExportLocalBtn.disabled = !hasFactData;
             factExportLocalBtn.title = hasFactData ? 'Export fact data to Parquet' : 'Generate fact data first';
