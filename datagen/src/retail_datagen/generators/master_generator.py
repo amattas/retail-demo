@@ -113,9 +113,12 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 # Constants for product generation
-_MAX_COMBINATION_BATCH_SIZE = 1000  # Maximum combinations to generate per batch
-_COMBINATION_SAFETY_MULTIPLIER = 2  # Generate 2x needed to account for validation failures
-_MAX_GENERATION_ATTEMPTS_MULTIPLIER = 10  # Max attempts = target_count * this multiplier
+# Balances memory usage vs. resampling overhead; 1000 is efficient for typical product counts
+_MAX_COMBINATION_BATCH_SIZE = 1000
+# 2x buffer accounts for ~50% validation failure rate due to pricing/category constraints
+_COMBINATION_SAFETY_MULTIPLIER = 2
+# Prevents infinite loops; allows for up to 90% failure rate before raising RuntimeError
+_MAX_GENERATION_ATTEMPTS_MULTIPLIER = 10
 
 
 class MasterDataGenerator:
@@ -1010,7 +1013,7 @@ class MasterDataGenerator:
                     strategy.trucks_per_dc,
                     strategy.assigned_refrigerated - refrigerated_assigned,
                 ))
-                dc_non_refrigerated = strategy.trucks_per_dc - dc_refrigerated
+                dc_non_refrigerated = max(0, strategy.trucks_per_dc - dc_refrigerated)
 
                 # Create refrigerated trucks for this DC
                 for _ in range(dc_refrigerated):
