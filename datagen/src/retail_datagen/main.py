@@ -11,7 +11,7 @@ import logging
 import os
 import traceback
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -242,7 +242,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             logger.error(f"Failed to log 400 error request details: {e}")
 
     error_response = ErrorResponse(
-        error=f"HTTP_{exc.status_code}", message=exc.detail, timestamp=datetime.now()
+        error=f"HTTP_{exc.status_code}", message=exc.detail, timestamp=datetime.now(UTC)
     )
     content = error_response.model_dump()
     # Ensure datetime is serialized as string
@@ -284,7 +284,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         error="VALIDATION_ERROR",
         message="Request validation failed",
         field_errors=field_errors,
-        timestamp=datetime.now(),
+        timestamp=datetime.now(UTC),
     )
     content = error_response.model_dump()
     # Ensure datetime is serialized as string
@@ -309,7 +309,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         error="INTERNAL_SERVER_ERROR",
         message="An unexpected error occurred",
         details={"exception_type": type(exc).__name__},
-        timestamp=datetime.now(),
+        timestamp=datetime.now(UTC),
     )
     content = error_response.model_dump()
     # Ensure datetime is serialized as string
@@ -332,7 +332,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Log all requests and responses."""
-    start_time = datetime.now()
+    start_time = datetime.now(UTC)
 
     # Log request
     logger.info(f"{request.method} {request.url} - Client: {request.client.host}")
@@ -341,7 +341,7 @@ async def logging_middleware(request: Request, call_next):
     response = await call_next(request)
 
     # Log response
-    duration = (datetime.now() - start_time).total_seconds()
+    duration = (datetime.now(UTC) - start_time).total_seconds()
     logger.info(
         f"{request.method} {request.url} - "
         f"Status: {response.status_code} - "
@@ -374,7 +374,7 @@ async def root():
         "version": APP_VERSION,
         "docs_url": "/docs",
         "health_url": "/health",
-        "timestamp": datetime.now(),
+        "timestamp": datetime.now(UTC),
     }
 
 
@@ -432,7 +432,7 @@ async def health_check():
 
     return HealthCheckResponse(
         status=overall_status,
-        timestamp=datetime.now(),
+        timestamp=datetime.now(UTC),
         version=APP_VERSION,
         checks=checks,
     )
@@ -445,7 +445,7 @@ async def health_check():
 )
 async def get_version():
     """Get application version information."""
-    return {"name": APP_NAME, "version": APP_VERSION, "timestamp": datetime.now()}
+    return {"name": APP_NAME, "version": APP_VERSION, "timestamp": datetime.now(UTC)}
 
 
 @app.get(
@@ -495,7 +495,7 @@ async def update_current_config(new_config: RetailConfig):
 
         return {
             "message": "Configuration updated successfully",
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
         raise HTTPException(
@@ -552,7 +552,7 @@ async def reset_config():
 
         return {
             "message": "Configuration reset to defaults",
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
         raise HTTPException(
@@ -573,13 +573,13 @@ async def validate_config(config_data: RetailConfig):
         return {
             "valid": True,
             "message": "Configuration is valid",
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
         return {
             "valid": False,
             "message": f"Configuration validation failed: {str(e)}",
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(UTC),
         }
 
 

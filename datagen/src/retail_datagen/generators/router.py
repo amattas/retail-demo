@@ -7,7 +7,7 @@ and historical fact data with comprehensive status tracking and validation.
 
 import logging
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -400,7 +400,7 @@ async def generate_all_master_data(
         success=True,
         message="Master data generation started",
         operation_id=task_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -543,7 +543,7 @@ async def generate_specific_master_table(
         success=True,
         message=f"Generation of {table_name} started",
         operation_id=task_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -857,7 +857,7 @@ async def generate_historical_data(
         success=True,
         message="Historical data generation started",
         operation_id=task_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -992,7 +992,7 @@ async def generate_specific_historical_table(
         success=True,
         message=f"Generation of {table_name} started",
         operation_id=task_id,
-        started_at=datetime.now(),
+        started_at=datetime.now(UTC),
     )
 
 
@@ -1064,7 +1064,7 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
                 "All data cleared by resetting DuckDB; caches and legacy files removed. "
                 f"Deleted {len(deleted_files)} files."
             ),
-            started_at=datetime.now(),
+            started_at=datetime.now(UTC),
         )
 
     except Exception as e:

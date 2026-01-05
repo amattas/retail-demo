@@ -14,7 +14,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from datetime import time as dt_time
 from decimal import Decimal
 from pathlib import Path
@@ -708,7 +708,7 @@ class FactDataGenerator:
                 launch_dt = (
                     datetime.combine(p.launch_date, dt_time(0, 0))
                     if hasattr(p, "launch_date") and p.launch_date
-                    else datetime.now()
+                    else datetime.now(UTC)
                 )
                 self.products.append(
                     ProductMaster(
@@ -893,7 +893,7 @@ class FactDataGenerator:
             summary = await generator.generate_historical_data(start, end)
             ```
         """
-        generation_start_time = datetime.now()
+        generation_start_time = datetime.now(UTC)
         # Remember outbox preference for this run so helpers
         # (e.g., _insert_hourly_to_db) can mirror to streaming_outbox
         self._publish_to_outbox = bool(publish_to_outbox)
@@ -1167,7 +1167,7 @@ class FactDataGenerator:
         # Final validation
         validation_results = self.business_rules.get_validation_summary()
 
-        generation_end_time = datetime.now()
+        generation_end_time = datetime.now(UTC)
         generation_time = (generation_end_time - generation_start_time).total_seconds()
 
         total_records = sum(facts_generated.values())

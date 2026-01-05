@@ -1,5 +1,5 @@
 """
-Unit tests for FactGenerator exception handling.
+Unit tests for FactDataGenerator exception handling.
 
 Tests verify that exception handlers properly log errors when fallbacks
 or error conditions occur.
@@ -8,26 +8,26 @@ or error conditions occur.
 from unittest.mock import patch, MagicMock
 import pytest
 import duckdb
-from retail_datagen.generators.fact_generator import FactGenerator
-from retail_datagen.config.config import GeneratorConfig
+from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.config.models import RetailConfig
 
 
 @pytest.fixture
 def mock_config():
     """Create a minimal mock configuration."""
-    config = MagicMock(spec=GeneratorConfig)
+    config = MagicMock(spec=RetailConfig)
     config.seed = 42
     return config
 
 
 def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
-    """Test that FactGenerator handles DuckDB initialization failure gracefully."""
-    # Mock get_duckdb to raise an exception
-    with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
+    """Test that FactDataGenerator handles DuckDB initialization failure gracefully."""
+    # Mock get_duckdb_conn to raise an exception
+    with patch('retail_datagen.db.duckdb_engine.get_duckdb_conn') as mock_get_duckdb:
         mock_get_duckdb.side_effect = Exception("DuckDB initialization failed")
 
         # Should not raise, should fall back to in-memory mode
-        gen = FactGenerator(mock_config)
+        gen = FactDataGenerator(mock_config)
 
         # Should log a warning about the failure
         assert "failed to initialize" in caplog.text.lower() or "duckdb" in caplog.text.lower()
@@ -36,23 +36,30 @@ def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
 
 
 def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
-    """Test that FactGenerator handles DuckDB connection errors."""
-    # Mock get_duckdb to raise duckdb.Error
-    with patch('retail_datagen.generators.fact_generator.get_duckdb') as mock_get_duckdb:
+    """Test that FactDataGenerator handles DuckDB connection errors."""
+    import logging
+    caplog.set_level(logging.WARNING)
+
+    # Mock get_duckdb_conn to raise duckdb.Error
+    with patch('retail_datagen.db.duckdb_engine.get_duckdb_conn') as mock_get_duckdb:
         mock_get_duckdb.side_effect = duckdb.Error("Connection failed")
 
-        gen = FactGenerator(mock_config)
+        gen = FactDataGenerator(mock_config)
 
         assert gen._use_duckdb is False
         # Should have logged something about the failure
-        if caplog.text:  # Only check if there's log output
-            assert "failed" in caplog.text.lower() or "error" in caplog.text.lower()
+        assert caplog.text, "Expected error to be logged when DuckDB connection fails"
+        assert "failed" in caplog.text.lower() or "error" in caplog.text.lower()
 
 
 def test_ensure_columns_handles_alter_table_failure(caplog):
     """Test that _ensure_columns logs but continues when ALTER TABLE fails."""
+    import logging
     from retail_datagen.db.duckdb_engine import _ensure_columns
     import pandas as pd
+
+    # Capture debug-level logs
+    caplog.set_level(logging.DEBUG)
 
     mock_conn = MagicMock()
     # Make _current_columns return empty set
@@ -63,9 +70,10 @@ def test_ensure_columns_handles_alter_table_failure(caplog):
         df = pd.DataFrame({'new_column': [1, 2, 3]})
 
         # Should not raise - just log and continue
-        _ensure_columns(mock_conn, 'test_table', df)
+        # Use a valid table name from the allowlist
+        _ensure_columns(mock_conn, 'fact_receipts', df)
 
-        # Should have logged the failure
+        # Should have logged the failure at debug level
         assert "failed to add column" in caplog.text.lower()
 
 

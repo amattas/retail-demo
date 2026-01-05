@@ -8,7 +8,7 @@ as specified in AGENTS.md.
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -390,8 +390,8 @@ class HistoricalConfig(BaseModel):
     def validate_start_date(cls, v: str) -> str:
         """Validate start date format and ensure it's not in the future."""
         try:
-            parsed_date = datetime.strptime(v, "%Y-%m-%d")
-            if parsed_date > datetime.now():
+            parsed_date = datetime.strptime(v, "%Y-%m-%d").replace(tzinfo=UTC)
+            if parsed_date > datetime.now(UTC):
                 raise ValueError("Start date cannot be in the future")
             return v
         except ValueError as e:

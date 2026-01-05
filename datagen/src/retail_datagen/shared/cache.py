@@ -7,7 +7,7 @@ to improve dashboard performance.
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,7 @@ class TableCount(BaseModel):
     table_name: str
     count: int
     table_type: str  # "master" or "fact"
-    last_updated: datetime = Field(default_factory=datetime.now)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class DashboardCache(BaseModel):
@@ -30,7 +30,7 @@ class DashboardCache(BaseModel):
 
     master_tables: dict[str, TableCount] = Field(default_factory=dict)
     fact_tables: dict[str, TableCount] = Field(default_factory=dict)
-    last_updated: datetime = Field(default_factory=datetime.now)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class CacheManager:
@@ -72,7 +72,7 @@ class CacheManager:
             cache: DashboardCache object to save
         """
         try:
-            cache.last_updated = datetime.now()
+            cache.last_updated = datetime.now(UTC)
             with open(self.cache_path, "w", encoding="utf-8") as f:
                 json.dump(cache.model_dump(mode="json"), f, indent=2, default=str)
             logger.info(f"Cache saved successfully to {self.cache_path}")

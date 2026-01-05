@@ -6,7 +6,7 @@ from the DuckDB database to CSV or Parquet files with comprehensive progress tra
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -85,7 +85,7 @@ async def export_master_data(
 
     # Create unique task ID
     task_id = f"export_master_{uuid4().hex[:8]}"
-    started_at = datetime.now()
+    started_at = datetime.now(UTC)
 
     # Define background export task
     async def export_task():
@@ -163,7 +163,7 @@ async def export_master_data(
                         from ..services.azure_uploader import upload_paths_to_blob
                         # Build absolute paths for upload
                         abs_paths = [base_dir / f for f in files_written]
-                        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
                         uploaded_summary = upload_paths_to_blob(
                             config.storage.account_uri,
                             config.storage.account_key,
@@ -262,7 +262,7 @@ async def export_fact_data(
 
     # Create unique task ID
     task_id = f"export_facts_{uuid4().hex[:8]}"
-    started_at = datetime.now()
+    started_at = datetime.now(UTC)
 
     # Define background export task
     async def export_task():
@@ -383,7 +383,7 @@ async def export_fact_data(
                     if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
                         from ..services.azure_uploader import upload_paths_to_blob
                         abs_paths = [base_dir / f for f in all_files]
-                        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
                         uploaded_summary = upload_paths_to_blob(
                             config.storage.account_uri,
                             config.storage.account_key,
