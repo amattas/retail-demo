@@ -7,12 +7,12 @@ echo "Starting Retail Data Generator..."
 
 # Determine Python path dynamically
 # Priority: 1) PYTHON_PATH env var, 2) conda env, 3) system python
-if [ -n "$PYTHON_PATH" ] && [ -f "$PYTHON_PATH" ]; then
+if [ -n "$PYTHON_PATH" ] && [ -x "$PYTHON_PATH" ]; then
     echo "Using PYTHON_PATH from environment: $PYTHON_PATH"
 elif command -v conda &> /dev/null; then
     # Try to get Python from the retail-datagen conda environment
     CONDA_PREFIX_PATH=$(conda run -n retail-datagen which python 2>/dev/null)
-    if [ -n "$CONDA_PREFIX_PATH" ] && [ -f "$CONDA_PREFIX_PATH" ]; then
+    if [ -n "$CONDA_PREFIX_PATH" ] && [ -x "$CONDA_PREFIX_PATH" ]; then
         PYTHON_PATH="$CONDA_PREFIX_PATH"
         echo "Using conda environment: retail-datagen"
     else
@@ -26,9 +26,9 @@ else
     echo "Using system Python: $PYTHON_PATH"
 fi
 
-# Check if Python was found
-if [ -z "$PYTHON_PATH" ] || [ ! -f "$PYTHON_PATH" ]; then
-    echo "Error: Could not find Python executable!"
+# Check if Python was found and is executable
+if [ -z "$PYTHON_PATH" ] || [ ! -x "$PYTHON_PATH" ]; then
+    echo "Error: Could not find executable Python!"
     echo "Please ensure Python is installed and available in PATH,"
     echo "or set PYTHON_PATH environment variable."
     exit 1

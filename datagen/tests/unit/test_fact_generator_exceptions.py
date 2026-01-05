@@ -37,6 +37,9 @@ def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
 
 def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
     """Test that FactDataGenerator handles DuckDB connection errors."""
+    import logging
+    caplog.set_level(logging.WARNING)
+
     # Mock get_duckdb_conn to raise duckdb.Error
     with patch('retail_datagen.db.duckdb_engine.get_duckdb_conn') as mock_get_duckdb:
         mock_get_duckdb.side_effect = duckdb.Error("Connection failed")
@@ -45,8 +48,8 @@ def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
 
         assert gen._use_duckdb is False
         # Should have logged something about the failure
-        if caplog.text:  # Only check if there's log output
-            assert "failed" in caplog.text.lower() or "error" in caplog.text.lower()
+        assert caplog.text, "Expected error to be logged when DuckDB connection fails"
+        assert "failed" in caplog.text.lower() or "error" in caplog.text.lower()
 
 
 def test_ensure_columns_handles_alter_table_failure(caplog):

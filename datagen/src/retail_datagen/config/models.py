@@ -390,7 +390,7 @@ class HistoricalConfig(BaseModel):
     def validate_start_date(cls, v: str) -> str:
         """Validate start date format and ensure it's not in the future."""
         try:
-            parsed_date = datetime.strptime(v, "%Y-%m-%d")
+            parsed_date = datetime.strptime(v, "%Y-%m-%d").replace(tzinfo=UTC)
             if parsed_date > datetime.now(UTC):
                 raise ValueError("Start date cannot be in the future")
             return v
