@@ -57,7 +57,7 @@
     total:real,
     tender_type:string,
     item_count:long,
-    campaign_id:string?,  // Null for non-campaign purchases
+    campaign_id:string?,  // Null for non-campaign purchases; use isnull(campaign_id, '') in queries
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

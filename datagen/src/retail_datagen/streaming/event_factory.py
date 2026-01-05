@@ -529,7 +529,9 @@ class EventFactory:
         # Uses O(1) customer_to_campaign index instead of O(n) linear search
         campaign_id = None
         if is_marketing_driven:
-            campaign_id = self.state.customer_to_campaign.get(customer_id)
+            campaign_id = self.state.customer_to_campaign.pop(customer_id, None)
+            # Note: pop() removes entry after lookup to prevent unbounded growth
+            # Each customer gets one attribution per marketing conversion
 
         payload = ReceiptCreatedPayload(
             store_id=store_id,
