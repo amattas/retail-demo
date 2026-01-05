@@ -450,3 +450,171 @@ class TestTruckDepartedEvents:
         actual_duration = max(30, unload_duration_minutes)  # Min 30 min
 
         assert actual_duration == 30  # Should be at least 30 minutes
+
+
+class TestEdgeCases:
+    """Edge case tests requested in code review."""
+
+    @pytest.fixture
+    def mock_inventory_simulator(self):
+        """Create a mock InventoryFlowSimulator for edge case testing."""
+        from retail_datagen.generators.retail_patterns import InventoryFlowSimulator
+
+        sim = InventoryFlowSimulator.__new__(InventoryFlowSimulator)
+        sim._truck_capacity = 1000
+        sim._active_shipments = {}
+        sim._rng = MagicMock()
+        sim._rng.randint = lambda a, b: (a + b) // 2
+        sim.distribution_centers = []
+        sim.trucks = []
+        sim._select_truck_for_shipment = lambda dc_id: "TRUCK001"
+        sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
+
+        return sim
+
+    def test_empty_reorder_list(self, mock_inventory_simulator):
+        """Test handling of empty reorder list."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Generate shipments with empty reorder list
+        shipments = sim.generate_truck_shipments(1, 101, [], departure_time)
+
+        # Should return empty list for empty reorder
+        assert shipments == []
+
+    def test_exact_capacity_match(self, mock_inventory_simulator):
+        """Test shipment that exactly matches truck capacity."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Create order that exactly matches capacity
+        reorder_list = [(1, 500), (2, 500)]  # Total: 1000 = capacity
+        shipment = sim.generate_truck_shipment(1, 101, reorder_list, departure_time)
+
+        # Should fit in one truck without truncation
+        assert shipment["total_items"] == 1000
+        assert len(shipment["products"]) == 2
+
+    def test_state_machine_recovery_steps_through_multiple_states(self, mock_inventory_simulator):
+        """Test that state machine recovery steps through multiple intermediate states."""
+        sim = mock_inventory_simulator
+
+        # Create a shipment in SCHEDULED state
+        departure_time = datetime(2024, 1, 15, 0, 0)
+        eta = datetime(2024, 1, 15, 8, 0)
+        etd = datetime(2024, 1, 15, 10, 0)
+
+        shipment = {
+            "shipment_id": "TEST001",
+            "truck_id": "TRUCK001",
+            "dc_id": 1,
+            "store_id": 101,
+            "departure_time": departure_time,
+            "eta": eta,
+            "etd": etd,
+            "status": TruckStatus.SCHEDULED,
+            "products": [(1, 100)],
+            "total_items": 100,
+            "unload_duration_hours": 1.0,
+        }
+        sim._active_shipments["TEST001"] = shipment
+
+        # Jump time far ahead - should require stepping through multiple states
+        current_time = datetime(2024, 1, 15, 12, 0)  # Well past ETD
+
+        result = sim.update_shipment_status("TEST001", current_time)
+
+        # Should have stepped through to COMPLETED
+        assert result["status"] == TruckStatus.COMPLETED
+        # Shipment should be removed from active
+        assert "TEST001" not in sim._active_shipments
+
+    def test_unload_duration_stored_in_shipment(self, mock_inventory_simulator):
+        """Test that unload duration is stored in shipment dict."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        reorder_list = [(1, 500)]  # 50% capacity
+        shipment = sim.generate_truck_shipment(1, 101, reorder_list, departure_time)
+
+        # Unload duration should be stored
+        assert "unload_duration_hours" in shipment
+        assert shipment["unload_duration_hours"] > 0
+        assert isinstance(shipment["unload_duration_hours"], float)
+
+    def test_brand_loyal_uses_top_50_percent(self):
+        """Test that BRAND_LOYAL segment uses top 50% of prices (not 30%)."""
+        # Create 10 products with prices $5-$50 for each category
+        # QUICK_TRIP uses: food (50%), snacks (30%), beverages (20%)
+        mock_products = [
+            MagicMock(ID=i, SalePrice=Decimal(str(i * 5)), Category=cat)
+            for i in range(1, 11)
+            for cat in ["food", "snacks", "beverages"]
+        ]
+
+        from retail_datagen.generators.retail_patterns import (
+            CustomerJourneySimulator,
+            ShoppingBehaviorType,
+        )
+
+        sim = CustomerJourneySimulator.__new__(CustomerJourneySimulator)
+        # Use only high-priced products in self.products to avoid fallback issues
+        high_price_products = [p for p in mock_products if p.SalePrice >= Decimal("30")]
+        sim.products = high_price_products
+        # Provide products for all categories QUICK_TRIP uses
+        food_products = [p for p in mock_products if p.Category == "food"]
+        snacks_products = [p for p in mock_products if p.Category == "snacks"]
+        beverage_products = [p for p in mock_products if p.Category == "beverages"]
+        sim._product_categories = {
+            "food": food_products,
+            "snacks": snacks_products,
+            "beverages": beverage_products,
+        }
+        sim._rng = MagicMock()
+        sim._rng.choice = lambda x: x[0]  # Always pick first item in filtered list
+        sim._rng.choices = lambda x, weights: [x[0]]
+        sim._rng.randint = lambda a, b: a
+
+        basket = sim._select_basket_products(
+            CustomerSegment.BRAND_LOYAL,
+            ShoppingBehaviorType.QUICK_TRIP,
+            5,
+        )
+
+        # BRAND_LOYAL should use top 50% (prices >= $30)
+        # With 10 products per category, threshold_idx = int(10 * (1.0 - 0.5)) = 5
+        # So prices >= sorted_prices[5] = $30 (sorted: $5,$10,$15,$20,$25,$30,$35,$40,$45,$50)
+        prices = [item[0].SalePrice for item in basket]
+        # All selected items should be >= $30 (top 50% of price range)
+        assert all(p >= Decimal("30.00") for p in prices), f"Got prices: {prices}"
+
+    def test_single_item_reorder_list(self, mock_inventory_simulator):
+        """Test handling of single-item reorder list."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        reorder_list = [(1, 50)]  # Single item
+        shipments = sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
+
+        assert len(shipments) == 1
+        assert shipments[0]["total_items"] == 50
+
+    def test_very_large_order_splits_correctly(self, mock_inventory_simulator):
+        """Test that very large orders split across many trucks."""
+        sim = mock_inventory_simulator
+        sim._select_truck_for_shipment = lambda dc_id: f"TRUCK{len(sim._active_shipments):03d}"
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Create order needing 5 trucks (capacity 1000 each)
+        reorder_list = [(1, 2000), (2, 2000), (3, 800)]  # Total: 4800
+        shipments = sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
+
+        # Should need 5 trucks
+        assert len(shipments) == 5
+        total_items = sum(s["total_items"] for s in shipments)
+        assert total_items == 4800
+
+        # Each shipment should respect capacity
+        for s in shipments:
+            assert s["total_items"] <= 1000

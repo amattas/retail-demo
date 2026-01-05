@@ -437,10 +437,12 @@ class CustomerJourneySimulator:
                     ]
                 elif price_modifier > 1.0:
                     # Quality/premium seekers: prefer higher-priced products
-                    # Use top ((modifier - 1) / modifier * 100)% of price range
-                    # e.g., modifier=1.3 means include top ~23% of prices (we use 30% for practicality)
-                    # e.g., modifier=1.1 means include top ~10% of prices (we use 50% for variety)
-                    top_percentile = max(0.3, 1.0 - (1.0 / price_modifier))
+                    # Use explicit percentile mapping to match documented behavior
+                    top_percentile_map = {
+                        CustomerSegment.QUALITY_SEEKER: 0.3,   # Top 30% of prices
+                        CustomerSegment.BRAND_LOYAL: 0.5,      # Top 50% of prices
+                    }
+                    top_percentile = top_percentile_map.get(segment, 0.3)
                     sorted_prices = sorted([p.SalePrice for p in available_products])
                     threshold_idx = min(
                         len(sorted_prices) - 1,
@@ -924,6 +926,7 @@ class InventoryFlowSimulator:
             "status": TruckStatus.SCHEDULED,
             "products": reorder_list,
             "total_items": sum(qty for _, qty in reorder_list),
+            "unload_duration_hours": unload_hours,  # Store for later reference
         }
 
         # Track active shipment
@@ -953,6 +956,10 @@ class InventoryFlowSimulator:
         Returns:
             List of shipment information dictionaries
         """
+        # Guard against empty reorder list
+        if not reorder_list:
+            return []
+
         capacity = self._truck_capacity
         total_items = sum(qty for _, qty in reorder_list)
 
@@ -1194,21 +1201,49 @@ class InventoryFlowSimulator:
             else:
                 # Invalid transition - try to recover by stepping through states
                 # This handles cases where time jumps and we skip states
-                next_valid_states = self.VALID_STATE_TRANSITIONS.get(current_status, set())
-                if next_valid_states:
-                    # Move to the next valid state (prefer the one closest to target)
-                    state_order = [
-                        TruckStatus.SCHEDULED, TruckStatus.LOADING, TruckStatus.IN_TRANSIT,
-                        TruckStatus.ARRIVED, TruckStatus.UNLOADING, TruckStatus.COMPLETED
-                    ]
+                # Keep stepping until we reach the target or can't progress anymore
+                state_order = [
+                    TruckStatus.SCHEDULED, TruckStatus.LOADING, TruckStatus.IN_TRANSIT,
+                    TruckStatus.ARRIVED, TruckStatus.UNLOADING, TruckStatus.COMPLETED
+                ]
+                stepping_status = current_status
+                steps_taken = 0
+                max_steps = len(state_order)  # Prevent infinite loops
+
+                while stepping_status != target_status and steps_taken < max_steps:
+                    next_valid_states = self.VALID_STATE_TRANSITIONS.get(stepping_status, set())
+                    if not next_valid_states:
+                        break
+
+                    # Find the next state in order that's valid from current position
+                    next_state = None
                     for state in state_order:
                         if state in next_valid_states:
-                            logger.info(
-                                f"Shipment {shipment_id} recovering by stepping to {state.value} "
-                                f"(target was {target_status.value})"
-                            )
-                            shipment["status"] = state
+                            next_state = state
                             break
+
+                    if next_state is None:
+                        break
+
+                    stepping_status = next_state
+                    steps_taken += 1
+
+                if stepping_status != current_status:
+                    logger.info(
+                        f"Shipment {shipment_id} recovered by stepping through {steps_taken} states: "
+                        f"{current_status.value} -> {stepping_status.value} (target was {target_status.value})"
+                    )
+                    shipment["status"] = stepping_status
+
+                    # Clear old state entry time and set new one
+                    for key in list(shipment.keys()):
+                        if key.startswith("_state_entered_"):
+                            del shipment[key]
+                    shipment[f"_state_entered_{stepping_status.value}"] = current_time
+
+                    # Remove from active tracking if completed
+                    if stepping_status == TruckStatus.COMPLETED:
+                        del self._active_shipments[shipment_id]
 
         return shipment
 
