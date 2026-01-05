@@ -640,3 +640,50 @@ class TestEdgeCases:
         assert len(shipments) == 3
         total_items = sum(s["total_items"] for s in shipments)
         assert total_items == 2500
+
+    def test_negative_quantity_in_generate_truck_shipments(self, mock_inventory_simulator):
+        """Test that negative quantities raise ValueError in generate_truck_shipments()."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Create reorder list with negative quantity
+        reorder_list = [(1, 500), (2, -100)]  # Negative quantity
+
+        with pytest.raises(ValueError, match="Invalid negative quantity"):
+            sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
+
+    def test_timeout_recovery_via_update_shipment_status(self, mock_inventory_simulator):
+        """Test that stuck shipments are recovered via timeout in update_shipment_status()."""
+        sim = mock_inventory_simulator
+
+        # Create a shipment stuck in LOADING state for > 8 hours
+        departure_time = datetime(2024, 1, 15, 0, 0)
+        eta = datetime(2024, 1, 15, 6, 0)
+        etd = datetime(2024, 1, 15, 8, 0)
+
+        shipment = {
+            "shipment_id": "STUCK001",
+            "truck_id": "TRUCK001",
+            "dc_id": 1,
+            "store_id": 101,
+            "departure_time": departure_time,
+            "eta": eta,
+            "etd": etd,
+            "status": TruckStatus.LOADING,
+            "products": [(1, 100)],
+            "total_items": 100,
+            "unload_duration_hours": 1.0,
+            "_state_entered_LOADING": datetime(2024, 1, 15, 2, 0),  # Entered LOADING 10+ hours ago
+        }
+        sim._active_shipments["STUCK001"] = shipment
+
+        # Current time is well past the 8-hour timeout for LOADING state
+        current_time = datetime(2024, 1, 15, 12, 0)
+
+        result = sim.update_shipment_status("STUCK001", current_time)
+
+        # Should have recovered to COMPLETED via timeout
+        assert result["status"] == TruckStatus.COMPLETED
+        assert result.get("_recovered_via_timeout") is True
+        # Should be removed from active shipments
+        assert "STUCK001" not in sim._active_shipments

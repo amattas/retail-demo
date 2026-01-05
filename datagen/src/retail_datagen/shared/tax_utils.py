@@ -144,7 +144,9 @@ class TaxCalculator:
 
             # Build county cache (average of city rates in each county)
             # Use Decimal.quantize() for consistent precision without float conversion
-            precision = Decimal("0.00001")  # 5 decimal places
+            # 5 decimal places: tax rates are typically 4 decimals (e.g., 0.0825 = 8.25%)
+            # but averaging can produce more; extra precision avoids rounding artifacts
+            precision = Decimal("0.00001")
             for county_key, rates in county_rates.items():
                 avg_rate = sum(rates) / len(rates)
                 self.county_cache[county_key] = avg_rate.quantize(precision)
