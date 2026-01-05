@@ -1531,9 +1531,4 @@ input[type="checkbox"] {
     .format-selector {
         flex: 1;
     }
-
-    #exportMasterBtn,
-    #exportFactBtn {
-        flex: 1;
-    }
 }
