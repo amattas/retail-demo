@@ -8,6 +8,7 @@ table creation/insert utilities optimized for batch loads.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from pathlib import Path
 import os
@@ -32,7 +33,7 @@ ALLOWED_TABLES: frozenset[str] = frozenset({
     "dim_trucks",
     "dim_customers",
     "dim_products",
-    # Fact tables
+    # Fact tables (current)
     "fact_dc_inventory_txn",
     "fact_truck_moves",
     "fact_store_inventory_txn",
@@ -43,10 +44,20 @@ ALLOWED_TABLES: frozenset[str] = frozenset({
     "fact_marketing",
     "fact_online_order_headers",
     "fact_online_order_lines",
+    # Fact tables (planned - see GitHub issues #7-#13)
+    "fact_payments",
+    "fact_stockouts",
+    "fact_reorders",
+    "fact_promotions",
+    "fact_store_ops",
+    "fact_customer_zone_changes",
     # System tables
     "streaming_outbox",
-    "_tmp_df",  # Used for DataFrame registration
 })
+
+# Internal temporary table name - uses double underscore prefix to avoid
+# collision with user-provided table names
+_INTERNAL_TMP_TABLE = "__rdg_tmp_df__"
 
 
 def validate_table_name(table: str) -> str:
@@ -70,7 +81,6 @@ def validate_table_name(table: str) -> str:
 
 
 # Pattern for valid SQL identifiers: alphanumeric and underscore, not starting with digit
-import re
 _VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
@@ -250,22 +260,22 @@ def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFra
     validated_table = validate_table_name(table)
     # Validate all column names before any SQL operations
     validated_cols = [validate_column_name(c) for c in df.columns]
-    # Register DataFrame and create table with actual data schema when first seen
-    conn.register("_tmp_df", df)
+    # Register DataFrame with internal name to avoid collision with user tables
+    conn.register(_INTERNAL_TMP_TABLE, df)
     try:
         if not _table_exists(conn, validated_table):
             # Create with data to ensure correct column types
-            conn.execute(f"CREATE TABLE {validated_table} AS SELECT * FROM _tmp_df")
+            conn.execute(f"CREATE TABLE {validated_table} AS SELECT * FROM {_INTERNAL_TMP_TABLE}")
         else:
             # Align columns by name to avoid positional mismatches
             # Ensure any new columns are added before INSERT
             _ensure_columns(conn, validated_table, df)
             col_list = ", ".join(validated_cols)
             conn.execute(
-                f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM _tmp_df"
+                f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
             )
     finally:
-        conn.unregister("_tmp_df")
+        conn.unregister(_INTERNAL_TMP_TABLE)
     return len(df)
 
 
