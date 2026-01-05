@@ -1,6 +1,6 @@
 site_name: Retail Fabric RTI Demo
 site_description: Microsoft Fabric Real-Time Intelligence demo for retail
-repo_url: https://github.com/yourusername/retail-demo
+repo_url: https://github.com/amattas/retail-demo
 theme:
   name: material
   palette:

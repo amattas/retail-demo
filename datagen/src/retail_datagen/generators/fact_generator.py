@@ -2187,7 +2187,8 @@ class FactDataGenerator:
         return 1.0
 
     def _create_receipt(
-        self, store: Store, customer: Customer, basket: Any, transaction_time: datetime
+        self, store: Store, customer: Customer, basket: Any, transaction_time: datetime,
+        campaign_id: str | None = None,
     ) -> dict[str, list[dict]]:
         """Create receipt, receipt lines, and inventory transactions.
 
@@ -2196,12 +2197,21 @@ class FactDataGenerator:
             customer: Customer making purchase
             basket: ShoppingBasket with items to purchase
             transaction_time: Timestamp of transaction
+            campaign_id: Optional marketing campaign ID for attribution tracking.
+                When provided, indicates this purchase was influenced by a marketing
+                campaign. Used by fn_attribution_window KQL function for ROI analysis.
 
         Returns:
             Dictionary with receipt, lines, and inventory_transactions
 
         Raises:
             ValueError: If basket has no items (business rule violation)
+
+        Note:
+            campaign_id population for historical data requires attribution window
+            analysis (matching ad impressions to purchases within a time window).
+            See issue #78 for implementation details. Real-time streaming already
+            supports campaign_id via event_factory.py.
         """
         # CRITICAL: Validate basket has at least 1 item
         # Empty receipts violate business rules and should never be generated

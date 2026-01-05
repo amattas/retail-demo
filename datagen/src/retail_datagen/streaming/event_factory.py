@@ -522,6 +522,18 @@ class EventFactory:
             "marketing_driven": is_marketing_driven,
         }
 
+        # Look up campaign_id for marketing-driven purchases (attribution tracking)
+        campaign_id = None
+        if is_marketing_driven:
+            # Find the marketing conversion that drove this customer
+            for impression_id, conversion in self.state.marketing_conversions.items():
+                if (
+                    conversion["customer_id"] == customer_id
+                    and conversion.get("converted", False)
+                ):
+                    campaign_id = conversion.get("campaign_id")
+                    break
+
         payload = ReceiptCreatedPayload(
             store_id=store_id,
             customer_id=customer_id,
@@ -531,6 +543,7 @@ class EventFactory:
             total=total,
             tender_type=tender_type.value,
             item_count=item_count,
+            campaign_id=campaign_id,  # Attribution tracking for marketing campaigns
         )
 
         return payload, receipt_id, f"store_{store_id}"

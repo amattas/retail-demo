@@ -2,6 +2,34 @@
 // Purpose: Create event tables for streaming ingestion from Eventstream
 // Run this entire script at once using .execute database script
 // ============================================================================
+//
+// FOREIGN KEY VALIDATION STRATEGY
+// ============================================================================
+// Event tables reference dimension IDs (store_id, customer_id, product_id, etc.)
+// without database-level FK constraints. Validation is handled as follows:
+//
+// 1. SOURCE VALIDATION (Primary): The datagen Python package validates all
+//    foreign key relationships before generating events. See:
+//    - datagen/src/retail_datagen/shared/validators.py (SyntheticDataValidator)
+//    - datagen/src/retail_datagen/generators/retail_patterns.py (BusinessRulesEngine)
+//
+// 2. POST-INGESTION QUERIES: For data quality monitoring, use these queries:
+//
+//    // Find orphan product references (if dim_products shortcut exists):
+//    receipt_line_added
+//    | where product_id !in (dim_products | project product_id)
+//    | summarize orphan_count = count() by bin(ingest_timestamp, 1h)
+//
+//    // Find orphan store references (if dim_stores shortcut exists):
+//    receipt_created
+//    | where store_id !in (dim_stores | project store_id)
+//    | summarize orphan_count = count() by bin(ingest_timestamp, 1h)
+//
+// 3. DIMENSION DATA: Master dimensions (dim_stores, dim_products, dim_customers,
+//    dim_distribution_centers) are loaded via Lakehouse shortcuts from Silver
+//    layer Delta tables. See fabric/lakehouse/02-onelake-to-silver.ipynb.
+//
+// ============================================================================
 
 .execute database script with (ContinueOnErrors=true) <|
 
@@ -352,27 +380,40 @@
 )
 
 // ============================================================================
-// RETENTION POLICIES (14 days softdelete)
+// RETENTION POLICIES
+// ============================================================================
+// Retention policies vary by data category based on business requirements:
+//
+// - TRANSACTIONS (30d): Financial/audit data for compliance and reconciliation
+// - INVENTORY (14d): Operational data with moderate retention needs
+// - OPERATIONS (14d): Logistics and store operations data
+// - CUSTOMER LOCATION (7d): PII-adjacent data with shorter retention for privacy
+// - MARKETING (14d): Campaign and promotion data
+// - OMNICHANNEL (30d): Online order data for fulfillment tracking
 // ============================================================================
 
-.alter-merge table receipt_created policy retention softdelete = 14d
+// --- TRANSACTIONS: 30 days for compliance/audit ---
+.alter-merge table receipt_created policy retention softdelete = 30d
 
-.alter-merge table receipt_line_added policy retention softdelete = 14d
+.alter-merge table receipt_line_added policy retention softdelete = 30d
 
-.alter-merge table payment_processed policy retention softdelete = 14d
+.alter-merge table payment_processed policy retention softdelete = 30d
 
+// --- INVENTORY: 14 days for operational visibility ---
 .alter-merge table inventory_updated policy retention softdelete = 14d
 
 .alter-merge table stockout_detected policy retention softdelete = 14d
 
 .alter-merge table reorder_triggered policy retention softdelete = 14d
 
-.alter-merge table customer_entered policy retention softdelete = 14d
+// --- CUSTOMER TRAFFIC: 7 days for privacy (PII-adjacent) ---
+.alter-merge table customer_entered policy retention softdelete = 7d
 
-.alter-merge table customer_zone_changed policy retention softdelete = 14d
+.alter-merge table customer_zone_changed policy retention softdelete = 7d
 
-.alter-merge table ble_ping_detected policy retention softdelete = 14d
+.alter-merge table ble_ping_detected policy retention softdelete = 7d
 
+// --- OPERATIONS: 14 days for logistics tracking ---
 .alter-merge table truck_arrived policy retention softdelete = 14d
 
 .alter-merge table truck_departed policy retention softdelete = 14d
@@ -381,12 +422,14 @@
 
 .alter-merge table store_closed policy retention softdelete = 14d
 
+// --- MARKETING: 14 days for campaign analytics ---
 .alter-merge table ad_impression policy retention softdelete = 14d
 
 .alter-merge table promotion_applied policy retention softdelete = 14d
 
-.alter-merge table online_order_created policy retention softdelete = 14d
+// --- OMNICHANNEL: 30 days for fulfillment tracking ---
+.alter-merge table online_order_created policy retention softdelete = 30d
 
-.alter-merge table online_order_picked policy retention softdelete = 14d
+.alter-merge table online_order_picked policy retention softdelete = 30d
 
-.alter-merge table online_order_shipped policy retention softdelete = 14d
+.alter-merge table online_order_shipped policy retention softdelete = 30d

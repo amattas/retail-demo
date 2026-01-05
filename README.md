@@ -86,16 +86,16 @@ Scaffolded in `fabric/` with build specs:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/retail-demo.git
+git clone https://github.com/amattas/retail-demo.git
 cd retail-demo
 
 # Set up the data generator
 cd datagen
 pip install -e .
 
-# Configure your environment
+# Configure your environment (from datagen directory)
 cp .env.example .env
-# Edit .env with your Azure credentials
+# Edit .env with your Azure credentials (Event Hub connection string, etc.)
 
 # Optional: local docs preview (requires mkdocs)
 # pip install mkdocs mkdocs-material
