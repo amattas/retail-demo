@@ -227,3 +227,57 @@ def test_insert_dataframe_validates_table_and_columns():
     with pytest.raises(ValueError) as exc_info:
         duckdb_engine.insert_dataframe(mock_conn, "dim_geographies", bad_col_df)
     assert "Invalid column name" in str(exc_info.value)
+
+
+def test_get_duckdb_conn_tolerates_pragma_failures(caplog):
+    """Test that PRAGMA failures are tolerated and connection still succeeds.
+
+    The initialization code uses best-effort for PRAGMA settings to maintain
+    compatibility with older DuckDB versions. Failures are logged but don't
+    prevent connection success.
+    """
+    import logging
+    caplog.set_level(logging.DEBUG)
+
+    mock_conn = MagicMock()
+
+    # Ensure _conn starts as None
+    with patch.object(duckdb_engine, '_conn', None):
+        # Mock duckdb.connect to return our mock connection
+        with patch('duckdb.connect', return_value=mock_conn):
+            # Make PRAGMA execute fail
+            mock_conn.execute.side_effect = RuntimeError("PRAGMA not supported")
+
+            # Should NOT raise - PRAGMA failures are tolerated
+            result = duckdb_engine.get_duckdb_conn()
+
+            # Connection should still be returned
+            assert result is mock_conn
+
+            # Failure should be logged (debug level for PRAGMA, warning for outbox)
+            assert "PRAGMA" in caplog.text or "outbox" in caplog.text.lower()
+
+
+def test_get_duckdb_conn_tolerates_outbox_creation_failure(caplog):
+    """Test that outbox table creation failures are logged but tolerated."""
+    mock_conn = MagicMock()
+
+    # Ensure _conn starts as None
+    with patch.object(duckdb_engine, '_conn', None):
+        # Mock duckdb.connect to return our mock connection
+        with patch('duckdb.connect', return_value=mock_conn):
+            # First two execute calls succeed (PRAGMAs), third fails (outbox)
+            mock_conn.execute.side_effect = [
+                None,  # PRAGMA threads
+                None,  # PRAGMA temp_directory
+                RuntimeError("Failed to create outbox"),  # _ensure_outbox_table
+            ]
+
+            # Should NOT raise - outbox failures are tolerated
+            result = duckdb_engine.get_duckdb_conn()
+
+            # Connection should still be returned
+            assert result is mock_conn
+
+            # Warning should be logged for outbox failure
+            assert "outbox" in caplog.text.lower()

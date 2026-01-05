@@ -55,7 +55,8 @@ def read_all_master_tables() -> Dict[str, pd.DataFrame]:
     result: Dict[str, pd.DataFrame] = {}
     for table in MASTER_TABLES:
         try:
-            df = conn.execute(f"SELECT * FROM {table}").df()
+            validated_table = validate_table_name(table)
+            df = conn.execute(f"SELECT * FROM {validated_table}").df()
         except duckdb.CatalogException:
             logger.debug(f"Table {table} does not exist, returning empty DataFrame")
             df = pd.DataFrame()
@@ -72,18 +73,19 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
     result: Dict[str, pd.DataFrame] = {}
     for table in FACT_TABLES:
         try:
+            validated_table = validate_table_name(table)
             if start_dt is None:
-                df = conn.execute(f"SELECT * FROM {table}").df()
+                df = conn.execute(f"SELECT * FROM {validated_table}").df()
             else:
                 # Special-case tables without event_ts
                 if table == "fact_online_order_lines":
                     df = conn.execute(
-                        f"SELECT * FROM {table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
+                        f"SELECT * FROM {validated_table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
                         [start_dt, end_dt],
                     ).df()
                 else:
                     df = conn.execute(
-                        f"SELECT * FROM {table} WHERE event_ts >= ? AND event_ts < ?",
+                        f"SELECT * FROM {validated_table} WHERE event_ts >= ? AND event_ts < ?",
                         [start_dt, end_dt],
                     ).df()
         except duckdb.CatalogException:
