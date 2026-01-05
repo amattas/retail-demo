@@ -412,10 +412,10 @@ When implementing features (after planning with Opus 4.1):
 {
   "seed": 42,                    // RNG seed for reproducibility
   "volume": {
-    "stores": 214,               // Number of retail locations
-    "dcs": 8,                    // Distribution centers
-    "total_customers": 100000,   // Customer base size
-    "customers_per_day": 2000    // Daily transaction volume
+    "stores": 86,                // Number of retail locations
+    "dcs": 20,                   // Distribution centers
+    "total_customers": 403000,   // Customer base size
+    "customers_per_day": 427     // Daily transaction volume
   },
   "paths": {
     "dict": "data/dictionaries", // Input CSVs

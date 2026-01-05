@@ -9,13 +9,6 @@
 // HELPER FUNCTIONS
 // ============================================================================
 
-.create-or-alter function with (folder = "helpers") fn_json_payload()
-{
-    // Usage: parse raw JSON string if needed
-    // Not required when Eventstream maps payload fields directly
-    print not_implemented = "Eventstream maps JSON → columns; no-op"
-}
-
 .create-or-alter function with (folder = "helpers") fn_attribution_window(target_campaign_id:string, windowHours:int)
 {
     // Example: join ad_impression to receipt_created within window
