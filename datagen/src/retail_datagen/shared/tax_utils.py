@@ -143,15 +143,16 @@ class TaxCalculator:
                 state_rates[state].append(rate)
 
             # Build county cache (average of city rates in each county)
+            # Use Decimal.quantize() for consistent precision without float conversion
+            precision = Decimal("0.00001")  # 5 decimal places
             for county_key, rates in county_rates.items():
                 avg_rate = sum(rates) / len(rates)
-                # Round to 5 decimal places for consistency
-                self.county_cache[county_key] = Decimal(str(round(float(avg_rate), 5)))
+                self.county_cache[county_key] = avg_rate.quantize(precision)
 
             # Build state cache (average of all city rates in each state)
             for state_code, rates in state_rates.items():
                 avg_rate = sum(rates) / len(rates)
-                self.state_cache[state_code] = Decimal(str(round(float(avg_rate), 5)))
+                self.state_cache[state_code] = avg_rate.quantize(precision)
 
         except pd.errors.EmptyDataError:
             raise ValueError(f"Tax rates file is empty: {self.tax_rates_path}")

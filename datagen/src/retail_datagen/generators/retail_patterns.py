@@ -430,6 +430,8 @@ class CustomerJourneySimulator:
                     # Use bottom (price_modifier * 100)% of price range
                     # e.g., modifier=0.7 means include bottom 70% of prices
                     sorted_prices = sorted([p.SalePrice for p in available_products])
+                    # Subtract 1 to convert count to 0-based index: for 10 items at 70%,
+                    # int(10*0.7)=7 items means indices 0-6, so threshold is at index 6
                     threshold_idx = max(0, int(len(sorted_prices) * price_modifier) - 1)
                     price_threshold = sorted_prices[threshold_idx]
                     preferred_products = [
@@ -1235,7 +1237,17 @@ class InventoryFlowSimulator:
                     )
                     shipment["status"] = stepping_status
 
-                    # Clear old state entry time and set new one
+                    # Warn if we couldn't reach the target state
+                    if stepping_status != target_status:
+                        logger.warning(
+                            f"Shipment {shipment_id} recovery stopped at {stepping_status.value}, "
+                            f"could not reach target {target_status.value}. May need manual intervention."
+                        )
+
+                    # Clear old state entry times and set new one.
+                    # Note: Only current state entry time is tracked; historical times are
+                    # discarded to keep shipment dict lightweight. For state duration analysis,
+                    # use the truck_moves event stream which records each transition.
                     for key in list(shipment.keys()):
                         if key.startswith("_state_entered_"):
                             del shipment[key]

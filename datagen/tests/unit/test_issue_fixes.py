@@ -10,19 +10,15 @@ Tests verify the following implementations:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import tempfile
 import os
 
 from retail_datagen.shared.models import (
     TruckStatus,
     TruckMove,
-    ProductMaster,
-    Store,
-    Customer,
-    DistributionCenter,
 )
 from retail_datagen.generators.retail_patterns import CustomerSegment
 
