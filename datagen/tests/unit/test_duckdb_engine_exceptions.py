@@ -182,3 +182,48 @@ def test_validate_column_name_rejects_empty():
     with pytest.raises(ValueError) as exc_info:
         duckdb_engine.validate_column_name("")
     assert "empty" in str(exc_info.value).lower()
+
+
+def test_insert_dataframe_validates_columns():
+    """Integration test: Verify malicious column names are blocked in insert_dataframe."""
+    import pandas as pd
+
+    # Create a DataFrame with a malicious column name
+    malicious_df = pd.DataFrame({
+        "valid_col": [1, 2, 3],
+        "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
+    })
+
+    mock_conn = MagicMock()
+
+    # Should raise ValueError before any SQL is executed
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine.insert_dataframe(mock_conn, "dim_geographies", malicious_df)
+
+    assert "Invalid column name" in str(exc_info.value)
+    # Verify no SQL was executed
+    assert not mock_conn.execute.called
+    assert not mock_conn.register.called
+
+
+def test_insert_dataframe_validates_table_and_columns():
+    """Integration test: Both table and column validation work together."""
+    import pandas as pd
+
+    valid_df = pd.DataFrame({
+        "id": [1, 2],
+        "name": ["a", "b"],
+    })
+
+    mock_conn = MagicMock()
+
+    # Invalid table name should raise
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine.insert_dataframe(mock_conn, "malicious_table", valid_df)
+    assert "Invalid table name" in str(exc_info.value)
+
+    # Valid table but invalid column should raise
+    bad_col_df = pd.DataFrame({"123invalid": [1]})
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine.insert_dataframe(mock_conn, "dim_geographies", bad_col_df)
+    assert "Invalid column name" in str(exc_info.value)

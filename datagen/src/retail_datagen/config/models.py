@@ -240,17 +240,18 @@ class RealtimeConfig(BaseModel):
                     f"Detected Fabric RTI connection to: {metadata.get('entity_path')}"
                 )
 
-        # Security warning: Check if connection string was provided in config (not from env)
+        # Security warning: Warn if connection string is stored in config model
+        # This detects when azure_connection_string field has a value (from config.json)
+        # regardless of whether an env var is also set. Users should use env vars or KeyVault.
         if self.azure_connection_string and not self.use_keyvault:
-            env_conn = os.getenv("AZURE_EVENTHUB_CONNECTION_STRING", "")
-            if self.azure_connection_string != env_conn and env_conn == "":
-                # Connection string was provided in config, not from environment
-                logger.warning(
-                    "SECURITY WARNING: Azure Event Hub connection string appears to be stored in config.json. "
-                    "This is a security risk - credentials may be accidentally committed to version control. "
-                    "Recommended: Use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead, "
-                    "or configure Azure Key Vault (use_keyvault=true)."
-                )
+            logger.warning(
+                "SECURITY WARNING: Azure Event Hub connection string is configured in the model. "
+                "If this value comes from config.json, it may be accidentally committed to version control. "
+                "Recommended: Use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead, "
+                "or configure Azure Key Vault (use_keyvault=true). "
+                "To suppress this warning, leave azure_connection_string empty in config.json "
+                "and set the AZURE_EVENTHUB_CONNECTION_STRING environment variable."
+            )
 
         return self
 
@@ -406,18 +407,18 @@ class StorageConfig(BaseModel):
             if "." not in uri and "/" not in uri:
                 raise ValueError("Storage account URI appears invalid")
 
-        # Security warning: Check if account_key was provided in config (not from env)
-        # We detect this by checking if env var is different from the stored value
+        # Security warning: Warn if account_key is stored in config model
+        # This detects when account_key field has a value regardless of env var.
+        # Users should use env vars or KeyVault for credentials.
         if self.account_key:
-            env_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
-            if self.account_key != env_key and env_key == "":
-                # Key was provided in config, not from environment
-                logger.warning(
-                    "SECURITY WARNING: Azure Storage account key appears to be stored in config.json. "
-                    "This is a security risk - credentials may be accidentally committed to version control. "
-                    "Recommended: Use environment variable AZURE_STORAGE_ACCOUNT_KEY instead, "
-                    "or configure Azure Key Vault (use_keyvault=true in realtime config)."
-                )
+            logger.warning(
+                "SECURITY WARNING: Azure Storage account key is configured in the model. "
+                "If this value comes from config.json, it may be accidentally committed to version control. "
+                "Recommended: Use environment variable AZURE_STORAGE_ACCOUNT_KEY instead, "
+                "or configure Azure Key Vault. "
+                "To suppress this warning, leave account_key empty in config.json "
+                "and set the AZURE_STORAGE_ACCOUNT_KEY environment variable."
+            )
         return self
 
 

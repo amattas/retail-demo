@@ -23,8 +23,14 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _conn: duckdb.DuckDBPyConnection | None = None
 
-# Allowlist of valid table names to prevent SQL injection
-# These are the only table names that can be used in dynamic SQL queries
+# Allowlist of valid table names to prevent SQL injection.
+# These are the only table names that can be used in dynamic SQL queries.
+# Any function that accepts a table name parameter will validate against this list.
+# Attempting to use an unlisted table name will raise ValueError.
+#
+# To add a new table:
+# 1. Add the table name to this frozenset
+# 2. Ensure the table follows naming conventions (dim_* for dimensions, fact_* for facts)
 ALLOWED_TABLES: frozenset[str] = frozenset({
     # Dimension tables
     "dim_geographies",
@@ -150,8 +156,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                 # Clean up connection if any critical initialization fails
                 try:
                     new_conn.close()
-                except Exception:
-                    pass
+                except Exception as close_error:
+                    # Log cleanup failure but don't mask the original exception
+                    logger.warning(f"Failed to close connection during cleanup: {close_error}")
                 raise
     return _conn
 
@@ -255,22 +262,42 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
 
 
 def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> int:
+    """Insert a pandas DataFrame into a DuckDB table.
+
+    Creates the table if it doesn't exist, otherwise inserts into existing table.
+    All table and column names are validated to prevent SQL injection.
+
+    Args:
+        conn: DuckDB connection
+        table: Target table name (must be in ALLOWED_TABLES)
+        df: DataFrame to insert
+
+    Returns:
+        Number of rows inserted
+
+    Raises:
+        ValueError: If table name is not in ALLOWED_TABLES or column names
+            contain invalid characters (must be alphanumeric + underscore)
+    """
     if df.empty:
         return 0
     validated_table = validate_table_name(table)
     # Validate all column names before any SQL operations
     validated_cols = [validate_column_name(c) for c in df.columns]
+    col_list = ", ".join(validated_cols)
     # Register DataFrame with internal name to avoid collision with user tables
     conn.register(_INTERNAL_TMP_TABLE, df)
     try:
         if not _table_exists(conn, validated_table):
-            # Create with data to ensure correct column types
-            conn.execute(f"CREATE TABLE {validated_table} AS SELECT * FROM {_INTERNAL_TMP_TABLE}")
+            # Create with explicit column list to ensure validation is applied
+            # (SELECT * would bypass column name validation)
+            conn.execute(
+                f"CREATE TABLE {validated_table} AS SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
+            )
         else:
             # Align columns by name to avoid positional mismatches
             # Ensure any new columns are added before INSERT
             _ensure_columns(conn, validated_table, df)
-            col_list = ", ".join(validated_cols)
             conn.execute(
                 f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
             )
