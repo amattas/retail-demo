@@ -138,3 +138,47 @@ def test_validate_table_name_rejects_sql_injection():
         with pytest.raises(ValueError) as exc_info:
             duckdb_engine.validate_table_name(attempt)
         assert "Invalid table name" in str(exc_info.value)
+
+
+def test_validate_column_name_accepts_valid_names():
+    """Test that validate_column_name accepts valid SQL identifiers."""
+    valid_names = [
+        "id",
+        "user_name",
+        "firstName",
+        "column123",
+        "_private",
+        "_underscore_prefix",
+        "CamelCase",
+        "UPPER_CASE",
+    ]
+
+    for name in valid_names:
+        result = duckdb_engine.validate_column_name(name)
+        assert result == name
+
+
+def test_validate_column_name_rejects_sql_injection():
+    """Test that validate_column_name blocks SQL injection attempts."""
+    injection_attempts = [
+        "col; DROP TABLE users;--",
+        "col' OR '1'='1",
+        "col UNION SELECT * FROM secrets",
+        "col--comment",
+        "123startsWithNumber",
+        "has space",
+        "has-dash",
+        "has.dot",
+    ]
+
+    for attempt in injection_attempts:
+        with pytest.raises(ValueError) as exc_info:
+            duckdb_engine.validate_column_name(attempt)
+        assert "Invalid column name" in str(exc_info.value)
+
+
+def test_validate_column_name_rejects_empty():
+    """Test that validate_column_name rejects empty strings."""
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine.validate_column_name("")
+    assert "empty" in str(exc_info.value).lower()

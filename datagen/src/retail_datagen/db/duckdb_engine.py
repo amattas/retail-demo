@@ -69,6 +69,40 @@ def validate_table_name(table: str) -> str:
     return table
 
 
+# Pattern for valid SQL identifiers: alphanumeric and underscore, not starting with digit
+import re
+_VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def validate_column_name(column: str) -> str:
+    """Validate that a column name is a safe SQL identifier to prevent injection.
+
+    Column names must:
+    - Start with a letter or underscore
+    - Contain only alphanumeric characters and underscores
+    - Not be empty
+
+    Args:
+        column: The column name to validate
+
+    Returns:
+        The validated column name
+
+    Raises:
+        ValueError: If the column name contains invalid characters
+    """
+    col_str = str(column)
+    if not col_str:
+        raise ValueError("Column name cannot be empty")
+    if not _VALID_IDENTIFIER_PATTERN.match(col_str):
+        raise ValueError(
+            f"Invalid column name: '{col_str}'. "
+            "Column names must start with a letter or underscore and contain "
+            "only alphanumeric characters and underscores."
+        )
+    return col_str
+
+
 def get_duckdb_path() -> Path:
     data_dir = Path("data")
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -200,13 +234,13 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
     existing = _current_columns(conn, validated_table)
     for col in df.columns:
         if str(col).lower() not in existing:
+            validated_col = validate_column_name(col)
             duck_type = _duck_type_from_series(df[col])
-            # Column names are validated by DuckDB's parser; we only use alphanumeric identifiers
             try:
-                conn.execute(f"ALTER TABLE {validated_table} ADD COLUMN {col} {duck_type}")
+                conn.execute(f"ALTER TABLE {validated_table} ADD COLUMN {validated_col} {duck_type}")
             except Exception as e:
                 # Best-effort; if it races or fails, proceed and let INSERT surface issues
-                logger.debug(f"Failed to add column {col} to {validated_table}: {e}")
+                logger.debug(f"Failed to add column {validated_col} to {validated_table}: {e}")
     # No need to drop extra table columns; INSERT will only specify df columns
 
 
@@ -214,6 +248,8 @@ def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFra
     if df.empty:
         return 0
     validated_table = validate_table_name(table)
+    # Validate all column names before any SQL operations
+    validated_cols = [validate_column_name(c) for c in df.columns]
     # Register DataFrame and create table with actual data schema when first seen
     conn.register("_tmp_df", df)
     try:
@@ -224,8 +260,7 @@ def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFra
             # Align columns by name to avoid positional mismatches
             # Ensure any new columns are added before INSERT
             _ensure_columns(conn, validated_table, df)
-            cols = [c for c in df.columns]
-            col_list = ", ".join(cols)
+            col_list = ", ".join(validated_cols)
             conn.execute(
                 f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM _tmp_df"
             )
