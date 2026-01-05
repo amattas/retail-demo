@@ -58,6 +58,7 @@ class EventGenerationState:
     store_hours: dict[int, dict] = None  # store_id -> hours_info
     promotion_campaigns: dict[str, dict] = None  # campaign_id -> campaign_info
     marketing_conversions: dict[str, dict] = None  # impression_id -> conversion_info
+    customer_to_campaign: dict[int, str] = None  # customer_id -> campaign_id (O(1) lookup index)
 
     def __post_init__(self):
         if self.active_receipts is None:
@@ -76,6 +77,8 @@ class EventGenerationState:
             self.promotion_campaigns = {}
         if self.marketing_conversions is None:
             self.marketing_conversions = {}
+        if self.customer_to_campaign is None:
+            self.customer_to_campaign = {}
 
 
 class EventFactory:
@@ -523,16 +526,10 @@ class EventFactory:
         }
 
         # Look up campaign_id for marketing-driven purchases (attribution tracking)
+        # Uses O(1) customer_to_campaign index instead of O(n) linear search
         campaign_id = None
         if is_marketing_driven:
-            # Find the marketing conversion that drove this customer
-            for impression_id, conversion in self.state.marketing_conversions.items():
-                if (
-                    conversion["customer_id"] == customer_id
-                    and conversion.get("converted", False)
-                ):
-                    campaign_id = conversion.get("campaign_id")
-                    break
+            campaign_id = self.state.customer_to_campaign.get(customer_id)
 
         payload = ReceiptCreatedPayload(
             store_id=store_id,
@@ -971,6 +968,8 @@ class EventFactory:
                 "scheduled_visit_time": conversion_time,
                 "converted": False,
             }
+            # Maintain O(1) lookup index for campaign attribution
+            self.state.customer_to_campaign[customer.ID] = campaign_id
 
         payload = AdImpressionPayload(
             channel=channel.value,
@@ -1156,4 +1155,8 @@ class EventFactory:
                 expired_conversions.append(impression_id)
 
         for impression_id in expired_conversions:
+            conversion = self.state.marketing_conversions[impression_id]
+            customer_id = conversion["customer_id"]
+            # Clean up O(1) lookup index
+            self.state.customer_to_campaign.pop(customer_id, None)
             del self.state.marketing_conversions[impression_id]

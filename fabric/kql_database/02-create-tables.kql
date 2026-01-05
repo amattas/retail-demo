@@ -433,3 +433,27 @@
 .alter-merge table online_order_picked policy retention softdelete = 30d
 
 .alter-merge table online_order_shipped policy retention softdelete = 30d
+
+// ============================================================================
+// RETENTION POLICY VALIDATION
+// ============================================================================
+// Run this query after applying policies to verify they were set correctly:
+//
+// .show tables
+// | project TableName, RetentionPolicy=parse_json(RetentionPolicy).SoftDeletePeriod
+// | where TableName in (
+//     'receipt_created', 'receipt_line_added', 'payment_processed',
+//     'inventory_updated', 'stockout_detected', 'reorder_triggered',
+//     'customer_entered', 'customer_zone_changed', 'ble_ping_detected',
+//     'truck_arrived', 'truck_departed', 'store_opened', 'store_closed',
+//     'ad_impression', 'promotion_applied',
+//     'online_order_created', 'online_order_picked', 'online_order_shipped'
+// )
+// | extend ExpectedRetention = case(
+//     TableName in ('receipt_created', 'receipt_line_added', 'payment_processed',
+//                   'online_order_created', 'online_order_picked', 'online_order_shipped'), '30.00:00:00',
+//     TableName in ('customer_entered', 'customer_zone_changed', 'ble_ping_detected'), '7.00:00:00',
+//     '14.00:00:00'  // All others: inventory, operations, marketing
+// )
+// | extend PolicyCorrect = (RetentionPolicy == ExpectedRetention)
+// | order by PolicyCorrect asc, TableName asc

@@ -313,6 +313,8 @@ class TestCampaignAttribution:
             "scheduled_visit_time": datetime.now(),
             "converted": True,
         }
+        # Set up O(1) lookup index (normally done when conversion is recorded)
+        factory.state.customer_to_campaign[100] = "CAMP_TEST_001"
 
         # Create a customer session that is marketing-driven
         factory.state.customer_sessions["100_1"] = {
