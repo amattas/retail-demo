@@ -7,8 +7,8 @@ hypothesis>=6.88.0
 httpx>=0.24.0
 ruff>=0.1.0
 mypy>=1.7.0
-sqlalchemy>=2.0.0
-aiosqlite>=0.19.0
+sqlalchemy>=2.0.0,<3.0.0
+aiosqlite>=0.19.0,<1.0.0
 
 # Documentation
 mkdocs>=1.5.3

@@ -16,6 +16,9 @@ elif command -v conda &> /dev/null; then
         PYTHON_PATH="$CONDA_PREFIX_PATH"
         echo "Using conda environment: retail-datagen"
     else
+        # Warn about missing environment
+        echo "Warning: retail-datagen conda environment not found!"
+        echo "Recommended: conda create -n retail-datagen python=3.11"
         # Fall back to current environment's Python
         PYTHON_PATH=$(which python 2>/dev/null || which python3 2>/dev/null)
         echo "Using current Python: $PYTHON_PATH"

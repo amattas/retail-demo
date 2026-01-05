@@ -102,6 +102,8 @@ class ReceiptCreatedPayload(BaseModel):
     total: float = Field(..., ge=0)
     tender_type: str = Field(..., min_length=1)
     item_count: int = Field(..., gt=0)
+    # TODO: Populate campaign_id in MarketingCampaignSimulator when receipt is
+    # generated during an active campaign (see GitHub issue for tracking)
     campaign_id: str | None = Field(None, description="Optional campaign ID for attribution tracking")
 
 
