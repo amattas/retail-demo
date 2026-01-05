@@ -614,3 +614,29 @@ class TestEdgeCases:
         # Each shipment should respect capacity
         for s in shipments:
             assert s["total_items"] <= 1000
+
+    def test_negative_quantity_raises_error(self, mock_inventory_simulator):
+        """Test that negative quantities in reorder list raise ValueError."""
+        sim = mock_inventory_simulator
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Create reorder list with negative quantity
+        reorder_list = [(1, 100), (2, -50)]  # Negative quantity
+
+        with pytest.raises(ValueError, match="Invalid negative quantity"):
+            sim.generate_truck_shipment(1, 101, reorder_list, departure_time)
+
+    def test_single_product_exceeds_capacity(self, mock_inventory_simulator):
+        """Test handling when a single product's quantity exceeds truck capacity."""
+        sim = mock_inventory_simulator
+        sim._select_truck_for_shipment = lambda dc_id: f"TRUCK{len(sim._active_shipments):03d}"
+        departure_time = datetime(2024, 1, 15, 8, 0)
+
+        # Single product with qty > capacity
+        reorder_list = [(1, 2500)]  # 2.5 trucks worth
+        shipments = sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
+
+        # Should split across 3 trucks
+        assert len(shipments) == 3
+        total_items = sum(s["total_items"] for s in shipments)
+        assert total_items == 2500

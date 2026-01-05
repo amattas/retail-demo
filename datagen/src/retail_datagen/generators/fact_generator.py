@@ -298,6 +298,10 @@ class FactDataGenerator:
         "online_order_lines",
     ]
 
+    # Truck unload duration constants (in minutes)
+    MIN_UNLOAD_DURATION_MINUTES = 30  # Minimum realistic unload time
+    DEFAULT_UNLOAD_DURATION_MINUTES = 60  # Default when ETA not available
+
     def __init__(
         self,
         config: RetailConfig,
@@ -2699,9 +2703,11 @@ class FactDataGenerator:
                         eta = updated_info["eta"]
                         if eta:
                             unload_duration_minutes = int((check_time - eta).total_seconds() / 60)
-                            truck_record["ActualUnloadDuration"] = max(30, unload_duration_minutes)  # min 30 min
+                            truck_record["ActualUnloadDuration"] = max(
+                                self.MIN_UNLOAD_DURATION_MINUTES, unload_duration_minutes
+                            )
                         else:
-                            truck_record["ActualUnloadDuration"] = 60  # default 60 min
+                            truck_record["ActualUnloadDuration"] = self.DEFAULT_UNLOAD_DURATION_MINUTES
 
                     truck_lifecycle_records.append(truck_record)
 

@@ -878,7 +878,17 @@ class InventoryFlowSimulator:
 
         Returns:
             Shipment information dictionary
+
+        Raises:
+            ValueError: If any quantity in reorder_list is negative
         """
+        # Validate quantities are non-negative
+        for product_id, qty in reorder_list:
+            if qty < 0:
+                raise ValueError(
+                    f"Invalid negative quantity {qty} for product {product_id} in shipment"
+                )
+
         # Enforce truck capacity - truncate if necessary
         capacity = self._truck_capacity
         total_requested = sum(qty for _, qty in reorder_list)
