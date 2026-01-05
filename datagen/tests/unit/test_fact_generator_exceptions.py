@@ -1,5 +1,5 @@
 """
-Unit tests for FactGenerator exception handling.
+Unit tests for FactDataGenerator exception handling.
 
 Tests verify that exception handlers properly log errors when fallbacks
 or error conditions occur.

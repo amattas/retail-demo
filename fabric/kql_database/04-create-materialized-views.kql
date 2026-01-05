@@ -2,6 +2,28 @@
 // Purpose: Materialized views for hot KPIs (aligned to datagen payloads)
 // Run this entire script at once using .execute database script
 // ============================================================================
+//
+// ⚠️ IMPORTANT: 7-DAY DATA RETENTION
+// ============================================================================
+// All materialized views use a 7-day rolling window (ingest_timestamp > ago(7d))
+// to prevent unbounded growth and ensure predictable memory usage.
+//
+// IMPLICATIONS:
+// - Historical queries beyond 7 days will NOT include materialized view data
+// - For historical analysis, query the base tables directly
+// - Month-over-month comparisons require base table queries
+// - Real-time dashboards (last 7 days) work correctly with MVs
+//
+// ALTERNATIVES CONSIDERED:
+// - Table retention policies: Would affect base data, not just aggregations
+// - Partitioned MVs: Not supported in KQL materialized views
+// - Extended windows: Risk of memory/performance issues at scale
+//
+// For longer retention needs, consider:
+// 1. Query base tables with explicit time filters
+// 2. Export MV data to Lakehouse for historical aggregations
+// 3. Create separate "archive" tables with scheduled exports
+// ============================================================================
 
 .execute database script with (ContinueOnErrors=true) <|
 

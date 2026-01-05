@@ -16,6 +16,9 @@
 // ============================================================================
 
 // TRANSACTION EVENTS
+// NOTE: campaign_id added for attribution tracking (Issue #60). Field is nullable
+// for backward compatibility - existing events without campaign_id will have null.
+// Downstream queries should use isnull(campaign_id, "") or coalesce patterns.
 
 .create-merge table receipt_created (
     store_id:long,
@@ -26,7 +29,7 @@
     total:real,
     tender_type:string,
     item_count:long,
-    campaign_id:string,
+    campaign_id:string,  // Optional: null for non-campaign purchases
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
