@@ -365,13 +365,17 @@ class TruckStatus(str, Enum):
     State machine lifecycle for truck shipments:
         SCHEDULED -> LOADING -> IN_TRANSIT -> ARRIVED -> UNLOADING -> COMPLETED
 
-    Event type mapping (for streaming/fact generation):
-        - SCHEDULED: truck_scheduled
-        - LOADING: truck_loading (triggers DC outbound inventory txn)
-        - IN_TRANSIT: truck_departed
-        - ARRIVED: truck_arrived
-        - UNLOADING: truck_unloading (triggers store inbound inventory txn)
-        - COMPLETED: truck_completed
+    Streaming event mapping (only ARRIVED and COMPLETED emit events):
+        - ARRIVED: truck_arrived (truck reached destination store)
+        - COMPLETED: truck_departed (truck left store after unloading)
+
+    Note: "truck_departed" fires at COMPLETED because it represents the truck
+    departing FROM THE STORE after finishing delivery, not departing from DC.
+    LOADING and IN_TRANSIT are internal states tracked in fact tables only.
+
+    Inventory transaction triggers:
+        - LOADING: DC outbound inventory transaction
+        - UNLOADING: Store inbound inventory transaction
 
     See InventoryFlowSimulator.VALID_STATE_TRANSITIONS for allowed transitions.
     """

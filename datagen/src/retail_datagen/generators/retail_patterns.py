@@ -901,9 +901,10 @@ class InventoryFlowSimulator:
                 f"Consider using generate_truck_shipments() for multi-truck support."
             )
             warnings.warn(
-                "generate_truck_shipment() truncates orders exceeding truck capacity. "
-                "Use generate_truck_shipments() for automatic multi-truck splitting.",
-                DeprecationWarning,
+                "Order exceeds truck capacity and will be truncated. "
+                "Use generate_truck_shipments() for automatic multi-truck splitting "
+                "to avoid data loss.",
+                UserWarning,
                 stacklevel=2,
             )
             # Truncate items to fit within capacity
