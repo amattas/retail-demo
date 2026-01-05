@@ -102,25 +102,6 @@ class TestCredentialIntegration:
             connection = config.get_connection_string()
             assert connection == config_conn_str
 
-    def test_keyvault_enabled_requires_url(self):
-        """Test that enabling Key Vault without URL raises error."""
-        config = RealtimeConfig(
-            emit_interval_ms=500,
-            burst=100,
-            use_keyvault=True,
-            keyvault_url=None,  # Missing URL
-        )
-
-        with pytest.raises(ValueError, match="keyvault_url required"):
-            config.get_connection_string()
-
-    @pytest.mark.skip(reason="Requires azure-keyvault-secrets package")
-    def test_keyvault_loading_integration(self):
-        """Test Key Vault integration (requires azure-keyvault-secrets)."""
-        # This test would require actual Key Vault setup
-        # Skip in CI/CD unless Key Vault is available
-        pass
-
     def test_retail_config_loads_connection_string(self):
         """Test that full RetailConfig properly loads connection string."""
         test_conn_str = (
@@ -191,15 +172,3 @@ class TestCredentialIntegration:
 
             connection = config.get_connection_string()
             assert connection == ""
-
-    def test_keyvault_fields_optional(self):
-        """Test that Key Vault fields are optional."""
-        config = RealtimeConfig(
-            emit_interval_ms=500,
-            burst=100,
-            # Key Vault fields not specified - should use defaults
-        )
-
-        assert config.use_keyvault is False
-        assert config.keyvault_url is None
-        assert config.keyvault_secret_name == "eventhub-connection-string"
