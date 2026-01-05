@@ -63,8 +63,8 @@ def test_table_exists_handles_catalog_exception(caplog):
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-    # Should return False, not raise
-    result = duckdb_engine._table_exists(mock_conn, "nonexistent_table")
+    # Use a valid table name from the allowlist
+    result = duckdb_engine._table_exists(mock_conn, "dim_geographies")
 
     assert result is False
     assert mock_conn.execute.called
@@ -75,11 +75,24 @@ def test_table_exists_handles_unexpected_exception(caplog):
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("Unexpected error")
 
-    # Should return False and log warning
-    result = duckdb_engine._table_exists(mock_conn, "test_table")
+    # Use a valid table name from the allowlist
+    result = duckdb_engine._table_exists(mock_conn, "dim_geographies")
 
     assert result is False
     assert "Unexpected error checking if table" in caplog.text
+
+
+def test_table_exists_rejects_invalid_table_name():
+    """Test that _table_exists rejects table names not in allowlist."""
+    mock_conn = MagicMock()
+
+    # Invalid table name should raise ValueError
+    with pytest.raises(ValueError) as exc_info:
+        duckdb_engine._table_exists(mock_conn, "malicious_table; DROP TABLE users;--")
+
+    assert "Invalid table name" in str(exc_info.value)
+    # Connection should not be called
+    assert not mock_conn.execute.called
 
 
 def test_current_columns_handles_catalog_exception():
@@ -87,8 +100,8 @@ def test_current_columns_handles_catalog_exception():
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-    # Should return empty set, not raise
-    result = duckdb_engine._current_columns(mock_conn, "nonexistent_table")
+    # Use a valid table name from the allowlist
+    result = duckdb_engine._current_columns(mock_conn, "dim_geographies")
 
     assert result == set()
 
@@ -98,8 +111,30 @@ def test_current_columns_handles_unexpected_exception(caplog):
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("Unexpected error")
 
-    # Should return empty set and log warning
-    result = duckdb_engine._current_columns(mock_conn, "test_table")
+    # Use a valid table name from the allowlist
+    result = duckdb_engine._current_columns(mock_conn, "dim_geographies")
 
     assert result == set()
     assert "Failed to get columns for table" in caplog.text
+
+
+def test_validate_table_name_accepts_valid_tables():
+    """Test that validate_table_name accepts all tables in allowlist."""
+    for table in duckdb_engine.ALLOWED_TABLES:
+        result = duckdb_engine.validate_table_name(table)
+        assert result == table
+
+
+def test_validate_table_name_rejects_sql_injection():
+    """Test that validate_table_name blocks SQL injection attempts."""
+    injection_attempts = [
+        "users; DROP TABLE users;--",
+        "' OR '1'='1",
+        "table_name UNION SELECT * FROM secrets",
+        "../../../etc/passwd",
+    ]
+
+    for attempt in injection_attempts:
+        with pytest.raises(ValueError) as exc_info:
+            duckdb_engine.validate_table_name(attempt)
+        assert "Invalid table name" in str(exc_info.value)

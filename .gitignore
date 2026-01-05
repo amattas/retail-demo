@@ -82,6 +82,13 @@ data/facts/**/*.csv
 *.log
 .env.local
 
+# Secret-containing config files (prefer env vars or Key Vault)
+# Note: config.json should not contain secrets; use environment variables instead
+**/config.local.json
+**/config.secrets.json
+**/.secrets/
+**/secrets.json
+
 # DuckDB files
 *.duckdb
 *.wal

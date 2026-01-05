@@ -22,6 +22,52 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _conn: duckdb.DuckDBPyConnection | None = None
 
+# Allowlist of valid table names to prevent SQL injection
+# These are the only table names that can be used in dynamic SQL queries
+ALLOWED_TABLES: frozenset[str] = frozenset({
+    # Dimension tables
+    "dim_geographies",
+    "dim_stores",
+    "dim_distribution_centers",
+    "dim_trucks",
+    "dim_customers",
+    "dim_products",
+    # Fact tables
+    "fact_dc_inventory_txn",
+    "fact_truck_moves",
+    "fact_store_inventory_txn",
+    "fact_receipts",
+    "fact_receipt_lines",
+    "fact_foot_traffic",
+    "fact_ble_pings",
+    "fact_marketing",
+    "fact_online_order_headers",
+    "fact_online_order_lines",
+    # System tables
+    "streaming_outbox",
+    "_tmp_df",  # Used for DataFrame registration
+})
+
+
+def validate_table_name(table: str) -> str:
+    """Validate that a table name is in the allowlist to prevent SQL injection.
+
+    Args:
+        table: The table name to validate
+
+    Returns:
+        The validated table name
+
+    Raises:
+        ValueError: If the table name is not in the allowlist
+    """
+    if table not in ALLOWED_TABLES:
+        raise ValueError(
+            f"Invalid table name: '{table}'. "
+            f"Table must be one of: {sorted(ALLOWED_TABLES)}"
+        )
+    return table
+
 
 def get_duckdb_path() -> Path:
     data_dir = Path("data")
@@ -35,24 +81,34 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
         return _conn
     with _lock:
         if _conn is None:
-            _conn = duckdb.connect(str(get_duckdb_path()))
-            # Pragmas suitable for fast local writes (best-effort; tolerate older DuckDB versions)
+            new_conn = duckdb.connect(str(get_duckdb_path()))
             try:
-                threads = os.cpu_count() or 2
-                _conn.execute(f"PRAGMA threads={threads}")
+                # Pragmas suitable for fast local writes (best-effort; tolerate older DuckDB versions)
+                try:
+                    threads = os.cpu_count() or 2
+                    new_conn.execute(f"PRAGMA threads={threads}")
+                except Exception as e:
+                    # Older DuckDB may not support PRAGMA threads
+                    logger.debug(f"Failed to set PRAGMA threads={threads}: {e}")
+                try:
+                    new_conn.execute("PRAGMA temp_directory=':memory:'")
+                except Exception as e:
+                    logger.debug(f"Failed to set PRAGMA temp_directory: {e}")
+                # Ensure streaming outbox exists for outbox-driven streaming
+                try:
+                    _ensure_outbox_table(new_conn)
+                except Exception as e:
+                    # Non-fatal if creation fails here; callers may retry
+                    logger.warning(f"Failed to create outbox table during connection initialization: {e}")
+                # Only assign to global after successful initialization
+                _conn = new_conn
             except Exception as e:
-                # Older DuckDB may not support PRAGMA threads
-                logger.debug(f"Failed to set PRAGMA threads={threads}: {e}")
-            try:
-                _conn.execute("PRAGMA temp_directory=':memory:'")
-            except Exception as e:
-                logger.debug(f"Failed to set PRAGMA temp_directory: {e}")
-            # Ensure streaming outbox exists for outbox-driven streaming
-            try:
-                _ensure_outbox_table(_conn)
-            except Exception as e:
-                # Non-fatal if creation fails here; callers may retry
-                logger.warning(f"Failed to create outbox table during connection initialization: {e}")
+                # Clean up connection if any critical initialization fails
+                try:
+                    new_conn.close()
+                except Exception:
+                    pass
+                raise
     return _conn
 
 
@@ -93,27 +149,29 @@ def close_duckdb() -> None:
 
 
 def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
+    validated_table = validate_table_name(table)
     try:
-        conn.execute(f"SELECT * FROM {table} LIMIT 0")
+        conn.execute(f"SELECT * FROM {validated_table} LIMIT 0")
         return True
     except duckdb.CatalogException:
         # Table doesn't exist
         return False
     except Exception as e:
-        logger.warning(f"Unexpected error checking if table {table} exists: {e}")
+        logger.warning(f"Unexpected error checking if table {validated_table} exists: {e}")
         return False
 
 
 def _current_columns(conn: duckdb.DuckDBPyConnection, table: str) -> set[str]:
+    validated_table = validate_table_name(table)
     try:
-        cur = conn.execute(f"PRAGMA table_info('{table}')")
+        cur = conn.execute(f"PRAGMA table_info('{validated_table}')")
         rows = cur.fetchall()
         return {str(r[1]).lower() for r in rows}  # name at index 1
     except duckdb.CatalogException:
         # Table doesn't exist
         return set()
     except Exception as e:
-        logger.warning(f"Failed to get columns for table {table}: {e}")
+        logger.warning(f"Failed to get columns for table {validated_table}: {e}")
         return set()
 
 
@@ -138,35 +196,38 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
     Adds missing columns with inferred types (conservative defaults) so that
     evolving schemas (e.g., later batches adding 'Source' or 'Balance') do not fail.
     """
-    existing = _current_columns(conn, table)
+    validated_table = validate_table_name(table)
+    existing = _current_columns(conn, validated_table)
     for col in df.columns:
         if str(col).lower() not in existing:
             duck_type = _duck_type_from_series(df[col])
+            # Column names are validated by DuckDB's parser; we only use alphanumeric identifiers
             try:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {duck_type}")
+                conn.execute(f"ALTER TABLE {validated_table} ADD COLUMN {col} {duck_type}")
             except Exception as e:
                 # Best-effort; if it races or fails, proceed and let INSERT surface issues
-                logger.debug(f"Failed to add column {col} to {table}: {e}")
+                logger.debug(f"Failed to add column {col} to {validated_table}: {e}")
     # No need to drop extra table columns; INSERT will only specify df columns
 
 
 def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> int:
     if df.empty:
         return 0
+    validated_table = validate_table_name(table)
     # Register DataFrame and create table with actual data schema when first seen
     conn.register("_tmp_df", df)
     try:
-        if not _table_exists(conn, table):
+        if not _table_exists(conn, validated_table):
             # Create with data to ensure correct column types
-            conn.execute(f"CREATE TABLE {table} AS SELECT * FROM _tmp_df")
+            conn.execute(f"CREATE TABLE {validated_table} AS SELECT * FROM _tmp_df")
         else:
             # Align columns by name to avoid positional mismatches
             # Ensure any new columns are added before INSERT
-            _ensure_columns(conn, table, df)
+            _ensure_columns(conn, validated_table, df)
             cols = [c for c in df.columns]
             col_list = ", ".join(cols)
             conn.execute(
-                f"INSERT INTO {table} ({col_list}) SELECT {col_list} FROM _tmp_df"
+                f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM _tmp_df"
             )
     finally:
         conn.unregister("_tmp_df")

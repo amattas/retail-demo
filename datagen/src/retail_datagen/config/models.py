@@ -115,7 +115,12 @@ class VolumeConfig(BaseModel):
 
 
 class RealtimeConfig(BaseModel):
-    """Configuration for real-time streaming settings."""
+    """Configuration for real-time streaming settings.
+
+    SECURITY NOTE: Prefer environment variables (AZURE_EVENTHUB_CONNECTION_STRING)
+    or Azure Key Vault (use_keyvault=true) over storing connection strings in config.json
+    to avoid accidental exposure in version control.
+    """
 
     emit_interval_ms: int = Field(
         ..., gt=0, description="Interval between event emissions in milliseconds"
@@ -235,6 +240,18 @@ class RealtimeConfig(BaseModel):
                     f"Detected Fabric RTI connection to: {metadata.get('entity_path')}"
                 )
 
+        # Security warning: Check if connection string was provided in config (not from env)
+        if self.azure_connection_string and not self.use_keyvault:
+            env_conn = os.getenv("AZURE_EVENTHUB_CONNECTION_STRING", "")
+            if self.azure_connection_string != env_conn and env_conn == "":
+                # Connection string was provided in config, not from environment
+                logger.warning(
+                    "SECURITY WARNING: Azure Event Hub connection string appears to be stored in config.json. "
+                    "This is a security risk - credentials may be accidentally committed to version control. "
+                    "Recommended: Use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead, "
+                    "or configure Azure Key Vault (use_keyvault=true)."
+                )
+
         return self
 
     def get_connection_string(self) -> str:
@@ -335,6 +352,9 @@ class StorageConfig(BaseModel):
     If provided, they can be used by services that upload generated data to
     Azure Storage. Values can be supplied via config file or environment vars.
 
+    SECURITY NOTE: Prefer environment variables (AZURE_STORAGE_ACCOUNT_KEY)
+    over storing keys in config.json to avoid accidental exposure in version control.
+
     Environment overrides (checked if field empty/None):
     - account_uri: AZURE_STORAGE_ACCOUNT_URI or AZURE_STORAGE_ACCOUNT_URL
     - account_key: AZURE_STORAGE_ACCOUNT_KEY
@@ -346,8 +366,11 @@ class StorageConfig(BaseModel):
     )
     account_key: str | None = Field(
         default=None,
-        description="Azure Storage account key (sensitive)",
+        description="Azure Storage account key (sensitive - prefer environment variable)",
     )
+
+    # Track whether credentials came from config file (for security warnings)
+    _key_from_config: bool = False
 
     @field_validator("account_uri", mode="before")
     @classmethod
@@ -382,6 +405,19 @@ class StorageConfig(BaseModel):
             # Prevent obviously invalid bare values
             if "." not in uri and "/" not in uri:
                 raise ValueError("Storage account URI appears invalid")
+
+        # Security warning: Check if account_key was provided in config (not from env)
+        # We detect this by checking if env var is different from the stored value
+        if self.account_key:
+            env_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
+            if self.account_key != env_key and env_key == "":
+                # Key was provided in config, not from environment
+                logger.warning(
+                    "SECURITY WARNING: Azure Storage account key appears to be stored in config.json. "
+                    "This is a security risk - credentials may be accidentally committed to version control. "
+                    "Recommended: Use environment variable AZURE_STORAGE_ACCOUNT_KEY instead, "
+                    "or configure Azure Key Vault (use_keyvault=true in realtime config)."
+                )
         return self
 
 
