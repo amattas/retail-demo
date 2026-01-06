@@ -142,9 +142,6 @@ async def export_master_data(
                 for path in result.values()
             ]
 
-            # Row counting skipped for Parquet to avoid heavy reads
-            _ = None  # Reserved for future row counting
-
             # Update final progress
             update_task_progress(
                 task_id,

@@ -151,8 +151,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     logger.warning(f"Failed to create outbox table during connection initialization: {e}")
                 # Only assign to global after successful initialization
                 _conn = new_conn
-            except Exception:
+            except Exception as e:
                 # Clean up connection if any critical initialization fails
+                logger.error(f"DuckDB connection initialization failed: {e}")
                 try:
                     new_conn.close()
                 except Exception as close_error:
