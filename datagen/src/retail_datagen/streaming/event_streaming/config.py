@@ -21,9 +21,10 @@ def event_generation_pipeline(method: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(method)
     async def wrapper(self, *args: Any, **kwargs: Any):
+        events: list[EventEnvelope] = []
         try:
             with event_generation_duration_seconds.time():
-                events: list[EventEnvelope] = await method(self, *args, **kwargs)
+                events = await method(self, *args, **kwargs)
         except Exception as exc:  # pragma: no cover - defensive logging
             self.log.error(
                 "Error generating event burst",

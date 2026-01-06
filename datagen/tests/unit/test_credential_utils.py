@@ -23,7 +23,7 @@ class TestValidateEventHubConnectionString:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789=="
+            "SharedAccessKey=abc123xyz789LongEnoughKey=="
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
         assert is_valid is True
@@ -34,7 +34,7 @@ class TestValidateEventHubConnectionString:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789==;"
+            "SharedAccessKey=abc123xyz789LongEnoughKey==;"
             "EntityPath=retail-events"
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
@@ -46,7 +46,7 @@ class TestValidateEventHubConnectionString:
         conn_str = (
             "Endpoint=sb://eventstream-abcd1234.servicebus.windows.net/;"
             "SharedAccessKeyName=key_123456;"
-            "SharedAccessKey=xyz789abc123==;"
+            "SharedAccessKey=xyz789abc123LongEnoughKey==;"
             "EntityPath=es_fabric_stream"
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
@@ -58,7 +58,7 @@ class TestValidateEventHubConnectionString:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.chinacloudapi.cn/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789=="
+            "SharedAccessKey=abc123xyz789LongEnoughKey=="
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
         assert is_valid is True
@@ -90,11 +90,11 @@ class TestValidateEventHubConnectionString:
         """Test validation fails when SharedAccessKeyName is missing."""
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
-            "SharedAccessKey=abc123xyz789=="
+            "SharedAccessKey=abc123xyz789LongEnoughKey=="
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
         assert is_valid is False
-        assert "SharedAccessKeyName=" in error
+        assert "Shared access key name" in error
 
     def test_missing_key(self):
         """Test validation fails when SharedAccessKey is missing."""
@@ -104,7 +104,7 @@ class TestValidateEventHubConnectionString:
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
         assert is_valid is False
-        assert "SharedAccessKey=" in error
+        assert "Shared access key" in error
 
     def test_invalid_endpoint_domain(self):
         """Test validation fails with invalid endpoint domain."""
@@ -155,7 +155,7 @@ class TestValidateEventHubConnectionString:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789==;"
+            "SharedAccessKey=abc123xyz789LongEnoughKey==;"
             "EntityPath="
         )
         is_valid, error = validate_eventhub_connection_string(conn_str)
@@ -225,7 +225,7 @@ class TestGetConnectionStringMetadata:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789==;"
+            "SharedAccessKey=abc123xyz789LongEnoughKey==;"
             "EntityPath=retail-events"
         )
         metadata = get_connection_string_metadata(conn_str)
@@ -241,7 +241,7 @@ class TestGetConnectionStringMetadata:
         conn_str = (
             "Endpoint=sb://test-namespace.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=abc123xyz789=="
+            "SharedAccessKey=abc123xyz789LongEnoughKey=="
         )
         metadata = get_connection_string_metadata(conn_str)
 

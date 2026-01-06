@@ -19,7 +19,7 @@ MASTER_TABLES = [
     "products_master",
 ]
 
-# DuckDB logical→physical mappings for master tables
+# DuckDB logical->physical mappings for master tables
 DUCK_MASTER_MAP = {
     "geographies_master": "dim_geographies",
     "stores": "dim_stores",
@@ -29,7 +29,7 @@ DUCK_MASTER_MAP = {
     "products_master": "dim_products",
 }
 
-# DuckDB logical→physical mappings for fact tables
+# DuckDB logical->physical mappings for fact tables
 DUCK_FACT_MAP = {
     "dc_inventory_txn": "fact_dc_inventory_txn",
     "truck_moves": "fact_truck_moves",
@@ -57,9 +57,19 @@ FACT_TABLES = [
     "online_order_lines",
 ]
 
+# Combined mapping for unified lookups
+ALL_TABLE_MAP = {**DUCK_MASTER_MAP, **DUCK_FACT_MAP}
+
 
 def get_physical_table_name(logical_name: str, table_type: str = "master") -> str:
     """Get the physical DuckDB table name for a logical table name."""
     if table_type == "master":
         return DUCK_MASTER_MAP.get(logical_name, logical_name)
     return DUCK_FACT_MAP.get(logical_name, logical_name)
+
+
+def get_duckdb_connection():
+    """Get a DuckDB connection (lazy import to avoid circular dependencies)."""
+    from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
+    return get_duckdb_conn()

@@ -188,7 +188,7 @@ def test_order_lifecycle_statuses(
         trace_counter[0] += 1
         return f"TRACE{trace_counter[0]:08d}"
 
-    orders, store_txn, dc_txn = generate_online_orders_with_lifecycle(
+    orders, store_txn, dc_txn, order_lines = generate_online_orders_with_lifecycle(
         date=datetime(2024, 1, 15),
         config=mock_config,
         customers=mock_customers,
@@ -202,25 +202,25 @@ def test_order_lifecycle_statuses(
         generate_trace_id_func=generate_trace_id,
     )
 
-    # Should have orders
+    # Should have orders (header rows)
     assert len(orders) > 0, "Should generate orders"
+
+    # Should have order lines with fulfillment details
+    assert len(order_lines) > 0, "Should generate order lines"
 
     # Extract unique order IDs
     order_ids = {order["OrderId"] for order in orders}
 
-    # Each order should have 4 statuses × number of products
+    # Each order should have order lines with fulfillment status
     for order_id in order_ids:
-        order_records = [o for o in orders if o["OrderId"] == order_id]
+        # Get lines for this order
+        lines = [ln for ln in order_lines if ln["OrderId"] == order_id]
+        assert len(lines) > 0, f"Order {order_id} should have order lines"
 
-        # Extract statuses for this order
-        statuses = {o["FulfillmentStatus"] for o in order_records}
-
-        assert statuses == {
-            "created",
-            "picked",
-            "shipped",
-            "delivered",
-        }, f"Order {order_id} should have all 4 statuses"
+        # Each line should have fulfillment status (DELIVERED, SHIPPED, etc.)
+        for line in lines:
+            assert "FulfillmentStatus" in line, "Line should have FulfillmentStatus"
+            assert line["FulfillmentStatus"] in {"DELIVERED", "SHIPPED", "PICKED", "NEW"}
 
 
 def test_financial_calculations(
@@ -243,7 +243,7 @@ def test_financial_calculations(
         trace_counter[0] += 1
         return f"TRACE{trace_counter[0]:08d}"
 
-    orders, _, _ = generate_online_orders_with_lifecycle(
+    orders, _, _, _ = generate_online_orders_with_lifecycle(
         date=datetime(2024, 1, 15),
         config=mock_config,
         customers=mock_customers,
@@ -293,7 +293,7 @@ def test_tender_type_distribution(
     # Generate many orders to test distribution
     mock_config.volume.online_orders_per_day = 50
 
-    orders, _, _ = generate_online_orders_with_lifecycle(
+    orders, _, _, _ = generate_online_orders_with_lifecycle(
         date=datetime(2024, 1, 15),
         config=mock_config,
         customers=mock_customers,
@@ -341,7 +341,7 @@ def test_timing_progression(
         trace_counter[0] += 1
         return f"TRACE{trace_counter[0]:08d}"
 
-    orders, _, _ = generate_online_orders_with_lifecycle(
+    orders, _, _, order_lines = generate_online_orders_with_lifecycle(
         date=datetime(2024, 1, 15),
         config=mock_config,
         customers=mock_customers,
@@ -359,24 +359,31 @@ def test_timing_progression(
     order_ids = {order["OrderId"] for order in orders}
 
     for order_id in order_ids:
-        order_records = [o for o in orders if o["OrderId"] == order_id]
+        # Get order header with created timestamp
+        order_header = next(o for o in orders if o["OrderId"] == order_id)
+        created_ts = order_header["EventTS"]
+        if isinstance(created_ts, str):
+            created_ts = datetime.fromisoformat(created_ts)
 
-        # Extract timestamps by status
-        timestamps = {}
-        for record in order_records:
-            status = record["FulfillmentStatus"]
-            ts = record["EventTS"]
-            if isinstance(ts, str):
-                ts = datetime.fromisoformat(ts)
-            timestamps[status] = ts
+        # Get order lines with fulfillment timestamps
+        lines = [ln for ln in order_lines if ln["OrderId"] == order_id]
+        assert len(lines) > 0, f"Order {order_id} should have lines"
 
-        # Verify progression
-        assert timestamps["created"] < timestamps["picked"], \
-            f"picked should be after created for {order_id}"
-        assert timestamps["picked"] < timestamps["shipped"], \
-            f"shipped should be after picked for {order_id}"
-        assert timestamps["shipped"] < timestamps["delivered"], \
-            f"delivered should be after shipped for {order_id}"
+        for line in lines:
+            picked_ts = line.get("PickedTS")
+            shipped_ts = line.get("ShippedTS")
+            delivered_ts = line.get("DeliveredTS")
+
+            # Verify progression: created -> picked -> shipped -> delivered
+            if picked_ts:
+                assert created_ts < picked_ts, \
+                    f"picked should be after created for {order_id}"
+            if picked_ts and shipped_ts:
+                assert picked_ts < shipped_ts, \
+                    f"shipped should be after picked for {order_id}"
+            if shipped_ts and delivered_ts:
+                assert shipped_ts < delivered_ts, \
+                    f"delivered should be after shipped for {order_id}"
 
 
 def test_inventory_transactions_at_picked_stage(
@@ -399,7 +406,7 @@ def test_inventory_transactions_at_picked_stage(
         trace_counter[0] += 1
         return f"TRACE{trace_counter[0]:08d}"
 
-    orders, store_txn, dc_txn = generate_online_orders_with_lifecycle(
+    orders, store_txn, dc_txn, order_lines = generate_online_orders_with_lifecycle(
         date=datetime(2024, 1, 15),
         config=mock_config,
         customers=mock_customers,

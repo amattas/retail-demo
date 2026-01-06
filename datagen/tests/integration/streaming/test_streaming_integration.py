@@ -490,7 +490,7 @@ async def test_state_persistence_across_runs(tmp_path):
     state_file = tmp_path / "generation_state.json"
 
     # Create initial state
-    state_manager = GenerationStateManager(state_file=str(state_file))
+    state_manager = GenerationStateManager(state_file_path=str(state_file))
 
     # Set historical data flag
     initial_time = datetime.now(UTC)
@@ -540,8 +540,8 @@ def test_fabric_rti_connection_validation():
     assert is_valid, f"Azure connection string should be valid: {error}"
     assert not is_fabric_rti_connection_string(azure_conn), "Should not be Fabric RTI"
 
-    # Valid Fabric RTI string
-    fabric_conn = "Endpoint=sb://test-fabric.eventhub.windows.net/;SharedAccessKeyName=FabricKey;SharedAccessKey=RmFicmljS2V5MTIzRmFicmljS2V5MTIz;EntityPath=fabric-hub"
+    # Valid Fabric RTI string (using servicebus.windows.net domain)
+    fabric_conn = "Endpoint=sb://eventstream-fabric.servicebus.windows.net/;SharedAccessKeyName=key_FabricKey;SharedAccessKey=RmFicmljS2V5MTIzRmFicmljS2V5MTIz;EntityPath=es_fabric-hub"
     is_valid, error = validate_eventhub_connection_string(fabric_conn)
     assert is_valid, f"Fabric connection string should be valid: {error}"
 

@@ -25,7 +25,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .api.export_router import router as export_router
 from .api.models import ErrorResponse, HealthCheckResponse, ValidationErrorResponse
 from .config.models import RetailConfig
-from .generators.router import router as generators_router
+from .generators.routers import router as generators_router
 from .shared.dependencies import (
     check_azure_connection,
     check_file_system_health,
