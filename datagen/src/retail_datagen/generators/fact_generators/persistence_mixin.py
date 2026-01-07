@@ -105,6 +105,7 @@ class PersistenceMixin:
             "online_order_lines": "online_order_picked",  # may change based on timestamps
             "fact_payments": "payment_processed",
             "store_ops": "store_opened",  # may change based on operation_type
+            "stockouts": "stockout_detected",
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
