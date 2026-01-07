@@ -1,6 +1,7 @@
 """
 Convenience functions for fact data generation.
 """
+
 from datetime import datetime
 
 from .core import FactDataGenerator

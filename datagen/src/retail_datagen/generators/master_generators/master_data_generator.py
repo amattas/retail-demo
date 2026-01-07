@@ -119,7 +119,9 @@ class MasterDataGenerator(
         from pathlib import Path
 
         print("Loading dictionary data...")
-        print(f"Dictionary path: {Path(self.dictionary_loader.dictionary_path).resolve()}")
+        print(
+            f"Dictionary path: {Path(self.dictionary_loader.dictionary_path).resolve()}"
+        )
 
         # Load geographies
         self._geography_data = self.dictionary_loader.load_geographies()
@@ -197,7 +199,9 @@ class MasterDataGenerator(
                     )
                     avg = Decimal("0.07407")
                 self._state_tax_avg[state] = avg
-            print(f"Computed state-level tax averages for {len(self._state_tax_avg)} states")
+            print(
+                f"Computed state-level tax averages for {len(self._state_tax_avg)} states"
+            )
 
         if self._tax_rate_mapping:
             sample_key = list(self._tax_rate_mapping.keys())[0]
@@ -291,8 +295,10 @@ class MasterDataGenerator(
         self._emit_progress("geographies_master", 0.0, "Generating geographies")
 
         geography_count = self.config.volume.total_geographies
-        self.geography_master, self._selected_geography_data = self.generate_geography_master(
-            self._geography_data, geography_count, self._rng
+        self.geography_master, self._selected_geography_data = (
+            self.generate_geography_master(
+                self._geography_data, geography_count, self._rng
+            )
         )
 
         # Register with FK validator
@@ -332,17 +338,24 @@ class MasterDataGenerator(
 
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("stores")
-        self._emit_progress("stores", 1.0, "Stores complete", {"stores": len(self.stores)})
+        self._emit_progress(
+            "stores", 1.0, "Stores complete", {"stores": len(self.stores)}
+        )
 
     async def generate_distribution_centers_async(self) -> None:
         """Generate distribution centers with database insertion."""
         if self._progress_tracker:
             self._progress_tracker.mark_table_started("distribution_centers")
-        self._emit_progress("distribution_centers", 0.0, "Generating distribution centers")
+        self._emit_progress(
+            "distribution_centers", 0.0, "Generating distribution centers"
+        )
 
         dc_count = self.config.volume.dcs
         self.distribution_centers = self.generate_distribution_centers(
-            dc_count, self.geography_master, self._selected_geography_data, self.config.seed
+            dc_count,
+            self.geography_master,
+            self._selected_geography_data,
+            self.config.seed,
         )
 
         # Register with FK validator
@@ -350,7 +363,9 @@ class MasterDataGenerator(
         self.fk_validator.register_dc_ids(dc_ids)
 
         # Write to DuckDB
-        await self._insert_to_db(None, DistributionCenterModel, self.distribution_centers)
+        await self._insert_to_db(
+            None, DistributionCenterModel, self.distribution_centers
+        )
 
         if self._progress_tracker:
             self._progress_tracker.mark_table_completed("distribution_centers")
@@ -437,7 +452,11 @@ class MasterDataGenerator(
 
         # Write to DuckDB
         await self._insert_to_db(
-            None, ProductModel, self.products_master, batch_size=2000, commit_every_batches=1
+            None,
+            ProductModel,
+            self.products_master,
+            batch_size=2000,
+            commit_every_batches=1,
         )
 
         if self._progress_tracker:
@@ -448,14 +467,18 @@ class MasterDataGenerator(
         """Generate DC inventory snapshots."""
         if self._progress_tracker:
             self._progress_tracker.mark_table_started("dc_inventory_snapshots")
-        self._emit_progress("dc_inventory_snapshots", 0.0, "Generating DC inventory snapshots")
+        self._emit_progress(
+            "dc_inventory_snapshots", 0.0, "Generating DC inventory snapshots"
+        )
 
         self.dc_inventory_snapshots = self.generate_dc_inventory_snapshots(
             self.distribution_centers, self.products_master, self.config, self._np_rng
         )
 
         # Note: Inventory snapshots don't have DB models yet - CSV only
-        self._emit_progress("dc_inventory_snapshots", 1.0, "DC inventory snapshots complete")
+        self._emit_progress(
+            "dc_inventory_snapshots", 1.0, "DC inventory snapshots complete"
+        )
 
     async def generate_store_inventory_snapshots_async(self) -> None:
         """Generate store inventory snapshots."""
@@ -470,7 +493,9 @@ class MasterDataGenerator(
         )
 
         # Note: Inventory snapshots don't have DB models yet - CSV only
-        self._emit_progress("store_inventory_snapshots", 1.0, "Store inventory snapshots complete")
+        self._emit_progress(
+            "store_inventory_snapshots", 1.0, "Store inventory snapshots complete"
+        )
 
     def _validate_foreign_keys(self) -> None:
         """Validate all foreign key relationships."""
@@ -488,7 +513,9 @@ class MasterDataGenerator(
         # Validate DC geography references
         for dc in self.distribution_centers:
             if not self.fk_validator.validate_geography_fk(dc.GeographyID):
-                validation_errors.append(f"DC {dc.ID} has invalid GeographyID {dc.GeographyID}")
+                validation_errors.append(
+                    f"DC {dc.ID} has invalid GeographyID {dc.GeographyID}"
+                )
 
         # Validate customer geography references (sample check)
         sample_size = min(1000, len(self.customers))
@@ -501,7 +528,9 @@ class MasterDataGenerator(
                 )
 
         if validation_errors:
-            raise ValueError("Foreign key validation failed:\n" + "\n".join(validation_errors[:10]))
+            raise ValueError(
+                "Foreign key validation failed:\n" + "\n".join(validation_errors[:10])
+            )
 
         # Print validation summary
         summary = self.fk_validator.get_validation_summary()

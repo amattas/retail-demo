@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 class GeographyGeneratorMixin:
     """Mixin for geography master data generation."""
 
-    def _load_geography_data(self, dictionary_loader: DictionaryLoader) -> list[GeographyDict]:
+    def _load_geography_data(
+        self, dictionary_loader: DictionaryLoader
+    ) -> list[GeographyDict]:
         """Load geography dictionary data."""
         geography_data = dictionary_loader.load_geographies()
         print(f"Loaded {len(geography_data)} geographies")

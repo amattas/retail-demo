@@ -216,7 +216,9 @@ else:
 if _templates_dir.exists():
     templates = Jinja2Templates(directory=str(_templates_dir))
 else:
-    logger.warning(f"Templates directory not found at {_templates_dir}; some routes may be disabled")
+    logger.warning(
+        f"Templates directory not found at {_templates_dir}; some routes may be disabled"
+    )
     # Fallback empty templates to avoid import-time errors in tests
     templates = Jinja2Templates(directory=str(_repo_root))
 
@@ -416,6 +418,7 @@ async def health_check():
     # No separate database manager; check via duckdb_engine module
     try:
         from retail_datagen.db.duckdb_engine import get_duckdb_conn
+
         conn = get_duckdb_conn()
         # Simple connectivity check
         conn.execute("SELECT 1").fetchone()

@@ -45,7 +45,9 @@ class InventoryGeneratorMixin:
         print("Generating DC inventory snapshots...")
 
         if not distribution_centers or not products_master:
-            raise ValueError("DCs and products must be generated before inventory snapshots")
+            raise ValueError(
+                "DCs and products must be generated before inventory snapshots"
+            )
 
         # Vectorized implementation
         current_time = datetime.now(UTC)
@@ -112,7 +114,9 @@ class InventoryGeneratorMixin:
         print("Generating store inventory snapshots...")
 
         if not stores or not products_master:
-            raise ValueError("Stores and products must be generated before inventory snapshots")
+            raise ValueError(
+                "Stores and products must be generated before inventory snapshots"
+            )
 
         # Vectorized implementation
         current_time = datetime.now(UTC)

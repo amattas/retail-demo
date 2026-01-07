@@ -113,7 +113,9 @@ async def generate_all_master_data(
                     for table in tables_to_generate:
                         physical = DUCK_MASTER_MAP.get(table, table)
                         try:
-                            count = conn.execute(f"SELECT COUNT(*) FROM {physical}").fetchone()[0]
+                            count = conn.execute(
+                                f"SELECT COUNT(*) FROM {physical}"
+                            ).fetchone()[0]
                             if count is None or int(count) == 0:
                                 missing_tables.append(table)
                         except Exception:
@@ -238,8 +240,10 @@ async def generate_all_master_data(
                 from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
                 conn = get_duckdb_conn()
+
                 def q(t):
                     return conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+
                 final_counts = {
                     "geographies_master": q("dim_geographies"),
                     "stores": q("dim_stores"),
@@ -415,9 +419,7 @@ async def generate_specific_master_table(
                 logger.info("Existing DuckDB master tables dropped")
             except Exception as drop_exc:
                 logger.warning(f"Failed to drop DuckDB tables: {drop_exc}")
-            result = await master_generator.generate_all_master_data_async(
-                session=None
-            )
+            result = await master_generator.generate_all_master_data_async(session=None)
 
             # Final accurate counts
             final_counts = {

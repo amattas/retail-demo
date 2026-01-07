@@ -57,16 +57,12 @@ def get_unpublished_data_range(
 
     if wm is None or wm[0] is None:
         # No watermark or earliest_unpublished NULL → start at data min
-        row = conn.execute(
-            f"SELECT MIN(event_ts) FROM {fact_table_name}"
-        ).fetchone()
+        row = conn.execute(f"SELECT MIN(event_ts) FROM {fact_table_name}").fetchone()
         earliest = row[0]
         if earliest is None:
             return None, None
         # Latest unpublished = current max in table
-        row2 = conn.execute(
-            f"SELECT MAX(event_ts) FROM {fact_table_name}"
-        ).fetchone()
+        row2 = conn.execute(f"SELECT MAX(event_ts) FROM {fact_table_name}").fetchone()
         latest = row2[0] or earliest
         return earliest, latest
 

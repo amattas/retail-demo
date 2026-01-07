@@ -150,7 +150,9 @@ class ProductGeneratorMixin:
                 price_variation = rng.uniform(0.9, 1.1)
 
             adjusted_base_price = base_price * price_variation
-            pricing = pricing_calculator.calculate_full_pricing(Decimal(str(adjusted_base_price)))
+            pricing = pricing_calculator.calculate_full_pricing(
+                Decimal(str(adjusted_base_price))
+            )
 
             try:
                 # Determine tags
@@ -254,7 +256,9 @@ class ProductGeneratorMixin:
         )
 
         # Create valid combinations
-        valid_combinations = self._create_valid_brand_product_combinations(category_data)
+        valid_combinations = self._create_valid_brand_product_combinations(
+            category_data
+        )
 
         # Sample combinations
         vc_count = len(valid_combinations)
@@ -269,7 +273,9 @@ class ProductGeneratorMixin:
 
         # Initialize generation
         products_master = []
-        progress_reporter = ProgressReporter(target_product_count, "Generating product combinations")
+        progress_reporter = ProgressReporter(
+            target_product_count, "Generating product combinations"
+        )
         product_id = 1
         combination_idx = 0
         successful_products = 0
@@ -348,20 +354,30 @@ class ProductGeneratorMixin:
 
         # Print summary and validate
         self._print_product_generation_summary(
-            target_product_count, combination_idx, successful_products, failed_validations, len(products_master)
+            target_product_count,
+            combination_idx,
+            successful_products,
+            failed_validations,
+            len(products_master),
         )
 
         if successful_products != target_product_count:
-            raise ValueError(f"Expected {target_product_count} products, got {successful_products}")
+            raise ValueError(
+                f"Expected {target_product_count} products, got {successful_products}"
+            )
         if len(products_master) != target_product_count:
             raise ValueError(
                 f"Expected {target_product_count} products in list, got {len(products_master)}"
             )
 
-        print(f"Generated {len(products_master)} product master records with brand combinations")
+        print(
+            f"Generated {len(products_master)} product master records with brand combinations"
+        )
         return products_master
 
-    def _map_product_to_brand_category(self, product_category: str, product_department: str) -> str:
+    def _map_product_to_brand_category(
+        self, product_category: str, product_department: str
+    ) -> str:
         """Map product categories/departments to appropriate brand categories."""
         category_mapping = {
             # Food-related mappings
@@ -541,7 +557,9 @@ class ProductGeneratorMixin:
 
         return category in refrigerated_categories
 
-    def _determine_product_taxability(self, department: str, category: str) -> ProductTaxability:
+    def _determine_product_taxability(
+        self, department: str, category: str
+    ) -> ProductTaxability:
         """Determine product taxability based on department and category."""
         food_keywords = {
             "food",
@@ -563,7 +581,8 @@ class ProductGeneratorMixin:
 
         # Check if it's food/grocery
         if any(
-            keyword in department_lower or keyword in category_lower for keyword in food_keywords
+            keyword in department_lower or keyword in category_lower
+            for keyword in food_keywords
         ):
             return ProductTaxability.NON_TAXABLE
 
@@ -578,7 +597,8 @@ class ProductGeneratorMixin:
         }
 
         if any(
-            keyword in department_lower or keyword in category_lower for keyword in clothing_keywords
+            keyword in department_lower or keyword in category_lower
+            for keyword in clothing_keywords
         ):
             return ProductTaxability.REDUCED_RATE
 

@@ -1,6 +1,7 @@
 """
 Master data loading and normalization methods.
 """
+
 from __future__ import annotations
 
 import logging
@@ -67,7 +68,6 @@ class DataLoadingMixin:
             ),
             "LaunchDate": parsed_launch_date,
         }
-
 
     def load_master_data_from_duckdb(self) -> None:
         """Load master data from DuckDB and initialize simulators."""
@@ -140,14 +140,10 @@ class DataLoadingMixin:
         """Synchronous alias that loads master data from DuckDB."""
         return self.load_master_data_from_duckdb()
 
-
     def _master_table_specs(self) -> list[MasterTableSpec]:
         """Deprecated: No longer used (DuckDB-only)."""
         return []
 
-
     def _load_master_table(self, master_path: Path, spec: MasterTableSpec) -> list[Any]:
         """Deprecated: CSV master load removed."""
         return []
-
-

@@ -1,6 +1,7 @@
 """
 Seasonal patterns and holiday-specific logic for product promotions
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,23 +32,27 @@ class SeasonalMixin:
         d = datetime(year, 9, 1)
         return d + timedelta(days=(0 - d.weekday()) % 7)
 
-    def _in_window(self, date: datetime, center: datetime, lead_days: int, lag_days: int) -> bool:
+    def _in_window(
+        self, date: datetime, center: datetime, lead_days: int, lag_days: int
+    ) -> bool:
         start = center - timedelta(days=lead_days)
         end = center + timedelta(days=lag_days)
         return start.date() <= date.date() <= end.date()
 
-
-    def _product_has_keywords(self, product: ProductMaster, keywords: list[str]) -> bool:
-        t = (getattr(product, 'Tags', None) or getattr(product, 'tags', None) or '')
-        hay = ' '.join([
-            str(product.ProductName),
-            str(product.Department),
-            str(product.Category),
-            str(product.Subcategory),
-            str(t or ''),
-        ]).lower()
+    def _product_has_keywords(
+        self, product: ProductMaster, keywords: list[str]
+    ) -> bool:
+        t = getattr(product, "Tags", None) or getattr(product, "tags", None) or ""
+        hay = " ".join(
+            [
+                str(product.ProductName),
+                str(product.Department),
+                str(product.Category),
+                str(product.Subcategory),
+                str(t or ""),
+            ]
+        ).lower()
         return any(k in hay for k in keywords)
-
 
     def _get_product_multiplier(self, date: datetime, product: ProductMaster) -> float:
         year = date.year
@@ -57,47 +62,117 @@ class SeasonalMixin:
         # Thanksgiving lead core foods
         if self._in_window(date, tg, 10, 1):
             core = [
-                'thanksgiving','turkey','stuffing','cranberry','cranberries','pie','pumpkin','rolls',
-                'casserole','green bean','cream of mushroom','fried onion','gravy','yams','sweet potato','baking'
+                "thanksgiving",
+                "turkey",
+                "stuffing",
+                "cranberry",
+                "cranberries",
+                "pie",
+                "pumpkin",
+                "rolls",
+                "casserole",
+                "green bean",
+                "cream of mushroom",
+                "fried onion",
+                "gravy",
+                "yams",
+                "sweet potato",
+                "baking",
             ]
-            baking = ['baking','flour','sugar','spice','cinnamon','nutmeg','clove']
+            baking = [
+                "baking",
+                "flour",
+                "sugar",
+                "spice",
+                "cinnamon",
+                "nutmeg",
+                "clove",
+            ]
             if self._product_has_keywords(product, core):
                 return 3.5
             if self._product_has_keywords(product, baking):
                 return 1.8
             # general grocery light bump
-            if self._product_has_keywords(product, ['grocery','produce','meat','beverage','snack']):
+            if self._product_has_keywords(
+                product, ["grocery", "produce", "meat", "beverage", "snack"]
+            ):
                 return 1.3
         # Black Friday (non-food)
         if date.date() == bf.date():
-            if self._product_has_keywords(product, ['electronics','tv','laptop','headphone','gaming','appliance']):
+            if self._product_has_keywords(
+                product,
+                ["electronics", "tv", "laptop", "headphone", "gaming", "appliance"],
+            ):
                 return 5.0
-            if self._product_has_keywords(product, ['toy','lego','action figure','doll']):
+            if self._product_has_keywords(
+                product, ["toy", "lego", "action figure", "doll"]
+            ):
                 return 3.0
-            if self._product_has_keywords(product, ['home','home goods','cookware','small appliance']):
+            if self._product_has_keywords(
+                product, ["home", "home goods", "cookware", "small appliance"]
+            ):
                 return 2.2
-            if self._product_has_keywords(product, ['apparel','clothing','shoe','footwear']):
+            if self._product_has_keywords(
+                product, ["apparel", "clothing", "shoe", "footwear"]
+            ):
                 return 2.3
         # Christmas ramp
         if self._in_window(date, xmas, 14, 0):
-            if self._product_has_keywords(product, ['ham','roast','cookie','baking','candy','cider','eggnog','hot chocolate','hot beverage']):
+            if self._product_has_keywords(
+                product,
+                [
+                    "ham",
+                    "roast",
+                    "cookie",
+                    "baking",
+                    "candy",
+                    "cider",
+                    "eggnog",
+                    "hot chocolate",
+                    "hot beverage",
+                ],
+            ):
                 return 1.8
-            if self._product_has_keywords(product, ['electronics','toy','apparel','home']):
+            if self._product_has_keywords(
+                product, ["electronics", "toy", "apparel", "home"]
+            ):
                 return 1.6
         # Grill-out windows
         mem = self._memorial_day(year)
         lab = self._labor_day(year)
         jul4 = datetime(year, 7, 4)
-        grill_tags = ['grill','hot dog','hotdog','sausage','burger','ground beef','steak','chicken breast','bun','buns','ketchup','mustard','relish','bbq sauce','charcoal','chips','soda','ice']
-        if self._in_window(date, mem, 2, 2) or self._in_window(date, lab, 2, 2) or self._in_window(date, jul4, 2, 2):
+        grill_tags = [
+            "grill",
+            "hot dog",
+            "hotdog",
+            "sausage",
+            "burger",
+            "ground beef",
+            "steak",
+            "chicken breast",
+            "bun",
+            "buns",
+            "ketchup",
+            "mustard",
+            "relish",
+            "bbq sauce",
+            "charcoal",
+            "chips",
+            "soda",
+            "ice",
+        ]
+        if (
+            self._in_window(date, mem, 2, 2)
+            or self._in_window(date, lab, 2, 2)
+            or self._in_window(date, jul4, 2, 2)
+        ):
             if self._product_has_keywords(product, grill_tags):
                 return 2.5
         return 1.0
 
-
     def _apply_holiday_overlay_to_basket(self, date: datetime, basket) -> None:
         """Adjust basket in-place based on holiday overlay (qty boosts + occasional extra lines)."""
-        if not getattr(basket, 'items', None):
+        if not getattr(basket, "items", None):
             return
         # Increase quantity for existing targeted items
         new_items = []
@@ -139,5 +214,3 @@ class SeasonalMixin:
                 new_items.append((product, 1))
 
         basket.items = new_items
-
-

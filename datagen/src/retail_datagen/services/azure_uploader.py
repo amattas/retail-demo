@@ -95,4 +95,3 @@ def upload_paths_to_blob(
             raise
 
     return {"uploaded": uploaded, "container": container, "prefix": full_prefix}
-

@@ -1,6 +1,7 @@
 """
 Marketing campaign generation and effectiveness tracking
 """
+
 from __future__ import annotations
 
 import logging
@@ -143,6 +144,7 @@ class MarketingMixin:
             # Note: Zero impressions are acceptable - campaign continues if not expired
             try:
                 import pandas as _pd
+
                 if impressions:
                     df = _pd.DataFrame(impressions)
                     if not df.empty:
@@ -158,7 +160,9 @@ class MarketingMixin:
                                 if crm_mask[i]:
                                     cust_ids[i] = mapped[i]
                         # Event timestamps and trace ids
-                        event_ts = [self._randomize_time_within_day(date) for _ in range(n)]
+                        event_ts = [
+                            self._randomize_time_within_day(date) for _ in range(n)
+                        ]
                         trace_ids = [self._generate_trace_id() for _ in range(n)]
                         # Build output records
                         out = _pd.DataFrame(
@@ -195,7 +199,9 @@ class MarketingMixin:
                     )
             except Exception as e:
                 # Fallback to original loop
-                logger.warning(f"Failed to process impressions via optimized path, using fallback: {e}")
+                logger.warning(
+                    f"Failed to process impressions via optimized path, using fallback: {e}"
+                )
                 for impression in impressions:
                     logger.debug(
                         f"      Creating marketing record: {impression.get('channel', 'unknown')}"
@@ -216,7 +222,9 @@ class MarketingMixin:
                             "CustomerId": customer_id,
                             "ImpressionId": impression["ImpressionId"],
                             "Cost": str(impression["Cost"]),
-                            "CostCents": int((impression["Cost"] * 100).quantize(Decimal("1"))),
+                            "CostCents": int(
+                                (impression["Cost"] * 100).quantize(Decimal("1"))
+                            ),
                             "Device": impression["Device"].value,
                         }
                     )
@@ -240,7 +248,6 @@ class MarketingMixin:
     # starting at line ~1015 to write each hour to the database immediately instead of
     # accumulating all 24 hours in memory first.
 
-
     def _compute_marketing_multiplier(self, date: datetime) -> float:
         # Conservative boosts; configurable later
         year = date.year
@@ -254,8 +261,10 @@ class MarketingMixin:
         if self._in_window(date, xmas, 14, 0):
             return 1.5
         # Grill weekends
-        if self._in_window(date, self._memorial_day(year), 2, 2) or self._in_window(date, datetime(year,7,4), 2, 2) or self._in_window(date, self._labor_day(year), 2, 2):
+        if (
+            self._in_window(date, self._memorial_day(year), 2, 2)
+            or self._in_window(date, datetime(year, 7, 4), 2, 2)
+            or self._in_window(date, self._labor_day(year), 2, 2)
+        ):
             return 1.5
         return 1.0
-
-

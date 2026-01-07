@@ -103,10 +103,14 @@ class StreamingCore:
         """Reset daily counts if day has changed."""
         day = ts.strftime("%Y-%m-%d")
         if self._current_day != day:
-            stores_count = len(self._stores) if hasattr(self, '_stores') else 1
-            dcs_count = len(self._distribution_centers) if hasattr(self, '_distribution_centers') else 1
+            stores_count = len(self._stores) if hasattr(self, "_stores") else 1
+            dcs_count = (
+                len(self._distribution_centers)
+                if hasattr(self, "_distribution_centers")
+                else 1
+            )
             # Need to pass config volume - this will be set by parent
-            if hasattr(self, '_config_volume'):
+            if hasattr(self, "_config_volume"):
                 self.compute_daily_targets(stores_count, dcs_count, self._config_volume)
 
     def _build_event_weights(self, ts: datetime) -> dict[EventType, float]:
@@ -122,7 +126,11 @@ class StreamingCore:
         return weights
 
     async def streaming_loop(
-        self, start_time: datetime, end_time: datetime | None, pause_event, is_shutdown_func
+        self,
+        start_time: datetime,
+        end_time: datetime | None,
+        pause_event,
+        is_shutdown_func,
     ):
         """
         Main streaming loop that generates and sends events.

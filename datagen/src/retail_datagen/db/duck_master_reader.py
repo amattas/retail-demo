@@ -89,7 +89,9 @@ def read_stores() -> list[Store]:
                 volume_class=r[idx.get("volume_class")],
                 store_format=r[idx.get("store_format")],
                 operating_hours=r[idx.get("operating_hours")],
-                daily_traffic_multiplier=_to_decimal(r[idx.get("daily_traffic_multiplier")]),
+                daily_traffic_multiplier=_to_decimal(
+                    r[idx.get("daily_traffic_multiplier")]
+                ),
             )
         )
     return out
@@ -178,10 +180,12 @@ def read_products() -> list[ProductMaster]:
                 MSRP=_to_decimal(r[idx["msrp"]]) or Decimal("0.00"),
                 SalePrice=_to_decimal(r[idx["saleprice"]]) or Decimal("0.00"),
                 RequiresRefrigeration=bool(
-                    r[idx.get(
-                        "requiresrefrigeration",
-                        idx.get("requires_refrigeration", "requiresrefrigeration")
-                    )]
+                    r[
+                        idx.get(
+                            "requiresrefrigeration",
+                            idx.get("requires_refrigeration", "requiresrefrigeration"),
+                        )
+                    ]
                 ),
                 LaunchDate=launch_dt,
                 taxability=r[idx.get("taxability")],
@@ -206,4 +210,3 @@ def read_all_masters() -> tuple[
     products = read_products()
     trucks = read_trucks()
     return geos, stores, dcs, customers, products, trucks
-

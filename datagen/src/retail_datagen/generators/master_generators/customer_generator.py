@@ -92,7 +92,10 @@ class CustomerGeneratorMixin:
             ids = list(range(current_id, current_id + count))
 
             # Addresses
-            addresses = [address_generator.generate_address(geo, "residential") for _ in range(count)]
+            addresses = [
+                address_generator.generate_address(geo, "residential")
+                for _ in range(count)
+            ]
 
             # Loyalty/Phone/BLE/Ad IDs
             loyalty_cards = [id_generator.generate_loyalty_card(cid) for cid in ids]

@@ -108,7 +108,9 @@ class InventoryFlowSimulator:
         self._active_disruptions: dict[int, dict] = {}  # dc_id -> disruption_info
         self._disruption_counter = 1
 
-    def _select_truck_for_shipment(self, dc_id: int, current_time: datetime) -> int | str | None:
+    def _select_truck_for_shipment(
+        self, dc_id: int, current_time: datetime
+    ) -> int | str | None:
         """Select an available truck for a shipment, preferring trucks assigned to the DC.
 
         Args:
@@ -122,7 +124,8 @@ class InventoryFlowSimulator:
         # Prefer DC-assigned trucks - find first available
         dc_list = self._trucks_by_dc.get(dc_id) or []
         available_dc_trucks = [
-            truck_id for truck_id in dc_list
+            truck_id
+            for truck_id in dc_list
             if self._truck_availability.get(truck_id, datetime.min) <= current_time
         ]
         if available_dc_trucks:
@@ -134,7 +137,8 @@ class InventoryFlowSimulator:
         # Fallback to pool trucks - find first available
         pool_list = self._trucks_by_dc.get(None) or []
         available_pool_trucks = [
-            truck_id for truck_id in pool_list
+            truck_id
+            for truck_id in pool_list
             if self._truck_availability.get(truck_id, datetime.min) <= current_time
         ]
         if available_pool_trucks:
@@ -147,7 +151,9 @@ class InventoryFlowSimulator:
         # All real trucks are busy - return None to signal queuing needed
         return None
 
-    def _mark_truck_unavailable(self, truck_id: int | str, return_time: datetime) -> None:
+    def _mark_truck_unavailable(
+        self, truck_id: int | str, return_time: datetime
+    ) -> None:
         """Mark a truck as unavailable until it returns to the DC.
 
         Args:
@@ -157,7 +163,9 @@ class InventoryFlowSimulator:
         if isinstance(truck_id, int):
             self._truck_availability[truck_id] = return_time
 
-    def _calculate_round_trip_time(self, travel_hours: float, unload_hours: float) -> float:
+    def _calculate_round_trip_time(
+        self, travel_hours: float, unload_hours: float
+    ) -> float:
         """Calculate total round trip time including return journey.
 
         Args:
@@ -171,7 +179,9 @@ class InventoryFlowSimulator:
         # Assume return trip is same duration as outbound
         return travel_hours + unload_hours + travel_hours
 
-    def get_next_available_truck_time(self, dc_id: int, current_time: datetime) -> datetime | None:
+    def get_next_available_truck_time(
+        self, dc_id: int, current_time: datetime
+    ) -> datetime | None:
         """Get the earliest time a truck will be available at this DC.
 
         Args:
@@ -452,10 +462,14 @@ class InventoryFlowSimulator:
         # If still no truck (shouldn't happen), use synthetic fallback
         if truck_id is None:
             truck_id = f"TRK{self._rng.randint(1000, 9999)}"
-            logger.warning(f"No trucks available for DC {dc_id}, using synthetic truck {truck_id}")
+            logger.warning(
+                f"No trucks available for DC {dc_id}, using synthetic truck {truck_id}"
+            )
 
         # Check for active disruptions at DC
-        capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, actual_departure_time)
+        capacity_multiplier = self.get_dc_capacity_multiplier(
+            dc_id, actual_departure_time
+        )
 
         # Add delays for disruptions (inverse of capacity - lower capacity = more delays)
         base_travel_hours = self._rng.randint(2, 12)  # 2-12 hours base travel time
@@ -464,7 +478,9 @@ class InventoryFlowSimulator:
 
         eta = actual_departure_time + timedelta(hours=travel_hours)
         # Unload duration scales with shipment size (30min - 2hrs)
-        unload_hours = self._calculate_unload_duration(sum(qty for _, qty in reorder_list))
+        unload_hours = self._calculate_unload_duration(
+            sum(qty for _, qty in reorder_list)
+        )
         etd = eta + timedelta(hours=unload_hours)
 
         # Calculate when truck returns to DC (round trip)
@@ -495,7 +511,9 @@ class InventoryFlowSimulator:
         # Track in-transit inventory to prevent over-ordering
         for product_id, quantity in reorder_list:
             key = (store_id, product_id)
-            self._in_transit_inventory[key] = self._in_transit_inventory.get(key, 0) + quantity
+            self._in_transit_inventory[key] = (
+                self._in_transit_inventory.get(key, 0) + quantity
+            )
 
         return shipment_info
 
@@ -540,7 +558,11 @@ class InventoryFlowSimulator:
 
         # If fits in one truck, use simple method
         if total_items <= capacity:
-            return [self.generate_truck_shipment(dc_id, store_id, reorder_list, departure_time)]
+            return [
+                self.generate_truck_shipment(
+                    dc_id, store_id, reorder_list, departure_time
+                )
+            ]
 
         # Split order across multiple trucks
         shipments = []
@@ -563,7 +585,9 @@ class InventoryFlowSimulator:
                 # If truck is full, dispatch it
                 if current_truck_total >= capacity:
                     # Stagger departure times by 30 minutes per truck
-                    truck_departure = departure_time + timedelta(minutes=30 * truck_number)
+                    truck_departure = departure_time + timedelta(
+                        minutes=30 * truck_number
+                    )
                     shipment = self.generate_truck_shipment(
                         dc_id, store_id, current_truck_items, truck_departure
                     )
@@ -611,7 +635,10 @@ class InventoryFlowSimulator:
     # Valid state transitions for truck lifecycle
     # Each state maps to the set of valid next states
     VALID_STATE_TRANSITIONS: dict[TruckStatus, set[TruckStatus]] = {
-        TruckStatus.SCHEDULED: {TruckStatus.LOADING, TruckStatus.COMPLETED},  # Can skip to COMPLETED on timeout
+        TruckStatus.SCHEDULED: {
+            TruckStatus.LOADING,
+            TruckStatus.COMPLETED,
+        },  # Can skip to COMPLETED on timeout
         TruckStatus.LOADING: {TruckStatus.IN_TRANSIT, TruckStatus.COMPLETED},
         TruckStatus.IN_TRANSIT: {TruckStatus.ARRIVED, TruckStatus.COMPLETED},
         TruckStatus.ARRIVED: {TruckStatus.UNLOADING, TruckStatus.COMPLETED},
@@ -621,11 +648,11 @@ class InventoryFlowSimulator:
 
     # Maximum time a shipment can be in any state before being considered stuck (hours)
     STATE_TIMEOUT_HOURS: dict[TruckStatus, int] = {
-        TruckStatus.SCHEDULED: 24,   # Max 24 hours waiting to load
-        TruckStatus.LOADING: 8,      # Max 8 hours loading
+        TruckStatus.SCHEDULED: 24,  # Max 24 hours waiting to load
+        TruckStatus.LOADING: 8,  # Max 8 hours loading
         TruckStatus.IN_TRANSIT: 48,  # Max 48 hours in transit
-        TruckStatus.ARRIVED: 4,      # Max 4 hours waiting to unload
-        TruckStatus.UNLOADING: 8,    # Max 8 hours unloading
+        TruckStatus.ARRIVED: 4,  # Max 4 hours waiting to unload
+        TruckStatus.UNLOADING: 8,  # Max 8 hours unloading
     }
 
     def _validate_state_transition(
@@ -728,8 +755,12 @@ class InventoryFlowSimulator:
         # Check for timeout recovery first
         recovery_status = self._check_state_timeout(shipment, current_time)
         if recovery_status == TruckStatus.COMPLETED:
-            if self._validate_state_transition(shipment_id, current_status, TruckStatus.COMPLETED):
-                logger.info(f"Shipment {shipment_id} recovered from stuck state via timeout")
+            if self._validate_state_transition(
+                shipment_id, current_status, TruckStatus.COMPLETED
+            ):
+                logger.info(
+                    f"Shipment {shipment_id} recovered from stuck state via timeout"
+                )
                 shipment["status"] = TruckStatus.COMPLETED
                 shipment["_recovered_via_timeout"] = True
                 del self._active_shipments[shipment_id]
@@ -759,7 +790,9 @@ class InventoryFlowSimulator:
         # Only update if state is changing
         if target_status != current_status:
             # Validate the transition
-            if self._validate_state_transition(shipment_id, current_status, target_status):
+            if self._validate_state_transition(
+                shipment_id, current_status, target_status
+            ):
                 old_status = current_status
                 shipment["status"] = target_status
 
@@ -782,15 +815,21 @@ class InventoryFlowSimulator:
                 # This handles cases where time jumps and we skip states
                 # Keep stepping until we reach the target or can't progress anymore
                 state_order = [
-                    TruckStatus.SCHEDULED, TruckStatus.LOADING, TruckStatus.IN_TRANSIT,
-                    TruckStatus.ARRIVED, TruckStatus.UNLOADING, TruckStatus.COMPLETED
+                    TruckStatus.SCHEDULED,
+                    TruckStatus.LOADING,
+                    TruckStatus.IN_TRANSIT,
+                    TruckStatus.ARRIVED,
+                    TruckStatus.UNLOADING,
+                    TruckStatus.COMPLETED,
                 ]
                 stepping_status = current_status
                 steps_taken = 0
                 max_steps = self.MAX_RECOVERY_STEPS  # Prevent infinite loops
 
                 while stepping_status != target_status and steps_taken < max_steps:
-                    next_valid_states = self.VALID_STATE_TRANSITIONS.get(stepping_status, set())
+                    next_valid_states = self.VALID_STATE_TRANSITIONS.get(
+                        stepping_status, set()
+                    )
                     if not next_valid_states:
                         break
 
@@ -1283,4 +1322,6 @@ class InventoryFlowSimulator:
         Returns:
             Total effective inventory including in-transit shipments
         """
-        return self.get_store_balance(store_id, product_id) + self.get_in_transit_quantity(store_id, product_id)
+        return self.get_store_balance(
+            store_id, product_id
+        ) + self.get_in_transit_quantity(store_id, product_id)

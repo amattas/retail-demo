@@ -250,14 +250,18 @@ async def start_streaming(
                         env = EventEnvelope(
                             event_type=etype,
                             payload=payload,
-                            trace_id=str(item.get("trace_id") or f"TR_{_uuid4().hex[:12]}"),
+                            trace_id=str(
+                                item.get("trace_id") or f"TR_{_uuid4().hex[:12]}"
+                            ),
                             ingest_timestamp=stamp,
                             schema_version="1.0",
                             source="retail-datagen-outbox",
                             partition_key=str(item.get("partition_key") or ""),
                         )
                         ok = await client.send_event(env)
-                        update_streaming_statistics({"event_type": etype.value}, success=ok)
+                        update_streaming_statistics(
+                            {"event_type": etype.value}, success=ok
+                        )
                         if ok:
                             outbox_ack_sent(conn, int(item["outbox_id"]))
                             total_sent += 1
@@ -280,7 +284,9 @@ async def start_streaming(
                 try:
                     st = state_mgr.load_state()
                     if st.last_generated_timestamp:
-                        next_day = st.last_generated_timestamp.date() + timedelta(days=1)
+                        next_day = st.last_generated_timestamp.date() + timedelta(
+                            days=1
+                        )
                     else:
                         next_day = datetime.strptime(
                             config.historical.start_date, "%Y-%m-%d"
@@ -288,7 +294,9 @@ async def start_streaming(
                     start_dt = datetime.combine(next_day, datetime.min.time())
                     end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
                     update_task_progress(
-                        new_session_id, 0.05, f"Generating {start_dt.date().isoformat()}"
+                        new_session_id,
+                        0.05,
+                        f"Generating {start_dt.date().isoformat()}",
                     )
                     await fact_gen.generate_historical_data(
                         start_dt, end_dt, publish_to_outbox=True
@@ -300,7 +308,11 @@ async def start_streaming(
 
             await client.disconnect()
             update_task_progress(new_session_id, 1.0, "Streaming completed")
-            return {"events_sent": total_sent, "end_reason": "completed", "mode": "outbox"}
+            return {
+                "events_sent": total_sent,
+                "end_reason": "completed",
+                "mode": "outbox",
+            }
         except _asyncio.CancelledError:
             update_task_progress(new_session_id, 1.0, "Streaming cancelled")
             return {"events_sent": 0, "end_reason": "cancelled"}

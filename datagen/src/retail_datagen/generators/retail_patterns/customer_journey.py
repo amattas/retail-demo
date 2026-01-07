@@ -59,8 +59,7 @@ class CustomerJourneySimulator:
 
         # Build product ID to category mapping for promotions
         self._product_category_map = {
-            product.ID: self._get_product_category(product)
-            for product in self.products
+            product.ID: self._get_product_category(product) for product in self.products
         }
 
         # Customer segment distribution
@@ -212,7 +211,10 @@ class CustomerJourneySimulator:
         return self._rng.choices(behaviors, weights=weights)[0]
 
     def generate_shopping_basket(
-        self, customer_id: int, behavior_type: ShoppingBehaviorType | None = None, store: Store | None = None
+        self,
+        customer_id: int,
+        behavior_type: ShoppingBehaviorType | None = None,
+        store: Store | None = None,
     ) -> ShoppingBasket:
         """
         Generate a realistic shopping basket for a customer.
@@ -243,16 +245,16 @@ class CustomerJourneySimulator:
         min_items, max_items = basket_sizes[behavior_type]
 
         # Adjust basket size based on store format if provided
-        if store and hasattr(store, 'store_format') and store.store_format:
+        if store and hasattr(store, "store_format") and store.store_format:
             # Clamp express explicitly to 1-3 items per profile spec
-            if store.store_format == 'express':
+            if store.store_format == "express":
                 min_items, max_items = 1, 3
             else:
                 format_multipliers = {
-                    'hypermarket': 1.3,   # Larger baskets in hypermarkets
-                    'superstore': 1.1,    # Slightly larger in superstores
-                    'standard': 1.0,      # Baseline
-                    'neighborhood': 0.8,  # Smaller in neighborhood stores
+                    "hypermarket": 1.3,  # Larger baskets in hypermarkets
+                    "superstore": 1.1,  # Slightly larger in superstores
+                    "standard": 1.0,  # Baseline
+                    "neighborhood": 0.8,  # Smaller in neighborhood stores
                 }
                 multiplier = format_multipliers.get(store.store_format, 1.0)
                 min_items = max(1, int(min_items * multiplier))
@@ -378,14 +380,14 @@ class CustomerJourneySimulator:
                     # Quality/premium seekers: prefer higher-priced products
                     # Use explicit percentile mapping to match documented behavior
                     top_percentile_map = {
-                        CustomerSegment.QUALITY_SEEKER: 0.3,   # Top 30% of prices
-                        CustomerSegment.BRAND_LOYAL: 0.5,      # Top 50% of prices
+                        CustomerSegment.QUALITY_SEEKER: 0.3,  # Top 30% of prices
+                        CustomerSegment.BRAND_LOYAL: 0.5,  # Top 50% of prices
                     }
                     top_percentile = top_percentile_map.get(segment, 0.3)
                     sorted_prices = sorted([p.SalePrice for p in available_products])
                     threshold_idx = min(
                         len(sorted_prices) - 1,
-                        int(len(sorted_prices) * (1.0 - top_percentile))
+                        int(len(sorted_prices) * (1.0 - top_percentile)),
                     )
                     price_threshold = sorted_prices[threshold_idx]
                     preferred_products = [
@@ -452,8 +454,7 @@ class CustomerJourneySimulator:
         self._product_categories = self._categorize_products()
         # Rebuild product category map
         self._product_category_map = {
-            product.ID: self._get_product_category(product)
-            for product in self.products
+            product.ID: self._get_product_category(product) for product in self.products
         }
 
     def apply_promotions_to_basket(
@@ -494,11 +495,13 @@ class CustomerJourneySimulator:
             category = self._product_category_map.get(product.ID, "other")
             basket_categories.append(category)
 
-            basket_items.append({
-                "product": product,
-                "qty": qty,
-                "subtotal": item_subtotal,
-            })
+            basket_items.append(
+                {
+                    "product": product,
+                    "qty": qty,
+                    "subtotal": item_subtotal,
+                }
+            )
 
         # Check if promotion should be applied
         should_apply = self._promotion_engine.should_apply_promotion(
@@ -531,10 +534,12 @@ class CustomerJourneySimulator:
             return Decimal("0.00"), items_without_promo
 
         # Apply promotion to basket
-        total_discount, items_with_promos = self._promotion_engine.apply_promotion_to_basket(
-            basket_items=basket_items,
-            promo_config=promo_config,
-            product_categories=self._product_category_map,
+        total_discount, items_with_promos = (
+            self._promotion_engine.apply_promotion_to_basket(
+                basket_items=basket_items,
+                promo_config=promo_config,
+                product_categories=self._product_category_map,
+            )
         )
 
         return total_discount, items_with_promos

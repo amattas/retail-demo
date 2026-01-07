@@ -58,7 +58,9 @@ class EventGenerationState:
     store_hours: dict[int, dict] = None  # store_id -> hours_info
     promotion_campaigns: dict[str, dict] = None  # campaign_id -> campaign_info
     marketing_conversions: dict[str, dict] = None  # impression_id -> conversion_info
-    customer_to_campaign: dict[int, str] = None  # customer_id -> campaign_id (O(1) lookup index)
+    customer_to_campaign: dict[int, str] = (
+        None  # customer_id -> campaign_id (O(1) lookup index)
+    )
 
     def __post_init__(self):
         if self.active_receipts is None:

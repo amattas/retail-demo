@@ -76,7 +76,9 @@ async def get_recent_events(
         )
 
     return RecentEventsResponse(
-        events=formatted_events, count=len(formatted_events), timestamp=datetime.now(UTC)
+        events=formatted_events,
+        count=len(formatted_events),
+        timestamp=datetime.now(UTC),
     )
 
 

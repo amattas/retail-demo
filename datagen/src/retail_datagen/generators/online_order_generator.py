@@ -108,14 +108,18 @@ def generate_online_orders_with_lifecycle(
 
         # Choose header-level mode/node for pricing (tax base), but allow per-line routing below
         # Distribution: 60% DC, 30% Store, 10% BOPIS
-        mode = rng.choices(["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10])[0]
+        mode = rng.choices(
+            ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10]
+        )[0]
 
         if mode in ("SHIP_FROM_STORE", "BOPIS") and stores:
             node_type = "STORE"
             store = rng.choice(stores)
             node_id = store.ID
             # Get store tax rate with fallback
-            fulfillment_tax_rate = store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
+            fulfillment_tax_rate = (
+                store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
+            )
         else:
             node_type = "DC"
             dc = rng.choice(distribution_centers) if distribution_centers else None
@@ -123,15 +127,23 @@ def generate_online_orders_with_lifecycle(
                 node_type = "STORE"
                 store = rng.choice(stores)
                 node_id = store.ID
-                fulfillment_tax_rate = store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
+                fulfillment_tax_rate = (
+                    store.tax_rate if store.tax_rate is not None else Decimal("0.07407")
+                )
             else:
                 node_id = dc.ID
                 # Approximate DC taxation using customer's local rate (store in same geo if available)
-                customer_geo = next((g for g in geographies if g.ID == customer.GeographyID), None)
+                customer_geo = next(
+                    (g for g in geographies if g.ID == customer.GeographyID), None
+                )
                 if customer_geo:
-                    customer_stores = [s for s in stores if s.GeographyID == customer_geo.ID]
+                    customer_stores = [
+                        s for s in stores if s.GeographyID == customer_geo.ID
+                    ]
                     if customer_stores:
-                        fulfillment_tax_rate = customer_stores[0].tax_rate or Decimal("0.07407")
+                        fulfillment_tax_rate = customer_stores[0].tax_rate or Decimal(
+                            "0.07407"
+                        )
                     else:
                         fulfillment_tax_rate = Decimal("0.07407")
                 else:
@@ -191,21 +203,28 @@ def generate_online_orders_with_lifecycle(
             promo_code = None
             discount_mult = Decimal("1.0")
             if apply_promo and not is_cancelled_order:
-                promo_pct = rng.choices([Decimal("0.05"), Decimal("0.10"), Decimal("0.20")], weights=[0.5, 0.35, 0.15])[0]
-                discount_mult = (Decimal("1.0") - promo_pct)
+                promo_pct = rng.choices(
+                    [Decimal("0.05"), Decimal("0.10"), Decimal("0.20")],
+                    weights=[0.5, 0.35, 0.15],
+                )[0]
+                discount_mult = Decimal("1.0") - promo_pct
                 # Encode promo in a simple code
                 promo_code = f"PROMO{int(promo_pct * 100)}"
 
             line_subtotal = (unit_price * qty * discount_mult).quantize(Decimal("0.01"))
-            line_tax = (line_subtotal * fulfillment_tax_rate * taxability_multiplier).quantize(Decimal("0.01"))
+            line_tax = (
+                line_subtotal * fulfillment_tax_rate * taxability_multiplier
+            ).quantize(Decimal("0.01"))
 
             order_subtotal += line_subtotal
             order_tax += line_tax
 
         order_total = (order_subtotal + order_tax).quantize(Decimal("0.01"))
+
         # Integer cents for numeric columns
         def _cents(d: Decimal) -> int:
-            return int((d * 100).quantize(Decimal('1')))
+            return int((d * 100).quantize(Decimal("1")))
+
         order_sub_cents = _cents(order_subtotal)
         order_tax_cents = _cents(order_tax)
         order_total_cents = _cents(order_total)
@@ -224,8 +243,11 @@ def generate_online_orders_with_lifecycle(
             promo_code = None
             discount_mult = Decimal("1.0")
             if apply_promo and not is_cancelled_order:
-                promo_pct = rng.choices([Decimal("0.05"), Decimal("0.10"), Decimal("0.20")], weights=[0.5, 0.35, 0.15])[0]
-                discount_mult = (Decimal("1.0") - promo_pct)
+                promo_pct = rng.choices(
+                    [Decimal("0.05"), Decimal("0.10"), Decimal("0.20")],
+                    weights=[0.5, 0.35, 0.15],
+                )[0]
+                discount_mult = Decimal("1.0") - promo_pct
                 promo_code = f"PROMO{int(promo_pct * 100)}"
 
             ext_price = (unit_price * qty * discount_mult).quantize(Decimal("0.01"))
@@ -233,14 +255,18 @@ def generate_online_orders_with_lifecycle(
             ext_cents = _cents(ext_price)
 
             # Choose per-line routing (can differ from header)
-            line_mode = rng.choices(["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10])[0]
+            line_mode = rng.choices(
+                ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10]
+            )[0]
             if line_mode in ("SHIP_FROM_STORE", "BOPIS") and stores:
                 ln_type = "STORE"
                 ln_store = rng.choice(stores)
                 ln_node_id = ln_store.ID
             else:
                 ln_type = "DC"
-                ln_dc = rng.choice(distribution_centers) if distribution_centers else None
+                ln_dc = (
+                    rng.choice(distribution_centers) if distribution_centers else None
+                )
                 if not ln_dc:
                     ln_type = "STORE"
                     ln_store = rng.choice(stores)
@@ -251,9 +277,13 @@ def generate_online_orders_with_lifecycle(
             # Compute per-line lifecycle consistent with SLA assumptions
             # Determine availability at node to simulate backorders
             if ln_type == "STORE":
-                current_balance_ln = inventory_flow_sim.get_store_balance(ln_node_id, product.ID)
+                current_balance_ln = inventory_flow_sim.get_store_balance(
+                    ln_node_id, product.ID
+                )
             else:
-                current_balance_ln = inventory_flow_sim.get_dc_balance(ln_node_id, product.ID)
+                current_balance_ln = inventory_flow_sim.get_dc_balance(
+                    ln_node_id, product.ID
+                )
             is_backordered = (current_balance_ln or 0) < qty
 
             # Holiday factor increases delays during peaks
@@ -262,6 +292,7 @@ def generate_online_orders_with_lifecycle(
             # Helper: triangular hours (min, mode, max)
             def _tri_h(min_h: int, mode_h: int, max_h: int) -> float:
                 import random as _r
+
                 return _r.triangular(min_h, max_h, mode_h)
 
             if is_cancelled_order:
@@ -277,12 +308,18 @@ def generate_online_orders_with_lifecycle(
                 line_status = "DELIVERED"
             else:
                 if is_backordered:
-                    ship_delay_h = int(rng.randint(72, 120) * float(holiday_factor))  # 3–5 days
+                    ship_delay_h = int(
+                        rng.randint(72, 120) * float(holiday_factor)
+                    )  # 3–5 days
                 else:
-                    ship_delay_h = int(_tri_h(8, 18, 48) * float(holiday_factor))  # most within 24h, worst 48h
+                    ship_delay_h = int(
+                        _tri_h(8, 18, 48) * float(holiday_factor)
+                    )  # most within 24h, worst 48h
 
                 pick_min = rng.randint(30, 240)
-                _picked_ts = created_ts + timedelta(minutes=min(pick_min, max(1, ship_delay_h * 60 - 30)))
+                _picked_ts = created_ts + timedelta(
+                    minutes=min(pick_min, max(1, ship_delay_h * 60 - 30))
+                )
                 _shipped_ts = created_ts + timedelta(hours=ship_delay_h)
 
                 # Transit time: DC 1–3 days, Store 0.5–2 days; scale by holidays
@@ -295,7 +332,9 @@ def generate_online_orders_with_lifecycle(
 
                 line_status = "DELIVERED" if not is_backordered else "SHIPPED"
 
-            line_routing.append((product.ID, ln_type, ln_node_id, line_mode, line_status))
+            line_routing.append(
+                (product.ID, ln_type, ln_node_id, line_mode, line_status)
+            )
             order_lines.append(
                 {
                     "OrderId": order_id,
@@ -334,14 +373,17 @@ def generate_online_orders_with_lifecycle(
         if all_statuses and all(s == "DELIVERED" for s in all_statuses):
             # Use the latest delivered timestamp among lines
             delivered_times = [
-                dt for dt in (
-                    (_delivered_ts if 'delivered_ts' in locals() else None),
-                ) if dt is not None
+                dt
+                for dt in ((_delivered_ts if "delivered_ts" in locals() else None),)
+                if dt is not None
             ]
             # Fallback: use delivered_ts computed above for lines; recompute from order_lines list
             if not delivered_times:
                 delivered_times = [
-                    ol.get("DeliveredTS") for ol in order_lines if ol.get("OrderId") == order_id and ol.get("DeliveredTS") is not None
+                    ol.get("DeliveredTS")
+                    for ol in order_lines
+                    if ol.get("OrderId") == order_id
+                    and ol.get("DeliveredTS") is not None
                 ]
             if delivered_times:
                 completed_ts = max(delivered_times)
@@ -397,7 +439,9 @@ def generate_online_orders_with_lifecycle(
                 inventory_flow_sim._store_inventory[key] = new_balance
 
                 # Get balance after transaction
-                balance = inventory_flow_sim.get_store_balance((inv_node_id or node_id), product.ID)
+                balance = inventory_flow_sim.get_store_balance(
+                    (inv_node_id or node_id), product.ID
+                )
 
                 store_txn.append(
                     {
@@ -419,7 +463,9 @@ def generate_online_orders_with_lifecycle(
                 inventory_flow_sim._dc_inventory[key] = new_balance
 
                 # Get balance after transaction
-                balance = inventory_flow_sim.get_dc_balance((inv_node_id or node_id), product.ID)
+                balance = inventory_flow_sim.get_dc_balance(
+                    (inv_node_id or node_id), product.ID
+                )
 
                 dc_txn.append(
                     {

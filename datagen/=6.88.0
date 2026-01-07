@@ -1,0 +1,7 @@
+Collecting hypothesis
+  Downloading hypothesis-6.150.0-py3-none-any.whl.metadata (5.6 kB)
+Requirement already satisfied: sortedcontainers<3.0.0,>=2.1.0 in /opt/miniconda3/lib/python3.12/site-packages (from hypothesis) (2.4.0)
+Downloading hypothesis-6.150.0-py3-none-any.whl (542 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 542.1/542.1 kB 22.0 MB/s eta 0:00:00
+Installing collected packages: hypothesis
+Successfully installed hypothesis-6.150.0

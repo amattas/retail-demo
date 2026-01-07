@@ -135,7 +135,9 @@ async def drain_outbox(
                 circuit_breaker_enabled=config.realtime.circuit_breaker_enabled,
             )
             await client.connect()
-            base_interval = (emit_interval_ms or config.realtime.emit_interval_ms) / 1000.0
+            base_interval = (
+                emit_interval_ms or config.realtime.emit_interval_ms
+            ) / 1000.0
             jitter_pct = 0.2
             conn = get_duckdb_conn()
             sent = 0

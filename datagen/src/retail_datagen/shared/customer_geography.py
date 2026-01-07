@@ -144,7 +144,10 @@ class GeographyAssigner:
         try:
             self._store_ids_arr = np.array([s.ID for s in stores], dtype=np.int32)
             self._store_coords = np.array(
-                [self._geo_coordinates.get(s.GeographyID, (np.nan, np.nan)) for s in stores],
+                [
+                    self._geo_coordinates.get(s.GeographyID, (np.nan, np.nan))
+                    for s in stores
+                ],
                 dtype=np.float64,
             )
         except Exception:
@@ -181,7 +184,9 @@ class GeographyAssigner:
 
             self._geo_coordinates[geo.ID] = (lat, lon)
 
-    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    def _calculate_distance(
+        self, lat1: float, lon1: float, lat2: float, lon2: float
+    ) -> float:
         """
         Calculate distance between two lat/lon points using Haversine formula.
 
@@ -211,9 +216,7 @@ class GeographyAssigner:
 
         return distance
 
-    def _calculate_store_distances(
-        self, customer_geo_id: int
-    ) -> dict[int, float]:
+    def _calculate_store_distances(self, customer_geo_id: int) -> dict[int, float]:
         """
         Calculate distances from customer's home geography to all stores.
 
@@ -368,8 +371,12 @@ class GeographyAssigner:
             nearest_stores = sorted_stores[:10]  # Keep top 10 nearest
 
             # Primary and secondary stores are the two closest
-            primary_store_id = nearest_stores[0][0] if len(nearest_stores) > 0 else self.stores[0].ID
-            secondary_store_id = nearest_stores[1][0] if len(nearest_stores) > 1 else primary_store_id
+            primary_store_id = (
+                nearest_stores[0][0] if len(nearest_stores) > 0 else self.stores[0].ID
+            )
+            secondary_store_id = (
+                nearest_stores[1][0] if len(nearest_stores) > 1 else primary_store_id
+            )
 
             # Determine customer segment
             segment = self._determine_customer_segment(customer)
@@ -403,7 +410,9 @@ class GeographyAssigner:
 
         return customer_geographies
 
-    def _log_geography_summary(self, customer_geographies: dict[int, CustomerGeography]) -> None:
+    def _log_geography_summary(
+        self, customer_geographies: dict[int, CustomerGeography]
+    ) -> None:
         """Log summary statistics about customer geographies."""
         if not customer_geographies:
             return
@@ -415,7 +424,11 @@ class GeographyAssigner:
             segment_counts[segment] = segment_counts.get(segment, 0) + 1
 
         # Calculate average distance to primary store
-        distances = [cg.nearest_stores[0][1] for cg in customer_geographies.values() if cg.nearest_stores]
+        distances = [
+            cg.nearest_stores[0][1]
+            for cg in customer_geographies.values()
+            if cg.nearest_stores
+        ]
         avg_distance = np.mean(distances) if distances else 0
         median_distance = np.median(distances) if distances else 0
 
@@ -461,7 +474,9 @@ class StoreSelector:
         # Build store lookup
         self._store_lookup = {store.ID: store for store in stores}
 
-        logger.info(f"StoreSelector initialized with {len(customer_geographies):,} customer geographies")
+        logger.info(
+            f"StoreSelector initialized with {len(customer_geographies):,} customer geographies"
+        )
 
     def select_store_for_customer(self, customer_id: int) -> Store | None:
         """
@@ -476,7 +491,9 @@ class StoreSelector:
         customer_geo = self.customer_geographies.get(customer_id)
         if not customer_geo:
             # Fallback: random store if geography not assigned
-            logger.debug(f"No geography for customer {customer_id}, selecting random store")
+            logger.debug(
+                f"No geography for customer {customer_id}, selecting random store"
+            )
             return self._rng.choice(self.stores) if self.stores else None
 
         # Get store selection weights

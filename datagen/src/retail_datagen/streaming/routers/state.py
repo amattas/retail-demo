@@ -34,25 +34,31 @@ active_disruptions: dict[str, dict[str, Any]] = {}  # disruption_id -> disruptio
 
 def reset_streaming_state():
     """Reset global streaming state."""
-    global streaming_session_id, streaming_start_time, recent_events, streaming_statistics
+    global \
+        streaming_session_id, \
+        streaming_start_time, \
+        recent_events, \
+        streaming_statistics
 
     streaming_session_id = None
     streaming_start_time = None
     recent_events.clear()
-    streaming_statistics.update({
-        "events_generated": 0,
-        "events_sent_successfully": 0,
-        "events_failed": 0,
-        "batches_sent": 0,
-        "total_streaming_time": 0.0,
-        "events_per_second": 0.0,
-        "bytes_sent": 0,
-        "last_event_time": None,
-        "event_type_counts": {},
-        "error_counts": {},
-        "connection_failures": 0,
-        "circuit_breaker_trips": 0,
-    })
+    streaming_statistics.update(
+        {
+            "events_generated": 0,
+            "events_sent_successfully": 0,
+            "events_failed": 0,
+            "batches_sent": 0,
+            "total_streaming_time": 0.0,
+            "events_per_second": 0.0,
+            "bytes_sent": 0,
+            "last_event_time": None,
+            "event_type_counts": {},
+            "error_counts": {},
+            "connection_failures": 0,
+            "circuit_breaker_trips": 0,
+        }
+    )
 
 
 def update_streaming_statistics(event_data: dict[str, Any], success: bool = True):

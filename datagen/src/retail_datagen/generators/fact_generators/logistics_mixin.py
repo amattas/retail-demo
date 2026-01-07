@@ -1,6 +1,7 @@
 """
 Truck logistics including movements, lifecycle, and deliveries
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,7 +54,9 @@ class LogisticsMixin:
         # Use current day as the cutoff for staging - shipments with departure
         # beyond today should be staged, not just beyond generation_end_date
         # This prevents "stuck in SCHEDULED" warnings on subsequent days
-        current_day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        current_day_end = date.replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
 
         # Restore pending shipments from staging that are ready for this day
         # These are shipments that were deferred from earlier generation runs
@@ -81,7 +84,8 @@ class LogisticsMixin:
                         .sum()
                     )
                     store_demands = {
-                        int(row.StoreID): int(row.QtyDelta) for row in demands.itertuples(index=False)
+                        int(row.StoreID): int(row.QtyDelta)
+                        for row in demands.itertuples(index=False)
                     }
                 else:
                     # Fallback to loop if schema unexpected
@@ -90,20 +94,25 @@ class LogisticsMixin:
                             sid = tr.get("StoreID")
                             if sid is None:
                                 continue
-                            store_demands[sid] = store_demands.get(sid, 0) + abs(int(tr["QtyDelta"]))
+                            store_demands[sid] = store_demands.get(sid, 0) + abs(
+                                int(tr["QtyDelta"])
+                            )
             except Exception as e:
-                logger.debug(f"Failed to aggregate store demands via pandas, using fallback: {e}")
+                logger.debug(
+                    f"Failed to aggregate store demands via pandas, using fallback: {e}"
+                )
                 for tr in store_transactions:
                     if tr.get("QtyDelta", 0) < 0:
                         sid = tr.get("StoreID")
                         if sid is None:
                             continue
-                        store_demands[sid] = store_demands.get(sid, 0) + abs(int(tr["QtyDelta"]))
+                        store_demands[sid] = store_demands.get(sid, 0) + abs(
+                            int(tr["QtyDelta"])
+                        )
 
         # Generate truck shipments for stores with high demand
         for store_id, demand in store_demands.items():
             if demand > 100:  # Threshold for triggering shipment
-
                 # Find nearest DC (simplified - use first DC)
                 dc = self.distribution_centers[0]
 
@@ -137,7 +146,9 @@ class LogisticsMixin:
                         # Check if shipment departure is beyond current day OR generation end date
                         # Stage if beyond current day to prevent "stuck in SCHEDULED" warnings
                         is_beyond_today = event_ts > current_day_end
-                        is_beyond_generation = _is_beyond_end_date(event_ts, generation_end_date)
+                        is_beyond_generation = _is_beyond_end_date(
+                            event_ts, generation_end_date
+                        )
 
                         if is_beyond_today or is_beyond_generation:
                             # Stage for future processing instead of writing to fact table
@@ -150,7 +161,9 @@ class LogisticsMixin:
                         else:
                             truck_movements.append(truck_record)
                             # Only track for lifecycle processing if not staged
-                            self._active_shipments[shipment_info["shipment_id"]] = shipment_info
+                            self._active_shipments[shipment_info["shipment_id"]] = (
+                                shipment_info
+                            )
 
         # Store pending shipments in staging table (DuckDB only)
         if pending_shipments and getattr(self, "_use_duckdb", False):
@@ -159,6 +172,7 @@ class LogisticsMixin:
                     get_duckdb_conn,
                     pending_shipments_insert,
                 )
+
                 conn = get_duckdb_conn()
                 staged_count = pending_shipments_insert(
                     conn, pending_shipments, generation_end_date
@@ -171,7 +185,6 @@ class LogisticsMixin:
                 # Don't fail generation - these shipments just won't be in staging
 
         return truck_movements
-
 
     def _process_truck_lifecycle(
         self, date: datetime
@@ -195,7 +208,9 @@ class LogisticsMixin:
         store_inbound_txn = []
 
         # Define current day boundary for deferring future events
-        current_day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        current_day_end = date.replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
 
         # Process each active shipment to check for status changes on this date
         shipments_to_process = list(self._active_shipments.values())
@@ -211,8 +226,12 @@ class LogisticsMixin:
 
             # Calculate actual transition times (same logic as update_shipment_status)
             # These determine when each lifecycle event actually occurs
-            loading_start = departure_time + timedelta(hours=2) if departure_time else None
-            transit_start = departure_time + timedelta(hours=4) if departure_time else None
+            loading_start = (
+                departure_time + timedelta(hours=2) if departure_time else None
+            )
+            transit_start = (
+                departure_time + timedelta(hours=4) if departure_time else None
+            )
             unloading_start = eta + timedelta(hours=1) if eta else None
 
             # Build list of check times: use actual transition times instead of hourly
@@ -280,71 +299,92 @@ class LogisticsMixin:
                         # (from ARRIVED/UNLOADING start to COMPLETED)
                         eta = updated_info["eta"]
                         if eta:
-                            unload_duration_minutes = int((check_time - eta).total_seconds() / 60)
+                            unload_duration_minutes = int(
+                                (check_time - eta).total_seconds() / 60
+                            )
                             truck_record["ActualUnloadDuration"] = max(
-                                self.MIN_UNLOAD_DURATION_MINUTES, unload_duration_minutes
+                                self.MIN_UNLOAD_DURATION_MINUTES,
+                                unload_duration_minutes,
                             )
                         else:
-                            truck_record["ActualUnloadDuration"] = self.DEFAULT_UNLOAD_DURATION_MINUTES
+                            truck_record["ActualUnloadDuration"] = (
+                                self.DEFAULT_UNLOAD_DURATION_MINUTES
+                            )
 
                     truck_lifecycle_records.append(truck_record)
 
                     # Generate inventory transactions at specific lifecycle stages
                     if current_status == TruckStatus.LOADING:
                         # Generate DC OUTBOUND transactions
-                        dc_txn = self.inventory_flow_sim.generate_dc_outbound_transactions(
-                            updated_info, check_time
+                        dc_txn = (
+                            self.inventory_flow_sim.generate_dc_outbound_transactions(
+                                updated_info, check_time
+                            )
                         )
                         for txn in dc_txn:
-                            dc_outbound_txn.append({
-                                "TraceId": self._generate_trace_id(),
-                                "EventTS": txn["EventTS"],
-                                "DCID": txn["DCID"],
-                                "ProductID": txn["ProductID"],
-                                "QtyDelta": txn["QtyDelta"],
-                                "Reason": txn["Reason"].value,
-                                "Source": txn["Source"],
-                                # Ensure NOT NULL balance is populated for DC inventory
-                                "Balance": txn.get("Balance", self.inventory_flow_sim.get_dc_balance(txn["DCID"], txn["ProductID"]))
-                            })
+                            dc_outbound_txn.append(
+                                {
+                                    "TraceId": self._generate_trace_id(),
+                                    "EventTS": txn["EventTS"],
+                                    "DCID": txn["DCID"],
+                                    "ProductID": txn["ProductID"],
+                                    "QtyDelta": txn["QtyDelta"],
+                                    "Reason": txn["Reason"].value,
+                                    "Source": txn["Source"],
+                                    # Ensure NOT NULL balance is populated for DC inventory
+                                    "Balance": txn.get(
+                                        "Balance",
+                                        self.inventory_flow_sim.get_dc_balance(
+                                            txn["DCID"], txn["ProductID"]
+                                        ),
+                                    ),
+                                }
+                            )
 
                     elif current_status == TruckStatus.UNLOADING:
                         # Generate Store INBOUND transactions
-                        store_txn = self.inventory_flow_sim.generate_store_inbound_transactions(
-                            updated_info, check_time
+                        store_txn = (
+                            self.inventory_flow_sim.generate_store_inbound_transactions(
+                                updated_info, check_time
+                            )
                         )
                         for txn in store_txn:
-                            store_inbound_txn.append({
-                                "TraceId": self._generate_trace_id(),
-                                "EventTS": txn["EventTS"],
-                                "StoreID": txn["StoreID"],
-                                "ProductID": txn["ProductID"],
-                                "QtyDelta": txn["QtyDelta"],
-                                "Reason": txn["Reason"].value,
-                                "Source": txn["Source"],
-                                "Balance": txn["Balance"],
-                            })
+                            store_inbound_txn.append(
+                                {
+                                    "TraceId": self._generate_trace_id(),
+                                    "EventTS": txn["EventTS"],
+                                    "StoreID": txn["StoreID"],
+                                    "ProductID": txn["ProductID"],
+                                    "QtyDelta": txn["QtyDelta"],
+                                    "Reason": txn["Reason"].value,
+                                    "Source": txn["Source"],
+                                    "Balance": txn["Balance"],
+                                }
+                            )
                     elif current_status == TruckStatus.ARRIVED:
                         # Also emit store INBOUND at ARRIVED to guarantee receipt at store
-                        store_txn = self.inventory_flow_sim.generate_store_inbound_transactions(
-                            updated_info, check_time
+                        store_txn = (
+                            self.inventory_flow_sim.generate_store_inbound_transactions(
+                                updated_info, check_time
+                            )
                         )
                         for txn in store_txn:
-                            store_inbound_txn.append({
-                                "TraceId": self._generate_trace_id(),
-                                "EventTS": txn["EventTS"],
-                                "StoreID": txn["StoreID"],
-                                "ProductID": txn["ProductID"],
-                                "QtyDelta": txn["QtyDelta"],
-                                "Reason": txn["Reason"].value,
-                                "Source": txn["Source"],
-                                "Balance": txn["Balance"],
-                            })
+                            store_inbound_txn.append(
+                                {
+                                    "TraceId": self._generate_trace_id(),
+                                    "EventTS": txn["EventTS"],
+                                    "StoreID": txn["StoreID"],
+                                    "ProductID": txn["ProductID"],
+                                    "QtyDelta": txn["QtyDelta"],
+                                    "Reason": txn["Reason"].value,
+                                    "Source": txn["Source"],
+                                    "Balance": txn["Balance"],
+                                }
+                            )
 
                     previous_status = current_status
 
         return truck_lifecycle_records, dc_outbound_txn, store_inbound_txn
-
 
     def _process_truck_deliveries(
         self, date: datetime, truck_moves: list[dict]
@@ -425,15 +465,20 @@ class LogisticsMixin:
             staging_ids_to_delete = []
 
             for shipment in ready_shipments:
-                departure_time = shipment.get("DepartureTime") or shipment.get("departure_time")
+                departure_time = shipment.get("DepartureTime") or shipment.get(
+                    "departure_time"
+                )
                 if departure_time is None:
                     departure_time = shipment.get("EventTS") or shipment.get("event_ts")
 
                 # Parse datetime if string
                 if isinstance(departure_time, str):
                     from datetime import datetime as dt
+
                     try:
-                        departure_time = dt.fromisoformat(departure_time.replace("Z", "+00:00"))
+                        departure_time = dt.fromisoformat(
+                            departure_time.replace("Z", "+00:00")
+                        )
                     except (ValueError, AttributeError):
                         continue
 
@@ -441,13 +486,17 @@ class LogisticsMixin:
                 if departure_time and start_of_day <= departure_time <= end_of_day:
                     # Convert back to truck_moves record format
                     truck_record = {
-                        "TraceId": shipment.get("TraceId") or shipment.get("trace_id") or self._generate_trace_id(),
+                        "TraceId": shipment.get("TraceId")
+                        or shipment.get("trace_id")
+                        or self._generate_trace_id(),
                         "EventTS": departure_time,
                         "TruckId": shipment.get("TruckId") or shipment.get("truck_id"),
                         "DCID": shipment.get("DCID") or shipment.get("dc_id"),
                         "StoreID": shipment.get("StoreID") or shipment.get("store_id"),
-                        "ShipmentId": shipment.get("ShipmentId") or shipment.get("shipment_id"),
-                        "Status": shipment.get("Status") or shipment.get("status", "SCHEDULED"),
+                        "ShipmentId": shipment.get("ShipmentId")
+                        or shipment.get("shipment_id"),
+                        "Status": shipment.get("Status")
+                        or shipment.get("status", "SCHEDULED"),
                         "ETA": shipment.get("ETA") or shipment.get("eta"),
                         "ETD": shipment.get("ETD") or shipment.get("etd"),
                         "DepartureTime": departure_time,
@@ -462,12 +511,14 @@ class LogisticsMixin:
             # Delete processed shipments from staging
             if staging_ids_to_delete:
                 deleted = pending_shipments_delete(conn, staging_ids_to_delete)
-                logger.debug(f"Removed {deleted} shipments from staging after restoration")
+                logger.debug(
+                    f"Removed {deleted} shipments from staging after restoration"
+                )
 
             return todays_shipments
 
         except Exception as e:
-            logger.warning(f"Failed to restore pending shipments for {date.date()}: {e}")
+            logger.warning(
+                f"Failed to restore pending shipments for {date.date()}: {e}"
+            )
             return []
-
-
