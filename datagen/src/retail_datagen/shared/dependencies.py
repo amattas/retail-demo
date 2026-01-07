@@ -8,12 +8,12 @@ and other middleware components for the FastAPI application.
 import asyncio
 import logging
 import time
-from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from cachetools import TTLCache
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -121,7 +121,9 @@ _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
 # Rate limiting storage
-_rate_limit_storage: dict[str, list] = defaultdict(list)
+# TTLCache automatically removes entries after 1 hour (3600s), preventing memory leaks
+# from inactive IP addresses. maxsize=10000 limits memory to ~10k unique IPs.
+_rate_limit_storage: TTLCache = TTLCache(maxsize=10000, ttl=3600)
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -426,7 +428,12 @@ def rate_limit(max_requests: int = 100, window_seconds: int = 60):
             client_ip = request.client.host
             current_time = time.time()
 
-            # Clean old requests
+            # Get or initialize request list for this IP
+            # TTLCache automatically evicts entries after 1 hour, preventing memory leaks
+            if client_ip not in _rate_limit_storage:
+                _rate_limit_storage[client_ip] = []
+
+            # Clean old requests within the rate limit window
             cutoff_time = current_time - window_seconds
             _rate_limit_storage[client_ip] = [
                 req_time
