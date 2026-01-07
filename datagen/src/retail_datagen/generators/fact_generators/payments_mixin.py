@@ -4,6 +4,7 @@ Payment generation for receipts and online orders.
 This module provides the PaymentsMixin class that generates fact_payments
 records linked to in-store receipts and online orders.
 """
+
 from __future__ import annotations
 
 import logging
@@ -29,24 +30,24 @@ class PaymentsMixin:
     # Decline rate adjustments by payment method
     # Base rate is 2.5%, these are multipliers
     _DECLINE_RATE_MULTIPLIERS: dict[str, float] = {
-        "CREDIT_CARD": 1.0,     # Base rate (2.5%)
-        "DEBIT_CARD": 0.8,      # Slightly lower (direct account link)
-        "CASH": 0.0,            # Cash never declines
-        "MOBILE_PAY": 1.2,      # Slightly higher (network issues)
-        "PAYPAL": 1.1,          # Slightly higher
-        "OTHER": 0.5,           # Lower (often gift cards, pre-funded)
-        "CHECK": 1.5,           # Higher (verification required)
+        "CREDIT_CARD": 1.0,  # Base rate (2.5%)
+        "DEBIT_CARD": 0.8,  # Slightly lower (direct account link)
+        "CASH": 0.0,  # Cash never declines
+        "MOBILE_PAY": 1.2,  # Slightly higher (network issues)
+        "PAYPAL": 1.1,  # Slightly higher
+        "OTHER": 0.5,  # Lower (often gift cards, pre-funded)
+        "CHECK": 1.5,  # Higher (verification required)
     }
 
     # Processing time ranges in milliseconds by payment method
     _PROCESSING_TIME_RANGES: dict[str, tuple[int, int]] = {
-        "CASH": (500, 2000),        # Fast cash handling
+        "CASH": (500, 2000),  # Fast cash handling
         "CREDIT_CARD": (1500, 4000),
         "DEBIT_CARD": (1200, 3500),
         "MOBILE_PAY": (800, 2500),
         "PAYPAL": (2000, 5000),
-        "OTHER": (1000, 3000),      # Gift cards, etc.
-        "CHECK": (3000, 8000),      # Slower verification
+        "OTHER": (1000, 3000),  # Gift cards, etc.
+        "CHECK": (3000, 8000),  # Slower verification
     }
 
     # Decline reason codes
@@ -215,7 +216,8 @@ class PaymentsMixin:
 
         # Get time range for this method
         min_ms, max_ms = self._PROCESSING_TIME_RANGES.get(
-            payment_method, (1500, 4000)  # Default to credit card range
+            payment_method,
+            (1500, 4000),  # Default to credit card range
         )
 
         return rng.randint(min_ms, max_ms)
