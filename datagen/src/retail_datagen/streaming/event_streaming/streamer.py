@@ -226,6 +226,8 @@ class EventStreamer:
                     retry_attempts=self.streaming_config.retry_attempts,
                     backoff_multiplier=self.streaming_config.backoff_multiplier,
                     circuit_breaker_enabled=self.streaming_config.circuit_breaker_enabled,
+                    circuit_breaker_failure_threshold=self.streaming_config.circuit_breaker_failure_threshold,
+                    circuit_breaker_recovery_timeout=self.streaming_config.circuit_breaker_recovery_timeout,
                 )
 
                 # Test connection
