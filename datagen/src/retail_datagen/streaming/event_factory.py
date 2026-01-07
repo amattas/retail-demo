@@ -608,6 +608,7 @@ class EventFactory:
 
         payload = PaymentProcessedPayload(
             receipt_id=receipt_id,
+            order_id=None,  # In-store payments have no order_id
             payment_method=payment_method,
             amount=amount,
             amount_cents=amount_cents,
@@ -615,6 +616,7 @@ class EventFactory:
             processing_time=timestamp,
             processing_time_ms=processing_time_ms,
             status="APPROVED",
+            decline_reason=None,  # Approved payments have no decline reason
             store_id=store_id,
             customer_id=customer_id,
         )

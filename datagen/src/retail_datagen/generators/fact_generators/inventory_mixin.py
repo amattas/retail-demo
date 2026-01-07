@@ -894,9 +894,9 @@ class InventoryMixin:
             daily_facts["online_orders"].extend(online_orders)
 
             # Generate payments for online orders (separate from in-store payments)
-            # Note: In this synthetic data, declined payments don't affect order fulfillment.
-            # Orders are always created - this simulates systems where payment processing
-            # happens asynchronously or where declined payments trigger retry flows.
+            # Note: Payments are generated after order creation. This simulates
+            # asynchronous payment processing where declined payments trigger
+            # retry flows or order cancellations (not modeled in this synthetic data).
             online_order_payments: list[dict] = []
             if "fact_payments" in active_tables and online_orders:
                 for order in online_orders:
