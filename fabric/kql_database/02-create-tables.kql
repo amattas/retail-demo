@@ -317,7 +317,7 @@
     discount_cents:long,
     discount_type:string,
     product_count:long,
-    product_ids:string,
+    product_ids:dynamic,
     store_id:long,
     customer_id:long,
     event_type:string,
