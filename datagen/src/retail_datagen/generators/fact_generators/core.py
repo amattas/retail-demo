@@ -121,6 +121,8 @@ class FactDataGenerator(
         # Promotional tracking for marketing ROI
         "promotions",
         "promo_lines",
+        # Inventory replenishment tracking
+        "reorders",
     ]
 
     # Truck unload duration constants (in minutes)

@@ -255,6 +255,7 @@ class InventoryMixin:
             "store_inventory_txn": total_days * len(self.stores) * 20,
             "marketing": total_days * 10,
             "supply_chain_disruption": total_days * 2,
+            "reorders": total_days * len(self.stores) * 2,  # Average 2 reorders per store per day
             "online_orders": total_days
             * max(0, int(self.config.volume.online_orders_per_day)),
         }
@@ -772,8 +773,14 @@ class InventoryMixin:
         # This creates initial shipments in SCHEDULED status
         if "truck_moves" in active_tables:
             base_store_txn = daily_facts.get("store_inventory_txn", [])
-            truck_movements = self._generate_truck_movements(date, base_store_txn)
+            truck_movements, reorder_records = self._generate_truck_movements(
+                date, base_store_txn
+            )
             daily_facts["truck_moves"].extend(truck_movements)
+
+            # Add reorder records to daily facts
+            if "reorders" in active_tables and reorder_records:
+                daily_facts["reorders"].extend(reorder_records)
 
             # Process all active shipments and generate status progression throughout the day
             truck_lifecycle_records, dc_outbound_txn, store_inbound_txn = (
