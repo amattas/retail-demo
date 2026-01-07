@@ -11,32 +11,76 @@ import pytest
 from retail_datagen.services import duckdb_reader as db_reader
 
 
-def test_read_all_master_tables_smoke():
-    data = db_reader.read_all_master_tables()
-    assert set(data.keys()) == {
-        "dim_geographies",
-        "dim_stores",
-        "dim_distribution_centers",
-        "dim_trucks",
-        "dim_customers",
-        "dim_products",
-    }
-    for df in data.values():
-        assert isinstance(df, pd.DataFrame)
+def test_read_all_master_tables_returns_expected_structure():
+    """Test that read_all_master_tables returns correct structure with mocked DB."""
+    # Create mock cursor that returns a DataFrame
+    mock_cursor = MagicMock()
+    mock_cursor.df.return_value = pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value = mock_cursor
+
+    with patch(
+        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
+        return_value=mock_conn
+    ):
+        data = db_reader.read_all_master_tables()
+
+        assert set(data.keys()) == {
+            "dim_geographies",
+            "dim_stores",
+            "dim_distribution_centers",
+            "dim_trucks",
+            "dim_customers",
+            "dim_products",
+        }
+        for df in data.values():
+            assert isinstance(df, pd.DataFrame)
 
 
-def test_read_all_fact_tables_smoke():
-    result = db_reader.read_all_fact_tables()
-    assert set(result.keys()) == set(db_reader.FACT_TABLES)
-    for df in result.values():
-        assert isinstance(df, pd.DataFrame)
+def test_read_all_fact_tables_returns_expected_structure():
+    """Test that read_all_fact_tables returns correct structure with mocked DB."""
+    # Create mock cursor that returns a DataFrame
+    mock_cursor = MagicMock()
+    mock_cursor.df.return_value = pd.DataFrame({"id": [1], "event_ts": ["2024-01-01"]})
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value = mock_cursor
+
+    with patch(
+        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
+        return_value=mock_conn
+    ):
+        result = db_reader.read_all_fact_tables()
+
+        assert set(result.keys()) == set(db_reader.FACT_TABLES)
+        for df in result.values():
+            assert isinstance(df, pd.DataFrame)
 
 
-def test_get_all_fact_table_date_ranges_shape():
-    ranges = db_reader.get_all_fact_table_date_ranges()
-    assert set(ranges.keys()) == set(db_reader.FACT_TABLES)
-    for rng in ranges.values():
-        assert isinstance(rng, tuple) and len(rng) == 2
+def test_get_all_fact_table_date_ranges_returns_expected_structure():
+    """Test that get_all_fact_table_date_ranges returns correct structure."""
+    from datetime import datetime
+
+    # Create mock cursor that returns date range
+    mock_cursor = MagicMock()
+    mock_cursor.fetchone.return_value = (
+        datetime(2024, 1, 1),
+        datetime(2024, 12, 31)
+    )
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value = mock_cursor
+
+    with patch(
+        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
+        return_value=mock_conn
+    ):
+        ranges = db_reader.get_all_fact_table_date_ranges()
+
+        assert set(ranges.keys()) == set(db_reader.FACT_TABLES)
+        for rng in ranges.values():
+            assert isinstance(rng, tuple) and len(rng) == 2
 
 
 # ================================

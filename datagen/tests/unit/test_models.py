@@ -226,7 +226,7 @@ class TestDimensionModels:
             "StoreNumber": "ST001",
             "Address": "123 Main St, Springfield, IL 62701",
             "GeographyID": 1,
-            "tax_rate": Decimal("0.20"),  # 20% tax rate (too high)
+            "tax_rate": Decimal("0.25"),  # 25% tax rate (exceeds max 20%)
         }
         with pytest.raises(ValidationError):
             Store(**invalid_store)

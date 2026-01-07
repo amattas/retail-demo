@@ -8,6 +8,8 @@ Tests the logic without requiring full master data generation.
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from retail_datagen.config.models import MarketingCostConfig, RetailConfig
 from retail_datagen.generators.fact_generators import FactDataGenerator
 from retail_datagen.generators.retail_patterns import MarketingCampaignSimulator
@@ -174,21 +176,10 @@ def test_ble_customer_matching():
         )
 
     # Validation (with statistical tolerance)
-    if 25 <= match_rate <= 40:
-        print(
-            f"\n✅ PASS: Match rate {match_rate:.1f}% is within expected range (25-40%)"
-        )
-        return True
-    else:
-        print(
-            f"\n❌ FAIL: Match rate {match_rate:.1f}% "
-            "is outside expected range (25-40%)"
-        )
-        print(
-            "   Note: With RNG seed=42 and 100 customers, "
-            "some variance is expected."
-        )
-        return False
+    assert 25 <= match_rate <= 40, (
+        f"Match rate {match_rate:.1f}% is outside expected range (25-40%). "
+        "Note: With RNG seed=42 and 100 customers, some variance is expected."
+    )
 
 
 def test_marketing_customer_resolution():
@@ -317,24 +308,12 @@ def test_marketing_customer_resolution():
 
     # Validation (with statistical tolerance)
     if total_impressions == 0:
-        print("\n⚠️  SKIP: No marketing impressions generated")
-        return None
-    elif 3 <= resolution_rate <= 7:
-        print(
-            f"\n✅ PASS: Resolution rate {resolution_rate:.1f}% "
-            "is within expected range (3-7%)"
-        )
-        return True
-    else:
-        print(
-            f"\n❌ FAIL: Resolution rate {resolution_rate:.1f}% "
-            "is outside expected range (3-7%)"
-        )
-        print(
-            "   Note: With RNG and small sample, some variance is expected. "
-            "Target is 5%."
-        )
-        return False
+        pytest.skip("No marketing impressions generated")
+
+    assert 3 <= resolution_rate <= 7, (
+        f"Resolution rate {resolution_rate:.1f}% is outside expected range (3-7%). "
+        "Note: With RNG and small sample, some variance is expected. Target is 5%."
+    )
 
 
 def test_marketing_cost_ranges():
@@ -415,62 +394,8 @@ def test_marketing_cost_ranges():
             all_match = False
 
     # Overall validation
-    if all_match:
-        print("\n✅ PASS: All marketing cost ranges match expected values")
-        return True
-    else:
-        print("\n❌ FAIL: Some marketing cost ranges don't match expected values")
-        return False
-
-
-def main():
-    """Run all unit tests."""
-    print("=" * 80)
-    print("BLE and Marketing Pattern Fixes - Unit Tests")
-    print("=" * 80)
-
-    results = []
-
-    # Run tests
-    result1 = test_ble_customer_matching()
-    results.append(("BLE Customer Matching", result1))
-
-    result2 = test_marketing_customer_resolution()
-    results.append(("Marketing Customer Resolution", result2))
-
-    result3 = test_marketing_cost_ranges()
-    results.append(("Marketing Cost Configuration", result3))
-
-    # Summary
-    print("\n" + "=" * 80)
-    print("SUMMARY")
-    print("=" * 80)
-
-    for test_name, result in results:
-        if result is True:
-            status = "✅ PASS"
-        elif result is False:
-            status = "❌ FAIL"
-        else:
-            status = "⚠️  SKIP"
-        print(f"  {status}: {test_name}")
-
-    passed = sum(1 for _, r in results if r is True)
-    total = sum(1 for _, r in results if r is not None)
-
-    print(f"\nTests passed: {passed}/{total}")
-
-    if total > 0 and passed == total:
-        print("\n🎉 All tests passed!")
-        return 0
-    elif total == 0:
-        print("\n⚠️  No tests could run")
-        return 2
-    else:
-        print(f"\n❌ {total - passed} test(s) failed")
-        return 1
+    assert all_match, "Some marketing cost ranges don't match expected values"
 
 
 if __name__ == "__main__":
-    exit_code = main()
-    exit(exit_code)
+    pytest.main([__file__, "-v"])

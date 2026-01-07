@@ -72,7 +72,12 @@ class TestFlexibleValidation:
         )
 
         assert not is_valid
-        assert "missing required part" in error.lower() or "endpoint" in error.lower()
+        # Mock string "mock://localhost/test-hub" is too short and lacks proper structure
+        assert any(phrase in error.lower() for phrase in [
+            "missing required part",
+            "endpoint",
+            "too short"
+        ])
 
     def test_valid_test_connection_string(self):
         """Test helper should create valid connection strings."""
