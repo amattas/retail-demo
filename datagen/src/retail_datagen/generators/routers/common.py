@@ -36,13 +36,13 @@ DUCK_FACT_MAP = {
     "store_inventory_txn": "fact_store_inventory_txn",
     "receipts": "fact_receipts",
     "receipt_lines": "fact_receipt_lines",
+    "reorders": "fact_reorders",
     "foot_traffic": "fact_foot_traffic",
     "ble_pings": "fact_ble_pings",
     "marketing": "fact_marketing",
     "online_orders": "fact_online_order_headers",
     "online_order_lines": "fact_online_order_lines",
     "fact_payments": "fact_payments",
-    "reorders": "fact_reorders",
 }
 
 # Available fact tables
@@ -52,13 +52,13 @@ FACT_TABLES = [
     "store_inventory_txn",
     "receipts",
     "receipt_lines",
+    "reorders",
     "foot_traffic",
     "ble_pings",
     "marketing",
     "online_orders",
     "online_order_lines",
     "fact_payments",
-    "reorders",
 ]
 
 # Combined mapping for unified lookups
