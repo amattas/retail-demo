@@ -42,6 +42,7 @@ DUCK_FACT_MAP = {
     "online_orders": "fact_online_order_headers",
     "online_order_lines": "fact_online_order_lines",
     "fact_payments": "fact_payments",
+    "reorders": "fact_reorders",
 }
 
 # Available fact tables
@@ -57,6 +58,7 @@ FACT_TABLES = [
     "online_orders",
     "online_order_lines",
     "fact_payments",
+    "reorders",
 ]
 
 # Combined mapping for unified lookups
