@@ -38,13 +38,16 @@ class ParquetWriter(BaseWriter):
         self.compression = compression
         self.default_kwargs = default_kwargs
 
-    def write(self, df: pd.DataFrame, output_path: Path, **kwargs) -> None:
+    def write(
+        self, df: pd.DataFrame, output_path: Path, append: bool = False, **kwargs
+    ) -> None:
         """
         Write DataFrame to a single Parquet file.
 
         Args:
             df: DataFrame to write
             output_path: Path where the Parquet file should be written
+            append: If True and file exists, read existing data and append new data
             **kwargs: Additional arguments passed to pandas to_parquet()
 
         Raises:
@@ -57,6 +60,19 @@ class ParquetWriter(BaseWriter):
 
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # If append mode and file exists, read existing data and concatenate
+        if append and output_path.exists():
+            try:
+                existing_df = pd.read_parquet(output_path)
+                df = pd.concat([existing_df, df], ignore_index=True)
+                logger.debug(
+                    f"Appending to existing file: {len(existing_df):,} existing + "
+                    f"{len(df) - len(existing_df):,} new = {len(df):,} total rows"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to read existing file for append: {e}")
+                # Continue with original df if read fails
 
         # Merge default kwargs with provided kwargs
         write_kwargs = {**self.default_kwargs, **kwargs}

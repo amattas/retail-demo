@@ -277,6 +277,10 @@ class ExportService:
                     result[table_name] = []
                     continue
 
+                # Clear old export files for this table to prevent append mode
+                # from adding to stale data (only on first chunk)
+                # Note: This is now handled by the router clearing before the loop
+
                 # Identify a timestamp column for partitioning
                 ts_candidates = [
                     "event_ts",
@@ -288,6 +292,23 @@ class ExportService:
                     "etd",
                 ]
                 ts_col = next((c for c in ts_candidates if c in df.columns), None)
+
+                # Special handling for fact_online_order_lines:
+                # Use COALESCE(picked_ts, shipped_ts, delivered_ts, order_event_ts)
+                # to partition pending orders by their creation time
+                if table_name == "fact_online_order_lines" and "order_event_ts" in df.columns:
+                    # Create a partition timestamp that falls back to order creation time
+                    df["_partition_ts"] = df["picked_ts"].combine_first(
+                        df["shipped_ts"]
+                    ).combine_first(
+                        df["delivered_ts"]
+                    ).combine_first(
+                        df["order_event_ts"]
+                    )
+                    ts_col = "_partition_ts"
+                    # Drop the order_event_ts column from final output (it was just for partitioning)
+                    df = df.drop(columns=["order_event_ts"])
+
                 if not ts_col:
                     raise ValueError(
                         f"Cannot determine timestamp column for table {table_name}; columns={list(df.columns)}"
@@ -307,7 +328,12 @@ class ExportService:
                     )
                     for per in months:
                         month_mask = df["ym"] == per
-                        part_df = df.loc[month_mask].copy().drop(columns=["ym"])
+                        part_df = df.loc[month_mask].copy()
+                        # Drop temporary columns used for partitioning
+                        cols_to_drop = ["ym"]
+                        if "_partition_ts" in part_df.columns:
+                            cols_to_drop.append("_partition_ts")
+                        part_df = part_df.drop(columns=cols_to_drop)
                         year = int(str(per).split("-")[0])
                         month = int(str(per).split("-")[1])
                         output_path = self.file_manager.get_fact_table_month_path(
@@ -317,7 +343,8 @@ class ExportService:
                         logger.debug(
                             f"Writing {len(part_df):,} rows to {output_path} (monthly)"
                         )
-                        writer.write(part_df, output_path)
+                        # Use append=True to support chunked exports that may span months
+                        writer.write(part_df, output_path, append=True)
                         self.file_manager.track_file(output_path)
                         partition_files.append(output_path)
                 else:

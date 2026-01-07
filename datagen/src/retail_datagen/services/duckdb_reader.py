@@ -78,9 +78,25 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
             else:
                 # Special-case tables without event_ts
                 if table == "fact_online_order_lines":
+                    # Join with headers to get order creation timestamp (event_ts)
+                    # for partitioning pending orders that have NULL fulfillment timestamps.
+                    # Include rows where:
+                    # - fulfillment timestamp is in range, OR
+                    # - all fulfillment timestamps are NULL but order was created in range
                     df = conn.execute(
-                        f"SELECT * FROM {validated_table} WHERE coalesce(picked_ts, shipped_ts, delivered_ts) >= ? AND coalesce(picked_ts, shipped_ts, delivered_ts) < ?",
-                        [start_dt, end_dt],
+                        f"""SELECT l.*, h.event_ts as order_event_ts
+                            FROM {validated_table} l
+                            JOIN fact_online_order_headers h ON l.order_id = h.order_id_ext
+                            WHERE (
+                                -- Include fulfilled orders with timestamps in range
+                                (COALESCE(l.picked_ts, l.shipped_ts, l.delivered_ts) >= ?
+                                 AND COALESCE(l.picked_ts, l.shipped_ts, l.delivered_ts) < ?)
+                                OR
+                                -- Include pending orders (all timestamps NULL) created in range
+                                (l.picked_ts IS NULL AND l.shipped_ts IS NULL AND l.delivered_ts IS NULL
+                                 AND h.event_ts >= ? AND h.event_ts < ?)
+                            )""",
+                        [start_dt, end_dt, start_dt, end_dt],
                     ).df()
                 else:
                     df = conn.execute(

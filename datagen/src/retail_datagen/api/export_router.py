@@ -324,6 +324,11 @@ async def export_fact_data(
                 f"Split export into {total_chunks} chunks of {chunk_size_days} days each"
             )
 
+            # Clear old export files before starting (prevents append from adding to stale data)
+            logger.info("Clearing old export files before starting new export")
+            for table_name in tables_to_export:
+                service.file_manager.clear_table_export_directory(table_name)
+
             # Export each chunk
             for chunk_idx, (chunk_start, chunk_end) in enumerate(chunks, 1):
                 chunk_progress = (chunk_idx - 1) / total_chunks
