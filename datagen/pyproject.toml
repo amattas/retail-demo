@@ -18,16 +18,23 @@ dependencies = [
     "faker>=20.0.0",
     "azure-eventhub>=5.11.0",
     "python-multipart>=0.0.6",
+    "prometheus-client>=0.19.0",
+    "pyarrow>=14.0.0",
+    "duckdb>=1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.15.0",
     "hypothesis>=6.88.0",
+    "httpx>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
-    "pytest-cov>=4.1.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "aiosqlite>=0.19.0,<1.0.0",
 ]
 
 #[project.scripts]
