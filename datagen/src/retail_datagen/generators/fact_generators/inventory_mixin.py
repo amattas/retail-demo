@@ -654,6 +654,7 @@ class InventoryMixin:
             "foot_traffic",
             "ble_pings",
             "fact_payments",
+            "customer_zone_changes",
         ]
 
         # Log hourly data processing for debugging
@@ -697,6 +698,7 @@ class InventoryMixin:
                     "foot_traffic": [],
                     "ble_pings": [],
                     "fact_payments": [],
+                    "customer_zone_changes": [],
                 }
             else:
                 hour_data = {
@@ -706,6 +708,7 @@ class InventoryMixin:
                     "foot_traffic": [],
                     "ble_pings": [],
                     "fact_payments": [],
+                    "customer_zone_changes": [],
                 }
 
                 # Generate customer transactions for each store for this hour

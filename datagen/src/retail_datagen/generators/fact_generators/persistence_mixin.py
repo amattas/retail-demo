@@ -99,6 +99,7 @@ class PersistenceMixin:
             "truck_moves": "truck_arrived",  # may change based on status
             "foot_traffic": "customer_entered",
             "ble_pings": "ble_ping_detected",
+            "customer_zone_changes": "customer_zone_changed",
             "marketing": "ad_impression",
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps

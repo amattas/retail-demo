@@ -33,6 +33,7 @@ class ReceiptsMixin:
             "foot_traffic": [],
             "ble_pings": [],
             "fact_payments": [],
+            "customer_zone_changes": [],
         }
 
         # Holiday closure: Christmas Day closed (no activity)
@@ -123,6 +124,11 @@ class ReceiptsMixin:
                 # Generate BLE pings for this customer
                 ble_records = self._generate_ble_pings(store, customer, hour_datetime)
                 hour_data["ble_pings"].extend(ble_records)
+
+        # Generate customer zone changes from BLE ping sequences
+        if hour_data["ble_pings"]:
+            zone_changes = self._generate_customer_zone_changes(hour_data["ble_pings"])
+            hour_data["customer_zone_changes"].extend(zone_changes)
 
         return hour_data
 
