@@ -49,6 +49,7 @@ from ..retail_patterns import (
     InventoryFlowSimulator,
     MarketingCampaignSimulator,
 )
+from .customer_zone_changes_mixin import CustomerZoneChangesMixin
 from .data_loading_mixin import DataLoadingMixin
 from .inventory_mixin import InventoryMixin
 from .logistics_mixin import LogisticsMixin
@@ -69,6 +70,7 @@ logger = logging.getLogger(__name__)
 
 
 class FactDataGenerator(
+    CustomerZoneChangesMixin,
     DataLoadingMixin,
     InventoryMixin,
     LogisticsMixin,
@@ -101,6 +103,7 @@ class FactDataGenerator(
         "receipt_lines",
         "foot_traffic",
         "ble_pings",
+        "customer_zone_changes",
         "marketing",
         # Omnichannel extension integrated into core facts
         "online_orders",
@@ -333,6 +336,7 @@ class FactDataGenerator(
             "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
+            "customer_zone_changes": total_days * len(self.stores) * 300,  # Estimated: ~60% of BLE pings result in zone changes
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,
