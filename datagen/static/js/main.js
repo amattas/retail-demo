@@ -23,7 +23,8 @@ class RetailDataGenerator {
             'ble_pings',
             'marketing',
             'online_orders',
-            'online_order_lines'
+            'online_order_lines',
+            'fact_payments'
         ];
         this._lastCountRefresh = {};
         this._tableCountVersions = {};
