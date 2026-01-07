@@ -376,58 +376,6 @@ class TestDCInventoryTransactionBalanceField:
             # This will FAIL until Balance is implemented
             # assert "Balance" in txn, "Transaction should have Balance field"
 
-    def test_dc_transaction_balance_is_numeric(
-        self, inventory_simulator, sample_dcs
-    ):
-        """Test that DC Balance field is numeric and non-negative."""
-        dc_id = sample_dcs[0].ID
-        date = datetime.now()
-
-        transactions = inventory_simulator.simulate_dc_receiving(dc_id, date)
-
-        if not transactions:
-            pytest.skip("No transactions generated in this run")
-
-        for txn in transactions:
-            # After implementation, test Balance field
-            # balance = txn.get("Balance")
-            # assert balance is not None, "Balance should not be None"
-            # assert isinstance(balance, (int, float)), "Balance should be numeric"
-            # assert balance >= 0, "Balance should be non-negative"
-            pass  # Placeholder until implementation
-
-    def test_dc_transaction_balance_matches_simulator_state(
-        self, inventory_simulator, sample_dcs, sample_products
-    ):
-        """Test that Balance in transaction matches simulator's internal state."""
-        dc_id = sample_dcs[0].ID
-        product_id = sample_products[0].ID
-        date = datetime.now()
-
-        # Get balance before transaction
-        key = (dc_id, product_id)
-        balance_before = inventory_simulator._dc_inventory.get(key, 0)
-
-        # Generate transaction
-        transactions = inventory_simulator.simulate_dc_receiving(dc_id, date)
-
-        # Find transaction for our product
-        product_txns = [
-            txn for txn in transactions if txn.get("ProductID") == product_id
-        ]
-
-        if not product_txns:
-            pytest.skip("Product not included in this receiving batch")
-
-        # Get balance after transaction
-        balance_after = inventory_simulator._dc_inventory.get(key, 0)
-
-        # After implementation, verify Balance field matches
-        # for txn in product_txns:
-        #     expected_balance = balance_after  # Balance AFTER this transaction
-        #     assert txn["Balance"] == expected_balance, "Balance should match simulator state"
-        pass  # Placeholder until implementation
-
 
 class TestStoreInventoryTransactionBalanceField:
     """Test Balance field in store inventory transaction generation."""
@@ -555,61 +503,6 @@ class TestStoreInventoryTransactionBalanceField:
 
             # This will FAIL until Balance is implemented
             # assert "Balance" in txn, "Delivery transaction should have Balance field"
-
-    def test_store_balance_is_numeric_and_non_negative(
-        self, inventory_simulator, sample_stores
-    ):
-        """Test that store Balance values are numeric and non-negative."""
-        store_id = sample_stores[0].ID
-        date = datetime.now()
-
-        transactions = inventory_simulator.simulate_store_demand(
-            store_id, date, traffic_multiplier=1.0
-        )
-
-        if not transactions:
-            pytest.skip("No transactions generated in this run")
-
-        for txn in transactions:
-            # After implementation, verify Balance field
-            # balance = txn.get("Balance")
-            # assert balance is not None, "Balance should not be None"
-            # assert isinstance(balance, (int, float)), "Balance should be numeric"
-            # assert balance >= 0, "Balance should be non-negative"
-            pass  # Placeholder until implementation
-
-    def test_store_balance_matches_simulator_state(
-        self, inventory_simulator, sample_stores, sample_products
-    ):
-        """Test that Balance in store transaction matches simulator state."""
-        store_id = sample_stores[0].ID
-        product_id = sample_products[0].ID
-        date = datetime.now()
-
-        # Ensure we have inventory
-        key = (store_id, product_id)
-        inventory_simulator._store_inventory[key] = 100  # Set known quantity
-
-        # Generate transactions
-        transactions = inventory_simulator.simulate_store_demand(
-            store_id, date, traffic_multiplier=1.0
-        )
-
-        # Find transaction for our product
-        product_txns = [
-            txn
-            for txn in transactions
-            if txn.get("ProductID") == product_id and txn.get("StoreID") == store_id
-        ]
-
-        if not product_txns:
-            pytest.skip("Product not sold in this run")
-
-        # After implementation, verify Balance matches
-        # for txn in product_txns:
-        #     balance_after = inventory_simulator._store_inventory.get(key, 0)
-        #     assert txn["Balance"] == balance_after, "Balance should match simulator state after transaction"
-        pass  # Placeholder until implementation
 
 
 class TestBalanceFieldMapping:
