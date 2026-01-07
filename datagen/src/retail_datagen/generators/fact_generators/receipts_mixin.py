@@ -110,6 +110,11 @@ class ReceiptsMixin:
                 )
 
                 # Generate payment for this receipt
+                # Note: All receipts get a payment record, including DECLINED ones.
+                # In this synthetic data model, declined payments represent attempted
+                # transactions where the customer successfully retried with another
+                # payment method (retry flow not explicitly modeled). This simplification
+                # allows analysis of payment decline rates without complex retry logic.
                 payment = self._generate_payment_for_receipt(
                     receipt_data["receipt"], hour_datetime
                 )
