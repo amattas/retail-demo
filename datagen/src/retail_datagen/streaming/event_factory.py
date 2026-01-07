@@ -58,7 +58,9 @@ class EventGenerationState:
     store_hours: dict[int, dict] = None  # store_id -> hours_info
     promotion_campaigns: dict[str, dict] = None  # campaign_id -> campaign_info
     marketing_conversions: dict[str, dict] = None  # impression_id -> conversion_info
-    customer_to_campaign: dict[int, str] = None  # customer_id -> campaign_id (O(1) lookup index)
+    customer_to_campaign: dict[int, str] = (
+        None  # customer_id -> campaign_id (O(1) lookup index)
+    )
 
     def __post_init__(self):
         if self.active_receipts is None:
@@ -592,18 +594,25 @@ class EventFactory:
         receipt_info = self.state.active_receipts[receipt_id]
 
         payment_method = self.rng.choice(list(TenderType)).value
-        amount = self.rng.uniform(10.0, 200.0)
+        amount = round(self.rng.uniform(10.0, 200.0), 2)
+        amount_cents = int(amount * 100)
         transaction_id = (
             f"TXN_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
         )
+        # Processing time varies by payment method
+        processing_time_ms = self.rng.randint(500, 3000)
+        customer_id = receipt_info.get("customer_id", self.rng.randint(1, 1000))
 
         payload = PaymentProcessedPayload(
             receipt_id=receipt_id,
             payment_method=payment_method,
             amount=amount,
+            amount_cents=amount_cents,
             transaction_id=transaction_id,
             processing_time=timestamp,
+            processing_time_ms=processing_time_ms,
             status="APPROVED",
+            customer_id=customer_id,
         )
 
         # Remove receipt from active receipts after payment

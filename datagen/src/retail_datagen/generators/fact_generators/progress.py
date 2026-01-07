@@ -1,6 +1,7 @@
 """
 Progress tracking and reporting functionality for fact data generation.
 """
+
 from __future__ import annotations
 
 import logging
@@ -202,5 +203,3 @@ class HourlyProgressTracker:
             total += len(day_hours)
 
         return total
-
-

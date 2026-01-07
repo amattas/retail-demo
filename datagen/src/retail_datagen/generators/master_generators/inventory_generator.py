@@ -32,20 +32,22 @@ class InventoryGeneratorMixin:
     ) -> list[DCInventorySnapshot]:
         """
         Generate realistic initial inventory snapshots for distribution centers.
-        
+
         Args:
             distribution_centers: DC records
             products_master: Product records
             config: Retail configuration
             np_rng: NumPy random generator
-            
+
         Returns:
             List of DCInventorySnapshot records
         """
         print("Generating DC inventory snapshots...")
 
         if not distribution_centers or not products_master:
-            raise ValueError("DCs and products must be generated before inventory snapshots")
+            raise ValueError(
+                "DCs and products must be generated before inventory snapshots"
+            )
 
         # Vectorized implementation
         current_time = datetime.now(UTC)
@@ -99,20 +101,22 @@ class InventoryGeneratorMixin:
     ) -> list[StoreInventorySnapshot]:
         """
         Generate realistic initial inventory snapshots for stores.
-        
+
         Args:
             stores: Store records
             products_master: Product records
             config: Retail configuration
             np_rng: NumPy random generator
-            
+
         Returns:
             List of StoreInventorySnapshot records
         """
         print("Generating store inventory snapshots...")
 
         if not stores or not products_master:
-            raise ValueError("Stores and products must be generated before inventory snapshots")
+            raise ValueError(
+                "Stores and products must be generated before inventory snapshots"
+            )
 
         # Vectorized implementation
         current_time = datetime.now(UTC)

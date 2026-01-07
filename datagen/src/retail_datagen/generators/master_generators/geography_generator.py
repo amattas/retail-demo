@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 class GeographyGeneratorMixin:
     """Mixin for geography master data generation."""
 
-    def _load_geography_data(self, dictionary_loader: DictionaryLoader) -> list[GeographyDict]:
+    def _load_geography_data(
+        self, dictionary_loader: DictionaryLoader
+    ) -> list[GeographyDict]:
         """Load geography dictionary data."""
         geography_data = dictionary_loader.load_geographies()
         print(f"Loaded {len(geography_data)} geographies")
@@ -30,12 +32,12 @@ class GeographyGeneratorMixin:
     ) -> tuple[list[GeographyMaster], list[GeographyDict]]:
         """
         Generate geography master data.
-        
+
         Args:
             geography_data: All available geography records
             geography_count: Number of geographies to generate
             rng: Random number generator
-            
+
         Returns:
             Tuple of (geography_master list, selected geography data subset)
         """

@@ -9,8 +9,8 @@ import asyncio
 from collections import Counter
 from datetime import UTC, datetime
 
-from .config import DLQEntry
 from ..schemas import EventEnvelope
+from .config import DLQEntry
 
 
 class DLQManager:
@@ -193,7 +193,11 @@ class DLQManager:
         return len(self._dlq) == 0
 
     async def retry_loop(
-        self, is_streaming_func, is_shutdown_func, azure_client, retry_interval: int = 300
+        self,
+        is_streaming_func,
+        is_shutdown_func,
+        azure_client,
+        retry_interval: int = 300,
     ):
         """
         Background loop to retry DLQ events periodically.

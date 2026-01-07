@@ -483,10 +483,13 @@ class TruckMove(BaseModel):
     ETD: datetime = Field(..., description="Estimated time of departure")
     # Departure fields - populated only for COMPLETED status (truck_departed event)
     DepartureTime: datetime | None = Field(
-        None, description="Actual departure time after unloading (COMPLETED status only)"
+        None,
+        description="Actual departure time after unloading (COMPLETED status only)",
     )
     ActualUnloadDuration: int | None = Field(
-        None, ge=0, description="Actual unload duration in minutes (COMPLETED status only)"
+        None,
+        ge=0,
+        description="Actual unload duration in minutes (COMPLETED status only)",
     )
 
 

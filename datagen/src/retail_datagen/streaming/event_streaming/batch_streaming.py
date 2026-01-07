@@ -45,7 +45,9 @@ class BatchStreamingManager:
             bool: True if streaming completed successfully, False otherwise
         """
         if duckdb_conn is None:
-            self.log.error("DuckDB connection not available", session_id=self._session_id)
+            self.log.error(
+                "DuckDB connection not available", session_id=self._session_id
+            )
             return False
 
         self.log.info(
@@ -346,15 +348,18 @@ class BatchStreamingManager:
         return mapping.get(duck_table, duck_table)
 
     def _load_unpublished_events_from_duck(
-        self, duckdb_conn, duck_table: str, start_ts: datetime, end_ts: datetime, batch_size: int
+        self,
+        duckdb_conn,
+        duck_table: str,
+        start_ts: datetime,
+        end_ts: datetime,
+        batch_size: int,
     ) -> list[dict]:
         """Load unpublished events from DuckDB."""
         if duckdb_conn is None:
             return []
         # Pull rows in window
-        q = (
-            f"SELECT * FROM {duck_table} WHERE event_ts >= ? AND event_ts < ? ORDER BY event_ts LIMIT ?"
-        )
+        q = f"SELECT * FROM {duck_table} WHERE event_ts >= ? AND event_ts < ? ORDER BY event_ts LIMIT ?"
         cur = duckdb_conn.execute(q, [start_ts, end_ts, batch_size])
         rows = cur.fetchall()
         cols = [d[0] for d in (cur.description or [])]
@@ -387,9 +392,13 @@ class BatchStreamingManager:
             List of event records as dicts
         """
         if not session:
-            raise ValueError("No database session provided - cannot read from legacy SQLite")
+            raise ValueError(
+                "No database session provided - cannot read from legacy SQLite"
+            )
 
         # Import here to avoid circular dependencies
+        from sqlalchemy import select
+
         from retail_datagen.db.models.facts import (
             BLEPing,
             DCInventoryTransaction,
@@ -401,7 +410,6 @@ class BatchStreamingManager:
             StoreInventoryTransaction,
             TruckMove,
         )
-        from sqlalchemy import select
 
         # Map table name to model
         model_map = {
@@ -454,9 +462,7 @@ class BatchStreamingManager:
         latest = None
 
         for table in self._get_fact_tables():
-            start, end = await get_unpublished_data_range(
-                session, f"fact_{table}"
-            )
+            start, end = await get_unpublished_data_range(session, f"fact_{table}")
             if start:
                 if not earliest or start < earliest:
                     earliest = start

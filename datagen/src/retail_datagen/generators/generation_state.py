@@ -67,7 +67,10 @@ class GenerationStateManager:
                     # Backward compatibility: map legacy keys to new ones
                     if "has_historical_data" in data and "has_fact_data" not in data:
                         data["has_fact_data"] = bool(data.get("has_historical_data"))
-                    if "historical_start_date" in data and "fact_start_date" not in data:
+                    if (
+                        "historical_start_date" in data
+                        and "fact_start_date" not in data
+                    ):
                         data["fact_start_date"] = data.get("historical_start_date")
                     if "last_historical_run" in data and "last_fact_run" not in data:
                         data["last_fact_run"] = data.get("last_historical_run")
@@ -156,14 +159,10 @@ class GenerationStateManager:
                 else None
             ),
             "fact_start_date": (
-                state.fact_start_date.isoformat()
-                if state.fact_start_date
-                else None
+                state.fact_start_date.isoformat() if state.fact_start_date else None
             ),
             "last_fact_run": (
-                state.last_fact_run.isoformat()
-                if state.last_fact_run
-                else None
+                state.last_fact_run.isoformat() if state.last_fact_run else None
             ),
             "last_realtime_run": (
                 state.last_realtime_run.isoformat() if state.last_realtime_run else None

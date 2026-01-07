@@ -30,36 +30,39 @@ _conn: duckdb.DuckDBPyConnection | None = None
 #
 # To add a new table:
 # 1. Add the table name to this frozenset
-# 2. Ensure the table follows naming conventions (dim_* for dimensions, fact_* for facts)
-ALLOWED_TABLES: frozenset[str] = frozenset({
-    # Dimension tables
-    "dim_geographies",
-    "dim_stores",
-    "dim_distribution_centers",
-    "dim_trucks",
-    "dim_customers",
-    "dim_products",
-    # Fact tables (current)
-    "fact_dc_inventory_txn",
-    "fact_truck_moves",
-    "fact_store_inventory_txn",
-    "fact_receipts",
-    "fact_receipt_lines",
-    "fact_foot_traffic",
-    "fact_ble_pings",
-    "fact_marketing",
-    "fact_online_order_headers",
-    "fact_online_order_lines",
-    # Fact tables (planned - see GitHub issues #7-#13)
-    "fact_payments",
-    "fact_stockouts",
-    "fact_reorders",
-    "fact_promotions",
-    "fact_store_ops",
-    "fact_customer_zone_changes",
-    # System tables
-    "streaming_outbox",
-})
+# 2. Ensure the table follows naming conventions (dim_* for dimensions,
+#    fact_* for facts)
+ALLOWED_TABLES: frozenset[str] = frozenset(
+    {
+        # Dimension tables
+        "dim_geographies",
+        "dim_stores",
+        "dim_distribution_centers",
+        "dim_trucks",
+        "dim_customers",
+        "dim_products",
+        # Fact tables (current)
+        "fact_dc_inventory_txn",
+        "fact_truck_moves",
+        "fact_store_inventory_txn",
+        "fact_receipts",
+        "fact_receipt_lines",
+        "fact_foot_traffic",
+        "fact_ble_pings",
+        "fact_marketing",
+        "fact_online_order_headers",
+        "fact_online_order_lines",
+        # Fact tables (planned - see GitHub issues #7-#13)
+        "fact_payments",
+        "fact_stockouts",
+        "fact_reorders",
+        "fact_promotions",
+        "fact_store_ops",
+        "fact_customer_zone_changes",
+        # System tables
+        "streaming_outbox",
+    }
+)
 
 # Internal temporary table name - uses double underscore prefix to avoid
 # collision with user-provided table names
@@ -90,7 +93,8 @@ def validate_table_name(table: str) -> str:
     return table
 
 
-# Pattern for valid SQL identifiers: alphanumeric and underscore, not starting with digit
+# Pattern for valid SQL identifiers: alphanumeric and underscore,
+# not starting with digit
 _VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
@@ -137,7 +141,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
         if _conn is None:
             new_conn = duckdb.connect(str(get_duckdb_path()))
             try:
-                # Pragmas suitable for fast local writes (best-effort; tolerate older DuckDB versions)
+                # Pragmas for fast local writes (best-effort; tolerate older DuckDB)
                 try:
                     threads = os.cpu_count() or 2
                     new_conn.execute(f"PRAGMA threads={threads}")
@@ -153,7 +157,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     _ensure_outbox_table(new_conn)
                 except Exception as e:
                     # Non-fatal if creation fails here; callers may retry
-                    logger.warning(f"Failed to create outbox table during connection initialization: {e}")
+                    logger.warning(f"Failed to create outbox table during init: {e}")
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -163,7 +167,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     new_conn.close()
                 except Exception as close_error:
                     # Log cleanup failure but don't mask the original exception
-                    logger.warning(f"Failed to close connection during cleanup: {close_error}")
+                    logger.warning(
+                        f"Failed to close connection during cleanup: {close_error}"
+                    )
                 raise
     return _conn
 
@@ -213,7 +219,9 @@ def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
         # Table doesn't exist
         return False
     except Exception as e:
-        logger.warning(f"Unexpected error checking if table {validated_table} exists: {e}")
+        logger.warning(
+            f"Unexpected error checking if table {validated_table} exists: {e}"
+        )
         return False
 
 
@@ -246,7 +254,9 @@ def _duck_type_from_series(s: pd.Series) -> str:
     return "VARCHAR"
 
 
-def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> None:
+def _ensure_columns(
+    conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame
+) -> None:
     """Ensure all DataFrame columns exist in the DuckDB table.
 
     Adds missing columns with inferred types (conservative defaults) so that
@@ -259,14 +269,21 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
             validated_col = validate_column_name(col)
             duck_type = _duck_type_from_series(df[col])
             try:
-                conn.execute(f"ALTER TABLE {validated_table} ADD COLUMN {validated_col} {duck_type}")
+                conn.execute(
+                    f"ALTER TABLE {validated_table} "
+                    f"ADD COLUMN {validated_col} {duck_type}"
+                )
             except Exception as e:
-                # Best-effort; if it races or fails, proceed and let INSERT surface issues
-                logger.debug(f"Failed to add column {validated_col} to {validated_table}: {e}")
+                # Best-effort; if it fails, proceed and let INSERT surface issues
+                logger.debug(
+                    f"Failed to add column {validated_col} to {validated_table}: {e}"
+                )
     # No need to drop extra table columns; INSERT will only specify df columns
 
 
-def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> int:
+def insert_dataframe(
+    conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame
+) -> int:
     """Insert a pandas DataFrame into a DuckDB table.
 
     Creates the table if it doesn't exist, otherwise inserts into existing table.
@@ -311,7 +328,9 @@ def insert_dataframe(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFra
     return len(df)
 
 
-def insert_records(conn: duckdb.DuckDBPyConnection, table: str, records: Iterable[dict]) -> int:
+def insert_records(
+    conn: duckdb.DuckDBPyConnection, table: str, records: Iterable[dict]
+) -> int:
     df = pd.DataFrame.from_records(list(records))
     return insert_dataframe(conn, table, df)
 
@@ -319,6 +338,7 @@ def insert_records(conn: duckdb.DuckDBPyConnection, table: str, records: Iterabl
 # ================================
 # Outbox helpers (DuckDB)
 # ================================
+
 
 def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
     """Create a simple outbox table if it does not exist.
@@ -377,7 +397,9 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
         _ensure("event_ts", "TIMESTAMP", None)
         _ensure("message_type", "VARCHAR", None)
     except Exception as e:
-        logger.warning(f"Failed to ensure backward compatibility columns on streaming_outbox: {e}")
+        logger.warning(
+            f"Failed to ensure backward compatibility columns on streaming_outbox: {e}"
+        )
     # Lightweight indexes for draining
     try:
         conn.execute(
@@ -464,7 +486,9 @@ def outbox_nack_retry(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
     )
 
 
-def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dict]) -> int:
+def outbox_insert_records(
+    conn: duckdb.DuckDBPyConnection, records: Iterable[dict]
+) -> int:
     """Insert outbox rows, assigning monotonically increasing outbox_id values.
 
     Ensures compatibility with DuckDB versions lacking IDENTITY columns by
@@ -472,7 +496,9 @@ def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dic
     """
     _ensure_outbox_table(conn)
     try:
-        row = conn.execute("SELECT COALESCE(MAX(outbox_id), 0) FROM streaming_outbox").fetchone()
+        row = conn.execute(
+            "SELECT COALESCE(MAX(outbox_id), 0) FROM streaming_outbox"
+        ).fetchone()
         max_id = int(row[0] or 0)
     except Exception as e:
         logger.warning(f"Failed to get max outbox_id, using 0: {e}")
@@ -495,6 +521,7 @@ def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dic
 # ================================
 # Pending Shipments Staging (DuckDB)
 # ================================
+
 
 def _ensure_pending_shipments_table(conn: duckdb.DuckDBPyConnection) -> None:
     """Create the pending shipments staging table if it does not exist.
@@ -555,7 +582,6 @@ def pending_shipments_insert(
         Number of records inserted
     """
     import json
-    from datetime import datetime
 
     _ensure_pending_shipments_table(conn)
 
@@ -586,22 +612,25 @@ def pending_shipments_insert(
         except (TypeError, ValueError):
             shipment_json = json.dumps({k: str(v) for k, v in rec.items()})
 
-        prepared.append({
-            "staging_id": next_id,
-            "event_ts": rec.get("EventTS") or rec.get("event_ts"),
-            "truck_id": str(rec.get("TruckId") or rec.get("truck_id", "")),
-            "dc_id": rec.get("DCID") or rec.get("dc_id"),
-            "store_id": rec.get("StoreID") or rec.get("store_id"),
-            "shipment_id": rec.get("ShipmentId") or rec.get("shipment_id"),
-            "status": rec.get("Status") or rec.get("status"),
-            "eta": rec.get("ETA") or rec.get("eta"),
-            "etd": rec.get("ETD") or rec.get("etd"),
-            "departure_time": rec.get("DepartureTime") or rec.get("departure_time"),
-            "actual_unload_duration": rec.get("ActualUnloadDuration") or rec.get("actual_unload_duration"),
-            "trace_id": rec.get("TraceId") or rec.get("trace_id", ""),
-            "generation_end_date": generation_end_date,
-            "shipment_info_json": shipment_json,
-        })
+        prepared.append(
+            {
+                "staging_id": next_id,
+                "event_ts": rec.get("EventTS") or rec.get("event_ts"),
+                "truck_id": str(rec.get("TruckId") or rec.get("truck_id", "")),
+                "dc_id": rec.get("DCID") or rec.get("dc_id"),
+                "store_id": rec.get("StoreID") or rec.get("store_id"),
+                "shipment_id": rec.get("ShipmentId") or rec.get("shipment_id"),
+                "status": rec.get("Status") or rec.get("status"),
+                "eta": rec.get("ETA") or rec.get("eta"),
+                "etd": rec.get("ETD") or rec.get("etd"),
+                "departure_time": rec.get("DepartureTime") or rec.get("departure_time"),
+                "actual_unload_duration": rec.get("ActualUnloadDuration")
+                or rec.get("actual_unload_duration"),
+                "trace_id": rec.get("TraceId") or rec.get("trace_id", ""),
+                "generation_end_date": generation_end_date,
+                "shipment_info_json": shipment_json,
+            }
+        )
 
     if not prepared:
         return 0
@@ -670,7 +699,9 @@ def pending_shipments_get_ready(
             rec["_staging_id"] = staging_id  # Include for deletion after processing
             results.append(rec)
         except (json.JSONDecodeError, TypeError) as e:
-            logger.warning(f"Failed to parse shipment JSON for staging_id={staging_id}: {e}")
+            logger.warning(
+                f"Failed to parse shipment JSON for staging_id={staging_id}: {e}"
+            )
 
     return results
 

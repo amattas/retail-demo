@@ -345,8 +345,7 @@ class ExportService:
                         )
                         self.file_manager.ensure_directory(output_path.parent)
                         logger.debug(
-                            f"Writing {len(part_df):,} rows to "
-                            f"{output_path} (monthly)"
+                            f"Writing {len(part_df):,} rows to {output_path} (monthly)"
                         )
                         # Use append=True for chunked exports spanning months
                         writer.write(part_df, output_path, append=True)

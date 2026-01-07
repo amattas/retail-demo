@@ -1,20 +1,17 @@
 """
 Receipt generation and in-store customer activity
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
-from datetime import time as dt_time
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
-
-import pandas as pd
 
 from retail_datagen.shared.models import (
     Customer,
     InventoryReason,
-    ProductMaster,
     Store,
     TenderType,
 )
@@ -47,8 +44,12 @@ class ReceiptsMixin:
         base_customers_per_hour = self.config.volume.customers_per_day / 24
 
         # Apply store profile multiplier for realistic variability
-        store_multiplier = float(getattr(store, 'daily_traffic_multiplier', Decimal("1.0")))
-        expected_customers = int(base_customers_per_hour * multiplier * store_multiplier)
+        store_multiplier = float(
+            getattr(store, "daily_traffic_multiplier", Decimal("1.0"))
+        )
+        expected_customers = int(
+            base_customers_per_hour * multiplier * store_multiplier
+        )
 
         # Generate foot traffic (will be calibrated to receipts with conversion rates)
         # Pass expected_customers (receipt count) to calculate realistic foot traffic
@@ -73,18 +74,25 @@ class ReceiptsMixin:
                     clist = self._store_customer_sampling[store.ID][0]
                     selected_customers = [clist[i] for i in chosen_idx]
                 else:
-                    selected_customers = [self._rng.choice(self.customers) for _ in range(expected_customers)]
+                    selected_customers = [
+                        self._rng.choice(self.customers)
+                        for _ in range(expected_customers)
+                    ]
             elif store.ID in self._store_customer_sampling:
                 customers_list, weights_list = self._store_customer_sampling[store.ID]
                 selected_customers = self._rng.choices(
                     customers_list, weights=weights_list, k=expected_customers
                 )
             else:
-                selected_customers = [self._rng.choice(self.customers) for _ in range(expected_customers)]
+                selected_customers = [
+                    self._rng.choice(self.customers) for _ in range(expected_customers)
+                ]
 
             for customer in selected_customers:
                 # Generate shopping basket (pass store for format-based adjustments)
-                basket = self.customer_journey_sim.generate_shopping_basket(customer.ID, store=store)
+                basket = self.customer_journey_sim.generate_shopping_basket(
+                    customer.ID, store=store
+                )
                 # Apply holiday overlay to adjust basket composition/quantities
                 try:
                     self._apply_holiday_overlay_to_basket(hour_datetime, basket)
@@ -92,7 +100,9 @@ class ReceiptsMixin:
                     logger.debug(f"Failed to apply holiday overlay to basket: {e}")
 
                 # Create receipt
-                receipt_data = self._create_receipt(store, customer, basket, hour_datetime)
+                receipt_data = self._create_receipt(
+                    store, customer, basket, hour_datetime
+                )
                 hour_data["receipts"].append(receipt_data["receipt"])
                 hour_data["receipt_lines"].extend(receipt_data["lines"])
                 hour_data["store_inventory_txn"].extend(
@@ -114,7 +124,11 @@ class ReceiptsMixin:
     # ---------------- Holiday Overlay Helpers -----------------
 
     def _create_receipt(
-        self, store: Store, customer: Customer, basket: Any, transaction_time: datetime,
+        self,
+        store: Store,
+        customer: Customer,
+        basket: Any,
+        transaction_time: datetime,
         _campaign_id: str | None = None,  # noqa: ARG002 - intentionally unused, see TODO below
     ) -> dict[str, list[dict]]:
         """Create receipt, receipt lines, and inventory transactions.
@@ -186,18 +200,27 @@ class ReceiptsMixin:
         )
         # Helpers for integer-cents math
         from retail_datagen.shared.models import ProductTaxability
+
         def _to_cents(d: Decimal) -> int:
             return int((d * 100).quantize(Decimal("1")))
 
         def _fmt_cents(c: int) -> str:
-            sign = '-' if c < 0 else ''
+            sign = "-" if c < 0 else ""
             c = abs(c)
             return f"{sign}{c // 100}.{c % 100:02d}"
 
-        def _tax_cents(amount_cents: int, rate: Decimal, taxability: ProductTaxability) -> int:
+        def _tax_cents(
+            amount_cents: int, rate: Decimal, taxability: ProductTaxability
+        ) -> int:
             # rate to basis points (1/100 of a percent), multiplier as integer percentage
             rate_bps = int((rate * 10000).quantize(Decimal("1")))
-            mult_pct = 100 if taxability == ProductTaxability.TAXABLE else 50 if taxability == ProductTaxability.REDUCED_RATE else 0
+            mult_pct = (
+                100
+                if taxability == ProductTaxability.TAXABLE
+                else 50
+                if taxability == ProductTaxability.REDUCED_RATE
+                else 0
+            )
             # Compute rounded cents: (amount_cents * rate_bps * mult_pct) / 1_000_000
             num = amount_cents * rate_bps * mult_pct
             return (num + 500_000) // 1_000_000
@@ -274,7 +297,9 @@ class ReceiptsMixin:
 
         # Validate subtotal (sanity check)
         try:
-            calculated_subtotal_cents = sum(_to_cents(Decimal(line["ExtPrice"])) for line in lines)
+            calculated_subtotal_cents = sum(
+                _to_cents(Decimal(line["ExtPrice"])) for line in lines
+            )
             if abs(calculated_subtotal_cents - subtotal_cents) > 1:
                 logger.error(
                     f"Receipt {receipt_id}: Subtotal mismatch! "
@@ -292,7 +317,9 @@ class ReceiptsMixin:
             "ReceiptId": receipt_id,
             "ReceiptType": "SALE",
             "Subtotal": _fmt_cents(subtotal_cents),
-            "DiscountAmount": _fmt_cents(discount_amount_cents),  # Phase 2.2: Promotional discounts
+            "DiscountAmount": _fmt_cents(
+                discount_amount_cents
+            ),  # Phase 2.2: Promotional discounts
             "Tax": _fmt_cents(total_tax_cents),
             "Total": _fmt_cents(total_cents),
             "SubtotalCents": subtotal_cents,
@@ -306,5 +333,3 @@ class ReceiptsMixin:
             "lines": lines,
             "inventory_transactions": inventory_transactions,
         }
-
-

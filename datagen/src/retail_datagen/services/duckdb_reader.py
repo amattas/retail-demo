@@ -107,9 +107,7 @@ def read_all_fact_tables(
                              AND h.event_ts < ?)
                         )
                     """
-                    df = conn.execute(
-                        query, [start_dt, end_dt, start_dt, end_dt]
-                    ).df()
+                    df = conn.execute(query, [start_dt, end_dt, start_dt, end_dt]).df()
                 else:
                     query = (
                         f"SELECT * FROM {validated_table} "
