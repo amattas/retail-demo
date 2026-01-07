@@ -653,6 +653,7 @@ class InventoryMixin:
             "store_inventory_txn",
             "foot_traffic",
             "ble_pings",
+            "fact_payments",
         ]
 
         # Log hourly data processing for debugging
@@ -695,6 +696,7 @@ class InventoryMixin:
                     "store_inventory_txn": [],
                     "foot_traffic": [],
                     "ble_pings": [],
+                    "fact_payments": [],
                 }
             else:
                 hour_data = {
@@ -703,6 +705,7 @@ class InventoryMixin:
                     "store_inventory_txn": [],
                     "foot_traffic": [],
                     "ble_pings": [],
+                    "fact_payments": [],
                 }
 
                 # Generate customer transactions for each store for this hour
@@ -889,6 +892,18 @@ class InventoryMixin:
                 self._generate_online_orders(date)
             )
             daily_facts["online_orders"].extend(online_orders)
+
+            # Generate payments for online orders (separate from in-store payments)
+            # Note: Payments are generated after order creation. This simulates
+            # asynchronous payment processing where declined payments trigger
+            # retry flows or order cancellations (not modeled in this synthetic data).
+            online_order_payments: list[dict] = []
+            if "fact_payments" in active_tables and online_orders:
+                for order in online_orders:
+                    payment = self._generate_payment_for_online_order(
+                        order, order.get("EventTS", date)
+                    )
+                    online_order_payments.append(payment)
             # First write online order headers (so lines can resolve order_id)
             if online_orders:
                 try:
@@ -926,6 +941,27 @@ class InventoryMixin:
                 except Exception as e:
                     logger.error(
                         f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
+            # Insert online order payments (separate from hourly in-store payments)
+            # Note: In-store payments are tracked via the hourly loop. Online order
+            # payments need explicit tracking here to ensure accurate progress reporting.
+            if online_order_payments:
+                try:
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "fact_payments",
+                        online_order_payments,
+                        hour=0,
+                        commit_every_batches=0,
+                    )
+                    # Update progress for online order payments (daily batch)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "fact_payments", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert online order payments for {date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Cascade inventory effects
             if "store_inventory_txn" in active_tables and online_store_txn:

@@ -55,6 +55,7 @@ from .logistics_mixin import LogisticsMixin
 from .marketing_mixin import MarketingMixin
 from .models import FactGenerationSummary
 from .online_orders_mixin import OnlineOrdersMixin
+from .payments_mixin import PaymentsMixin
 from .persistence_mixin import PersistenceMixin
 from .progress import HourlyProgressTracker
 from .progress_reporting_mixin import ProgressReportingMixin
@@ -72,6 +73,7 @@ class FactDataGenerator(
     LogisticsMixin,
     MarketingMixin,
     OnlineOrdersMixin,
+    PaymentsMixin,
     PersistenceMixin,
     ProgressReportingMixin,
     ReceiptsMixin,
@@ -101,6 +103,8 @@ class FactDataGenerator(
         # Omnichannel extension integrated into core facts
         "online_orders",
         "online_order_lines",
+        # Payment transactions linked to receipts and online orders
+        "fact_payments",
     ]
 
     # Truck unload duration constants (in minutes)

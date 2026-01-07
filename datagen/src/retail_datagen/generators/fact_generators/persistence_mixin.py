@@ -102,6 +102,7 @@ class PersistenceMixin:
             "marketing": "ad_impression",
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps
+            "fact_payments": "payment_processed",
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
@@ -314,6 +315,20 @@ class PersistenceMixin:
                 "FulfillmentMode": "fulfillment_mode",
                 "NodeType": "node_type",
                 "NodeID": "node_id",
+            },
+            "fact_payments": {
+                **common_mappings,
+                "ReceiptIdExt": "receipt_id_ext",
+                "OrderIdExt": "order_id_ext",
+                "PaymentMethod": "payment_method",
+                "AmountCents": "amount_cents",
+                "Amount": "amount",
+                "TransactionId": "transaction_id",
+                "ProcessingTimeMs": "processing_time_ms",
+                "Status": "status",
+                "DeclineReason": "decline_reason",
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
             },
         }
 
@@ -656,6 +671,7 @@ class PersistenceMixin:
                     "marketing": "fact_marketing",
                     "online_orders": "fact_online_order_headers",
                     "online_order_lines": "fact_online_order_lines",
+                    "fact_payments": "fact_payments",
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import (
                     insert_dataframe,
@@ -962,6 +978,7 @@ class PersistenceMixin:
             "ble_pings": "fact_ble_pings",
             "marketing": "fact_marketing",
             "online_orders": "fact_online_orders",
+            "fact_payments": "fact_payments",
         }
 
         for table_name in active_tables:

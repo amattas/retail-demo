@@ -90,11 +90,17 @@
 
 .create-merge table payment_processed (
     receipt_id:string,
+    order_id:string,
     payment_method:string,
     amount:real,
+    amount_cents:long,
     transaction_id:string,
     processing_time:datetime,
+    processing_time_ms:int,
     status:string,
+    decline_reason:string,
+    store_id:long,
+    customer_id:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

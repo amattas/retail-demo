@@ -239,12 +239,28 @@ class ReorderTriggeredPayload(BaseModel):
 class PaymentProcessedPayload(BaseModel):
     """Payload for payment_processed events."""
 
-    receipt_id: str = Field(..., min_length=1)
+    receipt_id: str | None = Field(
+        default=None, description="Receipt ID for in-store payments"
+    )
+    order_id: str | None = Field(
+        default=None, description="Order ID for online payments"
+    )
     payment_method: str = Field(..., min_length=1)
     amount: float = Field(..., gt=0)
+    amount_cents: int = Field(..., gt=0, description="Amount in cents for precision")
     transaction_id: str = Field(..., min_length=1)
     processing_time: datetime
-    status: str = Field(default="APPROVED")  # APPROVED, DECLINED, PENDING
+    processing_time_ms: int = Field(
+        ..., ge=0, description="Processing time in milliseconds"
+    )
+    status: str = Field(default="APPROVED")  # APPROVED, DECLINED
+    decline_reason: str | None = Field(
+        default=None, description="Reason for declined payments"
+    )
+    store_id: int | None = Field(
+        default=None, description="Store ID for in-store payments"
+    )
+    customer_id: int = Field(..., gt=0, description="Customer ID")
 
 
 class OnlineOrderCreatedPayload(BaseModel):

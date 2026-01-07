@@ -58,11 +58,17 @@
 ```
 [
   {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
   {"column":"payment_method","path":"$.payload.payment_method","datatype":"string"},
   {"column":"amount","path":"$.payload.amount","datatype":"real"},
+  {"column":"amount_cents","path":"$.payload.amount_cents","datatype":"long"},
   {"column":"transaction_id","path":"$.payload.transaction_id","datatype":"string"},
   {"column":"processing_time","path":"$.payload.processing_time","datatype":"datetime"},
+  {"column":"processing_time_ms","path":"$.payload.processing_time_ms","datatype":"int"},
   {"column":"status","path":"$.payload.status","datatype":"string"},
+  {"column":"decline_reason","path":"$.payload.decline_reason","datatype":"string"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},

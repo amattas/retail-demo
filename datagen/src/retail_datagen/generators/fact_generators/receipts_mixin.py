@@ -32,6 +32,7 @@ class ReceiptsMixin:
             "store_inventory_txn": [],
             "foot_traffic": [],
             "ble_pings": [],
+            "fact_payments": [],
         }
 
         # Holiday closure: Christmas Day closed (no activity)
@@ -107,6 +108,17 @@ class ReceiptsMixin:
                 hour_data["store_inventory_txn"].extend(
                     receipt_data["inventory_transactions"]
                 )
+
+                # Generate payment for this receipt
+                # Note: All receipts get a payment record, including DECLINED ones.
+                # In this synthetic data model, declined payments represent attempted
+                # transactions where the customer successfully retried with another
+                # payment method (retry flow not explicitly modeled). This simplification
+                # allows analysis of payment decline rates without complex retry logic.
+                payment = self._generate_payment_for_receipt(
+                    receipt_data["receipt"], hour_datetime
+                )
+                hour_data["fact_payments"].append(payment)
 
                 # Generate BLE pings for this customer
                 ble_records = self._generate_ble_pings(store, customer, hour_datetime)
