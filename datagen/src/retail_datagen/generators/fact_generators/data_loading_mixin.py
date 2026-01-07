@@ -34,13 +34,14 @@ logger = logging.getLogger(__name__)
 class DataLoadingMixin:
     """Master data loading and normalization methods."""
 
+    @staticmethod
     def _normalize_geography_row(row: dict[str, Any]) -> dict[str, Any]:
         """Ensure geography rows preserve ZipCode formatting."""
 
         zip_code = row.get("ZipCode", "")
         return {**row, "ZipCode": str(zip_code)}
 
-
+    @staticmethod
     def _to_decimal(value: Any) -> Decimal:
         """Convert a value into a Decimal instance."""
 
@@ -48,7 +49,7 @@ class DataLoadingMixin:
             return value
         return Decimal(str(value))
 
-
+    @staticmethod
     def _to_bool(value: Any) -> bool:
         """Convert truthy strings and numerics to bool safely."""
 
@@ -56,7 +57,7 @@ class DataLoadingMixin:
             return value.strip().lower() in {"true", "1", "yes", "y", "t"}
         return bool(value)
 
-
+    @classmethod
     def _normalize_product_row(cls, row: dict[str, Any]) -> dict[str, Any]:
         """Perform type conversions for product master rows."""
 

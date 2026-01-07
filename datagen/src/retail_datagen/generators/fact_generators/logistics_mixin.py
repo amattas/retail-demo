@@ -48,6 +48,11 @@ class LogisticsMixin:
         # Get generation end date for filtering future shipments
         generation_end_date = getattr(self, "_generation_end_date", None)
 
+        # Use current day as the cutoff for staging - shipments with departure
+        # beyond today should be staged, not just beyond generation_end_date
+        # This prevents "stuck in SCHEDULED" warnings on subsequent days
+        current_day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
         # Restore pending shipments from staging that are ready for this day
         # These are shipments that were deferred from earlier generation runs
         restored_movements = self._restore_pending_shipments_for_date(date)
@@ -127,19 +132,23 @@ class LogisticsMixin:
                             "DepartureTime": event_ts,
                         }
 
-                        # Check if shipment departure is beyond generation end date
-                        if _is_beyond_end_date(event_ts, generation_end_date):
+                        # Check if shipment departure is beyond current day OR generation end date
+                        # Stage if beyond current day to prevent "stuck in SCHEDULED" warnings
+                        is_beyond_today = event_ts > current_day_end
+                        is_beyond_generation = _is_beyond_end_date(event_ts, generation_end_date)
+
+                        if is_beyond_today or is_beyond_generation:
                             # Stage for future processing instead of writing to fact table
+                            # Do NOT add to _active_shipments - will be restored when generating future dates
                             pending_shipments.append(truck_record)
                             logger.debug(
                                 f"Staging shipment {shipment_info['shipment_id']} with "
-                                f"departure {event_ts} (beyond end date {generation_end_date})"
+                                f"departure {event_ts} (beyond current day {date.date()} or end date {generation_end_date})"
                             )
                         else:
                             truck_movements.append(truck_record)
-
-                        # Track shipment for lifecycle processing
-                        self._active_shipments[shipment_info["shipment_id"]] = shipment_info
+                            # Only track for lifecycle processing if not staged
+                            self._active_shipments[shipment_info["shipment_id"]] = shipment_info
 
         # Store pending shipments in staging table (DuckDB only)
         if pending_shipments and getattr(self, "_use_duckdb", False):
@@ -173,12 +182,18 @@ class LogisticsMixin:
         - ARRIVED → UNLOADING: Generate Store INBOUND transactions
         - UNLOADING → COMPLETED
 
+        Lifecycle events whose actual transition time falls beyond the current day
+        are deferred - they will be recorded when the appropriate day is generated.
+
         Returns:
             Tuple of (truck_move_records, dc_outbound_txn, store_inbound_txn)
         """
         truck_lifecycle_records = []
         dc_outbound_txn = []
         store_inbound_txn = []
+
+        # Define current day boundary for deferring future events
+        current_day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
         # Process each active shipment to check for status changes on this date
         shipments_to_process = list(self._active_shipments.values())
@@ -187,10 +202,49 @@ class LogisticsMixin:
             shipment_id = shipment_info["shipment_id"]
             previous_status = shipment_info.get("status")
 
-            # Update shipment status based on current date/time
-            # We'll check at multiple times throughout the day to capture transitions
-            for hour in range(24):
-                check_time = date.replace(hour=hour, minute=0)
+            # Get shipment timing info to calculate actual transition times
+            departure_time = shipment_info.get("departure_time")
+            eta = shipment_info.get("eta")
+            etd = shipment_info.get("etd")
+
+            # Calculate actual transition times (same logic as update_shipment_status)
+            # These determine when each lifecycle event actually occurs
+            loading_start = departure_time + timedelta(hours=2) if departure_time else None
+            transit_start = departure_time + timedelta(hours=4) if departure_time else None
+            unloading_start = eta + timedelta(hours=1) if eta else None
+
+            # Build list of check times: use actual transition times instead of hourly
+            # to avoid missing short state windows (e.g., transit_start to eta < 1 hour)
+            transition_times_list = [
+                (TruckStatus.SCHEDULED, departure_time),
+                (TruckStatus.LOADING, loading_start),
+                (TruckStatus.IN_TRANSIT, transit_start),
+                (TruckStatus.ARRIVED, eta),
+                (TruckStatus.UNLOADING, unloading_start),
+                (TruckStatus.COMPLETED, etd),
+            ]
+
+            # Filter to transitions within today and sort by time
+            start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            check_times_to_process = []
+            for status, trans_time in transition_times_list:
+                if trans_time is None:
+                    continue
+                # Only process transitions that fall within the current day
+                if start_of_day <= trans_time <= current_day_end:
+                    check_times_to_process.append(trans_time)
+
+            # Sort and deduplicate
+            check_times_to_process = sorted(set(check_times_to_process))
+
+            # If no transitions today but shipment is active, check once at start of day
+            # to see if there are any pending state changes from previous days
+            if not check_times_to_process:
+                # Check at start of day to process any deferred transitions
+                check_times_to_process = [start_of_day]
+
+            # Process each transition time
+            for check_time in check_times_to_process:
                 updated_info = self.inventory_flow_sim.update_shipment_status(
                     shipment_id, check_time
                 )
