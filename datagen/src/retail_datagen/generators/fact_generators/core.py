@@ -62,6 +62,7 @@ from .progress_reporting_mixin import ProgressReportingMixin
 from .receipts_mixin import ReceiptsMixin
 from .seasonal_mixin import SeasonalMixin
 from .sensors_mixin import SensorsMixin
+from .store_ops_mixin import StoreOpsMixin
 from .utils_mixin import UtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class FactDataGenerator(
     ReceiptsMixin,
     SeasonalMixin,
     SensorsMixin,
+    StoreOpsMixin,
     UtilsMixin,
 ):
     """
@@ -105,6 +107,8 @@ class FactDataGenerator(
         "online_order_lines",
         # Payment transactions linked to receipts and online orders
         "fact_payments",
+        # Store operations (Issue #11)
+        "store_ops",
     ]
 
     # Truck unload duration constants (in minutes)

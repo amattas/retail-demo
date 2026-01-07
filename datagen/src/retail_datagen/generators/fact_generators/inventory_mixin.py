@@ -969,7 +969,36 @@ class InventoryMixin:
             if "dc_inventory_txn" in active_tables and online_dc_txn:
                 daily_facts["dc_inventory_txn"].extend(online_dc_txn)
 
-        # 7. Generate supply chain disruptions
+        # 7. Generate store operations (open/close events)
+        if "store_ops" in active_tables:
+            store_ops_records = []
+            for store in self.stores:
+                store_ops = self._generate_store_operations_for_day(store, date)
+                store_ops_records.extend(store_ops)
+
+            daily_facts["store_ops"].extend(store_ops_records)
+
+            # Insert store operations immediately (daily batch)
+            if store_ops_records:
+                try:
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "store_ops",
+                        store_ops_records,
+                        hour=0,
+                        commit_every_batches=0,
+                    )
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "store_ops", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert store_ops for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
+
+        # 8. Generate supply chain disruptions
         if "supply_chain_disruption" in active_tables:
             disruption_events = (
                 self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
