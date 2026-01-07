@@ -1080,6 +1080,40 @@ class InventoryMixin:
                 f"Adjustment generation failed for {date.strftime('%Y-%m-%d')}: {e}"
             )
 
+        # 8.5. Generate stockout events from inventory transactions (Issue #8)
+        if "stockouts" in active_tables:
+            try:
+                # Collect all inventory transactions generated today
+                store_inv_txns = daily_facts.get("store_inventory_txn", [])
+                dc_inv_txns = daily_facts.get("dc_inventory_txn", [])
+
+                # Detect stockouts from inventory transactions
+                stockout_records = self._generate_stockouts_from_inventory_txns(
+                    store_inv_txns, dc_inv_txns
+                )
+
+                # Add to daily facts
+                daily_facts["stockouts"].extend(stockout_records)
+
+                # Insert stockouts immediately (daily batch)
+                if stockout_records:
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "stockouts",
+                        stockout_records,
+                        hour=0,
+                        commit_every_batches=0,
+                    )
+                    # Mark all hours complete for this daily-generated table
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "stockouts", day_index, hour, total_days
+                        )
+            except Exception as e:
+                logger.warning(
+                    f"Stockout generation failed for {date.strftime('%Y-%m-%d')}: {e}"
+                )
+
         # 9. Generate return receipts and inventory effects (baseline + holiday spikes)
         try:
             if getattr(self, "_use_duckdb", False):
