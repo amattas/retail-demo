@@ -413,3 +413,111 @@ class TestConfig:
         # Should have multiple validation errors
         # errors = exc_info.value.errors()
         # assert len(errors) >= 3  # At least seed, stores, emit_interval, dict path
+
+
+class TestCircuitBreakerConfigPropagation:
+    """Test circuit breaker config propagation from RealtimeConfig to StreamingConfig."""
+
+    def test_circuit_breaker_default_values(self):
+        """Test that circuit breaker has correct default values."""
+        config = RealtimeConfig(emit_interval_ms=500, burst=100)
+        assert config.circuit_breaker_failure_threshold == 5
+        assert config.circuit_breaker_recovery_timeout == 60
+        assert config.circuit_breaker_enabled is True
+
+    def test_circuit_breaker_custom_values(self):
+        """Test that custom circuit breaker values are accepted."""
+        config = RealtimeConfig(
+            emit_interval_ms=500,
+            burst=100,
+            circuit_breaker_failure_threshold=10,
+            circuit_breaker_recovery_timeout=120,
+            circuit_breaker_enabled=False,
+        )
+        assert config.circuit_breaker_failure_threshold == 10
+        assert config.circuit_breaker_recovery_timeout == 120
+        assert config.circuit_breaker_enabled is False
+
+    def test_circuit_breaker_validation(self):
+        """Test that invalid circuit breaker values are rejected."""
+        # failure_threshold must be > 0
+        with pytest.raises(ValidationError):
+            RealtimeConfig(
+                emit_interval_ms=500,
+                burst=100,
+                circuit_breaker_failure_threshold=0,
+            )
+
+        # recovery_timeout must be > 0
+        with pytest.raises(ValidationError):
+            RealtimeConfig(
+                emit_interval_ms=500,
+                burst=100,
+                circuit_breaker_recovery_timeout=-1,
+            )
+
+    def test_circuit_breaker_config_propagation(self):
+        """Test that circuit breaker config propagates from RetailConfig to StreamingConfig."""
+        from retail_datagen.streaming.event_streaming.config import StreamingConfig
+
+        # Create a RetailConfig with custom circuit breaker settings
+        retail_config = Config(
+            seed=42,
+            volume={
+                "stores": 10,
+                "dcs": 2,
+                "customers_per_day": 100,
+                "items_per_ticket_mean": 4.0,
+            },
+            realtime={
+                "emit_interval_ms": 500,
+                "burst": 100,
+                "circuit_breaker_failure_threshold": 10,
+                "circuit_breaker_recovery_timeout": 120,
+            },
+            paths={
+                "dict": "data/dictionaries",
+                "master": "data/master",
+                "facts": "data/facts",
+            },
+            stream={"hub": "retail-events"},
+        )
+
+        # Create StreamingConfig from RetailConfig
+        streaming_config = StreamingConfig.from_retail_config(retail_config)
+
+        # Verify values propagated correctly
+        assert streaming_config.circuit_breaker_failure_threshold == 10
+        assert streaming_config.circuit_breaker_recovery_timeout == 120
+
+    def test_circuit_breaker_default_propagation(self):
+        """Test that default circuit breaker config propagates correctly."""
+        from retail_datagen.streaming.event_streaming.config import StreamingConfig
+
+        # Create a RetailConfig without explicit circuit breaker settings
+        retail_config = Config(
+            seed=42,
+            volume={
+                "stores": 10,
+                "dcs": 2,
+                "customers_per_day": 100,
+                "items_per_ticket_mean": 4.0,
+            },
+            realtime={
+                "emit_interval_ms": 500,
+                "burst": 100,
+            },
+            paths={
+                "dict": "data/dictionaries",
+                "master": "data/master",
+                "facts": "data/facts",
+            },
+            stream={"hub": "retail-events"},
+        )
+
+        # Create StreamingConfig from RetailConfig
+        streaming_config = StreamingConfig.from_retail_config(retail_config)
+
+        # Verify default values propagated correctly
+        assert streaming_config.circuit_breaker_failure_threshold == 5  # Default
+        assert streaming_config.circuit_breaker_recovery_timeout == 60  # Default

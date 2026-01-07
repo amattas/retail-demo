@@ -126,14 +126,13 @@ class StreamingConfig:
             streaming_config.circuit_breaker_enabled = (
                 config.realtime.circuit_breaker_enabled
             )
-        if hasattr(config.realtime, "circuit_breaker_failure_threshold"):
-            streaming_config.circuit_breaker_failure_threshold = (
-                config.realtime.circuit_breaker_failure_threshold
-            )
-        if hasattr(config.realtime, "circuit_breaker_recovery_timeout"):
-            streaming_config.circuit_breaker_recovery_timeout = (
-                config.realtime.circuit_breaker_recovery_timeout
-            )
+        # These fields have defaults in RealtimeConfig, so hasattr() is unnecessary
+        streaming_config.circuit_breaker_failure_threshold = (
+            config.realtime.circuit_breaker_failure_threshold
+        )
+        streaming_config.circuit_breaker_recovery_timeout = (
+            config.realtime.circuit_breaker_recovery_timeout
+        )
         if hasattr(config.realtime, "monitoring_interval"):
             streaming_config.monitoring_interval = config.realtime.monitoring_interval
 
