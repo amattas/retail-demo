@@ -122,11 +122,9 @@ class StreamingConfig:
             streaming_config.retry_attempts = config.realtime.retry_attempts
         if hasattr(config.realtime, "backoff_multiplier"):
             streaming_config.backoff_multiplier = config.realtime.backoff_multiplier
-        if hasattr(config.realtime, "circuit_breaker_enabled"):
-            streaming_config.circuit_breaker_enabled = (
-                config.realtime.circuit_breaker_enabled
-            )
-        # These fields have defaults in RealtimeConfig, so hasattr() is unnecessary
+
+        # Circuit breaker fields have defaults in RealtimeConfig, so hasattr() is unnecessary
+        streaming_config.circuit_breaker_enabled = config.realtime.circuit_breaker_enabled
         streaming_config.circuit_breaker_failure_threshold = (
             config.realtime.circuit_breaker_failure_threshold
         )

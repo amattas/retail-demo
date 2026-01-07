@@ -486,9 +486,42 @@ class TestCircuitBreakerConfigPropagation:
         # Create StreamingConfig from RetailConfig
         streaming_config = StreamingConfig.from_retail_config(retail_config)
 
-        # Verify values propagated correctly
+        # Verify values propagated correctly (enabled defaults to True)
+        assert streaming_config.circuit_breaker_enabled is True
         assert streaming_config.circuit_breaker_failure_threshold == 10
         assert streaming_config.circuit_breaker_recovery_timeout == 120
+
+    def test_circuit_breaker_enabled_propagation(self):
+        """Test that circuit_breaker_enabled propagates correctly when set to False."""
+        from retail_datagen.streaming.event_streaming.config import StreamingConfig
+
+        # Create a RetailConfig with circuit breaker disabled
+        retail_config = Config(
+            seed=42,
+            volume={
+                "stores": 10,
+                "dcs": 2,
+                "customers_per_day": 100,
+                "items_per_ticket_mean": 4.0,
+            },
+            realtime={
+                "emit_interval_ms": 500,
+                "burst": 100,
+                "circuit_breaker_enabled": False,
+            },
+            paths={
+                "dict": "data/dictionaries",
+                "master": "data/master",
+                "facts": "data/facts",
+            },
+            stream={"hub": "retail-events"},
+        )
+
+        # Create StreamingConfig from RetailConfig
+        streaming_config = StreamingConfig.from_retail_config(retail_config)
+
+        # Verify circuit breaker is disabled
+        assert streaming_config.circuit_breaker_enabled is False
 
     def test_circuit_breaker_default_propagation(self):
         """Test that default circuit breaker config propagates correctly."""
@@ -519,5 +552,6 @@ class TestCircuitBreakerConfigPropagation:
         streaming_config = StreamingConfig.from_retail_config(retail_config)
 
         # Verify default values propagated correctly
+        assert streaming_config.circuit_breaker_enabled is True  # Default
         assert streaming_config.circuit_breaker_failure_threshold == 5  # Default
         assert streaming_config.circuit_breaker_recovery_timeout == 60  # Default
