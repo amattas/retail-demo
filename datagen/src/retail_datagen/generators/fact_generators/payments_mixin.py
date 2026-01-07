@@ -63,6 +63,11 @@ class PaymentsMixin:
         "LIMIT_EXCEEDED",
     ]
 
+    # Transaction ID suffix range (6 digits = 900k possible values per second)
+    # Used to minimize collision risk during high-volume periods
+    _TXN_ID_SUFFIX_MIN: int = 100000
+    _TXN_ID_SUFFIX_MAX: int = 999999
+
     def _generate_payment_for_receipt(
         self,
         receipt: dict,
@@ -238,5 +243,5 @@ class PaymentsMixin:
         rng: random.Random = self._rng  # type: ignore[attr-defined]
 
         epoch = int(timestamp.timestamp())
-        suffix = rng.randint(100000, 999999)
+        suffix = rng.randint(self._TXN_ID_SUFFIX_MIN, self._TXN_ID_SUFFIX_MAX)
         return f"TXN_{epoch}_{suffix:06d}"

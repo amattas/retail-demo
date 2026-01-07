@@ -11,7 +11,6 @@ Tests the PaymentsMixin class including:
 
 import random
 from datetime import datetime
-from unittest.mock import Mock
 
 import pytest
 
@@ -38,6 +37,8 @@ class MockPaymentsMixin:
     _DECLINE_RATE_MULTIPLIERS = PaymentsMixin._DECLINE_RATE_MULTIPLIERS
     _PROCESSING_TIME_RANGES = PaymentsMixin._PROCESSING_TIME_RANGES
     _DECLINE_REASONS = PaymentsMixin._DECLINE_REASONS
+    _TXN_ID_SUFFIX_MIN = PaymentsMixin._TXN_ID_SUFFIX_MIN
+    _TXN_ID_SUFFIX_MAX = PaymentsMixin._TXN_ID_SUFFIX_MAX
 
 
 @pytest.fixture

@@ -596,11 +596,14 @@ class EventFactory:
         payment_method = self.rng.choice(list(TenderType)).value
         amount = round(self.rng.uniform(10.0, 200.0), 2)
         amount_cents = int(amount * 100)
+        # Use 6-digit suffix (100000-999999) for consistency with PaymentsMixin
+        # to minimize collision risk during high-volume periods
         transaction_id = (
-            f"TXN_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
+            f"TXN_{int(timestamp.timestamp())}_{self.rng.randint(100000, 999999):06d}"
         )
         # Processing time varies by payment method
         processing_time_ms = self.rng.randint(500, 3000)
+        store_id = receipt_info.get("store_id")
         customer_id = receipt_info.get("customer_id", self.rng.randint(1, 1000))
 
         payload = PaymentProcessedPayload(
@@ -612,6 +615,7 @@ class EventFactory:
             processing_time=timestamp,
             processing_time_ms=processing_time_ms,
             status="APPROVED",
+            store_id=store_id,
             customer_id=customer_id,
         )
 

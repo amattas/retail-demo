@@ -943,6 +943,8 @@ class InventoryMixin:
                         f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Insert online order payments (separate from hourly in-store payments)
+            # Note: Progress tracking for fact_payments is handled by the hourly loop since
+            # fact_payments is in hourly_generated_tables. No additional tracking needed here.
             if online_order_payments:
                 try:
                     await self._insert_hourly_to_db(
@@ -952,12 +954,6 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Track as daily-generated (all hours complete)
-                    # Note: In-store payments are tracked hourly; this is for online orders only
-                    for hour in range(24):
-                        self.hourly_tracker.update_hourly_progress(
-                            "fact_payments", day_index, hour, total_days
-                        )
                 except Exception as e:
                     logger.error(
                         f"Failed to insert online order payments for {date.strftime('%Y-%m-%d')}: {e}"
