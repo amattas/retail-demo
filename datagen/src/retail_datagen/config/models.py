@@ -112,6 +112,13 @@ class VolumeConfig(BaseModel):
         "If specified, exactly this many trucks will be assigned to each DC. "
         "If None, trucks are distributed based on truck_dc_assignment_rate.",
     )
+    truck_capacity: int = Field(
+        15000,
+        gt=0,
+        description="Maximum items per truck shipment. A 53-foot semi-trailer "
+        "typically holds 20-26 pallets with 50-200+ items each. "
+        "Default 15,000 represents a realistic full truckload.",
+    )
 
 
 class RealtimeConfig(BaseModel):

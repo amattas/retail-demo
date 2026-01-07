@@ -8,15 +8,7 @@ SKIPPED TESTS DOCUMENTATION
 This test suite uses pytest.skip() in several categories. All skips are
 intentional and documented:
 
-1. LEGACY ORM TESTS (module-level skip)
-   - Pattern: `pytest.skip("Legacy ORM-based ... test deprecated; DuckDB-only path active.")`
-   - Files: test_retail_engine.py, test_promotions.py, test_truck_lifecycle.py,
-            test_master_generation_small.py, test_export_endpoints.py
-   - Reason: The codebase migrated from SQLite/SQLAlchemy to DuckDB-only.
-             These tests are preserved for reference but skipped.
-   - Status: DEPRECATED - safe to delete when DuckDB migration is complete
-
-2. AZURE SDK CONDITIONAL SKIPS
+1. AZURE SDK CONDITIONAL SKIPS
    - Pattern: `pytest.skip("Azure SDK not available")`
    - Files: test_azure_client.py (40+ occurrences)
    - Reason: Tests require azure-eventhub SDK which is optional for development.
@@ -40,9 +32,7 @@ To run tests excluding skipped categories:
     pytest tests/ -v --ignore=tests/validation/ --ignore=tests/unit/test_retail_engine.py
 """
 
-# Explicitly enable pytest-asyncio
-# Note: Only use pytest_plugins, not manual registration, to avoid double registration
-pytest_plugins = ("pytest_asyncio",)
+# pytest_plugins moved to root conftest.py (required by pytest 8.x+)
 
 # CRITICAL: Mock Prometheus BEFORE any imports to prevent registry conflicts
 import sys
@@ -916,3 +906,146 @@ def performance_test_config():
         },
         "stream": {"hub": "test-retail-events"},
     }
+
+
+# =============================================================================
+# Azure Event Hub Mock Fixtures (Issue #83)
+# =============================================================================
+
+
+@pytest.fixture
+def valid_connection_string() -> str:
+    """Valid Azure Event Hub connection string for testing."""
+    return VALID_TEST_CONNECTION_STRING
+
+
+@pytest.fixture
+def mock_event_data_class():
+    """Mock Azure EventData class."""
+    class MockEventData:
+        def __init__(self, body):
+            self.body = body
+            self.partition_key = None
+            self.properties = {}
+    return MockEventData
+
+
+@pytest.fixture
+def mock_event_hub_producer_client():
+    """Mock Azure EventHubProducerClient for testing without SDK."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = MagicMock()
+    mock_client.from_connection_string = MagicMock(return_value=mock_client)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.send_batch = AsyncMock(return_value=None)
+    mock_client.get_partition_properties = AsyncMock(
+        return_value={"id": "0", "beginning_sequence_number": 0}
+    )
+    mock_client.get_eventhub_properties = AsyncMock(
+        return_value={"name": "test-hub", "partition_ids": ["0", "1"]}
+    )
+    mock_client.close = AsyncMock(return_value=None)
+    return mock_client
+
+
+@pytest.fixture
+def mock_azure_exceptions():
+    """Mock Azure exception classes."""
+    class MockEventHubError(Exception):
+        """Mock EventHubError exception."""
+        pass
+
+    class MockAzureError(Exception):
+        """Mock AzureError exception."""
+        pass
+
+    return {
+        "EventHubError": MockEventHubError,
+        "AzureError": MockAzureError,
+    }
+
+
+@pytest.fixture
+def mock_azure_sdk_complete(
+    mock_event_hub_producer_client,
+    mock_event_data_class,
+    mock_azure_exceptions
+):
+    """Complete Azure SDK mock for comprehensive testing."""
+    return {
+        "EventHubProducerClient": mock_event_hub_producer_client,
+        "EventData": mock_event_data_class,
+        "EventHubError": mock_azure_exceptions["EventHubError"],
+        "AzureError": mock_azure_exceptions["AzureError"],
+    }
+
+
+@pytest.fixture
+def mock_azure_connection_failure():
+    """Mock Azure client that fails on connection."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = MagicMock()
+    mock_client.from_connection_string = MagicMock(return_value=mock_client)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.get_partition_properties = AsyncMock(
+        side_effect=Exception("Connection timeout")
+    )
+    mock_client.get_eventhub_properties = AsyncMock(
+        side_effect=Exception("Connection timeout")
+    )
+    mock_client.close = AsyncMock(return_value=None)
+    return mock_client
+
+
+@pytest.fixture
+def mock_azure_send_failure(mock_azure_exceptions):
+    """Mock Azure client that fails on send operations."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = MagicMock()
+    mock_client.from_connection_string = MagicMock(return_value=mock_client)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.send_batch = AsyncMock(
+        side_effect=mock_azure_exceptions["EventHubError"]("Send failed")
+    )
+    mock_client.get_partition_properties = AsyncMock(
+        return_value={"id": "0", "beginning_sequence_number": 0}
+    )
+    mock_client.get_eventhub_properties = AsyncMock(
+        return_value={"name": "test-hub", "partition_ids": ["0", "1"]}
+    )
+    mock_client.close = AsyncMock(return_value=None)
+    return mock_client
+
+
+@pytest.fixture
+def mock_azure_transient_failure(mock_azure_exceptions):
+    """Mock Azure client with transient failures that succeed on retry."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    attempt_count = {"value": 0}
+
+    async def transient_send(*args, **kwargs):
+        attempt_count["value"] += 1
+        if attempt_count["value"] < 3:
+            raise mock_azure_exceptions["EventHubError"]("Transient error")
+        return None
+
+    mock_client = MagicMock()
+    mock_client.from_connection_string = MagicMock(return_value=mock_client)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.send_batch = AsyncMock(side_effect=transient_send)
+    mock_client.get_partition_properties = AsyncMock(
+        return_value={"id": "0", "beginning_sequence_number": 0}
+    )
+    mock_client.get_eventhub_properties = AsyncMock(
+        return_value={"name": "test-hub", "partition_ids": ["0", "1"]}
+    )
+    mock_client.close = AsyncMock(return_value=None)
+    return mock_client

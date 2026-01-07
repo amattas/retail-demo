@@ -6,7 +6,6 @@ and cleanup operations for exported master and fact data.
 """
 
 import logging
-from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -291,3 +290,46 @@ class ExportFileManager:
             ...     print(f"Tracked: {f}")
         """
         return self.written_files.copy()
+
+    def clear_table_export_directory(self, table_name: str) -> int:
+        """
+        Clear all existing export files for a specific table.
+
+        This should be called before starting a new export to prevent
+        append mode from adding to stale data from previous exports.
+
+        Args:
+            table_name: Name of the table whose export directory should be cleared
+
+        Returns:
+            Number of files removed
+
+        Example:
+            >>> manager.clear_table_export_directory("fact_receipts")
+            3  # Removed 3 old export files
+        """
+        export_dir = self.base_dir / "export" / table_name
+
+        if not export_dir.exists():
+            logger.debug(f"Export directory does not exist: {export_dir}")
+            return 0
+
+        # Validate the directory is within allowed base
+        self._validate_path(export_dir)
+
+        removed_count = 0
+        try:
+            for file_path in export_dir.glob("*.parquet"):
+                try:
+                    file_path.unlink()
+                    logger.debug(f"Removed old export file: {file_path}")
+                    removed_count += 1
+                except OSError as e:
+                    logger.warning(f"Failed to remove old file {file_path}: {e}")
+        except Exception as e:
+            logger.warning(f"Error clearing export directory {export_dir}: {e}")
+
+        if removed_count > 0:
+            logger.info(f"Cleared {removed_count} old export files from {table_name}")
+
+        return removed_count

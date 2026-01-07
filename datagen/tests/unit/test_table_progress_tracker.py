@@ -5,10 +5,11 @@ Tests state transitions, progress updates, query methods, reset functionality,
 thread safety, and integration scenarios for table generation progress tracking.
 """
 
-import pytest
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pytest
 
 from src.retail_datagen.generators.progress_tracker import TableProgressTracker
 

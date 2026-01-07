@@ -186,7 +186,6 @@ class GenerationStateManager:
         Returns:
             Dictionary with deletion results
         """
-        import shutil
         from pathlib import Path
 
         results = {

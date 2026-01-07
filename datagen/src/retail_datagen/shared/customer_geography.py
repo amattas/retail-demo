@@ -10,7 +10,6 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -45,14 +44,14 @@ class CustomerGeography:
     home_latitude: float
     home_longitude: float
 
-    nearest_stores: List[Tuple[int, float]]  # [(store_id, distance_miles), ...]
+    nearest_stores: list[tuple[int, float]]  # [(store_id, distance_miles), ...]
 
     primary_store_id: int
     secondary_store_id: int
     travel_propensity: float  # 0.0 to 1.0
     customer_segment: str  # regular, tourist, commuter, snowbird, business_traveler
 
-    def get_store_selection_weights(self, all_store_ids: List[int]) -> Dict[int, float]:
+    def get_store_selection_weights(self, all_store_ids: list[int]) -> dict[int, float]:
         """
         Calculate probability of shopping at each store based on distance and patterns.
 
@@ -109,9 +108,9 @@ class GeographyAssigner:
 
     def __init__(
         self,
-        customers: List[Customer],
-        stores: List[Store],
-        geographies: List[GeographyMaster],
+        customers: list[Customer],
+        stores: list[Store],
+        geographies: list[GeographyMaster],
         seed: int = 42,
     ):
         """
@@ -214,7 +213,7 @@ class GeographyAssigner:
 
     def _calculate_store_distances(
         self, customer_geo_id: int
-    ) -> Dict[int, float]:
+    ) -> dict[int, float]:
         """
         Calculate distances from customer's home geography to all stores.
 
@@ -259,7 +258,7 @@ class GeographyAssigner:
 
         # Fallback per-store calculation
         customer_lat, customer_lon = customer_coords
-        distances: Dict[int, float] = {}
+        distances: dict[int, float] = {}
         for store in self.stores:
             store_geo_id = store.GeographyID
             store_coords = self._geo_coordinates.get(store_geo_id)
@@ -325,7 +324,7 @@ class GeographyAssigner:
 
         return propensities.get(segment, 0.10)
 
-    def assign_geographies(self) -> Dict[int, CustomerGeography]:
+    def assign_geographies(self) -> dict[int, CustomerGeography]:
         """
         Assign home geography and store affinity to each customer.
 
@@ -404,7 +403,7 @@ class GeographyAssigner:
 
         return customer_geographies
 
-    def _log_geography_summary(self, customer_geographies: Dict[int, CustomerGeography]) -> None:
+    def _log_geography_summary(self, customer_geographies: dict[int, CustomerGeography]) -> None:
         """Log summary statistics about customer geographies."""
         if not customer_geographies:
             return
@@ -440,8 +439,8 @@ class StoreSelector:
 
     def __init__(
         self,
-        customer_geographies: Dict[int, CustomerGeography],
-        stores: List[Store],
+        customer_geographies: dict[int, CustomerGeography],
+        stores: list[Store],
         seed: int = 42,
     ):
         """
@@ -493,7 +492,7 @@ class StoreSelector:
         selected_store_id = self._rng.choices(store_ids, weights=probabilities)[0]
         return self._store_lookup.get(selected_store_id)
 
-    def get_store_customer_distribution(self, store_id: int) -> Dict[str, float]:
+    def get_store_customer_distribution(self, store_id: int) -> dict[str, float]:
         """
         Get geographic distribution of customers for a given store.
 

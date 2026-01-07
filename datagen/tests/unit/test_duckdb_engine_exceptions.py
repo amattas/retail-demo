@@ -5,10 +5,12 @@ Tests verify that exception handlers properly log errors and maintain
 system stability when failures occur.
 """
 
-from unittest.mock import patch, MagicMock, PropertyMock
-import pytest
-import duckdb
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import duckdb
+import pytest
+
 from retail_datagen.db import duckdb_engine
 
 

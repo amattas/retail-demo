@@ -7,14 +7,11 @@ state management, and API endpoints.
 """
 
 import asyncio
-import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-import pytest_asyncio
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.generators.generation_state import GenerationStateManager
@@ -26,9 +23,8 @@ from retail_datagen.shared.models import (
 )
 from retail_datagen.streaming.azure_client import AzureEventHubClient, CircuitBreaker
 from retail_datagen.streaming.event_factory import EventFactory
-from retail_datagen.streaming.event_streamer import EventStreamer
+from retail_datagen.streaming.event_streaming import EventStreamer
 from retail_datagen.streaming.schemas import EventEnvelope, EventType
-
 
 # ================================
 # FIXTURES
@@ -494,7 +490,7 @@ async def test_state_persistence_across_runs(tmp_path):
     state_file = tmp_path / "generation_state.json"
 
     # Create initial state
-    state_manager = GenerationStateManager(state_file=str(state_file))
+    state_manager = GenerationStateManager(state_file_path=str(state_file))
 
     # Set historical data flag
     initial_time = datetime.now(UTC)
@@ -544,8 +540,8 @@ def test_fabric_rti_connection_validation():
     assert is_valid, f"Azure connection string should be valid: {error}"
     assert not is_fabric_rti_connection_string(azure_conn), "Should not be Fabric RTI"
 
-    # Valid Fabric RTI string
-    fabric_conn = "Endpoint=sb://test-fabric.eventhub.windows.net/;SharedAccessKeyName=FabricKey;SharedAccessKey=RmFicmljS2V5MTIzRmFicmljS2V5MTIz;EntityPath=fabric-hub"
+    # Valid Fabric RTI string (using servicebus.windows.net domain)
+    fabric_conn = "Endpoint=sb://eventstream-fabric.servicebus.windows.net/;SharedAccessKeyName=key_FabricKey;SharedAccessKey=RmFicmljS2V5MTIzRmFicmljS2V5MTIz;EntityPath=es_fabric-hub"
     is_valid, error = validate_eventhub_connection_string(fabric_conn)
     assert is_valid, f"Fabric connection string should be valid: {error}"
 

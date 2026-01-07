@@ -1,14 +1,15 @@
 """Integration test for task status endpoint with table tracking fields."""
 
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
-from datetime import datetime
 
 from src.retail_datagen.main import app
 from src.retail_datagen.shared.dependencies import (
     TaskStatus,
-    update_task_progress,
     _task_status,
+    update_task_progress,
 )
 
 

@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
+from retail_datagen.generators.fact_generators import FactDataGenerator
 
 
 class TestMarketingGenerationIntegration:
@@ -66,7 +66,7 @@ class TestMarketingGenerationIntegration:
 
         if not stores_file.exists():
             # Generate master data first
-            from retail_datagen.generators.master_generator import MasterDataGenerator
+            from retail_datagen.generators.master_generators import MasterDataGenerator
 
             master_gen = MasterDataGenerator(test_config)
             master_gen.generate_all_master_data()
@@ -591,7 +591,7 @@ class TestMarketingBugFixValidation:
         config, output_dir = small_test_config
 
         # Generate master data
-        from retail_datagen.generators.master_generator import MasterDataGenerator
+        from retail_datagen.generators.master_generators import MasterDataGenerator
 
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()
@@ -629,7 +629,7 @@ class TestMarketingBugFixValidation:
         config, output_dir = small_test_config
 
         # Generate master data
-        from retail_datagen.generators.master_generator import MasterDataGenerator
+        from retail_datagen.generators.master_generators import MasterDataGenerator
 
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()
@@ -690,7 +690,7 @@ class TestMarketingBugFixValidation:
         config, output_dir = small_test_config
 
         # Generate master data
-        from retail_datagen.generators.master_generator import MasterDataGenerator
+        from retail_datagen.generators.master_generators import MasterDataGenerator
 
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()

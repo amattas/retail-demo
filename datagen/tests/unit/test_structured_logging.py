@@ -1,11 +1,11 @@
 """Unit tests for structured logging functionality."""
 import json
 import logging
-from io import StringIO
 
-import pytest
-
-from src.retail_datagen.shared.logging_utils import StructuredLogger, get_structured_logger
+from src.retail_datagen.shared.logging_utils import (
+    StructuredLogger,
+    get_structured_logger,
+)
 
 
 class TestStructuredLogger:
@@ -130,8 +130,9 @@ class TestEventEnvelopeCorrelationFields:
 
     def test_event_envelope_has_correlation_fields(self):
         """Test EventEnvelope has session_id and parent_event_id fields."""
+        from datetime import UTC, datetime
+
         from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
-        from datetime import datetime, UTC
 
         # Create event envelope with correlation fields
         event = EventEnvelope(
@@ -150,8 +151,9 @@ class TestEventEnvelopeCorrelationFields:
 
     def test_event_envelope_correlation_fields_optional(self):
         """Test that correlation fields are optional."""
+        from datetime import UTC, datetime
+
         from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
-        from datetime import datetime, UTC
 
         # Create event without correlation fields
         event = EventEnvelope(
@@ -208,7 +210,9 @@ class TestLoggingConfiguration:
 
     def test_configure_structured_logging(self):
         """Test logging configuration function."""
-        from src.retail_datagen.shared.logging_config import configure_structured_logging
+        from src.retail_datagen.shared.logging_config import (
+            configure_structured_logging,
+        )
 
         # Should not raise an error
         configure_structured_logging(level="INFO")
@@ -219,7 +223,9 @@ class TestLoggingConfiguration:
 
     def test_configure_with_different_levels(self):
         """Test configuration with different log levels."""
-        from src.retail_datagen.shared.logging_config import configure_structured_logging
+        from src.retail_datagen.shared.logging_config import (
+            configure_structured_logging,
+        )
 
         configure_structured_logging(level="DEBUG")
         assert logging.getLogger().level == logging.DEBUG

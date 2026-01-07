@@ -8,15 +8,15 @@ table creation/insert utilities optimized for batch loads.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
+from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
-import os
-from typing import Iterable
 
 import duckdb
 import pandas as pd
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,10 @@ ALLOWED_TABLES: frozenset[str] = frozenset({
 # Internal temporary table name - uses double underscore prefix to avoid
 # collision with user-provided table names
 _INTERNAL_TMP_TABLE = "__rdg_tmp_df__"
+
+# Internal staging table for pending shipments (excluded from exports/dashboard)
+# Stores truck shipments scheduled beyond the generation end date
+_STAGING_PENDING_SHIPMENTS = "_staging_pending_shipments"
 
 
 def validate_table_name(table: str) -> str:
@@ -154,6 +158,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                 _conn = new_conn
             except Exception as e:
                 # Clean up connection if any critical initialization fails
+                logger.error(f"DuckDB connection initialization failed: {e}")
                 try:
                     new_conn.close()
                 except Exception as close_error:
@@ -485,3 +490,265 @@ def outbox_insert_records(conn: duckdb.DuckDBPyConnection, records: Iterable[dic
         prepared.append(rec_copy)
 
     return insert_records(conn, "streaming_outbox", prepared)
+
+
+# ================================
+# Pending Shipments Staging (DuckDB)
+# ================================
+
+def _ensure_pending_shipments_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create the pending shipments staging table if it does not exist.
+
+    This table stores truck shipments that are scheduled beyond the generation
+    end date. They are NOT included in exports or dashboard counts, but will
+    be picked up by streaming when it runs.
+
+    Schema mirrors fact_truck_moves but adds scheduling metadata.
+    """
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {_STAGING_PENDING_SHIPMENTS} (
+            staging_id BIGINT PRIMARY KEY,
+            -- Core shipment data (matches fact_truck_moves schema)
+            event_ts TIMESTAMP,
+            truck_id VARCHAR,
+            dc_id INTEGER,
+            store_id INTEGER,
+            shipment_id VARCHAR,
+            status VARCHAR,
+            eta TIMESTAMP,
+            etd TIMESTAMP,
+            departure_time TIMESTAMP,
+            actual_unload_duration INTEGER,
+            trace_id VARCHAR,
+            -- Scheduling metadata
+            generation_end_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT now(),
+            -- Full shipment info as JSON for restoration
+            shipment_info_json VARCHAR
+        );
+        """
+    )
+    # Index for efficient retrieval by departure time
+    try:
+        conn.execute(
+            f"CREATE INDEX IF NOT EXISTS idx_pending_shipments_departure "
+            f"ON {_STAGING_PENDING_SHIPMENTS}(departure_time)"
+        )
+    except Exception as e:
+        logger.debug(f"Failed to create index on pending shipments: {e}")
+
+
+def pending_shipments_insert(
+    conn: duckdb.DuckDBPyConnection,
+    records: list[dict],
+    generation_end_date: datetime | None = None,
+) -> int:
+    """Insert pending shipment records into staging table.
+
+    Args:
+        conn: DuckDB connection
+        records: List of shipment records to stage
+        generation_end_date: The end date of the generation run (for metadata)
+
+    Returns:
+        Number of records inserted
+    """
+    import json
+    from datetime import datetime
+
+    _ensure_pending_shipments_table(conn)
+
+    if not records:
+        return 0
+
+    # Get max existing staging_id
+    try:
+        row = conn.execute(
+            f"SELECT COALESCE(MAX(staging_id), 0) FROM {_STAGING_PENDING_SHIPMENTS}"
+        ).fetchone()
+        max_id = int(row[0] or 0)
+    except Exception as e:
+        logger.warning(f"Failed to get max staging_id, using 0: {e}")
+        max_id = 0
+
+    prepared: list[dict] = []
+    next_id = max_id
+
+    for rec in records:
+        if rec is None:
+            continue
+        next_id += 1
+
+        # Serialize full shipment info for restoration
+        try:
+            shipment_json = json.dumps(rec, default=str)
+        except (TypeError, ValueError):
+            shipment_json = json.dumps({k: str(v) for k, v in rec.items()})
+
+        prepared.append({
+            "staging_id": next_id,
+            "event_ts": rec.get("EventTS") or rec.get("event_ts"),
+            "truck_id": str(rec.get("TruckId") or rec.get("truck_id", "")),
+            "dc_id": rec.get("DCID") or rec.get("dc_id"),
+            "store_id": rec.get("StoreID") or rec.get("store_id"),
+            "shipment_id": rec.get("ShipmentId") or rec.get("shipment_id"),
+            "status": rec.get("Status") or rec.get("status"),
+            "eta": rec.get("ETA") or rec.get("eta"),
+            "etd": rec.get("ETD") or rec.get("etd"),
+            "departure_time": rec.get("DepartureTime") or rec.get("departure_time"),
+            "actual_unload_duration": rec.get("ActualUnloadDuration") or rec.get("actual_unload_duration"),
+            "trace_id": rec.get("TraceId") or rec.get("trace_id", ""),
+            "generation_end_date": generation_end_date,
+            "shipment_info_json": shipment_json,
+        })
+
+    if not prepared:
+        return 0
+
+    # Insert using pandas DataFrame for consistency
+    df = pd.DataFrame.from_records(prepared)
+    conn.register(_INTERNAL_TMP_TABLE, df)
+    try:
+        # Check if table exists and has data
+        try:
+            conn.execute(f"SELECT 1 FROM {_STAGING_PENDING_SHIPMENTS} LIMIT 0")
+            table_exists = True
+        except duckdb.CatalogException:
+            table_exists = False
+
+        col_list = ", ".join(df.columns)
+        if not table_exists:
+            conn.execute(
+                f"CREATE TABLE {_STAGING_PENDING_SHIPMENTS} AS "
+                f"SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
+            )
+        else:
+            conn.execute(
+                f"INSERT INTO {_STAGING_PENDING_SHIPMENTS} ({col_list}) "
+                f"SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
+            )
+    finally:
+        conn.unregister(_INTERNAL_TMP_TABLE)
+
+    logger.info(f"Staged {len(prepared)} pending shipments for future processing")
+    return len(prepared)
+
+
+def pending_shipments_get_ready(
+    conn: duckdb.DuckDBPyConnection,
+    up_to_time: datetime,
+) -> list[dict]:
+    """Get pending shipments that are ready to be processed (departure_time <= up_to_time).
+
+    Args:
+        conn: DuckDB connection
+        up_to_time: Process shipments with departure_time <= this time
+
+    Returns:
+        List of shipment records ready for processing
+    """
+    import json
+
+    _ensure_pending_shipments_table(conn)
+
+    try:
+        cur = conn.execute(
+            f"SELECT staging_id, shipment_info_json FROM {_STAGING_PENDING_SHIPMENTS} "
+            f"WHERE departure_time <= ? ORDER BY departure_time",
+            [up_to_time],
+        )
+        rows = cur.fetchall()
+    except Exception as e:
+        logger.warning(f"Failed to query pending shipments: {e}")
+        return []
+
+    results = []
+    for staging_id, shipment_json in rows:
+        try:
+            rec = json.loads(shipment_json)
+            rec["_staging_id"] = staging_id  # Include for deletion after processing
+            results.append(rec)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse shipment JSON for staging_id={staging_id}: {e}")
+
+    return results
+
+
+def pending_shipments_delete(
+    conn: duckdb.DuckDBPyConnection,
+    staging_ids: list[int],
+) -> int:
+    """Delete processed pending shipments from staging table.
+
+    Args:
+        conn: DuckDB connection
+        staging_ids: List of staging_ids to delete
+
+    Returns:
+        Number of records deleted
+    """
+    if not staging_ids:
+        return 0
+
+    _ensure_pending_shipments_table(conn)
+
+    try:
+        # DuckDB supports IN with list
+        placeholders = ", ".join(["?" for _ in staging_ids])
+        result = conn.execute(
+            f"DELETE FROM {_STAGING_PENDING_SHIPMENTS} WHERE staging_id IN ({placeholders})",
+            staging_ids,
+        )
+        deleted = result.rowcount
+        logger.debug(f"Deleted {deleted} processed pending shipments")
+        return deleted
+    except Exception as e:
+        logger.warning(f"Failed to delete pending shipments: {e}")
+        return 0
+
+
+def pending_shipments_count(conn: duckdb.DuckDBPyConnection) -> int:
+    """Get count of pending shipments in staging table.
+
+    Args:
+        conn: DuckDB connection
+
+    Returns:
+        Number of pending shipments
+    """
+    _ensure_pending_shipments_table(conn)
+
+    try:
+        row = conn.execute(
+            f"SELECT COUNT(*) FROM {_STAGING_PENDING_SHIPMENTS}"
+        ).fetchone()
+        return int(row[0] or 0)
+    except Exception as e:
+        logger.debug(f"Failed to count pending shipments: {e}")
+        return 0
+
+
+def pending_shipments_get_date_range(
+    conn: duckdb.DuckDBPyConnection,
+) -> tuple[datetime | None, datetime | None]:
+    """Get the min/max departure_time of pending shipments.
+
+    Args:
+        conn: DuckDB connection
+
+    Returns:
+        Tuple of (min_departure_time, max_departure_time), or (None, None) if empty
+    """
+    _ensure_pending_shipments_table(conn)
+
+    try:
+        row = conn.execute(
+            f"SELECT MIN(departure_time), MAX(departure_time) FROM {_STAGING_PENDING_SHIPMENTS}"
+        ).fetchone()
+        if row and row[0] is not None:
+            return row[0], row[1]
+    except Exception as e:
+        logger.debug(f"Failed to get pending shipments date range: {e}")
+
+    return None, None

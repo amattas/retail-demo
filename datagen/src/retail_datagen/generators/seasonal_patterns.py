@@ -247,10 +247,12 @@ class SeasonalPatterns:
             holiday_date = datetime.strptime(holiday_date_str, "%Y-%m-%d")
             duration = holiday_info.get("duration_days", 1)
 
+            # Compare dates without timezone info to avoid naive/aware comparison issues
+            date_naive = date.replace(tzinfo=None) if hasattr(date, 'tzinfo') and date.tzinfo else date
             # Check if current date falls within holiday effect window
-            if abs((date - holiday_date).days) <= duration:
+            if abs((date_naive - holiday_date).days) <= duration:
                 # Diminishing effect based on distance from holiday
-                distance = abs((date - holiday_date).days)
+                distance = abs((date_naive - holiday_date).days)
                 decay_factor = max(0.3, 1.0 - (distance / duration) * 0.7)
                 return 1.0 + (float(holiday_info["multiplier"]) - 1.0) * decay_factor
 

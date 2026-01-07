@@ -5,12 +5,12 @@ Tests the main export service that coordinates database reading,
 format writing, and file management for master and fact table exports.
 """
 
-import pytest
 import asyncio
 from datetime import date
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch, call
+from unittest.mock import AsyncMock, Mock, patch
+
 import pandas as pd
+import pytest
 
 from retail_datagen.services.export_service import ExportService
 
@@ -83,7 +83,6 @@ class TestExportMasterTables:
             }),
         }
 
-    @pytest.mark.asyncio
     def test_export_master_tables_parquet_success(
         self, tmp_path, mock_session, sample_master_data
     ):
@@ -110,7 +109,6 @@ class TestExportMasterTables:
             df = pd.read_parquet(file_path)
             assert len(df) == len(sample_master_data[table_name])
 
-    @pytest.mark.asyncio
     def test_export_master_tables_with_progress_callback(
         self, tmp_path, mock_session, sample_master_data
     ):
@@ -137,7 +135,6 @@ class TestExportMasterTables:
         assert progress_calls[1][1] == 2  # Second table
         assert progress_calls[2][1] == 3  # Third table
 
-    @pytest.mark.asyncio
     def test_export_master_tables_skips_empty_tables(
         self, tmp_path, mock_session
     ):
@@ -165,7 +162,6 @@ class TestExportMasterTables:
         assert "dim_stores" in result
         assert "dim_empty" not in result
 
-    @pytest.mark.asyncio
     def test_export_master_tables_cleanup_on_failure(
         self, tmp_path, mock_session, sample_master_data
     ):
@@ -180,7 +176,7 @@ class TestExportMasterTables:
                 mock_writer = Mock()
                 mock_writer.write.side_effect = [
                     None,  # First table succeeds
-                    IOError("Disk full"),  # Second table fails
+                    OSError("Disk full"),  # Second table fails
                 ]
                 mock_get_writer.return_value = mock_writer
 
@@ -194,7 +190,6 @@ class TestExportMasterTables:
         # File manager should have no tracked files after cleanup
         assert service.file_manager.get_tracked_file_count() == 0
 
-    @pytest.mark.asyncio
     def test_export_master_tables_tracks_files_correctly(
         self, tmp_path, mock_session, sample_master_data
     ):
@@ -214,7 +209,6 @@ class TestExportMasterTables:
                 # Verify track_file was called for each table
                 assert mock_track.call_count == 3
 
-    @pytest.mark.asyncio
     def test_export_master_tables_resets_tracking_on_success(
         self, tmp_path, mock_session, sample_master_data
     ):
@@ -267,7 +261,6 @@ class TestExportFactTables:
             }),
         }
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_parquet_success(
         self, tmp_path, mock_session, sample_fact_data
     ):
@@ -287,7 +280,6 @@ class TestExportFactTables:
             assert len(files) == 1
             assert files[0].suffix == ".parquet"
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_with_date_filtering(
         self, tmp_path, mock_session, sample_fact_data
     ):
@@ -309,7 +301,6 @@ class TestExportFactTables:
             # Verify date filters were passed to reader
             mock_read.assert_called_once_with(start_date, end_date)
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_with_progress_callback(
         self, tmp_path, mock_session, sample_fact_data
     ):
@@ -333,7 +324,6 @@ class TestExportFactTables:
         assert len(progress_calls) == 2
         assert all(total == 2 for _, _, total in progress_calls)
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_skips_empty_tables(
         self, tmp_path, mock_session
     ):
@@ -360,7 +350,6 @@ class TestExportFactTables:
         assert "fact_empty" in result
         assert result["fact_empty"] == []
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_missing_event_ts_column(
         self, tmp_path, mock_session
     ):
@@ -384,7 +373,6 @@ class TestExportFactTables:
                     format="parquet"
                 ))
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_partitions_by_date(
         self, tmp_path, mock_session
     ):
@@ -418,7 +406,6 @@ class TestExportFactTables:
         assert len(files) == 1
         assert files[0].name.endswith("fact_receipts_2024-01.parquet")
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_cleanup_on_failure(
         self, tmp_path, mock_session, sample_fact_data
     ):
@@ -431,7 +418,7 @@ class TestExportFactTables:
             # Mock writer to fail during processing
             with patch.object(service, '_get_writer') as mock_get_writer:
                 mock_writer = Mock()
-                mock_writer.write.side_effect = IOError("Write failed")
+                mock_writer.write.side_effect = OSError("Write failed")
                 mock_get_writer.return_value = mock_writer
 
                 with pytest.raises(IOError):
@@ -443,14 +430,12 @@ class TestExportFactTables:
         # Verify cleanup was called
         assert service.file_manager.get_tracked_file_count() == 0
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_removes_temp_dt_column(
         self, tmp_path, mock_session, sample_fact_data
     ):
         """Should remove temporary dt column before writing."""
         # Parquet path no longer adds dt column; not applicable.
 
-    @pytest.mark.asyncio
     def test_export_fact_tables_resets_tracking_on_success(
         self, tmp_path, mock_session, sample_fact_data
     ):
@@ -472,7 +457,6 @@ class TestExportFactTables:
 class TestExportServiceIntegration:
     """Integration tests for ExportService with real writers."""
 
-    @pytest.mark.asyncio
     def test_full_export_workflow_parquet(self, tmp_path):
         """Should perform complete export workflow with Parquet format."""
         service = ExportService(base_dir=tmp_path)

@@ -1,8 +1,9 @@
 """Unit tests for tax_utils module."""
 
-import pytest
 from decimal import Decimal
 from pathlib import Path
+
+import pytest
 
 from retail_datagen.shared.tax_utils import TaxCalculator
 
@@ -86,9 +87,11 @@ class TestGetTaxRate:
         assert rate_upper == rate_lower == rate_mixed
 
     def test_get_tax_rate_unknown_city(self, tax_calculator):
-        """Test that unknown city returns default rate."""
+        """Test that unknown city falls back to state average rate."""
         rate = tax_calculator.get_tax_rate("CA", city="NonexistentCity")
-        assert rate == tax_calculator.default_rate
+        # Falls back to CA state average, not default rate
+        assert rate > Decimal("0")
+        assert rate != tax_calculator.default_rate  # Should be state average
 
     def test_get_tax_rate_unknown_state(self, tax_calculator):
         """Test that unknown state returns default rate."""
@@ -96,9 +99,12 @@ class TestGetTaxRate:
         assert rate == tax_calculator.default_rate
 
     def test_get_tax_rate_no_city_provided(self, tax_calculator):
-        """Test that no city provided returns default rate."""
+        """Test that no city provided returns state average rate."""
         rate = tax_calculator.get_tax_rate("CA")
-        assert rate == tax_calculator.default_rate
+        # Falls back to CA state average, not default rate
+        assert rate > Decimal("0")
+        # CA state average should be around 8-9%
+        assert Decimal("0.07") < rate < Decimal("0.11")
 
     def test_get_tax_rate_zero_tax_states(self, tax_calculator):
         """Test states with zero sales tax."""

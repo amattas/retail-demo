@@ -8,8 +8,8 @@ from configuration. Requires azure-storage-blob to be installed.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)

@@ -7,8 +7,8 @@ historical fact data, and real-time event streams as specified in AGENTS.md.
 
 from retail_datagen.shared.dictionary_loader import DictionaryLoader
 
-from .fact_generator import FactDataGenerator
-from .master_generator import MasterDataGenerator
+from .fact_generators import FactDataGenerator
+from .master_generators import MasterDataGenerator
 from .retail_patterns import (
     BusinessRulesEngine,
     CustomerJourneySimulator,

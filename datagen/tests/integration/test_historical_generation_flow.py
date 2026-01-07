@@ -10,29 +10,22 @@ Tests the complete lifecycle of historical data generation including:
 """
 
 import asyncio
-import json
-import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
 
 # Import application and dependencies
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.generators.fact_generator import FactDataGenerator
 from retail_datagen.generators.progress_tracker import TableProgressTracker
 from retail_datagen.main import app
 from retail_datagen.shared.dependencies import (
     _task_status,
     get_config,
-    get_fact_generator,
     update_task_progress,
 )
-
 
 # Test constants
 FACT_TABLES = [

@@ -9,18 +9,19 @@ Tests verify the following implementations:
 - Issue #13: Truck departed events in fact_truck_moves
 """
 
-import pytest
+import os
+import tempfile
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
-import tempfile
-import os
 
-from retail_datagen.shared.models import (
-    TruckStatus,
-    TruckMove,
-)
+import pytest
+
 from retail_datagen.generators.retail_patterns import CustomerSegment
+from retail_datagen.shared.models import (
+    TruckMove,
+    TruckStatus,
+)
 
 
 class TestTaxFallbackChain:
@@ -212,6 +213,8 @@ class TestTruckCapacityConstraints:
         sim = InventoryFlowSimulator.__new__(InventoryFlowSimulator)
         sim._truck_capacity = 1000
         sim._active_shipments = {}
+        sim._in_transit_inventory = {}
+        sim._truck_availability = {}
         sim._rng = MagicMock()
         sim._rng.randint = lambda a, b: (a + b) // 2
         sim.distribution_centers = []
@@ -222,7 +225,8 @@ class TestTruckCapacityConstraints:
     def test_shipment_within_capacity(self, mock_inventory_simulator):
         """Test that shipments within capacity are not modified."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id: "TRUCK001"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: "TRUCK001"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
         reorder_list = [(1, 100), (2, 200), (3, 150)]  # Total: 450, under 1000 capacity
@@ -239,7 +243,8 @@ class TestTruckCapacityConstraints:
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id: "TRUCK001"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: "TRUCK001"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
         # Create order that exceeds capacity (1000)
@@ -255,7 +260,8 @@ class TestTruckCapacityConstraints:
     def test_generate_multiple_shipments_splits_order(self, mock_inventory_simulator):
         """Test that large orders are split across multiple trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
         # Create large order that needs 3 trucks
@@ -459,11 +465,14 @@ class TestEdgeCases:
         sim = InventoryFlowSimulator.__new__(InventoryFlowSimulator)
         sim._truck_capacity = 1000
         sim._active_shipments = {}
+        sim._in_transit_inventory = {}
+        sim._truck_availability = {}
         sim._rng = MagicMock()
         sim._rng.randint = lambda a, b: (a + b) // 2
         sim.distribution_centers = []
         sim.trucks = []
-        sim._select_truck_for_shipment = lambda dc_id: "TRUCK001"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: "TRUCK001"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
         return sim
@@ -599,7 +608,8 @@ class TestEdgeCases:
     def test_very_large_order_splits_correctly(self, mock_inventory_simulator):
         """Test that very large orders split across many trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
         # Create order needing 5 trucks (capacity 1000 each)
@@ -629,7 +639,8 @@ class TestEdgeCases:
     def test_single_product_exceeds_capacity(self, mock_inventory_simulator):
         """Test handling when a single product's quantity exceeds truck capacity."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
         # Single product with qty > capacity

@@ -19,9 +19,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from ..config.models import RetailConfig
-from ..generators.fact_generator import FactDataGenerator
-from ..generators.master_generator import MasterDataGenerator
-from ..streaming.event_streamer import EventStreamer
+from ..generators.fact_generators import FactDataGenerator
+from ..generators.master_generators import MasterDataGenerator
+from ..streaming.event_streaming import EventStreamer
 
 logger = logging.getLogger(__name__)
 
@@ -530,6 +530,13 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
 
 def validate_date_range(start_date: datetime, end_date: datetime) -> None:
     """Validate that date range is reasonable."""
+    # Normalize to timezone-aware datetimes for comparison
+    # If naive, assume UTC
+    if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=UTC)
+    if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=UTC)
+
     # Allow single-day ranges (start == end). Only error if start is after end.
     if start_date > end_date:
         raise HTTPException(

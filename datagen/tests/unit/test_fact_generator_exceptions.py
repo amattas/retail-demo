@@ -5,11 +5,13 @@ Tests verify that exception handlers properly log errors when fallbacks
 or error conditions occur.
 """
 
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import MagicMock, patch
+
 import duckdb
-from retail_datagen.generators.fact_generator import FactDataGenerator
+import pytest
+
 from retail_datagen.config.models import RetailConfig
+from retail_datagen.generators.fact_generators import FactDataGenerator
 
 
 @pytest.fixture
@@ -55,8 +57,10 @@ def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
 def test_ensure_columns_handles_alter_table_failure(caplog):
     """Test that _ensure_columns logs but continues when ALTER TABLE fails."""
     import logging
-    from retail_datagen.db.duckdb_engine import _ensure_columns
+
     import pandas as pd
+
+    from retail_datagen.db.duckdb_engine import _ensure_columns
 
     # Capture debug-level logs
     caplog.set_level(logging.DEBUG)

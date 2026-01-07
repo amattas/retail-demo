@@ -46,8 +46,9 @@ class TestConfigurationLoading:
     @pytest.mark.integration
     def test_config_validates_constraints(self):
         """Test that configuration validation enforces constraints."""
-        from retail_datagen.config.models import RetailConfig
         from pydantic import ValidationError
+
+        from retail_datagen.config.models import RetailConfig
 
         # Should fail with invalid values
         invalid_config = {
@@ -275,13 +276,18 @@ class TestCampaignAttribution:
     @pytest.mark.integration
     def test_campaign_id_populated_for_marketing_driven_purchase(self):
         """Test that campaign_id is populated when customer was marketing-driven."""
-        from retail_datagen.streaming.event_factory import EventFactory, EventGenerationState
+        from decimal import Decimal
 
         # Create minimal test data
         from retail_datagen.shared.models import (
-            Customer, Store, ProductMaster, DistributionCenter
+            Customer,
+            DistributionCenter,
+            ProductMaster,
+            Store,
         )
-        from decimal import Decimal
+        from retail_datagen.streaming.event_factory import (
+            EventFactory,
+        )
 
         store = Store(
             ID=1, StoreNumber="ST001", Address="123 Test St",
@@ -341,12 +347,15 @@ class TestCampaignAttribution:
     @pytest.mark.integration
     def test_campaign_id_null_for_non_marketing_purchase(self):
         """Test that campaign_id is None when customer was not marketing-driven."""
-        from retail_datagen.streaming.event_factory import EventFactory
+        from decimal import Decimal
 
         from retail_datagen.shared.models import (
-            Customer, Store, ProductMaster, DistributionCenter
+            Customer,
+            DistributionCenter,
+            ProductMaster,
+            Store,
         )
-        from decimal import Decimal
+        from retail_datagen.streaming.event_factory import EventFactory
 
         store = Store(
             ID=1, StoreNumber="ST001", Address="123 Test St",
@@ -394,7 +403,11 @@ class TestCampaignAttribution:
     @pytest.mark.integration
     def test_backward_compatibility_with_null_campaign_id(self):
         """Test that receipts without campaign_id are valid (backward compatibility)."""
-        from retail_datagen.streaming.schemas import ReceiptCreatedPayload, EventEnvelope, EventType
+        from retail_datagen.streaming.schemas import (
+            EventEnvelope,
+            EventType,
+            ReceiptCreatedPayload,
+        )
 
         # Create receipt without campaign_id (like old events)
         payload = ReceiptCreatedPayload(
@@ -427,7 +440,9 @@ class TestTemporalPatterns:
     @pytest.mark.integration
     def test_seasonal_patterns_exist(self):
         """Test that seasonal pattern utilities exist."""
-        from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
+        from retail_datagen.generators.seasonal_patterns import (
+            CompositeTemporalPatterns,
+        )
 
         # Should be able to instantiate
         patterns = CompositeTemporalPatterns(seed=42)
@@ -436,7 +451,9 @@ class TestTemporalPatterns:
     @pytest.mark.integration
     def test_holiday_detection(self):
         """Test holiday detection in temporal patterns."""
-        from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
+        from retail_datagen.generators.seasonal_patterns import (
+            CompositeTemporalPatterns,
+        )
 
         patterns = CompositeTemporalPatterns(seed=42)
 

@@ -8,8 +8,6 @@ Azure client, and event streamer.
 import os
 from unittest.mock import patch
 
-import pytest
-
 from retail_datagen.config.models import RealtimeConfig, RetailConfig
 
 

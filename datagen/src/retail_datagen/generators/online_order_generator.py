@@ -340,7 +340,6 @@ def generate_online_orders_with_lifecycle(
             ]
             # Fallback: use delivered_ts computed above for lines; recompute from order_lines list
             if not delivered_times:
-                from datetime import datetime as _dt
                 delivered_times = [
                     ol.get("DeliveredTS") for ol in order_lines if ol.get("OrderId") == order_id and ol.get("DeliveredTS") is not None
                 ]

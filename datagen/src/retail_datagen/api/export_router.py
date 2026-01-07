@@ -68,11 +68,12 @@ async def export_master_data(
             "tables": ["stores", "customers", "products_master"]
         }
     """
-    logger.info(
-        f"Master export request received: format={request.format}, tables={request.tables}"
-    )
+    logger.info(f"Master export: format={request.format}, tables={request.tables}")
     if request.format.lower() != "parquet":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only 'parquet' export is supported")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only 'parquet' export is supported",
+        )
 
     # Validate table names
     try:
@@ -99,9 +100,7 @@ async def export_master_data(
 
             # Track progress
             completed_tables = []
-            len(tables_to_export)
             total_files = 0
-            total_rows = 0
 
             # Progress callback for export service
             def progress_callback(message: str, current: int, total: int):
@@ -135,14 +134,11 @@ async def export_master_data(
 
             # Calculate results
             total_files = len(result)
-            # Convert paths to strings (resolve both to absolute for relative_to to work)
+            # Convert paths to strings (resolve both to absolute)
             files_written = [
                 str(path.resolve().relative_to(base_dir.resolve()))
                 for path in result.values()
             ]
-
-            # Row counting skipped for Parquet to avoid heavy reads
-            total_rows = None
 
             # Update final progress
             update_task_progress(
@@ -159,8 +155,13 @@ async def export_master_data(
             uploaded_summary = None
             if not request.skip_upload:
                 try:
-                    if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    storage = getattr(config, "storage", None)
+                    has_storage = (
+                        storage and storage.account_uri and storage.account_key
+                    )
+                    if has_storage:
                         from ..services.azure_uploader import upload_paths_to_blob
+
                         # Build absolute paths for upload
                         abs_paths = [base_dir / f for f in files_written]
                         ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -172,8 +173,10 @@ async def export_master_data(
                             blob_prefix=f"datagen/export/master/{ts}",
                         )
                         logger.info(
-                            f"Uploaded master export: {uploaded_summary.get('uploaded')} files to "
-                            f"{uploaded_summary.get('container')}/{uploaded_summary.get('prefix')}"
+                            f"Uploaded master export: "
+                            f"{uploaded_summary.get('uploaded')} files to "
+                            f"{uploaded_summary.get('container')}/"
+                            f"{uploaded_summary.get('prefix')}"
                         )
                 except ImportError as e:
                     logger.warning(str(e))
@@ -246,10 +249,14 @@ async def export_fact_data(
     """
     logger.info(
         f"Fact export request received: format={request.format}, "
-        f"tables={request.tables}, date_range={request.start_date} to {request.end_date}"
+        f"tables={request.tables}, "
+        f"date_range={request.start_date} to {request.end_date}"
     )
     if request.format.lower() != "parquet":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only 'parquet' export is supported")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only 'parquet' export is supported",
+        )
 
     # Validate table names
     try:
@@ -295,7 +302,9 @@ async def export_fact_data(
                 all_starts = [
                     start for start, end in date_ranges.values() if start is not None
                 ]
-                all_ends = [end for start, end in date_ranges.values() if end is not None]
+                all_ends = [
+                    end for start, end in date_ranges.values() if end is not None
+                ]
 
                 if not all_starts or not all_ends:
                     raise ValueError("No data found in fact tables")
@@ -321,8 +330,15 @@ async def export_fact_data(
 
             total_chunks = len(chunks)
             logger.info(
-                f"Split export into {total_chunks} chunks of {chunk_size_days} days each"
+                f"Split export into {total_chunks} chunks "
+                f"of {chunk_size_days} days each"
             )
+
+            # Clear old export files before starting
+            # (prevents append from adding to stale data)
+            logger.info("Clearing old export files before starting new export")
+            for table_name in tables_to_export:
+                service.file_manager.clear_table_export_directory(table_name)
 
             # Export each chunk
             for chunk_idx, (chunk_start, chunk_end) in enumerate(chunks, 1):
@@ -332,11 +348,13 @@ async def export_fact_data(
                 update_task_progress(
                     task_id,
                     chunk_progress,
-                    f"Exporting chunk {chunk_idx}/{total_chunks}: {chunk_start} to {chunk_end} ({days_in_chunk} days)",
+                    f"Exporting chunk {chunk_idx}/{total_chunks}: "
+                    f"{chunk_start} to {chunk_end} ({days_in_chunk} days)",
                 )
 
                 logger.info(
-                    f"Exporting chunk {chunk_idx}/{total_chunks}: {chunk_start} to {chunk_end}"
+                    f"Exporting chunk {chunk_idx}/{total_chunks}: "
+                    f"{chunk_start} to {chunk_end}"
                 )
 
                 # Export this chunk from DuckDB
@@ -358,8 +376,10 @@ async def export_fact_data(
                         ]
                     )
 
+                files_count = sum(len(files) for files in result.values())
                 logger.info(
-                    f"Chunk {chunk_idx}/{total_chunks} complete: {len(result)} tables, {sum(len(files) for files in result.values())} files"
+                    f"Chunk {chunk_idx}/{total_chunks} complete: "
+                    f"{len(result)} tables, {files_count} files"
                 )
 
             # Row counting disabled for Parquet exports
@@ -369,7 +389,8 @@ async def export_fact_data(
             update_task_progress(
                 task_id,
                 1.0,
-                f"Export completed: {total_files} files written across {total_chunks} chunks ({start_date} to {end_date})",
+                f"Export completed: {total_files} files written "
+                f"across {total_chunks} chunks ({start_date} to {end_date})",
                 tables_completed=tables_to_export,
                 tables_remaining=[],
             )
@@ -380,8 +401,13 @@ async def export_fact_data(
             uploaded_summary = None
             if not request.skip_upload:
                 try:
-                    if getattr(config, "storage", None) and config.storage.account_uri and config.storage.account_key:
+                    storage = getattr(config, "storage", None)
+                    has_storage = (
+                        storage and storage.account_uri and storage.account_key
+                    )
+                    if has_storage:
                         from ..services.azure_uploader import upload_paths_to_blob
+
                         abs_paths = [base_dir / f for f in all_files]
                         ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
                         uploaded_summary = upload_paths_to_blob(
@@ -392,8 +418,10 @@ async def export_fact_data(
                             blob_prefix=f"datagen/export/facts/{ts}",
                         )
                         logger.info(
-                            f"Uploaded fact export: {uploaded_summary.get('uploaded')} files to "
-                            f"{uploaded_summary.get('container')}/{uploaded_summary.get('prefix')}"
+                            f"Uploaded fact export: "
+                            f"{uploaded_summary.get('uploaded')} files to "
+                            f"{uploaded_summary.get('container')}/"
+                            f"{uploaded_summary.get('prefix')}"
                         )
                 except ImportError as e:
                     logger.warning(str(e))
@@ -440,7 +468,8 @@ async def export_fact_data(
     summary="Get export operation status",
     description=(
         "Get the current status and progress of an export operation. "
-        "Returns detailed progress information including tables completed, remaining, and current."
+        "Returns detailed progress information including tables completed, "
+        "remaining, and current."
     ),
 )
 async def get_export_status(task_id: str):

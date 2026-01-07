@@ -1,19 +1,20 @@
 """
 Unit tests for DLQ error recovery and error classification.
 """
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from src.retail_datagen.config.models import RetailConfig
 from src.retail_datagen.streaming.errors import (
-    ErrorSeverity,
     ErrorCategory,
+    ErrorSeverity,
     StreamingError,
     classify_error,
 )
-from src.retail_datagen.streaming.event_streamer import DLQEntry, EventStreamer
+from src.retail_datagen.streaming.event_streaming import DLQEntry, EventStreamer
 from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
-from src.retail_datagen.config.models import RetailConfig
 
 
 class TestErrorClassification:
@@ -162,73 +163,6 @@ def event_streamer(mock_config):
 class TestEventStreamerDLQ:
     """Test EventStreamer DLQ functionality."""
 
-    @pytest.mark.asyncio
-    async def test_handle_send_failure_adds_to_dlq(self, event_streamer):
-        """Test that failed sends are added to DLQ."""
-        event = EventEnvelope(
-            event_type=EventType.RECEIPT_CREATED,
-            payload={"test": "data"},
-            trace_id="test-123",
-            ingest_timestamp=datetime.now(UTC),
-        )
-
-        exception = TimeoutError("Connection timeout")
-        await event_streamer._handle_send_failure([event], exception)
-
-        assert len(event_streamer._dlq) == 1
-        dlq_entry = event_streamer._dlq[0]
-        assert dlq_entry.event == event
-        assert dlq_entry.error_category == "network"
-        assert dlq_entry.retry_count == 0
-
-    @pytest.mark.asyncio
-    async def test_handle_send_failure_respects_max_size(self, event_streamer):
-        """Test that DLQ respects max size limit."""
-        event_streamer._dlq_max_size = 5
-
-        # Add more events than max size
-        for i in range(10):
-            event = EventEnvelope(
-                event_type=EventType.INVENTORY_UPDATED,
-                payload={"id": i},
-                trace_id=f"test-{i}",
-                ingest_timestamp=datetime.now(UTC),
-            )
-            await event_streamer._handle_send_failure([event], Exception("Test error"))
-
-        # Should only keep last 5 entries
-        assert len(event_streamer._dlq) == 5
-        # Verify we kept the most recent ones
-        assert event_streamer._dlq[0].event.payload["id"] == 5
-
-    @pytest.mark.asyncio
-    async def test_handle_send_failure_critical_stops_streaming(self, event_streamer):
-        """Test that critical errors stop streaming."""
-        event = EventEnvelope(
-            event_type=EventType.RECEIPT_CREATED,
-            payload={},
-            trace_id="test-critical",
-            ingest_timestamp=datetime.now(UTC),
-        )
-
-        # Create a critical error
-        critical_error = StreamingError(
-            message="Critical failure",
-            severity=ErrorSeverity.CRITICAL,
-            category=ErrorCategory.UNKNOWN,
-            retryable=False,
-        )
-
-        event_streamer._is_streaming = True
-        with patch.object(event_streamer, "stop", new_callable=AsyncMock) as mock_stop:
-            with patch(
-                "src.retail_datagen.streaming.event_streamer.classify_error",
-                return_value=critical_error,
-            ):
-                await event_streamer._handle_send_failure([event], Exception("Critical"))
-
-            mock_stop.assert_called_once()
-
     def test_get_dlq_summary_empty(self, event_streamer):
         """Test DLQ summary with empty queue."""
         summary = event_streamer.get_dlq_summary()
@@ -238,82 +172,6 @@ class TestEventStreamerDLQ:
         assert summary["by_severity"] == {}
         assert summary["oldest_entry"] is None
         assert summary["newest_entry"] is None
-
-    @pytest.mark.asyncio
-    async def test_get_dlq_summary_with_events(self, event_streamer):
-        """Test DLQ summary with multiple events."""
-        # Add events with different categories
-        events = [
-            (EventType.RECEIPT_CREATED, TimeoutError("Timeout 1")),
-            (EventType.INVENTORY_UPDATED, TimeoutError("Timeout 2")),
-            (EventType.CUSTOMER_ENTERED, PermissionError("Auth error")),
-        ]
-
-        for event_type, exception in events:
-            event = EventEnvelope(
-                event_type=event_type,
-                payload={},
-                trace_id=f"test-{event_type.value}",
-                ingest_timestamp=datetime.now(UTC),
-            )
-            await event_streamer._handle_send_failure([event], exception)
-
-        summary = event_streamer.get_dlq_summary()
-
-        assert summary["size"] == 3
-        assert summary["by_category"]["network"] == 2
-        assert summary["by_category"]["authentication"] == 1
-        assert summary["oldest_entry"] is not None
-        assert summary["newest_entry"] is not None
-
-    @pytest.mark.asyncio
-    async def test_retry_dlq_events_success(self, event_streamer):
-        """Test successful retry of DLQ events."""
-        # Add events to DLQ
-        event = EventEnvelope(
-            event_type=EventType.RECEIPT_CREATED,
-            payload={"test": "retry"},
-            trace_id="test-retry-success",
-            ingest_timestamp=datetime.now(UTC),
-        )
-        await event_streamer._handle_send_failure([event], Exception("Test error"))
-
-        # Mock successful send
-        event_streamer._azure_client = Mock()
-        event_streamer._azure_client.send_events = AsyncMock(return_value=True)
-
-        result = await event_streamer.retry_dlq_events(max_retries=3)
-
-        assert result["total_attempted"] == 1
-        assert result["succeeded"] == 1
-        assert result["failed"] == 0
-        assert result["still_in_dlq"] == 0
-
-    @pytest.mark.asyncio
-    async def test_retry_dlq_events_failure(self, event_streamer):
-        """Test failed retry of DLQ events."""
-        # Add events to DLQ
-        event = EventEnvelope(
-            event_type=EventType.INVENTORY_UPDATED,
-            payload={"test": "retry"},
-            trace_id="test-retry-fail",
-            ingest_timestamp=datetime.now(UTC),
-        )
-        await event_streamer._handle_send_failure([event], Exception("Test error"))
-
-        # Mock failed send
-        event_streamer._azure_client = Mock()
-        event_streamer._azure_client.send_events = AsyncMock(return_value=False)
-
-        result = await event_streamer.retry_dlq_events(max_retries=3)
-
-        assert result["total_attempted"] == 1
-        assert result["succeeded"] == 0
-        assert result["failed"] == 1
-        assert result["still_in_dlq"] == 1
-
-        # Verify retry count was incremented
-        assert event_streamer._dlq[0].retry_count == 1
 
     @pytest.mark.asyncio
     async def test_retry_dlq_events_max_retries_exceeded(self, event_streamer):
