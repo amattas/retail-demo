@@ -34,6 +34,7 @@ class MockPaymentsMixin:
     _should_decline_payment = PaymentsMixin._should_decline_payment
     _simulate_processing_time_ms = PaymentsMixin._simulate_processing_time_ms
     _generate_payment_transaction_id = PaymentsMixin._generate_payment_transaction_id
+    _BASE_DECLINE_RATE = PaymentsMixin._BASE_DECLINE_RATE
     _DECLINE_RATE_MULTIPLIERS = PaymentsMixin._DECLINE_RATE_MULTIPLIERS
     _PROCESSING_TIME_RANGES = PaymentsMixin._PROCESSING_TIME_RANGES
     _DECLINE_REASONS = PaymentsMixin._DECLINE_REASONS

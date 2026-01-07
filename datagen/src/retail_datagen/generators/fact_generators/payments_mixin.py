@@ -27,8 +27,10 @@ class PaymentsMixin:
     - Transaction IDs
     """
 
-    # Decline rate adjustments by payment method
-    # Base rate is 2.5%, these are multipliers
+    # Base decline rate: 2.5% (midpoint of 2-3% industry average)
+    _BASE_DECLINE_RATE: float = 0.025
+
+    # Decline rate adjustments by payment method (multiplied with base rate)
     _DECLINE_RATE_MULTIPLIERS: dict[str, float] = {
         "CREDIT_CARD": 1.0,  # Base rate (2.5%)
         "DEBIT_CARD": 0.8,  # Slightly lower (direct account link)
@@ -184,14 +186,11 @@ class PaymentsMixin:
         # Access the random generator from the parent class
         rng: random.Random = self._rng  # type: ignore[attr-defined]
 
-        # Base decline rate: 2.5% (midpoint of 2-3% requirement)
-        base_rate = 0.025
-
         # Get method-specific multiplier
         multiplier = self._DECLINE_RATE_MULTIPLIERS.get(payment_method, 1.0)
 
         # Calculate adjusted rate
-        adjusted_rate = base_rate * multiplier
+        adjusted_rate = self._BASE_DECLINE_RATE * multiplier
 
         # Roll for decline
         if rng.random() < adjusted_rate:
