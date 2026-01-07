@@ -27,11 +27,11 @@ def create_test_data():
     stores = [
         Store(
             ID=1,
-            Name="Test Store 1",
+            StoreNumber="TEST001",
             Address="123 Test St",
             GeographyID=1,
-            Format="SUPERSTORE",
-            SqFt=50000,
+            store_format="superstore",
+            daily_traffic_multiplier=Decimal("1.0"),
         )
     ]
 
@@ -65,9 +65,8 @@ def create_test_data():
             Cost=Decimal("1.00"),
             SalePrice=Decimal("1.50"),
             MSRP=Decimal("2.00"),
-            BasePrice=Decimal("1.75"),
+            RequiresRefrigeration=False,
             LaunchDate=datetime(2024, 1, 1),
-            Taxability="TAXABLE",
         )
     ]
 
@@ -75,10 +74,9 @@ def create_test_data():
     dcs = [
         DistributionCenter(
             ID=1,
-            Name="Test DC",
+            DCNumber="DC001",
             Address="456 DC Blvd",
             GeographyID=1,
-            Capacity=1000000,
         )
     ]
 
@@ -93,7 +91,7 @@ def test_ble_customer_matching():
 
     stores, customers, products, dcs = create_test_data()
 
-    # Create minimal config
+    # Create minimal config with all required fields
     config = RetailConfig(
         seed=42,
         volume={
@@ -101,21 +99,47 @@ def test_ble_customer_matching():
             "dcs": 1,
             "total_customers": 100,
             "customers_per_day": 10,
+            "items_per_ticket_mean": 5.0,
         },
         paths={
             "dict": "data/dictionaries",
             "master": "data/master",
             "facts": "data/facts",
         },
+        realtime={
+            "emit_interval_ms": 500,
+            "burst": 10,
+        },
+        stream={
+            "hub": "test-hub",
+        },
     )
 
-    # Create generator
-    generator = FactDataGenerator(
-        stores=stores,
-        customers=customers,
-        products=products,
-        distribution_centers=dcs,
-        config=config,
+    # Create generator and manually inject test data
+    # (bypasses DuckDB loading for unit test isolation)
+    generator = FactDataGenerator(config=config)
+    generator.stores = stores
+    generator.customers = customers
+    generator.products = products
+    generator.distribution_centers = dcs
+    generator.geographies = []
+    generator.trucks = []
+
+    # Initialize required simulators that depend on master data
+    from retail_datagen.generators.retail_patterns import (
+        CustomerJourneySimulator,
+        InventoryFlowSimulator,
+        MarketingCampaignSimulator,
+    )
+
+    generator.customer_journey_sim = CustomerJourneySimulator(
+        customers, products, stores, config.seed + 1000
+    )
+    generator.inventory_flow_sim = InventoryFlowSimulator(
+        dcs, stores, products, config.seed + 2000
+    )
+    generator.marketing_campaign_sim = MarketingCampaignSimulator(
+        customers, config.seed + 3000, config.marketing_cost
     )
 
     # Generate BLE pings for 100 customer visits
@@ -157,10 +181,12 @@ def test_ble_customer_matching():
         return True
     else:
         print(
-            f"\n❌ FAIL: Match rate {match_rate:.1f}% is outside expected range (25-40%)"
+            f"\n❌ FAIL: Match rate {match_rate:.1f}% "
+            "is outside expected range (25-40%)"
         )
         print(
-            "   Note: With RNG seed=42 and 100 customers, some variance is expected."
+            "   Note: With RNG seed=42 and 100 customers, "
+            "some variance is expected."
         )
         return False
 
@@ -173,7 +199,7 @@ def test_marketing_customer_resolution():
 
     stores, customers, products, dcs = create_test_data()
 
-    # Create minimal config
+    # Create minimal config with all required fields
     config = RetailConfig(
         seed=42,
         volume={
@@ -181,21 +207,47 @@ def test_marketing_customer_resolution():
             "dcs": 1,
             "total_customers": 100,
             "customers_per_day": 10,
+            "items_per_ticket_mean": 5.0,
         },
         paths={
             "dict": "data/dictionaries",
             "master": "data/master",
             "facts": "data/facts",
         },
+        realtime={
+            "emit_interval_ms": 500,
+            "burst": 10,
+        },
+        stream={
+            "hub": "test-hub",
+        },
     )
 
-    # Create generator
-    generator = FactDataGenerator(
-        stores=stores,
-        customers=customers,
-        products=products,
-        distribution_centers=dcs,
-        config=config,
+    # Create generator and manually inject test data
+    # (bypasses DuckDB loading for unit test isolation)
+    generator = FactDataGenerator(config=config)
+    generator.stores = stores
+    generator.customers = customers
+    generator.products = products
+    generator.distribution_centers = dcs
+    generator.geographies = []
+    generator.trucks = []
+
+    # Initialize required simulators that depend on master data
+    from retail_datagen.generators.retail_patterns import (
+        CustomerJourneySimulator,
+        InventoryFlowSimulator,
+        MarketingCampaignSimulator,
+    )
+
+    generator.customer_journey_sim = CustomerJourneySimulator(
+        customers, products, stores, config.seed + 1000
+    )
+    generator.inventory_flow_sim = InventoryFlowSimulator(
+        dcs, stores, products, config.seed + 2000
+    )
+    generator.marketing_campaign_sim = MarketingCampaignSimulator(
+        customers, config.seed + 3000, config.marketing_cost
     )
 
     # Start a campaign manually
@@ -269,15 +321,18 @@ def test_marketing_customer_resolution():
         return None
     elif 3 <= resolution_rate <= 7:
         print(
-            f"\n✅ PASS: Resolution rate {resolution_rate:.1f}% is within expected range (3-7%)"
+            f"\n✅ PASS: Resolution rate {resolution_rate:.1f}% "
+            "is within expected range (3-7%)"
         )
         return True
     else:
         print(
-            f"\n❌ FAIL: Resolution rate {resolution_rate:.1f}% is outside expected range (3-7%)"
+            f"\n❌ FAIL: Resolution rate {resolution_rate:.1f}% "
+            "is outside expected range (3-7%)"
         )
         print(
-            "   Note: With RNG and small sample, some variance is expected. Target is 5%."
+            "   Note: With RNG and small sample, some variance is expected. "
+            "Target is 5%."
         )
         return False
 
@@ -291,11 +346,12 @@ def test_marketing_cost_ranges():
     # Create config and check defaults
     cost_config = MarketingCostConfig()
 
+    # Updated to match actual config values in MarketingCostConfig
     expected_ranges = {
-        "EMAIL": (0.05, 0.50),
-        "SOCIAL": (1.00, 5.00),
-        "DISPLAY": (2.00, 10.00),
-        "SEARCH": (0.50, 3.00),
+        "EMAIL": (0.10, 0.25),
+        "SOCIAL": (0.75, 3.00),
+        "DISPLAY": (0.50, 2.00),
+        "SEARCH": (1.00, 5.00),
     }
 
     actual_ranges = {

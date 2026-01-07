@@ -153,7 +153,8 @@ class ExportService:
                     )
 
                 logger.info(
-                    f"Exporting master table {current_table}/{total_tables}: {table_name}"
+                    f"Exporting master table {current_table}/{total_tables}: "
+                    f"{table_name}"
                 )
 
                 # Skip empty tables
@@ -180,7 +181,8 @@ class ExportService:
                 result[table_name] = output_path
 
                 logger.info(
-                    f"Successfully exported {table_name}: {len(df):,} rows to {output_path}"
+                    f"Successfully exported {table_name}: "
+                    f"{len(df):,} rows to {output_path}"
                 )
 
             # Success - reset file tracking (don't cleanup)
@@ -245,9 +247,7 @@ class ExportService:
         try:
             # Read all fact tables from DuckDB with date filtering
             logger.debug("Reading all fact tables from DuckDB")
-            all_fact_data = duckdb_reader.read_all_fact_tables(
-                start_date, end_date
-            )
+            all_fact_data = duckdb_reader.read_all_fact_tables(start_date, end_date)
 
             # Get writer for the specified format
             writer = self._get_writer(format)
@@ -296,22 +296,25 @@ class ExportService:
                 # Special handling for fact_online_order_lines:
                 # Use COALESCE(picked_ts, shipped_ts, delivered_ts, order_event_ts)
                 # to partition pending orders by their creation time
-                if table_name == "fact_online_order_lines" and "order_event_ts" in df.columns:
-                    # Create a partition timestamp that falls back to order creation time
-                    df["_partition_ts"] = df["picked_ts"].combine_first(
-                        df["shipped_ts"]
-                    ).combine_first(
-                        df["delivered_ts"]
-                    ).combine_first(
-                        df["order_event_ts"]
+                if (
+                    table_name == "fact_online_order_lines"
+                    and "order_event_ts" in df.columns
+                ):
+                    # Create partition timestamp that falls back to order time
+                    df["_partition_ts"] = (
+                        df["picked_ts"]
+                        .combine_first(df["shipped_ts"])
+                        .combine_first(df["delivered_ts"])
+                        .combine_first(df["order_event_ts"])
                     )
                     ts_col = "_partition_ts"
-                    # Drop the order_event_ts column from final output (it was just for partitioning)
+                    # Drop order_event_ts from output (used only for partitioning)
                     df = df.drop(columns=["order_event_ts"])
 
                 if not ts_col:
                     raise ValueError(
-                        f"Cannot determine timestamp column for table {table_name}; columns={list(df.columns)}"
+                        f"Cannot determine timestamp column for table "
+                        f"{table_name}; columns={list(df.columns)}"
                     )
 
                 # Normalize timestamp dtype
@@ -324,7 +327,8 @@ class ExportService:
                     df["ym"] = df[ts_col].dt.to_period("M")
                     months = sorted(df["ym"].unique())
                     logger.info(
-                        f"Table {table_name} contains {len(df):,} rows across {len(months)} month partitions"
+                        f"Table {table_name} contains {len(df):,} rows "
+                        f"across {len(months)} month partitions"
                     )
                     for per in months:
                         month_mask = df["ym"] == per
@@ -341,9 +345,10 @@ class ExportService:
                         )
                         self.file_manager.ensure_directory(output_path.parent)
                         logger.debug(
-                            f"Writing {len(part_df):,} rows to {output_path} (monthly)"
+                            f"Writing {len(part_df):,} rows to "
+                            f"{output_path} (monthly)"
                         )
-                        # Use append=True to support chunked exports that may span months
+                        # Use append=True for chunked exports spanning months
                         writer.write(part_df, output_path, append=True)
                         self.file_manager.track_file(output_path)
                         partition_files.append(output_path)
@@ -352,7 +357,8 @@ class ExportService:
 
                 result[table_name] = partition_files
                 logger.info(
-                    f"Successfully exported {table_name}: {len(df):,} rows across {len(partition_files)} partitions"
+                    f"Successfully exported {table_name}: {len(df):,} rows "
+                    f"across {len(partition_files)} partitions"
                 )
 
             # Success - reset file tracking (don't cleanup)

@@ -41,11 +41,15 @@ FACT_TABLES = [
 ]
 
 
-def _date_bounds(start_date: date | None, end_date: date | None) -> tuple[datetime | None, datetime | None]:
+def _date_bounds(
+    start_date: date | None, end_date: date | None
+) -> tuple[datetime | None, datetime | None]:
     if start_date is None and end_date is None:
         return None, None
     start_dt = datetime.combine(start_date or date.min, datetime.min.time())
-    end_dt = datetime.combine(end_date or date.max, datetime.min.time()) + timedelta(days=1)
+    end_dt = datetime.combine(end_date or date.max, datetime.min.time()) + timedelta(
+        days=1
+    )
     return start_dt, end_dt
 
 
@@ -60,13 +64,17 @@ def read_all_master_tables() -> dict[str, pd.DataFrame]:
             logger.debug(f"Table {table} does not exist, returning empty DataFrame")
             df = pd.DataFrame()
         except Exception as e:
-            logger.warning(f"Failed to read table {table}: {e}, returning empty DataFrame")
+            logger.warning(
+                f"Failed to read table {table}: {e}, returning empty DataFrame"
+            )
             df = pd.DataFrame()
         result[table] = df
     return result
 
 
-def read_all_fact_tables(start_date: date | None = None, end_date: date | None = None) -> dict[str, pd.DataFrame]:
+def read_all_fact_tables(
+    start_date: date | None = None, end_date: date | None = None
+) -> dict[str, pd.DataFrame]:
     conn = get_duckdb_conn()
     start_dt, end_dt = _date_bounds(start_date, end_date)
     result: dict[str, pd.DataFrame] = {}
@@ -78,42 +86,51 @@ def read_all_fact_tables(start_date: date | None = None, end_date: date | None =
             else:
                 # Special-case tables without event_ts
                 if table == "fact_online_order_lines":
-                    # Join with headers to get order creation timestamp (event_ts)
-                    # for partitioning pending orders that have NULL fulfillment timestamps.
-                    # Include rows where:
-                    # - fulfillment timestamp is in range, OR
-                    # - all fulfillment timestamps are NULL but order was created in range
+                    # Join with headers to get order creation timestamp
+                    # for partitioning pending orders with NULL timestamps.
+                    # Include: fulfilled orders in range OR pending orders
+                    # created in range
+                    query = f"""
+                        SELECT l.*, h.event_ts as order_event_ts
+                        FROM {validated_table} l
+                        JOIN fact_online_order_headers h
+                            ON l.order_id = h.order_id_ext
+                        WHERE (
+                            (COALESCE(l.picked_ts, l.shipped_ts, l.delivered_ts) >= ?
+                             AND COALESCE(l.picked_ts, l.shipped_ts,
+                                          l.delivered_ts) < ?)
+                            OR
+                            (l.picked_ts IS NULL
+                             AND l.shipped_ts IS NULL
+                             AND l.delivered_ts IS NULL
+                             AND h.event_ts >= ?
+                             AND h.event_ts < ?)
+                        )
+                    """
                     df = conn.execute(
-                        f"""SELECT l.*, h.event_ts as order_event_ts
-                            FROM {validated_table} l
-                            JOIN fact_online_order_headers h ON l.order_id = h.order_id_ext
-                            WHERE (
-                                -- Include fulfilled orders with timestamps in range
-                                (COALESCE(l.picked_ts, l.shipped_ts, l.delivered_ts) >= ?
-                                 AND COALESCE(l.picked_ts, l.shipped_ts, l.delivered_ts) < ?)
-                                OR
-                                -- Include pending orders (all timestamps NULL) created in range
-                                (l.picked_ts IS NULL AND l.shipped_ts IS NULL AND l.delivered_ts IS NULL
-                                 AND h.event_ts >= ? AND h.event_ts < ?)
-                            )""",
-                        [start_dt, end_dt, start_dt, end_dt],
+                        query, [start_dt, end_dt, start_dt, end_dt]
                     ).df()
                 else:
-                    df = conn.execute(
-                        f"SELECT * FROM {validated_table} WHERE event_ts >= ? AND event_ts < ?",
-                        [start_dt, end_dt],
-                    ).df()
+                    query = (
+                        f"SELECT * FROM {validated_table} "
+                        f"WHERE event_ts >= ? AND event_ts < ?"
+                    )
+                    df = conn.execute(query, [start_dt, end_dt]).df()
         except duckdb.CatalogException:
             logger.debug(f"Table {table} does not exist, returning empty DataFrame")
             df = pd.DataFrame()
         except Exception as e:
-            logger.warning(f"Failed to read table {table}: {e}, returning empty DataFrame")
+            logger.warning(
+                f"Failed to read table {table}: {e}, returning empty DataFrame"
+            )
             df = pd.DataFrame()
         result[table] = df
     return result
 
 
-def get_fact_table_date_range(table_name: str) -> tuple[datetime | None, datetime | None]:
+def get_fact_table_date_range(
+    table_name: str,
+) -> tuple[datetime | None, datetime | None]:
     """Return (min_event_ts, max_event_ts) for a DuckDB fact table.
 
     If the table does not exist or has no rows, returns (None, None).
@@ -124,15 +141,19 @@ def get_fact_table_date_range(table_name: str) -> tuple[datetime | None, datetim
         # Special handling for tables without event_ts column
         if table_name == "fact_online_order_lines":
             # Use coalesce of available timestamp columns
-            cur = conn.execute(
-                f"SELECT MIN(coalesce(picked_ts, shipped_ts, delivered_ts)) AS min_ts, "
+            query = (
+                f"SELECT "
+                f"MIN(coalesce(picked_ts, shipped_ts, delivered_ts)) AS min_ts, "
                 f"MAX(coalesce(picked_ts, shipped_ts, delivered_ts)) AS max_ts "
                 f"FROM {validated_table}"
             )
+            cur = conn.execute(query)
         else:
-            cur = conn.execute(
-                f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts FROM {validated_table}"
+            query = (
+                f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts "
+                f"FROM {validated_table}"
             )
+            cur = conn.execute(query)
         row = cur.fetchone()
         if not row:
             return None, None
@@ -145,7 +166,9 @@ def get_fact_table_date_range(table_name: str) -> tuple[datetime | None, datetim
         return None, None
 
 
-def get_all_fact_table_date_ranges() -> dict[str, tuple[datetime | None, datetime | None]]:
+def get_all_fact_table_date_ranges() -> dict[
+    str, tuple[datetime | None, datetime | None]
+]:
     """Return date ranges for all known fact tables from DuckDB."""
     ranges: dict[str, tuple[datetime | None, datetime | None]] = {}
     for tbl in FACT_TABLES:

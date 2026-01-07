@@ -330,8 +330,6 @@ class ExportFileManager:
             logger.warning(f"Error clearing export directory {export_dir}: {e}")
 
         if removed_count > 0:
-            logger.info(
-                f"Cleared {removed_count} old export files from {table_name}"
-            )
+            logger.info(f"Cleared {removed_count} old export files from {table_name}")
 
         return removed_count
