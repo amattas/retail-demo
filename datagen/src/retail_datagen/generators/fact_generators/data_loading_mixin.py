@@ -4,10 +4,14 @@ Master data loading and normalization methods.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+
 import pandas as pd
+
+from retail_datagen.shared.customer_geography import GeographyAssigner, StoreSelector
 from retail_datagen.shared.models import (
     Customer,
     DistributionCenter,
@@ -16,7 +20,13 @@ from retail_datagen.shared.models import (
     Store,
     Truck,
 )
+
 from ..fact_generators.models import MasterTableSpec
+from ..retail_patterns import (
+    CustomerJourneySimulator,
+    InventoryFlowSimulator,
+    MarketingCampaignSimulator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +103,7 @@ class DataLoadingMixin:
             self.products,
             self.config.seed + 2000,
             trucks=getattr(self, "trucks", None),
+            truck_capacity=getattr(self.config.volume, "truck_capacity", 15000),
         )
 
         self.marketing_campaign_sim = MarketingCampaignSimulator(

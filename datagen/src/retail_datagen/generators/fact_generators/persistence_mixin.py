@@ -3,12 +3,15 @@ Database persistence and data mapping methods.
 """
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)

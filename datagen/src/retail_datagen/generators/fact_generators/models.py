@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 
+@dataclass
 class FactGenerationSummary:
     """Summary of fact data generation results."""
 
@@ -20,8 +21,7 @@ class FactGenerationSummary:
     partitions_created: int
 
 
-
-
+@dataclass
 class MasterTableSpec:
     """Deprecated: CSV-based master specs removed in DuckDB-only mode."""
 

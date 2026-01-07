@@ -229,6 +229,8 @@ class MasterDataGenerator(
             "trucks",
             "customers",
             "products_master",
+            "dc_inventory_snapshots",
+            "store_inventory_snapshots",
         ]
         self._progress_tracker = TableProgressTracker(master_table_names)
 

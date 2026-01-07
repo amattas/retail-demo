@@ -105,9 +105,18 @@ def get_fact_table_date_range(table_name: str) -> tuple[datetime | None, datetim
     validated_table = validate_table_name(table_name)
     conn = get_duckdb_conn()
     try:
-        cur = conn.execute(
-            f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts FROM {validated_table}"
-        )
+        # Special handling for tables without event_ts column
+        if table_name == "fact_online_order_lines":
+            # Use coalesce of available timestamp columns
+            cur = conn.execute(
+                f"SELECT MIN(coalesce(picked_ts, shipped_ts, delivered_ts)) AS min_ts, "
+                f"MAX(coalesce(picked_ts, shipped_ts, delivered_ts)) AS max_ts "
+                f"FROM {validated_table}"
+            )
+        else:
+            cur = conn.execute(
+                f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts FROM {validated_table}"
+            )
         row = cur.fetchone()
         if not row:
             return None, None

@@ -522,3 +522,72 @@ class BatchStreamingManager:
             envelopes.append(envelope)
 
         return envelopes
+
+    async def _stream_pending_shipments(
+        self, duckdb_conn, azure_client: AzureEventHubClient, up_to_time: datetime
+    ) -> tuple[int, list[int]]:
+        """
+        Stream pending shipments from staging table that are ready for processing.
+
+        Pending shipments are truck movements that were scheduled beyond the historical
+        generation end date. They are stored in _staging_pending_shipments and picked up
+        when streaming catches up to their departure time.
+
+        Args:
+            duckdb_conn: DuckDB connection
+            azure_client: Azure Event Hub client for sending events
+            up_to_time: Process shipments with departure_time <= this time
+
+        Returns:
+            Tuple of (events_published_count, list_of_staging_ids_processed)
+        """
+        from retail_datagen.db.duckdb_engine import (
+            pending_shipments_delete,
+            pending_shipments_get_ready,
+        )
+
+        # Get pending shipments ready for processing
+        ready_shipments = pending_shipments_get_ready(duckdb_conn, up_to_time)
+
+        if not ready_shipments:
+            self.log.debug(
+                "No pending shipments ready for streaming",
+                session_id=self._session_id,
+            )
+            return 0, []
+
+        self.log.info(
+            f"Found {len(ready_shipments)} pending shipments ready for streaming",
+            session_id=self._session_id,
+        )
+
+        # Convert to event envelopes
+        envelopes = self._convert_db_events_to_envelopes(ready_shipments, "truck_moves")
+
+        if not envelopes:
+            return 0, []
+
+        # Send events
+        success = await azure_client.send_events(envelopes)
+
+        if success:
+            # Get staging IDs for deletion
+            staging_ids = [
+                s.get("_staging_id") for s in ready_shipments if s.get("_staging_id")
+            ]
+
+            # Delete processed shipments from staging
+            if staging_ids:
+                deleted = pending_shipments_delete(duckdb_conn, staging_ids)
+                self.log.info(
+                    f"Published {len(envelopes)} pending shipments, removed {deleted} from staging",
+                    session_id=self._session_id,
+                )
+
+            return len(envelopes), staging_ids
+        else:
+            self.log.error(
+                "Failed to publish pending shipments",
+                session_id=self._session_id,
+            )
+            return 0, []

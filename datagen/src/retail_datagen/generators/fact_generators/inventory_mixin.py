@@ -4,9 +4,32 @@ Inventory management for distribution centers and stores
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+import threading
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+import numpy as np
 import pandas as pd
-from retail_datagen.shared.models import Customer, DistributionCenter, ProductMaster
+
+from retail_datagen.generators.utils import ProgressReporter
+from retail_datagen.shared.models import (
+    Customer,
+    DistributionCenter,
+    InventoryReason,
+    ProductMaster,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+from .models import FactGenerationSummary
+
+# SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
+try:
+    from retail_datagen.db.session import retail_session_maker
+    SessionMaker = retail_session_maker()
+except ImportError:
+    SessionMaker = None  # type: ignore[assignment, misc]
 
 logger = logging.getLogger(__name__)
 

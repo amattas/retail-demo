@@ -6,7 +6,14 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta
-from retail_datagen.shared.models import ProductMaster
+from decimal import Decimal
+
+from retail_datagen.shared.models import (
+    InventoryReason,
+    ProductMaster,
+    ProductTaxability,
+    TenderType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +162,6 @@ class UtilsMixin:
                 unit_price_dec = self._to_decimal(unit_price)
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
-                from retail_datagen.shared.models import ProductTaxability
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
                 tax_mult = Decimal("1.0") if taxability == ProductTaxability.TAXABLE else (Decimal("0.5") if taxability == ProductTaxability.REDUCED_RATE else Decimal("0.0"))
                 line_tax = (neg_ext * store_tax_rate * tax_mult).quantize(Decimal("0.01"))
@@ -351,8 +357,6 @@ class UtilsMixin:
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
                 # Taxability
-                from retail_datagen.shared.models import ProductTaxability
-
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
                 if taxability == ProductTaxability.TAXABLE:
                     tax_mult = Decimal("1.0")

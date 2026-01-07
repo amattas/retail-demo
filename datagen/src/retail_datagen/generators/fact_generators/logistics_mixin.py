@@ -6,9 +6,26 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
-from retail_datagen.shared.models import DistributionCenter, ProductMaster, Store, Truck
+from retail_datagen.shared.models import DistributionCenter, ProductMaster, Store, Truck, TruckStatus
 
 logger = logging.getLogger(__name__)
+
+
+def _is_beyond_end_date(event_ts: datetime | None, end_date: datetime | None) -> bool:
+    """Check if event timestamp is beyond the generation end date.
+
+    Args:
+        event_ts: The event timestamp to check
+        end_date: The generation end date (end of day is considered inclusive)
+
+    Returns:
+        True if event_ts is beyond end_date (next day or later)
+    """
+    if event_ts is None or end_date is None:
+        return False
+    # Normalize to end of day for comparison (events on end_date are OK)
+    end_of_day = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return event_ts > end_of_day
 
 
 class LogisticsMixin:
@@ -21,8 +38,24 @@ class LogisticsMixin:
 
         This method creates initial shipments in SCHEDULED status.
         The _process_truck_lifecycle method will handle status progression.
+
+        Shipments with departure times beyond the generation end date are
+        stored in a staging table for later processing when the next day is generated.
         """
         truck_movements = []
+        pending_shipments = []  # Shipments with future departure times
+
+        # Get generation end date for filtering future shipments
+        generation_end_date = getattr(self, "_generation_end_date", None)
+
+        # Restore pending shipments from staging that are ready for this day
+        # These are shipments that were deferred from earlier generation runs
+        restored_movements = self._restore_pending_shipments_for_date(date)
+        if restored_movements:
+            truck_movements.extend(restored_movements)
+            logger.info(
+                f"Restored {len(restored_movements)} pending shipments for {date.date()}"
+            )
 
         # Analyze store inventory needs (vectorized when possible)
         store_demands: dict[int, int] = {}
@@ -71,28 +104,60 @@ class LogisticsMixin:
                 reorder_list = self.inventory_flow_sim.check_reorder_needs(store_id)
 
                 if reorder_list:
-                    # Generate truck shipment (initial status: SCHEDULED)
+                    # Generate truck shipments (may be multiple if order exceeds capacity)
                     departure_time = date.replace(hour=6, minute=0)  # 6 AM departure
-                    shipment_info = self.inventory_flow_sim.generate_truck_shipment(
+                    shipments = self.inventory_flow_sim.generate_truck_shipments(
                         dc.ID, store_id, reorder_list, departure_time
                     )
 
-                    # Create initial truck_move record in SCHEDULED status
-                    truck_record = {
-                        "TraceId": self._generate_trace_id(),
-                        "EventTS": departure_time,
-                        "TruckId": shipment_info["truck_id"],
-                        "DCID": shipment_info["dc_id"],
-                        "StoreID": shipment_info["store_id"],
-                        "ShipmentId": shipment_info["shipment_id"],
-                        "Status": shipment_info["status"].value,
-                        "ETA": shipment_info["eta"],
-                        "ETD": shipment_info["etd"],
-                    }
-                    truck_movements.append(truck_record)
+                    # Create truck_move records for each shipment
+                    for shipment_info in shipments:
+                        event_ts = shipment_info.get("departure_time", departure_time)
 
-                    # Track shipment for lifecycle processing
-                    self._active_shipments[shipment_info["shipment_id"]] = shipment_info
+                        truck_record = {
+                            "TraceId": self._generate_trace_id(),
+                            "EventTS": event_ts,
+                            "TruckId": shipment_info["truck_id"],
+                            "DCID": shipment_info["dc_id"],
+                            "StoreID": shipment_info["store_id"],
+                            "ShipmentId": shipment_info["shipment_id"],
+                            "Status": shipment_info["status"].value,
+                            "ETA": shipment_info["eta"],
+                            "ETD": shipment_info["etd"],
+                            "DepartureTime": event_ts,
+                        }
+
+                        # Check if shipment departure is beyond generation end date
+                        if _is_beyond_end_date(event_ts, generation_end_date):
+                            # Stage for future processing instead of writing to fact table
+                            pending_shipments.append(truck_record)
+                            logger.debug(
+                                f"Staging shipment {shipment_info['shipment_id']} with "
+                                f"departure {event_ts} (beyond end date {generation_end_date})"
+                            )
+                        else:
+                            truck_movements.append(truck_record)
+
+                        # Track shipment for lifecycle processing
+                        self._active_shipments[shipment_info["shipment_id"]] = shipment_info
+
+        # Store pending shipments in staging table (DuckDB only)
+        if pending_shipments and getattr(self, "_use_duckdb", False):
+            try:
+                from retail_datagen.db.duckdb_engine import (
+                    get_duckdb_conn,
+                    pending_shipments_insert,
+                )
+                conn = get_duckdb_conn()
+                staged_count = pending_shipments_insert(
+                    conn, pending_shipments, generation_end_date
+                )
+                logger.info(
+                    f"Staged {staged_count} pending shipments for future streaming"
+                )
+            except Exception as e:
+                logger.error(f"Failed to stage pending shipments: {e}")
+                # Don't fail generation - these shipments just won't be in staging
 
         return truck_movements
 
@@ -169,8 +234,6 @@ class LogisticsMixin:
                     truck_lifecycle_records.append(truck_record)
 
                     # Generate inventory transactions at specific lifecycle stages
-                    from retail_datagen.shared.models import TruckStatus
-
                     if current_status == TruckStatus.LOADING:
                         # Generate DC OUTBOUND transactions
                         dc_txn = self.inventory_flow_sim.generate_dc_outbound_transactions(
@@ -266,5 +329,89 @@ class LogisticsMixin:
             del self._active_shipments[shipment_id]
 
         return delivery_transactions
+
+    def _restore_pending_shipments_for_date(self, date: datetime) -> list[dict]:
+        """Restore pending shipments from staging table that are ready for this date.
+
+        This method retrieves shipments that were deferred from earlier generation
+        runs because their departure time was beyond the generation end date.
+        When generating new data, these shipments are restored if their departure
+        time falls within the current date.
+
+        Args:
+            date: The date being generated
+
+        Returns:
+            List of truck movement records restored from staging
+        """
+        if not getattr(self, "_use_duckdb", False):
+            return []
+
+        try:
+            from retail_datagen.db.duckdb_engine import (
+                get_duckdb_conn,
+                pending_shipments_delete,
+                pending_shipments_get_ready,
+            )
+
+            conn = get_duckdb_conn()
+
+            # Get shipments ready for this date (departure_time <= end of day)
+            end_of_day = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            ready_shipments = pending_shipments_get_ready(conn, end_of_day)
+
+            if not ready_shipments:
+                return []
+
+            # Filter to only shipments whose departure_time is actually on this date
+            start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            todays_shipments = []
+            staging_ids_to_delete = []
+
+            for shipment in ready_shipments:
+                departure_time = shipment.get("DepartureTime") or shipment.get("departure_time")
+                if departure_time is None:
+                    departure_time = shipment.get("EventTS") or shipment.get("event_ts")
+
+                # Parse datetime if string
+                if isinstance(departure_time, str):
+                    from datetime import datetime as dt
+                    try:
+                        departure_time = dt.fromisoformat(departure_time.replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        continue
+
+                # Check if departure is on this date
+                if departure_time and start_of_day <= departure_time <= end_of_day:
+                    # Convert back to truck_moves record format
+                    truck_record = {
+                        "TraceId": shipment.get("TraceId") or shipment.get("trace_id") or self._generate_trace_id(),
+                        "EventTS": departure_time,
+                        "TruckId": shipment.get("TruckId") or shipment.get("truck_id"),
+                        "DCID": shipment.get("DCID") or shipment.get("dc_id"),
+                        "StoreID": shipment.get("StoreID") or shipment.get("store_id"),
+                        "ShipmentId": shipment.get("ShipmentId") or shipment.get("shipment_id"),
+                        "Status": shipment.get("Status") or shipment.get("status", "SCHEDULED"),
+                        "ETA": shipment.get("ETA") or shipment.get("eta"),
+                        "ETD": shipment.get("ETD") or shipment.get("etd"),
+                        "DepartureTime": departure_time,
+                    }
+                    todays_shipments.append(truck_record)
+
+                    # Track staging ID for deletion
+                    staging_id = shipment.get("_staging_id")
+                    if staging_id:
+                        staging_ids_to_delete.append(staging_id)
+
+            # Delete processed shipments from staging
+            if staging_ids_to_delete:
+                deleted = pending_shipments_delete(conn, staging_ids_to_delete)
+                logger.debug(f"Removed {deleted} shipments from staging after restoration")
+
+            return todays_shipments
+
+        except Exception as e:
+            logger.warning(f"Failed to restore pending shipments for {date.date()}: {e}")
+            return []
 
 

@@ -424,18 +424,31 @@ class AzureEventHubClient:
             logger.error(f"Unexpected error sending batch: {e}")
             raise
 
-    def add_to_buffer(self, event: EventEnvelope):
+    def add_to_buffer(self, event: EventEnvelope) -> bool:
         """
         Add event to internal buffer for batching.
 
         Args:
             event: Event to buffer
+
+        Returns:
+            bool: True if buffer needs flushing (reached max size), False otherwise
         """
         self._event_buffer.append(event)
 
-        # Auto-flush if buffer reaches max size
-        if len(self._event_buffer) >= self.max_batch_size:
-            asyncio.create_task(self.flush_buffer())
+        # Check if buffer needs flushing
+        needs_flush = len(self._event_buffer) >= self.max_batch_size
+
+        # Auto-flush if buffer reaches max size and we're in an async context
+        if needs_flush:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_soon(lambda: asyncio.create_task(self.flush_buffer()))
+            except RuntimeError:
+                # No running event loop - caller should handle flush manually
+                pass
+
+        return needs_flush
 
     async def flush_buffer(self) -> bool:
         """

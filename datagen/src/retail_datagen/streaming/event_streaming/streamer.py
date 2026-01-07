@@ -155,8 +155,19 @@ class EventStreamer:
     def _setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown."""
         if threading.current_thread() is threading.main_thread():
+            # Store original handlers to restore later
+            self._original_sigint = signal.getsignal(signal.SIGINT)
+            self._original_sigterm = signal.getsignal(signal.SIGTERM)
             signal.signal(signal.SIGINT, self._signal_handler)
             signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _restore_signal_handlers(self):
+        """Restore original signal handlers."""
+        if threading.current_thread() is threading.main_thread():
+            if hasattr(self, "_original_sigint") and self._original_sigint:
+                signal.signal(signal.SIGINT, self._original_sigint)
+            if hasattr(self, "_original_sigterm") and self._original_sigterm:
+                signal.signal(signal.SIGTERM, self._original_sigterm)
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -165,7 +176,27 @@ class EventStreamer:
             session_id=self._session_id,
             signal=signum,
         )
-        asyncio.create_task(self.stop())
+        # Set shutdown flag - the streaming loop will check this and exit
+        self._is_shutdown = True
+
+        # Try to schedule stop() on the event loop if one is running
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(lambda: asyncio.create_task(self.stop()))
+        except RuntimeError:
+            # No running event loop - just set the flag, which we already did
+            pass
+
+        # Restore original handlers so a second Ctrl+C will force exit
+        self._restore_signal_handlers()
+
+        # Re-raise signal with original handler for proper exit
+        if signum == signal.SIGINT and hasattr(self, "_original_sigint"):
+            if callable(self._original_sigint) and self._original_sigint not in (signal.SIG_IGN, signal.SIG_DFL):
+                self._original_sigint(signum, frame)
+            elif self._original_sigint == signal.SIG_DFL:
+                # Default behavior - raise KeyboardInterrupt
+                raise KeyboardInterrupt
 
     async def initialize(self) -> bool:
         """
@@ -555,6 +586,9 @@ class EventStreamer:
             await self._azure_client.disconnect()
 
         self._is_streaming = False
+
+        # Restore original signal handlers
+        self._restore_signal_handlers()
 
     # Delegate methods to component managers
 

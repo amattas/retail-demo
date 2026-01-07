@@ -4,9 +4,13 @@ Sensor data generation (foot traffic and BLE pings)
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+import numpy as np
 import pandas as pd
-from retail_datagen.shared.models import Store
+
+from retail_datagen.shared.models import Customer, Store
 
 logger = logging.getLogger(__name__)
 

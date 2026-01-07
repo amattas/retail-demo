@@ -7,27 +7,36 @@ functional areas.
 """
 from __future__ import annotations
 
-import json
 import logging
 import random
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from threading import Lock
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+# SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
+try:
+    from retail_datagen.db.session import retail_session_maker
+    SessionMaker = retail_session_maker()
+except ImportError:
+    SessionMaker = None  # type: ignore[assignment, misc]
 
 import numpy as np
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.generators.progress_tracker import TableProgressTracker
 from retail_datagen.generators.seasonal_patterns import CompositeTemporalPatterns
+from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.cache import CacheManager
-from retail_datagen.shared.customer_geography import GeographyAssigner, StoreSelector
+from retail_datagen.shared.customer_geography import StoreSelector
 from retail_datagen.shared.models import (
     Customer,
     DistributionCenter,
     GeographyMaster,
     ProductMaster,
     Store,
-    Truck,
 )
 
 from .data_loading_mixin import DataLoadingMixin
@@ -190,6 +199,9 @@ class FactDataGenerator(
         # Fast CRM join map: AdId -> CustomerID (populated after master load)
         self._adid_to_customer_id: dict[str, int] = {}
 
+        # Generation end date for filtering future-dated shipments (set during generate_historical_data)
+        self._generation_end_date: datetime | None = None
+
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
 
@@ -236,6 +248,9 @@ class FactDataGenerator(
         # Remember outbox preference for this run so helpers
         # (e.g., _insert_hourly_to_db) can mirror to streaming_outbox
         self._publish_to_outbox = bool(publish_to_outbox)
+        # Track generation end date for filtering future-dated shipments
+        # Shipments scheduled beyond this date go to staging table
+        self._generation_end_date = end_date
         print(
             f"Starting historical fact data generation from {start_date} to {end_date}"
         )

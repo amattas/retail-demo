@@ -4,7 +4,9 @@ Seasonal patterns and holiday-specific logic for product promotions
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from retail_datagen.shared.models import ProductMaster
 
 logger = logging.getLogger(__name__)
 
@@ -14,29 +16,22 @@ class SeasonalMixin:
 
     def _thanksgiving_date(self, year: int) -> datetime:
         # 4th Thursday in November
-        from datetime import timedelta
         d = datetime(year, 11, 1)
         # weekday(): Mon=0..Sun=6; Thursday=3
         first_thu = d + timedelta(days=(3 - d.weekday() + 7) % 7)
         return first_thu + timedelta(weeks=3)
 
-
     def _memorial_day(self, year: int) -> datetime:
         # Last Monday of May
-        from datetime import timedelta
         d = datetime(year, 5, 31)
         return d - timedelta(days=(d.weekday() - 0) % 7)
 
-
     def _labor_day(self, year: int) -> datetime:
         # First Monday of September
-        from datetime import timedelta
         d = datetime(year, 9, 1)
         return d + timedelta(days=(0 - d.weekday()) % 7)
 
-
     def _in_window(self, date: datetime, center: datetime, lead_days: int, lag_days: int) -> bool:
-        from datetime import timedelta
         start = center - timedelta(days=lead_days)
         end = center + timedelta(days=lag_days)
         return start.date() <= date.date() <= end.date()

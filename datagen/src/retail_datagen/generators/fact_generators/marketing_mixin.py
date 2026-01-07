@@ -4,7 +4,9 @@ Marketing campaign generation and effectiveness tracking
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
+
 import pandas as pd
 
 logger = logging.getLogger(__name__)

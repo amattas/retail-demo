@@ -104,3 +104,4 @@ datagen/site/
 /datagen/data/*.json
 /datagen/data/cache
 /datagen/data/export
+/datagen/data

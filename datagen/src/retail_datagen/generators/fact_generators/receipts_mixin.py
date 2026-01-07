@@ -7,8 +7,17 @@ import logging
 from datetime import datetime, timedelta
 from datetime import time as dt_time
 from decimal import Decimal
+from typing import Any
+
 import pandas as pd
-from retail_datagen.shared.models import Customer, ProductMaster, Store, TenderType
+
+from retail_datagen.shared.models import (
+    Customer,
+    InventoryReason,
+    ProductMaster,
+    Store,
+    TenderType,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import inspect
 import logging
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
+
+from ..progress_tracker import TableProgressTracker
 
 logger = logging.getLogger(__name__)
 
@@ -99,180 +102,6 @@ class ProgressReportingMixin:
     async def load_master_data_from_db(self) -> None:
         """Deprecated SQLite path removed; DuckDB-only runtime."""
         raise RuntimeError("SQLite master load is not supported. Use DuckDB loader.")
-
-        # Import ORM models lazily to avoid circulars
-        from retail_datagen.db.models.master import (
-            Customer as CustomerModel,
-        )
-        from retail_datagen.db.models.master import (
-            DistributionCenter as DistributionCenterModel,
-        )
-        from retail_datagen.db.models.master import (
-            Geography as GeographyModel,
-        )
-        from retail_datagen.db.models.master import (
-            Product as ProductModel,
-        )
-        from retail_datagen.db.models.master import (
-            Store as StoreModel,
-        )
-        from retail_datagen.db.models.master import (
-            Truck as TruckModel,
-        )
-        from retail_datagen.db.session import retail_session_maker
-
-        SessionMaker = retail_session_maker()
-        async with SessionMaker() as session:
-            # Geographies
-            geos = (await session.execute(select(GeographyModel))).scalars().all()
-            self.geographies = [
-                GeographyMaster(
-                    ID=g.geography_id,
-                    City=g.city,
-                    State=g.state,
-                    ZipCode=str(g.postal_code),
-                    District=g.district,
-                    Region=g.region,
-                )
-                for g in geos
-            ]
-
-            # Stores
-            stores = (await session.execute(select(StoreModel))).scalars().all()
-            self.stores = [
-                Store(
-                    ID=s.store_id,
-                    StoreNumber=s.store_number,
-                    Address=s.address,
-                    GeographyID=s.geography_id,
-                    tax_rate=Decimal(str(s.tax_rate)) if getattr(s, "tax_rate", None) is not None else None,
-                    volume_class=s.volume_class,
-                    store_format=s.store_format,
-                    operating_hours=s.operating_hours,
-                    daily_traffic_multiplier=Decimal(str(s.daily_traffic_multiplier)) if s.daily_traffic_multiplier is not None else None,
-                )
-                for s in stores
-            ]
-
-            # Distribution Centers
-            dcs = (
-                (await session.execute(select(DistributionCenterModel))).scalars().all()
-            )
-            self.distribution_centers = [
-                DistributionCenter(
-                    ID=d.dc_id,
-                    DCNumber=d.dc_number,
-                    Address=d.address,
-                    GeographyID=d.geography_id,
-                )
-                for d in dcs
-            ]
-
-            # Customers
-            customers = (await session.execute(select(CustomerModel))).scalars().all()
-            self.customers = [
-                Customer(
-                    ID=c.customer_id,
-                    FirstName=c.first_name,
-                    LastName=c.last_name,
-                    Address=c.address,
-                    GeographyID=c.geography_id,
-                    LoyaltyCard=c.loyalty_card,
-                    Phone=c.phone,
-                    BLEId=c.ble_id,
-                    AdId=c.ad_id,
-                )
-                for c in customers
-            ]
-
-            # Products
-            products = (await session.execute(select(ProductModel))).scalars().all()
-            self.products = []
-            for p in products:
-                # Convert pricing floats to Decimal and date to datetime
-                launch_dt = (
-                    datetime.combine(p.launch_date, dt_time(0, 0))
-                    if hasattr(p, "launch_date") and p.launch_date
-                    else datetime.now(UTC)
-                )
-                self.products.append(
-                    ProductMaster(
-                        ID=p.product_id,
-                        ProductName=p.product_name,
-                        Brand=p.brand,
-                        Company=p.company,
-                        Department=p.department,
-                        Category=p.category,
-                        Subcategory=p.subcategory,
-                        Cost=self._to_decimal(p.cost),
-                        MSRP=self._to_decimal(p.msrp),
-                        SalePrice=self._to_decimal(p.sale_price),
-                        RequiresRefrigeration=bool(p.requires_refrigeration),
-                        LaunchDate=launch_dt,
-                        taxability=getattr(p, "taxability", None) or None,
-                        Tags=getattr(p, "tags", None),
-                    )
-                )
-
-            # Trucks
-            trucks = (await session.execute(select(TruckModel))).scalars().all()
-            self.trucks = [
-                Truck(
-                    ID=t.truck_id,
-                    LicensePlate=t.license_plate,
-                    Refrigeration=bool(t.refrigeration),
-                    DCID=t.dc_id,
-                )
-                for t in trucks
-            ]
-
-        # Initialize simulators with loaded data
-        self.customer_journey_sim = CustomerJourneySimulator(
-            self.customers, self.products, self.stores, self.config.seed + 1000
-        )
-
-        self.inventory_flow_sim = InventoryFlowSimulator(
-            self.distribution_centers,
-            self.stores,
-            self.products,
-            self.config.seed + 2000,
-            trucks=getattr(self, "trucks", None),
-        )
-
-        self.marketing_campaign_sim = MarketingCampaignSimulator(
-            self.customers, self.config.seed + 3000, self.config.marketing_cost
-        )
-
-        # Initialize customer geography and store selector
-        print("Assigning customer geographies and store affinities...")
-        geography_assigner = GeographyAssigner(
-            self.customers, self.stores, self.geographies, self.config.seed + 4000
-        )
-        customer_geographies = geography_assigner.assign_geographies()
-        self.store_selector = StoreSelector(
-            customer_geographies, self.stores, self.config.seed + 5000
-        )
-
-        # Build customer pools per store for efficient selection
-        print("Building customer pools for each store...")
-        self._build_store_customer_pools(customer_geographies)
-
-        print(
-            "Loaded master data (legacy SQLite): "
-            f"{len(self.geographies)} geographies, "
-            f"{len(self.stores)} stores, "
-            f"{len(self.distribution_centers)} DCs, "
-            f"{len(self.customers)} customers, "
-            f"{len(self.products)} products"
-        )
-        # Build fast AdId -> CustomerID map for marketing join
-        try:
-            self._adid_to_customer_id = {
-                c.AdId: c.ID for c in self.customers if getattr(c, "AdId", None)
-            }
-        except (AttributeError, TypeError) as e:
-            logger.warning(f"Failed to build AdId to CustomerID map: {e}")
-            self._adid_to_customer_id = {}
 
 
     def _send_throttled_progress_update(

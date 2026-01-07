@@ -39,6 +39,7 @@ class InventoryFlowSimulator:
         products: list[ProductMaster],
         seed: int = 42,
         trucks: list | None = None,
+        truck_capacity: int = 15000,
     ):
         """
         Initialize inventory flow simulator.
@@ -49,6 +50,7 @@ class InventoryFlowSimulator:
             products: List of product master records
             seed: Random seed for reproducible simulations
             trucks: Optional list of truck dimension records
+            truck_capacity: Max items per truck (default 15,000 for semi-trailer)
         """
         self.dcs = distribution_centers
         self.stores = stores
@@ -67,7 +69,9 @@ class InventoryFlowSimulator:
         self._initialize_inventory()
 
         # Truck fleet simulation
-        self._truck_capacity = 1000  # items per truck
+        # A 53-foot semi-trailer holds ~20-26 pallets, each with 50-200+ items
+        # Default 15,000 items represents a realistic full truckload capacity
+        self._truck_capacity = truck_capacity
         self._active_shipments: dict[str, dict] = {}  # shipment_id -> shipment_info
 
         # Optional trucks list (dimension trucks) for realistic linking from facts → dim
@@ -76,11 +80,23 @@ class InventoryFlowSimulator:
         self._trucks = trucks or []
         self._trucks_by_dc: dict[int | None, list[int]] = {}
         self._truck_rr_index: dict[int | None, int] = {}
+        # Track when each truck becomes available again (after round trip)
+        # truck_id -> datetime when truck returns to DC
+        self._truck_availability: dict[int, datetime] = {}
+        # Queue of pending shipments waiting for available trucks
+        # Each entry: {"dc_id": int, "store_id": int, "reorder_list": list, "requested_time": datetime}
+        self._shipment_queue: list[dict] = []
+        # Track in-transit inventory per store/product to prevent over-ordering
+        # (store_id, product_id) -> quantity already in transit
+        self._in_transit_inventory: dict[tuple[int, int], int] = {}
         if self._trucks:
             for t in self._trucks:
                 # Pydantic Truck model fields: ID, DCID
                 dc_key = getattr(t, "DCID", None)
-                self._trucks_by_dc.setdefault(dc_key, []).append(getattr(t, "ID"))
+                truck_id = getattr(t, "ID")
+                self._trucks_by_dc.setdefault(dc_key, []).append(truck_id)
+                # All trucks start as available (epoch time = always available)
+                self._truck_availability[truck_id] = datetime.min
             # Initialize round-robin indices
             for key in self._trucks_by_dc.keys():
                 self._truck_rr_index[key] = 0
@@ -92,27 +108,97 @@ class InventoryFlowSimulator:
         self._active_disruptions: dict[int, dict] = {}  # dc_id -> disruption_info
         self._disruption_counter = 1
 
-    def _select_truck_for_shipment(self, dc_id: int) -> int | str:
-        """Select a truck for a shipment, preferring trucks assigned to the DC.
+    def _select_truck_for_shipment(self, dc_id: int, current_time: datetime) -> int | str | None:
+        """Select an available truck for a shipment, preferring trucks assigned to the DC.
 
-        Returns an integer Truck ID if available (matching dim_trucks.ID).
-        Falls back to a pooled truck (DCID=None), and finally a synthetic code.
+        Args:
+            dc_id: Distribution center ID
+            current_time: Current simulation time to check availability
+
+        Returns:
+            Integer Truck ID if available, synthetic code if no real trucks exist,
+            or None if all trucks are currently in use.
         """
-        # Prefer DC-assigned trucks (round-robin)
+        # Prefer DC-assigned trucks - find first available
         dc_list = self._trucks_by_dc.get(dc_id) or []
-        if dc_list:
-            idx = self._truck_rr_index.get(dc_id, 0) % len(dc_list)
+        available_dc_trucks = [
+            truck_id for truck_id in dc_list
+            if self._truck_availability.get(truck_id, datetime.min) <= current_time
+        ]
+        if available_dc_trucks:
+            # Round-robin among available trucks
+            idx = self._truck_rr_index.get(dc_id, 0) % len(available_dc_trucks)
             self._truck_rr_index[dc_id] = idx + 1
-            return dc_list[idx]
+            return available_dc_trucks[idx]
 
-        # Fallback to pool trucks
+        # Fallback to pool trucks - find first available
         pool_list = self._trucks_by_dc.get(None) or []
-        if pool_list:
-            # Random selection among pool for variety
-            return self._rng.choice(pool_list)
+        available_pool_trucks = [
+            truck_id for truck_id in pool_list
+            if self._truck_availability.get(truck_id, datetime.min) <= current_time
+        ]
+        if available_pool_trucks:
+            return self._rng.choice(available_pool_trucks)
 
-        # Final fallback: synthetic truck code (kept for resilience)
-        return f"TRK{self._rng.randint(1000, 9999)}"
+        # If no real trucks exist at all, use synthetic (for backwards compatibility)
+        if not dc_list and not pool_list:
+            return f"TRK{self._rng.randint(1000, 9999)}"
+
+        # All real trucks are busy - return None to signal queuing needed
+        return None
+
+    def _mark_truck_unavailable(self, truck_id: int | str, return_time: datetime) -> None:
+        """Mark a truck as unavailable until it returns to the DC.
+
+        Args:
+            truck_id: Truck ID (int for real trucks, str for synthetic)
+            return_time: When the truck will be back at the DC
+        """
+        if isinstance(truck_id, int):
+            self._truck_availability[truck_id] = return_time
+
+    def _calculate_round_trip_time(self, travel_hours: float, unload_hours: float) -> float:
+        """Calculate total round trip time including return journey.
+
+        Args:
+            travel_hours: One-way travel time to store
+            unload_hours: Time to unload at store
+
+        Returns:
+            Total hours until truck returns to DC
+        """
+        # Round trip = travel to store + unload + travel back
+        # Assume return trip is same duration as outbound
+        return travel_hours + unload_hours + travel_hours
+
+    def get_next_available_truck_time(self, dc_id: int, current_time: datetime) -> datetime | None:
+        """Get the earliest time a truck will be available at this DC.
+
+        Args:
+            dc_id: Distribution center ID
+            current_time: Current simulation time
+
+        Returns:
+            Datetime when next truck becomes available, or None if trucks are available now
+        """
+        dc_list = self._trucks_by_dc.get(dc_id) or []
+        pool_list = self._trucks_by_dc.get(None) or []
+        all_trucks = dc_list + pool_list
+
+        if not all_trucks:
+            return None  # No real trucks, synthetic will be used
+
+        # Check if any truck is available now
+        for truck_id in all_trucks:
+            if self._truck_availability.get(truck_id, datetime.min) <= current_time:
+                return None  # A truck is available now
+
+        # Find earliest return time
+        return_times = [
+            self._truck_availability.get(truck_id, datetime.min)
+            for truck_id in all_trucks
+        ]
+        return min(return_times)
 
     def _initialize_inventory(self):
         """Initialize baseline inventory levels."""
@@ -255,6 +341,9 @@ class InventoryFlowSimulator:
         """
         Check which products need reordering for a store.
 
+        Accounts for both current inventory AND in-transit inventory to prevent
+        over-ordering when shipments are already on the way.
+
         Args:
             store_id: Store ID to check
 
@@ -269,9 +358,11 @@ class InventoryFlowSimulator:
         for product in self.products:
             key = (store_id, product.ID)
             current_inventory = self._store_inventory.get(key, 0)
+            in_transit = self._in_transit_inventory.get(key, 0)
+            effective_inventory = current_inventory + in_transit
             reorder_point = self._reorder_points.get(key, 10)
 
-            if current_inventory <= reorder_point:
+            if effective_inventory <= reorder_point:
                 # Calculate reorder quantity
                 reorder_qty = self._rng.randint(50, 200)
                 reorders.append((product.ID, reorder_qty))
@@ -341,38 +432,70 @@ class InventoryFlowSimulator:
 
         # Generate unique shipment ID
         shipment_id = f"SHIP{departure_time.strftime('%Y%m%d')}{dc_id:02d}{store_id:03d}{self._rng.randint(100, 999)}"
+
         # Choose a real truck when available to maintain referential integrity
-        truck_id = self._select_truck_for_shipment(dc_id)
+        # If no truck available, wait for the next one
+        actual_departure_time = departure_time
+        truck_id = self._select_truck_for_shipment(dc_id, departure_time)
+
+        if truck_id is None:
+            # All trucks are busy - find when next one is available
+            next_available = self.get_next_available_truck_time(dc_id, departure_time)
+            if next_available is not None:
+                actual_departure_time = next_available
+                truck_id = self._select_truck_for_shipment(dc_id, actual_departure_time)
+                logger.debug(
+                    f"No trucks available at {departure_time}, "
+                    f"shipment to store {store_id} delayed to {actual_departure_time}"
+                )
+
+        # If still no truck (shouldn't happen), use synthetic fallback
+        if truck_id is None:
+            truck_id = f"TRK{self._rng.randint(1000, 9999)}"
+            logger.warning(f"No trucks available for DC {dc_id}, using synthetic truck {truck_id}")
 
         # Check for active disruptions at DC
-        capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, departure_time)
+        capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, actual_departure_time)
 
         # Add delays for disruptions (inverse of capacity - lower capacity = more delays)
         base_travel_hours = self._rng.randint(2, 12)  # 2-12 hours base travel time
         delay_multiplier = 2.0 - capacity_multiplier  # 1.0 to 2.0 range
         travel_hours = int(base_travel_hours * delay_multiplier)
 
-        eta = departure_time + timedelta(hours=travel_hours)
+        eta = actual_departure_time + timedelta(hours=travel_hours)
         # Unload duration scales with shipment size (30min - 2hrs)
         unload_hours = self._calculate_unload_duration(sum(qty for _, qty in reorder_list))
         etd = eta + timedelta(hours=unload_hours)
+
+        # Calculate when truck returns to DC (round trip)
+        round_trip_hours = self._calculate_round_trip_time(travel_hours, unload_hours)
+        truck_return_time = actual_departure_time + timedelta(hours=round_trip_hours)
+
+        # Mark truck as unavailable until it returns
+        self._mark_truck_unavailable(truck_id, truck_return_time)
 
         shipment_info = {
             "shipment_id": shipment_id,
             "truck_id": truck_id,
             "dc_id": dc_id,
             "store_id": store_id,
-            "departure_time": departure_time,
+            "departure_time": actual_departure_time,
             "eta": eta,
             "etd": etd,
             "status": TruckStatus.SCHEDULED,
             "products": reorder_list,
             "total_items": sum(qty for _, qty in reorder_list),
-            "unload_duration_hours": unload_hours,  # Store for later reference
+            "unload_duration_hours": unload_hours,
+            "truck_return_time": truck_return_time,  # When truck is back at DC
         }
 
         # Track active shipment
         self._active_shipments[shipment_id] = shipment_info
+
+        # Track in-transit inventory to prevent over-ordering
+        for product_id, quantity in reorder_list:
+            key = (store_id, product_id)
+            self._in_transit_inventory[key] = self._in_transit_inventory.get(key, 0) + quantity
 
         return shipment_info
 
@@ -717,6 +840,8 @@ class InventoryFlowSimulator:
         """
         Complete delivery and update store inventory.
 
+        Also clears in-transit inventory tracking since items have arrived.
+
         Args:
             shipment_id: Shipment to complete
 
@@ -739,6 +864,10 @@ class InventoryFlowSimulator:
             self._store_inventory[store_key] = (
                 self._store_inventory.get(store_key, 0) + quantity
             )
+
+            # Clear in-transit tracking since items have arrived
+            in_transit = self._in_transit_inventory.get(store_key, 0)
+            self._in_transit_inventory[store_key] = max(0, in_transit - quantity)
 
             # Update DC inventory (outbound)
             dc_key = (dc_id, product_id)
@@ -847,6 +976,8 @@ class InventoryFlowSimulator:
         These transactions link to the truck shipment via shipment_id in the Source field,
         creating an audit trail from DC → Truck → Store.
 
+        Also clears the in-transit inventory tracking since items have now arrived.
+
         Args:
             shipment_info: Shipment information with snake_case keys (internal format)
             unload_time: When unloading occurs (truck status = UNLOADING)
@@ -863,6 +994,10 @@ class InventoryFlowSimulator:
             store_key = (store_id, product_id)
             current_inventory = self._store_inventory.get(store_key, 0)
             self._store_inventory[store_key] = current_inventory + quantity
+
+            # Clear in-transit tracking since items have arrived
+            in_transit = self._in_transit_inventory.get(store_key, 0)
+            self._in_transit_inventory[store_key] = max(0, in_transit - quantity)
 
             # Get balance after transaction
             balance = self._store_inventory[store_key]
@@ -1124,3 +1259,28 @@ class InventoryFlowSimulator:
         """
         key = (store_id, product_id)
         return self._store_inventory.get(key, 0)
+
+    def get_in_transit_quantity(self, store_id: int, product_id: int) -> int:
+        """Get quantity currently in transit to a store for a product.
+
+        Args:
+            store_id: Store ID
+            product_id: Product ID
+
+        Returns:
+            Quantity in transit (0 if none)
+        """
+        key = (store_id, product_id)
+        return self._in_transit_inventory.get(key, 0)
+
+    def get_effective_store_inventory(self, store_id: int, product_id: int) -> int:
+        """Get effective inventory (on-hand + in-transit) for reorder decisions.
+
+        Args:
+            store_id: Store ID
+            product_id: Product ID
+
+        Returns:
+            Total effective inventory including in-transit shipments
+        """
+        return self.get_store_balance(store_id, product_id) + self.get_in_transit_quantity(store_id, product_id)
