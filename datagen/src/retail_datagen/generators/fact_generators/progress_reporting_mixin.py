@@ -1,6 +1,7 @@
 """
 Progress reporting and tracking methods for FactDataGenerator.
 """
+
 from __future__ import annotations
 
 import inspect
@@ -25,7 +26,6 @@ class ProgressReportingMixin:
         self._progress_history = []
         # Initialize batch buffers for batched inserts (by hour)
         self._batch_buffers: dict[str, list[dict]] = {t: [] for t in self.FACT_TABLES}
-
 
     def _calculate_eta(self, current_progress: float) -> float | None:
         """
@@ -65,7 +65,6 @@ class ProgressReportingMixin:
     ) -> None:
         self._table_progress_callback = callback
 
-
     def set_progress_callback(
         self,
         callback: Callable[[int, str, dict], None] | None,
@@ -80,7 +79,6 @@ class ProgressReportingMixin:
             callback: Progress callback function(day_num, message, **kwargs), or None to clear
         """
         self._progress_callback = callback
-
 
     def _emit_table_progress(
         self,
@@ -102,7 +100,6 @@ class ProgressReportingMixin:
     async def load_master_data_from_db(self) -> None:
         """Deprecated SQLite path removed; DuckDB-only runtime."""
         raise RuntimeError("SQLite master load is not supported. Use DuckDB loader.")
-
 
     def _send_throttled_progress_update(
         self,
@@ -225,7 +222,6 @@ class ProgressReportingMixin:
             # Update last update timestamp
             self._last_progress_update_time = current_time
 
-
     def _filter_progress_kwargs(
         self, candidate_kwargs: dict[str, Any]
     ) -> dict[str, Any]:
@@ -280,5 +276,3 @@ class ProgressReportingMixin:
         return {
             key: value for key, value in cleaned_kwargs.items() if key in accepted_names
         }
-
-

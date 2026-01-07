@@ -294,14 +294,16 @@ class TestCampaignAttribution:
             GeographyID=1, tax_rate=Decimal("0.08")
         )
         customer = Customer(
-            ID=100, FirstName="Test", LastName="User",
-            GeographyID=1, LoyaltyCard="LC001", BLEId="BLE001", AdId="AD001"
+            ID=100, FirstName="Test", LastName="User", Address="100 Test Ave",
+            GeographyID=1, LoyaltyCard="LC001", Phone="555-555-0100",
+            BLEId="BLE001", AdId="AD001"
         )
         product = ProductMaster(
             ID=1, ProductName="Test Product", Brand="TestBrand",
             Company="TestCo", Department="Test", Category="Test",
             Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
-            SalePrice=Decimal("10.00")
+            SalePrice=Decimal("10.00"), RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1)
         )
         dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
 
@@ -362,14 +364,16 @@ class TestCampaignAttribution:
             GeographyID=1, tax_rate=Decimal("0.08")
         )
         customer = Customer(
-            ID=200, FirstName="Regular", LastName="Customer",
-            GeographyID=1, LoyaltyCard="LC002", BLEId="BLE002", AdId="AD002"
+            ID=200, FirstName="Regular", LastName="Customer", Address="200 Test Ave",
+            GeographyID=1, LoyaltyCard="LC002", Phone="555-555-0200",
+            BLEId="BLE002", AdId="AD002"
         )
         product = ProductMaster(
             ID=1, ProductName="Test Product", Brand="TestBrand",
             Company="TestCo", Department="Test", Category="Test",
             Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
-            SalePrice=Decimal("10.00")
+            SalePrice=Decimal("10.00"), RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1)
         )
         dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
 
@@ -458,12 +462,12 @@ class TestTemporalPatterns:
         patterns = CompositeTemporalPatterns(seed=42)
 
         # Black Friday (day after Thanksgiving) should have high multiplier
-        # Test a known Black Friday date
-        black_friday = datetime(2024, 11, 29)
-        multiplier = patterns.get_combined_multiplier(black_friday)
+        # Test a known Black Friday date at 10 AM (store open hours)
+        black_friday = datetime(2024, 11, 29, 10, 0, 0)
+        multiplier = patterns.get_overall_multiplier(black_friday)
 
-        # Should have elevated activity
-        assert multiplier > 0, "Multiplier should be positive"
+        # Should have elevated activity (store open at 10 AM)
+        assert multiplier > 0, "Multiplier should be positive during store hours"
 
 
 class TestEndToEndDataGeneration:

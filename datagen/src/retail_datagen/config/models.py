@@ -135,7 +135,10 @@ class RealtimeConfig(BaseModel):
     burst: int = Field(..., gt=0, description="Number of events to emit in each burst")
     azure_connection_string: str = Field(
         default="",
-        description="Azure Event Hub connection string (prefer AZURE_EVENTHUB_CONNECTION_STRING env var)",
+        description=(
+            "Azure Event Hub connection string "
+            "(prefer AZURE_EVENTHUB_CONNECTION_STRING env var)"
+        ),
     )
     max_batch_size: int = Field(
         default=256, gt=0, description="Maximum events per batch sent to Event Hub"
@@ -173,7 +176,7 @@ class RealtimeConfig(BaseModel):
     @field_validator("azure_connection_string", mode="before")
     @classmethod
     def load_connection_string_from_env(cls, v: str | None) -> str:
-        """Load connection string from environment variable if not provided in config."""
+        """Load connection string from env var if not provided in config."""
         # If value is provided in config and is not empty, use it
         if v and v.strip():
             return v
@@ -234,8 +237,9 @@ class RealtimeConfig(BaseModel):
                     f"Detected Fabric RTI connection to: {metadata.get('entity_path')}"
                 )
 
-        # Security warning: Only warn if connection string appears to be hardcoded in config
-        # (not loaded from environment variable). Compare against env var to detect source.
+        # Security warning: Only warn if connection string appears to be
+        # hardcoded in config (not loaded from environment variable).
+        # Compare against env var to detect source.
         if self.azure_connection_string:
             env_value = os.getenv("AZURE_EVENTHUB_CONNECTION_STRING", "")
             # Only warn if the value differs from env var (meaning it came from config)
@@ -243,11 +247,13 @@ class RealtimeConfig(BaseModel):
             # If env var matches, the value was safely loaded from env var
             if not env_value or self.azure_connection_string != env_value:
                 logger.warning(
-                    "SECURITY WARNING: Azure Event Hub connection string is configured in the model. "
-                    "If this value comes from config.json, it may be accidentally committed to version control. "
-                    "Recommended: Use environment variable AZURE_EVENTHUB_CONNECTION_STRING instead. "
-                    "To suppress this warning, leave azure_connection_string empty in config.json "
-                    "and set the AZURE_EVENTHUB_CONNECTION_STRING environment variable."
+                    "SECURITY WARNING: Azure Event Hub connection string is "
+                    "configured in the model. If this value comes from "
+                    "config.json, it may be accidentally committed to version "
+                    "control. Recommended: Use environment variable "
+                    "AZURE_EVENTHUB_CONNECTION_STRING instead. To suppress "
+                    "this warning, leave azure_connection_string empty in "
+                    "config.json and set the env var instead."
                 )
 
         return self
@@ -329,7 +335,7 @@ class StorageConfig(BaseModel):
     )
     account_key: str | None = Field(
         default=None,
-        description="Azure Storage account key (sensitive - prefer environment variable)",
+        description="Azure Storage account key (prefer env var)",
     )
 
     @field_validator("account_uri", mode="before")
@@ -366,20 +372,22 @@ class StorageConfig(BaseModel):
             if "." not in uri and "/" not in uri:
                 raise ValueError("Storage account URI appears invalid")
 
-        # Security warning: Only warn if account_key appears to be hardcoded in config
-        # (not loaded from environment variable). Compare against env var to detect source.
+        # Security warning: Only warn if account_key appears to be hardcoded
+        # in config (not loaded from environment variable).
         if self.account_key:
             env_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
-            # Only warn if the value differs from env var (meaning it came from config)
+            # Only warn if value differs from env var (came from config)
             # If env var is empty, the value must have come from config
             # If env var matches, the value was safely loaded from env var
             if not env_key or self.account_key != env_key:
                 logger.warning(
-                    "SECURITY WARNING: Azure Storage account key is configured in the model. "
-                    "If this value comes from config.json, it may be accidentally committed to version control. "
-                    "Recommended: Use environment variable AZURE_STORAGE_ACCOUNT_KEY instead. "
-                    "To suppress this warning, leave account_key empty in config.json "
-                    "and set the AZURE_STORAGE_ACCOUNT_KEY environment variable."
+                    "SECURITY WARNING: Azure Storage account key is "
+                    "configured in the model. If this value comes from "
+                    "config.json, it may be accidentally committed to version "
+                    "control. Recommended: Use environment variable "
+                    "AZURE_STORAGE_ACCOUNT_KEY instead. To suppress this "
+                    "warning, leave account_key empty in config.json and set "
+                    "the env var instead."
                 )
         return self
 
@@ -419,13 +427,13 @@ class PerformanceConfig(BaseModel):
     max_workers: int | None = Field(
         None,
         gt=0,
-        description="Override maximum number of parallel workers. If None, calculated from max_cpu_percent.",
+        description="Override max parallel workers. If None, uses max_cpu_percent.",
     )
     batch_hours: int = Field(
         1,
         ge=1,
         le=24,
-        description="Batch N hours of data before inserting to DuckDB (1 = no batching)",
+        description="Batch N hours before DuckDB insert (1 = no batching)",
     )
 
     def get_max_workers(self) -> int:

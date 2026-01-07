@@ -1,6 +1,7 @@
 """
 Master data loading and normalization methods.
 """
+
 from __future__ import annotations
 
 import logging
@@ -9,17 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 from retail_datagen.shared.customer_geography import GeographyAssigner, StoreSelector
-from retail_datagen.shared.models import (
-    Customer,
-    DistributionCenter,
-    GeographyMaster,
-    ProductMaster,
-    Store,
-    Truck,
-)
 
 from ..fact_generators.models import MasterTableSpec
 from ..retail_patterns import (
@@ -77,7 +68,6 @@ class DataLoadingMixin:
             ),
             "LaunchDate": parsed_launch_date,
         }
-
 
     def load_master_data_from_duckdb(self) -> None:
         """Load master data from DuckDB and initialize simulators."""
@@ -150,14 +140,10 @@ class DataLoadingMixin:
         """Synchronous alias that loads master data from DuckDB."""
         return self.load_master_data_from_duckdb()
 
-
     def _master_table_specs(self) -> list[MasterTableSpec]:
         """Deprecated: No longer used (DuckDB-only)."""
         return []
 
-
     def _load_master_table(self, master_path: Path, spec: MasterTableSpec) -> list[Any]:
         """Deprecated: CSV master load removed."""
         return []
-
-

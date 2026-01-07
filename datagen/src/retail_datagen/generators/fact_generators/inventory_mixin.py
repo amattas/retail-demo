@@ -1,6 +1,7 @@
 """
 Inventory management for distribution centers and stores
 """
+
 from __future__ import annotations
 
 import logging
@@ -9,14 +10,10 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 
 from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.models import (
-    Customer,
-    DistributionCenter,
     InventoryReason,
-    ProductMaster,
 )
 
 if TYPE_CHECKING:
@@ -27,6 +24,7 @@ from .models import FactGenerationSummary
 # SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
 try:
     from retail_datagen.db.session import retail_session_maker
+
     SessionMaker = retail_session_maker()
 except ImportError:
     SessionMaker = None  # type: ignore[assignment, misc]
@@ -67,7 +65,6 @@ class InventoryMixin:
 
         return transactions
 
-
     def _build_store_customer_pools(self, customer_geographies: dict) -> None:
         """
         Build customer pools for each store for efficient weighted selection.
@@ -91,7 +88,9 @@ class InventoryMixin:
                 # If no geography, give equal weight to all stores
                 equal_weight = 1.0 / len(self.stores)
                 for store in self.stores:
-                    self._store_customer_pools[store.ID].append((customer, equal_weight))
+                    self._store_customer_pools[store.ID].append(
+                        (customer, equal_weight)
+                    )
                 continue
 
             # Get store selection weights for this customer
@@ -138,7 +137,9 @@ class InventoryMixin:
                 self._store_customer_sampling_np[sid] = (idx, p)
             except Exception as e:
                 # Fallback will use Python choices
-                logger.debug(f"Failed to precompute numpy sampling for store {sid}: {e}")
+                logger.debug(
+                    f"Failed to precompute numpy sampling for store {sid}: {e}"
+                )
 
         # Log summary statistics
         pool_sizes = [len(pool) for pool in self._store_customer_pools.values()]
@@ -152,7 +153,11 @@ class InventoryMixin:
         logger.info(f"  Max pool size: {max_pool_size}")
 
     async def generate_historical_data(
-        self, start_date: datetime, end_date: datetime, *, publish_to_outbox: bool = False
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        publish_to_outbox: bool = False,
     ) -> FactGenerationSummary:
         """
         Generate historical fact data for the specified date range.
@@ -274,43 +279,85 @@ class InventoryMixin:
                 cols = [row[1] for row in res.fetchall()]
                 # receipt_id_ext
                 if "receipt_id_ext" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
-                    logger.info("Migrated fact_receipts: added receipt_id_ext column and index")
+                    await session.execute(
+                        text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added receipt_id_ext column and index"
+                    )
 
                 # receipt_type
                 if "receipt_type" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"))
-                    logger.info("Migrated fact_receipts: added receipt_type column and index")
+                    await session.execute(
+                        text(
+                            "ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"
+                        )
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added receipt_type column and index"
+                    )
 
                 # return_for_receipt_id
                 if "return_for_receipt_id" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"))
-                    logger.info("Migrated fact_receipts: added return_for_receipt_id column and index")
+                    await session.execute(
+                        text(
+                            "ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"
+                        )
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added return_for_receipt_id column and index"
+                    )
 
                 # Ensure online order lines table exists
-                await session.execute(text(
-                    "CREATE TABLE IF NOT EXISTS fact_online_order_lines (\n"
-                    " line_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
-                    " order_id INTEGER NOT NULL,\n"
-                    " product_id INTEGER NOT NULL,\n"
-                    " line_num INTEGER NOT NULL,\n"
-                    " quantity INTEGER NOT NULL,\n"
-                    " unit_price FLOAT NOT NULL,\n"
-                    " ext_price FLOAT NOT NULL,\n"
-                    " promo_code VARCHAR(50) NULL\n"
-                    ")"
-                ))
-                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"))
-                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"))
+                await session.execute(
+                    text(
+                        "CREATE TABLE IF NOT EXISTS fact_online_order_lines (\n"
+                        " line_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+                        " order_id INTEGER NOT NULL,\n"
+                        " product_id INTEGER NOT NULL,\n"
+                        " line_num INTEGER NOT NULL,\n"
+                        " quantity INTEGER NOT NULL,\n"
+                        " unit_price FLOAT NOT NULL,\n"
+                        " ext_price FLOAT NOT NULL,\n"
+                        " promo_code VARCHAR(50) NULL\n"
+                        ")"
+                    )
+                )
+                await session.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"
+                    )
+                )
+                await session.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"
+                    )
+                )
 
                 # Ensure dim_products has tags column
-                res_prod = await session.execute(text("PRAGMA table_info('dim_products')"))
+                res_prod = await session.execute(
+                    text("PRAGMA table_info('dim_products')")
+                )
                 prod_cols = [row[1] for row in res_prod.fetchall()]
                 if "tags" not in prod_cols:
-                    await session.execute(text("ALTER TABLE dim_products ADD COLUMN tags TEXT"))
+                    await session.execute(
+                        text("ALTER TABLE dim_products ADD COLUMN tags TEXT")
+                    )
                     logger.info("Migrated dim_products: added tags column")
 
                 await session.commit()
@@ -322,7 +369,7 @@ class InventoryMixin:
             # Ensure schema is compatible (adds new columns/tables if missing)
             if not self._use_duckdb:
                 await _ensure_required_schema(self._session)
-        # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
+            # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
             dropped_indexes: list[tuple[str, str]] = []
             try:
                 if not self._use_duckdb:
@@ -343,7 +390,9 @@ class InventoryMixin:
                         table_progress=table_progress,
                     )
             except Exception as e:
-                logger.warning(f"Failed to drop indexes for bulk load optimization: {e}")
+                logger.warning(
+                    f"Failed to drop indexes for bulk load optimization: {e}"
+                )
                 dropped_indexes = []
             while current_date <= end_date:
                 day_counter += 1
@@ -545,7 +594,9 @@ class InventoryMixin:
             try:
                 marketing_boost = self._compute_marketing_multiplier(date)
             except Exception as e:
-                logger.warning(f"Failed to compute marketing multiplier for {date}, using default 1.0: {e}")
+                logger.warning(
+                    f"Failed to compute marketing multiplier for {date}, using default 1.0: {e}"
+                )
             marketing_records = self._generate_marketing_activity(date, marketing_boost)
             if marketing_records:
                 logger.debug(
@@ -563,7 +614,11 @@ class InventoryMixin:
             if marketing_records:
                 try:
                     await self._insert_hourly_to_db(
-                        self._session, "marketing", marketing_records, hour=0, commit_every_batches=0
+                        self._session,
+                        "marketing",
+                        marketing_records,
+                        hour=0,
+                        commit_every_batches=0,
                     )
                     # Update progress for this daily-generated table (track all 24 hours as complete)
                     for hour in range(24):
@@ -629,7 +684,9 @@ class InventoryMixin:
                         tables_in_progress=progress_state.get("tables_in_progress", []),
                     )
             except Exception as e:
-                logger.debug(f"Failed to send progress update during hourly generation: {e}")
+                logger.debug(
+                    f"Failed to send progress update during hourly generation: {e}"
+                )
 
             if hour_multiplier == 0:  # Store closed
                 hour_data = {
@@ -820,7 +877,9 @@ class InventoryMixin:
             if delivery_transactions:
                 # Only add if not already added by lifecycle processing
                 # This prevents double-counting
-                logger.debug(f"Legacy delivery processing added {len(delivery_transactions)} transactions")
+                logger.debug(
+                    f"Legacy delivery processing added {len(delivery_transactions)} transactions"
+                )
                 # Skip adding these since _process_truck_lifecycle handles it
                 pass
 
@@ -905,7 +964,11 @@ class InventoryMixin:
                 # ~0.02% of store-product combinations touched (bounded)
                 num_stores = len(self.stores)
                 samples = max(1, int(num_stores * 0.10))  # ~10% of stores per day
-                sampled_stores = self._rng.sample(self.stores, min(samples, num_stores)) if self.stores else []
+                sampled_stores = (
+                    self._rng.sample(self.stores, min(samples, num_stores))
+                    if self.stores
+                    else []
+                )
                 for st in sampled_stores:
                     # Pick 1-3 random products to adjust
                     k = self._rng.randint(1, 3)
@@ -933,11 +996,21 @@ class InventoryMixin:
                             }
                         )
                 if adjustments:
-                    await self._insert_hourly_to_db(self._session, "store_inventory_txn", adjustments, hour=22, commit_every_batches=0)
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "store_inventory_txn",
+                        adjustments,
+                        hour=22,
+                        commit_every_batches=0,
+                    )
                     for hour in range(22, 24):
-                        self.hourly_tracker.update_hourly_progress("store_inventory_txn", day_index, hour, total_days)
+                        self.hourly_tracker.update_hourly_progress(
+                            "store_inventory_txn", day_index, hour, total_days
+                        )
         except Exception as e:
-            logger.warning(f"Adjustment generation failed for {date.strftime('%Y-%m-%d')}: {e}")
+            logger.warning(
+                f"Adjustment generation failed for {date.strftime('%Y-%m-%d')}: {e}"
+            )
 
         # 9. Generate return receipts and inventory effects (baseline + holiday spikes)
         try:
@@ -946,8 +1019,8 @@ class InventoryMixin:
             else:
                 await self._generate_and_insert_returns(date, active_tables)
         except Exception as e:
-            logger.warning(f"Return generation failed for {date.strftime('%Y-%m-%d')}: {e}")
+            logger.warning(
+                f"Return generation failed for {date.strftime('%Y-%m-%d')}: {e}"
+            )
 
         return daily_facts
-
-

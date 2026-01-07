@@ -81,7 +81,12 @@ class TaxCalculator:
             if "data/dictionaries" in path_str or "data\\dictionaries" in path_str:
                 try:
                     repo_datagen = Path(__file__).resolve().parents[3]
-                    fallback = repo_datagen / "data" / "dictionaries" / self.tax_rates_path.name
+                    fallback = (
+                        repo_datagen
+                        / "data"
+                        / "dictionaries"
+                        / self.tax_rates_path.name
+                    )
                     if fallback.exists():
                         self.tax_rates_path = fallback
                     else:
@@ -89,9 +94,13 @@ class TaxCalculator:
                             f"Tax rates file not found: {self.tax_rates_path} (also tried {fallback})"
                         )
                 except Exception:
-                    raise FileNotFoundError(f"Tax rates file not found: {self.tax_rates_path}")
+                    raise FileNotFoundError(
+                        f"Tax rates file not found: {self.tax_rates_path}"
+                    )
             else:
-                raise FileNotFoundError(f"Tax rates file not found: {self.tax_rates_path}")
+                raise FileNotFoundError(
+                    f"Tax rates file not found: {self.tax_rates_path}"
+                )
 
         try:
             # Load CSV with pandas for efficient parsing
@@ -101,7 +110,9 @@ class TaxCalculator:
             required_columns = {"StateCode", "County", "City", "CombinedRate"}
             if not required_columns.issubset(self.tax_rates.columns):
                 missing = required_columns - set(self.tax_rates.columns)
-                raise ValueError(f"Missing required columns in tax_rates.csv: {missing}")
+                raise ValueError(
+                    f"Missing required columns in tax_rates.csv: {missing}"
+                )
 
             # Build (StateCode, City) -> CombinedRate cache (use itertuples for speed)
             # Also collect rates by county and state for fallback calculations
@@ -196,9 +207,13 @@ class TaxCalculator:
             city = city.strip()
             city_key = (state, city)
             if city_key in self.rate_cache:
-                logger.debug(f"Tax rate found for {city}, {state}: {self.rate_cache[city_key]}")
+                logger.debug(
+                    f"Tax rate found for {city}, {state}: {self.rate_cache[city_key]}"
+                )
                 return self.rate_cache[city_key]
-            logger.debug(f"No city-level tax rate for {city}, {state}. Trying county fallback.")
+            logger.debug(
+                f"No city-level tax rate for {city}, {state}. Trying county fallback."
+            )
 
         # Step 2: Try County fallback (average of cities in county)
         if county:
@@ -209,15 +224,21 @@ class TaxCalculator:
                     f"Using county-level tax rate for {county}, {state}: {self.county_cache[county_key]}"
                 )
                 return self.county_cache[county_key]
-            logger.debug(f"No county-level tax rate for {county}, {state}. Trying state fallback.")
+            logger.debug(
+                f"No county-level tax rate for {county}, {state}. Trying state fallback."
+            )
 
         # Step 3: Try State-only fallback (average of all cities in state)
         if state in self.state_cache:
-            logger.debug(f"Using state-level tax rate for {state}: {self.state_cache[state]}")
+            logger.debug(
+                f"Using state-level tax rate for {state}: {self.state_cache[state]}"
+            )
             return self.state_cache[state]
 
         # Step 4: Return default if no match found at any level
-        logger.debug(f"No tax rate found for {state}. Using default: {self.default_rate}")
+        logger.debug(
+            f"No tax rate found for {state}. Using default: {self.default_rate}"
+        )
         return self.default_rate
 
     def calculate_tax(self, amount: Decimal, tax_rate: Decimal) -> Decimal:
@@ -259,9 +280,7 @@ class TaxCalculator:
         """
         state = state.strip().upper()
         return {
-            city: rate
-            for (st, city), rate in self.rate_cache.items()
-            if st == state
+            city: rate for (st, city), rate in self.rate_cache.items() if st == state
         }
 
     def get_rate_statistics(self) -> dict[str, Decimal]:

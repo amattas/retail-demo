@@ -192,7 +192,8 @@ class AzureEventHubClient:
 
         # Determine mock mode: either Azure SDK missing or explicit mock scheme
         self._is_mock = (not AZURE_AVAILABLE) or (
-            isinstance(connection_string, str) and connection_string.startswith("mock://")
+            isinstance(connection_string, str)
+            and connection_string.startswith("mock://")
         )
 
         # Initialize client only for real (non-mock) connections

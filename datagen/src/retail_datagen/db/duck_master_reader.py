@@ -26,7 +26,9 @@ from retail_datagen.shared.models import (
 )
 
 
-def _fetch_all(conn: duckdb.DuckDBPyConnection, table: str) -> tuple[list[str], list[tuple]]:
+def _fetch_all(
+    conn: duckdb.DuckDBPyConnection, table: str
+) -> tuple[list[str], list[tuple]]:
     cur = conn.execute(f"SELECT * FROM {table}")
     rows = cur.fetchall()
     cols = [d[0] for d in (cur.description or [])]
@@ -81,11 +83,15 @@ def read_stores() -> list[Store]:
                 StoreNumber=str(r[idx["storenumber"]]),
                 Address=str(r[idx["address"]]),
                 GeographyID=int(r[idx["geographyid"]]),
-                tax_rate=_to_decimal(r[idx.get("tax_rate", idx.get("taxrate", "tax_rate"))]),
+                tax_rate=_to_decimal(
+                    r[idx.get("tax_rate", idx.get("taxrate", "tax_rate"))]
+                ),
                 volume_class=r[idx.get("volume_class")],
                 store_format=r[idx.get("store_format")],
                 operating_hours=r[idx.get("operating_hours")],
-                daily_traffic_multiplier=_to_decimal(r[idx.get("daily_traffic_multiplier")]),
+                daily_traffic_multiplier=_to_decimal(
+                    r[idx.get("daily_traffic_multiplier")]
+                ),
             )
         )
     return out
@@ -119,7 +125,11 @@ def read_trucks() -> list[Truck]:
                 ID=int(r[idx["id"]]),
                 LicensePlate=str(r[idx["licenseplate"]]),
                 Refrigeration=bool(r[idx["refrigeration"]]),
-                DCID=int(r[idx.get("dcid", idx.get("dc_id", "dcid"))]) if r[idx.get("dcid", idx.get("dc_id", "dcid"))] is not None else None,
+                DCID=(
+                    int(r[idx.get("dcid", idx.get("dc_id", "dcid"))])
+                    if r[idx.get("dcid", idx.get("dc_id", "dcid"))] is not None
+                    else None
+                ),
             )
         )
     return out
@@ -160,14 +170,23 @@ def read_products() -> list[ProductMaster]:
                 ID=int(r[idx["id"]]),
                 ProductName=str(r[idx["productname"]]),
                 Brand=str(r[idx["brand"]]) if r[idx["brand"]] is not None else None,
-                Company=str(r[idx["company"]]) if r[idx["company"]] is not None else None,
+                Company=(
+                    str(r[idx["company"]]) if r[idx["company"]] is not None else None
+                ),
                 Department=str(r[idx["department"]]),
                 Category=str(r[idx["category"]]),
                 Subcategory=str(r[idx["subcategory"]]),
                 Cost=_to_decimal(r[idx["cost"]]) or Decimal("0.00"),
                 MSRP=_to_decimal(r[idx["msrp"]]) or Decimal("0.00"),
                 SalePrice=_to_decimal(r[idx["saleprice"]]) or Decimal("0.00"),
-                RequiresRefrigeration=bool(r[idx.get("requiresrefrigeration", idx.get("requires_refrigeration", "requiresrefrigeration"))]),
+                RequiresRefrigeration=bool(
+                    r[
+                        idx.get(
+                            "requiresrefrigeration",
+                            idx.get("requires_refrigeration", "requiresrefrigeration"),
+                        )
+                    ]
+                ),
                 LaunchDate=launch_dt,
                 taxability=r[idx.get("taxability")],
                 Tags=r[idx.get("tags")],
@@ -191,4 +210,3 @@ def read_all_masters() -> tuple[
     products = read_products()
     trucks = read_trucks()
     return geos, stores, dcs, customers, products, trucks
-

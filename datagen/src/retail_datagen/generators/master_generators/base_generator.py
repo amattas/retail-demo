@@ -5,7 +5,8 @@ Provides core functionality: database operations, progress tracking, validation.
 """
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.cache import CacheManager
@@ -37,7 +38,7 @@ ProductModel = _DuckModel("dim_products")
 class BaseGenerator:
     """
     Base class providing shared infrastructure for master data generation.
-    
+
     Handles:
     - Database connection and bulk inserts
     - Progress tracking and callbacks
@@ -205,7 +206,9 @@ class BaseGenerator:
 
                 # Emit incremental progress every batch
                 if ui_table_name:
-                    fraction = records_inserted / total_records if total_records else 1.0
+                    fraction = (
+                        records_inserted / total_records if total_records else 1.0
+                    )
                     self._emit_progress(
                         ui_table_name,
                         fraction,
@@ -214,16 +217,22 @@ class BaseGenerator:
                     )
 
                 batch_index += 1
-                if commit_every_batches > 0 and (batch_index % commit_every_batches == 0):
+                if commit_every_batches > 0 and (
+                    batch_index % commit_every_batches == 0
+                ):
                     try:
                         await session.commit()
-                        logger.info(f"Committed after {batch_index} batches for {table_name}")
+                        logger.info(
+                            f"Committed after {batch_index} batches for {table_name}"
+                        )
                     except Exception as e:
                         logger.warning(
                             f"Commit failed after batch {batch_index} for {table_name}: {e}"
                         )
 
-            logger.info(f"Successfully inserted all {total_records:,} records into {table_name}")
+            logger.info(
+                f"Successfully inserted all {total_records:,} records into {table_name}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to insert data into {table_name}: {e}", exc_info=True)
@@ -316,12 +325,20 @@ class BaseGenerator:
         try:
             cache_manager = CacheManager()
 
-            cache_manager.update_master_table("geographies_master", geography_count, "Master Data")
+            cache_manager.update_master_table(
+                "geographies_master", geography_count, "Master Data"
+            )
             cache_manager.update_master_table("stores", store_count, "Master Data")
-            cache_manager.update_master_table("distribution_centers", dc_count, "Master Data")
+            cache_manager.update_master_table(
+                "distribution_centers", dc_count, "Master Data"
+            )
             cache_manager.update_master_table("trucks", truck_count, "Master Data")
-            cache_manager.update_master_table("customers", customer_count, "Master Data")
-            cache_manager.update_master_table("products_master", product_count, "Master Data")
+            cache_manager.update_master_table(
+                "customers", customer_count, "Master Data"
+            )
+            cache_manager.update_master_table(
+                "products_master", product_count, "Master Data"
+            )
 
             print("Master data counts cached successfully")
         except Exception as e:

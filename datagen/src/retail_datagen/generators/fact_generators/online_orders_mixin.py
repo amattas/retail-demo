@@ -1,12 +1,15 @@
 """
 Online order generation with lifecycle tracking
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime
-import pandas as pd
-from retail_datagen.generators.online_order_generator import generate_online_orders_with_lifecycle
+
+from retail_datagen.generators.online_order_generator import (
+    generate_online_orders_with_lifecycle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,7 @@ class OnlineOrdersMixin:
         Returns:
             (orders, store_inventory_txn, dc_inventory_txn, order_lines)
         """
+
         # Basket adjuster applies the same holiday overlay used for POS
         def _adjuster(ts: datetime, basket):
             self._apply_holiday_overlay_to_basket(ts, basket)
@@ -46,5 +50,3 @@ class OnlineOrdersMixin:
             generate_trace_id_func=self._generate_trace_id,
             basket_adjuster=_adjuster,
         )
-
-

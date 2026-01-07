@@ -252,7 +252,9 @@ class MonitoringManager:
             ),
         }
 
-    async def get_statistics(self, buffer_size: int, dlq_size: int, azure_client) -> dict[str, Any]:
+    async def get_statistics(
+        self, buffer_size: int, dlq_size: int, azure_client
+    ) -> dict[str, Any]:
         """
         Get current streaming statistics.
 

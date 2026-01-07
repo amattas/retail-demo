@@ -271,7 +271,9 @@ class PromotionEngine:
             # Check category eligibility
             if config.eligible_categories:
                 # At least one basket item must be in eligible category
-                if not any(cat in config.eligible_categories for cat in basket_categories):
+                if not any(
+                    cat in config.eligible_categories for cat in basket_categories
+                ):
                     continue
 
             eligible_promos.append(config)
@@ -312,7 +314,9 @@ class PromotionEngine:
             if promo_config.eligible_categories:
                 if category not in promo_config.eligible_categories:
                     # Item not eligible, no promo code
-                    items_with_promos.append({**item, "promo_code": None, "discount": Decimal("0.00")})
+                    items_with_promos.append(
+                        {**item, "promo_code": None, "discount": Decimal("0.00")}
+                    )
                     continue
 
             # BOGO50 special logic: apply 50% to every other item
@@ -323,23 +327,34 @@ class PromotionEngine:
                 discounted_qty = qty // 2
                 if discounted_qty > 0:
                     unit_price = line_subtotal / qty
-                    line_discount = (unit_price * Decimal(str(discounted_qty)) * promo_config.discount_pct).quantize(Decimal("0.01"))
+                    line_discount = (
+                        unit_price
+                        * Decimal(str(discounted_qty))
+                        * promo_config.discount_pct
+                    ).quantize(Decimal("0.01"))
                 else:
                     line_discount = Decimal("0.00")
             else:
                 # Standard percentage discount
-                line_discount = (line_subtotal * promo_config.discount_pct).quantize(Decimal("0.01"))
+                line_discount = (line_subtotal * promo_config.discount_pct).quantize(
+                    Decimal("0.01")
+                )
 
             total_discount += line_discount
 
-            items_with_promos.append({
-                **item,
-                "promo_code": promo_config.code,
-                "discount": line_discount,
-            })
+            items_with_promos.append(
+                {
+                    **item,
+                    "promo_code": promo_config.code,
+                    "discount": line_discount,
+                }
+            )
 
         # Apply max discount cap if configured
-        if promo_config.max_discount_amount and total_discount > promo_config.max_discount_amount:
+        if (
+            promo_config.max_discount_amount
+            and total_discount > promo_config.max_discount_amount
+        ):
             # Proportionally reduce all line discounts
             reduction_factor = promo_config.max_discount_amount / total_discount
             total_discount = promo_config.max_discount_amount
@@ -347,7 +362,9 @@ class PromotionEngine:
             # Adjust individual line discounts
             for item in items_with_promos:
                 if item.get("discount", Decimal("0.00")) > Decimal("0.00"):
-                    item["discount"] = (item["discount"] * reduction_factor).quantize(Decimal("0.01"))
+                    item["discount"] = (item["discount"] * reduction_factor).quantize(
+                        Decimal("0.01")
+                    )
 
         return total_discount, items_with_promos
 

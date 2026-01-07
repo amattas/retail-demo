@@ -18,16 +18,24 @@ dependencies = [
     "faker>=20.0.0",
     "azure-eventhub>=5.11.0",
     "python-multipart>=0.0.6",
+    "prometheus-client>=0.19.0",
+    "pyarrow>=14.0.0",
+    "duckdb>=1.0.0",
+    "jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.15.0",
     "hypothesis>=6.88.0",
+    "httpx>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
-    "pytest-cov>=4.1.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "aiosqlite>=0.19.0,<1.0.0",
 ]
 
 #[project.scripts]
@@ -40,6 +48,11 @@ exclude = ["data/**/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+# Ignore these rules:
+# - E501: line-too-long (cleanup needed across codebase)
+# - N806: variable in function should be lowercase (math convention: D, P, S, R)
+# - N818: exception name should end with Error suffix (existing base exception)
+ignore = ["E501", "N806", "N818"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["retail_datagen"]

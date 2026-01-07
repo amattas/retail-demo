@@ -1,6 +1,7 @@
 """
 Data models and dataclasses for fact generation.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -30,5 +31,3 @@ class MasterTableSpec:
     model_cls: type[Any]
     dtype: dict[str, Any] | None = None
     row_adapter: Callable[[dict[str, Any]], dict[str, Any]] | None = None
-
-

@@ -87,7 +87,11 @@ class EventStreamer:
             self._use_duckdb = False
 
         # In unit-test mode, force in-memory streaming loop (no DuckDB batch path)
-        if os.getenv("RETAIL_DATAGEN_TEST_MODE", "").strip().lower() in {"1", "true", "yes"}:
+        if os.getenv("RETAIL_DATAGEN_TEST_MODE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
             self._use_duckdb = False
             self._duckdb_conn = None
 
@@ -192,7 +196,10 @@ class EventStreamer:
 
         # Re-raise signal with original handler for proper exit
         if signum == signal.SIGINT and hasattr(self, "_original_sigint"):
-            if callable(self._original_sigint) and self._original_sigint not in (signal.SIG_IGN, signal.SIG_DFL):
+            if callable(self._original_sigint) and self._original_sigint not in (
+                signal.SIG_IGN,
+                signal.SIG_DFL,
+            ):
                 self._original_sigint(signum, frame)
             elif self._original_sigint == signal.SIG_DFL:
                 # Default behavior - raise KeyboardInterrupt
@@ -274,7 +281,9 @@ class EventStreamer:
 
             # Compute daily targets for pacing after data load
             stores_count = len(self._stores) if self._stores else 1
-            dcs_count = len(self._distribution_centers) if self._distribution_centers else 1
+            dcs_count = (
+                len(self._distribution_centers) if self._distribution_centers else 1
+            )
             self._streaming_core.compute_daily_targets(
                 stores_count, dcs_count, self.config.volume
             )
@@ -303,9 +312,13 @@ class EventStreamer:
 
     async def _ensure_master_data_loaded(self):
         """Ensure all required master data is loaded from DuckDB."""
-        if all([self._stores, self._customers, self._products, self._distribution_centers]):
+        if all(
+            [self._stores, self._customers, self._products, self._distribution_centers]
+        ):
             return
-        self.log.info("Loading master data for streaming from DuckDB", session_id=self._session_id)
+        self.log.info(
+            "Loading master data for streaming from DuckDB", session_id=self._session_id
+        )
         try:
             from retail_datagen.db.duck_master_reader import (
                 read_customers,
@@ -402,8 +415,12 @@ class EventStreamer:
             ]
         if not self._distribution_centers:
             self._distribution_centers = [
-                DistributionCenter(ID=1, DCNumber="DC001", Address="999 Industrial Blvd", GeographyID=1),
-                DistributionCenter(ID=2, DCNumber="DC002", Address="888 Warehouse Way", GeographyID=2),
+                DistributionCenter(
+                    ID=1, DCNumber="DC001", Address="999 Industrial Blvd", GeographyID=1
+                ),
+                DistributionCenter(
+                    ID=2, DCNumber="DC002", Address="888 Warehouse Way", GeographyID=2
+                ),
             ]
 
     async def start(self, duration: timedelta | None = None) -> bool:
@@ -614,7 +631,9 @@ class EventStreamer:
 
     async def get_statistics(self) -> dict:
         """Get current streaming statistics."""
-        buffer_size = self._streaming_core.get_buffer_size() if self._streaming_core else 0
+        buffer_size = (
+            self._streaming_core.get_buffer_size() if self._streaming_core else 0
+        )
         dlq_size = self._dlq_manager.get_size()
         stats = await self._monitoring_manager.get_statistics(
             buffer_size, dlq_size, self._azure_client
@@ -625,13 +644,17 @@ class EventStreamer:
 
     async def get_health_status(self) -> dict:
         """Get comprehensive health status of the streaming system."""
-        master_data_loaded = all([
-            self._stores,
-            self._customers,
-            self._products,
-            self._distribution_centers,
-        ])
-        buffer_size = self._streaming_core.get_buffer_size() if self._streaming_core else 0
+        master_data_loaded = all(
+            [
+                self._stores,
+                self._customers,
+                self._products,
+                self._distribution_centers,
+            ]
+        )
+        buffer_size = (
+            self._streaming_core.get_buffer_size() if self._streaming_core else 0
+        )
         return await self._monitoring_manager.get_health_status(
             is_streaming=self._is_streaming,
             azure_client=self._azure_client,
@@ -712,22 +735,32 @@ class EventStreamer:
     @property
     def _stats_lock(self):
         """Backward compatibility: access stats lock."""
-        return self._monitoring_manager._stats_lock if self._monitoring_manager else None
+        return (
+            self._monitoring_manager._stats_lock if self._monitoring_manager else None
+        )
 
     @property
     def _allowed_event_types(self):
         """Backward compatibility: access allowed event types."""
-        return self._streaming_core._allowed_event_types if self._streaming_core else None
+        return (
+            self._streaming_core._allowed_event_types if self._streaming_core else None
+        )
 
     @property
     def _pause_event(self):
         """Backward compatibility: access pause event."""
-        return self._monitoring_manager.get_pause_event() if self._monitoring_manager else None
+        return (
+            self._monitoring_manager.get_pause_event()
+            if self._monitoring_manager
+            else None
+        )
 
     @property
     def _is_paused(self):
         """Backward compatibility: check if paused."""
-        return self._monitoring_manager.is_paused() if self._monitoring_manager else False
+        return (
+            self._monitoring_manager.is_paused() if self._monitoring_manager else False
+        )
 
     async def _generate_event_burst(self, timestamp):
         """Backward compatibility: delegate to streaming core."""

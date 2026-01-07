@@ -4,7 +4,6 @@ Store master data generation with profiles and geographic distribution.
 
 import logging
 from decimal import Decimal
-from typing import Any
 
 from retail_datagen.shared.models import (
     DistributionCenter,
@@ -34,7 +33,7 @@ class StoreGeneratorMixin:
     ) -> list[Store]:
         """
         Generate stores with strategic geographic distribution.
-        
+
         Args:
             store_count: Number of stores to generate
             geography_master: Geography dimension records
@@ -43,7 +42,7 @@ class StoreGeneratorMixin:
             tax_rate_mapping: (StateCode, City) -> CombinedRate
             state_tax_avg: StateCode -> average rate
             seed: Random seed
-            
+
         Returns:
             List of Store records
         """
@@ -65,13 +64,19 @@ class StoreGeneratorMixin:
             if dc_geo:
                 dc_states.add(dc_geo.State)
 
-        print(f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}")
+        print(
+            f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
+        )
 
         # Filter geography data to only include states with DCs
-        dc_constrained_geo_data = [geo for geo in selected_geography_data if geo.State in dc_states]
+        dc_constrained_geo_data = [
+            geo for geo in selected_geography_data if geo.State in dc_states
+        ]
 
         if not dc_constrained_geo_data:
-            raise ValueError("No geography data found in states with distribution centers")
+            raise ValueError(
+                "No geography data found in states with distribution centers"
+            )
 
         # Initialize geographic distribution using DC-constrained geographies
         geo_distribution = GeographicDistribution(dc_constrained_geo_data, seed)
@@ -86,8 +91,10 @@ class StoreGeneratorMixin:
         # If we need more stores than strategic locations, distribute remainder
         if store_count > len(strategic_geos):
             remaining_stores = store_count - len(strategic_geos)
-            additional_distribution = geo_distribution.distribute_entities_across_geographies(
-                remaining_stores
+            additional_distribution = (
+                geo_distribution.distribute_entities_across_geographies(
+                    remaining_stores
+                )
             )
         else:
             additional_distribution = []
@@ -126,7 +133,9 @@ class StoreGeneratorMixin:
         for geo, count in additional_distribution:
             geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
             if geo_master is None:
-                raise ValueError("Geography key not found for additional store placement")
+                raise ValueError(
+                    "Geography key not found for additional store placement"
+                )
 
             for _ in range(count):
                 if current_id > store_count:

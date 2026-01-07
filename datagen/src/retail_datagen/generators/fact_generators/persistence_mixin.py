@@ -1,12 +1,13 @@
 """
 Database persistence and data mapping methods.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -64,8 +65,9 @@ class PersistenceMixin:
 
         return mapping[table_name]
 
-
-    def _build_outbox_rows_from_df(self, table_name: str, df: pd.DataFrame) -> list[dict]:
+    def _build_outbox_rows_from_df(
+        self, table_name: str, df: pd.DataFrame
+    ) -> list[dict]:
         """Build streaming_outbox rows for a given fact table batch.
 
         Each outbox row includes: event_ts, message_type, payload (JSON text),
@@ -76,7 +78,7 @@ class PersistenceMixin:
             return rows
 
         # Normalize columns to lower for dictionary extraction safety
-        cols = [str(c) for c in df.columns]
+        [str(c) for c in df.columns]
 
         # Helper to get a field ignoring case
         def get_field(rec: dict, name: str):
@@ -174,7 +176,6 @@ class PersistenceMixin:
             )
 
         return rows
-
 
     def _map_field_names_for_db(self, table_name: str, record: dict) -> dict:
         """
@@ -444,6 +445,7 @@ class PersistenceMixin:
         records: list[dict]
         try:
             import pandas as _pd
+
             if isinstance(data, _pd.DataFrame):
                 if data.empty:
                     logger.debug(f"No data to insert for {table_name} hour {hour}")
@@ -453,23 +455,41 @@ class PersistenceMixin:
                 records = list(data or [])
         except (ImportError, AttributeError) as e:
             # If pandas not available, assume list path
-            logger.warning(f"Failed to process data via pandas for {table_name}, using fallback: {e}")
+            logger.warning(
+                f"Failed to process data via pandas for {table_name}, using fallback: {e}"
+            )
             records = list(data or [])  # type: ignore[arg-type]
         if not records:
             logger.debug(f"No data to insert for {table_name} hour {hour}")
             return
 
         # DuckDB fast path
-        if getattr(self, "_use_duckdb", False) and getattr(self, "_duckdb_conn", None) is not None:
+        if (
+            getattr(self, "_use_duckdb", False)
+            and getattr(self, "_duckdb_conn", None) is not None
+        ):
             try:
                 import pandas as _pd
+
                 # Struct-of-Arrays build for high-volume tables
                 hot_tables = {
-                    'receipt_lines','store_inventory_txn','online_order_lines',
-                    'receipts','dc_inventory_txn','truck_moves',
-                    'foot_traffic','ble_pings','marketing','online_orders'
+                    "receipt_lines",
+                    "store_inventory_txn",
+                    "online_order_lines",
+                    "receipts",
+                    "dc_inventory_txn",
+                    "truck_moves",
+                    "foot_traffic",
+                    "ble_pings",
+                    "marketing",
+                    "online_orders",
                 }
-                if table_name in hot_tables and isinstance(records, list) and records and isinstance(records[0], dict):
+                if (
+                    table_name in hot_tables
+                    and isinstance(records, list)
+                    and records
+                    and isinstance(records[0], dict)
+                ):
                     # Build dict-of-lists for existing keys across a small sample to avoid missing columns
                     sample_keys = set()
                     for r in records[:10]:
@@ -484,65 +504,126 @@ class PersistenceMixin:
                     df = _pd.DataFrame.from_records(records)
                 if df.empty:
                     return
-                if 'TraceId' in df.columns:
-                    df = df.drop(columns=['TraceId'])
+                if "TraceId" in df.columns:
+                    df = df.drop(columns=["TraceId"])
 
                 # Table-specific rename mapping (generator -> DB)
-                common = {'EventTS': 'event_ts'}
+                common = {"EventTS": "event_ts"}
                 mapping_tbl = {
-                    'receipts': {
+                    "receipts": {
                         **common,
-                        'StoreID': 'store_id', 'CustomerID': 'customer_id',
-                        'ReceiptId': 'receipt_id_ext', 'ReceiptType': 'receipt_type',
-                        'SubtotalCents': 'subtotal_cents', 'TaxCents': 'tax_cents', 'TotalCents': 'total_cents',
-                        'ReturnForReceiptId': 'return_for_receipt_id', 'ReturnForReceiptIdExt': 'return_for_receipt_id_ext',
-                        'DiscountAmount': 'discount_amount', 'Tax': 'tax_amount', 'Total': 'total_amount',
-                        'TenderType': 'payment_method',
+                        "StoreID": "store_id",
+                        "CustomerID": "customer_id",
+                        "ReceiptId": "receipt_id_ext",
+                        "ReceiptType": "receipt_type",
+                        "SubtotalCents": "subtotal_cents",
+                        "TaxCents": "tax_cents",
+                        "TotalCents": "total_cents",
+                        "ReturnForReceiptId": "return_for_receipt_id",
+                        "ReturnForReceiptIdExt": "return_for_receipt_id_ext",
+                        "DiscountAmount": "discount_amount",
+                        "Tax": "tax_amount",
+                        "Total": "total_amount",
+                        "TenderType": "payment_method",
                     },
-                    'receipt_lines': {
+                    "receipt_lines": {
                         **common,
-                        'ProductID': 'product_id', 'Line': 'line_num', 'Qty': 'quantity',
-                        'UnitPrice': 'unit_price', 'ExtPrice': 'ext_price', 'UnitCents': 'unit_cents', 'ExtCents': 'ext_cents', 'PromoCode': 'promo_code',
+                        "ProductID": "product_id",
+                        "Line": "line_num",
+                        "Qty": "quantity",
+                        "UnitPrice": "unit_price",
+                        "ExtPrice": "ext_price",
+                        "UnitCents": "unit_cents",
+                        "ExtCents": "ext_cents",
+                        "PromoCode": "promo_code",
                     },
-                    'dc_inventory_txn': {
+                    "dc_inventory_txn": {
                         **common,
-                        'DCID': 'dc_id', 'ProductID': 'product_id', 'QtyDelta': 'quantity', 'Reason': 'txn_type', 'Balance': 'balance',
+                        "DCID": "dc_id",
+                        "ProductID": "product_id",
+                        "QtyDelta": "quantity",
+                        "Reason": "txn_type",
+                        "Balance": "balance",
                     },
-                    'truck_moves': {
+                    "truck_moves": {
                         **common,
-                        'TruckId': 'truck_id', 'DCID': 'dc_id', 'StoreID': 'store_id', 'ProductID': 'product_id', 'Status': 'status',
-                        'ShipmentId': 'shipment_id', 'ETA': 'eta', 'ETD': 'etd',
-                        'DepartureTime': 'departure_time', 'ActualUnloadDuration': 'actual_unload_duration',
+                        "TruckId": "truck_id",
+                        "DCID": "dc_id",
+                        "StoreID": "store_id",
+                        "ProductID": "product_id",
+                        "Status": "status",
+                        "ShipmentId": "shipment_id",
+                        "ETA": "eta",
+                        "ETD": "etd",
+                        "DepartureTime": "departure_time",
+                        "ActualUnloadDuration": "actual_unload_duration",
                     },
-                    'store_inventory_txn': {
+                    "store_inventory_txn": {
                         **common,
-                        'StoreID': 'store_id', 'ProductID': 'product_id', 'QtyDelta': 'quantity', 'Reason': 'txn_type', 'Source': 'source', 'Balance': 'balance',
+                        "StoreID": "store_id",
+                        "ProductID": "product_id",
+                        "QtyDelta": "quantity",
+                        "Reason": "txn_type",
+                        "Source": "source",
+                        "Balance": "balance",
                     },
-                    'foot_traffic': {
+                    "foot_traffic": {
                         **common,
-                        'StoreID': 'store_id', 'SensorId': 'sensor_id', 'Zone': 'zone', 'Dwell': 'dwell_seconds', 'Count': 'count',
+                        "StoreID": "store_id",
+                        "SensorId": "sensor_id",
+                        "Zone": "zone",
+                        "Dwell": "dwell_seconds",
+                        "Count": "count",
                     },
-                    'ble_pings': {
+                    "ble_pings": {
                         **common,
-                        'StoreID': 'store_id', 'CustomerBLEId': 'customer_ble_id', 'BeaconId': 'beacon_id', 'RSSI': 'rssi', 'Zone': 'zone',
+                        "StoreID": "store_id",
+                        "CustomerBLEId": "customer_ble_id",
+                        "BeaconId": "beacon_id",
+                        "RSSI": "rssi",
+                        "Zone": "zone",
                     },
-                    'marketing': {
+                    "marketing": {
                         **common,
-                        'CampaignId': 'campaign_id', 'CreativeId': 'creative_id', 'ImpressionId': 'impression_id_ext', 'CustomerAdId': 'customer_ad_id',
-                        'Channel': 'channel', 'Device': 'device', 'Cost': 'cost',
+                        "CampaignId": "campaign_id",
+                        "CreativeId": "creative_id",
+                        "ImpressionId": "impression_id_ext",
+                        "CustomerAdId": "customer_ad_id",
+                        "Channel": "channel",
+                        "Device": "device",
+                        "Cost": "cost",
                     },
-                    'online_orders': {
+                    "online_orders": {
                         **common,
-                        'CustomerID': 'customer_id', 'Subtotal': 'subtotal_amount', 'Tax': 'tax_amount', 'Total': 'total_amount',
-                        'SubtotalCents': 'subtotal_cents', 'TaxCents': 'tax_cents', 'TotalCents': 'total_cents',
-                        'TenderType': 'payment_method', 'CompletedTS': 'completed_ts', 'OrderId': 'order_id_ext',
+                        "CustomerID": "customer_id",
+                        "Subtotal": "subtotal_amount",
+                        "Tax": "tax_amount",
+                        "Total": "total_amount",
+                        "SubtotalCents": "subtotal_cents",
+                        "TaxCents": "tax_cents",
+                        "TotalCents": "total_cents",
+                        "TenderType": "payment_method",
+                        "CompletedTS": "completed_ts",
+                        "OrderId": "order_id_ext",
                     },
-                    'online_order_lines': {
+                    "online_order_lines": {
                         **common,
-                        'OrderId': 'order_id', 'ProductID': 'product_id', 'Line': 'line_num', 'Qty': 'quantity', 'UnitPrice': 'unit_price',
-                        'ExtPrice': 'ext_price', 'UnitCents': 'unit_cents', 'ExtCents': 'ext_cents', 'PromoCode': 'promo_code', 'PickedTS': 'picked_ts', 'ShippedTS': 'shipped_ts',
-                        'DeliveredTS': 'delivered_ts', 'FulfillmentStatus': 'fulfillment_status', 'FulfillmentMode': 'fulfillment_mode',
-                        'NodeType': 'node_type', 'NodeID': 'node_id',
+                        "OrderId": "order_id",
+                        "ProductID": "product_id",
+                        "Line": "line_num",
+                        "Qty": "quantity",
+                        "UnitPrice": "unit_price",
+                        "ExtPrice": "ext_price",
+                        "UnitCents": "unit_cents",
+                        "ExtCents": "ext_cents",
+                        "PromoCode": "promo_code",
+                        "PickedTS": "picked_ts",
+                        "ShippedTS": "shipped_ts",
+                        "DeliveredTS": "delivered_ts",
+                        "FulfillmentStatus": "fulfillment_status",
+                        "FulfillmentMode": "fulfillment_mode",
+                        "NodeType": "node_type",
+                        "NodeID": "node_id",
                     },
                 }
                 mp = mapping_tbl.get(table_name, common)
@@ -550,28 +631,37 @@ class PersistenceMixin:
                 if rename_map:
                     df = df.rename(columns=rename_map)
                 # Ensure external IDs on line tables
-                if table_name == 'receipt_lines' and 'receipt_id_ext' not in df.columns and 'ReceiptId' in df.columns:
-                    df['receipt_id_ext'] = df['ReceiptId']
-                    df = df.drop(columns=['ReceiptId'])
-                if table_name == 'online_order_lines' and 'order_id_ext' not in df.columns and 'OrderId' in df.columns:
-                    df['order_id_ext'] = df['OrderId']
+                if (
+                    table_name == "receipt_lines"
+                    and "receipt_id_ext" not in df.columns
+                    and "ReceiptId" in df.columns
+                ):
+                    df["receipt_id_ext"] = df["ReceiptId"]
+                    df = df.drop(columns=["ReceiptId"])
+                if (
+                    table_name == "online_order_lines"
+                    and "order_id_ext" not in df.columns
+                    and "OrderId" in df.columns
+                ):
+                    df["order_id_ext"] = df["OrderId"]
 
                 duck_table = {
-                    'dc_inventory_txn': 'fact_dc_inventory_txn',
-                    'truck_moves': 'fact_truck_moves',
-                    'store_inventory_txn': 'fact_store_inventory_txn',
-                    'receipts': 'fact_receipts',
-                    'receipt_lines': 'fact_receipt_lines',
-                    'foot_traffic': 'fact_foot_traffic',
-                    'ble_pings': 'fact_ble_pings',
-                    'marketing': 'fact_marketing',
-                    'online_orders': 'fact_online_order_headers',
-                    'online_order_lines': 'fact_online_order_lines',
+                    "dc_inventory_txn": "fact_dc_inventory_txn",
+                    "truck_moves": "fact_truck_moves",
+                    "store_inventory_txn": "fact_store_inventory_txn",
+                    "receipts": "fact_receipts",
+                    "receipt_lines": "fact_receipt_lines",
+                    "foot_traffic": "fact_foot_traffic",
+                    "ble_pings": "fact_ble_pings",
+                    "marketing": "fact_marketing",
+                    "online_orders": "fact_online_order_headers",
+                    "online_order_lines": "fact_online_order_lines",
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import (
                     insert_dataframe,
                     outbox_insert_records,
                 )
+
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
                 # Optionally mirror to streaming outbox (only for outbox-driven realtime)
                 if getattr(self, "_publish_to_outbox", False):
@@ -593,10 +683,14 @@ class PersistenceMixin:
                     )
 
                     tracker_state = self.hourly_tracker.get_current_progress()
-                    completed_hours = tracker_state.get("completed_hours", {}).get(table_name, 0)
+                    completed_hours = tracker_state.get("completed_hours", {}).get(
+                        table_name, 0
+                    )
                     total_days = tracker_state.get("total_days") or 1
                     total_hours_expected = max(1, total_days * 24)
-                    per_table_fraction = min(1.0, (completed_hours + 1.0) / total_hours_expected)
+                    per_table_fraction = min(
+                        1.0, (completed_hours + 1.0) / total_hours_expected
+                    )
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,
@@ -665,9 +759,9 @@ class PersistenceMixin:
 
                 rows = (
                     await session.execute(
-                        select(headers_model.order_id, headers_model.order_id_ext).where(
-                            headers_model.order_id_ext.in_(ext_ids)
-                        )
+                        select(
+                            headers_model.order_id, headers_model.order_id_ext
+                        ).where(headers_model.order_id_ext.in_(ext_ids))
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -885,5 +979,3 @@ class PersistenceMixin:
                     logger.error(f"Failed to update watermark for {db_table_name}: {e}")
                     # Don't fail generation if watermark update fails
                     continue
-
-

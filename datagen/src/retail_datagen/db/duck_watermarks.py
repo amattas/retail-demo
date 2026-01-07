@@ -40,7 +40,8 @@ def get_unpublished_data_range(
     _ensure_watermark_table(conn)
     # Read watermark row
     wm = conn.execute(
-        f"SELECT earliest_unpublished_ts, latest_published_ts FROM {WATERMARK_TABLE} WHERE fact_table_name=?",
+        f"SELECT earliest_unpublished_ts, latest_published_ts "
+        f"FROM {WATERMARK_TABLE} WHERE fact_table_name=?",
         [fact_table_name],
     ).fetchone()
 
@@ -56,16 +57,12 @@ def get_unpublished_data_range(
 
     if wm is None or wm[0] is None:
         # No watermark or earliest_unpublished NULL → start at data min
-        row = conn.execute(
-            f"SELECT MIN(event_ts) FROM {fact_table_name}"
-        ).fetchone()
+        row = conn.execute(f"SELECT MIN(event_ts) FROM {fact_table_name}").fetchone()
         earliest = row[0]
         if earliest is None:
             return None, None
         # Latest unpublished = current max in table
-        row2 = conn.execute(
-            f"SELECT MAX(event_ts) FROM {fact_table_name}"
-        ).fetchone()
+        row2 = conn.execute(f"SELECT MAX(event_ts) FROM {fact_table_name}").fetchone()
         latest = row2[0] or earliest
         return earliest, latest
 
@@ -86,14 +83,18 @@ def update_publication_watermark(
     """
     _ensure_watermark_table(conn)
     row = conn.execute(
-        f"SELECT earliest_unpublished_ts FROM {WATERMARK_TABLE} WHERE fact_table_name=?",
+        f"SELECT earliest_unpublished_ts FROM {WATERMARK_TABLE} "
+        f"WHERE fact_table_name=?",
         [fact_table_name],
     ).fetchone()
 
     # Upsert
     if row is None:
         conn.execute(
-            f"INSERT INTO {WATERMARK_TABLE} (fact_table_name, earliest_unpublished_ts, latest_published_ts, last_purge_ts, created_at, updated_at) VALUES (?, NULL, ?, NULL, now(), now())",
+            f"INSERT INTO {WATERMARK_TABLE} "
+            f"(fact_table_name, earliest_unpublished_ts, latest_published_ts, "
+            f"last_purge_ts, created_at, updated_at) "
+            f"VALUES (?, NULL, ?, NULL, now(), now())",
             [fact_table_name, published_up_to_ts],
         )
         return
@@ -105,6 +106,8 @@ def update_publication_watermark(
         new_earliest = published_up_to_ts + timedelta(seconds=1)
 
     conn.execute(
-        f"UPDATE {WATERMARK_TABLE} SET latest_published_ts=?, earliest_unpublished_ts=?, updated_at=now() WHERE fact_table_name=?",
+        f"UPDATE {WATERMARK_TABLE} "
+        f"SET latest_published_ts=?, earliest_unpublished_ts=?, updated_at=now() "
+        f"WHERE fact_table_name=?",
         [published_up_to_ts, new_earliest, fact_table_name],
     )

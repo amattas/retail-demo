@@ -104,7 +104,9 @@ class ReceiptCreatedPayload(BaseModel):
     item_count: int = Field(..., gt=0)
     # TODO: Populate campaign_id in MarketingCampaignSimulator when receipt is
     # generated during an active campaign (see GitHub issue for tracking)
-    campaign_id: str | None = Field(None, description="Optional campaign ID for attribution tracking")
+    campaign_id: str | None = Field(
+        None, description="Optional campaign ID for attribution tracking"
+    )
 
 
 class ReceiptLineAddedPayload(BaseModel):

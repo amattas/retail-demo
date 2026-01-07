@@ -6,10 +6,14 @@ Handles DC strategic placement and truck allocation strategies.
 
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.shared.models import DistributionCenter, GeographyDict, GeographyMaster, Truck
+from retail_datagen.shared.models import (
+    DistributionCenter,
+    GeographyDict,
+    GeographyMaster,
+    Truck,
+)
 
 from ..utils import AddressGenerator, GeographicDistribution, IdentifierGenerator
 
@@ -42,7 +46,9 @@ class AssignedTrucksResult:
 
     next_id: int  # Next available truck ID
     trucks_generated: int  # Count of trucks created
-    dc_assignment_list: list[tuple[int, int, bool]]  # (truck_id, dc_id, is_refrigerated)
+    dc_assignment_list: list[
+        tuple[int, int, bool]
+    ]  # (truck_id, dc_id, is_refrigerated)
 
 
 @dataclass
@@ -65,13 +71,13 @@ class DistributionGeneratorMixin:
     ) -> list[DistributionCenter]:
         """
         Generate distribution centers with strategic placement.
-        
+
         Args:
             dc_count: Number of DCs to generate
             geography_master: Geography dimension records
             selected_geography_data: Geography dict subset
             seed: Random seed
-            
+
         Returns:
             List of DistributionCenter records
         """
@@ -91,12 +97,16 @@ class DistributionGeneratorMixin:
         distribution_centers = []
 
         # Build a fast key index
-        geo_key_index = {(gm.City, gm.State, str(gm.ZipCode)): gm for gm in geography_master}
+        geo_key_index = {
+            (gm.City, gm.State, str(gm.ZipCode)): gm for gm in geography_master
+        }
 
         for i, geo in enumerate(strategic_geos, 1):
             geo_master = geo_key_index.get((geo.City, geo.State, str(geo.Zip)))
             if geo_master is None:
-                raise ValueError("Geography key not found for distribution center placement")
+                raise ValueError(
+                    "Geography key not found for distribution center placement"
+                )
 
             dc = DistributionCenter(
                 ID=i,
@@ -342,7 +352,9 @@ class DistributionGeneratorMixin:
         # Show per-DC distribution for assigned trucks
         if assigned_result.dc_assignment_list:
             if strategy.assignment_strategy == "fixed":
-                print(f"\nPer-DC Assignment (fixed: {strategy.trucks_per_dc} trucks/DC):")
+                print(
+                    f"\nPer-DC Assignment (fixed: {strategy.trucks_per_dc} trucks/DC):"
+                )
             else:
                 print("\nPer-DC Assignment (round-robin distribution):")
 
@@ -371,12 +383,12 @@ class DistributionGeneratorMixin:
     ) -> list[Truck]:
         """
         Generate trucks with refrigeration capabilities and DC assignment.
-        
+
         Args:
             config: Retail configuration
             distribution_centers: DC records
             seed: Random seed
-            
+
         Returns:
             List of Truck records
         """
@@ -396,7 +408,9 @@ class DistributionGeneratorMixin:
             )
 
             # Calculate allocation strategy
-            strategy = self._calculate_truck_allocation_strategy(config, len(distribution_centers))
+            strategy = self._calculate_truck_allocation_strategy(
+                config, len(distribution_centers)
+            )
 
             # Initialize
             id_generator = IdentifierGenerator(seed + 3000)
@@ -411,12 +425,16 @@ class DistributionGeneratorMixin:
             current_id = assigned_result.next_id
 
             # Generate pool trucks
-            pool_trucks, pool_result = self._generate_pool_trucks(id_generator, current_id, strategy)
+            pool_trucks, pool_result = self._generate_pool_trucks(
+                id_generator, current_id, strategy
+            )
             all_trucks.extend(pool_trucks)
             current_id = pool_result.next_id
 
             # Generate supplier trucks
-            supplier_trucks = self._generate_supplier_trucks(config, id_generator, current_id)
+            supplier_trucks = self._generate_supplier_trucks(
+                config, id_generator, current_id
+            )
             all_trucks.extend(supplier_trucks)
 
             # Print summary

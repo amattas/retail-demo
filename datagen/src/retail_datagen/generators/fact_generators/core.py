@@ -5,13 +5,15 @@ This module contains the main FactDataGenerator class which coordinates
 historical fact data generation using specialized mixins for different
 functional areas.
 """
+
 from __future__ import annotations
 
 import logging
 import random
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
 # SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
 try:
     from retail_datagen.db.session import retail_session_maker
+
     SessionMaker = retail_session_maker()
 except ImportError:
     SessionMaker = None  # type: ignore[assignment, misc]
@@ -39,6 +42,13 @@ from retail_datagen.shared.models import (
     Store,
 )
 
+# Import business logic simulators
+from ..retail_patterns import (
+    BusinessRulesEngine,
+    CustomerJourneySimulator,
+    InventoryFlowSimulator,
+    MarketingCampaignSimulator,
+)
 from .data_loading_mixin import DataLoadingMixin
 from .inventory_mixin import InventoryMixin
 from .logistics_mixin import LogisticsMixin
@@ -52,14 +62,6 @@ from .receipts_mixin import ReceiptsMixin
 from .seasonal_mixin import SeasonalMixin
 from .sensors_mixin import SensorsMixin
 from .utils_mixin import UtilsMixin
-
-# Import business logic simulators
-from ..retail_patterns import (
-    BusinessRulesEngine,
-    CustomerJourneySimulator,
-    InventoryFlowSimulator,
-    MarketingCampaignSimulator,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,6 @@ class FactDataGenerator(
     MIN_UNLOAD_DURATION_MINUTES = 30  # Minimum realistic unload time
     DEFAULT_UNLOAD_DURATION_MINUTES = 60  # Default when ETA not available
 
-
     def __init__(
         self,
         config: RetailConfig,
@@ -133,7 +134,9 @@ class FactDataGenerator(
 
             self._duckdb_conn = get_duckdb_conn()
         except Exception as e:
-            logger.warning(f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}")
+            logger.warning(
+                f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}"
+            )
             self._use_duckdb = False
 
         # Buffer for database writes
@@ -142,7 +145,9 @@ class FactDataGenerator(
 
         # Precomputed sampling lists for hot-path customer selection
         # Maps store_id -> (customers_list, weights_list)
-        self._store_customer_sampling: dict[int, tuple[list[Customer], list[float]]] = {}
+        self._store_customer_sampling: dict[
+            int, tuple[list[Customer], list[float]]
+        ] = {}
 
         # Initialize patterns and simulators
         self.temporal_patterns = CompositeTemporalPatterns(config.seed)
@@ -204,7 +209,6 @@ class FactDataGenerator(
 
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
-
     def set_included_tables(self, tables: list[str] | None) -> None:
         """Restrict generation to a subset of FACT_TABLES, or clear filter if None."""
         if tables:
@@ -214,7 +218,6 @@ class FactDataGenerator(
             self._included_tables = None
         self._reset_table_states()
 
-
     def _active_fact_tables(self) -> list[str]:
         return [
             t
@@ -222,9 +225,12 @@ class FactDataGenerator(
             if (self._included_tables is None or t in self._included_tables)
         ]
 
-
     async def generate_historical_data(
-        self, start_date: datetime, end_date: datetime, *, publish_to_outbox: bool = False
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        publish_to_outbox: bool = False,
     ) -> FactGenerationSummary:
         """
         Generate historical fact data for the specified date range.
@@ -349,43 +355,85 @@ class FactDataGenerator(
                 cols = [row[1] for row in res.fetchall()]
                 # receipt_id_ext
                 if "receipt_id_ext" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"))
-                    logger.info("Migrated fact_receipts: added receipt_id_ext column and index")
+                    await session.execute(
+                        text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added receipt_id_ext column and index"
+                    )
 
                 # receipt_type
                 if "receipt_type" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"))
-                    logger.info("Migrated fact_receipts: added receipt_type column and index")
+                    await session.execute(
+                        text(
+                            "ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"
+                        )
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added receipt_type column and index"
+                    )
 
                 # return_for_receipt_id
                 if "return_for_receipt_id" not in cols:
-                    await session.execute(text("ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"))
-                    await session.execute(text("CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"))
-                    logger.info("Migrated fact_receipts: added return_for_receipt_id column and index")
+                    await session.execute(
+                        text(
+                            "ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"
+                        )
+                    )
+                    await session.execute(
+                        text(
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"
+                        )
+                    )
+                    logger.info(
+                        "Migrated fact_receipts: added return_for_receipt_id column and index"
+                    )
 
                 # Ensure online order lines table exists
-                await session.execute(text(
-                    "CREATE TABLE IF NOT EXISTS fact_online_order_lines (\n"
-                    " line_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
-                    " order_id INTEGER NOT NULL,\n"
-                    " product_id INTEGER NOT NULL,\n"
-                    " line_num INTEGER NOT NULL,\n"
-                    " quantity INTEGER NOT NULL,\n"
-                    " unit_price FLOAT NOT NULL,\n"
-                    " ext_price FLOAT NOT NULL,\n"
-                    " promo_code VARCHAR(50) NULL\n"
-                    ")"
-                ))
-                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"))
-                await session.execute(text("CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"))
+                await session.execute(
+                    text(
+                        "CREATE TABLE IF NOT EXISTS fact_online_order_lines (\n"
+                        " line_id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+                        " order_id INTEGER NOT NULL,\n"
+                        " product_id INTEGER NOT NULL,\n"
+                        " line_num INTEGER NOT NULL,\n"
+                        " quantity INTEGER NOT NULL,\n"
+                        " unit_price FLOAT NOT NULL,\n"
+                        " ext_price FLOAT NOT NULL,\n"
+                        " promo_code VARCHAR(50) NULL\n"
+                        ")"
+                    )
+                )
+                await session.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"
+                    )
+                )
+                await session.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"
+                    )
+                )
 
                 # Ensure dim_products has tags column
-                res_prod = await session.execute(text("PRAGMA table_info('dim_products')"))
+                res_prod = await session.execute(
+                    text("PRAGMA table_info('dim_products')")
+                )
                 prod_cols = [row[1] for row in res_prod.fetchall()]
                 if "tags" not in prod_cols:
-                    await session.execute(text("ALTER TABLE dim_products ADD COLUMN tags TEXT"))
+                    await session.execute(
+                        text("ALTER TABLE dim_products ADD COLUMN tags TEXT")
+                    )
                     logger.info("Migrated dim_products: added tags column")
 
                 await session.commit()
@@ -397,7 +445,7 @@ class FactDataGenerator(
             # Ensure schema is compatible (adds new columns/tables if missing)
             if not self._use_duckdb:
                 await _ensure_required_schema(self._session)
-        # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
+            # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
             dropped_indexes: list[tuple[str, str]] = []
             try:
                 if not self._use_duckdb:
@@ -418,7 +466,9 @@ class FactDataGenerator(
                         table_progress=table_progress,
                     )
             except Exception as e:
-                logger.warning(f"Failed to drop indexes for bulk load optimization: {e}")
+                logger.warning(
+                    f"Failed to drop indexes for bulk load optimization: {e}"
+                )
                 dropped_indexes = []
             while current_date <= end_date:
                 day_counter += 1
@@ -553,7 +603,6 @@ class FactDataGenerator(
 
         return summary
 
-
     def get_generation_summary(self, summary: FactGenerationSummary) -> dict[str, Any]:
         """Get detailed summary of fact generation."""
         return {
@@ -582,7 +631,6 @@ class FactDataGenerator(
             },
         }
 
-
     def _cache_fact_counts(self, facts_generated: dict[str, int]) -> None:
         """
         Cache fact table counts for dashboard performance.
@@ -606,4 +654,3 @@ class FactDataGenerator(
 
 
 # Convenience function for direct usage
-
