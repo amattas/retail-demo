@@ -60,6 +60,7 @@ from .payments_mixin import PaymentsMixin
 from .persistence_mixin import PersistenceMixin
 from .progress import HourlyProgressTracker
 from .progress_reporting_mixin import ProgressReportingMixin
+from .promotions_mixin import PromotionsMixin
 from .receipts_mixin import ReceiptsMixin
 from .seasonal_mixin import SeasonalMixin
 from .sensors_mixin import SensorsMixin
@@ -80,6 +81,7 @@ class FactDataGenerator(
     PaymentsMixin,
     PersistenceMixin,
     ProgressReportingMixin,
+    PromotionsMixin,
     ReceiptsMixin,
     SeasonalMixin,
     SensorsMixin,
@@ -116,6 +118,9 @@ class FactDataGenerator(
         "store_ops",
         # Supply chain analytics (Issue #8)
         "stockouts",
+        # Promotional tracking for marketing ROI
+        "promotions",
+        "promo_lines",
     ]
 
     # Truck unload duration constants (in minutes)

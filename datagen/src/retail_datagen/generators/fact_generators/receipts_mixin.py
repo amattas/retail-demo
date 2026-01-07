@@ -34,6 +34,8 @@ class ReceiptsMixin:
             "ble_pings": [],
             "fact_payments": [],
             "customer_zone_changes": [],
+            "promotions": [],
+            "promo_lines": [],
         }
 
         # Holiday closure: Christmas Day closed (no activity)
@@ -120,6 +122,15 @@ class ReceiptsMixin:
                     receipt_data["receipt"], hour_datetime
                 )
                 hour_data["fact_payments"].append(payment)
+
+                # Generate promotion records if promotions were applied
+                promotions, promo_lines = self._generate_promotions_from_receipt(
+                    receipt_data["receipt"],
+                    receipt_data["lines"],
+                    hour_datetime,
+                )
+                hour_data["promotions"].extend(promotions)
+                hour_data["promo_lines"].extend(promo_lines)
 
                 # Generate BLE pings for this customer
                 ble_records = self._generate_ble_pings(store, customer, hour_datetime)

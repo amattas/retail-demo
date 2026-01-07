@@ -106,6 +106,8 @@ class PersistenceMixin:
             "fact_payments": "payment_processed",
             "store_ops": "store_opened",  # may change based on operation_type
             "stockouts": "stockout_detected",
+            "promotions": "promotion_applied",
+            "promo_lines": "promotion_applied",  # Promo line records don't have separate events
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
@@ -168,6 +170,19 @@ class PersistenceMixin:
                 trace_id = f"{oid}-{ln}" if oid is not None and ln is not None else None
             elif table_name == "marketing":
                 trace_id = get_field(rec, "impression_id_ext")
+            elif table_name == "promotions":
+                rid = get_field(rec, "receipt_id_ext")
+                promo = get_field(rec, "promo_code")
+                trace_id = f"{rid}-{promo}" if rid is not None and promo is not None else None
+            elif table_name == "promo_lines":
+                rid = get_field(rec, "receipt_id_ext")
+                ln = get_field(rec, "line_number")
+                promo = get_field(rec, "promo_code")
+                trace_id = (
+                    f"{rid}-{ln}-{promo}"
+                    if rid is not None and ln is not None and promo is not None
+                    else None
+                )
 
             try:
                 payload_json = json.dumps(rec, default=str)
@@ -339,6 +354,28 @@ class PersistenceMixin:
                 "DeclineReason": "decline_reason",
                 "StoreID": "store_id",
                 "CustomerID": "customer_id",
+            },
+            "promotions": {
+                **common_mappings,
+                "ReceiptId": "receipt_id_ext",
+                "PromoCode": "promo_code",
+                "DiscountAmount": "discount_amount",
+                "DiscountCents": "discount_cents",
+                "DiscountType": "discount_type",
+                "ProductCount": "product_count",
+                "ProductIds": "product_ids",
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
+            },
+            "promo_lines": {
+                **common_mappings,
+                "ReceiptId": "receipt_id_ext",
+                "PromoCode": "promo_code",
+                "LineNumber": "line_number",
+                "ProductID": "product_id",
+                "Qty": "quantity",
+                "DiscountAmount": "discount_amount",
+                "DiscountCents": "discount_cents",
             },
         }
 
@@ -682,6 +719,8 @@ class PersistenceMixin:
                     "online_orders": "fact_online_order_headers",
                     "online_order_lines": "fact_online_order_lines",
                     "fact_payments": "fact_payments",
+                    "promotions": "fact_promotions",
+                    "promo_lines": "fact_promo_lines",
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import (
                     insert_dataframe,
