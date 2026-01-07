@@ -412,22 +412,16 @@ async def health_check():
     if azure_check["status"] in ["error", "invalid_config"]:
         overall_status = "degraded"
 
-    # Check database health
+    # Database health check - DuckDB singleton is used directly
+    # No separate database manager; check via duckdb_engine module
     try:
-        db_manager = get_db_manager()
-        db_health = await db_manager.check_health()
-        checks["databases"] = {
-            "status": "healthy" if db_health["overall"] else "degraded",
-            "master": "healthy" if db_health["master"] else "unhealthy",
-            "facts": "healthy" if db_health["facts"] else "unhealthy",
-        }
-        if not db_health["overall"]:
-            overall_status = "degraded"
+        from retail_datagen.db.duckdb_engine import get_duckdb_conn
+        conn = get_duckdb_conn()
+        # Simple connectivity check
+        conn.execute("SELECT 1").fetchone()
+        checks["databases"] = {"status": "healthy"}
     except Exception as e:
-        checks["databases"] = {
-            "status": "unknown",
-            "error": str(e),
-        }
+        checks["databases"] = {"status": "unknown", "error": str(e)}
         logger.warning(f"Database health check failed: {e}")
 
     return HealthCheckResponse(
@@ -598,19 +592,29 @@ async def database_status():
     """
     Get database status and statistics.
 
-    Returns information about both master and facts databases including:
+    Returns information about the DuckDB database including:
     - Health status
-    - File sizes
+    - File existence
     - Connection state
-    - Configuration settings
     """
+    from retail_datagen.db.duckdb_engine import get_duckdb_conn, get_duckdb_path
+
     try:
-        status = await get_database_status()
-        return status
+        db_path = get_duckdb_path()
+        conn = get_duckdb_conn()
+        # Simple connectivity check
+        conn.execute("SELECT 1").fetchone()
+        return {
+            "status": "healthy",
+            "path": str(db_path),
+            "exists": db_path.exists(),
+            "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+            "timestamp": datetime.now(UTC),
+        }
     except Exception as e:
         logger.error(f"Error getting database status: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Failed to get database status: {str(e)}",
         )
 

@@ -9,8 +9,8 @@ import asyncio
 from collections import Counter
 from datetime import UTC, datetime
 
-from .config import DLQEntry
 from ..schemas import EventEnvelope
+from .config import DLQEntry
 
 
 class DLQManager:

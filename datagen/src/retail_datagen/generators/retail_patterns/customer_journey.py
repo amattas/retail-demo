@@ -14,7 +14,6 @@ from retail_datagen.shared.models import Customer, ProductMaster, Store
 from retail_datagen.shared.promotion_utils import PromotionEngine
 
 from .common import (
-    CAMPAIGN_START_PROBABILITY,
     CustomerSegment,
     ShoppingBasket,
     ShoppingBehaviorType,

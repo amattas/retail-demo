@@ -19,7 +19,12 @@ from ...shared.credential_utils import (
     validate_eventhub_connection_string,
     validate_fabric_rti_specific,
 )
-from ...shared.dependencies import get_config, rate_limit, update_config, get_task_status
+from ...shared.dependencies import (
+    get_config,
+    get_task_status,
+    rate_limit,
+    update_config,
+)
 from ...streaming.azure_client import AzureEventHubClient
 from ...streaming.schemas import EventType
 from .state import get_session_id

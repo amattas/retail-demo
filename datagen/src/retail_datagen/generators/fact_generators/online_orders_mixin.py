@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-import pandas as pd
-from retail_datagen.generators.online_order_generator import generate_online_orders_with_lifecycle
+
+from retail_datagen.generators.online_order_generator import (
+    generate_online_orders_with_lifecycle,
+)
 
 logger = logging.getLogger(__name__)
 

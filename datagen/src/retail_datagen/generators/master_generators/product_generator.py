@@ -219,7 +219,7 @@ class ProductGeneratorMixin:
     ) -> list[ProductMaster]:
         """
         Generate products with realistic pricing and brand combinations.
-        
+
         Args:
             target_product_count: Number of products to generate
             product_data: Product dictionary data
@@ -230,7 +230,7 @@ class ProductGeneratorMixin:
             historical_start_date: Start date for launch date calculation
             rng: Random number generator
             np_rng: NumPy random generator
-            
+
         Returns:
             List of ProductMaster records
         """

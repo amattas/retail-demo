@@ -7,8 +7,9 @@ and buffer management functionality.
 
 import asyncio
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Callable
+from typing import Any
 
 from ..errors import ErrorSeverity, classify_error
 from ..schemas import EventEnvelope, EventType

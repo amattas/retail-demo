@@ -6,10 +6,14 @@ Handles DC strategic placement and truck allocation strategies.
 
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 from retail_datagen.config.models import RetailConfig
-from retail_datagen.shared.models import DistributionCenter, GeographyDict, GeographyMaster, Truck
+from retail_datagen.shared.models import (
+    DistributionCenter,
+    GeographyDict,
+    GeographyMaster,
+    Truck,
+)
 
 from ..utils import AddressGenerator, GeographicDistribution, IdentifierGenerator
 
@@ -65,13 +69,13 @@ class DistributionGeneratorMixin:
     ) -> list[DistributionCenter]:
         """
         Generate distribution centers with strategic placement.
-        
+
         Args:
             dc_count: Number of DCs to generate
             geography_master: Geography dimension records
             selected_geography_data: Geography dict subset
             seed: Random seed
-            
+
         Returns:
             List of DistributionCenter records
         """
@@ -371,12 +375,12 @@ class DistributionGeneratorMixin:
     ) -> list[Truck]:
         """
         Generate trucks with refrigeration capabilities and DC assignment.
-        
+
         Args:
             config: Retail configuration
             distribution_centers: DC records
             seed: Random seed
-            
+
         Returns:
             List of Truck records
         """

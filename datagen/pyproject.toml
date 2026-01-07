@@ -47,6 +47,11 @@ exclude = ["data/**/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+# Ignore these rules:
+# - E501: line-too-long (cleanup needed across codebase)
+# - N806: variable in function should be lowercase (math convention: D, P, S, R)
+# - N818: exception name should end with Error suffix (existing base exception)
+ignore = ["E501", "N806", "N818"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["retail_datagen"]

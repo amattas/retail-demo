@@ -17,6 +17,8 @@ from .control import router as control_router
 from .disruption import (
     apply_disruption_effects,
     get_active_disruptions_for_target,
+)
+from .disruption import (
     router as disruption_router,
 )
 from .dlq import router as dlq_router

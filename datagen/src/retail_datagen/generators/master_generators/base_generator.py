@@ -5,7 +5,8 @@ Provides core functionality: database operations, progress tracking, validation.
 """
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from retail_datagen.config.models import RetailConfig
 from retail_datagen.shared.cache import CacheManager
@@ -37,7 +38,7 @@ ProductModel = _DuckModel("dim_products")
 class BaseGenerator:
     """
     Base class providing shared infrastructure for master data generation.
-    
+
     Handles:
     - Database connection and bulk inserts
     - Progress tracking and callbacks

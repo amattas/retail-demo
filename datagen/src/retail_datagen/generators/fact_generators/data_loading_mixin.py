@@ -9,17 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 from retail_datagen.shared.customer_geography import GeographyAssigner, StoreSelector
-from retail_datagen.shared.models import (
-    Customer,
-    DistributionCenter,
-    GeographyMaster,
-    ProductMaster,
-    Store,
-    Truck,
-)
 
 from ..fact_generators.models import MasterTableSpec
 from ..retail_patterns import (

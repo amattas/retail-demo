@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -76,7 +76,7 @@ class PersistenceMixin:
             return rows
 
         # Normalize columns to lower for dictionary extraction safety
-        cols = [str(c) for c in df.columns]
+        [str(c) for c in df.columns]
 
         # Helper to get a field ignoring case
         def get_field(rec: dict, name: str):

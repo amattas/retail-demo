@@ -238,7 +238,8 @@ async def generate_all_master_data(
                 from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
                 conn = get_duckdb_conn()
-                q = lambda t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                def q(t):
+                    return conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                 final_counts = {
                     "geographies_master": q("dim_geographies"),
                     "stores": q("dim_stores"),

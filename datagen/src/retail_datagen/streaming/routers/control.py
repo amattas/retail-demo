@@ -144,7 +144,7 @@ async def start_streaming(
                     azure_connection_string=config.realtime.azure_connection_string,
                 )
                 # Start DuckDB batch streaming
-                success = await duck_streamer.start(duration=timedelta(seconds=0))
+                await duck_streamer.start(duration=timedelta(seconds=0))
                 # start() will internally choose DuckDB batch path first
                 stats = await duck_streamer.get_statistics()
                 update_task_progress(new_session_id, 1.0, "Batch streaming completed")

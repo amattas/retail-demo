@@ -4,17 +4,13 @@ Receipt generation and in-store customer activity
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
-from datetime import time as dt_time
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
-
-import pandas as pd
 
 from retail_datagen.shared.models import (
     Customer,
     InventoryReason,
-    ProductMaster,
     Store,
     TenderType,
 )

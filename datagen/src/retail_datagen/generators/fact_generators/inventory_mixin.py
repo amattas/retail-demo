@@ -9,14 +9,10 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 
 from retail_datagen.generators.utils import ProgressReporter
 from retail_datagen.shared.models import (
-    Customer,
-    DistributionCenter,
     InventoryReason,
-    ProductMaster,
 )
 
 if TYPE_CHECKING:

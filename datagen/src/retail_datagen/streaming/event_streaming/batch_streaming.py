@@ -390,6 +390,8 @@ class BatchStreamingManager:
             raise ValueError("No database session provided - cannot read from legacy SQLite")
 
         # Import here to avoid circular dependencies
+        from sqlalchemy import select
+
         from retail_datagen.db.models.facts import (
             BLEPing,
             DCInventoryTransaction,
@@ -401,7 +403,6 @@ class BatchStreamingManager:
             StoreInventoryTransaction,
             TruckMove,
         )
-        from sqlalchemy import select
 
         # Map table name to model
         model_map = {

@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-import pandas as pd
-from retail_datagen.shared.models import DistributionCenter, ProductMaster, Store, Truck, TruckStatus
+
+from retail_datagen.shared.models import (
+    TruckStatus,
+)
 
 logger = logging.getLogger(__name__)
 

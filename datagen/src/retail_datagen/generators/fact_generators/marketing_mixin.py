@@ -7,8 +7,6 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-import pandas as pd
-
 logger = logging.getLogger(__name__)
 
 

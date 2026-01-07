@@ -5,8 +5,6 @@ Customer master data generation with geographic distribution.
 import logging
 from typing import Any
 
-import numpy as np
-
 from retail_datagen.shared.models import Customer, GeographyDict, GeographyMaster
 
 from ..utils import (
@@ -35,7 +33,7 @@ class CustomerGeneratorMixin:
     ) -> list[Customer]:
         """
         Generate customers with realistic geographic distribution.
-        
+
         Args:
             customer_count: Number of customers to generate
             geography_master: Geography dimension records
@@ -44,7 +42,7 @@ class CustomerGeneratorMixin:
             last_names: List of last names
             seed: Random seed
             np_rng: NumPy random generator
-            
+
         Returns:
             List of Customer records
         """
@@ -59,7 +57,7 @@ class CustomerGeneratorMixin:
         # Initialize utilities
         geo_distribution = GeographicDistribution(selected_geography_data, seed + 2000)
         address_generator = AddressGenerator(selected_geography_data, seed + 2000)
-        name_generator = SyntheticNameGenerator(first_names, last_names, seed + 2000)
+        SyntheticNameGenerator(first_names, last_names, seed + 2000)
         id_generator = IdentifierGenerator(seed + 2000)
 
         # Build a fast key index

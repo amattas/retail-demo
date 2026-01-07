@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import logging
 import random
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +40,13 @@ from retail_datagen.shared.models import (
     Store,
 )
 
+# Import business logic simulators
+from ..retail_patterns import (
+    BusinessRulesEngine,
+    CustomerJourneySimulator,
+    InventoryFlowSimulator,
+    MarketingCampaignSimulator,
+)
 from .data_loading_mixin import DataLoadingMixin
 from .inventory_mixin import InventoryMixin
 from .logistics_mixin import LogisticsMixin
@@ -52,14 +60,6 @@ from .receipts_mixin import ReceiptsMixin
 from .seasonal_mixin import SeasonalMixin
 from .sensors_mixin import SensorsMixin
 from .utils_mixin import UtilsMixin
-
-# Import business logic simulators
-from ..retail_patterns import (
-    BusinessRulesEngine,
-    CustomerJourneySimulator,
-    InventoryFlowSimulator,
-    MarketingCampaignSimulator,
-)
 
 logger = logging.getLogger(__name__)
 

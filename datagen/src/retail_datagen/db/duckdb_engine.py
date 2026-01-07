@@ -30,7 +30,8 @@ _conn: duckdb.DuckDBPyConnection | None = None
 #
 # To add a new table:
 # 1. Add the table name to this frozenset
-# 2. Ensure the table follows naming conventions (dim_* for dimensions, fact_* for facts)
+# 2. Ensure the table follows naming conventions (dim_* for dimensions,
+#    fact_* for facts)
 ALLOWED_TABLES: frozenset[str] = frozenset({
     # Dimension tables
     "dim_geographies",
@@ -90,7 +91,8 @@ def validate_table_name(table: str) -> str:
     return table
 
 
-# Pattern for valid SQL identifiers: alphanumeric and underscore, not starting with digit
+# Pattern for valid SQL identifiers: alphanumeric and underscore,
+# not starting with digit
 _VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
@@ -137,7 +139,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
         if _conn is None:
             new_conn = duckdb.connect(str(get_duckdb_path()))
             try:
-                # Pragmas suitable for fast local writes (best-effort; tolerate older DuckDB versions)
+                # Pragmas for fast local writes (best-effort; tolerate older DuckDB)
                 try:
                     threads = os.cpu_count() or 2
                     new_conn.execute(f"PRAGMA threads={threads}")
@@ -153,7 +155,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     _ensure_outbox_table(new_conn)
                 except Exception as e:
                     # Non-fatal if creation fails here; callers may retry
-                    logger.warning(f"Failed to create outbox table during connection initialization: {e}")
+                    logger.warning(
+                        f"Failed to create outbox table during init: {e}"
+                    )
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -163,7 +167,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     new_conn.close()
                 except Exception as close_error:
                     # Log cleanup failure but don't mask the original exception
-                    logger.warning(f"Failed to close connection during cleanup: {close_error}")
+                    logger.warning(
+                        f"Failed to close connection during cleanup: {close_error}"
+                    )
                 raise
     return _conn
 
@@ -213,7 +219,9 @@ def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
         # Table doesn't exist
         return False
     except Exception as e:
-        logger.warning(f"Unexpected error checking if table {validated_table} exists: {e}")
+        logger.warning(
+            f"Unexpected error checking if table {validated_table} exists: {e}"
+        )
         return False
 
 
@@ -246,7 +254,9 @@ def _duck_type_from_series(s: pd.Series) -> str:
     return "VARCHAR"
 
 
-def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> None:
+def _ensure_columns(
+    conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame
+) -> None:
     """Ensure all DataFrame columns exist in the DuckDB table.
 
     Adds missing columns with inferred types (conservative defaults) so that
@@ -259,10 +269,16 @@ def _ensure_columns(conn: duckdb.DuckDBPyConnection, table: str, df: pd.DataFram
             validated_col = validate_column_name(col)
             duck_type = _duck_type_from_series(df[col])
             try:
-                conn.execute(f"ALTER TABLE {validated_table} ADD COLUMN {validated_col} {duck_type}")
+                conn.execute(
+                    f"ALTER TABLE {validated_table} "
+                    f"ADD COLUMN {validated_col} {duck_type}"
+                )
             except Exception as e:
-                # Best-effort; if it races or fails, proceed and let INSERT surface issues
-                logger.debug(f"Failed to add column {validated_col} to {validated_table}: {e}")
+                # Best-effort; if it fails, proceed and let INSERT surface issues
+                logger.debug(
+                    f"Failed to add column {validated_col} "
+                    f"to {validated_table}: {e}"
+                )
     # No need to drop extra table columns; INSERT will only specify df columns
 
 
@@ -555,7 +571,6 @@ def pending_shipments_insert(
         Number of records inserted
     """
     import json
-    from datetime import datetime
 
     _ensure_pending_shipments_table(conn)
 

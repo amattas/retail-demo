@@ -30,12 +30,12 @@ class GeographyGeneratorMixin:
     ) -> tuple[list[GeographyMaster], list[GeographyDict]]:
         """
         Generate geography master data.
-        
+
         Args:
             geography_data: All available geography records
             geography_count: Number of geographies to generate
             rng: Random number generator
-            
+
         Returns:
             Tuple of (geography_master list, selected geography data subset)
         """

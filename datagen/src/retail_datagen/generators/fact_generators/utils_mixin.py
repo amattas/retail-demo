@@ -4,8 +4,7 @@ Utility methods for fact data generation.
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from retail_datagen.shared.models import (
@@ -352,7 +351,7 @@ class UtilsMixin:
                 # Negative quantities and ext price
                 nqty = int(qty) * -1
                 unit_price_dec = self._to_decimal(unit_price)
-                next_price = (unit_price_dec * nqty).quantize(Decimal("0.01"))
+                (unit_price_dec * nqty).quantize(Decimal("0.01"))
                 # ext_price could be used, but recompute to ensure consistency with negative qty
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 

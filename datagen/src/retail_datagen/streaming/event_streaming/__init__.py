@@ -9,7 +9,12 @@ For backward compatibility, the main EventStreamer class and
 related types are re-exported at the package level.
 """
 
-from .config import DLQEntry, StreamingConfig, StreamingStatistics, event_generation_pipeline
+from .config import (
+    DLQEntry,
+    StreamingConfig,
+    StreamingStatistics,
+    event_generation_pipeline,
+)
 from .streamer import EventStreamer
 
 __all__ = [

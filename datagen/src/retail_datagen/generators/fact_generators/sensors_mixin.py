@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
-import pandas as pd
 
 from retail_datagen.shared.models import Customer, Store
 

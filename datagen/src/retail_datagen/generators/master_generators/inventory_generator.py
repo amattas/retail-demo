@@ -32,13 +32,13 @@ class InventoryGeneratorMixin:
     ) -> list[DCInventorySnapshot]:
         """
         Generate realistic initial inventory snapshots for distribution centers.
-        
+
         Args:
             distribution_centers: DC records
             products_master: Product records
             config: Retail configuration
             np_rng: NumPy random generator
-            
+
         Returns:
             List of DCInventorySnapshot records
         """
@@ -99,13 +99,13 @@ class InventoryGeneratorMixin:
     ) -> list[StoreInventorySnapshot]:
         """
         Generate realistic initial inventory snapshots for stores.
-        
+
         Args:
             stores: Store records
             products_master: Product records
             config: Retail configuration
             np_rng: NumPy random generator
-            
+
         Returns:
             List of StoreInventorySnapshot records
         """

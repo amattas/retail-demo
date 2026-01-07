@@ -4,7 +4,6 @@ Store master data generation with profiles and geographic distribution.
 
 import logging
 from decimal import Decimal
-from typing import Any
 
 from retail_datagen.shared.models import (
     DistributionCenter,
@@ -34,7 +33,7 @@ class StoreGeneratorMixin:
     ) -> list[Store]:
         """
         Generate stores with strategic geographic distribution.
-        
+
         Args:
             store_count: Number of stores to generate
             geography_master: Geography dimension records
@@ -43,7 +42,7 @@ class StoreGeneratorMixin:
             tax_rate_mapping: (StateCode, City) -> CombinedRate
             state_tax_avg: StateCode -> average rate
             seed: Random seed
-            
+
         Returns:
             List of Store records
         """
