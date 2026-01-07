@@ -103,6 +103,7 @@ class PersistenceMixin:
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps
             "fact_payments": "payment_processed",
+            "reorders": "reorder_triggered",
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
