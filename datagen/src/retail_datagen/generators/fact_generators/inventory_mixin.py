@@ -951,6 +951,10 @@ class InventoryMixin:
                     )
                     # Track as daily-generated (all hours complete)
                     # Note: In-store payments are tracked hourly; this is for online orders only
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "fact_payments", day_index, hour, total_days
+                        )
                 except Exception as e:
                     logger.error(
                         f"Failed to insert online order payments for {date.strftime('%Y-%m-%d')}: {e}"

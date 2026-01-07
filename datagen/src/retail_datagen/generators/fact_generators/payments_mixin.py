@@ -227,6 +227,9 @@ class PaymentsMixin:
 
         Format: TXN_{epoch}_{random_suffix}
 
+        Uses 6-digit suffix (900k possible values per second) to minimize
+        collision risk during high-volume periods with many concurrent stores.
+
         Args:
             timestamp: The payment timestamp.
 
@@ -236,5 +239,5 @@ class PaymentsMixin:
         rng: random.Random = self._rng  # type: ignore[attr-defined]
 
         epoch = int(timestamp.timestamp())
-        suffix = rng.randint(1000, 9999)
-        return f"TXN_{epoch}_{suffix:04d}"
+        suffix = rng.randint(100000, 999999)
+        return f"TXN_{epoch}_{suffix:06d}"

@@ -118,7 +118,7 @@ class TestPaymentPersistenceMapping:
         with open(source_file) as f:
             source = f.read()
 
-        assert "'fact_payments': 'fact_payments'" in source
+        assert '"fact_payments": "fact_payments"' in source
 
 
 class TestPaymentConstants:
