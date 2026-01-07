@@ -126,8 +126,10 @@ _task_status: dict[str, TaskStatus] = {}
 RATE_LIMIT_MAXSIZE = int(os.getenv("RATE_LIMIT_MAXSIZE", "10000"))
 RATE_LIMIT_TTL = int(os.getenv("RATE_LIMIT_TTL", "3600"))
 
-# TTLCache automatically removes entries after TTL seconds, preventing memory leaks
-# from inactive IP addresses. maxsize limits memory to a fixed number of unique IPs.
+# TTLCache uses Time-To-Idle (TTI) behavior: entries are evicted after TTL seconds
+# of inactivity (no reads or writes), not TTL seconds from creation. This prevents
+# memory leaks from inactive IP addresses while keeping active IPs in cache.
+# maxsize limits memory to a fixed number of unique IPs.
 _rate_limit_storage: TTLCache = TTLCache(maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL)
 
 # Security
@@ -433,28 +435,24 @@ def rate_limit(max_requests: int = 100, window_seconds: int = 60):
             client_ip = request.client.host
             current_time = time.time()
 
-            # Get or initialize request list for this IP
-            # TTLCache automatically evicts entries after 1 hour, preventing memory leaks
-            if client_ip not in _rate_limit_storage:
-                _rate_limit_storage[client_ip] = []
+            # Get or initialize request list for this IP atomically.
+            # Using setdefault() prevents race conditions in concurrent requests.
+            # TTLCache uses TTI behavior - inactive entries are evicted after TTL seconds.
+            request_times = _rate_limit_storage.setdefault(client_ip, [])
 
             # Clean old requests within the rate limit window
             cutoff_time = current_time - window_seconds
-            _rate_limit_storage[client_ip] = [
-                req_time
-                for req_time in _rate_limit_storage[client_ip]
-                if req_time > cutoff_time
-            ]
+            request_times[:] = [t for t in request_times if t > cutoff_time]
 
             # Check rate limit
-            if len(_rate_limit_storage[client_ip]) >= max_requests:
+            if len(request_times) >= max_requests:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds} seconds",
                 )
 
             # Record this request
-            _rate_limit_storage[client_ip].append(current_time)
+            request_times.append(current_time)
 
             return await func(*args, **kwargs)
 

@@ -1,10 +1,14 @@
 """
 Unit tests for rate limiting TTL cache behavior.
 
+Note: cachetools.TTLCache uses Time-To-Idle (TTI) behavior, not pure TTL.
+Entries are evicted after the TTL period of inactivity (no reads/writes),
+not after a fixed time from creation. Any access resets the idle timer.
+
 Tests cover:
-- TTL eviction of inactive IPs
+- TTI eviction of inactive IPs (entries evicted after idle period)
 - maxsize enforcement
-- TTL accessibility within window
+- Entry accessibility within idle window
 - Concurrent request handling
 - Environment variable configuration
 """
@@ -40,10 +44,10 @@ class TestTTLCacheConfiguration:
 
 
 class TestTTLEviction:
-    """Tests for TTL-based eviction behavior."""
+    """Tests for TTI-based eviction behavior (TTLCache uses time-to-idle)."""
 
-    def test_entries_accessible_within_ttl(self):
-        """Test that entries are accessible before TTL expires."""
+    def test_entries_accessible_within_idle_period(self):
+        """Test that entries are accessible before idle period expires."""
         # Create a short-TTL cache for testing
         test_cache: TTLCache = TTLCache(maxsize=100, ttl=1.0)
 
@@ -53,24 +57,24 @@ class TestTTLEviction:
         assert "test_ip" in test_cache
         assert len(test_cache["test_ip"]) == 1
 
-    def test_entries_evicted_after_ttl(self):
-        """Test that entries are evicted after TTL expires."""
-        # Create a very short TTL cache
+    def test_entries_evicted_after_idle_period(self):
+        """Test that entries are evicted after idle period expires."""
+        # Create a cache with short idle timeout for testing
         test_cache: TTLCache = TTLCache(maxsize=100, ttl=0.1)
 
         test_cache["test_ip"] = [time.time()]
         assert "test_ip" in test_cache
 
-        # Wait for TTL to expire
+        # Wait for idle period to expire (no access during this time)
         time.sleep(0.15)
 
-        # Entry should be evicted (expire_after is checked on access)
-        # Access triggers eviction check
+        # Entry should be evicted due to inactivity
+        # expire() triggers eviction check
         test_cache.expire()
         assert "test_ip" not in test_cache
 
-    def test_ttl_resets_on_update(self):
-        """Test that TTL is reset when entry is updated."""
+    def test_idle_timer_resets_on_update(self):
+        """Test that idle timer is reset when entry is updated (TTI behavior)."""
         test_cache: TTLCache = TTLCache(maxsize=100, ttl=0.2)
 
         test_cache["test_ip"] = [time.time()]
@@ -79,10 +83,10 @@ class TestTTLEviction:
         # Update the entry
         test_cache["test_ip"] = [time.time(), time.time()]
 
-        # Wait past original TTL but not new TTL
+        # Wait past original idle period but not new idle period
         time.sleep(0.15)
 
-        # Entry should still exist because TTL was reset
+        # Entry should still exist because idle timer was reset by the update
         assert "test_ip" in test_cache
 
 
@@ -262,10 +266,10 @@ class TestRateLimitDecorator:
 class TestMemoryLeakPrevention:
     """Tests specifically for memory leak prevention."""
 
-    def test_ttl_prevents_memory_leak_from_inactive_ips(self):
-        """Test that TTL prevents memory accumulation from inactive IPs."""
+    def test_tti_prevents_memory_leak_from_inactive_ips(self):
+        """Test that TTI (time-to-idle) prevents memory accumulation from inactive IPs."""
         # Simulate the scenario that caused the memory leak:
-        # Many unique IPs making single requests
+        # Many unique IPs making single requests then going idle
         test_cache: TTLCache = TTLCache(maxsize=100, ttl=0.1)
 
         # Add many IPs
@@ -274,11 +278,11 @@ class TestMemoryLeakPrevention:
 
         assert len(test_cache) == 50
 
-        # Wait for TTL to expire
+        # Wait for idle period to expire (no activity)
         time.sleep(0.15)
         test_cache.expire()
 
-        # All entries should be evicted
+        # All entries should be evicted due to inactivity
         assert len(test_cache) == 0
 
     def test_maxsize_prevents_memory_leak_from_flooding(self):
@@ -293,7 +297,7 @@ class TestMemoryLeakPrevention:
         assert len(test_cache) <= 100
 
     def test_combined_protection(self):
-        """Test that TTL and maxsize work together for protection."""
+        """Test that TTI and maxsize work together for protection."""
         test_cache: TTLCache = TTLCache(maxsize=10, ttl=0.1)
 
         # Add entries
@@ -308,11 +312,11 @@ class TestMemoryLeakPrevention:
 
         assert len(test_cache) == 10
 
-        # Wait for TTL
+        # Wait for idle period to expire
         time.sleep(0.15)
         test_cache.expire()
 
-        # All should be evicted due to TTL
+        # All should be evicted due to inactivity (TTI)
         assert len(test_cache) == 0
 
 
