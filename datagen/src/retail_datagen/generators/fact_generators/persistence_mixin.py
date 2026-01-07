@@ -103,6 +103,7 @@ class PersistenceMixin:
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps
             "fact_payments": "payment_processed",
+            "store_ops": "store_opened",  # may change based on operation_type
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
@@ -112,7 +113,14 @@ class PersistenceMixin:
             # Determine message_type and event timestamp
             message_type = default_type
             event_ts = get_field(rec, "event_ts")
-            if table_name == "online_order_lines":
+            if table_name == "store_ops":
+                # Store operations: map operation_type to event_type
+                operation_type = (get_field(rec, "operation_type") or "").lower()
+                if operation_type == "opened":
+                    message_type = "store_opened"
+                elif operation_type == "closed":
+                    message_type = "store_closed"
+            elif table_name == "online_order_lines":
                 picked = get_field(rec, "picked_ts")
                 shipped = get_field(rec, "shipped_ts")
                 delivered = get_field(rec, "delivered_ts")
