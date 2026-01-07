@@ -7,6 +7,7 @@ and other middleware components for the FastAPI application.
 
 import asyncio
 import logging
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from functools import wraps
@@ -120,10 +121,14 @@ _event_streamer: EventStreamer | None = None
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
-# Rate limiting storage
-# TTLCache automatically removes entries after 1 hour (3600s), preventing memory leaks
-# from inactive IP addresses. maxsize=10000 limits memory to ~10k unique IPs.
-_rate_limit_storage: TTLCache = TTLCache(maxsize=10000, ttl=3600)
+# Rate limiting storage configuration
+# These can be tuned via environment variables for different deployment scenarios
+RATE_LIMIT_MAXSIZE = int(os.getenv("RATE_LIMIT_MAXSIZE", "10000"))
+RATE_LIMIT_TTL = int(os.getenv("RATE_LIMIT_TTL", "3600"))
+
+# TTLCache automatically removes entries after TTL seconds, preventing memory leaks
+# from inactive IP addresses. maxsize limits memory to a fixed number of unique IPs.
+_rate_limit_storage: TTLCache = TTLCache(maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL)
 
 # Security
 security = HTTPBearer(auto_error=False)
