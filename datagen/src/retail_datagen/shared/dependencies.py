@@ -276,9 +276,11 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
     cleaned_count = 0
 
-    for task_id in list(_task_status.keys()):
-        status = _task_status.get(task_id)
-        if status and status.completed_at and status.completed_at < cutoff:
+    # Thread-safety note: We create a snapshot of items() to avoid modifying the
+    # dict during iteration. In asyncio single-threaded context, this is safe.
+    # If multi-threading is introduced, consider adding a lock.
+    for task_id, status in list(_task_status.items()):
+        if status.completed_at and status.completed_at < cutoff:
             _task_status.pop(task_id, None)
             _background_tasks.pop(task_id, None)
             cleaned_count += 1
@@ -392,8 +394,11 @@ def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
     Raises:
         ValueError: If max_age_hours is negative
     """
-    if max_age_hours is not None and max_age_hours < 0:
-        raise ValueError("max_age_hours must be non-negative")
+    if max_age_hours is not None:
+        if max_age_hours < 0:
+            raise ValueError("max_age_hours must be non-negative")
+        if max_age_hours > 8760:  # 1 year max for safety
+            raise ValueError("max_age_hours must not exceed 8760 (1 year)")
     age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
     return _cleanup_old_tasks(max_age_hours=age)
 
