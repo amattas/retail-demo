@@ -266,6 +266,29 @@ async def get_event_streamer(
 # ================================
 
 
+def _cleanup_old_tasks_locked(max_age_hours: int) -> int:
+    """Remove completed/failed tasks older than max_age_hours (lock held)."""
+    global _background_tasks, _task_status
+
+    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+    cleaned_count = 0
+
+    # Create a snapshot of items() to avoid modifying the dict during iteration
+    for task_id, task_stat in list(_task_status.items()):
+        if task_stat.completed_at and task_stat.completed_at < cutoff:
+            _task_status.pop(task_id, None)
+            _background_tasks.pop(task_id, None)
+            cleaned_count += 1
+
+    if cleaned_count > 0:
+        logger.info(
+            f"Cleaned up {cleaned_count} old background tasks",
+            extra={"cleaned_count": cleaned_count, "cutoff_hours": max_age_hours},
+        )
+
+    return cleaned_count
+
+
 def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     """
     Remove completed/failed tasks older than max_age_hours.
@@ -279,27 +302,9 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     Returns:
         Number of tasks cleaned up
     """
-    global _background_tasks, _task_status
-
-    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
-    cleaned_count = 0
-
     # Use lock to prevent race conditions in multi-worker deployments
     with _cleanup_lock:
-        # Create a snapshot of items() to avoid modifying the dict during iteration
-        for task_id, task_stat in list(_task_status.items()):
-            if task_stat.completed_at and task_stat.completed_at < cutoff:
-                _task_status.pop(task_id, None)
-                _background_tasks.pop(task_id, None)
-                cleaned_count += 1
-
-    if cleaned_count > 0:
-        logger.info(
-            f"Cleaned up {cleaned_count} old background tasks",
-            extra={"cleaned_count": cleaned_count, "cutoff_hours": max_age_hours},
-        )
-
-    return cleaned_count
+        return _cleanup_old_tasks_locked(max_age_hours)
 
 
 def create_background_task(task_id: str, coro, description: str = "") -> str:
@@ -313,18 +318,7 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
         # Cleanup old tasks if threshold exceeded (check inside lock)
         if len(_task_status) >= TASK_CLEANUP_THRESHOLD:
             # Call internal cleanup without re-acquiring lock
-            cutoff = datetime.now(UTC) - timedelta(hours=TASK_CLEANUP_MAX_AGE_HOURS)
-            cleaned_count = 0
-            for tid, task_stat in list(_task_status.items()):
-                if task_stat.completed_at and task_stat.completed_at < cutoff:
-                    _task_status.pop(tid, None)
-                    _background_tasks.pop(tid, None)
-                    cleaned_count += 1
-            if cleaned_count > 0:
-                logger.info(
-                    f"Cleaned up {cleaned_count} old background tasks",
-                    extra={"cleaned_count": cleaned_count},
-                )
+            _cleanup_old_tasks_locked(TASK_CLEANUP_MAX_AGE_HOURS)
 
         if task_id in _background_tasks and not _background_tasks[task_id].done():
             raise HTTPException(
