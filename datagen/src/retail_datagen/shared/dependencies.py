@@ -279,8 +279,8 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     # Thread-safety note: We create a snapshot of items() to avoid modifying the
     # dict during iteration. In asyncio single-threaded context, this is safe.
     # If multi-threading is introduced, consider adding a lock.
-    for task_id, status in list(_task_status.items()):
-        if status.completed_at and status.completed_at < cutoff:
+    for task_id, task_stat in list(_task_status.items()):
+        if task_stat.completed_at and task_stat.completed_at < cutoff:
             _task_status.pop(task_id, None)
             _background_tasks.pop(task_id, None)
             cleaned_count += 1

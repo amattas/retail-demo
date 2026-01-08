@@ -2,12 +2,16 @@
 Integration tests for store operations fact generation.
 """
 
-import asyncio
 from datetime import datetime
 
 import pytest
 
-from retail_datagen.config.models import HistoricalConfig, PathsConfig, RetailConfig, VolumeConfig
+from retail_datagen.config.models import (
+    HistoricalConfig,
+    PathsConfig,
+    RetailConfig,
+    VolumeConfig,
+)
 from retail_datagen.db.duckdb_engine import get_duckdb_conn, reset_duckdb
 from retail_datagen.generators.fact_generator import FactDataGenerator
 
