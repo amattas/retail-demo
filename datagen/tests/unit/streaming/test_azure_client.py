@@ -1422,8 +1422,9 @@ class TestConcurrentBufferAccess:
         # Run multiple add_to_buffer calls concurrently
         await asyncio.gather(*[add_event(i) for i in range(num_events)])
 
-        # Get statistics to check buffer size
+        # Get statistics to verify buffer operations completed
         stats = await mock_client.get_statistics()
+        assert "buffer_size" in stats  # Verify stats structure is valid
 
         # All events should be either in buffer or flushed
         # (we can't check exact count due to auto-flush, but no events should be lost)
