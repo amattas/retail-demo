@@ -303,83 +303,108 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
 
 
 def create_background_task(task_id: str, coro, description: str = "") -> str:
-    """Create and track a background task."""
+    """Create and track a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect all dictionary operations.
+    """
     global _background_tasks, _task_status
 
-    # Cleanup old tasks if threshold exceeded
-    if len(_task_status) >= TASK_CLEANUP_THRESHOLD:
-        _cleanup_old_tasks()
+    with _cleanup_lock:
+        # Cleanup old tasks if threshold exceeded (check inside lock)
+        if len(_task_status) >= TASK_CLEANUP_THRESHOLD:
+            # Call internal cleanup without re-acquiring lock
+            cutoff = datetime.now(UTC) - timedelta(hours=TASK_CLEANUP_MAX_AGE_HOURS)
+            cleaned_count = 0
+            for tid, task_stat in list(_task_status.items()):
+                if task_stat.completed_at and task_stat.completed_at < cutoff:
+                    _task_status.pop(tid, None)
+                    _background_tasks.pop(tid, None)
+                    cleaned_count += 1
+            if cleaned_count > 0:
+                logger.info(
+                    f"Cleaned up {cleaned_count} old background tasks",
+                    extra={"cleaned_count": cleaned_count},
+                )
 
-    if task_id in _background_tasks and not _background_tasks[task_id].done():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} is already running",
+        if task_id in _background_tasks and not _background_tasks[task_id].done():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Task {task_id} is already running",
+            )
+
+        task = asyncio.create_task(coro)
+        _background_tasks[task_id] = task
+        _task_status[task_id] = TaskStatus(
+            status="running",
+            started_at=datetime.now(UTC),
+            description=description,
+            progress=0.0,
+            message="Task started",
+            error=None,
         )
 
-    task = asyncio.create_task(coro)
-    _background_tasks[task_id] = task
-    _task_status[task_id] = TaskStatus(
-        status="running",
-        started_at=datetime.now(UTC),
-        description=description,
-        progress=0.0,
-        message="Task started",
-        error=None,
-    )
-
     def task_done_callback(future):
-        try:
-            result = future.result()
-            _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(
-                    exclude={"status", "completed_at", "progress", "message", "result"}
-                ),
-                status="completed",
-                completed_at=datetime.now(UTC),
-                progress=1.0,
-                message="Task completed successfully",
-                result=result,
-            )
-        except Exception as e:
-            logger.error(f"Background task {task_id} failed: {e}")
-            _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(
-                    exclude={"status", "completed_at", "message", "error"}
-                ),
-                status="failed",
-                completed_at=datetime.now(UTC),
-                message=f"Task failed: {str(e)}",
-                error=str(e),
-            )
+        with _cleanup_lock:
+            try:
+                result = future.result()
+                _task_status[task_id] = TaskStatus(
+                    **_task_status[task_id].model_dump(
+                        exclude={"status", "completed_at", "progress", "message", "result"}
+                    ),
+                    status="completed",
+                    completed_at=datetime.now(UTC),
+                    progress=1.0,
+                    message="Task completed successfully",
+                    result=result,
+                )
+            except Exception as e:
+                logger.error(f"Background task {task_id} failed: {e}")
+                _task_status[task_id] = TaskStatus(
+                    **_task_status[task_id].model_dump(
+                        exclude={"status", "completed_at", "message", "error"}
+                    ),
+                    status="failed",
+                    completed_at=datetime.now(UTC),
+                    message=f"Task failed: {str(e)}",
+                    error=str(e),
+                )
 
     task.add_done_callback(task_done_callback)
     return task_id
 
 
 def get_task_status(task_id: str) -> TaskStatus | None:
-    """Get the status of a background task."""
-    return _task_status.get(task_id)
+    """Get the status of a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect dictionary access.
+    """
+    with _cleanup_lock:
+        return _task_status.get(task_id)
 
 
 def cancel_task(task_id: str) -> bool:
-    """Cancel a background task."""
+    """Cancel a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect dictionary operations.
+    """
     global _background_tasks, _task_status
 
-    if task_id not in _background_tasks:
-        return False
+    with _cleanup_lock:
+        if task_id not in _background_tasks:
+            return False
 
-    task = _background_tasks[task_id]
-    if not task.done():
-        task.cancel()
-        _task_status[task_id] = TaskStatus(
-            **_task_status[task_id].model_dump(
-                exclude={"status", "completed_at", "message"}
-            ),
-            status="cancelled",
-            completed_at=datetime.now(UTC),
-            message="Task was cancelled",
-        )
-        return True
+        task = _background_tasks[task_id]
+        if not task.done():
+            task.cancel()
+            _task_status[task_id] = TaskStatus(
+                **_task_status[task_id].model_dump(
+                    exclude={"status", "completed_at", "message"}
+                ),
+                status="cancelled",
+                completed_at=datetime.now(UTC),
+                message="Task was cancelled",
+            )
+            return True
 
     return False
 
@@ -432,6 +457,8 @@ def update_task_progress(
 ) -> None:
     """Update progress for a background task with optional per-table tracking.
 
+    Thread-safe: Uses _cleanup_lock to protect dictionary operations.
+
     Args:
         task_id: Unique identifier for the task
         progress: Overall progress (0.0 to 1.0)
@@ -449,7 +476,9 @@ def update_task_progress(
         hourly_progress: Optional per-table hourly progress
         total_hours_completed: Optional total hours completed across all days
     """
-    if task_id in _task_status:
+    with _cleanup_lock:
+        if task_id not in _task_status:
+            return
         # Get existing status fields we want to preserve
         existing = _task_status[task_id].model_dump()
 
@@ -467,12 +496,12 @@ def update_task_progress(
 
         # Update table-level progress if provided (merge with max to avoid regressions)
         if table_progress is not None:
-            existing_progress = existing.get("table_progress") or {}
+            existing_table_progress = existing.get("table_progress") or {}
             merged_progress: dict[str, float] = {}
             # Union of keys
-            keys = set(existing_progress.keys()) | set(table_progress.keys())
-            for k in keys:
-                old = existing_progress.get(k, 0.0) or 0.0
+            prog_keys = set(existing_table_progress.keys()) | set(table_progress.keys())
+            for k in prog_keys:
+                old = existing_table_progress.get(k, 0.0) or 0.0
                 new = table_progress.get(k, 0.0) or 0.0
                 merged_progress[k] = max(old, new)
             updated_fields["table_progress"] = merged_progress
@@ -500,8 +529,8 @@ def update_task_progress(
             # clamp with max to avoid decreases
             existing_counts = existing.get("table_counts") or {}
             merged: dict[str, int] = {}
-            keys = set(existing_counts.keys()) | set(table_counts.keys())
-            for k in keys:
+            count_keys = set(existing_counts.keys()) | set(table_counts.keys())
+            for k in count_keys:
                 old = int(existing_counts.get(k, 0) or 0)
                 new = int(table_counts.get(k, 0) or 0)
                 merged[k] = max(old, new)
