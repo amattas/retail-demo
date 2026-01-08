@@ -834,6 +834,33 @@ class TestPriorityCalculationConstants:
 
         assert deficit_pct == 0
 
+    def test_priority_calculation_helper_urgent(self):
+        """Test helper returns URGENT at or above urgent threshold."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 50) == "URGENT"
+        assert LogisticsMixin._calculate_reorder_priority(100, 0) == "URGENT"
+
+    def test_priority_calculation_helper_high(self):
+        """Test helper returns HIGH at or above high threshold."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 75) == "HIGH"
+        assert LogisticsMixin._calculate_reorder_priority(100, 60) == "HIGH"
+
+    def test_priority_calculation_helper_normal(self):
+        """Test helper returns NORMAL below thresholds or with zero reorder point."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 90) == "NORMAL"
+        assert LogisticsMixin._calculate_reorder_priority(0, 10) == "NORMAL"
+
     def test_constants_have_correct_values(self):
         """Test that the threshold constants have expected values."""
         from retail_datagen.generators.fact_generators.logistics_mixin import (

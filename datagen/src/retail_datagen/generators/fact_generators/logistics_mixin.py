@@ -34,6 +34,25 @@ def _is_beyond_end_date(event_ts: datetime | None, end_date: datetime | None) ->
 class LogisticsMixin:
     """Truck logistics including movements, lifecycle, and deliveries"""
 
+    # Reorder priority thresholds (percentage below reorder point)
+    REORDER_PRIORITY_URGENT_THRESHOLD = 50.0  # 50%+ below reorder point (critical stockout risk)
+    REORDER_PRIORITY_HIGH_THRESHOLD = 25.0  # 25-50% below reorder point (significant risk)
+
+    # Minimum and default unload durations (minutes)
+    MIN_UNLOAD_DURATION_MINUTES = 30
+    DEFAULT_UNLOAD_DURATION_MINUTES = 60
+
+    @classmethod
+    def _calculate_reorder_priority(cls, reorder_point: int, current_qty: int) -> str:
+        """Calculate reorder priority based on inventory deficit percentage."""
+        if reorder_point <= 0:
+            return "NORMAL"
+        deficit_pct = (reorder_point - current_qty) / reorder_point * 100
+        if deficit_pct >= cls.REORDER_PRIORITY_URGENT_THRESHOLD:
+            return "URGENT"
+        if deficit_pct >= cls.REORDER_PRIORITY_HIGH_THRESHOLD:
+            return "HIGH"
+        return "NORMAL"
     def _generate_truck_movements(
         self, date: datetime, store_transactions: list[dict]
     ) -> tuple[list[dict], list[dict]]:
@@ -133,25 +152,17 @@ class LogisticsMixin:
                         current_qty = self.inventory_flow_sim.get_store_balance(
                             store_id, product_id
                         )
-                        reorder_point = self.inventory_flow_sim._reorder_points.get(
-                            (store_id, product_id), 10
+                        reorder_point = self.inventory_flow_sim.get_reorder_point(
+                            store_id, product_id
                         )
 
                         # Calculate priority based on how far below reorder point
-                        # URGENT: 50%+ below reorder point (critical stockout risk)
-                        # HIGH: 25-50% below reorder point (significant risk)
-                        # NORMAL: at or slightly below reorder point
-                        deficit_pct = (
-                            (reorder_point - current_qty) / reorder_point * 100
-                            if reorder_point > 0
-                            else 0
+                        # Edge case: When reorder_point is 0, this indicates a product with no
+                        # minimum stock requirement (e.g., seasonal items, promotional products).
+                        # In this case, deficit_pct defaults to 0 and priority is NORMAL.
+                        priority = self._calculate_reorder_priority(
+                            reorder_point, current_qty
                         )
-                        if deficit_pct >= 50:
-                            priority = "URGENT"
-                        elif deficit_pct >= 25:
-                            priority = "HIGH"
-                        else:
-                            priority = "NORMAL"
 
                         reorder_records.append(
                             {
