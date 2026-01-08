@@ -176,6 +176,7 @@ class AzureEventHubClient:
         self._is_connected = False
         self._event_buffer: list[EventEnvelope] = []
         self._buffer_lock: asyncio.Lock | None = None  # Lazy-initialized in async context
+        self._is_flushing = False  # Prevents multiple concurrent flush tasks
         self._statistics = {
             "events_sent": 0,
             "events_failed": 0,
@@ -460,19 +461,27 @@ class AzureEventHubClient:
         Returns:
             bool: True if buffer needs flushing (reached max size), False otherwise
         """
+        should_schedule_flush = False
         async with self._get_buffer_lock():
             self._event_buffer.append(event)
             # Check if buffer needs flushing
             needs_flush = len(self._event_buffer) >= self.max_batch_size
+            # Only schedule flush if needed and not already flushing
+            if needs_flush and not self._is_flushing:
+                self._is_flushing = True
+                should_schedule_flush = True
 
         # Auto-flush if buffer reaches max size and we're in an async context
-        if needs_flush:
+        # Note: We schedule outside the lock to avoid holding lock during I/O,
+        # but the decision to flush is made atomically inside the lock.
+        if should_schedule_flush:
             try:
                 loop = asyncio.get_running_loop()
-                loop.call_soon(lambda: asyncio.create_task(self.flush_buffer()))
+                loop.call_soon(lambda: asyncio.create_task(self._flush_and_reset()))
             except RuntimeError:
-                # No running event loop - caller should handle flush manually
-                pass
+                # No running event loop - reset flag and let caller handle flush
+                async with self._get_buffer_lock():
+                    self._is_flushing = False
 
         return needs_flush
 
@@ -492,6 +501,22 @@ class AzureEventHubClient:
 
         return await self.send_events(events_to_send)
 
+    async def _flush_and_reset(self) -> bool:
+        """
+        Internal method that flushes buffer and resets the flushing flag.
+
+        This method is called by the auto-flush mechanism to ensure the
+        _is_flushing flag is properly reset after flush completes.
+
+        Returns:
+            bool: True if flush succeeded, False otherwise
+        """
+        try:
+            return await self.flush_buffer()
+        finally:
+            async with self._get_buffer_lock():
+                self._is_flushing = False
+
     async def get_statistics(self) -> dict[str, Any]:
         """
         Get client statistics and performance metrics.
@@ -501,8 +526,8 @@ class AzureEventHubClient:
         """
         async with self._get_buffer_lock():
             buffer_size = len(self._event_buffer)
-
-        stats = self._statistics.copy()
+            # Copy statistics under lock for consistency
+            stats = self._statistics.copy()
         stats.update(
             {
                 "is_connected": self._is_connected,
