@@ -484,12 +484,12 @@ class AzureEventHubClient:
         # but the decision to flush is made atomically inside the lock.
         if should_schedule_flush:
             try:
-                loop = asyncio.get_running_loop()
-                loop.call_soon(lambda: asyncio.create_task(self._flush_and_reset()))
+                # Create task directly - we're already in an async context
+                asyncio.create_task(self._flush_and_reset())
             except RuntimeError:
-                # No running event loop - reset flag and let caller handle flush
-                async with self._get_buffer_lock():
-                    self._is_flushing = False
+                # No running event loop - reset flag synchronously
+                # Direct assignment is safe here as it's atomic for simple types
+                self._is_flushing = False
 
         return needs_flush
 
