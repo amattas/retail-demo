@@ -124,13 +124,30 @@ _task_status: dict[str, TaskStatus] = {}
 # Rate limiting storage configuration
 # These can be tuned via environment variables for different deployment scenarios
 # Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
-RATE_LIMIT_MAXSIZE = max(100, min(100000, int(os.getenv("RATE_LIMIT_MAXSIZE", "10000"))))
-RATE_LIMIT_TTL = max(60, min(86400, int(os.getenv("RATE_LIMIT_TTL", "3600"))))
+def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -> int:
+    """Parse rate limit environment variable with validation and fallback."""
+    try:
+        value = int(os.getenv(name, str(default)))
+        return max(min_val, min(max_val, value))
+    except ValueError:
+        logger.warning(
+            f"Invalid {name} value, using default {default}",
+            extra={"env_var": name, "default": default},
+        )
+        return default
+
+
+RATE_LIMIT_MAXSIZE = _parse_rate_limit_env("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
+RATE_LIMIT_TTL = _parse_rate_limit_env("RATE_LIMIT_TTL", 3600, 60, 86400)
 
 # TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
-# Reading an entry does NOT reset the timer; only updating (re-inserting) resets it.
-# In our rate limiter, each request appends to the list which counts as an update,
-# so active IPs stay cached while truly inactive ones are evicted after TTL.
+# Reading an entry does NOT reset the timer; only re-assigning (cache[key] = value) does.
+# IMPORTANT: In-place list modification (append, [:]=) does NOT reset TTL.
+# This means IPs are evicted after RATE_LIMIT_TTL seconds from their first request,
+# regardless of continued activity. This is acceptable since:
+#   1. Window-based cleanup handles active rate limiting within the window
+#   2. The 1-hour default TTL is longer than typical rate limit windows (60s)
+#   3. An IP returning after eviction simply gets a fresh entry
 # maxsize limits memory to a fixed number of unique IPs.
 _rate_limit_storage: TTLCache[str, list[float]] = TTLCache(
     maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL

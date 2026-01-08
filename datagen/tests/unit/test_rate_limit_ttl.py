@@ -462,3 +462,39 @@ class TestEnvironmentVariableConfiguration:
             else:
                 os.environ.pop("RATE_LIMIT_TTL", None)
             importlib.reload(dependencies)
+
+    def test_invalid_maxsize_value_uses_default(self):
+        """Test that invalid (non-integer) RATE_LIMIT_MAXSIZE uses default."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_MAXSIZE")
+        try:
+            os.environ["RATE_LIMIT_MAXSIZE"] = "invalid"  # Non-integer value
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_MAXSIZE == 10000  # Default value
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_MAXSIZE"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_MAXSIZE", None)
+            importlib.reload(dependencies)
+
+    def test_invalid_ttl_value_uses_default(self):
+        """Test that invalid (non-integer) RATE_LIMIT_TTL uses default."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_TTL")
+        try:
+            os.environ["RATE_LIMIT_TTL"] = "not_a_number"  # Non-integer value
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_TTL == 3600  # Default value
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_TTL"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_TTL", None)
+            importlib.reload(dependencies)
