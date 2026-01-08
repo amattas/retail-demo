@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import random
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,6 @@ Customer zone change generation (derived from BLE pings)
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
