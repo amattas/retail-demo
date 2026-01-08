@@ -123,15 +123,18 @@ _task_status: dict[str, TaskStatus] = {}
 
 # Rate limiting storage configuration
 # These can be tuned via environment variables for different deployment scenarios
-RATE_LIMIT_MAXSIZE = int(os.getenv("RATE_LIMIT_MAXSIZE", "10000"))
-RATE_LIMIT_TTL = int(os.getenv("RATE_LIMIT_TTL", "3600"))
+# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
+RATE_LIMIT_MAXSIZE = max(100, min(100000, int(os.getenv("RATE_LIMIT_MAXSIZE", "10000"))))
+RATE_LIMIT_TTL = max(60, min(86400, int(os.getenv("RATE_LIMIT_TTL", "3600"))))
 
 # TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
 # Reading an entry does NOT reset the timer; only updating (re-inserting) resets it.
 # In our rate limiter, each request appends to the list which counts as an update,
 # so active IPs stay cached while truly inactive ones are evicted after TTL.
 # maxsize limits memory to a fixed number of unique IPs.
-_rate_limit_storage: TTLCache = TTLCache(maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL)
+_rate_limit_storage: TTLCache[str, list[float]] = TTLCache(
+    maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL
+)
 
 # Security
 security = HTTPBearer(auto_error=False)

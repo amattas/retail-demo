@@ -393,3 +393,75 @@ class TestEnvironmentVariableConfiguration:
             else:
                 os.environ.pop("RATE_LIMIT_TTL", None)
             importlib.reload(dependencies)
+
+    def test_maxsize_clamped_to_minimum(self):
+        """Test that RATE_LIMIT_MAXSIZE below minimum is clamped to 100."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_MAXSIZE")
+        try:
+            os.environ["RATE_LIMIT_MAXSIZE"] = "10"  # Below minimum of 100
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_MAXSIZE == 100
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_MAXSIZE"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_MAXSIZE", None)
+            importlib.reload(dependencies)
+
+    def test_maxsize_clamped_to_maximum(self):
+        """Test that RATE_LIMIT_MAXSIZE above maximum is clamped to 100000."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_MAXSIZE")
+        try:
+            os.environ["RATE_LIMIT_MAXSIZE"] = "999999"  # Above maximum of 100000
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_MAXSIZE == 100000
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_MAXSIZE"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_MAXSIZE", None)
+            importlib.reload(dependencies)
+
+    def test_ttl_clamped_to_minimum(self):
+        """Test that RATE_LIMIT_TTL below minimum is clamped to 60."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_TTL")
+        try:
+            os.environ["RATE_LIMIT_TTL"] = "10"  # Below minimum of 60
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_TTL == 60
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_TTL"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_TTL", None)
+            importlib.reload(dependencies)
+
+    def test_ttl_clamped_to_maximum(self):
+        """Test that RATE_LIMIT_TTL above maximum is clamped to 86400."""
+        import importlib
+
+        from retail_datagen.shared import dependencies
+
+        original = os.environ.get("RATE_LIMIT_TTL")
+        try:
+            os.environ["RATE_LIMIT_TTL"] = "999999"  # Above maximum of 86400 (1 day)
+            importlib.reload(dependencies)
+            assert dependencies.RATE_LIMIT_TTL == 86400
+        finally:
+            if original:
+                os.environ["RATE_LIMIT_TTL"] = original
+            else:
+                os.environ.pop("RATE_LIMIT_TTL", None)
+            importlib.reload(dependencies)
