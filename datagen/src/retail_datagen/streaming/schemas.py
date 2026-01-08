@@ -213,7 +213,9 @@ class PromotionAppliedPayload(BaseModel):
     discount_cents: int = Field(
         ..., gt=0, description="Discount amount in cents for precision"
     )
-    discount_type: str = Field(..., min_length=1)  # "percentage" or "fixed"
+    discount_type: str = Field(
+        ..., min_length=1
+    )  # "PERCENTAGE", "FIXED_AMOUNT", or "BOGO"
     product_count: int = Field(
         ..., gt=0, description="Number of products the promotion applies to"
     )
