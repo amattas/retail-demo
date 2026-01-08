@@ -700,6 +700,30 @@ class OnlineOrder(BaseModel):
         return self
 
 
+class StoreOperation(BaseModel):
+    """
+    Store operations fact table.
+
+    Tracks store open/close events for analyzing operating hours and
+    traffic patterns.
+    """
+
+    TraceId: str = Field(..., description="Unique trace identifier")
+    EventTS: datetime = Field(..., description="Event timestamp")
+    StoreID: int = Field(..., gt=0, description="Store ID")
+    OperationType: str = Field(
+        ..., min_length=1, description="Operation type (opened or closed)"
+    )
+
+    @field_validator("OperationType")
+    @classmethod
+    def validate_operation_type(cls, v: str) -> str:
+        """Validate operation type is either 'opened' or 'closed'."""
+        if v.lower() not in ["opened", "closed"]:
+            raise ValueError("OperationType must be either 'opened' or 'closed'")
+        return v.lower()
+
+
 # ================================
 # ALIASES FOR TEST COMPATIBILITY
 # ================================
@@ -729,3 +753,4 @@ FootTraffic = FootTraffic
 BLEPing = BLEPing
 Marketing = Marketing
 OnlineOrder = OnlineOrder
+StoreOperation = StoreOperation

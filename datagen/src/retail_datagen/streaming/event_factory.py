@@ -1013,19 +1013,26 @@ class EventFactory:
         promo_code = self.rng.choice(list(self.state.promotion_campaigns.keys()))
         self.state.promotion_campaigns[promo_code]
 
-        discount_amount = self.rng.uniform(5.0, 25.0)
+        discount_amount = round(self.rng.uniform(5.0, 25.0), 2)
+        discount_cents = int(discount_amount * 100)
         discount_type = "percentage" if self.rng.random() < 0.7 else "fixed"
         product_ids = [
             self.rng.choice(list(self.products.keys()))
             for _ in range(self.rng.randint(1, 3))
         ]
+        store_id = receipt_info["store_id"]
+        customer_id = receipt_info["customer_id"]
 
         payload = PromotionAppliedPayload(
             receipt_id=receipt_id,
             promo_code=promo_code,
             discount_amount=discount_amount,
+            discount_cents=discount_cents,
             discount_type=discount_type,
+            product_count=len(product_ids),
             product_ids=product_ids,
+            store_id=store_id,
+            customer_id=customer_id,
         )
 
         return payload, receipt_id, f"store_{receipt_info['store_id']}"

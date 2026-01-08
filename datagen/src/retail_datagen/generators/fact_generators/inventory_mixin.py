@@ -255,6 +255,7 @@ class InventoryMixin:
             "store_inventory_txn": total_days * len(self.stores) * 20,
             "marketing": total_days * 10,
             "supply_chain_disruption": total_days * 2,
+            "reorders": total_days * len(self.stores) * 2,  # Average 2 reorders per store per day
             "online_orders": total_days
             * max(0, int(self.config.volume.online_orders_per_day)),
         }
@@ -654,6 +655,7 @@ class InventoryMixin:
             "foot_traffic",
             "ble_pings",
             "fact_payments",
+            "customer_zone_changes",
         ]
 
         # Log hourly data processing for debugging
@@ -697,6 +699,7 @@ class InventoryMixin:
                     "foot_traffic": [],
                     "ble_pings": [],
                     "fact_payments": [],
+                    "customer_zone_changes": [],
                 }
             else:
                 hour_data = {
@@ -706,6 +709,7 @@ class InventoryMixin:
                     "foot_traffic": [],
                     "ble_pings": [],
                     "fact_payments": [],
+                    "customer_zone_changes": [],
                 }
 
                 # Generate customer transactions for each store for this hour
@@ -769,8 +773,14 @@ class InventoryMixin:
         # This creates initial shipments in SCHEDULED status
         if "truck_moves" in active_tables:
             base_store_txn = daily_facts.get("store_inventory_txn", [])
-            truck_movements = self._generate_truck_movements(date, base_store_txn)
+            truck_movements, reorder_records = self._generate_truck_movements(
+                date, base_store_txn
+            )
             daily_facts["truck_moves"].extend(truck_movements)
+
+            # Add reorder records to daily facts
+            if "reorders" in active_tables and reorder_records:
+                daily_facts["reorders"].extend(reorder_records)
 
             # Process all active shipments and generate status progression throughout the day
             truck_lifecycle_records, dc_outbound_txn, store_inbound_txn = (
@@ -969,7 +979,36 @@ class InventoryMixin:
             if "dc_inventory_txn" in active_tables and online_dc_txn:
                 daily_facts["dc_inventory_txn"].extend(online_dc_txn)
 
-        # 7. Generate supply chain disruptions
+        # 7. Generate store operations (open/close events)
+        if "store_ops" in active_tables:
+            store_ops_records = []
+            for store in self.stores:
+                store_ops = self._generate_store_operations_for_day(store, date)
+                store_ops_records.extend(store_ops)
+
+            daily_facts["store_ops"].extend(store_ops_records)
+
+            # Insert store operations immediately (daily batch)
+            if store_ops_records:
+                try:
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "store_ops",
+                        store_ops_records,
+                        hour=0,
+                        commit_every_batches=0,
+                    )
+                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "store_ops", day_index, hour, total_days
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to insert store_ops for {date.strftime('%Y-%m-%d')}: {e}"
+                    )
+
+        # 8. Generate supply chain disruptions
         if "supply_chain_disruption" in active_tables:
             disruption_events = (
                 self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
@@ -1047,6 +1086,40 @@ class InventoryMixin:
             logger.warning(
                 f"Adjustment generation failed for {date.strftime('%Y-%m-%d')}: {e}"
             )
+
+        # 8.5. Generate stockout events from inventory transactions (Issue #8)
+        if "stockouts" in active_tables:
+            try:
+                # Collect all inventory transactions generated today
+                store_inv_txns = daily_facts.get("store_inventory_txn", [])
+                dc_inv_txns = daily_facts.get("dc_inventory_txn", [])
+
+                # Detect stockouts from inventory transactions
+                stockout_records = self._generate_stockouts_from_inventory_txns(
+                    store_inv_txns, dc_inv_txns
+                )
+
+                # Add to daily facts
+                daily_facts["stockouts"].extend(stockout_records)
+
+                # Insert stockouts immediately (daily batch)
+                if stockout_records:
+                    await self._insert_hourly_to_db(
+                        self._session,
+                        "stockouts",
+                        stockout_records,
+                        hour=0,
+                        commit_every_batches=0,
+                    )
+                    # Mark all hours complete for this daily-generated table
+                    for hour in range(24):
+                        self.hourly_tracker.update_hourly_progress(
+                            "stockouts", day_index, hour, total_days
+                        )
+            except Exception as e:
+                logger.warning(
+                    f"Stockout generation failed for {date.strftime('%Y-%m-%d')}: {e}"
+                )
 
         # 9. Generate return receipts and inventory effects (baseline + holiday spikes)
         try:

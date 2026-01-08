@@ -36,7 +36,7 @@ class LogisticsMixin:
 
     def _generate_truck_movements(
         self, date: datetime, store_transactions: list[dict]
-    ) -> list[dict]:
+    ) -> tuple[list[dict], list[dict]]:
         """Generate truck movements based on store inventory needs.
 
         This method creates initial shipments in SCHEDULED status.
@@ -44,8 +44,12 @@ class LogisticsMixin:
 
         Shipments with departure times beyond the generation end date are
         stored in a staging table for later processing when the next day is generated.
+
+        Returns:
+            Tuple of (truck_movements, reorder_records)
         """
         truck_movements = []
+        reorder_records = []
         pending_shipments = []  # Shipments with future departure times
 
         # Get generation end date for filtering future shipments
@@ -120,6 +124,47 @@ class LogisticsMixin:
                 reorder_list = self.inventory_flow_sim.check_reorder_needs(store_id)
 
                 if reorder_list:
+                    # Generate reorder events for analytics
+                    reorder_time = date.replace(hour=4, minute=0)  # Reorders triggered at 4 AM
+                    for product_id, reorder_qty in reorder_list:
+                        # Get current inventory levels
+                        current_qty = self.inventory_flow_sim.get_store_balance(
+                            store_id, product_id
+                        )
+                        reorder_point = self.inventory_flow_sim._reorder_points.get(
+                            (store_id, product_id), 10
+                        )
+
+                        # Calculate priority based on how far below reorder point
+                        # URGENT: 50%+ below reorder point (critical stockout risk)
+                        # HIGH: 25-50% below reorder point (significant risk)
+                        # NORMAL: at or slightly below reorder point
+                        deficit_pct = (
+                            (reorder_point - current_qty) / reorder_point * 100
+                            if reorder_point > 0
+                            else 0
+                        )
+                        if deficit_pct >= 50:
+                            priority = "URGENT"
+                        elif deficit_pct >= 25:
+                            priority = "HIGH"
+                        else:
+                            priority = "NORMAL"
+
+                        reorder_records.append(
+                            {
+                                "TraceId": self._generate_trace_id(),
+                                "EventTS": reorder_time,
+                                "StoreID": store_id,
+                                "DCID": dc.ID,
+                                "ProductID": product_id,
+                                "CurrentQuantity": current_qty,
+                                "ReorderQuantity": reorder_qty,
+                                "ReorderPoint": reorder_point,
+                                "Priority": priority,
+                            }
+                        )
+
                     # Generate truck shipments (may be multiple if order exceeds capacity)
                     departure_time = date.replace(hour=6, minute=0)  # 6 AM departure
                     shipments = self.inventory_flow_sim.generate_truck_shipments(
@@ -184,7 +229,7 @@ class LogisticsMixin:
                 logger.error(f"Failed to stage pending shipments: {e}")
                 # Don't fail generation - these shipments just won't be in staging
 
-        return truck_movements
+        return truck_movements, reorder_records
 
     def _process_truck_lifecycle(
         self, date: datetime

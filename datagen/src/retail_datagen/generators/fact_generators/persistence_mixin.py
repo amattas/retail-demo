@@ -99,11 +99,16 @@ class PersistenceMixin:
             "truck_moves": "truck_arrived",  # may change based on status
             "foot_traffic": "customer_entered",
             "ble_pings": "ble_ping_detected",
+            "customer_zone_changes": "customer_zone_changed",
             "marketing": "ad_impression",
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps
             "fact_payments": "payment_processed",
             "reorders": "reorder_triggered",
+            "store_ops": "store_opened",  # may change based on operation_type
+            "stockouts": "stockout_detected",
+            "promotions": "promotion_applied",
+            "promo_lines": "promotion_applied",  # Promo line records don't have separate events
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
@@ -113,7 +118,14 @@ class PersistenceMixin:
             # Determine message_type and event timestamp
             message_type = default_type
             event_ts = get_field(rec, "event_ts")
-            if table_name == "online_order_lines":
+            if table_name == "store_ops":
+                # Store operations: map operation_type to event_type
+                operation_type = (get_field(rec, "operation_type") or "").lower()
+                if operation_type == "opened":
+                    message_type = "store_opened"
+                elif operation_type == "closed":
+                    message_type = "store_closed"
+            elif table_name == "online_order_lines":
                 picked = get_field(rec, "picked_ts")
                 shipped = get_field(rec, "shipped_ts")
                 delivered = get_field(rec, "delivered_ts")
@@ -159,6 +171,19 @@ class PersistenceMixin:
                 trace_id = f"{oid}-{ln}" if oid is not None and ln is not None else None
             elif table_name == "marketing":
                 trace_id = get_field(rec, "impression_id_ext")
+            elif table_name == "promotions":
+                rid = get_field(rec, "receipt_id_ext")
+                promo = get_field(rec, "promo_code")
+                trace_id = f"{rid}-{promo}" if rid is not None and promo is not None else None
+            elif table_name == "promo_lines":
+                rid = get_field(rec, "receipt_id_ext")
+                ln = get_field(rec, "line_number")
+                promo = get_field(rec, "promo_code")
+                trace_id = (
+                    f"{rid}-{ln}-{promo}"
+                    if rid is not None and ln is not None and promo is not None
+                    else None
+                )
 
             try:
                 payload_json = json.dumps(rec, default=str)
@@ -330,6 +355,28 @@ class PersistenceMixin:
                 "DeclineReason": "decline_reason",
                 "StoreID": "store_id",
                 "CustomerID": "customer_id",
+            },
+            "promotions": {
+                **common_mappings,
+                "ReceiptId": "receipt_id_ext",
+                "PromoCode": "promo_code",
+                "DiscountAmount": "discount_amount",
+                "DiscountCents": "discount_cents",
+                "DiscountType": "discount_type",
+                "ProductCount": "product_count",
+                "ProductIds": "product_ids",
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
+            },
+            "promo_lines": {
+                **common_mappings,
+                "ReceiptId": "receipt_id_ext",
+                "PromoCode": "promo_code",
+                "LineNumber": "line_number",
+                "ProductID": "product_id",
+                "Qty": "quantity",
+                "DiscountAmount": "discount_amount",
+                "DiscountCents": "discount_cents",
             },
         }
 
@@ -673,6 +720,8 @@ class PersistenceMixin:
                     "online_orders": "fact_online_order_headers",
                     "online_order_lines": "fact_online_order_lines",
                     "fact_payments": "fact_payments",
+                    "promotions": "fact_promotions",
+                    "promo_lines": "fact_promo_lines",
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import (
                     insert_dataframe,
