@@ -698,3 +698,62 @@ class TestEdgeCases:
         assert result.get("_recovered_via_timeout") is True
         # Should be removed from active shipments
         assert "STUCK001" not in sim._active_shipments
+
+
+class TestReorderPointAccessor:
+    """Tests for Issue #110: get_reorder_point() public accessor method."""
+
+    @pytest.fixture
+    def mock_inventory_simulator(self):
+        """Create a mock InventoryFlowSimulator for testing."""
+        from retail_datagen.generators.retail_patterns import InventoryFlowSimulator
+
+        sim = InventoryFlowSimulator.__new__(InventoryFlowSimulator)
+        sim._reorder_points = {}
+        return sim
+
+    def test_get_reorder_point_returns_stored_value(self, mock_inventory_simulator):
+        """Test that get_reorder_point returns stored reorder points."""
+        sim = mock_inventory_simulator
+
+        # Set up known reorder points
+        sim._reorder_points[(101, 1)] = 25
+        sim._reorder_points[(101, 2)] = 50
+        sim._reorder_points[(102, 1)] = 15
+
+        # Assert correct values are returned
+        assert sim.get_reorder_point(101, 1) == 25
+        assert sim.get_reorder_point(101, 2) == 50
+        assert sim.get_reorder_point(102, 1) == 15
+
+    def test_get_reorder_point_defaults_to_10(self, mock_inventory_simulator):
+        """Test that get_reorder_point returns 10 for unknown combinations."""
+        sim = mock_inventory_simulator
+
+        # No reorder points set, should return default
+        assert sim.get_reorder_point(999, 999) == 10
+        assert sim.get_reorder_point(0, 0) == 10
+
+    def test_get_reorder_point_mixed_known_unknown(self, mock_inventory_simulator):
+        """Test mixed scenarios with known and unknown store/product combos."""
+        sim = mock_inventory_simulator
+
+        # Set up one known reorder point
+        sim._reorder_points[(101, 1)] = 30
+
+        # Known combination returns stored value
+        assert sim.get_reorder_point(101, 1) == 30
+        # Unknown product for known store returns default
+        assert sim.get_reorder_point(101, 999) == 10
+        # Unknown store with known product returns default
+        assert sim.get_reorder_point(999, 1) == 10
+
+    def test_get_reorder_point_zero_value(self, mock_inventory_simulator):
+        """Test that zero reorder point is correctly returned (not default)."""
+        sim = mock_inventory_simulator
+
+        # Zero reorder point for seasonal/promotional products
+        sim._reorder_points[(101, 5)] = 0
+
+        # Should return 0, not the default 10
+        assert sim.get_reorder_point(101, 5) == 0
