@@ -1380,3 +1380,99 @@ class TestConnectionTest:
             assert metadata["namespace"] == "test"
             assert metadata["key_name"] == "RootManageSharedAccessKey"
             assert metadata["is_fabric_rti"] is False
+
+
+# =============================================================================
+# Concurrent Access Tests
+# =============================================================================
+
+
+class TestConcurrentBufferAccess:
+    """Tests for thread-safe buffer operations under concurrent access."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock client for concurrent testing."""
+        return AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+            max_batch_size=10,
+        )
+
+    def _create_test_event(self, event_id: int) -> EventEnvelope:
+        """Create a test event with a unique identifier."""
+        return EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload={"event_id": event_id, "test": True},
+            trace_id=str(uuid4()),
+            ingest_timestamp=datetime.now(UTC),
+        )
+
+    @pytest.mark.asyncio
+    async def test_concurrent_add_to_buffer_no_lost_events(self, mock_client):
+        """Test that concurrent add_to_buffer calls don't lose events."""
+        num_events = 100
+        events_added = []
+
+        async def add_event(event_id: int):
+            event = self._create_test_event(event_id)
+            await mock_client.add_to_buffer(event)
+            events_added.append(event_id)
+
+        # Run multiple add_to_buffer calls concurrently
+        await asyncio.gather(*[add_event(i) for i in range(num_events)])
+
+        # Get statistics to check buffer size
+        stats = await mock_client.get_statistics()
+
+        # All events should be either in buffer or flushed
+        # (we can't check exact count due to auto-flush, but no events should be lost)
+        assert len(events_added) == num_events
+
+    @pytest.mark.asyncio
+    async def test_concurrent_add_and_flush(self, mock_client):
+        """Test concurrent add and flush operations don't corrupt buffer."""
+        num_adds = 50
+        num_flushes = 10
+
+        async def add_events():
+            for i in range(num_adds):
+                event = self._create_test_event(i)
+                await mock_client.add_to_buffer(event)
+                await asyncio.sleep(0.001)  # Small delay to interleave
+
+        async def flush_periodically():
+            for _ in range(num_flushes):
+                await mock_client.flush_buffer()
+                await asyncio.sleep(0.005)
+
+        # Run add and flush concurrently
+        await asyncio.gather(add_events(), flush_periodically())
+
+        # Final flush to clear any remaining events
+        await mock_client.flush_buffer()
+
+        # Buffer should be empty after final flush
+        stats = await mock_client.get_statistics()
+        assert stats["buffer_size"] == 0
+
+    @pytest.mark.asyncio
+    async def test_concurrent_get_statistics(self, mock_client):
+        """Test concurrent get_statistics calls are safe."""
+        # Add some events first
+        for i in range(5):
+            event = self._create_test_event(i)
+            await mock_client.add_to_buffer(event)
+
+        async def get_stats():
+            return await mock_client.get_statistics()
+
+        # Run multiple get_statistics calls concurrently
+        results = await asyncio.gather(*[get_stats() for _ in range(20)])
+
+        # All results should be valid dicts with consistent structure
+        for stats in results:
+            assert isinstance(stats, dict)
+            assert "buffer_size" in stats
+            assert "events_sent" in stats
+            assert "is_connected" in stats

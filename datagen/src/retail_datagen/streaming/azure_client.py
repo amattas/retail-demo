@@ -308,6 +308,14 @@ class AzureEventHubClient:
         """
         Send multiple events to Event Hub with batching and retry logic.
 
+        IMPORTANT: Deadlock Prevention Constraint
+        -----------------------------------------
+        This method is called from flush_buffer() which may be triggered by
+        add_to_buffer(). To prevent deadlocks, this method and any methods it
+        calls (e.g., _send_batch, _send_batch_direct) must NEVER attempt to
+        acquire _buffer_lock or call methods that do (add_to_buffer, flush_buffer,
+        get_statistics). If this constraint is violated, a deadlock will occur.
+
         Args:
             events: List of event envelopes to send
 
