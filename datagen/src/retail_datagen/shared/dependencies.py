@@ -441,7 +441,9 @@ def rate_limit(max_requests: int = 100, window_seconds: int = 60):
 
             # Get or initialize request list for this IP atomically.
             # Using setdefault() prevents race conditions in concurrent requests.
-            # TTLCache uses TTL - entries expire after TTL seconds, reset on update.
+            # Note: In-place list modification ([:]=, append) does NOT reset TTL.
+            # IPs are evicted after RATE_LIMIT_TTL seconds from first request,
+            # which is fine since window-based cleanup handles active rate limiting.
             request_times = _rate_limit_storage.setdefault(client_ip, [])
 
             # Clean old requests within the rate limit window
