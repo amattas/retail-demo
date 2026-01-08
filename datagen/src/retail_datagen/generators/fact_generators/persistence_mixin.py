@@ -380,36 +380,6 @@ class PersistenceMixin:
                 "DiscountAmount": "discount_amount",
                 "DiscountCents": "discount_cents",
             },
-            "store_ops": {
-                **common_mappings,
-                "StoreID": "store_id",
-                "OperationType": "operation_type",
-            },
-            "customer_zone_changes": {
-                **common_mappings,
-                "StoreID": "store_id",
-                "CustomerBLEId": "customer_ble_id",
-                "FromZone": "from_zone",
-                "ToZone": "to_zone",
-            },
-            "stockouts": {
-                **common_mappings,
-                "StoreID": "store_id",
-                "DCID": "dc_id",
-                "ProductID": "product_id",
-                "LastKnownQuantity": "last_known_quantity",
-                "DetectionTime": "detection_time",
-            },
-            "reorders": {
-                **common_mappings,
-                "StoreID": "store_id",
-                "DCID": "dc_id",
-                "ProductID": "product_id",
-                "CurrentQuantity": "current_quantity",
-                "ReorderQuantity": "reorder_quantity",
-                "ReorderPoint": "reorder_point",
-                "Priority": "priority",
-            },
         }
 
         mapping = table_specific_mappings.get(table_name, common_mappings)
@@ -754,10 +724,6 @@ class PersistenceMixin:
                     "fact_payments": "fact_payments",
                     "promotions": "fact_promotions",
                     "promo_lines": "fact_promo_lines",
-                    "store_ops": "fact_store_ops",
-                    "customer_zone_changes": "fact_customer_zone_changes",
-                    "stockouts": "fact_stockouts",
-                    "reorders": "fact_reorders",
                 }.get(table_name, table_name)
                 from retail_datagen.db.duckdb_engine import (
                     insert_dataframe,
@@ -1065,12 +1031,6 @@ class PersistenceMixin:
             "marketing": "fact_marketing",
             "online_orders": "fact_online_orders",
             "fact_payments": "fact_payments",
-            "promotions": "fact_promotions",
-            "promo_lines": "fact_promo_lines",
-            "store_ops": "fact_store_ops",
-            "customer_zone_changes": "fact_customer_zone_changes",
-            "stockouts": "fact_stockouts",
-            "reorders": "fact_reorders",
         }
 
         for table_name in active_tables:
