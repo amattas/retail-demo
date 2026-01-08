@@ -210,8 +210,12 @@ class PromotionAppliedPayload(BaseModel):
     receipt_id: str = Field(..., min_length=1)
     promo_code: str = Field(..., min_length=1)
     discount_amount: float = Field(..., gt=0)
+    discount_cents: int = Field(..., gt=0, description="Discount amount in cents for precision")
     discount_type: str = Field(..., min_length=1)  # "percentage" or "fixed"
+    product_count: int = Field(..., gt=0, description="Number of products the promotion applies to")
     product_ids: list[int] = Field(..., min_length=1)
+    store_id: int = Field(..., gt=0, description="Store where promotion was applied")
+    customer_id: int = Field(..., gt=0, description="Customer who received the promotion")
 
 
 class StockoutDetectedPayload(BaseModel):
