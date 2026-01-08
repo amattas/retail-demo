@@ -16,12 +16,12 @@ import asyncio
 from pathlib import Path
 
 from retail_datagen.db import (
-    init_databases,
-    migrate_master_data_from_csv,
-    migrate_fact_data_from_csv,
-    validate_foreign_keys,
-    get_master_session,
     get_facts_session,
+    get_master_session,
+    init_databases,
+    migrate_fact_data_from_csv,
+    migrate_master_data_from_csv,
+    validate_foreign_keys,
 )
 
 

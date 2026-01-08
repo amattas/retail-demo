@@ -256,7 +256,7 @@ async def test_full_streaming_flow(
 
         # Start streaming for short duration
         duration = timedelta(seconds=2)
-        streaming_task = asyncio.create_task(streamer.start(duration))
+        asyncio.create_task(streamer.start(duration))
 
         # Allow streaming to run
         await asyncio.sleep(2.5)

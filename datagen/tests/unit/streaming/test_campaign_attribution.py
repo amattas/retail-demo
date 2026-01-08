@@ -8,7 +8,6 @@ Tests verify:
 4. Edge cases for attribution handling
 """
 
-import random
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -16,16 +15,11 @@ import pytest
 
 from retail_datagen.shared.models import (
     Customer,
-    DeviceType,
     DistributionCenter,
-    MarketingChannel,
     ProductMaster,
     Store,
-    TenderType,
 )
-from retail_datagen.streaming.event_factory import EventFactory, EventGenerationState
-from retail_datagen.streaming.schemas import EventType
-
+from retail_datagen.streaming.event_factory import EventFactory
 
 # ================================
 # TEST FIXTURES

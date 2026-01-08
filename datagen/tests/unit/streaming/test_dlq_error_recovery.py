@@ -2,7 +2,7 @@
 Unit tests for DLQ error recovery and error classification.
 """
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -10,7 +10,6 @@ from src.retail_datagen.config.models import RetailConfig
 from src.retail_datagen.streaming.errors import (
     ErrorCategory,
     ErrorSeverity,
-    StreamingError,
     classify_error,
 )
 from src.retail_datagen.streaming.event_streaming import DLQEntry, EventStreamer

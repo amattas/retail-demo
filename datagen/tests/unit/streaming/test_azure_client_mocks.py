@@ -14,10 +14,8 @@ Fixtures are provided in conftest.py for mock Azure components.
 
 import asyncio
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ================================
 # MOCK AZURE SDK COMPONENTS

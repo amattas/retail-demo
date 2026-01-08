@@ -1538,8 +1538,8 @@ class TestSignalHandling:
 
     def test_signal_handler_setup(self, mock_config):
         """Test signal handlers are set up during initialization."""
-        with patch("signal.signal") as mock_signal:
-            streamer = EventStreamer(mock_config)
+        with patch("signal.signal"):
+            EventStreamer(mock_config)
 
             # Signal handlers should have been registered (if main thread)
             # This test is environment-dependent

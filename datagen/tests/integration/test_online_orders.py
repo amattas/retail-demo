@@ -73,8 +73,8 @@ async def test_online_orders():
     # 1. Multi-line support
     print("\n1. MULTI-LINE ORDER SUPPORT:")
     order_counts = df.groupby('OrderId').size()
-    unique_orders = len(order_counts.unique())
-    products_per_order = df.groupby(['OrderId', 'FulfillmentStatus']).ProductID.nunique()
+    len(order_counts.unique())
+    df.groupby(['OrderId', 'FulfillmentStatus']).ProductID.nunique()
     print(f"   - Unique orders: {len(order_counts) // 4}")  # Divide by 4 statuses
     print("   - Products per order (at created status):")
     created_df = df[df['FulfillmentStatus'] == 'created']

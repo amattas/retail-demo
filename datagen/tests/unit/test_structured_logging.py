@@ -187,7 +187,7 @@ class TestAzureClientStructuredLogging:
         from src.retail_datagen.streaming.azure_client import AzureEventHubClient
 
         with caplog.at_level(logging.INFO):
-            client = AzureEventHubClient(
+            AzureEventHubClient(
                 connection_string="mock://test", hub_name="test-hub"
             )
 

@@ -2,15 +2,14 @@
 Systematic extraction script for modularizing fact_generator.py
 """
 import re
-import ast
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
 
-def extract_imports_section(lines: List[str]) -> Tuple[List[str], int]:
+
+def extract_imports_section(lines: list[str]) -> tuple[list[str], int]:
     """Extract all imports from the beginning of the file"""
     imports = []
     last_import_idx = 0
-    
+
     # Skip module docstring
     i = 0
     if lines[0].strip().startswith('"""') or lines[0].strip().startswith("'''"):
@@ -20,7 +19,7 @@ def extract_imports_section(lines: List[str]) -> Tuple[List[str], int]:
         while i < len(lines) and quote not in lines[i]:
             i += 1
         i += 1  # Skip the closing quote line
-    
+
     # Now extract imports
     while i < len(lines):
         line = lines[i].strip()
@@ -36,10 +35,10 @@ def extract_imports_section(lines: List[str]) -> Tuple[List[str], int]:
             # Hit non-import, non-comment line
             break
         i += 1
-    
+
     return imports, last_import_idx + 1
 
-def find_class_or_function(lines: List[str], name: str, start_idx: int = 0) -> Tuple[int, int]:
+def find_class_or_function(lines: list[str], name: str, start_idx: int = 0) -> tuple[int, int]:
     """Find start and end indices for a class or top-level function"""
     # Find start
     start = None
@@ -49,20 +48,20 @@ def find_class_or_function(lines: List[str], name: str, start_idx: int = 0) -> T
            re.match(rf'^def {re.escape(name)}\(', lines[i]):
             start = i
             break
-    
+
     if start is None:
         return None, None
-    
+
     # Find end - next top-level definition or EOF
     end = len(lines)
     for i in range(start + 1, len(lines)):
         if re.match(r'^(class |def |@)', lines[i]):
             end = i
             break
-    
+
     return start, end
 
-def find_method_in_class(lines: List[str], method_name: str, class_start: int, class_end: int) -> Tuple[int, int]:
+def find_method_in_class(lines: list[str], method_name: str, class_start: int, class_end: int) -> tuple[int, int]:
     """Find a method within a class"""
     # Find method start
     start = None
@@ -70,10 +69,10 @@ def find_method_in_class(lines: List[str], method_name: str, class_start: int, c
         if re.match(rf'^    def {re.escape(method_name)}\(', lines[i]):
             start = i
             break
-    
+
     if start is None:
         return None, None
-    
+
     # Find method end - next method at same indent level or class end
     end = class_end
     for i in range(start + 1, class_end):
@@ -85,12 +84,12 @@ def find_method_in_class(lines: List[str], method_name: str, class_start: int, c
         if re.match(r'^    def ', line) or re.match(r'^    @', line):
             end = i
             break
-    
+
     return start, end
 
 # Read source
 source_path = Path('src/retail_datagen/generators/fact_generator.py')
-with open(source_path, 'r') as f:
+with open(source_path) as f:
     lines = f.readlines()
 
 # Extract imports

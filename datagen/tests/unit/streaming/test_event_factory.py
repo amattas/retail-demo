@@ -35,7 +35,6 @@ from retail_datagen.streaming.schemas import (
     EventType,
 )
 
-
 # ================================
 # TEST FIXTURES
 # ================================

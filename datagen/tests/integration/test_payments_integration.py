@@ -6,11 +6,6 @@ integrated with the generator infrastructure.
 """
 
 from datetime import datetime
-from decimal import Decimal
-
-import pytest
-
-from retail_datagen.shared.models import TenderType
 
 
 class TestPaymentsIntegration:
@@ -32,7 +27,9 @@ class TestPaymentsIntegration:
 
     def test_payments_mixin_can_be_imported(self):
         """PaymentsMixin should be importable."""
-        from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
+        from retail_datagen.generators.fact_generators.payments_mixin import (
+            PaymentsMixin,
+        )
 
         # Verify key methods exist
         assert hasattr(PaymentsMixin, "_generate_payment_for_receipt")
@@ -44,14 +41,17 @@ class TestPaymentsIntegration:
     def test_factdatagenerator_has_payments_mixin(self):
         """FactDataGenerator should inherit from PaymentsMixin."""
         from retail_datagen.generators.fact_generators.core import FactDataGenerator
-        from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
+        from retail_datagen.generators.fact_generators.payments_mixin import (
+            PaymentsMixin,
+        )
 
         assert issubclass(FactDataGenerator, PaymentsMixin)
 
     def test_receipts_mixin_has_payments_key(self):
         """ReceiptsMixin._generate_store_hour_activity should initialize fact_payments."""
-        from retail_datagen.generators.fact_generators import receipts_mixin
         import inspect
+
+        from retail_datagen.generators.fact_generators import receipts_mixin
 
         # Read the source code to verify fact_payments is initialized in hour_data
         source = inspect.getsource(receipts_mixin.ReceiptsMixin)
@@ -63,7 +63,9 @@ class TestPaymentPersistenceMapping:
 
     def test_field_mapping_exists(self):
         """fact_payments should have field mappings in persistence_mixin."""
-        from retail_datagen.generators.fact_generators.persistence_mixin import PersistenceMixin
+        from retail_datagen.generators.fact_generators.persistence_mixin import (
+            PersistenceMixin,
+        )
 
         # Create a minimal instance to access the mapping
         class TestMixin(PersistenceMixin):
@@ -126,7 +128,9 @@ class TestPaymentConstants:
 
     def test_decline_rate_multipliers(self):
         """Decline rate multipliers should include common payment methods."""
-        from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
+        from retail_datagen.generators.fact_generators.payments_mixin import (
+            PaymentsMixin,
+        )
 
         multipliers = PaymentsMixin._DECLINE_RATE_MULTIPLIERS
         assert "CREDIT_CARD" in multipliers
@@ -136,7 +140,9 @@ class TestPaymentConstants:
 
     def test_processing_time_ranges(self):
         """Processing time ranges should include common payment methods."""
-        from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
+        from retail_datagen.generators.fact_generators.payments_mixin import (
+            PaymentsMixin,
+        )
 
         ranges = PaymentsMixin._PROCESSING_TIME_RANGES
         assert "CREDIT_CARD" in ranges
@@ -151,7 +157,9 @@ class TestPaymentConstants:
 
     def test_decline_reasons_not_empty(self):
         """Decline reasons list should not be empty."""
-        from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
+        from retail_datagen.generators.fact_generators.payments_mixin import (
+            PaymentsMixin,
+        )
 
         reasons = PaymentsMixin._DECLINE_REASONS
         assert len(reasons) > 0
