@@ -40,17 +40,17 @@
 
 ## Files Modified
 
-1. `/Users/amattas/GitHub/retail-demo-field-naming/datagen/src/retail_datagen/streaming/schemas.py`
+1. `datagen/src/retail_datagen/streaming/schemas.py`
    - Line 216-218: Updated discount_type field comment
 
-2. `/Users/amattas/GitHub/retail-demo-field-naming/datagen/src/retail_datagen/streaming/event_factory.py`
-   - Line 1018: Changed discount_type values to uppercase
+2. `datagen/src/retail_datagen/streaming/event_factory.py`
+   - Line 1018: Changed discount_type values to uppercase with BOGO support
 
-3. `/Users/amattas/GitHub/retail-demo-field-naming/datagen/src/retail_datagen/generators/fact_generators/README.md`
+3. `datagen/src/retail_datagen/generators/fact_generators/README.md`
    - Lines 162-208: Added "Field Naming Conventions" section
    - Lines 220: Updated contributor guidelines
 
-4. `/Users/amattas/GitHub/retail-demo-field-naming/datagen/tests/unit/streaming/test_event_factory.py`
+4. `datagen/tests/unit/streaming/test_event_factory.py`
    - Line 999: Updated test assertion for new discount type values
 
 ## Test Results
