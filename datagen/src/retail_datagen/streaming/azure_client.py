@@ -175,7 +175,7 @@ class AzureEventHubClient:
         self._client: EventHubProducerClient | None = None
         self._is_connected = False
         self._event_buffer: list[EventEnvelope] = []
-        self._buffer_lock = asyncio.Lock()
+        self._buffer_lock: asyncio.Lock | None = None  # Lazy-initialized in async context
         self._statistics = {
             "events_sent": 0,
             "events_failed": 0,
@@ -211,6 +211,19 @@ class AzureEventHubClient:
         # Initialize client only for real (non-mock) connections
         if (not self._is_mock) and connection_string and hub_name:
             self._initialize_client()
+
+    def _get_buffer_lock(self) -> asyncio.Lock:
+        """Get the buffer lock, lazily initializing it if needed.
+
+        This ensures the lock is created in an async context rather than
+        potentially during __init__ which may run outside an event loop.
+
+        Returns:
+            The asyncio.Lock instance for buffer synchronization
+        """
+        if self._buffer_lock is None:
+            self._buffer_lock = asyncio.Lock()
+        return self._buffer_lock
 
     def _initialize_client(self):
         """Initialize the Azure Event Hub producer client."""
@@ -447,7 +460,7 @@ class AzureEventHubClient:
         Returns:
             bool: True if buffer needs flushing (reached max size), False otherwise
         """
-        async with self._buffer_lock:
+        async with self._get_buffer_lock():
             self._event_buffer.append(event)
             # Check if buffer needs flushing
             needs_flush = len(self._event_buffer) >= self.max_batch_size
@@ -470,7 +483,7 @@ class AzureEventHubClient:
         Returns:
             bool: True if all events sent successfully, False otherwise
         """
-        async with self._buffer_lock:
+        async with self._get_buffer_lock():
             if not self._event_buffer:
                 return True
 
@@ -486,7 +499,7 @@ class AzureEventHubClient:
         Returns:
             dict: Statistics about client performance
         """
-        async with self._buffer_lock:
+        async with self._get_buffer_lock():
             buffer_size = len(self._event_buffer)
 
         stats = self._statistics.copy()
