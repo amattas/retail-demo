@@ -19,7 +19,6 @@ import pytest
 
 from retail_datagen.shared.dependencies import (
     TASK_CLEANUP_MAX_AGE_HOURS,
-    TASK_CLEANUP_THRESHOLD,
     TaskStatus,
     _background_tasks,
     _task_status,
