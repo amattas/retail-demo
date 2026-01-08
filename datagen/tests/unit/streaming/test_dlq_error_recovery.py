@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.retail_datagen.config.models import RetailConfig
-from src.retail_datagen.streaming.errors import (
+from retail_datagen.config.models import RetailConfig
+from retail_datagen.streaming.errors import (
     ErrorCategory,
     ErrorSeverity,
     classify_error,
 )
-from src.retail_datagen.streaming.event_streaming import DLQEntry, EventStreamer
-from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
+from retail_datagen.streaming.event_streaming import DLQEntry, EventStreamer
+from retail_datagen.streaming.schemas import EventEnvelope, EventType
 
 
 class TestErrorClassification:

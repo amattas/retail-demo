@@ -2,7 +2,7 @@
 import json
 import logging
 
-from src.retail_datagen.shared.logging_utils import (
+from retail_datagen.shared.logging_utils import (
     StructuredLogger,
     get_structured_logger,
 )
@@ -132,7 +132,7 @@ class TestEventEnvelopeCorrelationFields:
         """Test EventEnvelope has session_id and parent_event_id fields."""
         from datetime import UTC, datetime
 
-        from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
+        from retail_datagen.streaming.schemas import EventEnvelope, EventType
 
         # Create event envelope with correlation fields
         event = EventEnvelope(
@@ -153,7 +153,7 @@ class TestEventEnvelopeCorrelationFields:
         """Test that correlation fields are optional."""
         from datetime import UTC, datetime
 
-        from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
+        from retail_datagen.streaming.schemas import EventEnvelope, EventType
 
         # Create event without correlation fields
         event = EventEnvelope(
@@ -173,7 +173,7 @@ class TestAzureClientStructuredLogging:
 
     def test_azure_client_has_structured_logger(self):
         """Test AzureEventHubClient initializes structured logger."""
-        from src.retail_datagen.streaming.azure_client import AzureEventHubClient
+        from retail_datagen.streaming.azure_client import AzureEventHubClient
 
         client = AzureEventHubClient(
             connection_string="mock://test", hub_name="test-hub"
@@ -184,7 +184,7 @@ class TestAzureClientStructuredLogging:
 
     def test_azure_client_logs_initialization(self, caplog):
         """Test that Azure client logs initialization with structured logging."""
-        from src.retail_datagen.streaming.azure_client import AzureEventHubClient
+        from retail_datagen.streaming.azure_client import AzureEventHubClient
 
         with caplog.at_level(logging.INFO):
             AzureEventHubClient(
@@ -210,7 +210,7 @@ class TestLoggingConfiguration:
 
     def test_configure_structured_logging(self):
         """Test logging configuration function."""
-        from src.retail_datagen.shared.logging_config import (
+        from retail_datagen.shared.logging_config import (
             configure_structured_logging,
         )
 
@@ -223,7 +223,7 @@ class TestLoggingConfiguration:
 
     def test_configure_with_different_levels(self):
         """Test configuration with different log levels."""
-        from src.retail_datagen.shared.logging_config import (
+        from retail_datagen.shared.logging_config import (
             configure_structured_logging,
         )
 
