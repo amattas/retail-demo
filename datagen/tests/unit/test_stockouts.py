@@ -2,9 +2,7 @@
 Unit tests for stockouts detection and generation.
 """
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 from retail_datagen.generators.fact_generators.stockouts_mixin import StockoutsMixin
 
@@ -34,7 +32,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=5,
-            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -54,7 +52,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=5,
-            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             current_balance=3,
         )
 
@@ -70,7 +68,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=5,
-            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -80,7 +78,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=3,
-            detection_time=datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 22, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -97,7 +95,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=5,
-            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -107,7 +105,7 @@ class TestStockoutsDetection:
             node_id=1,
             product_id=100,
             last_known_quantity=3,
-            detection_time=datetime(2024, 1, 2, 11, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 2, 11, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -123,7 +121,7 @@ class TestStockoutsDetection:
             node_id=5,
             product_id=200,
             last_known_quantity=10,
-            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+            detection_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             current_balance=0,
         )
 
@@ -142,21 +140,21 @@ class TestStockoutsDetection:
                 "ProductID": 100,
                 "Balance": 0,
                 "QtyDelta": -5,
-                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             },
             {
                 "StoreID": 1,
                 "ProductID": 101,
                 "Balance": 10,  # Not a stockout
                 "QtyDelta": -2,
-                "EventTS": datetime(2024, 1, 1, 11, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 11, 0, 0, tzinfo=UTC),
             },
             {
                 "StoreID": 2,
                 "ProductID": 100,
                 "Balance": 0,
                 "QtyDelta": -3,
-                "EventTS": datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
             },
         ]
 
@@ -166,7 +164,7 @@ class TestStockoutsDetection:
                 "ProductID": 200,
                 "Balance": 0,
                 "QtyDelta": -8,
-                "EventTS": datetime(2024, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 13, 0, 0, tzinfo=UTC),
             }
         ]
 
@@ -196,7 +194,7 @@ class TestStockoutsDetection:
                 "ProductID": 100,
                 "Balance": 0,
                 "QtyDelta": -7,  # Negative delta
-                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             }
         ]
 
@@ -215,7 +213,7 @@ class TestStockoutsDetection:
                 "ProductID": 100,
                 "Balance": 0,
                 "QtyDelta": 0,  # Zero delta
-                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+                "EventTS": datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             }
         ]
 

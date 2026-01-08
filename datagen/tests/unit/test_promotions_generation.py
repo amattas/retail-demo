@@ -5,9 +5,10 @@ Tests the PromotionsMixin class that generates promotional tracking records
 from receipts with applied discounts.
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
+
+import pytest
 
 
 class TestPromotionGeneration:

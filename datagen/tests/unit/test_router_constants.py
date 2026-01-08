@@ -5,7 +5,6 @@ These tests verify that all fact tables are properly registered in the
 router configuration, ensuring consistency between FACT_TABLES and DUCK_FACT_MAP.
 """
 
-import pytest
 
 from retail_datagen.generators.routers.common import (
     DUCK_FACT_MAP,
