@@ -996,7 +996,7 @@ class TestMarketingEventBehaviors:
     def test_promotion_valid_discount_type(self, factory_with_active_receipt, test_timestamp):
         """Test promotion uses valid discount type."""
         event = factory_with_active_receipt.generate_event(EventType.PROMOTION_APPLIED, test_timestamp)
-        assert event.payload["discount_type"] in ["PERCENTAGE", "FIXED_AMOUNT", "BOGO"]
+        assert event.payload["discount_type"] in ["percentage", "fixed"]
 
 
 # ================================
