@@ -49,6 +49,7 @@ from ..retail_patterns import (
     InventoryFlowSimulator,
     MarketingCampaignSimulator,
 )
+from .customer_zone_changes_mixin import CustomerZoneChangesMixin
 from .data_loading_mixin import DataLoadingMixin
 from .inventory_mixin import InventoryMixin
 from .logistics_mixin import LogisticsMixin
@@ -59,15 +60,19 @@ from .payments_mixin import PaymentsMixin
 from .persistence_mixin import PersistenceMixin
 from .progress import HourlyProgressTracker
 from .progress_reporting_mixin import ProgressReportingMixin
+from .promotions_mixin import PromotionsMixin
 from .receipts_mixin import ReceiptsMixin
 from .seasonal_mixin import SeasonalMixin
 from .sensors_mixin import SensorsMixin
+from .stockouts_mixin import StockoutsMixin
+from .store_ops_mixin import StoreOpsMixin
 from .utils_mixin import UtilsMixin
 
 logger = logging.getLogger(__name__)
 
 
 class FactDataGenerator(
+    CustomerZoneChangesMixin,
     DataLoadingMixin,
     InventoryMixin,
     LogisticsMixin,
@@ -76,9 +81,12 @@ class FactDataGenerator(
     PaymentsMixin,
     PersistenceMixin,
     ProgressReportingMixin,
+    PromotionsMixin,
     ReceiptsMixin,
     SeasonalMixin,
     SensorsMixin,
+    StockoutsMixin,
+    StoreOpsMixin,
     UtilsMixin,
 ):
     """
@@ -99,12 +107,22 @@ class FactDataGenerator(
         "receipt_lines",
         "foot_traffic",
         "ble_pings",
+        "customer_zone_changes",
         "marketing",
         # Omnichannel extension integrated into core facts
         "online_orders",
         "online_order_lines",
         # Payment transactions linked to receipts and online orders
         "fact_payments",
+        # Store operations (Issue #11)
+        "store_ops",
+        # Supply chain analytics (Issue #8)
+        "stockouts",
+        # Promotional tracking for marketing ROI
+        "promotions",
+        "promo_lines",
+        # Inventory replenishment tracking
+        "reorders",
     ]
 
     # Truck unload duration constants (in minutes)
@@ -210,6 +228,12 @@ class FactDataGenerator(
 
         # Generation end date for filtering future-dated shipments (set during generate_historical_data)
         self._generation_end_date: datetime | None = None
+
+        # Stockout tracking (StockoutsMixin)
+        # Track last known stockout timestamps to avoid duplicate detections
+        # Key: (store_id, product_id) or (dc_id, product_id)
+        # Value: datetime of last stockout detection
+        self._last_stockout_detection: dict[tuple[int, int], datetime] = {}
 
         print(f"FactDataGenerator initialized with seed {config.seed}")
 
@@ -329,6 +353,7 @@ class FactDataGenerator(
             "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
+            "customer_zone_changes": total_days * len(self.stores) * 300,  # Estimated: ~60% of BLE pings result in zone changes
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,
@@ -337,6 +362,7 @@ class FactDataGenerator(
             "supply_chain_disruption": total_days * 2,
             "online_orders": total_days
             * max(0, int(self.config.volume.online_orders_per_day)),
+            "stockouts": total_days * len(self.stores) * 2,  # ~2 stockouts per store per day
         }
         expected_records = {
             k: v for k, v in expected_records_all.items() if k in active_tables

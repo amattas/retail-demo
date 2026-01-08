@@ -57,6 +57,7 @@ ALLOWED_TABLES: frozenset[str] = frozenset(
         "fact_stockouts",
         "fact_reorders",
         "fact_promotions",
+        "fact_promo_lines",
         "fact_store_ops",
         "fact_customer_zone_changes",
         # System tables

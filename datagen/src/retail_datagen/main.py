@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
         conn = get_duckdb_conn()
         conn.execute("SELECT 1")
         logger.info("✅ DuckDB initialized successfully")
-        logger.info(f"  - DuckDB Path: {get_duckdb_path()}")
+        logger.debug(f"  - DuckDB Path: {get_duckdb_path()}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize DuckDB: {e}", exc_info=True)
         logger.warning("Application will continue but database features may not work")
