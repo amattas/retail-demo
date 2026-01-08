@@ -104,6 +104,7 @@ class PersistenceMixin:
             "online_orders": "online_order_created",
             "online_order_lines": "online_order_picked",  # may change based on timestamps
             "fact_payments": "payment_processed",
+            "reorders": "reorder_triggered",
             "store_ops": "store_opened",  # may change based on operation_type
             "stockouts": "stockout_detected",
             "promotions": "promotion_applied",
