@@ -290,7 +290,13 @@ class MonitoringManager:
 
             # Add Azure client statistics if available
             if azure_client:
-                azure_stats = azure_client.get_statistics()
+                # Handle both real clients and mock dicts
+                if isinstance(azure_client, dict):
+                    # Mock dict from tests
+                    azure_stats = azure_client
+                else:
+                    # Real Azure client
+                    azure_stats = await azure_client.get_statistics()
                 stats.update({"azure_client": azure_stats})
 
             return stats

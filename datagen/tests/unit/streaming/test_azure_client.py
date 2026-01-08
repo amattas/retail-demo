@@ -594,8 +594,8 @@ class TestBatching:
             await client.connect()
 
             # Add events to buffer
-            client.add_to_buffer(sample_event_envelope)
-            client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
 
             assert len(client._event_buffer) == 2
 
@@ -631,7 +631,7 @@ class TestBatching:
                     trace_id=str(uuid4()),
                     ingest_timestamp=datetime.now(UTC),
                 )
-                client.add_to_buffer(event)
+                await client.add_to_buffer(event)
 
             # Give async task time to execute
             await asyncio.sleep(0.1)
@@ -974,7 +974,7 @@ class TestStatisticsAndMonitoring:
             await client.connect()
             await client.send_events(sample_event_batch)
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["events_sent"] == 5
             assert stats["batches_sent"] == 1
@@ -998,7 +998,7 @@ class TestStatisticsAndMonitoring:
                 circuit_breaker_enabled=True,
             )
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert "circuit_breaker_state" in stats
             assert stats["circuit_breaker_state"] == "CLOSED"
@@ -1018,7 +1018,7 @@ class TestStatisticsAndMonitoring:
                 circuit_breaker_enabled=False,
             )
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["circuit_breaker_state"] == "DISABLED"
 
@@ -1035,10 +1035,10 @@ class TestStatisticsAndMonitoring:
                 connection_string=valid_connection_string, hub_name="test-hub"
             )
 
-            client.add_to_buffer(sample_event_envelope)
-            client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["buffer_size"] == 2
 
