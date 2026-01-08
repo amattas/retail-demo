@@ -842,7 +842,7 @@ All events use a standard envelope format for consistency and traceability.
   "receipt_id": "RCT_20240115_xyz789",
   "promo_code": "SAVE10",
   "discount_amount": 8.50,
-  "discount_type": "percentage",
+  "discount_type": "PERCENTAGE",
   "product_ids": [1523, 1524, 1525]
 }
 ```
