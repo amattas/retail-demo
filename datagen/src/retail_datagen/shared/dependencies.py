@@ -384,10 +384,16 @@ def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
     Args:
         max_age_hours: Maximum age in hours for completed/failed tasks.
                       If None, uses TASK_CLEANUP_MAX_AGE_HOURS default.
+                      Must be non-negative if provided.
 
     Returns:
         Number of tasks cleaned up
+
+    Raises:
+        ValueError: If max_age_hours is negative
     """
+    if max_age_hours is not None and max_age_hours < 0:
+        raise ValueError("max_age_hours must be non-negative")
     age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
     return _cleanup_old_tasks(max_age_hours=age)
 
