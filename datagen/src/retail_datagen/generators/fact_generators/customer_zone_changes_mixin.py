@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 class CustomerZoneChangesMixin:
     """Customer zone change tracking derived from BLE ping sequences"""
 
-    def _generate_customer_zone_changes(
-        self, ble_pings: list[dict]
-    ) -> list[dict]:
+    def _generate_customer_zone_changes(self, ble_pings: list[dict]) -> list[dict]:
         """Derive customer zone change events from BLE ping sequences.
 
         Args:

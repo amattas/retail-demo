@@ -353,7 +353,9 @@ class FactDataGenerator(
             "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
-            "customer_zone_changes": total_days * len(self.stores) * 300,  # Estimated: ~60% of BLE pings result in zone changes
+            "customer_zone_changes": total_days
+            * len(self.stores)
+            * 300,  # Estimated: ~60% of BLE pings result in zone changes
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,
@@ -362,7 +364,9 @@ class FactDataGenerator(
             "supply_chain_disruption": total_days * 2,
             "online_orders": total_days
             * max(0, int(self.config.volume.online_orders_per_day)),
-            "stockouts": total_days * len(self.stores) * 2,  # ~2 stockouts per store per day
+            "stockouts": total_days
+            * len(self.stores)
+            * 2,  # ~2 stockouts per store per day
         }
         expected_records = {
             k: v for k, v in expected_records_all.items() if k in active_tables
