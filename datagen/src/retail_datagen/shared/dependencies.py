@@ -121,16 +121,24 @@ _event_streamer: EventStreamer | None = None
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
-# Task cleanup configuration
-TASK_CLEANUP_MAX_AGE_HOURS = int(os.getenv("TASK_CLEANUP_MAX_AGE_HOURS", "24"))
-TASK_CLEANUP_THRESHOLD = int(os.getenv("TASK_CLEANUP_THRESHOLD", "1000"))
+
+# ================================
+# ENVIRONMENT VARIABLE PARSING
+# ================================
 
 
-# Rate limiting storage configuration
-# These can be tuned via environment variables for different deployment scenarios
-# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
-def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -> int:
-    """Parse rate limit environment variable with validation and fallback."""
+def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
+    """Parse integer environment variable with validation and fallback.
+
+    Args:
+        name: Environment variable name
+        default: Default value if not set or invalid
+        min_val: Minimum allowed value
+        max_val: Maximum allowed value
+
+    Returns:
+        Validated integer value within bounds
+    """
     try:
         value = int(os.getenv(name, str(default)))
         return max(min_val, min(max_val, value))
@@ -142,8 +150,16 @@ def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -
         return default
 
 
-RATE_LIMIT_MAXSIZE = _parse_rate_limit_env("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
-RATE_LIMIT_TTL = _parse_rate_limit_env("RATE_LIMIT_TTL", 3600, 60, 86400)
+# Task cleanup configuration
+# Bounds: max age 1-720 hours (1 hour to 30 days), threshold 100-100000 tasks
+TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int("TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, 720)
+TASK_CLEANUP_THRESHOLD = _parse_env_int("TASK_CLEANUP_THRESHOLD", 1000, 100, 100000)
+
+# Rate limiting storage configuration
+# These can be tuned via environment variables for different deployment scenarios
+# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
+RATE_LIMIT_MAXSIZE = _parse_env_int("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
+RATE_LIMIT_TTL = _parse_env_int("RATE_LIMIT_TTL", 3600, 60, 86400)
 
 # TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
 # Reading an entry does NOT reset the timer; only re-assigning (cache[key] = value) does.
