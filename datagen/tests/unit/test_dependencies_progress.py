@@ -13,13 +13,17 @@ Key Test Areas:
     4. Integration: Simulate calls from fact_generator with tracker states
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from retail_datagen.shared.dependencies import (
+    TASK_CLEANUP_MAX_AGE_HOURS,
+    TASK_CLEANUP_THRESHOLD,
     TaskStatus,
+    _background_tasks,
     _task_status,
+    cleanup_old_tasks,
     get_task_status,
     update_task_progress,
 )
@@ -793,3 +797,155 @@ class TestBackwardsCompatibility:
         # State fields not provided, should remain None
         assert status.tables_completed is None
         assert status.tables_in_progress is None
+
+
+# ================================
+# TASK CLEANUP TESTS
+# ================================
+
+
+class TestTaskCleanup:
+    """Tests for background task cleanup functionality."""
+
+    @pytest.fixture(autouse=True)
+    def clean_task_stores(self):
+        """Clean task stores before and after each test."""
+        _task_status.clear()
+        _background_tasks.clear()
+        yield
+        _task_status.clear()
+        _background_tasks.clear()
+
+    def test_cleanup_removes_old_completed_tasks(self):
+        """Test that cleanup removes completed tasks older than max_age."""
+        # Create an old completed task (48 hours ago)
+        old_time = datetime.now(UTC) - timedelta(hours=48)
+        _task_status["old_task"] = TaskStatus(
+            status="completed",
+            started_at=old_time,
+            completed_at=old_time,
+            progress=1.0,
+            message="Old task",
+        )
+
+        # Create a recent completed task (1 hour ago)
+        recent_time = datetime.now(UTC) - timedelta(hours=1)
+        _task_status["recent_task"] = TaskStatus(
+            status="completed",
+            started_at=recent_time,
+            completed_at=recent_time,
+            progress=1.0,
+            message="Recent task",
+        )
+
+        # Run cleanup with 24 hour threshold
+        cleaned = cleanup_old_tasks(max_age_hours=24)
+
+        assert cleaned == 1
+        assert "old_task" not in _task_status
+        assert "recent_task" in _task_status
+
+    def test_cleanup_preserves_running_tasks(self):
+        """Test that cleanup does not remove running tasks (no completed_at)."""
+        # Create an old running task
+        old_time = datetime.now(UTC) - timedelta(hours=48)
+        _task_status["running_task"] = TaskStatus(
+            status="running",
+            started_at=old_time,
+            completed_at=None,
+            progress=0.5,
+            message="Still running",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=24)
+
+        assert cleaned == 0
+        assert "running_task" in _task_status
+
+    def test_cleanup_removes_old_failed_tasks(self):
+        """Test that cleanup removes failed tasks older than max_age."""
+        old_time = datetime.now(UTC) - timedelta(hours=48)
+        _task_status["failed_task"] = TaskStatus(
+            status="failed",
+            started_at=old_time,
+            completed_at=old_time,
+            progress=0.5,
+            message="Failed",
+            error="Some error",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=24)
+
+        assert cleaned == 1
+        assert "failed_task" not in _task_status
+
+    def test_cleanup_with_no_tasks(self):
+        """Test cleanup when no tasks exist."""
+        cleaned = cleanup_old_tasks()
+        assert cleaned == 0
+
+    def test_cleanup_with_all_recent_tasks(self):
+        """Test cleanup when all tasks are recent."""
+        recent_time = datetime.now(UTC) - timedelta(hours=1)
+        _task_status["task1"] = TaskStatus(
+            status="completed",
+            started_at=recent_time,
+            completed_at=recent_time,
+            progress=1.0,
+            message="Task 1",
+        )
+        _task_status["task2"] = TaskStatus(
+            status="completed",
+            started_at=recent_time,
+            completed_at=recent_time,
+            progress=1.0,
+            message="Task 2",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=24)
+
+        assert cleaned == 0
+        assert len(_task_status) == 2
+
+    def test_cleanup_uses_default_max_age(self):
+        """Test that cleanup uses default max_age when None provided."""
+        # Create a task older than default (24 hours)
+        old_time = datetime.now(UTC) - timedelta(hours=TASK_CLEANUP_MAX_AGE_HOURS + 1)
+        _task_status["old_task"] = TaskStatus(
+            status="completed",
+            started_at=old_time,
+            completed_at=old_time,
+            progress=1.0,
+            message="Old task",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=None)
+
+        assert cleaned == 1
+        assert "old_task" not in _task_status
+
+    def test_cleanup_negative_hours_raises_error(self):
+        """Test that negative max_age_hours raises ValueError."""
+        with pytest.raises(ValueError, match="max_age_hours must be non-negative"):
+            cleanup_old_tasks(max_age_hours=-1)
+
+    def test_cleanup_exceeds_max_hours_raises_error(self):
+        """Test that max_age_hours > 8760 raises ValueError."""
+        with pytest.raises(ValueError, match="max_age_hours must not exceed 8760"):
+            cleanup_old_tasks(max_age_hours=8761)
+
+    def test_cleanup_edge_case_zero_hours(self):
+        """Test cleanup with zero hours removes all completed tasks."""
+        recent_time = datetime.now(UTC) - timedelta(seconds=1)
+        _task_status["task"] = TaskStatus(
+            status="completed",
+            started_at=recent_time,
+            completed_at=recent_time,
+            progress=1.0,
+            message="Just completed",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=0)
+
+        assert cleaned == 1
+        assert "task" not in _task_status
