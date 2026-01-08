@@ -8,6 +8,7 @@ and other middleware components for the FastAPI application.
 import asyncio
 import logging
 import os
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from functools import wraps
@@ -120,6 +121,10 @@ _event_streamer: EventStreamer | None = None
 # Background task tracking
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
+
+# Lock for thread-safe cleanup operations
+# Prevents race conditions when multiple threads/workers trigger cleanup
+_cleanup_lock = threading.Lock()
 
 
 # ================================
@@ -265,6 +270,9 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     """
     Remove completed/failed tasks older than max_age_hours.
 
+    Thread-safe: Uses _cleanup_lock to prevent race conditions when multiple
+    threads/workers trigger cleanup simultaneously.
+
     Args:
         max_age_hours: Maximum age in hours for completed/failed tasks
 
@@ -276,14 +284,14 @@ def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
     cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
     cleaned_count = 0
 
-    # Thread-safety note: We create a snapshot of items() to avoid modifying the
-    # dict during iteration. In asyncio single-threaded context, this is safe.
-    # If multi-threading is introduced, consider adding a lock.
-    for task_id, task_stat in list(_task_status.items()):
-        if task_stat.completed_at and task_stat.completed_at < cutoff:
-            _task_status.pop(task_id, None)
-            _background_tasks.pop(task_id, None)
-            cleaned_count += 1
+    # Use lock to prevent race conditions in multi-worker deployments
+    with _cleanup_lock:
+        # Create a snapshot of items() to avoid modifying the dict during iteration
+        for task_id, task_stat in list(_task_status.items()):
+            if task_stat.completed_at and task_stat.completed_at < cutoff:
+                _task_status.pop(task_id, None)
+                _background_tasks.pop(task_id, None)
+                cleaned_count += 1
 
     if cleaned_count > 0:
         logger.info(
@@ -397,8 +405,8 @@ def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
     if max_age_hours is not None:
         if max_age_hours < 0:
             raise ValueError("max_age_hours must be non-negative")
-        if max_age_hours > 8760:  # 1 year max for safety
-            raise ValueError("max_age_hours must not exceed 8760 (1 year)")
+        if max_age_hours > 720:  # 30 days max, aligned with TASK_CLEANUP_MAX_AGE_HOURS bounds
+            raise ValueError("max_age_hours must not exceed 720 (30 days)")
     age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
     return _cleanup_old_tasks(max_age_hours=age)
 

@@ -930,9 +930,9 @@ class TestTaskCleanup:
             cleanup_old_tasks(max_age_hours=-1)
 
     def test_cleanup_exceeds_max_hours_raises_error(self):
-        """Test that max_age_hours > 8760 raises ValueError."""
-        with pytest.raises(ValueError, match="max_age_hours must not exceed 8760"):
-            cleanup_old_tasks(max_age_hours=8761)
+        """Test that max_age_hours > 720 raises ValueError."""
+        with pytest.raises(ValueError, match="max_age_hours must not exceed 720"):
+            cleanup_old_tasks(max_age_hours=721)
 
     def test_cleanup_edge_case_zero_hours(self):
         """Test cleanup with zero hours removes all completed tasks."""
@@ -949,3 +949,30 @@ class TestTaskCleanup:
 
         assert cleaned == 1
         assert "task" not in _task_status
+
+    def test_cleanup_removes_old_cancelled_tasks(self):
+        """Test that cleanup removes cancelled tasks older than max_age."""
+        old_time = datetime.now(UTC) - timedelta(hours=48)
+        _task_status["cancelled_task"] = TaskStatus(
+            status="cancelled",
+            started_at=old_time,
+            completed_at=old_time,  # Cancelled tasks have completed_at set
+            progress=0.3,
+            message="Task was cancelled",
+        )
+
+        # Create a recent cancelled task
+        recent_time = datetime.now(UTC) - timedelta(hours=1)
+        _task_status["recent_cancelled"] = TaskStatus(
+            status="cancelled",
+            started_at=recent_time,
+            completed_at=recent_time,
+            progress=0.5,
+            message="Recently cancelled",
+        )
+
+        cleaned = cleanup_old_tasks(max_age_hours=24)
+
+        assert cleaned == 1
+        assert "cancelled_task" not in _task_status
+        assert "recent_cancelled" in _task_status
