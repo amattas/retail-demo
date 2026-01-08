@@ -104,8 +104,8 @@ class TestMaxsizeEnforcement:
         # Cache should not exceed maxsize
         assert len(test_cache) <= 10
 
-    def test_lru_eviction_when_maxsize_exceeded(self):
-        """Test that LRU entries are evicted when maxsize is exceeded."""
+    def test_fifo_eviction_when_maxsize_exceeded(self):
+        """Test that oldest (FIFO) entries are evicted when maxsize is exceeded."""
         test_cache: TTLCache = TTLCache(maxsize=3, ttl=3600)
 
         # Add entries
@@ -113,10 +113,7 @@ class TestMaxsizeEnforcement:
         test_cache["ip_2"] = [2]
         test_cache["ip_3"] = [3]
 
-        # Access ip_1 and ip_2 to make ip_3 least recently used... wait, TTLCache uses FIFO not LRU
-        # TTLCache evicts oldest entries first
-
-        # Add a 4th entry
+        # Add a 4th entry - TTLCache uses FIFO, evicting oldest first
         test_cache["ip_4"] = [4]
 
         # Oldest entry (ip_1) should be evicted
