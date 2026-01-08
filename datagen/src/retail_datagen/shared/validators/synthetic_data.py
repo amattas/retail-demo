@@ -37,14 +37,14 @@ class SyntheticDataValidator:
         """
         Check if a first name is acceptable for synthetic data generation.
 
-        Real names are allowed as per requirements. This method now validates
-        basic format requirements rather than rejecting real names.
+        Validates that the name is not a common real name and meets basic
+        format requirements, as required by AGENTS.md and CLAUDE.md.
 
         Args:
             name: First name to validate
 
         Returns:
-            True if acceptable for use, False if invalid format
+            True if synthetic and acceptable, False if real or invalid format
         """
         name_stripped = name.strip()
 
@@ -57,6 +57,11 @@ class SyntheticDataValidator:
 
         # Allow letters, spaces, hyphens, and apostrophes
         if not re.match(r"^[A-Za-z\s\-']+$", name_stripped):
+            return False
+
+        # Check against real name blocklist
+        name_lower = name_stripped.lower()
+        if name_lower in self.real_first_names:
             return False
 
         return True
@@ -65,14 +70,14 @@ class SyntheticDataValidator:
         """
         Check if a last name is acceptable for synthetic data generation.
 
-        Real names are allowed as per requirements. This method now validates
-        basic format requirements rather than rejecting real names.
+        Validates that the name is not a common real name and meets basic
+        format requirements, as required by AGENTS.md and CLAUDE.md.
 
         Args:
             name: Last name to validate
 
         Returns:
-            True if acceptable for use, False if invalid format
+            True if synthetic and acceptable, False if real or invalid format
         """
         name_stripped = name.strip()
 
@@ -85,6 +90,11 @@ class SyntheticDataValidator:
 
         # Allow letters, spaces, hyphens, and apostrophes
         if not re.match(r"^[A-Za-z\s\-']+$", name_stripped):
+            return False
+
+        # Check against real name blocklist
+        name_lower = name_stripped.lower()
+        if name_lower in self.real_last_names:
             return False
 
         return True
