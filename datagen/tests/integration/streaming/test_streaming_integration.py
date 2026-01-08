@@ -350,7 +350,9 @@ async def test_circuit_breaker_opens_on_failures():
     try:
         result = circuit_breaker.call(mock_func_success)
         assert result is True
-        assert circuit_breaker.state == "CLOSED", "Circuit breaker should close on success"
+        assert circuit_breaker.state == "CLOSED", (
+            "Circuit breaker should close on success"
+        )
     except Exception:
         # State should be HALF_OPEN at least
         assert circuit_breaker.state in ["HALF_OPEN", "CLOSED"]
@@ -391,7 +393,9 @@ async def test_dlq_flow(
 
         # Generate events manually and try to send
         timestamp = datetime.now(UTC)
-        events = streamer._event_factory.generate_mixed_events(count=10, timestamp=timestamp)
+        events = streamer._event_factory.generate_mixed_events(
+            count=10, timestamp=timestamp
+        )
 
         # Add to buffer
         async with streamer._buffer_lock:
@@ -428,9 +432,9 @@ async def test_event_filtering(event_factory):
 
     # Verify only filtered types generated
     event_types_generated = {event.event_type for event in events}
-    assert event_types_generated.issubset(
-        allowed_types
-    ), f"Unexpected event types: {event_types_generated - allowed_types}"
+    assert event_types_generated.issubset(allowed_types), (
+        f"Unexpected event types: {event_types_generated - allowed_types}"
+    )
 
     # Verify event distribution
     type_counts = {}
@@ -600,9 +604,7 @@ async def test_statistics_collection(
 
         # Verify counters match
         assert stats["events_generated"] == len(events), "Generated count mismatch"
-        assert (
-            stats["events_sent_successfully"] == len(events)
-        ), "Sent count mismatch"
+        assert stats["events_sent_successfully"] == len(events), "Sent count mismatch"
         assert stats["batches_sent"] == 1, "Batch count mismatch"
         assert stats["events_failed"] == 0, "Should have no failures"
 
@@ -630,9 +632,9 @@ async def test_streaming_throughput(event_factory):
     events_per_second = len(events) / max(elapsed, 0.001)
 
     # Verify meets minimum threshold (should be very fast with mocking)
-    assert (
-        events_per_second > 100
-    ), f"Throughput too low: {events_per_second:.2f} events/sec"
+    assert events_per_second > 100, (
+        f"Throughput too low: {events_per_second:.2f} events/sec"
+    )
     assert len(events) > 0, "Should generate events"
 
 
@@ -738,15 +740,13 @@ async def test_event_factory_maintains_state(event_factory):
     timestamp = datetime.now(UTC)
 
     # Generate customer entered event
-    customer_event = event_factory.generate_event(
-        EventType.CUSTOMER_ENTERED, timestamp
-    )
+    customer_event = event_factory.generate_event(EventType.CUSTOMER_ENTERED, timestamp)
     assert customer_event is not None, "Should generate customer entered event"
 
     # Verify customer session created
-    assert (
-        len(event_factory.state.customer_sessions) > 0
-    ), "Customer session should be tracked"
+    assert len(event_factory.state.customer_sessions) > 0, (
+        "Customer session should be tracked"
+    )
 
     # Generate receipt event (requires customer in store)
     # Add small delay to allow customer to be in store
@@ -863,7 +863,9 @@ async def test_event_hooks(
 
         # Verify generated hooks called
         assert len(generated_events) > 0, "Generated hooks should be called"
-        assert len(generated_events) == len(events), "Hook should be called for each event"
+        assert len(generated_events) == len(events), (
+            "Hook should be called for each event"
+        )
 
 
 # ================================
@@ -946,7 +948,9 @@ def test_connection_string_sanitization():
 
     # Verify sensitive data is hidden
     assert "U2VjcmV0S2V5MTIz" not in sanitized, "Secret key should be hidden"
-    assert "***" in sanitized or "REDACTED" in sanitized.upper(), "Should indicate redaction"
+    assert "***" in sanitized or "REDACTED" in sanitized.upper(), (
+        "Should indicate redaction"
+    )
     assert "test.servicebus.windows.net" in sanitized, "Endpoint should be visible"
 
 
@@ -1035,7 +1039,9 @@ async def test_buffer_management(
 
         # Verify buffer is empty
         async with streamer._buffer_lock:
-            assert len(streamer._event_buffer) == 0, "Buffer should be empty after flush"
+            assert len(streamer._event_buffer) == 0, (
+                "Buffer should be empty after flush"
+            )
 
         # Verify events were sent
         mock_event_hub_client.send_events.assert_called()

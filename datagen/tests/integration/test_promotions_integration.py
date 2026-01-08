@@ -79,9 +79,7 @@ async def generator_with_master_data(small_test_config, set_test_mode):
 class TestPromotionsIntegration:
     """Test fact_promotions integration with receipts and database."""
 
-    async def test_promotions_generated_with_receipts(
-        self, generator_with_master_data
-    ):
+    async def test_promotions_generated_with_receipts(self, generator_with_master_data):
         """Test that promotions are generated when receipts have discounts."""
         generator = generator_with_master_data
 
@@ -133,9 +131,7 @@ class TestPromotionsIntegration:
 
         # Query promotions from DuckDB
         conn = generator._duckdb_conn
-        promotions_df = conn.execute(
-            "SELECT * FROM fact_promotions LIMIT 10"
-        ).fetchdf()
+        promotions_df = conn.execute("SELECT * FROM fact_promotions LIMIT 10").fetchdf()
 
         if len(promotions_df) > 0:
             # Verify column structure
@@ -153,9 +149,9 @@ class TestPromotionsIntegration:
             }
 
             actual_cols = set(promotions_df.columns)
-            assert expected_cols.issubset(
-                actual_cols
-            ), f"Missing columns: {expected_cols - actual_cols}"
+            assert expected_cols.issubset(actual_cols), (
+                f"Missing columns: {expected_cols - actual_cols}"
+            )
 
             # Verify data types and constraints
             for _, row in promotions_df.iterrows():
