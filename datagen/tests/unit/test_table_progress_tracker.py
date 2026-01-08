@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 
-from src.retail_datagen.generators.progress_tracker import TableProgressTracker
+from retail_datagen.generators.progress_tracker import TableProgressTracker
 
 
 class TestInitialization:

@@ -17,7 +17,7 @@ from datetime import datetime
 
 import pytest
 
-from src.retail_datagen.shared.dependencies import (
+from retail_datagen.shared.dependencies import (
     TaskStatus,
     _task_status,
     get_task_status,

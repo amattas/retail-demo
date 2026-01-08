@@ -12,10 +12,10 @@ Tests verify:
 """
 
 import os
+
 import pytest
 
 from retail_datagen.shared.notebook_utils import get_required_env
-
 
 # ================================
 # MISSING VARIABLE TESTS

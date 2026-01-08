@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.retail_datagen.config.models import RetailConfig
-from src.retail_datagen.streaming.event_streaming import EventStreamer
-from src.retail_datagen.streaming.schemas import EventEnvelope, EventType
+from retail_datagen.config.models import RetailConfig
+from retail_datagen.streaming.event_streaming import EventStreamer
+from retail_datagen.streaming.schemas import EventEnvelope, EventType
 
 
 @pytest.fixture

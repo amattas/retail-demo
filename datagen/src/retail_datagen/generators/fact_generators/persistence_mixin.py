@@ -174,7 +174,9 @@ class PersistenceMixin:
             elif table_name == "promotions":
                 rid = get_field(rec, "receipt_id_ext")
                 promo = get_field(rec, "promo_code")
-                trace_id = f"{rid}-{promo}" if rid is not None and promo is not None else None
+                trace_id = (
+                    f"{rid}-{promo}" if rid is not None and promo is not None else None
+                )
             elif table_name == "promo_lines":
                 rid = get_field(rec, "receipt_id_ext")
                 ln = get_field(rec, "line_number")

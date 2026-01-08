@@ -8,7 +8,7 @@ from threading import Barrier, Thread
 
 import pytest
 
-from src.retail_datagen.generators.fact_generators import HourlyProgressTracker
+from retail_datagen.generators.fact_generators import HourlyProgressTracker
 
 
 @pytest.fixture
@@ -252,7 +252,6 @@ class TestThreadSafety:
     def test_concurrent_updates_different_tables(self, tracker):
         """Multiple threads updating different tables should work correctly."""
         total_days = 5
-        num_threads = 3
         hours_per_thread = 10
 
         def update_table(table_name, thread_id):

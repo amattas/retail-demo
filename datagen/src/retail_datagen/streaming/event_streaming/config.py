@@ -124,7 +124,9 @@ class StreamingConfig:
             streaming_config.backoff_multiplier = config.realtime.backoff_multiplier
 
         # Circuit breaker fields have defaults in RealtimeConfig, so hasattr() is unnecessary
-        streaming_config.circuit_breaker_enabled = config.realtime.circuit_breaker_enabled
+        streaming_config.circuit_breaker_enabled = (
+            config.realtime.circuit_breaker_enabled
+        )
         streaming_config.circuit_breaker_failure_threshold = (
             config.realtime.circuit_breaker_failure_threshold
         )

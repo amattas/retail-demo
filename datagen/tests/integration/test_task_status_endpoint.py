@@ -5,8 +5,8 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from src.retail_datagen.main import app
-from src.retail_datagen.shared.dependencies import (
+from retail_datagen.main import app
+from retail_datagen.shared.dependencies import (
     TaskStatus,
     _task_status,
     update_task_progress,

@@ -6,8 +6,8 @@ Tests the relaxed validation mode for test scenarios.
 
 import os
 
-from src.retail_datagen.config.models import RetailConfig
-from src.retail_datagen.shared.credential_utils import (
+from retail_datagen.config.models import RetailConfig
+from retail_datagen.shared.credential_utils import (
     validate_eventhub_connection_string,
 )
 from tests.test_utils import (

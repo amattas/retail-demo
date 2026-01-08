@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from retail_datagen.shared.models import Store
@@ -43,12 +43,14 @@ class StoreOpsMixin:
 
         # Parse time ranges like "8am-10pm", "6am-midnight"
         # Pattern matches formats like: 6am-midnight, 8am-10pm, 9am-9pm
-        pattern = r'(\d{1,2})([ap]m)?[-\s]*(midnight|noon|\d{1,2})([ap]m)?'
+        pattern = r"(\d{1,2})([ap]m)?[-\s]*(midnight|noon|\d{1,2})([ap]m)?"
         match = re.search(pattern, hours_str)
 
         if not match:
             # Fallback to standard hours
-            logger.debug(f"Could not parse operating hours '{hours_str}', using default 8am-10pm")
+            logger.debug(
+                f"Could not parse operating hours '{hours_str}', using default 8am-10pm"
+            )
             return (8, 22)
 
         # Parse open time
@@ -56,24 +58,24 @@ class StoreOpsMixin:
         open_modifier = match.group(2)  # 'am' or 'pm'
 
         # Convert to 24-hour format
-        if open_modifier == 'pm' and open_hour != 12:
+        if open_modifier == "pm" and open_hour != 12:
             open_hour += 12
-        elif open_modifier == 'am' and open_hour == 12:
+        elif open_modifier == "am" and open_hour == 12:
             open_hour = 0
 
         # Parse close time
         close_str = match.group(3)
         close_modifier = match.group(4)
 
-        if close_str == 'midnight':
+        if close_str == "midnight":
             close_hour = 24  # Use 24 to represent midnight of next day
-        elif close_str == 'noon':
+        elif close_str == "noon":
             close_hour = 12
         else:
             close_hour = int(close_str)
-            if close_modifier == 'pm' and close_hour != 12:
+            if close_modifier == "pm" and close_hour != 12:
                 close_hour += 12
-            elif close_modifier == 'am' and close_hour == 12:
+            elif close_modifier == "am" and close_hour == 12:
                 close_hour = 0
 
         # Validate and fix any edge cases
@@ -112,25 +114,31 @@ class StoreOpsMixin:
 
         # Generate opened event
         open_time = day_date.replace(hour=open_hour, minute=0, second=0, microsecond=0)
-        operations.append({
-            "TraceId": self._generate_trace_id(),
-            "EventTS": open_time,
-            "StoreID": store.ID,
-            "OperationType": "opened",
-        })
+        operations.append(
+            {
+                "TraceId": self._generate_trace_id(),
+                "EventTS": open_time,
+                "StoreID": store.ID,
+                "OperationType": "opened",
+            }
+        )
 
         # Generate closed event
         # Handle midnight close (close_hour == 24)
         if close_hour == 24:
             close_time = day_date.replace(hour=23, minute=59, second=59, microsecond=0)
         else:
-            close_time = day_date.replace(hour=close_hour, minute=0, second=0, microsecond=0)
+            close_time = day_date.replace(
+                hour=close_hour, minute=0, second=0, microsecond=0
+            )
 
-        operations.append({
-            "TraceId": self._generate_trace_id(),
-            "EventTS": close_time,
-            "StoreID": store.ID,
-            "OperationType": "closed",
-        })
+        operations.append(
+            {
+                "TraceId": self._generate_trace_id(),
+                "EventTS": close_time,
+                "StoreID": store.ID,
+                "OperationType": "closed",
+            }
+        )
 
         return operations

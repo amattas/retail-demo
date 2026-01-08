@@ -1,0 +1,27 @@
+# Root-level ruff configuration for the retail-demo repository
+# This handles linting when run from the repo root
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+# Exclude Fabric notebooks and other non-Python code
+exclude = [
+    "fabric/**/*",
+    "data/**/*",
+    ".git",
+    "__pycache__",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+# Ignore these rules:
+# - E402: module-level import not at top (pytest.importorskip and conftest patterns)
+# - E501: line-too-long (cleanup needed across codebase)
+# - N806: variable in function should be lowercase (math convention: D, P, S, R)
+# - N818: exception name should end with Error suffix (existing base exception)
+ignore = ["E402", "E501", "N806", "N818"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["retail_datagen"]

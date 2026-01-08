@@ -225,7 +225,7 @@ class TestInventoryFlowSimulatorBalanceGetters:
         shipment_id = shipment_info["shipment_id"]
 
         # Complete delivery
-        transactions = inventory_simulator.complete_delivery(shipment_id)
+        inventory_simulator.complete_delivery(shipment_id)
 
         # Get updated balance
         updated_balance = inventory_simulator._store_inventory.get(key, 0)
@@ -531,7 +531,6 @@ class TestBalanceFieldMapping:
 
         # The actual mapping happens in fact_generator.py during database insert
         # This test documents the expected behavior
-        expected_db_column = "balance"  # lowercase in database
         expected_python_field = "Balance"  # PascalCase in Python dict
 
         assert expected_python_field in sample_transaction, "Python field should use PascalCase 'Balance'"
@@ -557,7 +556,6 @@ class TestBalanceFieldMapping:
         ), "Balance should be integer"
 
         # Document expected mapping
-        expected_db_column = "balance"  # lowercase in database
         expected_python_field = "Balance"  # PascalCase in Python dict
 
         assert expected_python_field in sample_transaction, "Python field should use PascalCase 'Balance'"
@@ -634,10 +632,10 @@ class TestBalanceEdgeCases:
         inventory_simulator._store_inventory[key] = 2
 
         # Sell items to deplete inventory
-        date = datetime.now()
+        datetime.now()
 
         # Manually create a sale that depletes inventory
-        current_qty = inventory_simulator._store_inventory[key]
+        inventory_simulator._store_inventory[key]
         inventory_simulator._store_inventory[key] = 0
 
         # Balance should be 0 after depletion

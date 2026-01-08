@@ -4,6 +4,7 @@ Promotion tracking for marketing ROI analytics.
 This module provides the PromotionsMixin class that generates fact_promotions
 records linked to receipt lines with promotional discounts applied.
 """
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +13,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import random
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,9 @@ class PromotionsMixin:
                         "ProductID": line.get("ProductID"),
                         "Qty": qty,
                         "DiscountAmount": str(line_discount),
-                        "DiscountCents": int((line_discount * 100).quantize(Decimal("1"))),
+                        "DiscountCents": int(
+                            (line_discount * 100).quantize(Decimal("1"))
+                        ),
                     }
                     promo_lines.append(promo_line)
 
@@ -144,7 +147,15 @@ class PromotionsMixin:
         # Check for clearance/sale patterns (typically percentage)
         if any(
             keyword in promo_code.upper()
-            for keyword in ["CLEARANCE", "SALE", "FRIDAY", "SUMMER", "HOLIDAY", "NEWYEAR", "BACKTOSCHOOL"]
+            for keyword in [
+                "CLEARANCE",
+                "SALE",
+                "FRIDAY",
+                "SUMMER",
+                "HOLIDAY",
+                "NEWYEAR",
+                "BACKTOSCHOOL",
+            ]
         ):
             return "PERCENTAGE"
 

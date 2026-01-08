@@ -7,13 +7,14 @@ and other middleware components for the FastAPI application.
 
 import asyncio
 import logging
+import os
 import time
-from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from cachetools import TTLCache
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -120,8 +121,38 @@ _event_streamer: EventStreamer | None = None
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
-# Rate limiting storage
-_rate_limit_storage: dict[str, list] = defaultdict(list)
+
+# Rate limiting storage configuration
+# These can be tuned via environment variables for different deployment scenarios
+# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
+def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -> int:
+    """Parse rate limit environment variable with validation and fallback."""
+    try:
+        value = int(os.getenv(name, str(default)))
+        return max(min_val, min(max_val, value))
+    except ValueError:
+        logger.warning(
+            f"Invalid {name} value, using default {default}",
+            extra={"env_var": name, "default": default},
+        )
+        return default
+
+
+RATE_LIMIT_MAXSIZE = _parse_rate_limit_env("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
+RATE_LIMIT_TTL = _parse_rate_limit_env("RATE_LIMIT_TTL", 3600, 60, 86400)
+
+# TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
+# Reading an entry does NOT reset the timer; only re-assigning (cache[key] = value) does.
+# IMPORTANT: In-place list modification (append, [:]=) does NOT reset TTL.
+# This means IPs are evicted after RATE_LIMIT_TTL seconds from their first request,
+# regardless of continued activity. This is acceptable since:
+#   1. Window-based cleanup handles active rate limiting within the window
+#   2. The 1-hour default TTL is longer than typical rate limit windows (60s)
+#   3. An IP returning after eviction simply gets a fresh entry
+# maxsize limits memory to a fixed number of unique IPs.
+_rate_limit_storage: TTLCache[str, list[float]] = TTLCache(
+    maxsize=RATE_LIMIT_MAXSIZE, ttl=RATE_LIMIT_TTL
+)
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -426,23 +457,26 @@ def rate_limit(max_requests: int = 100, window_seconds: int = 60):
             client_ip = request.client.host
             current_time = time.time()
 
-            # Clean old requests
+            # Get or initialize request list for this IP atomically.
+            # Using setdefault() prevents race conditions in concurrent requests.
+            # Note: In-place list modification ([:]=, append) does NOT reset TTL.
+            # IPs are evicted after RATE_LIMIT_TTL seconds from first request,
+            # which is fine since window-based cleanup handles active rate limiting.
+            request_times = _rate_limit_storage.setdefault(client_ip, [])
+
+            # Clean old requests within the rate limit window
             cutoff_time = current_time - window_seconds
-            _rate_limit_storage[client_ip] = [
-                req_time
-                for req_time in _rate_limit_storage[client_ip]
-                if req_time > cutoff_time
-            ]
+            request_times[:] = [t for t in request_times if t > cutoff_time]
 
             # Check rate limit
-            if len(_rate_limit_storage[client_ip]) >= max_requests:
+            if len(request_times) >= max_requests:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds} seconds",
                 )
 
             # Record this request
-            _rate_limit_storage[client_ip].append(current_time)
+            request_times.append(current_time)
 
             return await func(*args, **kwargs)
 

@@ -255,7 +255,9 @@ class InventoryMixin:
             "store_inventory_txn": total_days * len(self.stores) * 20,
             "marketing": total_days * 10,
             "supply_chain_disruption": total_days * 2,
-            "reorders": total_days * len(self.stores) * 2,  # Average 2 reorders per store per day
+            "reorders": total_days
+            * len(self.stores)
+            * 2,  # Average 2 reorders per store per day
             "online_orders": total_days
             * max(0, int(self.config.volume.online_orders_per_day)),
         }
