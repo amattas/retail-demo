@@ -159,54 +159,6 @@ The mixin pattern was chosen over alternatives (e.g., composition, separate clas
 
 Tests were updated to use the new import paths but remain functionally identical. No business logic was changed during refactoring.
 
-## Field Naming Conventions
-
-### Generator Layer (PascalCase)
-The fact generation mixins use **PascalCase** for field names in dictionary records:
-- `EventTS`, `TraceId`, `StoreID`, `CustomerID`, `ProductID`
-- `ReceiptId`, `OrderId`, `PromoCode`, `DiscountAmount`
-
-### Streaming Layer (snake_case)
-The streaming schemas (`streaming/schemas.py`) use **snake_case** for payload fields:
-- `event_ts`, `trace_id`, `store_id`, `customer_id`, `product_id`
-- `receipt_id`, `order_id`, `promo_code`, `discount_amount`
-
-### Database Layer (snake_case)
-The database models and KQL tables use **snake_case** for column names.
-
-### Automatic Field Mapping
-The `persistence_mixin.py` module handles automatic transformation between naming conventions:
-
-- **`_map_field_names_for_db()`**: Maps PascalCase (generator) → snake_case (database)
-- **`_build_outbox_rows_from_df()`**: Converts fact records to streaming event payloads
-
-The mapping is table-specific and documented in the `table_specific_mappings` dictionary (lines 233-383).
-
-### Example Field Mappings
-
-**Receipts Table:**
-```python
-"StoreID" → "store_id"
-"CustomerID" → "customer_id"
-"ReceiptId" → "receipt_id_ext"  # External linking key
-"TenderType" → "payment_method"
-"Tax" → "tax_amount"
-```
-
-**Promotions Table:**
-```python
-"ReceiptId" → "receipt_id_ext"
-"PromoCode" → "promo_code"
-"DiscountAmount" → "discount_amount"
-"DiscountType" → "discount_type"  # Values: "PERCENTAGE", "FIXED_AMOUNT", "BOGO"
-"ProductIds" → "product_ids"
-```
-
-### Important Notes
-- **TraceId** field is excluded during database persistence (not stored in fact tables)
-- External IDs (e.g., `receipt_id_ext`, `order_id_ext`) are used for cross-table linking
-- The mapping layer ensures data integrity between generation and persistence
-
 ## Migration Notes
 
 ### For Contributors
@@ -217,7 +169,6 @@ When adding new fact generation logic:
 2. Add methods to that mixin following existing patterns
 3. Methods should use `self.*` for accessing shared state
 4. Update tests if adding new public methods
-5. **Use PascalCase for generator field names**, snake_case mapping will be handled automatically
 
 ### For External Code
 

@@ -1015,7 +1015,7 @@ class EventFactory:
 
         discount_amount = round(self.rng.uniform(5.0, 25.0), 2)
         discount_cents = int(discount_amount * 100)
-        discount_type = "PERCENTAGE" if self.rng.random() < 0.7 else "FIXED_AMOUNT"
+        discount_type = "percentage" if self.rng.random() < 0.7 else "fixed"
         product_ids = [
             self.rng.choice(list(self.products.keys()))
             for _ in range(self.rng.randint(1, 3))

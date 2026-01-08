@@ -353,10 +353,9 @@ class FactDataGenerator(
             "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
-            # Estimated: ~60% of BLE pings result in zone changes
             "customer_zone_changes": total_days
             * len(self.stores)
-            * int(500 * 0.6),  # 60% of BLE pings (500 per store per day)
+            * 300,  # Estimated: ~60% of BLE pings result in zone changes
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,

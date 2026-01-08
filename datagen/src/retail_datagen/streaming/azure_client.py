@@ -175,7 +175,6 @@ class AzureEventHubClient:
         self._client: EventHubProducerClient | None = None
         self._is_connected = False
         self._event_buffer: list[EventEnvelope] = []
-        self._buffer_lock = asyncio.Lock()
         self._statistics = {
             "events_sent": 0,
             "events_failed": 0,
@@ -437,7 +436,7 @@ class AzureEventHubClient:
             logger.error(f"Unexpected error sending batch: {e}")
             raise
 
-    async def add_to_buffer(self, event: EventEnvelope) -> bool:
+    def add_to_buffer(self, event: EventEnvelope) -> bool:
         """
         Add event to internal buffer for batching.
 
@@ -447,10 +446,10 @@ class AzureEventHubClient:
         Returns:
             bool: True if buffer needs flushing (reached max size), False otherwise
         """
-        async with self._buffer_lock:
-            self._event_buffer.append(event)
-            # Check if buffer needs flushing
-            needs_flush = len(self._event_buffer) >= self.max_batch_size
+        self._event_buffer.append(event)
+
+        # Check if buffer needs flushing
+        needs_flush = len(self._event_buffer) >= self.max_batch_size
 
         # Auto-flush if buffer reaches max size and we're in an async context
         if needs_flush:
@@ -470,30 +469,26 @@ class AzureEventHubClient:
         Returns:
             bool: True if all events sent successfully, False otherwise
         """
-        async with self._buffer_lock:
-            if not self._event_buffer:
-                return True
+        if not self._event_buffer:
+            return True
 
-            events_to_send = self._event_buffer.copy()
-            self._event_buffer.clear()
+        events_to_send = self._event_buffer.copy()
+        self._event_buffer.clear()
 
         return await self.send_events(events_to_send)
 
-    async def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get client statistics and performance metrics.
 
         Returns:
             dict: Statistics about client performance
         """
-        async with self._buffer_lock:
-            buffer_size = len(self._event_buffer)
-
         stats = self._statistics.copy()
         stats.update(
             {
                 "is_connected": self._is_connected,
-                "buffer_size": buffer_size,
+                "buffer_size": len(self._event_buffer),
                 "circuit_breaker_state": (
                     self.circuit_breaker.state if self.circuit_breaker else "DISABLED"
                 ),
