@@ -172,6 +172,16 @@ class RealtimeConfig(BaseModel):
     enable_dead_letter_queue: bool = Field(
         default=True, description="Enable dead letter queue for failed events"
     )
+    circuit_breaker_failure_threshold: int = Field(
+        default=5,
+        gt=0,
+        description="Number of failures before circuit breaker opens",
+    )
+    circuit_breaker_recovery_timeout: int = Field(
+        default=60,
+        gt=0,
+        description="Seconds to wait before attempting to close an open circuit breaker",
+    )
 
     @field_validator("azure_connection_string", mode="before")
     @classmethod

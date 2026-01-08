@@ -87,6 +87,8 @@ class StreamingConfig:
     retry_attempts: int = 3
     backoff_multiplier: float = 2.0
     circuit_breaker_enabled: bool = True
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_recovery_timeout: int = 60
     monitoring_interval: int = 30  # seconds
     max_buffer_size: int = 10000
     enable_dead_letter_queue: bool = True
@@ -120,6 +122,15 @@ class StreamingConfig:
             streaming_config.retry_attempts = config.realtime.retry_attempts
         if hasattr(config.realtime, "backoff_multiplier"):
             streaming_config.backoff_multiplier = config.realtime.backoff_multiplier
+
+        # Circuit breaker fields have defaults in RealtimeConfig, so hasattr() is unnecessary
+        streaming_config.circuit_breaker_enabled = config.realtime.circuit_breaker_enabled
+        streaming_config.circuit_breaker_failure_threshold = (
+            config.realtime.circuit_breaker_failure_threshold
+        )
+        streaming_config.circuit_breaker_recovery_timeout = (
+            config.realtime.circuit_breaker_recovery_timeout
+        )
         if hasattr(config.realtime, "monitoring_interval"):
             streaming_config.monitoring_interval = config.realtime.monitoring_interval
 

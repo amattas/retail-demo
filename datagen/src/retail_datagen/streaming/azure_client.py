@@ -145,6 +145,8 @@ class AzureEventHubClient:
         retry_attempts: int = 3,
         backoff_multiplier: float = 2.0,
         circuit_breaker_enabled: bool = True,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_recovery_timeout: int = 60,
     ):
         """
         Initialize Azure Event Hub client.
@@ -157,6 +159,8 @@ class AzureEventHubClient:
             retry_attempts: Number of retry attempts on failures
             backoff_multiplier: Multiplier for exponential backoff
             circuit_breaker_enabled: Whether to use circuit breaker pattern
+            circuit_breaker_failure_threshold: Number of failures before circuit breaker opens
+            circuit_breaker_recovery_timeout: Seconds to wait before attempting to close circuit breaker
         """
         if not AZURE_AVAILABLE:
             logger.warning("Azure Event Hub SDK not available - using mock client")
@@ -180,7 +184,14 @@ class AzureEventHubClient:
         }
 
         # Circuit breaker for failure handling
-        self.circuit_breaker = CircuitBreaker() if circuit_breaker_enabled else None
+        self.circuit_breaker = (
+            CircuitBreaker(
+                failure_threshold=circuit_breaker_failure_threshold,
+                recovery_timeout=circuit_breaker_recovery_timeout,
+            )
+            if circuit_breaker_enabled
+            else None
+        )
 
         # Structured logger
         self.log = get_structured_logger(__name__)
