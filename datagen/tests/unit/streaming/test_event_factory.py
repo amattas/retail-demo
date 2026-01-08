@@ -998,6 +998,27 @@ class TestMarketingEventBehaviors:
         event = factory_with_active_receipt.generate_event(EventType.PROMOTION_APPLIED, test_timestamp)
         assert event.payload["discount_type"] in ["PERCENTAGE", "FIXED_AMOUNT", "BOGO"]
 
+    def test_promotion_discount_type_distribution(self, factory_with_active_receipt, test_timestamp):
+        """Test discount type distribution follows expected weights (70/25/5)."""
+        # Generate many events to verify distribution
+        discount_types = []
+        for _ in range(1000):
+            event = factory_with_active_receipt.generate_event(
+                EventType.PROMOTION_APPLIED, test_timestamp
+            )
+            discount_types.append(event.payload["discount_type"])
+
+        # Count occurrences
+        percentage_count = discount_types.count("PERCENTAGE")
+        fixed_count = discount_types.count("FIXED_AMOUNT")
+        bogo_count = discount_types.count("BOGO")
+
+        # Allow 15% variance from expected distribution (70%, 25%, 5%)
+        # Expected: PERCENTAGE ~700, FIXED_AMOUNT ~250, BOGO ~50
+        assert 550 < percentage_count < 850, f"PERCENTAGE count {percentage_count} outside expected range"
+        assert 100 < fixed_count < 400, f"FIXED_AMOUNT count {fixed_count} outside expected range"
+        assert bogo_count < 150, f"BOGO count {bogo_count} outside expected range"
+
 
 # ================================
 # TEST: Stockout and Reorder (Unique Behaviors)
