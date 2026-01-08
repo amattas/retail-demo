@@ -6,9 +6,10 @@ database persistence, verifying correct integration with existing
 fact tables and promotion engine.
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
+
+import pytest
 
 
 @pytest.fixture
@@ -184,14 +185,14 @@ class TestPromotionsIntegration:
         # Get promotions and their lines
         result = conn.execute(
             """
-            SELECT 
+            SELECT
                 p.receipt_id_ext,
                 p.promo_code,
                 p.product_count,
                 COUNT(pl.line_number) as line_count
             FROM fact_promotions p
-            LEFT JOIN fact_promo_lines pl 
-                ON p.receipt_id_ext = pl.receipt_id_ext 
+            LEFT JOIN fact_promo_lines pl
+                ON p.receipt_id_ext = pl.receipt_id_ext
                 AND p.promo_code = pl.promo_code
             GROUP BY p.receipt_id_ext, p.promo_code, p.product_count
             LIMIT 10
@@ -224,7 +225,7 @@ class TestPromotionsIntegration:
         # Verify: All receipts with promotions have discount_amount > 0
         result = conn.execute(
             """
-            SELECT 
+            SELECT
                 r.receipt_id_ext,
                 r.discount_amount,
                 COUNT(p.promo_code) as promo_count

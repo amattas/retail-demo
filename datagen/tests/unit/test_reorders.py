@@ -7,7 +7,6 @@ Tests the fact_reorders table generation including:
 - Integration with truck shipment generation
 """
 
-import pytest
 from retail_datagen.generators.fact_generators import FactDataGenerator
 
 
