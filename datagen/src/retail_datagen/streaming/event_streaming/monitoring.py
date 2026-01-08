@@ -290,14 +290,7 @@ class MonitoringManager:
 
             # Add Azure client statistics if available
             if azure_client:
-                # Use duck typing: if it has get_statistics, call it
-                if hasattr(azure_client, "get_statistics") and callable(
-                    azure_client.get_statistics
-                ):
-                    azure_stats = await azure_client.get_statistics()
-                else:
-                    # Treat as dict-like (for backward compatibility)
-                    azure_stats = azure_client
+                azure_stats = await azure_client.get_statistics()
                 stats.update({"azure_client": azure_stats})
 
             return stats
