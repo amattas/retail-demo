@@ -121,6 +121,10 @@ _event_streamer: EventStreamer | None = None
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
+# Task cleanup configuration
+TASK_CLEANUP_MAX_AGE_HOURS = int(os.getenv("TASK_CLEANUP_MAX_AGE_HOURS", "24"))
+TASK_CLEANUP_THRESHOLD = int(os.getenv("TASK_CLEANUP_THRESHOLD", "1000"))
+
 
 # Rate limiting storage configuration
 # These can be tuned via environment variables for different deployment scenarios
@@ -241,9 +245,44 @@ async def get_event_streamer(
 # ================================
 
 
+def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
+    """
+    Remove completed/failed tasks older than max_age_hours.
+
+    Args:
+        max_age_hours: Maximum age in hours for completed/failed tasks
+
+    Returns:
+        Number of tasks cleaned up
+    """
+    global _background_tasks, _task_status
+
+    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+    cleaned_count = 0
+
+    for task_id in list(_task_status.keys()):
+        status = _task_status.get(task_id)
+        if status and status.completed_at and status.completed_at < cutoff:
+            _task_status.pop(task_id, None)
+            _background_tasks.pop(task_id, None)
+            cleaned_count += 1
+
+    if cleaned_count > 0:
+        logger.info(
+            f"Cleaned up {cleaned_count} old background tasks",
+            extra={"cleaned_count": cleaned_count, "cutoff_hours": max_age_hours},
+        )
+
+    return cleaned_count
+
+
 def create_background_task(task_id: str, coro, description: str = "") -> str:
     """Create and track a background task."""
     global _background_tasks, _task_status
+
+    # Cleanup old tasks if threshold exceeded
+    if len(_task_status) >= TASK_CLEANUP_THRESHOLD:
+        _cleanup_old_tasks()
 
     if task_id in _background_tasks and not _background_tasks[task_id].done():
         raise HTTPException(
@@ -317,6 +356,24 @@ def cancel_task(task_id: str) -> bool:
         return True
 
     return False
+
+
+def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
+    """
+    Manually trigger cleanup of old background tasks.
+
+    This is a public wrapper around _cleanup_old_tasks that can be called
+    from APIs or scheduled jobs.
+
+    Args:
+        max_age_hours: Maximum age in hours for completed/failed tasks.
+                      If None, uses TASK_CLEANUP_MAX_AGE_HOURS default.
+
+    Returns:
+        Number of tasks cleaned up
+    """
+    age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
+    return _cleanup_old_tasks(max_age_hours=age)
 
 
 def update_task_progress(
