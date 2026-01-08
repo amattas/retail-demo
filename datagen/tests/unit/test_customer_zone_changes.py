@@ -2,8 +2,8 @@
 Unit tests for customer zone change generation.
 """
 
-import pytest
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from retail_datagen.generators.fact_generators.customer_zone_changes_mixin import (
     CustomerZoneChangesMixin,
 )
@@ -30,7 +30,7 @@ def test_generate_customer_zone_changes_empty():
 def test_generate_customer_zone_changes_single_zone():
     """Test zone change generation with pings in same zone (no changes)."""
     generator = MockGenerator()
-    
+
     ble_pings = [
         {
             "StoreID": 1,
@@ -45,7 +45,7 @@ def test_generate_customer_zone_changes_single_zone():
             "Zone": "ENTRANCE",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
     # Should have no zone changes since customer stayed in same zone
     assert zone_changes == []
@@ -54,7 +54,7 @@ def test_generate_customer_zone_changes_single_zone():
 def test_generate_customer_zone_changes_multiple_zones():
     """Test zone change generation with multiple zone transitions."""
     generator = MockGenerator()
-    
+
     ble_pings = [
         {
             "StoreID": 1,
@@ -75,19 +75,19 @@ def test_generate_customer_zone_changes_multiple_zones():
             "Zone": "CHECKOUT",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
-    
+
     # Should have 2 zone changes
     assert len(zone_changes) == 2
-    
+
     # First zone change: ENTRANCE -> GROCERY
     assert zone_changes[0]["StoreID"] == 1
     assert zone_changes[0]["CustomerBLEId"] == "BLE-001"
     assert zone_changes[0]["FromZone"] == "ENTRANCE"
     assert zone_changes[0]["ToZone"] == "GROCERY"
     assert zone_changes[0]["EventTS"] == datetime(2024, 1, 1, 10, 5, 0, tzinfo=UTC)
-    
+
     # Second zone change: GROCERY -> CHECKOUT
     assert zone_changes[1]["StoreID"] == 1
     assert zone_changes[1]["CustomerBLEId"] == "BLE-001"
@@ -99,7 +99,7 @@ def test_generate_customer_zone_changes_multiple_zones():
 def test_generate_customer_zone_changes_multiple_customers():
     """Test zone change generation with multiple customers."""
     generator = MockGenerator()
-    
+
     ble_pings = [
         # Customer 1
         {
@@ -128,12 +128,12 @@ def test_generate_customer_zone_changes_multiple_customers():
             "Zone": "GROCERY",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
-    
+
     # Should have 2 zone changes (one per customer)
     assert len(zone_changes) == 2
-    
+
     # Verify both customers have zone changes
     customer_ids = {zc["CustomerBLEId"] for zc in zone_changes}
     assert customer_ids == {"BLE-001", "BLE-002"}
@@ -142,7 +142,7 @@ def test_generate_customer_zone_changes_multiple_customers():
 def test_generate_customer_zone_changes_out_of_order_pings():
     """Test zone change generation with out-of-order BLE pings."""
     generator = MockGenerator()
-    
+
     # Pings are intentionally out of chronological order
     ble_pings = [
         {
@@ -164,9 +164,9 @@ def test_generate_customer_zone_changes_out_of_order_pings():
             "Zone": "GROCERY",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
-    
+
     # Should have 2 zone changes in correct chronological order
     assert len(zone_changes) == 2
     assert zone_changes[0]["FromZone"] == "ENTRANCE"
@@ -178,7 +178,7 @@ def test_generate_customer_zone_changes_out_of_order_pings():
 def test_generate_customer_zone_changes_missing_fields():
     """Test zone change generation with missing required fields."""
     generator = MockGenerator()
-    
+
     # Ping with missing StoreID
     ble_pings = [
         {
@@ -187,7 +187,7 @@ def test_generate_customer_zone_changes_missing_fields():
             "Zone": "ENTRANCE",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
     # Should skip pings with missing required fields
     assert zone_changes == []
@@ -196,7 +196,7 @@ def test_generate_customer_zone_changes_missing_fields():
 def test_generate_customer_zone_changes_back_and_forth():
     """Test zone change generation with customer moving back and forth."""
     generator = MockGenerator()
-    
+
     ble_pings = [
         {
             "StoreID": 1,
@@ -223,9 +223,9 @@ def test_generate_customer_zone_changes_back_and_forth():
             "Zone": "CHECKOUT",
         },
     ]
-    
+
     zone_changes = generator._generate_customer_zone_changes(ble_pings)
-    
+
     # Should have 3 zone changes
     assert len(zone_changes) == 3
     assert zone_changes[0]["FromZone"] == "ENTRANCE"

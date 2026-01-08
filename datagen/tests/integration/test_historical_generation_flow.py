@@ -120,7 +120,12 @@ def temp_master_data(temp_data_dirs):
         )
         writer.writeheader()
         writer.writerow(
-            {"ID": 1, "DCNumber": "DC001", "Address": "789 Industrial Dr", "GeographyID": 1}
+            {
+                "ID": 1,
+                "DCNumber": "DC001",
+                "Address": "789 Industrial Dr",
+                "GeographyID": 1,
+            }
         )
 
     # Create customers.csv
@@ -160,7 +165,16 @@ def temp_master_data(temp_data_dirs):
     products_file = master_dir / "products_master.csv"
     with open(products_file, "w", newline="") as f:
         writer = csv.DictWriter(
-            f, fieldnames=["ID", "ProductName", "Brand", "Company", "Cost", "MSRP", "SalePrice"]
+            f,
+            fieldnames=[
+                "ID",
+                "ProductName",
+                "Brand",
+                "Company",
+                "Cost",
+                "MSRP",
+                "SalePrice",
+            ],
         )
         writer.writeheader()
         for i in range(1, 6):
@@ -197,8 +211,12 @@ class TestHistoricalGenerationStateTransitions:
             assert tracker.get_progress(table) == 0.0
 
         # Get initial state lists
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         assert len(not_started) == len(FACT_TABLES)
@@ -207,16 +225,22 @@ class TestHistoricalGenerationStateTransitions:
 
         # Mark first table as started
         tracker.mark_table_started(FACT_TABLES[0])
-        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        assert (
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        )
 
         # Update progress (should NOT change state)
         tracker.update_progress(FACT_TABLES[0], 0.5)
-        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        assert (
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        )
         assert tracker.get_progress(FACT_TABLES[0]) == 0.5
 
         # Even at 100% progress, state should remain in_progress
         tracker.update_progress(FACT_TABLES[0], 1.0)
-        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        assert (
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+        )
         assert tracker.get_progress(FACT_TABLES[0]) == 1.0
 
         # Mark generation complete (transitions all in_progress -> completed)
@@ -225,7 +249,9 @@ class TestHistoricalGenerationStateTransitions:
 
         # Check state lists after completion
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         assert FACT_TABLES[0] in completed
         assert len(in_progress) == 0
 
@@ -267,7 +293,9 @@ class TestHistoricalGenerationStateTransitions:
         tracker.mark_table_started(FACT_TABLES[1])
 
         remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         # Lists should be mutually exclusive
@@ -282,7 +310,9 @@ class TestHistoricalGenerationStateTransitions:
         tracker.mark_generation_complete()
 
         remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         # After completion, in_progress should be empty
@@ -500,8 +530,12 @@ class TestMultipleGenerationRuns:
         tracker.reset()
 
         # Verify reset to initial state
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         assert len(not_started) == 3
@@ -529,7 +563,9 @@ class TestMultipleGenerationRuns:
 
         # Verify first table completed
         assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_COMPLETED
-        assert tracker.get_state(FACT_TABLES[1]) == TableProgressTracker.STATE_NOT_STARTED
+        assert (
+            tracker.get_state(FACT_TABLES[1]) == TableProgressTracker.STATE_NOT_STARTED
+        )
 
         # Incremental run: reset and continue
         tracker.reset()
@@ -573,7 +609,9 @@ class TestStateTransitionEdgeCases:
         tracker = TableProgressTracker([])
 
         # Should handle empty list gracefully
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
         assert len(not_started) == 0
 
         tracker.reset()  # Should not error
@@ -640,7 +678,9 @@ class TestUIStateRendering:
 
         # CRITICAL: At this point, UI should NOT show green tiles
         # Because tables are still in_progress state
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         assert len(in_progress) == 3
@@ -649,7 +689,9 @@ class TestUIStateRendering:
         # Only after mark_generation_complete should tiles turn green
         tracker.mark_generation_complete()
 
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         assert len(in_progress) == 0
@@ -668,9 +710,15 @@ class TestUIStateRendering:
 
         # Simulate 10 polls during generation
         for i in range(10):
-            in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
-            completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
-            poll_results.append({"in_progress": len(in_progress), "completed": len(completed)})
+            in_progress = tracker.get_tables_by_state(
+                TableProgressTracker.STATE_IN_PROGRESS
+            )
+            completed = tracker.get_tables_by_state(
+                TableProgressTracker.STATE_COMPLETED
+            )
+            poll_results.append(
+                {"in_progress": len(in_progress), "completed": len(completed)}
+            )
 
             # Update progress (simulating work)
             for table in FACT_TABLES[:5]:
@@ -685,7 +733,9 @@ class TestUIStateRendering:
         tracker.mark_generation_complete()
 
         # Final poll
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
 
         assert len(in_progress) == 0
