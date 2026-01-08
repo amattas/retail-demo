@@ -125,9 +125,9 @@ class FactDataGenerator(
         "reorders",
     ]
 
-    # Truck unload duration constants (in minutes)
-    MIN_UNLOAD_DURATION_MINUTES = 30  # Minimum realistic unload time
-    DEFAULT_UNLOAD_DURATION_MINUTES = 60  # Default when ETA not available
+    # Note: Truck unload duration constants (MIN_UNLOAD_DURATION_MINUTES,
+    # DEFAULT_UNLOAD_DURATION_MINUTES) are defined in LogisticsMixin and
+    # inherited by this class. Do not duplicate them here.
 
     def __init__(
         self,
