@@ -89,14 +89,26 @@ if _SRC.exists() and str(_SRC) not in sys.path:
 
 @pytest.fixture(scope="session", autouse=True)
 def set_test_mode():
-    """Automatically set test mode for all tests to relax validation."""
+    """Automatically set test mode for all tests to relax validation.
+
+    This sets both:
+    - RETAIL_DATAGEN_TEST_MODE: Relaxes config validation for testing
+    - RETAIL_DATAGEN_DEMO_MODE: Allows realistic names in demo data
+
+    The demo mode setting enables realistic names by clearing name blocklists,
+    which is intentional for demo data generation. Brand blocklists remain
+    active regardless of this setting.
+    """
     # Set environment variable to enable test mode
     os.environ["RETAIL_DATAGEN_TEST_MODE"] = "true"
+    # Set demo mode to allow realistic names in tests
+    os.environ["RETAIL_DATAGEN_DEMO_MODE"] = "true"
 
     yield
 
     # Cleanup after all tests
     os.environ.pop("RETAIL_DATAGEN_TEST_MODE", None)
+    os.environ.pop("RETAIL_DATAGEN_DEMO_MODE", None)
 
 
 @pytest.fixture
