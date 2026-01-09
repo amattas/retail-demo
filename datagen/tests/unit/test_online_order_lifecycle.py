@@ -220,7 +220,12 @@ def test_order_lifecycle_statuses(
         # Each line should have fulfillment status (DELIVERED, SHIPPED, etc.)
         for line in lines:
             assert "FulfillmentStatus" in line, "Line should have FulfillmentStatus"
-            assert line["FulfillmentStatus"] in {"DELIVERED", "SHIPPED", "PICKED", "NEW"}
+            assert line["FulfillmentStatus"] in {
+                "DELIVERED",
+                "SHIPPED",
+                "PICKED",
+                "NEW",
+            }
 
 
 def test_financial_calculations(
@@ -265,9 +270,9 @@ def test_financial_calculations(
 
         calculated_total = subtotal + tax
 
-        assert abs(total - calculated_total) <= Decimal(
-            "0.01"
-        ), f"Total should equal Subtotal + Tax for order {order['OrderId']}"
+        assert abs(total - calculated_total) <= Decimal("0.01"), (
+            f"Total should equal Subtotal + Tax for order {order['OrderId']}"
+        )
 
 
 def test_tender_type_distribution(
@@ -311,14 +316,17 @@ def test_tender_type_distribution(
     tender_types = {order["TenderType"] for order in orders}
 
     # Should include PAYPAL and OTHER (new tender types)
-    assert "PAYPAL" in tender_types or "OTHER" in tender_types or "CREDIT_CARD" in tender_types, \
-        "Should use online-appropriate tender types"
+    assert (
+        "PAYPAL" in tender_types
+        or "OTHER" in tender_types
+        or "CREDIT_CARD" in tender_types
+    ), "Should use online-appropriate tender types"
 
     # All tender types should be valid
     valid_tenders = {t.value for t in TenderType}
-    assert tender_types.issubset(
-        valid_tenders
-    ), f"All tender types should be valid: {tender_types - valid_tenders}"
+    assert tender_types.issubset(valid_tenders), (
+        f"All tender types should be valid: {tender_types - valid_tenders}"
+    )
 
 
 def test_timing_progression(
@@ -376,14 +384,17 @@ def test_timing_progression(
 
             # Verify progression: created -> picked -> shipped -> delivered
             if picked_ts:
-                assert created_ts < picked_ts, \
+                assert created_ts < picked_ts, (
                     f"picked should be after created for {order_id}"
+                )
             if picked_ts and shipped_ts:
-                assert picked_ts < shipped_ts, \
+                assert picked_ts < shipped_ts, (
                     f"shipped should be after picked for {order_id}"
+                )
             if shipped_ts and delivered_ts:
-                assert shipped_ts < delivered_ts, \
+                assert shipped_ts < delivered_ts, (
                     f"delivered should be after shipped for {order_id}"
+                )
 
 
 def test_inventory_transactions_at_picked_stage(
@@ -421,10 +432,10 @@ def test_inventory_transactions_at_picked_stage(
     )
 
     # Should have inventory transactions
-    assert len(store_txn) > 0 or len(dc_txn) > 0, \
+    assert len(store_txn) > 0 or len(dc_txn) > 0, (
         "Should generate inventory transactions"
+    )
 
     # All transactions should have negative qty delta (items leaving inventory)
     for txn in store_txn + dc_txn:
-        assert txn["QtyDelta"] < 0, \
-            "Inventory transactions should decrease inventory"
+        assert txn["QtyDelta"] < 0, "Inventory transactions should decrease inventory"

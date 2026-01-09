@@ -31,6 +31,7 @@ class TestExportServiceInit:
         service = ExportService(base_dir=tmp_path)
 
         from retail_datagen.services.file_manager import ExportFileManager
+
         assert isinstance(service.file_manager, ExportFileManager)
 
 
@@ -42,6 +43,7 @@ class TestExportServiceGetWriter:
         writer = service._get_writer("parquet")
 
         from retail_datagen.services.writers import ParquetWriter
+
         assert isinstance(writer, ParquetWriter)
         assert writer.engine == "pyarrow"
         assert writer.compression == "snappy"
@@ -66,21 +68,27 @@ class TestExportMasterTables:
     def sample_master_data(self):
         """Create sample master table data."""
         return {
-            "dim_geographies": pd.DataFrame({
-                "ID": [1, 2, 3],
-                "City": ["Springfield", "Riverside", "Franklin"],
-                "State": ["IL", "CA", "TN"],
-            }),
-            "dim_stores": pd.DataFrame({
-                "ID": [1, 2],
-                "StoreNumber": ["ST001", "ST002"],
-                "Address": ["123 Main St", "456 Oak Ave"],
-            }),
-            "dim_customers": pd.DataFrame({
-                "ID": [1, 2, 3, 4],
-                "FirstName": ["Alex", "Blake", "Casey", "Drew"],
-                "LastName": ["Anderson", "Brightwell", "Clearwater", "Dalewood"],
-            }),
+            "dim_geographies": pd.DataFrame(
+                {
+                    "ID": [1, 2, 3],
+                    "City": ["Springfield", "Riverside", "Franklin"],
+                    "State": ["IL", "CA", "TN"],
+                }
+            ),
+            "dim_stores": pd.DataFrame(
+                {
+                    "ID": [1, 2],
+                    "StoreNumber": ["ST001", "ST002"],
+                    "Address": ["123 Main St", "456 Oak Ave"],
+                }
+            ),
+            "dim_customers": pd.DataFrame(
+                {
+                    "ID": [1, 2, 3, 4],
+                    "FirstName": ["Alex", "Blake", "Casey", "Drew"],
+                    "LastName": ["Anderson", "Brightwell", "Clearwater", "Dalewood"],
+                }
+            ),
         }
 
     def test_export_master_tables_parquet_success(
@@ -89,13 +97,14 @@ class TestExportMasterTables:
         """Should export all master tables to Parquet format successfully."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = sample_master_data
 
-            result = asyncio.run(service.export_master_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_master_tables(mock_session, format="parquet")
+            )
 
         # Verify all tables were exported
         assert len(result) == 3
@@ -119,14 +128,16 @@ class TestExportMasterTables:
         def progress_callback(message: str, current: int, total: int):
             progress_calls.append((message, current, total))
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = sample_master_data
 
-            asyncio.run(service.export_master_tables(
-                mock_session,
-                format="parquet",
-                progress_callback=progress_callback
-            ))
+            asyncio.run(
+                service.export_master_tables(
+                    mock_session, format="parquet", progress_callback=progress_callback
+                )
+            )
 
         # Verify progress callback was called for each table
         assert len(progress_calls) == 3
@@ -135,27 +146,28 @@ class TestExportMasterTables:
         assert progress_calls[1][1] == 2  # Second table
         assert progress_calls[2][1] == 3  # Third table
 
-    def test_export_master_tables_skips_empty_tables(
-        self, tmp_path, mock_session
-    ):
+    def test_export_master_tables_skips_empty_tables(self, tmp_path, mock_session):
         """Should skip empty tables without error."""
         service = ExportService(base_dir=tmp_path)
 
         master_data = {
-            "dim_stores": pd.DataFrame({
-                "ID": [1, 2],
-                "StoreNumber": ["ST001", "ST002"],
-            }),
+            "dim_stores": pd.DataFrame(
+                {
+                    "ID": [1, 2],
+                    "StoreNumber": ["ST001", "ST002"],
+                }
+            ),
             "dim_empty": pd.DataFrame(),  # Empty table
         }
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = master_data
 
-            result = asyncio.run(service.export_master_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_master_tables(mock_session, format="parquet")
+            )
 
         # Only non-empty table should be in result
         assert len(result) == 1
@@ -168,11 +180,13 @@ class TestExportMasterTables:
         """Should cleanup partial exports on failure."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = sample_master_data
 
             # Mock writer to fail on second table
-            with patch.object(service, '_get_writer') as mock_get_writer:
+            with patch.object(service, "_get_writer") as mock_get_writer:
                 mock_writer = Mock()
                 mock_writer.write.side_effect = [
                     None,  # First table succeeds
@@ -181,10 +195,9 @@ class TestExportMasterTables:
                 mock_get_writer.return_value = mock_writer
 
                 with pytest.raises(IOError, match="Disk full"):
-                    asyncio.run(service.export_master_tables(
-                        mock_session,
-                        format="parquet"
-                    ))
+                    asyncio.run(
+                        service.export_master_tables(mock_session, format="parquet")
+                    )
 
         # Verify cleanup was attempted
         # File manager should have no tracked files after cleanup
@@ -196,15 +209,20 @@ class TestExportMasterTables:
         """Should track files during export for potential rollback."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = sample_master_data
 
             # Mock file manager to spy on tracking calls
-            with patch.object(service.file_manager, 'track_file', wraps=service.file_manager.track_file) as mock_track:
-                asyncio.run(service.export_master_tables(
-                    mock_session,
-                    format="parquet"
-                ))
+            with patch.object(
+                service.file_manager,
+                "track_file",
+                wraps=service.file_manager.track_file,
+            ) as mock_track:
+                asyncio.run(
+                    service.export_master_tables(mock_session, format="parquet")
+                )
 
                 # Verify track_file was called for each table
                 assert mock_track.call_count == 3
@@ -215,13 +233,12 @@ class TestExportMasterTables:
         """Should reset file tracking on successful export."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = sample_master_data
 
-            asyncio.run(service.export_master_tables(
-                mock_session,
-                format="parquet"
-            ))
+            asyncio.run(service.export_master_tables(mock_session, format="parquet"))
 
         # File tracking should be reset after success
         assert service.file_manager.get_tracked_file_count() == 0
@@ -239,26 +256,34 @@ class TestExportFactTables:
     def sample_fact_data(self):
         """Create sample fact table data with event_ts column."""
         return {
-            "fact_receipts": pd.DataFrame({
-                "TraceId": ["trace1", "trace2", "trace3"],
-                "event_ts": pd.to_datetime([
-                    "2024-01-01 10:00:00",
-                    "2024-01-01 14:30:00",
-                    "2024-01-02 09:15:00",
-                ]),
-                "StoreID": [1, 2, 1],
-                "Total": [25.99, 49.98, 35.50],
-            }),
-            "fact_receipt_lines": pd.DataFrame({
-                "TraceId": ["trace1", "trace2"],
-                "event_ts": pd.to_datetime([
-                    "2024-01-01 10:00:00",
-                    "2024-01-02 09:15:00",
-                ]),
-                "ReceiptId": ["RCP001", "RCP002"],
-                "ProductID": [1, 2],
-                "Qty": [2, 1],
-            }),
+            "fact_receipts": pd.DataFrame(
+                {
+                    "TraceId": ["trace1", "trace2", "trace3"],
+                    "event_ts": pd.to_datetime(
+                        [
+                            "2024-01-01 10:00:00",
+                            "2024-01-01 14:30:00",
+                            "2024-01-02 09:15:00",
+                        ]
+                    ),
+                    "StoreID": [1, 2, 1],
+                    "Total": [25.99, 49.98, 35.50],
+                }
+            ),
+            "fact_receipt_lines": pd.DataFrame(
+                {
+                    "TraceId": ["trace1", "trace2"],
+                    "event_ts": pd.to_datetime(
+                        [
+                            "2024-01-01 10:00:00",
+                            "2024-01-02 09:15:00",
+                        ]
+                    ),
+                    "ReceiptId": ["RCP001", "RCP002"],
+                    "ProductID": [1, 2],
+                    "Qty": [2, 1],
+                }
+            ),
         }
 
     def test_export_fact_tables_parquet_success(
@@ -267,13 +292,14 @@ class TestExportFactTables:
         """Should export fact tables to monthly Parquet files."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = sample_fact_data
 
-            result = asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_fact_tables(mock_session, format="parquet")
+            )
 
         # Verify monthly grouping: sample data has only January dates, so one file per table
         for files in result.values():
@@ -288,15 +314,19 @@ class TestExportFactTables:
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = sample_fact_data
 
-            asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet",
-                start_date=start_date,
-                end_date=end_date
-            ))
+            asyncio.run(
+                service.export_fact_tables(
+                    mock_session,
+                    format="parquet",
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
 
             # Verify date filters were passed to reader
             mock_read.assert_called_once_with(start_date, end_date)
@@ -311,95 +341,100 @@ class TestExportFactTables:
         def progress_callback(message: str, current: int, total: int):
             progress_calls.append((message, current, total))
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = sample_fact_data
 
-            asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet",
-                progress_callback=progress_callback
-            ))
+            asyncio.run(
+                service.export_fact_tables(
+                    mock_session, format="parquet", progress_callback=progress_callback
+                )
+            )
 
         # Verify progress callback was called for each table
         assert len(progress_calls) == 2
         assert all(total == 2 for _, _, total in progress_calls)
 
-    def test_export_fact_tables_skips_empty_tables(
-        self, tmp_path, mock_session
-    ):
+    def test_export_fact_tables_skips_empty_tables(self, tmp_path, mock_session):
         """Should skip empty tables and return empty list."""
         service = ExportService(base_dir=tmp_path)
 
         fact_data = {
-            "fact_receipts": pd.DataFrame({
-                "TraceId": ["trace1"],
-                "event_ts": pd.to_datetime(["2024-01-01 10:00:00"]),
-            }),
+            "fact_receipts": pd.DataFrame(
+                {
+                    "TraceId": ["trace1"],
+                    "event_ts": pd.to_datetime(["2024-01-01 10:00:00"]),
+                }
+            ),
             "fact_empty": pd.DataFrame(),  # Empty table
         }
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = fact_data
 
-            result = asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_fact_tables(mock_session, format="parquet")
+            )
 
         # Empty table should have empty list
         assert "fact_empty" in result
         assert result["fact_empty"] == []
 
-    def test_export_fact_tables_missing_event_ts_column(
-        self, tmp_path, mock_session
-    ):
+    def test_export_fact_tables_missing_event_ts_column(self, tmp_path, mock_session):
         """Should raise ValueError if event_ts column is missing."""
         service = ExportService(base_dir=tmp_path)
 
         fact_data = {
-            "fact_receipts": pd.DataFrame({
-                "TraceId": ["trace1"],
-                "StoreID": [1],
-                # Missing event_ts column
-            }),
+            "fact_receipts": pd.DataFrame(
+                {
+                    "TraceId": ["trace1"],
+                    "StoreID": [1],
+                    # Missing event_ts column
+                }
+            ),
         }
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = fact_data
 
             with pytest.raises(ValueError, match="Cannot determine timestamp column"):
-                asyncio.run(service.export_fact_tables(
-                    mock_session,
-                    format="parquet"
-                ))
+                asyncio.run(service.export_fact_tables(mock_session, format="parquet"))
 
-    def test_export_fact_tables_partitions_by_date(
-        self, tmp_path, mock_session
-    ):
+    def test_export_fact_tables_partitions_by_date(self, tmp_path, mock_session):
         """Should create separate files for each date partition."""
         service = ExportService(base_dir=tmp_path)
 
         # Data spanning 3 dates
         fact_data = {
-            "fact_receipts": pd.DataFrame({
-                "TraceId": ["t1", "t2", "t3", "t4"],
-                "event_ts": pd.to_datetime([
-                    "2024-01-01 10:00:00",
-                    "2024-01-01 14:00:00",
-                    "2024-01-02 09:00:00",
-                    "2024-01-03 11:00:00",
-                ]),
-                "StoreID": [1, 2, 1, 2],
-            }),
+            "fact_receipts": pd.DataFrame(
+                {
+                    "TraceId": ["t1", "t2", "t3", "t4"],
+                    "event_ts": pd.to_datetime(
+                        [
+                            "2024-01-01 10:00:00",
+                            "2024-01-01 14:00:00",
+                            "2024-01-02 09:00:00",
+                            "2024-01-03 11:00:00",
+                        ]
+                    ),
+                    "StoreID": [1, 2, 1, 2],
+                }
+            ),
         }
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = fact_data
 
-            result = asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_fact_tables(mock_session, format="parquet")
+            )
 
         # Monthly Parquet grouping: single file for the month
         files = result["fact_receipts"]
@@ -412,20 +447,21 @@ class TestExportFactTables:
         """Should cleanup partial exports on failure."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = sample_fact_data
 
             # Mock writer to fail during processing
-            with patch.object(service, '_get_writer') as mock_get_writer:
+            with patch.object(service, "_get_writer") as mock_get_writer:
                 mock_writer = Mock()
                 mock_writer.write.side_effect = OSError("Write failed")
                 mock_get_writer.return_value = mock_writer
 
                 with pytest.raises(IOError):
-                    asyncio.run(service.export_fact_tables(
-                        mock_session,
-                        format="parquet"
-                    ))
+                    asyncio.run(
+                        service.export_fact_tables(mock_session, format="parquet")
+                    )
 
         # Verify cleanup was called
         assert service.file_manager.get_tracked_file_count() == 0
@@ -442,13 +478,12 @@ class TestExportFactTables:
         """Should reset file tracking on successful export."""
         service = ExportService(base_dir=tmp_path)
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_fact_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_fact_tables"
+        ) as mock_read:
             mock_read.return_value = sample_fact_data
 
-            asyncio.run(service.export_fact_tables(
-                mock_session,
-                format="parquet"
-            ))
+            asyncio.run(service.export_fact_tables(mock_session, format="parquet"))
 
         # File tracking should be reset after success
         assert service.file_manager.get_tracked_file_count() == 0
@@ -463,19 +498,22 @@ class TestExportServiceIntegration:
         mock_session = AsyncMock()
 
         master_data = {
-            "dim_products": pd.DataFrame({
-                "ID": [1, 2, 3],
-                "ProductName": ["Widget", "Gadget", "Tool"],
-            }),
+            "dim_products": pd.DataFrame(
+                {
+                    "ID": [1, 2, 3],
+                    "ProductName": ["Widget", "Gadget", "Tool"],
+                }
+            ),
         }
 
-        with patch('retail_datagen.services.duckdb_reader.read_all_master_tables') as mock_read:
+        with patch(
+            "retail_datagen.services.duckdb_reader.read_all_master_tables"
+        ) as mock_read:
             mock_read.return_value = master_data
 
-            result = asyncio.run(service.export_master_tables(
-                mock_session,
-                format="parquet"
-            ))
+            result = asyncio.run(
+                service.export_master_tables(mock_session, format="parquet")
+            )
 
         # Verify end-to-end: file exists and has correct content
         products_file = result["dim_products"]

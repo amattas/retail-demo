@@ -46,6 +46,7 @@ async def main():
         return
 
     async with get_master_session() as session:
+
         def progress_callback(table: str, loaded: int, total: int):
             if total > 0:
                 pct = (loaded / total) * 100
@@ -101,7 +102,9 @@ async def main():
     print("\nDatabases created:")
     print("  - data/db/master.db (dimension tables)")
     print("  - data/db/facts.db (fact tables)")
-    print("\nYou can now use SQLite-based operations for data generation and streaming.")
+    print(
+        "\nYou can now use SQLite-based operations for data generation and streaming."
+    )
 
 
 if __name__ == "__main__":

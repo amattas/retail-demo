@@ -41,6 +41,7 @@ from unittest.mock import MagicMock
 # Create mock prometheus_client module
 mock_prometheus = MagicMock()
 
+
 def _create_mock_metric(*args, **kwargs):
     """Create a mock metric with all necessary methods."""
     mock = MagicMock()
@@ -49,10 +50,13 @@ def _create_mock_metric(*args, **kwargs):
     mock.dec = MagicMock()
     mock.set = MagicMock()
     mock.observe = MagicMock()
-    mock.time = MagicMock(return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock()))
+    mock.time = MagicMock(
+        return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+    )
     # Add _name attribute for compatibility
     mock._name = args[0] if args else "mock_metric"
     return mock
+
 
 mock_prometheus.Counter = MagicMock(side_effect=_create_mock_metric)
 mock_prometheus.Gauge = MagicMock(side_effect=_create_mock_metric)
@@ -62,7 +66,7 @@ mock_prometheus.REGISTRY = MagicMock()
 mock_prometheus.REGISTRY._collector_to_names = {}
 
 # Install mock before any other imports
-sys.modules['prometheus_client'] = mock_prometheus
+sys.modules["prometheus_client"] = mock_prometheus
 
 # Now safe to import other modules
 import json
@@ -922,11 +926,13 @@ def valid_connection_string() -> str:
 @pytest.fixture
 def mock_event_data_class():
     """Mock Azure EventData class."""
+
     class MockEventData:
         def __init__(self, body):
             self.body = body
             self.partition_key = None
             self.properties = {}
+
     return MockEventData
 
 
@@ -953,12 +959,15 @@ def mock_event_hub_producer_client():
 @pytest.fixture
 def mock_azure_exceptions():
     """Mock Azure exception classes."""
+
     class MockEventHubError(Exception):
         """Mock EventHubError exception."""
+
         pass
 
     class MockAzureError(Exception):
         """Mock AzureError exception."""
+
         pass
 
     return {
@@ -969,9 +978,7 @@ def mock_azure_exceptions():
 
 @pytest.fixture
 def mock_azure_sdk_complete(
-    mock_event_hub_producer_client,
-    mock_event_data_class,
-    mock_azure_exceptions
+    mock_event_hub_producer_client, mock_event_data_class, mock_azure_exceptions
 ):
     """Complete Azure SDK mock for comprehensive testing."""
     return {

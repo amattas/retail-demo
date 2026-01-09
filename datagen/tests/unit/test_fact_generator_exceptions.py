@@ -25,14 +25,17 @@ def mock_config():
 def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
     """Test that FactDataGenerator handles DuckDB initialization failure gracefully."""
     # Mock get_duckdb_conn to raise an exception
-    with patch('retail_datagen.db.duckdb_engine.get_duckdb_conn') as mock_get_duckdb:
+    with patch("retail_datagen.db.duckdb_engine.get_duckdb_conn") as mock_get_duckdb:
         mock_get_duckdb.side_effect = Exception("DuckDB initialization failed")
 
         # Should not raise, should fall back to in-memory mode
         gen = FactDataGenerator(mock_config)
 
         # Should log a warning about the failure
-        assert "failed to initialize" in caplog.text.lower() or "duckdb" in caplog.text.lower()
+        assert (
+            "failed to initialize" in caplog.text.lower()
+            or "duckdb" in caplog.text.lower()
+        )
         # Should fall back to not using DuckDB
         assert gen._use_duckdb is False
 
@@ -40,10 +43,11 @@ def test_fact_generator_handles_duckdb_init_failure(caplog, mock_config):
 def test_fact_generator_handles_duckdb_connection_error(caplog, mock_config):
     """Test that FactDataGenerator handles DuckDB connection errors."""
     import logging
+
     caplog.set_level(logging.WARNING)
 
     # Mock get_duckdb_conn to raise duckdb.Error
-    with patch('retail_datagen.db.duckdb_engine.get_duckdb_conn') as mock_get_duckdb:
+    with patch("retail_datagen.db.duckdb_engine.get_duckdb_conn") as mock_get_duckdb:
         mock_get_duckdb.side_effect = duckdb.Error("Connection failed")
 
         gen = FactDataGenerator(mock_config)
@@ -67,15 +71,15 @@ def test_ensure_columns_handles_alter_table_failure(caplog):
 
     mock_conn = MagicMock()
     # Make _current_columns return empty set
-    with patch('retail_datagen.db.duckdb_engine._current_columns', return_value=set()):
+    with patch("retail_datagen.db.duckdb_engine._current_columns", return_value=set()):
         # Make execute fail when trying to add column
         mock_conn.execute.side_effect = Exception("ALTER TABLE failed")
 
-        df = pd.DataFrame({'new_column': [1, 2, 3]})
+        df = pd.DataFrame({"new_column": [1, 2, 3]})
 
         # Should not raise - just log and continue
         # Use a valid table name from the allowlist
-        _ensure_columns(mock_conn, 'fact_receipts', df)
+        _ensure_columns(mock_conn, "fact_receipts", df)
 
         # Should have logged the failure at debug level
         assert "failed to add column" in caplog.text.lower()
@@ -88,13 +92,15 @@ def test_outbox_insert_handles_max_id_query_failure(caplog):
     mock_conn = MagicMock()
 
     # Mock _ensure_outbox_table to succeed
-    with patch('retail_datagen.db.duckdb_engine._ensure_outbox_table'):
+    with patch("retail_datagen.db.duckdb_engine._ensure_outbox_table"):
         # Mock the execute call for getting max ID to fail
         mock_conn.execute.side_effect = Exception("Query failed")
 
         # Should use 0 as fallback and log warning
         try:
-            outbox_insert_records(mock_conn, [{'message_type': 'test', 'payload': '{}'}])
+            outbox_insert_records(
+                mock_conn, [{"message_type": "test", "payload": "{}"}]
+            )
         except Exception:
             # May fail at insert, but should have logged the max_id warning
             pass
@@ -107,13 +113,15 @@ def test_pragma_setting_failures_are_logged(caplog):
     from retail_datagen.db import duckdb_engine
 
     # Reset the connection
-    with patch.object(duckdb_engine, '_conn', None):
+    with patch.object(duckdb_engine, "_conn", None):
         # Mock duckdb.connect to return a connection that fails on PRAGMA
         mock_conn = MagicMock()
         mock_conn.execute.side_effect = Exception("PRAGMA not supported")
 
-        with patch('retail_datagen.db.duckdb_engine.duckdb.connect', return_value=mock_conn):
-            with patch('retail_datagen.db.duckdb_engine._ensure_outbox_table'):
+        with patch(
+            "retail_datagen.db.duckdb_engine.duckdb.connect", return_value=mock_conn
+        ):
+            with patch("retail_datagen.db.duckdb_engine._ensure_outbox_table"):
                 try:
                     duckdb_engine.get_duckdb_conn()
                 except Exception:
@@ -121,4 +129,7 @@ def test_pragma_setting_failures_are_logged(caplog):
 
                 # Should have logged debug messages about PRAGMA failures
                 if caplog.text:
-                    assert "failed to set pragma" in caplog.text.lower() or "pragma" in caplog.text.lower()
+                    assert (
+                        "failed to set pragma" in caplog.text.lower()
+                        or "pragma" in caplog.text.lower()
+                    )

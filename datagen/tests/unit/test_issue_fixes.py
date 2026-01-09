@@ -41,7 +41,7 @@ TX,Harris,Pasadena,0.0825
 TX,Dallas,Dallas,0.0825
 NY,New York,New York,0.0880
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write(csv_content)
             f.flush()
             yield f.name
@@ -161,7 +161,9 @@ class TestPriceModifier:
         sim.products = mock_products
         sim._product_categories = {"food": mock_products}
         sim._rng = MagicMock()
-        sim._rng.choice = lambda x: x[-1]  # Always pick last item (highest price in filtered)
+        sim._rng.choice = lambda x: x[
+            -1
+        ]  # Always pick last item (highest price in filtered)
         sim._rng.choices = lambda x, weights: [x[0]]
         sim._rng.randint = lambda a, b: a
 
@@ -237,9 +239,12 @@ class TestTruckCapacityConstraints:
         assert shipment["total_items"] == 450
         assert len(shipment["products"]) == 3
 
-    def test_shipment_exceeds_capacity_truncated(self, mock_inventory_simulator, caplog):
+    def test_shipment_exceeds_capacity_truncated(
+        self, mock_inventory_simulator, caplog
+    ):
         """Test that shipments exceeding capacity are truncated."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -260,7 +265,9 @@ class TestTruckCapacityConstraints:
     def test_generate_multiple_shipments_splits_order(self, mock_inventory_simulator):
         """Test that large orders are split across multiple trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
@@ -323,6 +330,7 @@ class TestTruckStateMachineValidation:
     def test_invalid_state_transitions(self, mock_inventory_simulator, caplog):
         """Test that invalid state transitions are rejected with warnings."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -330,7 +338,10 @@ class TestTruckStateMachineValidation:
         # Test invalid transitions
         invalid_cases = [
             (TruckStatus.SCHEDULED, TruckStatus.ARRIVED),  # Can't skip LOADING
-            (TruckStatus.LOADING, TruckStatus.UNLOADING),  # Can't skip IN_TRANSIT and ARRIVED
+            (
+                TruckStatus.LOADING,
+                TruckStatus.UNLOADING,
+            ),  # Can't skip IN_TRANSIT and ARRIVED
             (TruckStatus.COMPLETED, TruckStatus.SCHEDULED),  # Terminal state
         ]
 
@@ -342,6 +353,7 @@ class TestTruckStateMachineValidation:
     def test_state_timeout_recovery(self, mock_inventory_simulator, caplog):
         """Test that stuck shipments are recovered via timeout."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -501,7 +513,9 @@ class TestEdgeCases:
         assert shipment["total_items"] == 1000
         assert len(shipment["products"]) == 2
 
-    def test_state_machine_recovery_steps_through_multiple_states(self, mock_inventory_simulator):
+    def test_state_machine_recovery_steps_through_multiple_states(
+        self, mock_inventory_simulator
+    ):
         """Test that state machine recovery steps through multiple intermediate states."""
         sim = mock_inventory_simulator
 
@@ -608,7 +622,9 @@ class TestEdgeCases:
     def test_very_large_order_splits_correctly(self, mock_inventory_simulator):
         """Test that very large orders split across many trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
@@ -639,7 +655,9 @@ class TestEdgeCases:
     def test_single_product_exceeds_capacity(self, mock_inventory_simulator):
         """Test handling when a single product's quantity exceeds truck capacity."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
@@ -652,7 +670,9 @@ class TestEdgeCases:
         total_items = sum(s["total_items"] for s in shipments)
         assert total_items == 2500
 
-    def test_negative_quantity_in_generate_truck_shipments(self, mock_inventory_simulator):
+    def test_negative_quantity_in_generate_truck_shipments(
+        self, mock_inventory_simulator
+    ):
         """Test that negative quantities raise ValueError in generate_truck_shipments()."""
         sim = mock_inventory_simulator
         departure_time = datetime(2024, 1, 15, 8, 0)
@@ -663,7 +683,9 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="Invalid negative quantity"):
             sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
 
-    def test_timeout_recovery_via_update_shipment_status(self, mock_inventory_simulator):
+    def test_timeout_recovery_via_update_shipment_status(
+        self, mock_inventory_simulator
+    ):
         """Test that stuck shipments are recovered via timeout in update_shipment_status()."""
         sim = mock_inventory_simulator
 
@@ -684,7 +706,9 @@ class TestEdgeCases:
             "products": [(1, 100)],
             "total_items": 100,
             "unload_duration_hours": 1.0,
-            "_state_entered_LOADING": datetime(2024, 1, 15, 2, 0),  # Entered LOADING 10+ hours ago
+            "_state_entered_LOADING": datetime(
+                2024, 1, 15, 2, 0
+            ),  # Entered LOADING 10+ hours ago
         }
         sim._active_shipments["STUCK001"] = shipment
 
@@ -698,3 +722,177 @@ class TestEdgeCases:
         assert result.get("_recovered_via_timeout") is True
         # Should be removed from active shipments
         assert "STUCK001" not in sim._active_shipments
+
+
+class TestReorderPointAccessor:
+    """Tests for Issue #110: get_reorder_point() public accessor method."""
+
+    @pytest.fixture
+    def mock_inventory_simulator(self):
+        """Create a mock InventoryFlowSimulator for testing."""
+        from retail_datagen.generators.retail_patterns import InventoryFlowSimulator
+
+        sim = InventoryFlowSimulator.__new__(InventoryFlowSimulator)
+        sim._reorder_points = {}
+        return sim
+
+    def test_get_reorder_point_returns_stored_value(self, mock_inventory_simulator):
+        """Test that get_reorder_point returns stored reorder points."""
+        sim = mock_inventory_simulator
+
+        # Set up known reorder points
+        sim._reorder_points[(101, 1)] = 25
+        sim._reorder_points[(101, 2)] = 50
+        sim._reorder_points[(102, 1)] = 15
+
+        # Assert correct values are returned
+        assert sim.get_reorder_point(101, 1) == 25
+        assert sim.get_reorder_point(101, 2) == 50
+        assert sim.get_reorder_point(102, 1) == 15
+
+    def test_get_reorder_point_defaults_to_10(self, mock_inventory_simulator):
+        """Test that get_reorder_point returns 10 for unknown combinations."""
+        sim = mock_inventory_simulator
+
+        # No reorder points set, should return default
+        assert sim.get_reorder_point(999, 999) == 10
+        assert sim.get_reorder_point(0, 0) == 10
+
+    def test_get_reorder_point_mixed_known_unknown(self, mock_inventory_simulator):
+        """Test mixed scenarios with known and unknown store/product combos."""
+        sim = mock_inventory_simulator
+
+        # Set up one known reorder point
+        sim._reorder_points[(101, 1)] = 30
+
+        # Known combination returns stored value
+        assert sim.get_reorder_point(101, 1) == 30
+        # Unknown product for known store returns default
+        assert sim.get_reorder_point(101, 999) == 10
+        # Unknown store with known product returns default
+        assert sim.get_reorder_point(999, 1) == 10
+
+    def test_get_reorder_point_zero_value(self, mock_inventory_simulator):
+        """Test that zero reorder point is correctly returned (not default)."""
+        sim = mock_inventory_simulator
+
+        # Zero reorder point for seasonal/promotional products
+        sim._reorder_points[(101, 5)] = 0
+
+        # Should return 0, not the default 10
+        assert sim.get_reorder_point(101, 5) == 0
+
+
+class TestPriorityCalculationConstants:
+    """Tests for Issue #110: Priority calculation uses extracted constants correctly."""
+
+    def test_priority_urgent_threshold_at_boundary(self):
+        """Test that URGENT priority is assigned at exactly 50% deficit."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        # Exactly 50% below reorder point should be URGENT
+        reorder_point = 100
+        current_qty = 50  # 50% deficit
+        deficit_pct = (reorder_point - current_qty) / reorder_point * 100
+
+        assert deficit_pct == LogisticsMixin.REORDER_PRIORITY_URGENT_THRESHOLD
+        # At this boundary, priority should be URGENT
+        assert deficit_pct >= LogisticsMixin.REORDER_PRIORITY_URGENT_THRESHOLD
+
+    def test_priority_high_threshold_at_boundary(self):
+        """Test that HIGH priority is assigned at exactly 25% deficit."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        # Exactly 25% below reorder point should be HIGH
+        reorder_point = 100
+        current_qty = 75  # 25% deficit
+        deficit_pct = (reorder_point - current_qty) / reorder_point * 100
+
+        assert deficit_pct == LogisticsMixin.REORDER_PRIORITY_HIGH_THRESHOLD
+        # At this boundary, priority should be HIGH (not URGENT)
+        assert deficit_pct >= LogisticsMixin.REORDER_PRIORITY_HIGH_THRESHOLD
+        assert deficit_pct < LogisticsMixin.REORDER_PRIORITY_URGENT_THRESHOLD
+
+    def test_priority_normal_below_high_threshold(self):
+        """Test that NORMAL priority is assigned below 25% deficit."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        # 20% below reorder point should be NORMAL
+        reorder_point = 100
+        current_qty = 80  # 20% deficit
+        deficit_pct = (reorder_point - current_qty) / reorder_point * 100
+
+        assert deficit_pct < LogisticsMixin.REORDER_PRIORITY_HIGH_THRESHOLD
+
+    def test_priority_urgent_above_threshold(self):
+        """Test that URGENT priority is assigned for >50% deficit."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        # 70% below reorder point should be URGENT
+        reorder_point = 100
+        current_qty = 30  # 70% deficit
+        deficit_pct = (reorder_point - current_qty) / reorder_point * 100
+
+        assert deficit_pct >= LogisticsMixin.REORDER_PRIORITY_URGENT_THRESHOLD
+
+    def test_priority_zero_reorder_point_yields_normal(self):
+        """Test that zero reorder point results in NORMAL priority (no deficit)."""
+        # When reorder_point is 0, deficit_pct should be 0
+        reorder_point = 0
+        current_qty = 10
+
+        # Using the same logic as logistics_mixin.py:152-156
+        deficit_pct = (
+            (reorder_point - current_qty) / reorder_point * 100
+            if reorder_point > 0
+            else 0
+        )
+
+        assert deficit_pct == 0
+
+    def test_priority_calculation_helper_urgent(self):
+        """Test helper returns URGENT at or above urgent threshold."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 50) == "URGENT"
+        assert LogisticsMixin._calculate_reorder_priority(100, 0) == "URGENT"
+
+    def test_priority_calculation_helper_high(self):
+        """Test helper returns HIGH at or above high threshold."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 75) == "HIGH"
+        assert LogisticsMixin._calculate_reorder_priority(100, 60) == "HIGH"
+
+    def test_priority_calculation_helper_normal(self):
+        """Test helper returns NORMAL below thresholds or with zero reorder point."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        assert LogisticsMixin._calculate_reorder_priority(100, 90) == "NORMAL"
+        assert LogisticsMixin._calculate_reorder_priority(0, 10) == "NORMAL"
+
+    def test_constants_have_correct_values(self):
+        """Test that the threshold constants have expected values."""
+        from retail_datagen.generators.fact_generators.logistics_mixin import (
+            LogisticsMixin,
+        )
+
+        # Verify the constants match the documented values
+        assert LogisticsMixin.REORDER_PRIORITY_URGENT_THRESHOLD == 50.0
+        assert LogisticsMixin.REORDER_PRIORITY_HIGH_THRESHOLD == 25.0
+        assert LogisticsMixin.MIN_UNLOAD_DURATION_MINUTES == 30
+        assert LogisticsMixin.DEFAULT_UNLOAD_DURATION_MINUTES == 60

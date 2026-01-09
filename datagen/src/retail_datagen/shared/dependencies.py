@@ -8,6 +8,7 @@ and other middleware components for the FastAPI application.
 import asyncio
 import logging
 import os
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from functools import wraps
@@ -121,12 +122,31 @@ _event_streamer: EventStreamer | None = None
 _background_tasks: dict[str, asyncio.Task] = {}
 _task_status: dict[str, TaskStatus] = {}
 
+# Lock for thread-safe cleanup operations
+# Prevents race conditions when multiple threads/workers trigger cleanup
+_cleanup_lock = threading.Lock()
 
-# Rate limiting storage configuration
-# These can be tuned via environment variables for different deployment scenarios
-# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
-def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -> int:
-    """Parse rate limit environment variable with validation and fallback."""
+# Track last cleanup time for cooldown logic
+_last_cleanup_time: datetime | None = None
+
+
+# ================================
+# ENVIRONMENT VARIABLE PARSING
+# ================================
+
+
+def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
+    """Parse integer environment variable with validation and fallback.
+
+    Args:
+        name: Environment variable name
+        default: Default value if not set or invalid
+        min_val: Minimum allowed value
+        max_val: Maximum allowed value
+
+    Returns:
+        Validated integer value within bounds
+    """
     try:
         value = int(os.getenv(name, str(default)))
         return max(min_val, min(max_val, value))
@@ -138,8 +158,20 @@ def _parse_rate_limit_env(name: str, default: int, min_val: int, max_val: int) -
         return default
 
 
-RATE_LIMIT_MAXSIZE = _parse_rate_limit_env("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
-RATE_LIMIT_TTL = _parse_rate_limit_env("RATE_LIMIT_TTL", 3600, 60, 86400)
+# Task cleanup configuration
+# Bounds: max age 1-720 hours (1 hour to 30 days), threshold 100-100000 tasks
+MAX_TASK_AGE_HOURS = 720  # 30 days maximum retention
+MAX_TASK_AGE_LIMIT_HOURS = 8760  # 1 year absolute maximum for manual cleanup
+TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int("TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, MAX_TASK_AGE_HOURS)
+TASK_CLEANUP_THRESHOLD = _parse_env_int("TASK_CLEANUP_THRESHOLD", 1000, 100, 100000)
+# Cooldown period between automatic cleanups (in seconds)
+TASK_CLEANUP_COOLDOWN_SECONDS = 300  # 5 minutes
+
+# Rate limiting storage configuration
+# These can be tuned via environment variables for different deployment scenarios
+# Bounds ensure reasonable values: maxsize 100-100000, TTL 60-86400 seconds
+RATE_LIMIT_MAXSIZE = _parse_env_int("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
+RATE_LIMIT_TTL = _parse_env_int("RATE_LIMIT_TTL", 3600, 60, 86400)
 
 # TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
 # Reading an entry does NOT reset the timer; only re-assigning (cache[key] = value) does.
@@ -241,82 +273,196 @@ async def get_event_streamer(
 # ================================
 
 
-def create_background_task(task_id: str, coro, description: str = "") -> str:
-    """Create and track a background task."""
-    global _background_tasks, _task_status
+def _cleanup_old_tasks_locked(max_age_hours: int) -> int:
+    """Remove completed/failed tasks older than max_age_hours (lock held)."""
+    global _background_tasks, _task_status, _last_cleanup_time
 
-    if task_id in _background_tasks and not _background_tasks[task_id].done():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} is already running",
+    cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+    cleaned_count = 0
+
+    # Create a snapshot of items() to avoid modifying the dict during iteration
+    for task_id, task_stat in list(_task_status.items()):
+        if task_stat.completed_at and task_stat.completed_at < cutoff:
+            _task_status.pop(task_id, None)
+            _background_tasks.pop(task_id, None)
+            cleaned_count += 1
+
+    # Update last cleanup time
+    _last_cleanup_time = datetime.now(UTC)
+
+    if cleaned_count > 0:
+        logger.info(
+            f"Cleaned up {cleaned_count} old background tasks",
+            extra={"cleaned_count": cleaned_count, "cutoff_hours": max_age_hours},
         )
 
-    task = asyncio.create_task(coro)
-    _background_tasks[task_id] = task
-    _task_status[task_id] = TaskStatus(
-        status="running",
-        started_at=datetime.now(UTC),
-        description=description,
-        progress=0.0,
-        message="Task started",
-        error=None,
-    )
+    return cleaned_count
+
+
+def _cleanup_old_tasks(max_age_hours: int = TASK_CLEANUP_MAX_AGE_HOURS) -> int:
+    """
+    Remove completed/failed tasks older than max_age_hours.
+
+    Thread-safe: Uses _cleanup_lock to prevent race conditions when multiple
+    threads/workers trigger cleanup simultaneously.
+
+    Args:
+        max_age_hours: Maximum age in hours for completed/failed tasks
+
+    Returns:
+        Number of tasks cleaned up
+    """
+    # Use lock to prevent race conditions in multi-worker deployments
+    with _cleanup_lock:
+        return _cleanup_old_tasks_locked(max_age_hours)
+
+
+def create_background_task(task_id: str, coro, description: str = "") -> str:
+    """Create and track a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect all dictionary operations.
+    Automatic cleanup is triggered when threshold is exceeded AND cooldown period
+    has elapsed since last cleanup to avoid excessive cleanup operations.
+    """
+    global _background_tasks, _task_status, _last_cleanup_time
+
+    with _cleanup_lock:
+        # Cleanup old tasks if threshold exceeded AND cooldown has elapsed
+        should_cleanup = len(_task_status) >= TASK_CLEANUP_THRESHOLD
+        if should_cleanup and _last_cleanup_time is not None:
+            # Check if cooldown period has elapsed
+            elapsed = (datetime.now(UTC) - _last_cleanup_time).total_seconds()
+            should_cleanup = elapsed >= TASK_CLEANUP_COOLDOWN_SECONDS
+
+        if should_cleanup:
+            # Call internal cleanup without re-acquiring lock
+            logger.debug(
+                "Triggering automatic cleanup",
+                extra={
+                    "task_count": len(_task_status),
+                    "threshold": TASK_CLEANUP_THRESHOLD,
+                },
+            )
+            _cleanup_old_tasks_locked(TASK_CLEANUP_MAX_AGE_HOURS)
+
+        if task_id in _background_tasks and not _background_tasks[task_id].done():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Task {task_id} is already running",
+            )
+
+        task = asyncio.create_task(coro)
+        _background_tasks[task_id] = task
+        _task_status[task_id] = TaskStatus(
+            status="running",
+            started_at=datetime.now(UTC),
+            description=description,
+            progress=0.0,
+            message="Task started",
+            error=None,
+        )
 
     def task_done_callback(future):
-        try:
-            result = future.result()
-            _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(
-                    exclude={"status", "completed_at", "progress", "message", "result"}
-                ),
-                status="completed",
-                completed_at=datetime.now(UTC),
-                progress=1.0,
-                message="Task completed successfully",
-                result=result,
-            )
-        except Exception as e:
-            logger.error(f"Background task {task_id} failed: {e}")
-            _task_status[task_id] = TaskStatus(
-                **_task_status[task_id].model_dump(
-                    exclude={"status", "completed_at", "message", "error"}
-                ),
-                status="failed",
-                completed_at=datetime.now(UTC),
-                message=f"Task failed: {str(e)}",
-                error=str(e),
-            )
+        with _cleanup_lock:
+            try:
+                result = future.result()
+                _task_status[task_id] = TaskStatus(
+                    **_task_status[task_id].model_dump(
+                        exclude={
+                            "status",
+                            "completed_at",
+                            "progress",
+                            "message",
+                            "result",
+                        }
+                    ),
+                    status="completed",
+                    completed_at=datetime.now(UTC),
+                    progress=1.0,
+                    message="Task completed successfully",
+                    result=result,
+                )
+            except Exception as e:
+                logger.error(f"Background task {task_id} failed: {e}")
+                _task_status[task_id] = TaskStatus(
+                    **_task_status[task_id].model_dump(
+                        exclude={"status", "completed_at", "message", "error"}
+                    ),
+                    status="failed",
+                    completed_at=datetime.now(UTC),
+                    message=f"Task failed: {str(e)}",
+                    error=str(e),
+                )
 
     task.add_done_callback(task_done_callback)
     return task_id
 
 
 def get_task_status(task_id: str) -> TaskStatus | None:
-    """Get the status of a background task."""
-    return _task_status.get(task_id)
+    """Get the status of a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect dictionary access.
+    """
+    with _cleanup_lock:
+        return _task_status.get(task_id)
 
 
 def cancel_task(task_id: str) -> bool:
-    """Cancel a background task."""
+    """Cancel a background task.
+
+    Thread-safe: Uses _cleanup_lock to protect dictionary operations.
+    """
     global _background_tasks, _task_status
 
-    if task_id not in _background_tasks:
-        return False
+    with _cleanup_lock:
+        if task_id not in _background_tasks:
+            return False
 
-    task = _background_tasks[task_id]
-    if not task.done():
-        task.cancel()
-        _task_status[task_id] = TaskStatus(
-            **_task_status[task_id].model_dump(
-                exclude={"status", "completed_at", "message"}
-            ),
-            status="cancelled",
-            completed_at=datetime.now(UTC),
-            message="Task was cancelled",
-        )
-        return True
+        task = _background_tasks[task_id]
+        if not task.done():
+            task.cancel()
+            _task_status[task_id] = TaskStatus(
+                **_task_status[task_id].model_dump(
+                    exclude={"status", "completed_at", "message"}
+                ),
+                status="cancelled",
+                completed_at=datetime.now(UTC),
+                message="Task was cancelled",
+            )
+            return True
 
     return False
+
+
+def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
+    """
+    Manually trigger cleanup of old background tasks.
+
+    This is a public wrapper around _cleanup_old_tasks that can be called
+    from APIs or scheduled jobs. Unlike automatic cleanup, manual cleanup
+    is not subject to cooldown restrictions.
+
+    Args:
+        max_age_hours: Maximum age in hours for completed/failed tasks.
+                      If None, uses TASK_CLEANUP_MAX_AGE_HOURS default.
+                      Must be non-negative and not exceed MAX_TASK_AGE_LIMIT_HOURS.
+
+    Returns:
+        Number of tasks cleaned up
+
+    Raises:
+        ValueError: If max_age_hours is negative or exceeds the limit
+    """
+    if max_age_hours is not None:
+        if max_age_hours < 0:
+            raise ValueError("max_age_hours must be non-negative")
+        if max_age_hours > MAX_TASK_AGE_LIMIT_HOURS:
+            raise ValueError(
+                f"max_age_hours must not exceed {MAX_TASK_AGE_LIMIT_HOURS} "
+                f"({MAX_TASK_AGE_LIMIT_HOURS // 24} days)"
+            )
+    age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
+    return _cleanup_old_tasks(max_age_hours=age)
 
 
 def update_task_progress(
@@ -340,6 +486,8 @@ def update_task_progress(
 ) -> None:
     """Update progress for a background task with optional per-table tracking.
 
+    Thread-safe: Uses _cleanup_lock to protect dictionary operations.
+
     Args:
         task_id: Unique identifier for the task
         progress: Overall progress (0.0 to 1.0)
@@ -357,7 +505,9 @@ def update_task_progress(
         hourly_progress: Optional per-table hourly progress
         total_hours_completed: Optional total hours completed across all days
     """
-    if task_id in _task_status:
+    with _cleanup_lock:
+        if task_id not in _task_status:
+            return
         # Get existing status fields we want to preserve
         existing = _task_status[task_id].model_dump()
 
@@ -375,12 +525,12 @@ def update_task_progress(
 
         # Update table-level progress if provided (merge with max to avoid regressions)
         if table_progress is not None:
-            existing_progress = existing.get("table_progress") or {}
+            existing_table_progress = existing.get("table_progress") or {}
             merged_progress: dict[str, float] = {}
             # Union of keys
-            keys = set(existing_progress.keys()) | set(table_progress.keys())
-            for k in keys:
-                old = existing_progress.get(k, 0.0) or 0.0
+            prog_keys = set(existing_table_progress.keys()) | set(table_progress.keys())
+            for k in prog_keys:
+                old = existing_table_progress.get(k, 0.0) or 0.0
                 new = table_progress.get(k, 0.0) or 0.0
                 merged_progress[k] = max(old, new)
             updated_fields["table_progress"] = merged_progress
@@ -408,8 +558,8 @@ def update_task_progress(
             # clamp with max to avoid decreases
             existing_counts = existing.get("table_counts") or {}
             merged: dict[str, int] = {}
-            keys = set(existing_counts.keys()) | set(table_counts.keys())
-            for k in keys:
+            count_keys = set(existing_counts.keys()) | set(table_counts.keys())
+            for k in count_keys:
                 old = int(existing_counts.get(k, 0) or 0)
                 new = int(table_counts.get(k, 0) or 0)
                 merged[k] = max(old, new)

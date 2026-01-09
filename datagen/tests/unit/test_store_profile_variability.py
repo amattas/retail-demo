@@ -102,16 +102,16 @@ class TestStoreProfileAssignment:
         profiles = profiler.assign_profiles()
 
         for store_id, profile in profiles.items():
-            assert hasattr(profile, 'volume_class')
-            assert hasattr(profile, 'store_format')
-            assert hasattr(profile, 'operating_hours')
-            assert hasattr(profile, 'daily_traffic_multiplier')
-            assert hasattr(profile, 'avg_basket_size')
-            assert hasattr(profile, 'avg_basket_value')
-            assert hasattr(profile, 'peak_hour_multiplier')
-            assert hasattr(profile, 'weekend_multiplier')
-            assert hasattr(profile, 'is_urban')
-            assert hasattr(profile, 'is_destination')
+            assert hasattr(profile, "volume_class")
+            assert hasattr(profile, "store_format")
+            assert hasattr(profile, "operating_hours")
+            assert hasattr(profile, "daily_traffic_multiplier")
+            assert hasattr(profile, "avg_basket_size")
+            assert hasattr(profile, "avg_basket_value")
+            assert hasattr(profile, "peak_hour_multiplier")
+            assert hasattr(profile, "weekend_multiplier")
+            assert hasattr(profile, "is_urban")
+            assert hasattr(profile, "is_destination")
 
     def test_volume_class_distribution(self, profiler):
         """Test that volume classes are distributed across stores."""
@@ -121,7 +121,9 @@ class TestStoreProfileAssignment:
         unique_classes = set(volume_classes)
 
         # Should have multiple volume classes (not all the same)
-        assert len(unique_classes) >= 2, "Should have at least 2 different volume classes"
+        assert len(unique_classes) >= 2, (
+            "Should have at least 2 different volume classes"
+        )
 
     def test_traffic_multiplier_variability(self, profiler):
         """Test that traffic multipliers vary across stores."""
@@ -130,48 +132,58 @@ class TestStoreProfileAssignment:
         multipliers = [float(p.daily_traffic_multiplier) for p in profiles.values()]
 
         # Should have variation (not all the same)
-        assert len(set(multipliers)) > 1, "Traffic multipliers should vary across stores"
+        assert len(set(multipliers)) > 1, (
+            "Traffic multipliers should vary across stores"
+        )
 
         # Should be within expected range (0.25 to 3.0)
-        assert all(0.2 <= m <= 3.5 for m in multipliers), "All multipliers should be in valid range"
+        assert all(0.2 <= m <= 3.5 for m in multipliers), (
+            "All multipliers should be in valid range"
+        )
 
         # Calculate coefficient of variation (should be > 0.3 for good variability)
         mean_mult = sum(multipliers) / len(multipliers)
         variance = sum((m - mean_mult) ** 2 for m in multipliers) / len(multipliers)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
         cv = std_dev / mean_mult
 
-        assert cv > 0.3, f"Coefficient of variation ({cv:.2f}) should be > 0.3 for sufficient variability"
+        assert cv > 0.3, (
+            f"Coefficient of variation ({cv:.2f}) should be > 0.3 for sufficient variability"
+        )
 
     def test_flagship_stores_have_high_multipliers(self, profiler):
         """Test that flagship stores have higher traffic multipliers."""
         profiles = profiler.assign_profiles()
 
         flagship_profiles = [
-            p for p in profiles.values()
-            if p.volume_class == StoreVolumeClass.FLAGSHIP
+            p for p in profiles.values() if p.volume_class == StoreVolumeClass.FLAGSHIP
         ]
 
         if flagship_profiles:  # Only test if we have flagship stores
-            flagship_mults = [float(p.daily_traffic_multiplier) for p in flagship_profiles]
+            flagship_mults = [
+                float(p.daily_traffic_multiplier) for p in flagship_profiles
+            ]
 
             # All flagship stores should have multipliers >= 2.0
-            assert all(m >= 2.0 for m in flagship_mults), "Flagship stores should have high traffic multipliers (>= 2.0)"
+            assert all(m >= 2.0 for m in flagship_mults), (
+                "Flagship stores should have high traffic multipliers (>= 2.0)"
+            )
 
     def test_kiosk_stores_have_low_multipliers(self, profiler):
         """Test that kiosk stores have lower traffic multipliers."""
         profiles = profiler.assign_profiles()
 
         kiosk_profiles = [
-            p for p in profiles.values()
-            if p.volume_class == StoreVolumeClass.KIOSK
+            p for p in profiles.values() if p.volume_class == StoreVolumeClass.KIOSK
         ]
 
         if kiosk_profiles:  # Only test if we have kiosk stores
             kiosk_mults = [float(p.daily_traffic_multiplier) for p in kiosk_profiles]
 
             # All kiosk stores should have multipliers <= 0.5
-            assert all(m <= 0.5 for m in kiosk_mults), "Kiosk stores should have low traffic multipliers (<= 0.5)"
+            assert all(m <= 0.5 for m in kiosk_mults), (
+                "Kiosk stores should have low traffic multipliers (<= 0.5)"
+            )
 
     def test_basket_sizes_vary_by_format(self, profiler):
         """Test that basket sizes vary by store format."""
@@ -187,10 +199,16 @@ class TestStoreProfileAssignment:
 
         # If we have multiple formats, larger formats should have larger baskets
         if StoreFormat.HYPERMARKET in by_format and StoreFormat.EXPRESS in by_format:
-            avg_hypermarket = sum(by_format[StoreFormat.HYPERMARKET]) / len(by_format[StoreFormat.HYPERMARKET])
-            avg_express = sum(by_format[StoreFormat.EXPRESS]) / len(by_format[StoreFormat.EXPRESS])
+            avg_hypermarket = sum(by_format[StoreFormat.HYPERMARKET]) / len(
+                by_format[StoreFormat.HYPERMARKET]
+            )
+            avg_express = sum(by_format[StoreFormat.EXPRESS]) / len(
+                by_format[StoreFormat.EXPRESS]
+            )
 
-            assert avg_hypermarket > avg_express, "Hypermarkets should have larger average basket sizes than express stores"
+            assert avg_hypermarket > avg_express, (
+                "Hypermarkets should have larger average basket sizes than express stores"
+            )
 
     def test_operating_hours_assigned(self, profiler):
         """Test that operating hours are assigned to all stores."""
@@ -203,7 +221,9 @@ class TestStoreProfileAssignment:
 
         # Should have at least some variety
         unique_hours = set(operating_hours)
-        assert len(unique_hours) >= 2, "Should have at least 2 different operating hour patterns"
+        assert len(unique_hours) >= 2, (
+            "Should have at least 2 different operating hour patterns"
+        )
 
 
 class TestStoreProfileVariabilityIntegration:
@@ -287,17 +307,23 @@ class TestTrafficMultiplierRanges:
         max_mult = max(multipliers)
 
         # Should span a wide range
-        assert max_mult - min_mult >= 2.0, f"Range ({max_mult - min_mult:.2f}) should be at least 2.0"
+        assert max_mult - min_mult >= 2.0, (
+            f"Range ({max_mult - min_mult:.2f}) should be at least 2.0"
+        )
 
         # Mean should be reasonable (around 1.0-1.5)
-        assert 0.8 <= mean_mult <= 1.8, f"Mean multiplier ({mean_mult:.2f}) should be in reasonable range"
+        assert 0.8 <= mean_mult <= 1.8, (
+            f"Mean multiplier ({mean_mult:.2f}) should be in reasonable range"
+        )
 
         # Coefficient of variation
         variance = sum((m - mean_mult) ** 2 for m in multipliers) / len(multipliers)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
         cv = std_dev / mean_mult
 
-        assert cv >= 0.5, f"Coefficient of variation ({cv:.2f}) should be >= 0.5 for good variability"
+        assert cv >= 0.5, (
+            f"Coefficient of variation ({cv:.2f}) should be >= 0.5 for good variability"
+        )
 
     def test_volume_class_percentages(self, large_store_set, sample_geographies):
         """Test that volume class distribution is roughly as expected."""
@@ -313,8 +339,12 @@ class TestTrafficMultiplierRanges:
 
         if StoreVolumeClass.FLAGSHIP in counts:
             flagship_pct = counts[StoreVolumeClass.FLAGSHIP] / total
-            assert 0.02 <= flagship_pct <= 0.15, f"Flagship percentage ({flagship_pct:.2%}) should be 2-15%"
+            assert 0.02 <= flagship_pct <= 0.15, (
+                f"Flagship percentage ({flagship_pct:.2%}) should be 2-15%"
+            )
 
         if StoreVolumeClass.MEDIUM_VOLUME in counts:
             medium_pct = counts[StoreVolumeClass.MEDIUM_VOLUME] / total
-            assert 0.30 <= medium_pct <= 0.70, f"Medium volume percentage ({medium_pct:.2%}) should be 30-70%"
+            assert 0.30 <= medium_pct <= 0.70, (
+                f"Medium volume percentage ({medium_pct:.2%}) should be 30-70%"
+            )

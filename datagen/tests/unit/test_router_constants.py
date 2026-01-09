@@ -5,7 +5,6 @@ These tests verify that all fact tables are properly registered in the
 router configuration, ensuring consistency between FACT_TABLES and DUCK_FACT_MAP.
 """
 
-
 from retail_datagen.generators.routers.common import (
     DUCK_FACT_MAP,
     DUCK_MASTER_MAP,
@@ -38,7 +37,9 @@ class TestRouterConstants:
     def test_all_duck_fact_map_entries_in_fact_tables(self):
         """Test that all DUCK_FACT_MAP keys are in FACT_TABLES."""
         for table in DUCK_FACT_MAP:
-            assert table in FACT_TABLES, f"{table} in DUCK_FACT_MAP but not in FACT_TABLES"
+            assert table in FACT_TABLES, (
+                f"{table} in DUCK_FACT_MAP but not in FACT_TABLES"
+            )
 
     def test_all_master_tables_have_mapping(self):
         """Test that all MASTER_TABLES have corresponding DUCK_MASTER_MAP entries."""
@@ -48,7 +49,9 @@ class TestRouterConstants:
     def test_fact_payments_in_router_config(self):
         """Test that fact_payments is registered in router configuration."""
         assert "fact_payments" in FACT_TABLES, "fact_payments missing from FACT_TABLES"
-        assert "fact_payments" in DUCK_FACT_MAP, "fact_payments missing from DUCK_FACT_MAP"
+        assert "fact_payments" in DUCK_FACT_MAP, (
+            "fact_payments missing from DUCK_FACT_MAP"
+        )
 
 
 class TestGetPhysicalTableName:

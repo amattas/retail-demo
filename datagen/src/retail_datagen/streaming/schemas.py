@@ -7,7 +7,7 @@ used in the real-time streaming system.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -213,7 +213,9 @@ class PromotionAppliedPayload(BaseModel):
     discount_cents: int = Field(
         ..., gt=0, description="Discount amount in cents for precision"
     )
-    discount_type: str = Field(..., min_length=1)  # "percentage" or "fixed"
+    discount_type: Literal["PERCENTAGE", "FIXED_AMOUNT", "BOGO"] = Field(
+        ..., description="Type of discount applied"
+    )
     product_count: int = Field(
         ..., gt=0, description="Number of products the promotion applies to"
     )

@@ -29,7 +29,9 @@ class MockPaymentsMixin:
     from retail_datagen.generators.fact_generators.payments_mixin import PaymentsMixin
 
     _generate_payment_for_receipt = PaymentsMixin._generate_payment_for_receipt
-    _generate_payment_for_online_order = PaymentsMixin._generate_payment_for_online_order
+    _generate_payment_for_online_order = (
+        PaymentsMixin._generate_payment_for_online_order
+    )
     _should_decline_payment = PaymentsMixin._should_decline_payment
     _simulate_processing_time_ms = PaymentsMixin._simulate_processing_time_ms
     _generate_payment_transaction_id = PaymentsMixin._generate_payment_transaction_id
@@ -191,9 +193,7 @@ class TestDeclineLogic:
         """Cash payments should never decline."""
         # Test many times to ensure no declines
         for _ in range(100):
-            is_declined, reason = payments_mixin._should_decline_payment(
-                "CASH", 10000
-            )
+            is_declined, reason = payments_mixin._should_decline_payment("CASH", 10000)
             assert is_declined is False
             assert reason is None
 
@@ -245,7 +245,10 @@ class TestProcessingTime:
 
     def test_processing_time_within_range(self, payments_mixin):
         """Processing time should be within expected ranges."""
-        for method, (min_ms, max_ms) in MockPaymentsMixin._PROCESSING_TIME_RANGES.items():
+        for method, (
+            min_ms,
+            max_ms,
+        ) in MockPaymentsMixin._PROCESSING_TIME_RANGES.items():
             for _ in range(10):
                 time_ms = payments_mixin._simulate_processing_time_ms(method)
                 assert min_ms <= time_ms <= max_ms, (
@@ -255,8 +258,7 @@ class TestProcessingTime:
     def test_cash_is_fastest(self, payments_mixin):
         """Cash should generally have lower processing times than cards."""
         cash_times = [
-            payments_mixin._simulate_processing_time_ms("CASH")
-            for _ in range(100)
+            payments_mixin._simulate_processing_time_ms("CASH") for _ in range(100)
         ]
         credit_times = [
             payments_mixin._simulate_processing_time_ms("CREDIT_CARD")

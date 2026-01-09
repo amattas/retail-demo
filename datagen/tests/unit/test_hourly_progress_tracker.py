@@ -129,7 +129,9 @@ class TestProgressCalculation:
 
         # Complete 12 hours for receipts (25% of 48)
         for hour in range(12):
-            tracker.update_hourly_progress("receipts", day=1, hour=hour, total_days=total_days)
+            tracker.update_hourly_progress(
+                "receipts", day=1, hour=hour, total_days=total_days
+            )
 
         progress = tracker.get_current_progress()
         # Overall progress uses max completed hours across tables (not average)
@@ -142,11 +144,15 @@ class TestProgressCalculation:
 
         # Complete 24 hours for receipts (50%)
         for hour in range(24):
-            tracker.update_hourly_progress("receipts", day=1, hour=hour, total_days=total_days)
+            tracker.update_hourly_progress(
+                "receipts", day=1, hour=hour, total_days=total_days
+            )
 
         # Complete 12 hours for receipt_lines (25%)
         for hour in range(12):
-            tracker.update_hourly_progress("receipt_lines", day=1, hour=hour, total_days=total_days)
+            tracker.update_hourly_progress(
+                "receipt_lines", day=1, hour=hour, total_days=total_days
+            )
 
         progress = tracker.get_current_progress()
         assert abs(progress["per_table_progress"]["receipts"] - 0.5) < 0.01
@@ -174,7 +180,9 @@ class TestProgressCalculation:
         for table in ["receipts", "receipt_lines", "store_inventory_txn"]:
             for day in range(1, total_days + 1):
                 for hour in range(24):
-                    tracker.update_hourly_progress(table, day=day, hour=hour, total_days=total_days)
+                    tracker.update_hourly_progress(
+                        table, day=day, hour=hour, total_days=total_days
+                    )
 
         progress = tracker.get_current_progress()
         # Once all are complete, tables_in_progress should be empty
@@ -197,7 +205,9 @@ class TestProgressCalculation:
 
         # Complete all hours plus some extras
         for hour in range(30):  # More than 24
-            tracker.update_hourly_progress("receipts", day=1, hour=hour % 24, total_days=total_days)
+            tracker.update_hourly_progress(
+                "receipts", day=1, hour=hour % 24, total_days=total_days
+            )
 
         progress = tracker.get_current_progress()
         assert progress["per_table_progress"]["receipts"] <= 1.0
@@ -258,10 +268,7 @@ class TestThreadSafety:
             """Update progress for a specific table."""
             for hour in range(hours_per_thread):
                 tracker.update_hourly_progress(
-                    table_name,
-                    day=1,
-                    hour=hour,
-                    total_days=total_days
+                    table_name, day=1, hour=hour, total_days=total_days
                 )
 
         threads = []
@@ -295,10 +302,7 @@ class TestThreadSafety:
                     actual_hour = (thread_id * 8) + hour
                     if actual_hour < 24:
                         tracker.update_hourly_progress(
-                            "receipts",
-                            day=day,
-                            hour=actual_hour,
-                            total_days=total_days
+                            "receipts", day=day, hour=actual_hour, total_days=total_days
                         )
 
         threads = []
@@ -330,10 +334,7 @@ class TestThreadSafety:
             barrier.wait()
             for hour in range(10):
                 tracker.update_hourly_progress(
-                    "receipts",
-                    day=1,
-                    hour=hour,
-                    total_days=total_days
+                    "receipts", day=1, hour=hour, total_days=total_days
                 )
 
         def reader(thread_id):
@@ -403,7 +404,9 @@ class TestEdgeCases:
         # Complete all hours for all days for one table
         for day in range(1, total_days + 1):
             for hour in range(24):
-                tracker.update_hourly_progress("receipts", day=day, hour=hour, total_days=total_days)
+                tracker.update_hourly_progress(
+                    "receipts", day=day, hour=hour, total_days=total_days
+                )
 
         progress = tracker.get_current_progress()
         assert progress["completed_hours"]["receipts"] == total_days * 24

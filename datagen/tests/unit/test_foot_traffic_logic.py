@@ -52,7 +52,9 @@ def test_conversion_rates():
     for hour, is_weekend, label in test_cases:
         rate = calculate_conversion_rate(hour, is_weekend)
         foot_traffic = int(receipts / rate)
-        print(f"{label:35s}: {foot_traffic} visitors ({foot_traffic/receipts:.1f}x receipts)")
+        print(
+            f"{label:35s}: {foot_traffic} visitors ({foot_traffic / receipts:.1f}x receipts)"
+        )
 
     print("\nSensor Distribution (100 total visitors):")
     print("-" * 60)
@@ -70,7 +72,9 @@ def test_conversion_rates():
         print(f"{zone:20s}: {count:3d} visitors ({proportion:.0%})")
 
     total_allocated = sum(int(total_traffic * p) for _, p in sensors)
-    print(f"\n{'Total':20s}: {total_allocated:3d} visitors ({total_allocated/total_traffic:.0%})")
+    print(
+        f"\n{'Total':20s}: {total_allocated:3d} visitors ({total_allocated / total_traffic:.0%})"
+    )
 
     print("\n" + "=" * 60)
     print("✅ Logic test complete - all calculations valid")

@@ -21,9 +21,9 @@ def test_reset_duckdb_handles_close_failure(caplog):
     mock_conn.close.side_effect = Exception("Failed to close connection")
 
     # Patch the global _conn variable to use our mock
-    with patch.object(duckdb_engine, '_conn', mock_conn):
+    with patch.object(duckdb_engine, "_conn", mock_conn):
         # Patch Path.exists to return False so we don't try to delete files
-        with patch.object(Path, 'exists', return_value=False):
+        with patch.object(Path, "exists", return_value=False):
             # Should not raise, but should log warning
             duckdb_engine.reset_duckdb()
 
@@ -33,17 +33,22 @@ def test_reset_duckdb_handles_close_failure(caplog):
 def test_reset_duckdb_handles_file_deletion_failure(caplog):
     """Test that file deletion failures are logged during reset."""
     # Patch _conn to None so we skip connection close
-    with patch.object(duckdb_engine, '_conn', None):
+    with patch.object(duckdb_engine, "_conn", None):
         # Patch get_duckdb_path to return a known path
         test_path = Path("/tmp/test.db")
-        with patch.object(duckdb_engine, 'get_duckdb_path', return_value=test_path):
+        with patch.object(duckdb_engine, "get_duckdb_path", return_value=test_path):
             # Mock Path.exists to return True and unlink to fail
-            with patch.object(Path, 'exists', return_value=True):
-                with patch.object(Path, 'unlink', side_effect=OSError("Permission denied")):
+            with patch.object(Path, "exists", return_value=True):
+                with patch.object(
+                    Path, "unlink", side_effect=OSError("Permission denied")
+                ):
                     # Should not raise, but should log warning
                     duckdb_engine.reset_duckdb()
 
-                    assert "Permission denied" in caplog.text or "failed" in caplog.text.lower()
+                    assert (
+                        "Permission denied" in caplog.text
+                        or "failed" in caplog.text.lower()
+                    )
 
 
 def test_close_duckdb_handles_exception(caplog):
@@ -53,7 +58,7 @@ def test_close_duckdb_handles_exception(caplog):
     mock_conn.close.side_effect = Exception("Connection close error")
 
     # Patch the global _conn variable
-    with patch.object(duckdb_engine, '_conn', mock_conn):
+    with patch.object(duckdb_engine, "_conn", mock_conn):
         # Should not raise
         duckdb_engine.close_duckdb()
 
@@ -191,10 +196,12 @@ def test_insert_dataframe_validates_columns():
     import pandas as pd
 
     # Create a DataFrame with a malicious column name
-    malicious_df = pd.DataFrame({
-        "valid_col": [1, 2, 3],
-        "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
-    })
+    malicious_df = pd.DataFrame(
+        {
+            "valid_col": [1, 2, 3],
+            "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
+        }
+    )
 
     mock_conn = MagicMock()
 
@@ -212,10 +219,12 @@ def test_insert_dataframe_validates_table_and_columns():
     """Integration test: Both table and column validation work together."""
     import pandas as pd
 
-    valid_df = pd.DataFrame({
-        "id": [1, 2],
-        "name": ["a", "b"],
-    })
+    valid_df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["a", "b"],
+        }
+    )
 
     mock_conn = MagicMock()
 
@@ -239,14 +248,15 @@ def test_get_duckdb_conn_tolerates_pragma_failures(caplog):
     prevent connection success.
     """
     import logging
+
     caplog.set_level(logging.DEBUG)
 
     mock_conn = MagicMock()
 
     # Ensure _conn starts as None
-    with patch.object(duckdb_engine, '_conn', None):
+    with patch.object(duckdb_engine, "_conn", None):
         # Mock duckdb.connect to return our mock connection
-        with patch('duckdb.connect', return_value=mock_conn):
+        with patch("duckdb.connect", return_value=mock_conn):
             # Make PRAGMA execute fail
             mock_conn.execute.side_effect = RuntimeError("PRAGMA not supported")
 
@@ -265,9 +275,9 @@ def test_get_duckdb_conn_tolerates_outbox_creation_failure(caplog):
     mock_conn = MagicMock()
 
     # Ensure _conn starts as None
-    with patch.object(duckdb_engine, '_conn', None):
+    with patch.object(duckdb_engine, "_conn", None):
         # Mock duckdb.connect to return our mock connection
-        with patch('duckdb.connect', return_value=mock_conn):
+        with patch("duckdb.connect", return_value=mock_conn):
             # First two execute calls succeed (PRAGMAs), third fails (outbox)
             mock_conn.execute.side_effect = [
                 None,  # PRAGMA threads
@@ -294,10 +304,12 @@ def test_ensure_columns_validates_column_names():
     mock_conn.execute.return_value.fetchall.return_value = []
 
     # Create a DataFrame with a malicious column name
-    malicious_df = pd.DataFrame({
-        "valid_col": [1, 2, 3],
-        "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
-    })
+    malicious_df = pd.DataFrame(
+        {
+            "valid_col": [1, 2, 3],
+            "col; DROP TABLE users;--": [4, 5, 6],  # SQL injection attempt
+        }
+    )
 
     # Should raise ValueError when trying to add malicious column
     with pytest.raises(ValueError) as exc_info:
@@ -317,16 +329,19 @@ def test_ensure_columns_allows_valid_column_names():
     mock_conn.execute.return_value = mock_cur
 
     # Create a DataFrame with valid column names only
-    valid_df = pd.DataFrame({
-        "new_column_1": [1, 2, 3],
-        "AnotherColumn": [4, 5, 6],
-        "_private_col": [7, 8, 9],
-    })
+    valid_df = pd.DataFrame(
+        {
+            "new_column_1": [1, 2, 3],
+            "AnotherColumn": [4, 5, 6],
+            "_private_col": [7, 8, 9],
+        }
+    )
 
     # Should not raise - columns are valid
     duckdb_engine._ensure_columns(mock_conn, "dim_geographies", valid_df)
 
     # Verify ALTER TABLE was called for each column
-    alter_calls = [call for call in mock_conn.execute.call_args_list
-                   if "ALTER TABLE" in str(call)]
+    alter_calls = [
+        call for call in mock_conn.execute.call_args_list if "ALTER TABLE" in str(call)
+    ]
     assert len(alter_calls) == 3

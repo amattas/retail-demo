@@ -447,9 +447,7 @@ class TestEventSending:
             assert client._statistics["batches_sent"] == 1
 
     @pytest.mark.asyncio
-    async def test_send_empty_event_list(
-        self, mock_azure_sdk, valid_connection_string
-    ):
+    async def test_send_empty_event_list(self, mock_azure_sdk, valid_connection_string):
         """Test sending empty event list returns True."""
         if not AZURE_AVAILABLE:
             pytest.skip("Azure SDK not available")
@@ -640,9 +638,7 @@ class TestBatching:
             # Note: This is timing-dependent in real tests
 
     @pytest.mark.asyncio
-    async def test_flush_empty_buffer(
-        self, mock_azure_sdk, valid_connection_string
-    ):
+    async def test_flush_empty_buffer(self, mock_azure_sdk, valid_connection_string):
         """Test flushing empty buffer returns True."""
         if not AZURE_AVAILABLE:
             pytest.skip("Azure SDK not available")
@@ -688,9 +684,9 @@ class TestRetryLogic:
             # Second retry: 2^1 = 2 seconds
             # Third retry: 2^2 = 4 seconds
 
-            assert client.backoff_multiplier ** 0 == 1.0
-            assert client.backoff_multiplier ** 1 == 2.0
-            assert client.backoff_multiplier ** 2 == 4.0
+            assert client.backoff_multiplier**0 == 1.0
+            assert client.backoff_multiplier**1 == 2.0
+            assert client.backoff_multiplier**2 == 4.0
 
     @pytest.mark.asyncio
     async def test_max_retry_attempts(
@@ -1120,9 +1116,7 @@ class TestEdgeCases:
             assert client._client is None
 
     @pytest.mark.asyncio
-    async def test_very_large_batch(
-        self, mock_azure_sdk, valid_connection_string
-    ):
+    async def test_very_large_batch(self, mock_azure_sdk, valid_connection_string):
         """Test handling of very large event batch."""
         if not AZURE_AVAILABLE:
             pytest.skip("Azure SDK not available")
@@ -1310,9 +1304,7 @@ class TestConnectionTest:
                 "SharedAccessKeyName=RootManageSharedAccessKey;"
                 "SharedAccessKey=dGVzdGtleTEyM3Rlc3RrZXkxMjN0ZXN0a2V5MTIzZGVzdGtleTE="
             )
-            client = AzureEventHubClient(
-                connection_string=conn_no_entity, hub_name=""
-            )
+            client = AzureEventHubClient(connection_string=conn_no_entity, hub_name="")
 
             success, message, metadata = await client.test_connection()
 

@@ -125,9 +125,8 @@ class FactDataGenerator(
         "reorders",
     ]
 
-    # Truck unload duration constants (in minutes)
-    MIN_UNLOAD_DURATION_MINUTES = 30  # Minimum realistic unload time
-    DEFAULT_UNLOAD_DURATION_MINUTES = 60  # Default when ETA not available
+    # Note: Truck unload duration constants are defined in LogisticsMixin
+    # (MIN_UNLOAD_DURATION_MINUTES, DEFAULT_UNLOAD_DURATION_MINUTES).
 
     def __init__(
         self,
@@ -353,9 +352,10 @@ class FactDataGenerator(
             "receipt_lines": total_days * total_customers_per_day * 3,
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
+            # Estimated: ~60% of BLE pings result in zone changes
             "customer_zone_changes": total_days
             * len(self.stores)
-            * 300,  # Estimated: ~60% of BLE pings result in zone changes
+            * int(500 * 0.6),  # 60% of BLE pings (500 per store per day)
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,

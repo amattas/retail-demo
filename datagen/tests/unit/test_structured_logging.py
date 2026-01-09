@@ -1,4 +1,5 @@
 """Unit tests for structured logging functionality."""
+
 import json
 import logging
 
@@ -187,9 +188,7 @@ class TestAzureClientStructuredLogging:
         from retail_datagen.streaming.azure_client import AzureEventHubClient
 
         with caplog.at_level(logging.INFO):
-            AzureEventHubClient(
-                connection_string="mock://test", hub_name="test-hub"
-            )
+            AzureEventHubClient(connection_string="mock://test", hub_name="test-hub")
 
         # Should have logged initialization
         assert len(caplog.records) > 0
