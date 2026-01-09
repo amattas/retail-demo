@@ -3,6 +3,9 @@ Event generation factory for real-time streaming.
 
 This module provides event generation capabilities that create realistic
 retail events with proper timing patterns and correlations.
+
+The module has been modularized for maintainability while preserving
+backward compatibility through mixin inheritance.
 """
 
 import random
@@ -13,34 +16,24 @@ from datetime import datetime, timedelta
 from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from ..shared.models import (
     Customer,
-    DeviceType,
     DistributionCenter,
     InventoryReason,
-    MarketingChannel,
     ProductMaster,
     Store,
-    TenderType,
+)
+from .event_generators import (
+    CustomerEventsMixin,
+    InventoryEventsMixin,
+    LogisticsEventsMixin,
+    MarketingEventsMixin,
+    ReceiptEventsMixin,
 )
 from .schemas import (
-    AdImpressionPayload,
-    BLEPingDetectedPayload,
-    CustomerEnteredPayload,
-    CustomerZoneChangedPayload,
     EventEnvelope,
     EventType,
     InventoryUpdatedPayload,
-    OnlineOrderCreatedPayload,
     OnlineOrderPickedPayload,
     OnlineOrderShippedPayload,
-    PaymentProcessedPayload,
-    PromotionAppliedPayload,
-    ReceiptCreatedPayload,
-    ReceiptLineAddedPayload,
-    ReorderTriggeredPayload,
-    StockoutDetectedPayload,
-    StoreOperationPayload,
-    TruckArrivedPayload,
-    TruckDepartedPayload,
 )
 
 
@@ -83,7 +76,13 @@ class EventGenerationState:
             self.customer_to_campaign = {}
 
 
-class EventFactory:
+class EventFactory(
+    ReceiptEventsMixin,
+    CustomerEventsMixin,
+    InventoryEventsMixin,
+    LogisticsEventsMixin,
+    MarketingEventsMixin,
+):
     """
     Factory for generating realistic retail events.
 
@@ -92,6 +91,13 @@ class EventFactory:
     - Store-based variations (different patterns by store size/location)
     - Correlated events (receipt -> inventory -> reorder chains)
     - Seasonal effects and promotional periods
+
+    Inherits from:
+        ReceiptEventsMixin: Receipt, line item, and payment events
+        CustomerEventsMixin: Customer entry, zone change, BLE ping events
+        InventoryEventsMixin: Inventory, stockout, and reorder events
+        LogisticsEventsMixin: Truck arrival/departure, store open/close events
+        MarketingEventsMixin: Ad impression, promotion, online order events
     """
 
     def __init__(
@@ -390,810 +396,80 @@ class EventFactory:
                     events.append(event)
                     # If online order created, also emit follow-up events
                     if event.event_type == EventType.ONLINE_ORDER_CREATED:
-                        try:
-                            pl = event.payload
-                            node_type = pl.get("node_type")
-                            node_id = pl.get("node_id")
-                            product_id = self.rng.choice(list(self.products.keys()))
-                            qty_delta = -self.rng.randint(1, 3)
-                            inv_payload = InventoryUpdatedPayload(
-                                store_id=node_id if node_type == "STORE" else None,
-                                dc_id=node_id if node_type == "DC" else None,
-                                product_id=product_id,
-                                quantity_delta=qty_delta,
-                                reason=InventoryReason.SALE.value,
-                                source="ONLINE",
-                            )
-                            inv_envelope = EventEnvelope(
-                                event_type=EventType.INVENTORY_UPDATED,
-                                payload=inv_payload.model_dump(),
-                                trace_id=self.generate_trace_id(event_timestamp),
-                                ingest_timestamp=event_timestamp,
-                                partition_key=f"{node_type.lower()}_{node_id}",
-                                correlation_id=event.trace_id,
-                            )
-                            events.append(inv_envelope)
-
-                            # Order picked event (slightly later)
-                            picked_payload = OnlineOrderPickedPayload(
-                                order_id=pl.get("order_id"),
-                                node_type=node_type,
-                                node_id=node_id,
-                                fulfillment_mode=pl.get("fulfillment_mode"),
-                                picked_time=event_timestamp
-                                + timedelta(seconds=self.rng.randint(60, 900)),
-                            )
-                            events.append(
-                                EventEnvelope(
-                                    event_type=EventType.ONLINE_ORDER_PICKED,
-                                    payload=picked_payload.model_dump(),
-                                    trace_id=self.generate_trace_id(event_timestamp),
-                                    ingest_timestamp=event_timestamp,
-                                    partition_key=f"{node_type.lower()}_{node_id}",
-                                    correlation_id=event.trace_id,
-                                )
-                            )
-
-                            # Order shipped event (after pick)
-                            shipped_payload = OnlineOrderShippedPayload(
-                                order_id=pl.get("order_id"),
-                                node_type=node_type,
-                                node_id=node_id,
-                                fulfillment_mode=pl.get("fulfillment_mode"),
-                                shipped_time=event_timestamp
-                                + timedelta(seconds=self.rng.randint(900, 3600)),
-                            )
-                            events.append(
-                                EventEnvelope(
-                                    event_type=EventType.ONLINE_ORDER_SHIPPED,
-                                    payload=shipped_payload.model_dump(),
-                                    trace_id=self.generate_trace_id(event_timestamp),
-                                    ingest_timestamp=event_timestamp,
-                                    partition_key=f"{node_type.lower()}_{node_id}",
-                                    correlation_id=event.trace_id,
-                                )
-                            )
-                        except Exception:
-                            pass
+                        follow_ups = self._generate_online_order_followups(
+                            event, event_timestamp
+                        )
+                        events.extend(follow_ups)
 
         return events
 
-    # Event-specific generation methods
-
-    def _generate_receipt_created(
-        self, timestamp: datetime
-    ) -> tuple[ReceiptCreatedPayload, str, str] | None:
-        """Generate receipt created event.
-
-        Respects marketing-driven purchase likelihood.
-        """
-        # Get customers who are currently in stores and haven't made a purchase yet
-        eligible_sessions = [
-            session
-            for session in self.state.customer_sessions.values()
-            if (
-                timestamp < session["expected_exit_time"]
-                and not session["has_made_purchase"]
-                and timestamp >= session["entered_at"] + timedelta(minutes=2)
-            )  # At least 2 minutes in store
-        ]
-
-        if not eligible_sessions:
-            return None  # No eligible customers to make purchases
-
-        # Apply purchase likelihood filtering - prioritize marketing-driven customers
-        weighted_sessions = []
-        for session in eligible_sessions:
-            purchase_likelihood = session.get("purchase_likelihood", 0.4)  # Default 40%
-            # Apply probability check
-            if self.rng.random() < purchase_likelihood:
-                # Weight marketing-driven customers higher for selection
-                weight = 3 if session.get("marketing_driven", False) else 1
-                weighted_sessions.extend([session] * weight)
-
-        if not weighted_sessions:
-            return None  # No customers decided to purchase this time
-
-        session = self.rng.choice(weighted_sessions)
-        store_id = session["store_id"]
-        customer_id = session["customer_id"]
-        receipt_id = f"RCP_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
-
-        # Generate realistic receipt amounts - marketing customers spend more
-        is_marketing_driven = session.get("marketing_driven", False)
-        base_item_count = max(1, int(self.rng.gauss(4.2, 2.0)))  # From config
-
-        if is_marketing_driven:
-            # Marketing-driven customers buy 25% more items and spend 30% more
-            item_count = int(base_item_count * 1.25)
-            subtotal = self.rng.uniform(13.0, 260.0)  # 30% higher range
-        else:
-            item_count = base_item_count
-            subtotal = self.rng.uniform(10.0, 200.0)
-
-        tax_rate = 0.08  # 8% tax
-        tax = round(subtotal * tax_rate, 2)
-        total = subtotal + tax
-
-        tender_type = self.rng.choice(list(TenderType))
-
-        # Mark customer as having made a purchase and move them to checkout
-        session["has_made_purchase"] = True
-        session["current_zone"] = "CHECKOUT"
-        session["expected_exit_time"] = timestamp + timedelta(
-            minutes=self.rng.randint(2, 8)
-        )  # Exit soon after purchase
-
-        # Store receipt in active receipts for line items
-        self.state.active_receipts[receipt_id] = {
-            "store_id": store_id,
-            "customer_id": customer_id,
-            "item_count": item_count,
-            "timestamp": timestamp,
-            "marketing_driven": is_marketing_driven,
-        }
-
-        # Look up campaign_id for marketing-driven purchases (attribution tracking)
-        # Uses O(1) customer_to_campaign index instead of O(n) linear search
-        campaign_id = None
-        if is_marketing_driven:
-            campaign_id = self.state.customer_to_campaign.pop(customer_id, None)
-            # Note: pop() removes entry after lookup to prevent unbounded growth
-            # Each customer gets one attribution per marketing conversion
-
-        payload = ReceiptCreatedPayload(
-            store_id=store_id,
-            customer_id=customer_id,
-            receipt_id=receipt_id,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            tender_type=tender_type.value,
-            item_count=item_count,
-            campaign_id=campaign_id,  # Attribution tracking for marketing campaigns
-        )
-
-        return payload, receipt_id, f"store_{store_id}"
-
-    def _generate_receipt_line_added(
-        self, timestamp: datetime
-    ) -> tuple[ReceiptLineAddedPayload, str, str] | None:
-        """Generate receipt line added event."""
-        if not self.state.active_receipts:
-            return None
-
-        receipt_id = self.rng.choice(list(self.state.active_receipts.keys()))
-        receipt_info = self.state.active_receipts[receipt_id]
-
-        # Generate line item
-        product_id = self.rng.choice(list(self.products.keys()))
-        product = self.products[product_id]
-        quantity = self.rng.randint(1, 3)
-        unit_price = float(product.SalePrice)
-        extended_price = unit_price * quantity
-
-        # Randomly apply promotion
-        promo_code = None
-        if self.rng.random() < 0.2:  # 20% chance of promotion
-            promo_code = self.rng.choice(list(self.state.promotion_campaigns.keys()))
-
-        payload = ReceiptLineAddedPayload(
-            receipt_id=receipt_id,
-            line_number=self.rng.randint(1, 10),
-            product_id=product_id,
-            quantity=quantity,
-            unit_price=unit_price,
-            extended_price=extended_price,
-            promo_code=promo_code,
-        )
-
-        return payload, receipt_id, f"store_{receipt_info['store_id']}"
-
-    def _generate_payment_processed(
-        self, timestamp: datetime
-    ) -> tuple[PaymentProcessedPayload, str, str] | None:
-        """Generate payment processed event."""
-        if not self.state.active_receipts:
-            return None
-
-        receipt_id = self.rng.choice(list(self.state.active_receipts.keys()))
-        receipt_info = self.state.active_receipts[receipt_id]
-
-        payment_method = self.rng.choice(list(TenderType)).value
-        amount = round(self.rng.uniform(10.0, 200.0), 2)
-        amount_cents = int(amount * 100)
-        # Use 6-digit suffix (100000-999999) for consistency with PaymentsMixin
-        # to minimize collision risk during high-volume periods
-        transaction_id = (
-            f"TXN_{int(timestamp.timestamp())}_{self.rng.randint(100000, 999999):06d}"
-        )
-        # Processing time varies by payment method
-        processing_time_ms = self.rng.randint(500, 3000)
-        store_id = receipt_info.get("store_id")
-        customer_id = receipt_info.get("customer_id", self.rng.randint(1, 1000))
-
-        payload = PaymentProcessedPayload(
-            receipt_id=receipt_id,
-            order_id=None,  # In-store payments have no order_id
-            payment_method=payment_method,
-            amount=amount,
-            amount_cents=amount_cents,
-            transaction_id=transaction_id,
-            processing_time=timestamp,
-            processing_time_ms=processing_time_ms,
-            status="APPROVED",
-            decline_reason=None,  # Approved payments have no decline reason
-            store_id=store_id,
-            customer_id=customer_id,
-        )
-
-        # Remove receipt from active receipts after payment
-        if self.rng.random() < 0.8:  # 80% chance to complete receipt
-            del self.state.active_receipts[receipt_id]
-
-        return payload, receipt_id, f"store_{receipt_info['store_id']}"
-
-    def _generate_inventory_updated(
-        self, timestamp: datetime
-    ) -> tuple[InventoryUpdatedPayload, str, str]:
-        """Generate inventory updated event."""
-        # Decide between store or DC inventory
-        is_store = self.rng.random() < 0.7  # 70% store, 30% DC
-
-        if is_store:
-            location_id = self.rng.choice(list(self.stores.keys()))
-            store_id = location_id
-            dc_id = None
-            partition_key = f"store_{location_id}"
-        else:
-            location_id = self.rng.choice(list(self.dcs.keys()))
-            store_id = None
-            dc_id = location_id
-            partition_key = f"dc_{location_id}"
-
-        product_id = self.rng.choice(list(self.products.keys()))
-        reason = self.rng.choice(list(InventoryReason))
-
-        # Generate realistic quantity delta based on reason
-        if reason in [
-            InventoryReason.SALE,
-            InventoryReason.DAMAGED,
-            InventoryReason.LOST,
-        ]:
-            qty_delta = -self.rng.randint(1, 10)
-        else:
-            qty_delta = self.rng.randint(10, 100)
-
-        # Update internal inventory tracking
-        inventory_key = (location_id, product_id)
-        if is_store:
-            self.state.store_inventory[inventory_key] += qty_delta
-        else:
-            self.state.dc_inventory[inventory_key] += qty_delta
-
-        payload = InventoryUpdatedPayload(
-            store_id=store_id,
-            dc_id=dc_id,
-            product_id=product_id,
-            quantity_delta=qty_delta,
-            reason=reason.value,
-            source=f"truck_{self.rng.randint(1000, 9999)}" if qty_delta > 0 else None,
-        )
-
-        return payload, f"inventory_{location_id}_{product_id}", partition_key
-
-    def _generate_customer_entered(
-        self, timestamp: datetime
-    ) -> tuple[CustomerEnteredPayload, str, str]:
-        """Generate customer entered event.
-
-        Includes session tracking and marketing conversions.
-        """
-        store_id = self.rng.choice(list(self.stores.keys()))
-        sensor_id = f"SENSOR_{store_id}_1"  # Use store-specific entrance sensor
-        zone = "ENTRANCE"  # Always start at entrance
-
-        # Check for marketing-driven visits first
-        marketing_driven_customers = []
-        for impression_id, conversion in self.state.marketing_conversions.items():
-            if (
-                not conversion["converted"]
-                and timestamp >= conversion["scheduled_visit_time"]
-                and timestamp <= conversion["scheduled_visit_time"] + timedelta(hours=2)
-            ):  # 2-hour window
-                customer_id = conversion["customer_id"]
-                customer = self.customers.get(customer_id)
-                session_key = f"{customer_id}_{store_id}"
-
-                if customer and session_key not in self.state.customer_sessions:
-                    marketing_driven_customers.append(
-                        (customer, impression_id, conversion)
-                    )
-
-        # Select customers (prioritize marketing-driven visits)
-        available_customers = [
-            cust
-            for cust in self.customers.values()
-            if f"{cust.ID}_{store_id}" not in self.state.customer_sessions
-        ]
-
-        entering_customers = []
-
-        # First, add marketing-driven customers
-        if marketing_driven_customers:
-            # Select 1-2 marketing-driven customers
-            selected_marketing = self.rng.sample(
-                marketing_driven_customers,
-                min(self.rng.randint(1, 2), len(marketing_driven_customers)),
-            )
-            for customer, impression_id, conversion in selected_marketing:
-                entering_customers.append(customer)
-                # Mark conversion as completed
-                conversion["converted"] = True
-                conversion["actual_visit_time"] = timestamp
-
-        # Then add random customers if needed
-        remaining_slots = self.rng.randint(1, 3) - len(entering_customers)
-        if remaining_slots > 0 and available_customers:
-            random_customers = [
-                c for c in available_customers if c not in entering_customers
-            ]
-            if random_customers:
-                additional_customers = self.rng.sample(
-                    random_customers, min(remaining_slots, len(random_customers))
-                )
-                entering_customers.extend(additional_customers)
-
-        customer_count = len(entering_customers)
-        if customer_count == 0:
-            # Fallback: generic foot traffic event
-            customer_count = self.rng.randint(1, 2)
-        else:
-            # Create customer sessions
-            for customer in entering_customers:
-                session_id = f"{customer.ID}_{store_id}"
-                base_visit_duration = self.rng.randint(10, 45)
-
-                # Marketing-driven customers tend to stay longer and are more
-                # likely to purchase
-                is_marketing_driven = any(
-                    customer == mc[0]
-                    for mc in marketing_driven_customers
-                    if mc[0] in entering_customers
-                )
-
-                if is_marketing_driven:
-                    # 20% longer visit, higher purchase intent
-                    visit_duration = int(base_visit_duration * 1.2)
-                    purchase_likelihood = 0.8  # 80% likely to purchase
-                else:
-                    visit_duration = base_visit_duration
-                    purchase_likelihood = 0.4  # 40% likely to purchase
-
-                self.state.customer_sessions[session_id] = {
-                    "customer_id": customer.ID,
-                    "customer_ble_id": customer.BLEId,
-                    "store_id": store_id,
-                    "entered_at": timestamp,
-                    "current_zone": "ENTRANCE",
-                    "has_made_purchase": False,
-                    "expected_exit_time": timestamp + timedelta(minutes=visit_duration),
-                    "marketing_driven": is_marketing_driven,
-                    "purchase_likelihood": purchase_likelihood,
-                }
-
-        # Update store customer count
-        self.state.store_hours[store_id]["current_customers"] += customer_count
-
-        payload = CustomerEnteredPayload(
-            store_id=store_id,
-            sensor_id=sensor_id,
-            zone=zone,
-            customer_count=customer_count,
-            dwell_time=0,
-        )
-
-        return payload, f"foottraffic_{store_id}", f"store_{store_id}"
-
-    def _generate_customer_zone_changed(
-        self, timestamp: datetime
-    ) -> tuple[CustomerZoneChangedPayload, str, str] | None:
-        """Generate customer zone changed event."""
-        store_id = self.rng.choice(list(self.stores.keys()))
-        customer = self.rng.choice(list(self.customers.values()))
-        customer_ble_id = customer.BLEId
-
-        zones = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
-        from_zone = self.rng.choice(zones)
-        to_zone = self.rng.choice([z for z in zones if z != from_zone])
-
-        payload = CustomerZoneChangedPayload(
-            store_id=store_id,
-            customer_ble_id=customer_ble_id,
-            from_zone=from_zone,
-            to_zone=to_zone,
-            timestamp=timestamp,
-        )
-
-        return payload, customer_ble_id, f"store_{store_id}"
-
-    def _generate_ble_ping_detected(
-        self, timestamp: datetime
-    ) -> tuple[BLEPingDetectedPayload, str, str] | None:
-        """Generate BLE ping detected event - only for customers currently in store."""
-        # Get customers who are currently in stores
-        active_sessions = [
-            session
-            for session in self.state.customer_sessions.values()
-            if timestamp < session["expected_exit_time"]
-        ]
-
-        if not active_sessions:
-            return None  # No customers in any store
-
-        session = self.rng.choice(active_sessions)
-        store_id = session["store_id"]
-        customer_ble_id = session["customer_ble_id"]
-        current_zone = session["current_zone"]
-
-        # Use appropriate beacon for the zone
-        beacon_id = f"BEACON_{store_id}_{current_zone}"
-        rssi = self.rng.randint(-80, -30)  # Typical RSSI range
-
-        # Occasionally move customer to a different zone (20% chance)
-        zones = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
-        if self.rng.random() < 0.2:
-            new_zone = self.rng.choice([z for z in zones if z != current_zone])
-            session["current_zone"] = new_zone
-            current_zone = new_zone
-            beacon_id = f"BEACON_{store_id}_{new_zone}"
-
-        payload = BLEPingDetectedPayload(
-            store_id=store_id,
-            beacon_id=beacon_id,
-            customer_ble_id=customer_ble_id,
-            rssi=rssi,
-            zone=current_zone,
-        )
-
-        return payload, customer_ble_id, f"store_{store_id}"
-
-    def _generate_truck_arrived(
-        self, timestamp: datetime
-    ) -> tuple[TruckArrivedPayload, str, str]:
-        """Generate truck arrived event."""
-        truck_id = f"TRUCK_{self.rng.randint(1000, 9999)}"
-
-        # 70% to stores, 30% to DCs
-        if self.rng.random() < 0.7:
-            store_id = self.rng.choice(list(self.stores.keys()))
-            dc_id = None
-            partition_key = f"store_{store_id}"
-        else:
-            dc_id = self.rng.choice(list(self.dcs.keys()))
-            store_id = None
-            partition_key = f"dc_{dc_id}"
-
-        shipment_id = f"SHIP_{int(timestamp.timestamp())}_{self.rng.randint(100, 999)}"
-        estimated_unload_duration = self.rng.randint(30, 180)  # 30-180 minutes
-
-        # Track active truck
-        self.state.active_trucks[truck_id] = {
-            "store_id": store_id,
-            "dc_id": dc_id,
-            "arrival_time": timestamp,
-            "shipment_id": shipment_id,
-        }
-
-        payload = TruckArrivedPayload(
-            truck_id=truck_id,
-            store_id=store_id,
-            dc_id=dc_id,
-            shipment_id=shipment_id,
-            arrival_time=timestamp,
-            estimated_unload_duration=estimated_unload_duration,
-        )
-
-        return payload, truck_id, partition_key
-
-    def _generate_truck_departed(
-        self, timestamp: datetime
-    ) -> tuple[TruckDepartedPayload, str, str] | None:
-        """Generate truck departed event."""
-        if not self.state.active_trucks:
-            return None
-
-        truck_id = self.rng.choice(list(self.state.active_trucks.keys()))
-        truck_info = self.state.active_trucks[truck_id]
-
-        actual_unload_duration = self.rng.randint(25, 200)  # Actual vs estimated
-
-        if truck_info["store_id"]:
-            partition_key = f"store_{truck_info['store_id']}"
-        else:
-            partition_key = f"dc_{truck_info['dc_id']}"
-
-        payload = TruckDepartedPayload(
-            truck_id=truck_id,
-            store_id=truck_info["store_id"],
-            dc_id=truck_info["dc_id"],
-            shipment_id=truck_info["shipment_id"],
-            departure_time=timestamp,
-            actual_unload_duration=actual_unload_duration,
-        )
-
-        # Remove from active trucks
-        del self.state.active_trucks[truck_id]
-
-        return payload, truck_id, partition_key
-
-    def _generate_store_opened(
-        self, timestamp: datetime
-    ) -> tuple[StoreOperationPayload, str, str]:
-        """Generate store opened event."""
-        store_id = self.rng.choice(list(self.stores.keys()))
-        self.state.store_hours[store_id]["is_open"] = True
-
-        payload = StoreOperationPayload(
-            store_id=store_id, operation_time=timestamp, operation_type="opened"
-        )
-
-        return payload, f"store_ops_{store_id}", f"store_{store_id}"
-
-    def _generate_store_closed(
-        self, timestamp: datetime
-    ) -> tuple[StoreOperationPayload, str, str]:
-        """Generate store closed event."""
-        store_id = self.rng.choice(list(self.stores.keys()))
-        self.state.store_hours[store_id]["is_open"] = False
-        self.state.store_hours[store_id]["current_customers"] = 0
-
-        payload = StoreOperationPayload(
-            store_id=store_id, operation_time=timestamp, operation_type="closed"
-        )
-
-        return payload, f"store_ops_{store_id}", f"store_{store_id}"
-
-    def _generate_ad_impression(
-        self, timestamp: datetime
-    ) -> tuple[AdImpressionPayload, str, str]:
-        """Generate ad impression event with conversion tracking."""
-        channel = self.rng.choice(list(MarketingChannel))
-        campaign_id = self.rng.choice(list(self.state.promotion_campaigns.keys()))
-        creative_id = f"CRE_{self.rng.randint(1000, 9999)}"
-        customer = self.rng.choice(list(self.customers.values()))
-        customer_ad_id = customer.AdId
-        impression_id = (
-            f"IMP_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
-        )
-        cost = self.rng.uniform(0.10, 2.50)  # Cost per impression
-        device_type = self.rng.choice(list(DeviceType))
-
-        # Industry standard conversion rates by channel
-        conversion_rates = {
-            MarketingChannel.SOCIAL: 0.012,  # 1.2% - social media ads
-            MarketingChannel.SEARCH: 0.035,  # 3.5% - search ads
-            MarketingChannel.DISPLAY: 0.008,  # 0.8% - display ads
-            MarketingChannel.EMAIL: 0.025,  # 2.5% - email campaigns
-            MarketingChannel.VIDEO: 0.015,  # 1.5% - video ads
-        }
-
-        # Determine if this impression will convert to store visit
-        conversion_rate = conversion_rates.get(channel, 0.015)
-        will_convert = self.rng.random() < conversion_rate
-
-        if will_convert:
-            # Schedule conversion: customer will visit store within 1-48 hours
-            conversion_delay_hours = self.rng.uniform(1, 48)
-            conversion_time = timestamp + timedelta(hours=conversion_delay_hours)
-
-            self.state.marketing_conversions[impression_id] = {
-                "customer_id": customer.ID,
-                "customer_ad_id": customer_ad_id,
-                "campaign_id": campaign_id,
-                "channel": channel.value,
-                "scheduled_visit_time": conversion_time,
-                "converted": False,
-            }
-            # Maintain O(1) lookup index for campaign attribution
-            self.state.customer_to_campaign[customer.ID] = campaign_id
-
-        payload = AdImpressionPayload(
-            channel=channel.value,
-            campaign_id=campaign_id,
-            creative_id=creative_id,
-            customer_ad_id=customer_ad_id,
-            impression_id=impression_id,
-            cost=cost,
-            device_type=device_type.value,
-        )
-
-        return payload, impression_id, f"marketing_{channel.value}"
-
-    def _generate_promotion_applied(
-        self, timestamp: datetime
-    ) -> tuple[PromotionAppliedPayload, str, str] | None:
-        """Generate promotion applied event."""
-        if not self.state.active_receipts:
-            return None
-
-        receipt_id = self.rng.choice(list(self.state.active_receipts.keys()))
-        receipt_info = self.state.active_receipts[receipt_id]
-
-        promo_code = self.rng.choice(list(self.state.promotion_campaigns.keys()))
-        self.state.promotion_campaigns[promo_code]
-
-        discount_amount = round(self.rng.uniform(5.0, 25.0), 2)
-        discount_cents = int(discount_amount * 100)
-        discount_type = self.rng.choices(
-            ["PERCENTAGE", "FIXED_AMOUNT", "BOGO"],
-            weights=[0.7, 0.25, 0.05],
-        )[0]
-        product_ids = [
-            self.rng.choice(list(self.products.keys()))
-            for _ in range(self.rng.randint(1, 3))
-        ]
-        store_id = receipt_info["store_id"]
-        customer_id = receipt_info["customer_id"]
-
-        payload = PromotionAppliedPayload(
-            receipt_id=receipt_id,
-            promo_code=promo_code,
-            discount_amount=discount_amount,
-            discount_cents=discount_cents,
-            discount_type=discount_type,
-            product_count=len(product_ids),
-            product_ids=product_ids,
-            store_id=store_id,
-            customer_id=customer_id,
-        )
-
-        return payload, receipt_id, f"store_{receipt_info['store_id']}"
-
-    def _generate_online_order_created(
-        self, timestamp: datetime
-    ) -> tuple[OnlineOrderCreatedPayload, str, str]:
-        """Generate an online order created event with fulfillment details.
-
-        Fulfillment mode distribution:
-        - SHIP_FROM_DC: 60% (most common)
-        - SHIP_FROM_STORE: 30% (ship-from-store programs)
-        - BOPIS: 10% (buy online, pick up in store)
-        """
-        customer_id = self.rng.choice(list(self.customers.keys()))
-        mode = self.rng.choices(
-            ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10]
-        )[0]
-
-        if mode in ("SHIP_FROM_STORE", "BOPIS"):
-            node_type = "STORE"
-            node_id = self.rng.choice(list(self.stores.keys()))
-        else:
-            node_type = "DC"
-            node_id = self.rng.choice(list(self.dcs.keys()))
-
-        item_count = max(1, int(self.rng.gauss(3.5, 1.8)))
-        subtotal = self.rng.uniform(15.0, 220.0)
-        tax = round(subtotal * 0.08, 2)
-        total = subtotal + tax
-        tender_type = self.rng.choice(list(TenderType)).value
-
-        order_id = f"ONL_{int(timestamp.timestamp())}_{self.rng.randint(1000, 9999)}"
-        trace_id = self.generate_trace_id(timestamp)
-
-        payload = OnlineOrderCreatedPayload(
-            order_id=order_id,
-            customer_id=customer_id,
-            fulfillment_mode=mode,
-            node_type=node_type,
-            node_id=node_id,
-            item_count=item_count,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            tender_type=tender_type,
-        )
-
-        partition_key = f"{node_type.lower()}_{node_id}"
-        return payload, trace_id, partition_key
-
-    def _generate_stockout_detected(
-        self, timestamp: datetime
-    ) -> tuple[StockoutDetectedPayload, str, str]:
-        """Generate stockout detected event."""
-        # Find low inventory items
-        low_inventory_items = [
-            (location_id, product_id, qty)
-            for (location_id, product_id), qty in self.state.store_inventory.items()
-            if qty <= 5
-        ]
-
-        if not low_inventory_items:
-            # Generate a random stockout
-            store_id = self.rng.choice(list(self.stores.keys()))
+    def _generate_online_order_followups(
+        self, order_event: EventEnvelope, timestamp: datetime
+    ) -> list[EventEnvelope]:
+        """Generate follow-up events for an online order."""
+        followup_events = []
+        try:
+            pl = order_event.payload
+            node_type = pl.get("node_type")
+            node_id = pl.get("node_id")
             product_id = self.rng.choice(list(self.products.keys()))
-            last_known_quantity = 0
-            dc_id = None
-        else:
-            location_id, product_id, last_known_quantity = self.rng.choice(
-                low_inventory_items
+            qty_delta = -self.rng.randint(1, 3)
+            inv_payload = InventoryUpdatedPayload(
+                store_id=node_id if node_type == "STORE" else None,
+                dc_id=node_id if node_type == "DC" else None,
+                product_id=product_id,
+                quantity_delta=qty_delta,
+                reason=InventoryReason.SALE.value,
+                source="ONLINE",
             )
-            store_id = location_id
-            dc_id = None
+            inv_envelope = EventEnvelope(
+                event_type=EventType.INVENTORY_UPDATED,
+                payload=inv_payload.model_dump(),
+                trace_id=self.generate_trace_id(timestamp),
+                ingest_timestamp=timestamp,
+                partition_key=f"{node_type.lower()}_{node_id}",
+                correlation_id=order_event.trace_id,
+            )
+            followup_events.append(inv_envelope)
 
-        payload = StockoutDetectedPayload(
-            store_id=store_id,
-            dc_id=dc_id,
-            product_id=product_id,
-            last_known_quantity=last_known_quantity,
-            detection_time=timestamp,
-        )
+            # Order picked event (slightly later)
+            picked_payload = OnlineOrderPickedPayload(
+                order_id=pl.get("order_id"),
+                node_type=node_type,
+                node_id=node_id,
+                fulfillment_mode=pl.get("fulfillment_mode"),
+                picked_time=timestamp + timedelta(seconds=self.rng.randint(60, 900)),
+            )
+            followup_events.append(
+                EventEnvelope(
+                    event_type=EventType.ONLINE_ORDER_PICKED,
+                    payload=picked_payload.model_dump(),
+                    trace_id=self.generate_trace_id(timestamp),
+                    ingest_timestamp=timestamp,
+                    partition_key=f"{node_type.lower()}_{node_id}",
+                    correlation_id=order_event.trace_id,
+                )
+            )
 
-        return payload, f"stockout_{store_id}_{product_id}", f"store_{store_id}"
+            # Order shipped event (after pick)
+            shipped_payload = OnlineOrderShippedPayload(
+                order_id=pl.get("order_id"),
+                node_type=node_type,
+                node_id=node_id,
+                fulfillment_mode=pl.get("fulfillment_mode"),
+                shipped_time=timestamp + timedelta(seconds=self.rng.randint(900, 3600)),
+            )
+            followup_events.append(
+                EventEnvelope(
+                    event_type=EventType.ONLINE_ORDER_SHIPPED,
+                    payload=shipped_payload.model_dump(),
+                    trace_id=self.generate_trace_id(timestamp),
+                    ingest_timestamp=timestamp,
+                    partition_key=f"{node_type.lower()}_{node_id}",
+                    correlation_id=order_event.trace_id,
+                )
+            )
+        except Exception:
+            pass
 
-    def _generate_reorder_triggered(
-        self, timestamp: datetime
-    ) -> tuple[ReorderTriggeredPayload, str, str]:
-        """Generate reorder triggered event."""
-        store_id = self.rng.choice(list(self.stores.keys()))
-        product_id = self.rng.choice(list(self.products.keys()))
-
-        current_quantity = max(
-            0, self.state.store_inventory.get((store_id, product_id), 0)
-        )
-        reorder_point = self.rng.randint(10, 30)
-        reorder_quantity = self.rng.randint(50, 200)
-
-        priority = self.rng.choices(
-            ["NORMAL", "HIGH", "URGENT"], weights=[0.7, 0.2, 0.1]
-        )[0]
-
-        payload = ReorderTriggeredPayload(
-            store_id=store_id,
-            dc_id=None,
-            product_id=product_id,
-            current_quantity=current_quantity,
-            reorder_quantity=reorder_quantity,
-            reorder_point=reorder_point,
-            priority=priority,
-        )
-
-        return payload, f"reorder_{store_id}_{product_id}", f"store_{store_id}"
-
-    def _cleanup_expired_sessions(self, timestamp: datetime) -> None:
-        """Clean up expired customer sessions and update store occupancy."""
-        expired_sessions = []
-
-        for session_id, session in self.state.customer_sessions.items():
-            if timestamp >= session["expected_exit_time"]:
-                expired_sessions.append(session_id)
-
-                # Decrease store occupancy count
-                store_id = session["store_id"]
-                if store_id in self.state.store_hours:
-                    current_count = self.state.store_hours[store_id][
-                        "current_customers"
-                    ]
-                    self.state.store_hours[store_id]["current_customers"] = max(
-                        0, current_count - 1
-                    )
-
-        # Remove expired sessions
-        for session_id in expired_sessions:
-            del self.state.customer_sessions[session_id]
-
-        # Clean up old marketing conversions (older than 72 hours)
-        expired_conversions = []
-        cutoff_time = timestamp - timedelta(hours=72)
-
-        for impression_id, conversion in self.state.marketing_conversions.items():
-            scheduled_time = conversion["scheduled_visit_time"]
-            if scheduled_time < cutoff_time:
-                expired_conversions.append(impression_id)
-
-        for impression_id in expired_conversions:
-            conversion = self.state.marketing_conversions[impression_id]
-            customer_id = conversion["customer_id"]
-            # Clean up O(1) lookup index
-            self.state.customer_to_campaign.pop(customer_id, None)
-            del self.state.marketing_conversions[impression_id]
+        return followup_events

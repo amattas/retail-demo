@@ -35,8 +35,10 @@ from .common import (
     ShoppingBehaviorType,
 )
 from .customer_journey import CustomerJourneySimulator
+from .disruption_simulator import DisruptionMixin
 from .inventory_flow import InventoryFlowSimulator
 from .marketing_campaign import MarketingCampaignSimulator
+from .truck_operations import TruckOperationsMixin
 
 __all__ = [
     # Simulators
@@ -44,6 +46,9 @@ __all__ = [
     "InventoryFlowSimulator",
     "MarketingCampaignSimulator",
     "BusinessRulesEngine",
+    # Mixins (for advanced use/extension)
+    "TruckOperationsMixin",
+    "DisruptionMixin",
     # Common types and enums
     "ShoppingBehaviorType",
     "CustomerSegment",
