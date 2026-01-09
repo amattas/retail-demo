@@ -78,13 +78,16 @@ class StoreOpsMixin:
             elif close_modifier == "am" and close_hour == 12:
                 close_hour = 0
 
-        # Validate and fix any edge cases
+        # Validate and fix edge cases for late-night operations
         if close_hour <= open_hour and close_hour != 24:
-            # If close is before open, assume it's next day
+            # If close is before open, assume it's next day (late-night operation)
             if close_hour == 0:
                 close_hour = 24
             elif close_hour < open_hour:
-                close_hour += 12
+                # For late-night stores (e.g., 10pm-2am), add 24 to represent
+                # closing time as next-day hours. This correctly handles stores
+                # that close after midnight.
+                close_hour += 24
 
         return (open_hour, close_hour)
 
@@ -116,10 +119,10 @@ class StoreOpsMixin:
         open_time = day_date.replace(hour=open_hour, minute=0, second=0, microsecond=0)
         operations.append(
             {
-                "TraceId": self._generate_trace_id(),
-                "EventTS": open_time,
-                "StoreID": store.ID,
-                "OperationType": "opened",
+                "trace_id": self._generate_trace_id(),
+                "event_ts": open_time,
+                "store_id": store.ID,
+                "operation_type": "opened",
             }
         )
 
@@ -134,10 +137,10 @@ class StoreOpsMixin:
 
         operations.append(
             {
-                "TraceId": self._generate_trace_id(),
-                "EventTS": close_time,
-                "StoreID": store.ID,
-                "OperationType": "closed",
+                "trace_id": self._generate_trace_id(),
+                "event_ts": close_time,
+                "store_id": store.ID,
+                "operation_type": "closed",
             }
         )
 

@@ -159,6 +159,12 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                 except Exception as e:
                     # Non-fatal if creation fails here; callers may retry
                     logger.warning(f"Failed to create outbox table during init: {e}")
+                # Ensure fact_store_ops table exists with proper schema
+                try:
+                    ensure_fact_store_ops_table(new_conn)
+                except Exception as e:
+                    # Non-fatal if creation fails here; table can be created on first insert
+                    logger.debug(f"Failed to create fact_store_ops table during init: {e}")
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -334,6 +340,51 @@ def insert_records(
 ) -> int:
     df = pd.DataFrame.from_records(list(records))
     return insert_dataframe(conn, table, df)
+
+
+# ================================
+# Fact Table Schema Helpers (DuckDB)
+# ================================
+
+
+def ensure_fact_store_ops_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create the fact_store_ops table if it does not exist.
+
+    This ensures the table schema is defined before any inserts,
+    preventing runtime failures when the generator attempts to insert records.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fact_store_ops (
+            trace_id VARCHAR,
+            event_ts TIMESTAMP,
+            store_id INTEGER,
+            operation_type VARCHAR
+        );
+        """
+    )
+    # Add any missing columns for backward compatibility
+    try:
+        existing = _current_columns(conn, "fact_store_ops")
+
+        def _ensure(col: str, type_sql: str) -> None:
+            if col not in existing:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE fact_store_ops ADD COLUMN {col} {type_sql}"
+                    )
+                    existing.add(col)
+                except Exception as e:
+                    logger.debug(f"Failed to add column {col} to fact_store_ops: {e}")
+
+        _ensure("trace_id", "VARCHAR")
+        _ensure("event_ts", "TIMESTAMP")
+        _ensure("store_id", "INTEGER")
+        _ensure("operation_type", "VARCHAR")
+    except Exception as e:
+        logger.warning(
+            f"Failed to ensure columns on fact_store_ops: {e}"
+        )
 
 
 # ================================
