@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from .base_types import FactGeneratorBase
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PersistenceMixin:
+class PersistenceMixin(FactGeneratorBase):
     """Database persistence and data mapping methods."""
 
     def _get_model_for_table(self, table_name: str) -> type[DeclarativeBase]:
@@ -841,11 +843,15 @@ class PersistenceMixin:
                 receipts_model = self._get_model_for_table("receipts")
                 from sqlalchemy import select
 
+                # SQLAlchemy ORM columns are dynamically defined; mypy can't see them
                 rows = (
                     await session.execute(
                         select(
-                            receipts_model.receipt_id, receipts_model.receipt_id_ext
-                        ).where(receipts_model.receipt_id_ext.in_(ext_ids))
+                            receipts_model.receipt_id,  # type: ignore[attr-defined]
+                            receipts_model.receipt_id_ext,  # type: ignore[attr-defined]
+                        ).where(
+                            receipts_model.receipt_id_ext.in_(ext_ids)  # type: ignore[attr-defined]
+                        )
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -878,11 +884,15 @@ class PersistenceMixin:
                 headers_model = self._get_model_for_table("online_orders")
                 from sqlalchemy import select
 
+                # SQLAlchemy ORM columns are dynamically defined; mypy can't see them
                 rows = (
                     await session.execute(
                         select(
-                            headers_model.order_id, headers_model.order_id_ext
-                        ).where(headers_model.order_id_ext.in_(ext_ids))
+                            headers_model.order_id,  # type: ignore[attr-defined]
+                            headers_model.order_id_ext,  # type: ignore[attr-defined]
+                        ).where(
+                            headers_model.order_id_ext.in_(ext_ids)  # type: ignore[attr-defined]
+                        )
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -952,7 +962,9 @@ class PersistenceMixin:
 
                 # Use bulk insert for performance
                 # Note: This doesn't populate auto-increment IDs back to Python objects
-                await session.execute(model_class.__table__.insert(), batch)
+                # __table__ is typed as FromClause but is actually Table at runtime
+                stmt = model_class.__table__.insert()  # type: ignore[attr-defined]
+                await session.execute(stmt, batch)
                 # Flush to DB
                 await session.flush()
 

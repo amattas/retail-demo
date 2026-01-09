@@ -18,11 +18,12 @@ from ..retail_patterns import (
     InventoryFlowSimulator,
     MarketingCampaignSimulator,
 )
+from .base_types import FactGeneratorBase
 
 logger = logging.getLogger(__name__)
 
 
-class DataLoadingMixin:
+class DataLoadingMixin(FactGeneratorBase):
     """Master data loading and normalization methods."""
 
     @staticmethod

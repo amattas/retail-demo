@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import logging
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class CustomerZoneChangesMixin:
+class CustomerZoneChangesMixin(FactGeneratorBase):
     """Customer zone change tracking derived from BLE ping sequences"""
 
     def _generate_customer_zone_changes(self, ble_pings: list[dict]) -> list[dict]:

@@ -11,13 +11,15 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from .base_types import FactGeneratorBase
+
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
 
 
-class StockoutsMixin:
+class StockoutsMixin(FactGeneratorBase):
     """Stockout detection and tracking mixin for fact data generation."""
 
     def _detect_and_record_stockout(

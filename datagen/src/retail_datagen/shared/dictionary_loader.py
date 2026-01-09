@@ -439,11 +439,15 @@ class DictionaryLoader:
             "product_brands" in self._loaded_data
             and "product_companies" in self._loaded_data
         ):
+            # _loaded_data is typed as dict[str, list[BaseModel]] for flexibility,
+            # but at runtime these are ProductCompanyDict/ProductBrandDict with Company
             companies = {
-                item.Company for item in self._loaded_data["product_companies"]
+                item.Company  # type: ignore[attr-defined]
+                for item in self._loaded_data["product_companies"]
             }
             brand_companies = {
-                item.Company for item in self._loaded_data["product_brands"]
+                item.Company  # type: ignore[attr-defined]
+                for item in self._loaded_data["product_brands"]
             }
 
             missing_companies = brand_companies - companies

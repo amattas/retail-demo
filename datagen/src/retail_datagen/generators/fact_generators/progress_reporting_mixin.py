@@ -12,11 +12,12 @@ from collections.abc import Callable
 from typing import Any
 
 from ..progress_tracker import TableProgressTracker
+from .base_types import FactGeneratorBase
 
 logger = logging.getLogger(__name__)
 
 
-class ProgressReportingMixin:
+class ProgressReportingMixin(FactGeneratorBase):
     """Progress reporting and callback management for fact generation."""
 
     def _reset_table_states(self) -> None:

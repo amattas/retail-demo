@@ -11,10 +11,12 @@ from retail_datagen.generators.online_order_generator import (
     generate_online_orders_with_lifecycle,
 )
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class OnlineOrdersMixin:
+class OnlineOrdersMixin(FactGeneratorBase):
     """Online order generation with lifecycle tracking"""
 
     def _generate_online_orders(

@@ -188,7 +188,7 @@ class GenerationStateManager:
         """
         from pathlib import Path
 
-        results = {
+        results: dict[str, bool | list[str]] = {
             "state_reset": False,
             "master_data_cleared": False,
             "facts_data_cleared": False,
@@ -240,7 +240,7 @@ class GenerationStateManager:
         import shutil
         from pathlib import Path
 
-        results = {
+        results: dict[str, bool | list[str]] = {
             "state_reset": False,
             "facts_data_cleared": False,
             "files_deleted": [],

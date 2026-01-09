@@ -9,10 +9,12 @@ from datetime import datetime, timedelta
 
 from retail_datagen.shared.models import ProductMaster
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class SeasonalMixin:
+class SeasonalMixin(FactGeneratorBase):
     """Seasonal patterns and holiday-specific logic for product promotions"""
 
     def _thanksgiving_date(self, year: int) -> datetime:

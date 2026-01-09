@@ -15,10 +15,12 @@ from retail_datagen.shared.models import (
     TenderType,
 )
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class UtilsMixin:
+class UtilsMixin(FactGeneratorBase):
     """Utility helper methods for fact generation."""
 
     def _get_available_products_for_date(self, date: datetime) -> list[ProductMaster]:

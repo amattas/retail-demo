@@ -11,10 +11,12 @@ from typing import Any
 
 from retail_datagen.shared.models import Store
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class StoreOpsMixin:
+class StoreOpsMixin(FactGeneratorBase):
     """Store operations generation for open/close events"""
 
     def _parse_operating_hours(self, hours_str: str | None) -> tuple[int, int]:
