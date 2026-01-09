@@ -46,8 +46,27 @@ class FactGeneratorBase:
     """
     Base class providing type annotations for fact generator mixins.
 
-    This class declares the attributes that mixins expect to access on `self`.
-    The actual implementations are in core.py's FactDataGenerator class.
+    This class enables mypy to understand the mixin pattern used by
+    FactDataGenerator. All mixins inherit from this class to get type
+    checking support for cross-mixin calls.
+
+    MAINTENANCE CONTRACT:
+    ---------------------
+    1. Attributes here must match those in core.py FactDataGenerator.__init__
+    2. Method signatures must match actual implementations in the mixins
+    3. When adding a new attribute to FactDataGenerator, add it here too
+    4. When adding a cross-mixin method, add a stub here
+    5. The `...` body in method stubs is intentional - implementations in mixins
+
+    Type checking flow:
+    - Mixins inherit from FactGeneratorBase (for type hints)
+    - FactDataGenerator inherits from all mixins (for implementations)
+    - mypy sees attributes/methods via FactGeneratorBase
+    - Runtime uses actual implementations from mixins
+
+    See also:
+    - core.py: FactDataGenerator class with actual attribute initialization
+    - *_mixin.py: Mixin classes with actual method implementations
     """
 
     # Configuration

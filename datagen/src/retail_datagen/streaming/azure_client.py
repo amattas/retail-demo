@@ -790,6 +790,9 @@ class AzureEventHubClient:
             # Create a temporary producer client with short timeout
             logger.info(f"Testing connection to Event Hub: {hub_name}")
 
+            # azure-eventhub lacks type stubs, so mypy doesn't know
+            # EventHubProducerClient supports async context management.
+            # SDK docs confirm this pattern: https://learn.microsoft.com/azure
             async with EventHubProducerClient.from_connection_string(  # type: ignore[attr-defined]
                 conn_str=self.connection_string,
                 eventhub_name=hub_name,
