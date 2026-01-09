@@ -78,14 +78,23 @@ class TestStoreOpsMixin:
         assert open_hour == 8
         assert close_hour == 22
 
-    def test_parse_operating_hours_late_night(self, generator):
-        """Test parsing late-night store hours that span midnight (e.g., 10pm-2am)."""
+    @pytest.mark.parametrize(
+        "hours_str,expected_open,expected_close",
+        [
+            ("10pm-2am", 22, 26),  # 10pm to 2am next day
+            ("11pm-1am", 23, 25),  # 11pm to 1am next day
+            ("8pm-6am", 20, 30),   # 8pm to 6am next day (overnight shift)
+            ("6pm-midnight", 18, 24),  # 6pm to midnight (should not add 24)
+        ],
+    )
+    def test_parse_operating_hours_late_night(
+        self, generator, hours_str, expected_open, expected_close
+    ):
+        """Test parsing late-night store hours that span midnight."""
         # This tests the fix for issue #96
-        open_hour, close_hour = generator._parse_operating_hours("10pm-2am")
-        assert open_hour == 22  # 10pm
-        # close_hour should be 26 (2am next day = 2 + 24)
-        # The store closes at 2am the next day
-        assert close_hour == 26
+        open_hour, close_hour = generator._parse_operating_hours(hours_str)
+        assert open_hour == expected_open
+        assert close_hour == expected_close
 
     def test_generate_store_operations_for_day(self, generator, sample_store):
         """Test generating store operations for a single day."""

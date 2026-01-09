@@ -93,6 +93,14 @@ class StoreOpsMixin:
                 # that close after midnight.
                 close_hour += 24
 
+        # Validate that close_hour is not unreasonably far in the future
+        # (more than 48 hours would indicate a parsing error)
+        if close_hour > 48:
+            logger.warning(
+                f"Invalid close_hour {close_hour} for '{hours_str}', using default 8am-10pm"
+            )
+            return (8, 22)
+
         return (open_hour, close_hour)
 
     def _generate_store_operations_for_day(
