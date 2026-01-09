@@ -164,7 +164,9 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     ensure_fact_store_ops_table(new_conn)
                 except Exception as e:
                     # Non-fatal if creation fails here; table can be created on first insert
-                    logger.debug(f"Failed to create fact_store_ops table during init: {e}")
+                    logger.debug(
+                        f"Failed to create fact_store_ops table during init: {e}"
+                    )
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -382,9 +384,7 @@ def ensure_fact_store_ops_table(conn: duckdb.DuckDBPyConnection) -> None:
         _ensure("store_id", "INTEGER")
         _ensure("operation_type", "VARCHAR")
     except Exception as e:
-        logger.warning(
-            f"Failed to ensure columns on fact_store_ops: {e}"
-        )
+        logger.warning(f"Failed to ensure columns on fact_store_ops: {e}")
 
 
 # ================================
