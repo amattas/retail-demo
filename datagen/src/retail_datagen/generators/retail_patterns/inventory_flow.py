@@ -1325,3 +1325,15 @@ class InventoryFlowSimulator:
         return self.get_store_balance(
             store_id, product_id
         ) + self.get_in_transit_quantity(store_id, product_id)
+
+    def get_reorder_point(self, store_id: int, product_id: int) -> int:
+        """Get reorder point for a store-product combination.
+
+        Args:
+            store_id: Store identifier
+            product_id: Product identifier
+
+        Returns:
+            Reorder point quantity (defaults to 10 if not set)
+        """
+        return self._reorder_points.get((store_id, product_id), 10)

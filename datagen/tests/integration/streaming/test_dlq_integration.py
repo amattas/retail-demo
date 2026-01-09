@@ -1,6 +1,7 @@
 """
 Integration tests for DLQ error recovery with full streaming system.
 """
+
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 

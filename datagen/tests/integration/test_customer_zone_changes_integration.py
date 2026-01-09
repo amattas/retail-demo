@@ -83,9 +83,7 @@ async def test_customer_zone_changes_generation(small_config):
         print(f"Generated {zone_change_count} zone change records")
 
         # Also verify BLE pings were generated (prerequisite for zone changes)
-        ble_ping_result = conn.execute(
-            "SELECT COUNT(*) FROM fact_ble_pings"
-        ).fetchone()
+        ble_ping_result = conn.execute("SELECT COUNT(*) FROM fact_ble_pings").fetchone()
         ble_ping_count = ble_ping_result[0] if ble_ping_result else 0
 
         print(f"Generated {ble_ping_count} BLE ping records")
@@ -103,13 +101,22 @@ async def test_customer_zone_changes_generation(small_config):
         # Verify schema of zone change records
         if zone_change_count > 0:
             # Get column names
-            columns = [desc[0] for desc in conn.execute(
-                "SELECT * FROM fact_customer_zone_changes LIMIT 0"
-            ).description]
+            columns = [
+                desc[0]
+                for desc in conn.execute(
+                    "SELECT * FROM fact_customer_zone_changes LIMIT 0"
+                ).description
+            ]
 
             # Verify required columns exist (case-insensitive)
             columns_lower = [c.lower() for c in columns]
-            required_fields = ["eventts", "storeid", "customerbleid", "fromzone", "tozone"]
+            required_fields = [
+                "eventts",
+                "storeid",
+                "customerbleid",
+                "fromzone",
+                "tozone",
+            ]
             for field in required_fields:
                 assert field in columns_lower, f"Missing required field: {field}"
 
@@ -159,22 +166,30 @@ async def test_zone_changes_follow_ble_pings(small_config):
         customer_ble_id = sample_customer[0]
 
         # Get all BLE pings for this customer, ordered by time
-        pings = conn.execute("""
+        pings = conn.execute(
+            """
             SELECT EventTS, Zone
             FROM fact_ble_pings
             WHERE CustomerBLEId = ?
             ORDER BY EventTS
-        """, [customer_ble_id]).fetchall()
+        """,
+            [customer_ble_id],
+        ).fetchall()
 
         # Get all zone changes for this customer
-        changes = conn.execute("""
+        changes = conn.execute(
+            """
             SELECT EventTS, FromZone, ToZone
             FROM fact_customer_zone_changes
             WHERE CustomerBLEId = ?
             ORDER BY EventTS
-        """, [customer_ble_id]).fetchall()
+        """,
+            [customer_ble_id],
+        ).fetchall()
 
-        print(f"Customer {customer_ble_id}: {len(pings)} pings, {len(changes)} zone changes")
+        print(
+            f"Customer {customer_ble_id}: {len(pings)} pings, {len(changes)} zone changes"
+        )
 
         # Each zone change should correspond to an actual zone transition in BLE pings
         if len(changes) > 0:

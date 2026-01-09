@@ -23,7 +23,9 @@ class TestCredentialIntegration:
             "EntityPath=test-hub"
         )
 
-        with patch.dict(os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": test_conn_str}):
+        with patch.dict(
+            os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": test_conn_str}
+        ):
             # Create config with empty azure_connection_string
             config = RealtimeConfig(
                 emit_interval_ms=500,
@@ -44,7 +46,9 @@ class TestCredentialIntegration:
         )
 
         # Clear environment variable
-        with patch.dict(os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": ""}, clear=True):
+        with patch.dict(
+            os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": ""}, clear=True
+        ):
             config = RealtimeConfig(
                 emit_interval_ms=500,
                 burst=100,
@@ -109,7 +113,9 @@ class TestCredentialIntegration:
             "EntityPath=retail-hub"
         )
 
-        with patch.dict(os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": test_conn_str}):
+        with patch.dict(
+            os.environ, {"AZURE_EVENTHUB_CONNECTION_STRING": test_conn_str}
+        ):
             config = RetailConfig(
                 seed=42,
                 volume={
@@ -125,7 +131,11 @@ class TestCredentialIntegration:
                     "burst": 100,
                     "azure_connection_string": "",  # Empty - should load from env
                 },
-                paths={"dict": "data/dictionaries", "master": "data/master", "facts": "data/facts"},
+                paths={
+                    "dict": "data/dictionaries",
+                    "master": "data/master",
+                    "facts": "data/facts",
+                },
                 stream={"hub": "test-hub"},
             )
 
@@ -178,6 +188,7 @@ class TestSecurityWarnings:
     def test_security_warning_fires_when_credential_in_config_only(self, caplog):
         """Test that security warning fires when credential is in config but not env var."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         config_conn_str = (
@@ -197,11 +208,15 @@ class TestSecurityWarnings:
 
             # Security warning should be logged
             assert "SECURITY WARNING" in caplog.text
-            assert "azure_connection_string" in caplog.text.lower() or "connection string" in caplog.text.lower()
+            assert (
+                "azure_connection_string" in caplog.text.lower()
+                or "connection string" in caplog.text.lower()
+            )
 
     def test_no_security_warning_when_credential_from_env_var(self, caplog):
         """Test that no security warning fires when credential comes from env var."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         env_conn_str = (
@@ -225,6 +240,7 @@ class TestSecurityWarnings:
     def test_no_security_warning_when_empty_credential(self, caplog):
         """Test that no security warning fires when no credential is set."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         # No credential set anywhere
