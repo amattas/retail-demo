@@ -83,8 +83,9 @@ class PromotionsMixin(FactGeneratorBase):
                 qty = int(line.get("Qty", 1))
 
                 # Calculate line discount
+                # Use max() to ensure non-negative discount in case of rounding issues
                 pre_discount_total = unit_price * qty
-                line_discount = pre_discount_total - ext_price
+                line_discount = max(Decimal("0.00"), pre_discount_total - ext_price)
 
                 if line_discount > Decimal("0.00"):
                     promo_discount += line_discount

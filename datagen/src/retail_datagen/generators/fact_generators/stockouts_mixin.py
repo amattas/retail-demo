@@ -66,11 +66,24 @@ class StockoutsMixin(FactGeneratorBase):
         self._last_stockout_detection[key] = detection_time
 
         # Build stockout record matching the schema
+        store_id = node_id if node_type == "STORE" else None
+        dc_id = node_id if node_type == "DC" else None
+
+        # Validate mutual exclusivity: exactly one of StoreID or DCID must be set
+        has_store = store_id is not None
+        has_dc = dc_id is not None
+        if has_store == has_dc:
+            logger.error(
+                f"Invalid stockout: exactly one of StoreID or DCID must be set. "
+                f"Got StoreID={store_id}, DCID={dc_id}, node_type={node_type}"
+            )
+            return None
+
         stockout_record = {
             "TraceId": self._generate_trace_id(),
             "EventTS": detection_time,
-            "StoreID": node_id if node_type == "STORE" else None,
-            "DCID": node_id if node_type == "DC" else None,
+            "StoreID": store_id,
+            "DCID": dc_id,
             "ProductID": product_id,
             "LastKnownQuantity": max(0, last_known_quantity),
             "DetectionTime": detection_time,

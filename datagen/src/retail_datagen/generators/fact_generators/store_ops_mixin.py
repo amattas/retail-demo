@@ -55,8 +55,8 @@ class StoreOpsMixin(FactGeneratorBase):
         match = re.search(pattern, hours_str)
 
         if not match:
-            # Fallback to standard hours
-            logger.debug(
+            # Fallback to standard hours - warn as this may indicate data quality issue
+            logger.warning(
                 f"Could not parse operating hours '{hours_str}', using default 8am-10pm"
             )
             return (8, 22)
