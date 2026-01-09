@@ -11,7 +11,6 @@ import random
 import string
 
 from retail_datagen.shared.models import GeographyDict
-from retail_datagen.shared.validators import SyntheticDataValidator
 
 
 class AddressGenerator:
@@ -90,9 +89,6 @@ class AddressGenerator:
             "Jackson",
         ]
 
-        # Initialize validator for safety checks
-        self.validator = SyntheticDataValidator()
-
     def generate_address(
         self, geography: GeographyDict, address_type: str = "residential"
     ) -> str:
@@ -133,16 +129,7 @@ class AddressGenerator:
         street_type = self._rng.choice(self.street_types)
 
         # Compose address
-        address = f"{street_number} {prefix}{street_name} {street_type}, {geography.City}, {geography.State} {geography.Zip}"
-
-        # Validate synthetic safety
-        if not self.validator.is_synthetic_address(address):
-            # Fallback to safe synthetic pattern
-            safe_number = self._rng.randint(1000, 9999)
-            safe_name = f"Synthetic{safe_number % 1000}"
-            address = f"{safe_number} {safe_name} {street_type}, {geography.City}, {geography.State} {geography.Zip}"
-
-        return address
+        return f"{street_number} {prefix}{street_name} {street_type}, {geography.City}, {geography.State} {geography.Zip}"
 
 
 class IdentifierGenerator:
