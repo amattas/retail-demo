@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from retail_datagen.shared.dependencies import (
+    MAX_TASK_AGE_LIMIT_HOURS,
     TASK_CLEANUP_MAX_AGE_HOURS,
     TaskStatus,
     _background_tasks,
@@ -947,9 +948,11 @@ class TestTaskCleanup:
             cleanup_old_tasks(max_age_hours=-1)
 
     def test_cleanup_exceeds_max_hours_raises_error(self):
-        """Test that max_age_hours > 720 raises ValueError."""
-        with pytest.raises(ValueError, match="max_age_hours must not exceed 720"):
-            cleanup_old_tasks(max_age_hours=721)
+        """Test that max_age_hours > MAX_TASK_AGE_LIMIT_HOURS raises ValueError."""
+        with pytest.raises(
+            ValueError, match=f"max_age_hours must not exceed {MAX_TASK_AGE_LIMIT_HOURS}"
+        ):
+            cleanup_old_tasks(max_age_hours=MAX_TASK_AGE_LIMIT_HOURS + 1)
 
     def test_cleanup_edge_case_zero_hours(self):
         """Test cleanup with zero hours removes all completed tasks."""
