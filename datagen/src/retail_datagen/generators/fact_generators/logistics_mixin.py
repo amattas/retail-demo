@@ -47,9 +47,7 @@ class LogisticsMixin:
     DEFAULT_UNLOAD_DURATION_MINUTES = 60
 
     @classmethod
-    def _calculate_reorder_priority(
-        cls, reorder_point: int, current_qty: int
-    ) -> str:
+    def _calculate_reorder_priority(cls, reorder_point: int, current_qty: int) -> str:
         """Calculate reorder priority based on inventory deficit percentage.
 
         Args:

@@ -162,7 +162,9 @@ def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
 # Bounds: max age 1-720 hours (1 hour to 30 days), threshold 100-100000 tasks
 MAX_TASK_AGE_HOURS = 720  # 30 days maximum retention
 MAX_TASK_AGE_LIMIT_HOURS = 8760  # 1 year absolute maximum for manual cleanup
-TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int("TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, MAX_TASK_AGE_HOURS)
+TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int(
+    "TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, MAX_TASK_AGE_HOURS
+)
 TASK_CLEANUP_THRESHOLD = _parse_env_int("TASK_CLEANUP_THRESHOLD", 1000, 100, 100000)
 # Cooldown period between automatic cleanups (in seconds)
 TASK_CLEANUP_COOLDOWN_SECONDS = 300  # 5 minutes
