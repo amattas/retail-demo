@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from retail_datagen.shared.models import Store
@@ -28,8 +28,12 @@ class StoreOpsMixin:
             Tuple of (open_hour, close_hour) in 24-hour format
 
         Note:
-            Returns (0, 24) for 24/7 stores
-            Returns (8, 22) as default for standard hours
+            - Returns (0, 24) for 24/7 stores
+            - Returns (8, 22) as default for standard hours
+            - For late-night stores that close after midnight (e.g., "10pm-2am"),
+              close_hour uses values > 24 to represent next-day hours (e.g., 26 for 2am).
+              This simplifies time range checks: if close_hour > 24, store closes after midnight.
+              The actual close event timestamp is generated correctly using datetime arithmetic.
         """
         if not hours_str:
             # Default to standard hours (8am-10pm)
@@ -78,13 +82,25 @@ class StoreOpsMixin:
             elif close_modifier == "am" and close_hour == 12:
                 close_hour = 0
 
-        # Validate and fix any edge cases
+        # Validate and fix edge cases for late-night operations
         if close_hour <= open_hour and close_hour != 24:
-            # If close is before open, assume it's next day
+            # If close is before open, assume it's next day (late-night operation)
             if close_hour == 0:
                 close_hour = 24
             elif close_hour < open_hour:
-                close_hour += 12
+                # For late-night stores (e.g., 10pm-2am), add 24 to represent
+                # closing time as next-day hours. This correctly handles stores
+                # that close after midnight.
+                close_hour += 24
+
+        # Validate that close_hour is not unreasonably far in the future
+        # Max of 36 allows stores open until noon next day (reasonable limit)
+        # Values above this likely indicate parsing errors
+        if close_hour > 36:
+            logger.warning(
+                f"Invalid close_hour {close_hour} for '{hours_str}', using default 8am-10pm"
+            )
+            return (8, 22)
 
         return (open_hour, close_hour)
 
@@ -116,28 +132,37 @@ class StoreOpsMixin:
         open_time = day_date.replace(hour=open_hour, minute=0, second=0, microsecond=0)
         operations.append(
             {
-                "TraceId": self._generate_trace_id(),
-                "EventTS": open_time,
-                "StoreID": store.ID,
-                "OperationType": "opened",
+                "trace_id": self._generate_trace_id(),
+                "operation_time": open_time,
+                "store_id": store.ID,
+                "operation_type": "opened",
             }
         )
 
         # Generate closed event
-        # Handle midnight close (close_hour == 24)
+        # Handle midnight close (close_hour == 24) and late-night closes (close_hour > 24)
         if close_hour == 24:
+            # Midnight: use 23:59:59 on the same day
             close_time = day_date.replace(hour=23, minute=59, second=59, microsecond=0)
+        elif close_hour > 24:
+            # Late-night close after midnight (e.g., close_hour=26 for 2am next day)
+            # Convert to next day with proper hour (26 -> next day at 2am)
+            actual_hour = close_hour - 24
+            close_time = (day_date + timedelta(days=1)).replace(
+                hour=actual_hour, minute=0, second=0, microsecond=0
+            )
         else:
+            # Standard close time on the same day
             close_time = day_date.replace(
                 hour=close_hour, minute=0, second=0, microsecond=0
             )
 
         operations.append(
             {
-                "TraceId": self._generate_trace_id(),
-                "EventTS": close_time,
-                "StoreID": store.ID,
-                "OperationType": "closed",
+                "trace_id": self._generate_trace_id(),
+                "operation_time": close_time,
+                "store_id": store.ID,
+                "operation_type": "closed",
             }
         )
 

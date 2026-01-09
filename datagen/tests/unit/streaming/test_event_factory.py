@@ -1185,9 +1185,7 @@ class TestMarketingEventBehaviors:
         assert 100 < fixed_count < 400, (
             f"FIXED_AMOUNT count {fixed_count} outside expected range"
         )
-        assert bogo_count < 150, (
-            f"BOGO count {bogo_count} outside expected range"
-        )
+        assert bogo_count < 150, f"BOGO count {bogo_count} outside expected range"
 
 
 # ================================

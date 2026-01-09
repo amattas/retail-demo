@@ -78,6 +78,24 @@ class TestStoreOpsMixin:
         assert open_hour == 8
         assert close_hour == 22
 
+    @pytest.mark.parametrize(
+        "hours_str,expected_open,expected_close",
+        [
+            ("10pm-2am", 22, 26),  # 10pm to 2am next day
+            ("11pm-1am", 23, 25),  # 11pm to 1am next day
+            ("8pm-6am", 20, 30),  # 8pm to 6am next day (overnight shift)
+            ("6pm-midnight", 18, 24),  # 6pm to midnight (should not add 24)
+        ],
+    )
+    def test_parse_operating_hours_late_night(
+        self, generator, hours_str, expected_open, expected_close
+    ):
+        """Test parsing late-night store hours that span midnight."""
+        # This tests the fix for issue #96
+        open_hour, close_hour = generator._parse_operating_hours(hours_str)
+        assert open_hour == expected_open
+        assert close_hour == expected_close
+
     def test_generate_store_operations_for_day(self, generator, sample_store):
         """Test generating store operations for a single day."""
         test_date = datetime(2024, 1, 15, 0, 0, 0)
@@ -90,19 +108,19 @@ class TestStoreOpsMixin:
 
         # Check opened event
         opened = operations[0]
-        assert opened["StoreID"] == 1
-        assert opened["OperationType"] == "opened"
-        assert opened["EventTS"].hour == 8
-        assert opened["EventTS"].minute == 0
-        assert "TraceId" in opened
+        assert opened["store_id"] == 1
+        assert opened["operation_type"] == "opened"
+        assert opened["operation_time"].hour == 8
+        assert opened["operation_time"].minute == 0
+        assert "trace_id" in opened
 
         # Check closed event
         closed = operations[1]
-        assert closed["StoreID"] == 1
-        assert closed["OperationType"] == "closed"
-        assert closed["EventTS"].hour == 22
-        assert closed["EventTS"].minute == 0
-        assert "TraceId" in closed
+        assert closed["store_id"] == 1
+        assert closed["operation_type"] == "closed"
+        assert closed["operation_time"].hour == 22
+        assert closed["operation_time"].minute == 0
+        assert "trace_id" in closed
 
     def test_generate_store_operations_christmas(self, generator, sample_store):
         """Test that stores are closed on Christmas Day."""
@@ -131,12 +149,12 @@ class TestStoreOpsMixin:
         assert len(operations) == 2
 
         opened = operations[0]
-        assert opened["EventTS"].hour == 0
+        assert opened["operation_time"].hour == 0
 
         closed = operations[1]
         # Midnight close should be 23:59:59
-        assert closed["EventTS"].hour == 23
-        assert closed["EventTS"].minute == 59
+        assert closed["operation_time"].hour == 23
+        assert closed["operation_time"].minute == 59
 
     def test_generate_store_operations_different_dates(self, generator, sample_store):
         """Test generating operations for different dates."""
@@ -151,8 +169,8 @@ class TestStoreOpsMixin:
         assert len(ops2) == 2
 
         # Dates should be different
-        assert ops1[0]["EventTS"].day == 15
-        assert ops2[0]["EventTS"].day == 16
+        assert ops1[0]["operation_time"].day == 15
+        assert ops2[0]["operation_time"].day == 16
 
     def test_trace_ids_are_unique(self, generator, sample_store):
         """Test that trace IDs are unique across operations."""
@@ -161,6 +179,36 @@ class TestStoreOpsMixin:
             sample_store, test_date
         )
 
-        trace_ids = [op["TraceId"] for op in operations]
+        trace_ids = [op["trace_id"] for op in operations]
         # All trace IDs should be unique
         assert len(trace_ids) == len(set(trace_ids))
+
+    def test_late_night_close_generates_next_day_timestamp(self, generator):
+        """Test that late-night closes generate correct next-day timestamps."""
+        # Store that closes at 2am next day (10pm-2am)
+        late_night_store = Store(
+            ID=3,
+            StoreNumber="S003",
+            Address="789 Night Ave",
+            GeographyID=1,
+            operating_hours="10pm-2am",
+        )
+
+        test_date = datetime(2024, 1, 15, 0, 0, 0)
+        operations = generator._generate_store_operations_for_day(
+            late_night_store, test_date
+        )
+
+        assert len(operations) == 2
+
+        # Check opened event - should be on Jan 15 at 10pm
+        opened = operations[0]
+        assert opened["operation_time"].day == 15
+        assert opened["operation_time"].hour == 22
+
+        # Check closed event - should be on Jan 16 at 2am (next day)
+        closed = operations[1]
+        assert closed["operation_time"].day == 16
+        assert closed["operation_time"].hour == 2
+        assert closed["operation_time"].month == 1
+        assert closed["operation_time"].year == 2024
