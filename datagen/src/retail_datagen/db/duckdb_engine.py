@@ -164,7 +164,7 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     ensure_fact_store_ops_table(new_conn)
                 except Exception as e:
                     # Non-fatal if creation fails here; table can be created on first insert
-                    logger.debug(
+                    logger.warning(
                         f"Failed to create fact_store_ops table during init: {e}"
                     )
                 # Only assign to global after successful initialization
@@ -354,18 +354,29 @@ def ensure_fact_store_ops_table(conn: duckdb.DuckDBPyConnection) -> None:
 
     This ensures the table schema is defined before any inserts,
     preventing runtime failures when the generator attempts to insert records.
+
+    Schema matches the KQL tables (store_opened/store_closed) with all envelope fields
+    for consistency across the data pipeline.
     """
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS fact_store_ops (
-            trace_id VARCHAR,
-            event_ts TIMESTAMP,
             store_id INTEGER,
-            operation_type VARCHAR
+            operation_time TIMESTAMP,
+            operation_type VARCHAR,
+            event_type VARCHAR,
+            trace_id VARCHAR,
+            ingest_timestamp TIMESTAMP,
+            schema_version VARCHAR,
+            source VARCHAR,
+            correlation_id VARCHAR,
+            partition_key VARCHAR,
+            session_id VARCHAR,
+            parent_event_id VARCHAR
         );
         """
     )
-    # Add any missing columns for backward compatibility
+    # Add any missing columns for backward compatibility with existing databases
     try:
         existing = _current_columns(conn, "fact_store_ops")
 
@@ -379,10 +390,19 @@ def ensure_fact_store_ops_table(conn: duckdb.DuckDBPyConnection) -> None:
                 except Exception as e:
                     logger.debug(f"Failed to add column {col} to fact_store_ops: {e}")
 
-        _ensure("trace_id", "VARCHAR")
-        _ensure("event_ts", "TIMESTAMP")
+        # Ensure all envelope fields exist for backward compatibility
         _ensure("store_id", "INTEGER")
+        _ensure("operation_time", "TIMESTAMP")
         _ensure("operation_type", "VARCHAR")
+        _ensure("event_type", "VARCHAR")
+        _ensure("trace_id", "VARCHAR")
+        _ensure("ingest_timestamp", "TIMESTAMP")
+        _ensure("schema_version", "VARCHAR")
+        _ensure("source", "VARCHAR")
+        _ensure("correlation_id", "VARCHAR")
+        _ensure("partition_key", "VARCHAR")
+        _ensure("session_id", "VARCHAR")
+        _ensure("parent_event_id", "VARCHAR")
     except Exception as e:
         logger.warning(f"Failed to ensure columns on fact_store_ops: {e}")
 

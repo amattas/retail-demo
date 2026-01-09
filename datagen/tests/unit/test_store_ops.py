@@ -101,16 +101,16 @@ class TestStoreOpsMixin:
         opened = operations[0]
         assert opened["store_id"] == 1
         assert opened["operation_type"] == "opened"
-        assert opened["event_ts"].hour == 8
-        assert opened["event_ts"].minute == 0
+        assert opened["operation_time"].hour == 8
+        assert opened["operation_time"].minute == 0
         assert "trace_id" in opened
 
         # Check closed event
         closed = operations[1]
         assert closed["store_id"] == 1
         assert closed["operation_type"] == "closed"
-        assert closed["event_ts"].hour == 22
-        assert closed["event_ts"].minute == 0
+        assert closed["operation_time"].hour == 22
+        assert closed["operation_time"].minute == 0
         assert "trace_id" in closed
 
     def test_generate_store_operations_christmas(self, generator, sample_store):
@@ -140,12 +140,12 @@ class TestStoreOpsMixin:
         assert len(operations) == 2
 
         opened = operations[0]
-        assert opened["event_ts"].hour == 0
+        assert opened["operation_time"].hour == 0
 
         closed = operations[1]
         # Midnight close should be 23:59:59
-        assert closed["event_ts"].hour == 23
-        assert closed["event_ts"].minute == 59
+        assert closed["operation_time"].hour == 23
+        assert closed["operation_time"].minute == 59
 
     def test_generate_store_operations_different_dates(self, generator, sample_store):
         """Test generating operations for different dates."""
@@ -160,8 +160,8 @@ class TestStoreOpsMixin:
         assert len(ops2) == 2
 
         # Dates should be different
-        assert ops1[0]["event_ts"].day == 15
-        assert ops2[0]["event_ts"].day == 16
+        assert ops1[0]["operation_time"].day == 15
+        assert ops2[0]["operation_time"].day == 16
 
     def test_trace_ids_are_unique(self, generator, sample_store):
         """Test that trace IDs are unique across operations."""

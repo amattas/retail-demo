@@ -381,11 +381,8 @@ class PersistenceMixin:
                 "DiscountCents": "discount_cents",
             },
             "store_ops": {
-                # store_ops now uses snake_case keys directly
-                "trace_id": "trace_id",
-                "event_ts": "event_ts",
-                "store_id": "store_id",
-                "operation_type": "operation_type",
+                # store_ops uses snake_case keys directly, no mapping needed
+                # Fields: store_id, operation_time, operation_type, trace_id
             },
             "customer_zone_changes": {
                 **common_mappings,
