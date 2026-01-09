@@ -91,24 +91,15 @@ if _SRC.exists() and str(_SRC) not in sys.path:
 def set_test_mode():
     """Automatically set test mode for all tests to relax validation.
 
-    This sets both:
-    - RETAIL_DATAGEN_TEST_MODE: Relaxes config validation for testing
-    - RETAIL_DATAGEN_DEMO_MODE: Allows realistic names in demo data
-
-    The demo mode setting enables realistic names by clearing name blocklists,
-    which is intentional for demo data generation. Brand blocklists remain
-    active regardless of this setting.
+    RETAIL_DATAGEN_TEST_MODE: Relaxes config validation for testing.
     """
     # Set environment variable to enable test mode
     os.environ["RETAIL_DATAGEN_TEST_MODE"] = "true"
-    # Set demo mode to allow realistic names in tests
-    os.environ["RETAIL_DATAGEN_DEMO_MODE"] = "true"
 
     yield
 
     # Cleanup after all tests
     os.environ.pop("RETAIL_DATAGEN_TEST_MODE", None)
-    os.environ.pop("RETAIL_DATAGEN_DEMO_MODE", None)
 
 
 @pytest.fixture
@@ -600,121 +591,6 @@ def sample_online_orders(sample_customers, sample_products_master) -> list[dict]
             "NodeType": "STORE",
             "NodeID": 1,
         },
-    ]
-
-
-@pytest.fixture
-def real_names_blacklist() -> list[str]:
-    """List of real names that should never be generated."""
-    return [
-        # Common first names
-        "John",
-        "Mary",
-        "Michael",
-        "Jennifer",
-        "William",
-        "Elizabeth",
-        "David",
-        "Patricia",
-        "Robert",
-        "Linda",
-        "James",
-        "Barbara",
-        "Christopher",
-        "Susan",
-        "Matthew",
-        "Jessica",
-        "Anthony",
-        "Sarah",
-        "Mark",
-        "Karen",
-        "Donald",
-        "Nancy",
-        "Steven",
-        "Lisa",
-        # Common last names
-        "Smith",
-        "Johnson",
-        "Williams",
-        "Brown",
-        "Jones",
-        "Garcia",
-        "Miller",
-        "Davis",
-        "Rodriguez",
-        "Martinez",
-        "Hernandez",
-        "Lopez",
-        "Gonzalez",
-        "Wilson",
-        "Anderson",
-        "Thomas",
-        "Taylor",
-        "Moore",
-        "Jackson",
-        "Martin",
-        "Lee",
-        "Perez",
-        "Thompson",
-        "White",
-    ]
-
-
-@pytest.fixture
-def fictitious_companies_examples() -> list[str]:
-    """List of fictitious company names that are safe for testing."""
-    return [
-        "Tech Solutions",
-        "Global Industries",
-        "Acme Corp",
-        "Innovation Inc",
-        "Quality Goods",
-        "Prime Corp",
-        "Future Tech",
-        "Digital Solutions",
-        "Smart Industries",
-        "Mega Corp",
-        "Ultra Systems",
-        "Pro Solutions",
-        "Elite Manufacturing",
-        "Advanced Corp",
-        "Premier Industries",
-        "Next Gen Corp",
-        "Superior Systems",
-        "Dynamic Corp",
-        "Modern Industries",
-        "Creative Solutions",
-    ]
-
-
-@pytest.fixture
-def real_companies_blacklist() -> list[str]:
-    """List of well-known real companies that must be rejected by validators."""
-    return [
-        "Apple Inc",
-        "Microsoft",
-        "Google",
-        "Amazon",
-        "Meta",
-        "Facebook",
-        "Alphabet",
-        "IBM",
-        "Nike",
-        "Adidas",
-        "Coca-Cola",
-        "PepsiCo",
-        "Walmart",
-        "Target",
-        "Costco",
-        "Samsung",
-        "Sony",
-        "Intel",
-        "Oracle",
-        "SAP",
-        "NVIDIA",
-        "Tesla",
-        "Starbucks",
-        "McDonald's",
     ]
 
 

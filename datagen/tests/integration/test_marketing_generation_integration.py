@@ -605,7 +605,9 @@ class TestMarketingBugFixValidation:
         generator = FactDataGenerator(config)
         generator.load_master_data()
         asyncio.run(
-            generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+            generator.generate_historical_data(
+                datetime(2024, 1, 1), datetime(2024, 1, 30)
+            )
         )
 
         # Read marketing data
@@ -645,7 +647,9 @@ class TestMarketingBugFixValidation:
         generator = FactDataGenerator(config)
         generator.load_master_data()
         asyncio.run(
-            generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+            generator.generate_historical_data(
+                datetime(2024, 1, 1), datetime(2024, 1, 30)
+            )
         )
 
         # Read marketing data

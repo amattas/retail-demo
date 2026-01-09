@@ -199,11 +199,11 @@ src/retail_datagen/
 ```
 
 ### Dictionary Files (CSV Inputs)
-- **geographies.csv**: ~578 synthetic locations `(City, State, Zip, District, Region)`
-- **first_names.csv**: ~312 synthetic first names  
-- **last_names.csv**: ~363 synthetic last names
-- **product_companies.csv**: 112 synthetic retail companies (current repo)
-- **product_brands.csv**: 629 synthetic brand-company mappings (current repo)
+- **geographies.csv**: ~578 locations `(City, State, Zip, District, Region)`
+- **first_names.csv**: ~312 curated first names
+- **last_names.csv**: ~363 curated last names
+- **product_companies.csv**: 112 fictional retail companies (current repo)
+- **product_brands.csv**: 629 fictional brand-company mappings (current repo)
 - **products.csv**: 599 base products with `(ProductName, BasePrice, Department, Category, Subcategory)` spanning 10+ categories
 
 ### Generated Dimensions (Parquet Exports)

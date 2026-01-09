@@ -1135,9 +1135,7 @@ async def test_no_client_with_empty_connection_string(
     )
 
     # Before initialization, client should be None
-    assert streamer._azure_client is None, (
-        "Client should be None before initialization"
-    )
+    assert streamer._azure_client is None, "Client should be None before initialization"
 
     # Initialize should succeed (creates default client for local operation)
     success = await streamer.initialize()

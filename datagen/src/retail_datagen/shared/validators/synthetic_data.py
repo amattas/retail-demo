@@ -2,8 +2,7 @@
 Synthetic data validator.
 
 Validates that generated data is synthetic and safe.
-Prevents generation of real names, addresses, companies, and
-personally identifiable information as required by AGENTS.md.
+Prevents generation of real addresses and brands as required by AGENTS.md.
 """
 
 import re
@@ -11,10 +10,6 @@ import re
 from .blocklists import (
     REAL_ADDRESS_PATTERNS,
     REAL_BRANDS,
-    REAL_COMPANIES,
-    REAL_FIRST_NAMES,
-    REAL_LAST_NAMES,
-    is_demo_mode,
 )
 
 
@@ -22,141 +17,13 @@ class SyntheticDataValidator:
     """
     Validates that generated data is synthetic and safe.
 
-    Prevents generation of real names, addresses, companies, and
-    personally identifiable information as required by AGENTS.md.
+    Prevents generation of real addresses and brands as required by AGENTS.md.
     """
 
     def __init__(self) -> None:
-        """Initialize with blocklists of real data to avoid.
-
-        Note: Name blocklists are evaluated dynamically based on demo mode,
-        allowing tests to modify RETAIL_DATAGEN_DEMO_MODE at runtime.
-        """
-        # Store references to blocklist sets (will check demo mode dynamically)
-        self._real_first_names = REAL_FIRST_NAMES
-        self._real_last_names = REAL_LAST_NAMES
-        self.real_companies = REAL_COMPANIES
+        """Initialize with blocklists of real data to avoid."""
         self.real_brands = REAL_BRANDS
         self.real_address_patterns = REAL_ADDRESS_PATTERNS
-
-    @property
-    def real_first_names(self) -> set[str]:
-        """Get first name blocklist, respecting demo mode setting."""
-        if is_demo_mode():
-            return set()
-        return self._real_first_names
-
-    @property
-    def real_last_names(self) -> set[str]:
-        """Get last name blocklist, respecting demo mode setting."""
-        if is_demo_mode():
-            return set()
-        return self._real_last_names
-
-    def _validate_name_format_and_blocklist(
-        self, name: str, blocklist: set[str]
-    ) -> bool:
-        """
-        Common validation logic for name format and blocklist checking.
-
-        Args:
-            name: Name to validate
-            blocklist: Set of real names to check against (case-insensitive)
-
-        Returns:
-            True if name passes validation, False otherwise
-        """
-        name_stripped = name.strip()
-
-        # Basic format validation
-        if not name_stripped:
-            return False
-
-        if len(name_stripped) < 2 or len(name_stripped) > 50:
-            return False
-
-        # Allow letters, spaces, hyphens, and apostrophes
-        if not re.match(r"^[A-Za-z\s\-']+$", name_stripped):
-            return False
-
-        # Check against real name blocklist (case-insensitive)
-        name_lower = name_stripped.lower()
-        if name_lower in blocklist:
-            return False
-
-        return True
-
-    def is_synthetic_first_name(self, name: str) -> bool:
-        """
-        Check if a first name is acceptable for synthetic data generation.
-
-        Validates that the name is not a common real name and meets basic
-        format requirements, as required by AGENTS.md and CLAUDE.md.
-
-        Args:
-            name: First name to validate
-
-        Returns:
-            True if synthetic and acceptable, False if real or invalid format
-        """
-        return self._validate_name_format_and_blocklist(name, self.real_first_names)
-
-    def is_synthetic_last_name(self, name: str) -> bool:
-        """
-        Check if a last name is acceptable for synthetic data generation.
-
-        Validates that the name is not a common real name and meets basic
-        format requirements, as required by AGENTS.md and CLAUDE.md.
-
-        Args:
-            name: Last name to validate
-
-        Returns:
-            True if synthetic and acceptable, False if real or invalid format
-        """
-        return self._validate_name_format_and_blocklist(name, self.real_last_names)
-
-    def is_synthetic_company(self, company: str) -> bool:
-        """
-        Check if a company name is synthetic.
-
-        Args:
-            company: Company name to validate
-
-        Returns:
-            True if synthetic, False if potentially real
-        """
-        company_lower = company.lower().strip()
-
-        # Remove common business suffixes for comparison
-        suffixes = [
-            "inc",
-            "corp",
-            "llc",
-            "ltd",
-            "co",
-            "company",
-            "corporation",
-            "incorporated",
-            "limited",
-        ]
-        company_clean = company_lower
-        for suffix in suffixes:
-            company_clean = company_clean.replace(f" {suffix}", "").replace(
-                f".{suffix}", ""
-            )
-
-        # Check against real companies
-        if company_clean in self.real_companies:
-            return False
-
-        # Check for partial matches
-        for real_company in self.real_companies:
-            if real_company in company_clean or company_clean in real_company:
-                if len(company_clean) - len(real_company) < 3:
-                    return False
-
-        return True
 
     def is_synthetic_address(self, address: str) -> bool:
         """
