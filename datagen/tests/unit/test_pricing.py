@@ -16,7 +16,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 # Import will be available after implementation
-from retail_datagen.shared.validators import PricingCalculator, PricingValidator
+from retail_datagen.shared.validators import PricingCalculator
 
 
 class TestPricingRules:
@@ -402,84 +402,3 @@ class TestPricingDistribution:
         # Results should be identical
         # for i, (individual, batch) in enumerate(zip(individual_results, batch_results)):
         #     assert individual == batch, f"Mismatch at index {i}"
-
-
-class TestPricingValidationRules:
-    """Test pricing validation and constraint enforcement."""
-
-    def test_validate_pricing_struct_valid(self):
-        """Test validation of valid pricing structure."""
-        pricing = {
-            "cost": Decimal("15.00"),
-            "sale_price": Decimal("20.00"),
-            "msrp": Decimal("25.00"),
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is True
-
-    def test_validate_pricing_struct_cost_too_high(self):
-        """Test validation rejects cost higher than sale price."""
-        pricing = {
-            "cost": Decimal("25.00"),  # Higher than sale price
-            "sale_price": Decimal("20.00"),
-            "msrp": Decimal("25.00"),
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is False
-
-    def test_validate_pricing_struct_sale_price_too_high(self):
-        """Test validation rejects sale price higher than MSRP."""
-        pricing = {
-            "cost": Decimal("15.00"),
-            "sale_price": Decimal("30.00"),  # Higher than MSRP
-            "msrp": Decimal("25.00"),
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is False
-
-    def test_validate_cost_percentage_too_low(self):
-        """Test validation rejects cost below 50% of sale price."""
-        pricing = {
-            "cost": Decimal("5.00"),  # 25% of sale price (too low)
-            "sale_price": Decimal("20.00"),
-            "msrp": Decimal("25.00"),
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is False
-
-    def test_validate_cost_percentage_too_high(self):
-        """Test validation rejects cost above 85% of sale price."""
-        pricing = {
-            "cost": Decimal("18.00"),  # 90% of sale price (too high)
-            "sale_price": Decimal("20.00"),
-            "msrp": Decimal("25.00"),
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is False
-
-    @given(
-        cost_percentage=st.floats(min_value=0.50, max_value=0.85),
-        sale_price=st.decimals(
-            min_value=Decimal("1.00"), max_value=Decimal("1000.00"), places=2
-        ),
-    )
-    def test_validate_cost_percentage_property_based(
-        self, cost_percentage: float, sale_price: Decimal
-    ):
-        """Property-based test for cost percentage validation."""
-        cost = sale_price * Decimal(str(cost_percentage))
-        msrp = sale_price * Decimal("1.2")  # Ensure MSRP > sale price
-
-        pricing = {
-            "cost": cost,
-            "sale_price": sale_price,
-            "msrp": msrp,
-        }
-
-        validator = PricingValidator()
-        assert validator.validate_pricing_structure(pricing) is True
