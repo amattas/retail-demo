@@ -41,7 +41,7 @@ TX,Harris,Pasadena,0.0825
 TX,Dallas,Dallas,0.0825
 NY,New York,New York,0.0880
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write(csv_content)
             f.flush()
             yield f.name
@@ -161,7 +161,9 @@ class TestPriceModifier:
         sim.products = mock_products
         sim._product_categories = {"food": mock_products}
         sim._rng = MagicMock()
-        sim._rng.choice = lambda x: x[-1]  # Always pick last item (highest price in filtered)
+        sim._rng.choice = lambda x: x[
+            -1
+        ]  # Always pick last item (highest price in filtered)
         sim._rng.choices = lambda x, weights: [x[0]]
         sim._rng.randint = lambda a, b: a
 
@@ -237,9 +239,12 @@ class TestTruckCapacityConstraints:
         assert shipment["total_items"] == 450
         assert len(shipment["products"]) == 3
 
-    def test_shipment_exceeds_capacity_truncated(self, mock_inventory_simulator, caplog):
+    def test_shipment_exceeds_capacity_truncated(
+        self, mock_inventory_simulator, caplog
+    ):
         """Test that shipments exceeding capacity are truncated."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -260,7 +265,9 @@ class TestTruckCapacityConstraints:
     def test_generate_multiple_shipments_splits_order(self, mock_inventory_simulator):
         """Test that large orders are split across multiple trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         sim.get_dc_capacity_multiplier = lambda dc_id, time: 1.0
 
@@ -323,6 +330,7 @@ class TestTruckStateMachineValidation:
     def test_invalid_state_transitions(self, mock_inventory_simulator, caplog):
         """Test that invalid state transitions are rejected with warnings."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -330,7 +338,10 @@ class TestTruckStateMachineValidation:
         # Test invalid transitions
         invalid_cases = [
             (TruckStatus.SCHEDULED, TruckStatus.ARRIVED),  # Can't skip LOADING
-            (TruckStatus.LOADING, TruckStatus.UNLOADING),  # Can't skip IN_TRANSIT and ARRIVED
+            (
+                TruckStatus.LOADING,
+                TruckStatus.UNLOADING,
+            ),  # Can't skip IN_TRANSIT and ARRIVED
             (TruckStatus.COMPLETED, TruckStatus.SCHEDULED),  # Terminal state
         ]
 
@@ -342,6 +353,7 @@ class TestTruckStateMachineValidation:
     def test_state_timeout_recovery(self, mock_inventory_simulator, caplog):
         """Test that stuck shipments are recovered via timeout."""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         sim = mock_inventory_simulator
@@ -501,7 +513,9 @@ class TestEdgeCases:
         assert shipment["total_items"] == 1000
         assert len(shipment["products"]) == 2
 
-    def test_state_machine_recovery_steps_through_multiple_states(self, mock_inventory_simulator):
+    def test_state_machine_recovery_steps_through_multiple_states(
+        self, mock_inventory_simulator
+    ):
         """Test that state machine recovery steps through multiple intermediate states."""
         sim = mock_inventory_simulator
 
@@ -608,7 +622,9 @@ class TestEdgeCases:
     def test_very_large_order_splits_correctly(self, mock_inventory_simulator):
         """Test that very large orders split across many trucks."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
@@ -639,7 +655,9 @@ class TestEdgeCases:
     def test_single_product_exceeds_capacity(self, mock_inventory_simulator):
         """Test handling when a single product's quantity exceeds truck capacity."""
         sim = mock_inventory_simulator
-        sim._select_truck_for_shipment = lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        sim._select_truck_for_shipment = (
+            lambda dc_id, current_time: f"TRUCK{len(sim._active_shipments):03d}"
+        )
         sim._mark_truck_unavailable = lambda truck_id, return_time: None
         departure_time = datetime(2024, 1, 15, 8, 0)
 
@@ -652,7 +670,9 @@ class TestEdgeCases:
         total_items = sum(s["total_items"] for s in shipments)
         assert total_items == 2500
 
-    def test_negative_quantity_in_generate_truck_shipments(self, mock_inventory_simulator):
+    def test_negative_quantity_in_generate_truck_shipments(
+        self, mock_inventory_simulator
+    ):
         """Test that negative quantities raise ValueError in generate_truck_shipments()."""
         sim = mock_inventory_simulator
         departure_time = datetime(2024, 1, 15, 8, 0)
@@ -663,7 +683,9 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="Invalid negative quantity"):
             sim.generate_truck_shipments(1, 101, reorder_list, departure_time)
 
-    def test_timeout_recovery_via_update_shipment_status(self, mock_inventory_simulator):
+    def test_timeout_recovery_via_update_shipment_status(
+        self, mock_inventory_simulator
+    ):
         """Test that stuck shipments are recovered via timeout in update_shipment_status()."""
         sim = mock_inventory_simulator
 
@@ -684,7 +706,9 @@ class TestEdgeCases:
             "products": [(1, 100)],
             "total_items": 100,
             "unload_duration_hours": 1.0,
-            "_state_entered_LOADING": datetime(2024, 1, 15, 2, 0),  # Entered LOADING 10+ hours ago
+            "_state_entered_LOADING": datetime(
+                2024, 1, 15, 2, 0
+            ),  # Entered LOADING 10+ hours ago
         }
         sim._active_shipments["STUCK001"] = shipment
 

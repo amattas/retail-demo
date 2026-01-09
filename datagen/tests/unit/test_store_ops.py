@@ -81,7 +81,9 @@ class TestStoreOpsMixin:
     def test_generate_store_operations_for_day(self, generator, sample_store):
         """Test generating store operations for a single day."""
         test_date = datetime(2024, 1, 15, 0, 0, 0)
-        operations = generator._generate_store_operations_for_day(sample_store, test_date)
+        operations = generator._generate_store_operations_for_day(
+            sample_store, test_date
+        )
 
         # Should have 2 operations: opened and closed
         assert len(operations) == 2
@@ -105,7 +107,9 @@ class TestStoreOpsMixin:
     def test_generate_store_operations_christmas(self, generator, sample_store):
         """Test that stores are closed on Christmas Day."""
         christmas = datetime(2024, 12, 25, 0, 0, 0)
-        operations = generator._generate_store_operations_for_day(sample_store, christmas)
+        operations = generator._generate_store_operations_for_day(
+            sample_store, christmas
+        )
 
         # Should have no operations on Christmas
         assert len(operations) == 0
@@ -153,7 +157,9 @@ class TestStoreOpsMixin:
     def test_trace_ids_are_unique(self, generator, sample_store):
         """Test that trace IDs are unique across operations."""
         test_date = datetime(2024, 1, 15, 0, 0, 0)
-        operations = generator._generate_store_operations_for_day(sample_store, test_date)
+        operations = generator._generate_store_operations_for_day(
+            sample_store, test_date
+        )
 
         trace_ids = [op["TraceId"] for op in operations]
         # All trace IDs should be unique

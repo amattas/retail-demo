@@ -76,7 +76,9 @@ class TestStatePassThrough:
         status = get_task_status(task_id)
         assert status is not None
         assert status.tables_completed == completed
-        assert status.tables_completed is not completed  # Should be a different list object
+        assert (
+            status.tables_completed is not completed
+        )  # Should be a different list object
 
     def test_tables_in_progress_passed_through(self, initialized_task):
         """Test that tables_in_progress list is passed through without modification."""
@@ -183,7 +185,9 @@ class TestStatePassThrough:
 class TestNoOverrideBehavior:
     """Test that progress percentages don't affect state list values."""
 
-    def test_100_percent_progress_does_not_derive_completed_state(self, initialized_task):
+    def test_100_percent_progress_does_not_derive_completed_state(
+        self, initialized_task
+    ):
         """Test that table_progress at 100% doesn't override tables_completed."""
         task_id = initialized_task
 
@@ -194,7 +198,11 @@ class TestNoOverrideBehavior:
             message="All done",
             table_progress={"receipts": 1.0, "receipt_lines": 1.0, "marketing": 1.0},
             tables_completed=[],  # Explicitly empty
-            tables_in_progress=["receipts", "receipt_lines", "marketing"],  # Still in progress
+            tables_in_progress=[
+                "receipts",
+                "receipt_lines",
+                "marketing",
+            ],  # Still in progress
         )
 
         status = get_task_status(task_id)
@@ -203,7 +211,9 @@ class TestNoOverrideBehavior:
         assert status.tables_in_progress == ["receipts", "receipt_lines", "marketing"]
         # Progress shows 100%, but state is still in_progress - they're independent
 
-    def test_zero_percent_progress_does_not_affect_completed_state(self, initialized_task):
+    def test_zero_percent_progress_does_not_affect_completed_state(
+        self, initialized_task
+    ):
         """Test that 0% progress doesn't prevent tables from being marked completed."""
         task_id = initialized_task
 
@@ -530,7 +540,11 @@ class TestIntegrationWithTableProgressTracker:
             current_table="receipts",
             tables_completed=[],
             tables_in_progress=["receipts"],
-            tables_remaining=["receipt_lines", "dc_inventory_txn", "store_inventory_txn"],
+            tables_remaining=[
+                "receipt_lines",
+                "dc_inventory_txn",
+                "store_inventory_txn",
+            ],
             table_progress={"receipts": 0.3},
         )
 
@@ -551,7 +565,11 @@ class TestIntegrationWithTableProgressTracker:
             current_table="receipts",
             tables_completed=[],
             tables_in_progress=["receipts"],  # Still in_progress
-            tables_remaining=["receipt_lines", "dc_inventory_txn", "store_inventory_txn"],
+            tables_remaining=[
+                "receipt_lines",
+                "dc_inventory_txn",
+                "store_inventory_txn",
+            ],
             table_progress={"receipts": 1.0},  # 100% progress
         )
 

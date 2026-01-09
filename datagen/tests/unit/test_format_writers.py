@@ -39,12 +39,16 @@ class TestParquetWriter:
 
     def test_write_partitioned(self, tmp_path):
         w = ParquetWriter()
-        df = pd.DataFrame({
-            "Month": ["2024-01", "2024-01", "2024-02"],
-            "Amount": [10, 20, 30],
-        })
+        df = pd.DataFrame(
+            {
+                "Month": ["2024-01", "2024-01", "2024-02"],
+                "Amount": [10, 20, 30],
+            }
+        )
         outdir = tmp_path / "parts"
-        files = w.write_partitioned(df, outdir, partition_col="Month", table_name="sales")
+        files = w.write_partitioned(
+            df, outdir, partition_col="Month", table_name="sales"
+        )
         # Two months -> two files
         assert len(files) == 2
         for p in files:
@@ -89,11 +93,13 @@ class TestParquetWriterWrite:
     @pytest.fixture
     def sample_df(self):
         """Create sample DataFrame for testing."""
-        return pd.DataFrame({
-            "ID": [1, 2, 3],
-            "Name": ["Alice", "Bob", "Charlie"],
-            "Amount": [10.5, 20.0, 15.75],
-        })
+        return pd.DataFrame(
+            {
+                "ID": [1, 2, 3],
+                "Name": ["Alice", "Bob", "Charlie"],
+                "Amount": [10.5, 20.0, 15.75],
+            }
+        )
 
     def test_write_simple_success(self, tmp_path, sample_df):
         """Should write DataFrame to Parquet file successfully."""
@@ -147,12 +153,14 @@ class TestParquetWriterWrite:
         writer = ParquetWriter()
         output_path = tmp_path / "types.parquet"
 
-        df = pd.DataFrame({
-            "IntCol": [1, 2, 3],
-            "FloatCol": [1.5, 2.5, 3.5],
-            "StrCol": ["a", "b", "c"],
-            "DateCol": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
-        })
+        df = pd.DataFrame(
+            {
+                "IntCol": [1, 2, 3],
+                "FloatCol": [1.5, 2.5, 3.5],
+                "StrCol": ["a", "b", "c"],
+                "DateCol": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+            }
+        )
 
         writer.write(df, output_path)
 
@@ -182,12 +190,20 @@ class TestParquetWriterWritePartitioned:
     @pytest.fixture
     def partitioned_df(self):
         """Create DataFrame suitable for partitioning."""
-        return pd.DataFrame({
-            "ID": [1, 2, 3, 4, 5, 6],
-            "Date": ["2024-01-01", "2024-01-01", "2024-01-02",
-                     "2024-01-02", "2024-01-03", "2024-01-03"],
-            "Amount": [10, 20, 30, 40, 50, 60],
-        })
+        return pd.DataFrame(
+            {
+                "ID": [1, 2, 3, 4, 5, 6],
+                "Date": [
+                    "2024-01-01",
+                    "2024-01-01",
+                    "2024-01-02",
+                    "2024-01-02",
+                    "2024-01-03",
+                    "2024-01-03",
+                ],
+                "Amount": [10, 20, 30, 40, 50, 60],
+            }
+        )
 
     def test_write_partitioned_success(self, tmp_path, partitioned_df):
         """Should write partitioned Parquet files correctly."""
@@ -195,10 +211,7 @@ class TestParquetWriterWritePartitioned:
         output_dir = tmp_path / "partitioned"
 
         result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date",
-            table_name="sales"
+            partitioned_df, output_dir, partition_col="Date", table_name="sales"
         )
 
         # Should create 3 partition files
@@ -217,9 +230,7 @@ class TestParquetWriterWritePartitioned:
         output_dir = tmp_path / "partitioned"
 
         result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date"
+            partitioned_df, output_dir, partition_col="Date"
         )
 
         # Files should use "data" as default name
@@ -233,11 +244,7 @@ class TestParquetWriterWritePartitioned:
         empty_df = pd.DataFrame()
 
         with pytest.raises(ValueError, match="Cannot write empty DataFrame"):
-            writer.write_partitioned(
-                empty_df,
-                output_dir,
-                partition_col="Date"
-            )
+            writer.write_partitioned(empty_df, output_dir, partition_col="Date")
 
     def test_write_partitioned_missing_column(self, tmp_path, partitioned_df):
         """Should raise ValueError if partition column doesn't exist."""
@@ -246,9 +253,7 @@ class TestParquetWriterWritePartitioned:
 
         with pytest.raises(ValueError, match="Partition column 'InvalidCol' not found"):
             writer.write_partitioned(
-                partitioned_df,
-                output_dir,
-                partition_col="InvalidCol"
+                partitioned_df, output_dir, partition_col="InvalidCol"
             )
 
     def test_write_partitioned_preserves_data(self, tmp_path, partitioned_df):
@@ -257,9 +262,7 @@ class TestParquetWriterWritePartitioned:
         output_dir = tmp_path / "partitioned"
 
         result = writer.write_partitioned(
-            partitioned_df,
-            output_dir,
-            partition_col="Date"
+            partitioned_df, output_dir, partition_col="Date"
         )
 
         # Read all partitions and combine
@@ -279,11 +282,13 @@ class TestParquetCompression:
 
     @pytest.fixture
     def test_df(self):
-        return pd.DataFrame({
-            "ID": range(1, 101),
-            "Category": ["A", "B", "C", "D"] * 25,
-            "Value": [x * 1.5 for x in range(1, 101)],
-        })
+        return pd.DataFrame(
+            {
+                "ID": range(1, 101),
+                "Category": ["A", "B", "C", "D"] * 25,
+                "Value": [x * 1.5 for x in range(1, 101)],
+            }
+        )
 
     def test_parquet_non_empty(self, tmp_path, test_df):
         writer = ParquetWriter()

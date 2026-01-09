@@ -56,7 +56,9 @@ class TestSyntheticNameBlocklistEnforcement:
         """Test that common real first names are rejected."""
         real_names = ["John", "Mary", "Michael", "Jennifer", "William"]
         for name in real_names:
-            assert not validator.is_synthetic_first_name(name), f"{name} should be rejected"
+            assert not validator.is_synthetic_first_name(name), (
+                f"{name} should be rejected"
+            )
 
     def test_first_name_rejects_case_insensitive(self, validator):
         """Test that blocklist check is case-insensitive."""
@@ -91,7 +93,9 @@ class TestSyntheticNameBlocklistEnforcement:
         """Test that common real last names are rejected."""
         real_names = ["Smith", "Johnson", "Williams", "Brown", "Jones"]
         for name in real_names:
-            assert not validator.is_synthetic_last_name(name), f"{name} should be rejected"
+            assert not validator.is_synthetic_last_name(name), (
+                f"{name} should be rejected"
+            )
 
     def test_last_name_rejects_case_insensitive(self, validator):
         """Test that blocklist check is case-insensitive."""

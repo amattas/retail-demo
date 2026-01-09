@@ -377,9 +377,7 @@ class TestAttributionEdgeCases:
     def test_nonexistent_customer_attribution_returns_none(self, event_factory):
         """Non-existent customer ID returns None for attribution."""
         nonexistent_id = 99999
-        attribution = event_factory.state.customer_to_campaign.pop(
-            nonexistent_id, None
-        )
+        attribution = event_factory.state.customer_to_campaign.pop(nonexistent_id, None)
         assert attribution is None
 
     def test_cleanup_handles_empty_structures(self, event_factory, test_timestamp):

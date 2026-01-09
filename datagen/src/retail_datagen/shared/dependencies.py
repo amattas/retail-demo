@@ -343,7 +343,13 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
                 result = future.result()
                 _task_status[task_id] = TaskStatus(
                     **_task_status[task_id].model_dump(
-                        exclude={"status", "completed_at", "progress", "message", "result"}
+                        exclude={
+                            "status",
+                            "completed_at",
+                            "progress",
+                            "message",
+                            "result",
+                        }
                     ),
                     status="completed",
                     completed_at=datetime.now(UTC),
@@ -424,7 +430,9 @@ def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
     if max_age_hours is not None:
         if max_age_hours < 0:
             raise ValueError("max_age_hours must be non-negative")
-        if max_age_hours > 720:  # 30 days max, aligned with TASK_CLEANUP_MAX_AGE_HOURS bounds
+        if (
+            max_age_hours > 720
+        ):  # 30 days max, aligned with TASK_CLEANUP_MAX_AGE_HOURS bounds
             raise ValueError("max_age_hours must not exceed 720 (30 days)")
     age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
     return _cleanup_old_tasks(max_age_hours=age)

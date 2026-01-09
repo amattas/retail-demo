@@ -43,14 +43,14 @@ def create_test_data():
         customers.append(
             Customer(
                 ID=i + 1,
-                FirstName=f"FirstName{i+1}",
-                LastName=f"LastName{i+1}",
-                Address=f"{i+1} Test Ave",
+                FirstName=f"FirstName{i + 1}",
+                LastName=f"LastName{i + 1}",
+                Address=f"{i + 1} Test Ave",
                 GeographyID=1,
-                LoyaltyCard=f"LOYAL{i+1:08d}",
-                Phone=f"{200+i:03d}-555-{1000+i:04d}",
-                BLEId=f"BLE{i+1:010d}",
-                AdId=f"AD{i+1:010d}",
+                LoyaltyCard=f"LOYAL{i + 1:08d}",
+                Phone=f"{200 + i:03d}-555-{1000 + i:04d}",
+                BLEId=f"BLE{i + 1:010d}",
+                AdId=f"AD{i + 1:010d}",
             )
         )
 
@@ -171,7 +171,7 @@ def test_ble_customer_matching():
         has_customer = "✓" if ping.get("CustomerId") else "✗"
         customer_id_str = str(ping.get("CustomerId", "None")).rjust(6)
         print(
-            f"  {i+1:2d}. BLEId: {ping['CustomerBLEId'][:15]:15s} | "
+            f"  {i + 1:2d}. BLEId: {ping['CustomerBLEId'][:15]:15s} | "
             f"CustomerId: {customer_id_str} {has_customer} | Zone: {ping['Zone']}"
         )
 
@@ -302,7 +302,7 @@ def test_marketing_customer_resolution():
     ][:10]
     for i, rec in enumerate(resolved_samples):
         print(
-            f"  {i+1:2d}. AdId: {rec['CustomerAdId'][:15]:15s} | "
+            f"  {i + 1:2d}. AdId: {rec['CustomerAdId'][:15]:15s} | "
             f"CustomerId: {rec['CustomerId']:3d} | Channel: {rec['Channel']}"
         )
 

@@ -168,13 +168,19 @@ def sample_products():
 def sample_dcs():
     """Create sample distribution centers for testing."""
     return [
-        DistributionCenter(ID=1, DCNumber="DC001", Address="100 Warehouse Way", GeographyID=1),
-        DistributionCenter(ID=2, DCNumber="DC002", Address="200 Logistics Ln", GeographyID=2),
+        DistributionCenter(
+            ID=1, DCNumber="DC001", Address="100 Warehouse Way", GeographyID=1
+        ),
+        DistributionCenter(
+            ID=2, DCNumber="DC002", Address="200 Logistics Ln", GeographyID=2
+        ),
     ]
 
 
 @pytest.fixture
-def event_factory(sample_stores, sample_customers, sample_products, sample_dcs, test_seed):
+def event_factory(
+    sample_stores, sample_customers, sample_products, sample_dcs, test_seed
+):
     """Create EventFactory instance with test data."""
     return EventFactory(
         stores=sample_stores,
@@ -297,7 +303,9 @@ class TestEventGenerationState:
 class TestEventFactoryInit:
     """Test EventFactory initialization."""
 
-    def test_factory_initialization(self, sample_stores, sample_customers, sample_products, sample_dcs):
+    def test_factory_initialization(
+        self, sample_stores, sample_customers, sample_products, sample_dcs
+    ):
         """Test EventFactory initializes correctly."""
         factory = EventFactory(
             stores=sample_stores,
@@ -339,7 +347,9 @@ class TestEventFactoryInit:
         assert "discount" in winter_campaign
         assert "active" in winter_campaign
 
-    def test_factory_converts_lists_to_dicts(self, sample_stores, sample_customers, sample_products, sample_dcs):
+    def test_factory_converts_lists_to_dicts(
+        self, sample_stores, sample_customers, sample_products, sample_dcs
+    ):
         """Test factory converts master data lists to ID-indexed dicts."""
         factory = EventFactory(
             stores=sample_stores,
@@ -384,7 +394,9 @@ class TestTraceIdGeneration:
 
     def test_generate_trace_id_uniqueness(self, event_factory, test_timestamp):
         """Test trace IDs are unique across multiple generations."""
-        trace_ids = [event_factory.generate_trace_id(test_timestamp) for _ in range(100)]
+        trace_ids = [
+            event_factory.generate_trace_id(test_timestamp) for _ in range(100)
+        ]
 
         # All should be unique (high probability with random component)
         assert len(set(trace_ids)) > 90  # Allow for small collision chance
@@ -421,14 +433,18 @@ class TestShouldGenerateEvent:
         business_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, business_time)
+            if event_factory.should_generate_event(
+                EventType.RECEIPT_CREATED, business_time
+            )
         )
 
         event_factory.rng = random.Random(42)
         after_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, after_hours)
+            if event_factory.should_generate_event(
+                EventType.RECEIPT_CREATED, after_hours
+            )
         )
 
         # Business hours should have more events
@@ -456,21 +472,27 @@ class TestShouldGenerateEvent:
         # Temporal model boosts weekends; allow weekend >= weekday
         assert weekend_count >= weekday_count
 
-    def test_event_type_specific_probabilities(self, event_factory, business_hours_timestamp):
+    def test_event_type_specific_probabilities(
+        self, event_factory, business_hours_timestamp
+    ):
         """Test different event types have different base probabilities."""
         event_factory.rng = random.Random(42)
 
         receipt_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, business_hours_timestamp)
+            if event_factory.should_generate_event(
+                EventType.RECEIPT_CREATED, business_hours_timestamp
+            )
         )
 
         event_factory.rng = random.Random(42)
         truck_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.TRUCK_ARRIVED, business_hours_timestamp)
+            if event_factory.should_generate_event(
+                EventType.TRUCK_ARRIVED, business_hours_timestamp
+            )
         )
 
         # Receipts more common than truck arrivals
@@ -478,7 +500,9 @@ class TestShouldGenerateEvent:
 
     def test_returns_boolean(self, event_factory, test_timestamp):
         """Test should_generate_event returns boolean."""
-        result = event_factory.should_generate_event(EventType.RECEIPT_CREATED, test_timestamp)
+        result = event_factory.should_generate_event(
+            EventType.RECEIPT_CREATED, test_timestamp
+        )
         assert isinstance(result, bool)
 
 
@@ -504,7 +528,9 @@ STATELESS_EVENT_TYPES = [
 class TestEventEnvelopeCompliance:
     """Parametrized tests for event envelope structure across stateless event types."""
 
-    def test_event_has_required_envelope_fields(self, event_factory, test_timestamp, event_type):
+    def test_event_has_required_envelope_fields(
+        self, event_factory, test_timestamp, event_type
+    ):
         """Test event envelope contains all required fields."""
         event = event_factory.generate_event(event_type, test_timestamp)
 
@@ -516,7 +542,9 @@ class TestEventEnvelopeCompliance:
         assert hasattr(event, "schema_version")
         assert hasattr(event, "source")
 
-    def test_event_has_correct_defaults(self, event_factory, test_timestamp, event_type):
+    def test_event_has_correct_defaults(
+        self, event_factory, test_timestamp, event_type
+    ):
         """Test event envelope has correct default values."""
         event = event_factory.generate_event(event_type, test_timestamp)
 
@@ -555,13 +583,48 @@ class TestEventEnvelopeCompliance:
 EVENT_PAYLOAD_FIELDS = {
     EventType.STORE_OPENED: ["store_id", "operation_time", "operation_type"],
     EventType.STORE_CLOSED: ["store_id", "operation_time", "operation_type"],
-    EventType.CUSTOMER_ENTERED: ["store_id", "sensor_id", "zone", "customer_count", "dwell_time"],
-    EventType.CUSTOMER_ZONE_CHANGED: ["store_id", "customer_ble_id", "from_zone", "to_zone", "timestamp"],
-    EventType.TRUCK_ARRIVED: ["truck_id", "shipment_id", "arrival_time", "estimated_unload_duration"],
+    EventType.CUSTOMER_ENTERED: [
+        "store_id",
+        "sensor_id",
+        "zone",
+        "customer_count",
+        "dwell_time",
+    ],
+    EventType.CUSTOMER_ZONE_CHANGED: [
+        "store_id",
+        "customer_ble_id",
+        "from_zone",
+        "to_zone",
+        "timestamp",
+    ],
+    EventType.TRUCK_ARRIVED: [
+        "truck_id",
+        "shipment_id",
+        "arrival_time",
+        "estimated_unload_duration",
+    ],
     EventType.INVENTORY_UPDATED: ["product_id", "quantity_delta", "reason"],
-    EventType.AD_IMPRESSION: ["channel", "campaign_id", "creative_id", "customer_ad_id", "impression_id", "cost", "device_type"],
-    EventType.STOCKOUT_DETECTED: ["product_id", "last_known_quantity", "detection_time"],
-    EventType.REORDER_TRIGGERED: ["product_id", "current_quantity", "reorder_quantity", "reorder_point", "priority"],
+    EventType.AD_IMPRESSION: [
+        "channel",
+        "campaign_id",
+        "creative_id",
+        "customer_ad_id",
+        "impression_id",
+        "cost",
+        "device_type",
+    ],
+    EventType.STOCKOUT_DETECTED: [
+        "product_id",
+        "last_known_quantity",
+        "detection_time",
+    ],
+    EventType.REORDER_TRIGGERED: [
+        "product_id",
+        "current_quantity",
+        "reorder_quantity",
+        "reorder_point",
+        "priority",
+    ],
 }
 
 
@@ -573,13 +636,17 @@ EVENT_PAYLOAD_FIELDS = {
 class TestPayloadFieldsParametrized:
     """Parametrized tests for payload field validation."""
 
-    def test_payload_contains_required_fields(self, event_factory, test_timestamp, event_type, required_fields):
+    def test_payload_contains_required_fields(
+        self, event_factory, test_timestamp, event_type, required_fields
+    ):
         """Test payload contains all required fields for each event type."""
         event = event_factory.generate_event(event_type, test_timestamp)
 
         assert event is not None
         for field in required_fields:
-            assert field in event.payload, f"Missing field '{field}' in {event_type.value}"
+            assert field in event.payload, (
+                f"Missing field '{field}' in {event_type.value}"
+            )
 
 
 # ================================
@@ -588,9 +655,32 @@ class TestPayloadFieldsParametrized:
 
 # Events that require active receipt in state
 RECEIPT_REQUIRED_EVENTS = [
-    (EventType.RECEIPT_LINE_ADDED, ["receipt_id", "line_number", "product_id", "quantity", "unit_price", "extended_price"]),
-    (EventType.PAYMENT_PROCESSED, ["receipt_id", "payment_method", "amount", "transaction_id", "processing_time", "status"]),
-    (EventType.PROMOTION_APPLIED, ["receipt_id", "promo_code", "discount_amount", "discount_type", "product_ids"]),
+    (
+        EventType.RECEIPT_LINE_ADDED,
+        [
+            "receipt_id",
+            "line_number",
+            "product_id",
+            "quantity",
+            "unit_price",
+            "extended_price",
+        ],
+    ),
+    (
+        EventType.PAYMENT_PROCESSED,
+        [
+            "receipt_id",
+            "payment_method",
+            "amount",
+            "transaction_id",
+            "processing_time",
+            "status",
+        ],
+    ),
+    (
+        EventType.PROMOTION_APPLIED,
+        ["receipt_id", "promo_code", "discount_amount", "discount_type", "product_ids"],
+    ),
 ]
 
 
@@ -602,22 +692,30 @@ RECEIPT_REQUIRED_EVENTS = [
 class TestReceiptRequiredEvents:
     """Parametrized tests for events requiring active receipt."""
 
-    def test_requires_active_receipt(self, event_factory, test_timestamp, event_type, required_fields):
+    def test_requires_active_receipt(
+        self, event_factory, test_timestamp, event_type, required_fields
+    ):
         """Test event returns None without active receipt."""
         event = event_factory.generate_event(event_type, test_timestamp)
         assert event is None
 
-    def test_generates_with_active_receipt(self, factory_with_active_receipt, test_timestamp, event_type, required_fields):
+    def test_generates_with_active_receipt(
+        self, factory_with_active_receipt, test_timestamp, event_type, required_fields
+    ):
         """Test event generates with active receipt."""
         event = factory_with_active_receipt.generate_event(event_type, test_timestamp)
         assert event is not None
         assert event.event_type == event_type
 
-    def test_has_required_fields(self, factory_with_active_receipt, test_timestamp, event_type, required_fields):
+    def test_has_required_fields(
+        self, factory_with_active_receipt, test_timestamp, event_type, required_fields
+    ):
         """Test payload has required fields."""
         event = factory_with_active_receipt.generate_event(event_type, test_timestamp)
         for field in required_fields:
-            assert field in event.payload, f"Missing field '{field}' in {event_type.value}"
+            assert field in event.payload, (
+                f"Missing field '{field}' in {event_type.value}"
+            )
 
 
 # ================================
@@ -631,7 +729,9 @@ class TestReceiptCreatedBehaviors:
     def test_receipt_id_format(self, factory_with_customer_session, test_timestamp):
         """Test receipt ID has correct format."""
         purchase_time = test_timestamp + timedelta(minutes=5)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             receipt_id = event.payload["receipt_id"]
@@ -641,7 +741,9 @@ class TestReceiptCreatedBehaviors:
     def test_pricing_valid(self, factory_with_customer_session, test_timestamp):
         """Test receipt pricing follows business rules."""
         purchase_time = test_timestamp + timedelta(minutes=5)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             payload = event.payload
@@ -652,17 +754,23 @@ class TestReceiptCreatedBehaviors:
     def test_valid_tender_type(self, factory_with_customer_session, test_timestamp):
         """Test receipt uses valid tender type."""
         purchase_time = test_timestamp + timedelta(minutes=5)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             valid_tender_types = [t.value for t in TenderType]
             assert event.payload["tender_type"] in valid_tender_types
 
-    def test_stores_in_active_receipts(self, factory_with_customer_session, test_timestamp):
+    def test_stores_in_active_receipts(
+        self, factory_with_customer_session, test_timestamp
+    ):
         """Test receipt is added to active receipts state."""
         purchase_time = test_timestamp + timedelta(minutes=5)
         initial_count = len(factory_with_customer_session.state.active_receipts)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             final_count = len(factory_with_customer_session.state.active_receipts)
@@ -673,10 +781,14 @@ class TestReceiptCreatedBehaviors:
         event = event_factory.generate_event(EventType.RECEIPT_CREATED, test_timestamp)
         assert event is None
 
-    def test_correlation_id_is_receipt_id(self, factory_with_customer_session, test_timestamp):
+    def test_correlation_id_is_receipt_id(
+        self, factory_with_customer_session, test_timestamp
+    ):
         """Test receipt_created correlation ID is the receipt ID."""
         purchase_time = test_timestamp + timedelta(minutes=5)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             assert event.correlation_id == event.payload["receipt_id"]
@@ -684,7 +796,9 @@ class TestReceiptCreatedBehaviors:
     def test_partition_key(self, factory_with_customer_session, test_timestamp):
         """Test receipt_created has partition key by store."""
         purchase_time = test_timestamp + timedelta(minutes=5)
-        event = factory_with_customer_session.generate_event(EventType.RECEIPT_CREATED, purchase_time)
+        event = factory_with_customer_session.generate_event(
+            EventType.RECEIPT_CREATED, purchase_time
+        )
 
         if event:
             store_id = event.payload["store_id"]
@@ -701,14 +815,18 @@ class TestReceiptLineBehaviors:
 
     def test_pricing_calculation(self, factory_with_active_receipt, test_timestamp):
         """Test receipt line extended price calculation."""
-        event = factory_with_active_receipt.generate_event(EventType.RECEIPT_LINE_ADDED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.RECEIPT_LINE_ADDED, test_timestamp
+        )
 
         payload = event.payload
         assert payload["extended_price"] == payload["quantity"] * payload["unit_price"]
 
     def test_uses_valid_product(self, factory_with_active_receipt, test_timestamp):
         """Test receipt line uses valid product from master data."""
-        event = factory_with_active_receipt.generate_event(EventType.RECEIPT_LINE_ADDED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.RECEIPT_LINE_ADDED, test_timestamp
+        )
 
         product_id = event.payload["product_id"]
         assert product_id in factory_with_active_receipt.products
@@ -716,7 +834,9 @@ class TestReceiptLineBehaviors:
     def test_promo_code_optional(self, factory_with_active_receipt, test_timestamp):
         """Test receipt line may have optional promo code."""
         events = [
-            factory_with_active_receipt.generate_event(EventType.RECEIPT_LINE_ADDED, test_timestamp)
+            factory_with_active_receipt.generate_event(
+                EventType.RECEIPT_LINE_ADDED, test_timestamp
+            )
             for _ in range(20)
         ]
 
@@ -729,7 +849,9 @@ class TestReceiptLineBehaviors:
 
     def test_correlation_id(self, factory_with_active_receipt, test_timestamp):
         """Test receipt_line_added correlation ID matches receipt."""
-        event = factory_with_active_receipt.generate_event(EventType.RECEIPT_LINE_ADDED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.RECEIPT_LINE_ADDED, test_timestamp
+        )
         assert event.correlation_id == event.payload["receipt_id"]
 
 
@@ -743,12 +865,16 @@ class TestPaymentProcessedBehaviors:
 
     def test_status_approved(self, factory_with_active_receipt, test_timestamp):
         """Test payment status is APPROVED."""
-        event = factory_with_active_receipt.generate_event(EventType.PAYMENT_PROCESSED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.PAYMENT_PROCESSED, test_timestamp
+        )
         assert event.payload["status"] == "APPROVED"
 
     def test_valid_payment_method(self, factory_with_active_receipt, test_timestamp):
         """Test payment method is valid tender type."""
-        event = factory_with_active_receipt.generate_event(EventType.PAYMENT_PROCESSED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.PAYMENT_PROCESSED, test_timestamp
+        )
 
         valid_methods = [t.value for t in TenderType]
         assert event.payload["payment_method"] in valid_methods
@@ -759,14 +885,18 @@ class TestPaymentProcessedBehaviors:
 
         for _ in range(10):
             if factory_with_active_receipt.state.active_receipts:
-                factory_with_active_receipt.generate_event(EventType.PAYMENT_PROCESSED, test_timestamp)
+                factory_with_active_receipt.generate_event(
+                    EventType.PAYMENT_PROCESSED, test_timestamp
+                )
 
         final_count = len(factory_with_active_receipt.state.active_receipts)
         assert final_count <= initial_count
 
     def test_transaction_id_format(self, factory_with_active_receipt, test_timestamp):
         """Test transaction ID has correct format."""
-        event = factory_with_active_receipt.generate_event(EventType.PAYMENT_PROCESSED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.PAYMENT_PROCESSED, test_timestamp
+        )
         assert event.payload["transaction_id"].startswith("TXN_")
 
 
@@ -780,7 +910,9 @@ class TestInventoryUpdatedBehaviors:
 
     def test_store_or_dc(self, event_factory, test_timestamp):
         """Test inventory update for either store or DC."""
-        event = event_factory.generate_event(EventType.INVENTORY_UPDATED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.INVENTORY_UPDATED, test_timestamp
+        )
 
         payload = event.payload
         has_store = payload.get("store_id") is not None
@@ -791,7 +923,9 @@ class TestInventoryUpdatedBehaviors:
 
     def test_valid_reason(self, event_factory, test_timestamp):
         """Test inventory reason is valid."""
-        event = event_factory.generate_event(EventType.INVENTORY_UPDATED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.INVENTORY_UPDATED, test_timestamp
+        )
 
         valid_reasons = [r.value for r in InventoryReason]
         assert event.payload["reason"] in valid_reasons
@@ -803,7 +937,9 @@ class TestInventoryUpdatedBehaviors:
             for _ in range(50)
         ]
 
-        sale_events = [e for e in events if e.payload["reason"] in ["SALE", "DAMAGED", "LOST"]]
+        sale_events = [
+            e for e in events if e.payload["reason"] in ["SALE", "DAMAGED", "LOST"]
+        ]
         if sale_events:
             for event in sale_events:
                 assert event.payload["quantity_delta"] < 0
@@ -815,7 +951,9 @@ class TestInventoryUpdatedBehaviors:
             for _ in range(50)
         ]
 
-        inbound_events = [e for e in events if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]]
+        inbound_events = [
+            e for e in events if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]
+        ]
         if inbound_events:
             for event in inbound_events:
                 assert event.payload["quantity_delta"] > 0
@@ -841,13 +979,17 @@ class TestCustomerEventBehaviors:
 
     def test_zone_changed_different_zones(self, event_factory, test_timestamp):
         """Test from_zone and to_zone are different."""
-        event = event_factory.generate_event(EventType.CUSTOMER_ZONE_CHANGED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.CUSTOMER_ZONE_CHANGED, test_timestamp
+        )
 
         assert event.payload["from_zone"] != event.payload["to_zone"]
 
     def test_zone_changed_valid_zones(self, event_factory, test_timestamp):
         """Test zones are valid store zones."""
-        event = event_factory.generate_event(EventType.CUSTOMER_ZONE_CHANGED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.CUSTOMER_ZONE_CHANGED, test_timestamp
+        )
 
         valid_zones = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
         assert event.payload["from_zone"] in valid_zones
@@ -864,30 +1006,42 @@ class TestBLEPingBehaviors:
 
     def test_requires_active_session(self, event_factory, test_timestamp):
         """Test ble_ping requires active customer session."""
-        event = event_factory.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
         assert event is None
 
-    def test_generates_with_session(self, factory_with_customer_session, test_timestamp):
+    def test_generates_with_session(
+        self, factory_with_customer_session, test_timestamp
+    ):
         """Test BLE ping generates with active session."""
-        event = factory_with_customer_session.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = factory_with_customer_session.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
         assert event is not None
         assert event.event_type == EventType.BLE_PING_DETECTED
 
     def test_has_required_fields(self, factory_with_customer_session, test_timestamp):
         """Test BLE ping has required fields."""
-        event = factory_with_customer_session.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = factory_with_customer_session.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
 
         for field in ["store_id", "beacon_id", "customer_ble_id", "rssi", "zone"]:
             assert field in event.payload
 
     def test_rssi_range(self, factory_with_customer_session, test_timestamp):
         """Test RSSI is in valid range."""
-        event = factory_with_customer_session.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = factory_with_customer_session.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
         assert -80 <= event.payload["rssi"] <= -30
 
     def test_beacon_id_format(self, factory_with_customer_session, test_timestamp):
         """Test beacon ID has correct format."""
-        event = factory_with_customer_session.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = factory_with_customer_session.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
         assert event.payload["beacon_id"].startswith("BEACON_")
 
 
@@ -927,10 +1081,14 @@ class TestTruckEventBehaviors:
         event = event_factory.generate_event(EventType.TRUCK_DEPARTED, test_timestamp)
         assert event is None
 
-    def test_truck_departed_removes_from_active(self, factory_with_active_truck, test_timestamp):
+    def test_truck_departed_removes_from_active(
+        self, factory_with_active_truck, test_timestamp
+    ):
         """Test truck_departed removes truck from active trucks."""
         initial_count = len(factory_with_active_truck.state.active_trucks)
-        factory_with_active_truck.generate_event(EventType.TRUCK_DEPARTED, test_timestamp)
+        factory_with_active_truck.generate_event(
+            EventType.TRUCK_DEPARTED, test_timestamp
+        )
         final_count = len(factory_with_active_truck.state.active_trucks)
         assert final_count < initial_count
 
@@ -993,9 +1151,13 @@ class TestMarketingEventBehaviors:
         event = event_factory.generate_event(EventType.AD_IMPRESSION, test_timestamp)
         assert event.payload["cost"] > 0
 
-    def test_promotion_valid_discount_type(self, factory_with_active_receipt, test_timestamp):
+    def test_promotion_valid_discount_type(
+        self, factory_with_active_receipt, test_timestamp
+    ):
         """Test promotion uses valid discount type."""
-        event = factory_with_active_receipt.generate_event(EventType.PROMOTION_APPLIED, test_timestamp)
+        event = factory_with_active_receipt.generate_event(
+            EventType.PROMOTION_APPLIED, test_timestamp
+        )
         assert event.payload["discount_type"] in ["percentage", "fixed"]
 
 
@@ -1009,19 +1171,25 @@ class TestStockoutReorderBehaviors:
 
     def test_stockout_quantity_low(self, event_factory, test_timestamp):
         """Test stockout last known quantity is low."""
-        event = event_factory.generate_event(EventType.STOCKOUT_DETECTED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.STOCKOUT_DETECTED, test_timestamp
+        )
         quantity = event.payload["last_known_quantity"]
         assert quantity >= 0
         assert quantity <= 5
 
     def test_reorder_valid_priority(self, event_factory, test_timestamp):
         """Test reorder priority is valid."""
-        event = event_factory.generate_event(EventType.REORDER_TRIGGERED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.REORDER_TRIGGERED, test_timestamp
+        )
         assert event.payload["priority"] in ["NORMAL", "HIGH", "URGENT"]
 
     def test_reorder_quantity_positive(self, event_factory, test_timestamp):
         """Test reorder quantity is positive."""
-        event = event_factory.generate_event(EventType.REORDER_TRIGGERED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.REORDER_TRIGGERED, test_timestamp
+        )
         assert event.payload["reorder_quantity"] > 0
 
 
@@ -1056,7 +1224,9 @@ class TestMixedEventGeneration:
             EventType.STORE_CLOSED: 0.5,
         }
 
-        events = event_factory.generate_mixed_events(50, business_hours_timestamp, weights)
+        events = event_factory.generate_mixed_events(
+            50, business_hours_timestamp, weights
+        )
         if events:
             event_types = [e.event_type for e in events]
             assert all(et in weights for et in event_types)
@@ -1184,7 +1354,9 @@ class TestEdgeCases:
         assert event2 is not None
         assert event1.ingest_timestamp.date() != event2.ingest_timestamp.date()
 
-    def test_simultaneous_events_different_trace_ids(self, event_factory, test_timestamp):
+    def test_simultaneous_events_different_trace_ids(
+        self, event_factory, test_timestamp
+    ):
         """Test simultaneous events have different trace IDs."""
         events = [
             event_factory.generate_event(EventType.STORE_OPENED, test_timestamp)
@@ -1210,7 +1382,9 @@ class TestEdgeCases:
                 "purchase_likelihood": 0.4,
             }
 
-        event = event_factory.generate_event(EventType.BLE_PING_DETECTED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.BLE_PING_DETECTED, test_timestamp
+        )
         assert event is not None
 
 
@@ -1222,7 +1396,14 @@ class TestEdgeCases:
 class TestReproducibility:
     """Test deterministic behavior with same seed."""
 
-    def test_same_seed_same_events(self, sample_stores, sample_customers, sample_products, sample_dcs, test_timestamp):
+    def test_same_seed_same_events(
+        self,
+        sample_stores,
+        sample_customers,
+        sample_products,
+        sample_dcs,
+        test_timestamp,
+    ):
         """Test same seed produces same events."""
         factory1 = EventFactory(
             stores=sample_stores,
@@ -1246,7 +1427,14 @@ class TestReproducibility:
         if event1 and event2:
             assert event1.payload["store_id"] == event2.payload["store_id"]
 
-    def test_different_seed_different_events(self, sample_stores, sample_customers, sample_products, sample_dcs, test_timestamp):
+    def test_different_seed_different_events(
+        self,
+        sample_stores,
+        sample_customers,
+        sample_products,
+        sample_dcs,
+        test_timestamp,
+    ):
         """Test different seeds produce different events."""
         factory1 = EventFactory(
             stores=sample_stores,
@@ -1264,8 +1452,14 @@ class TestReproducibility:
             seed=999,
         )
 
-        events1 = [factory1.generate_event(EventType.INVENTORY_UPDATED, test_timestamp) for _ in range(10)]
-        events2 = [factory2.generate_event(EventType.INVENTORY_UPDATED, test_timestamp) for _ in range(10)]
+        events1 = [
+            factory1.generate_event(EventType.INVENTORY_UPDATED, test_timestamp)
+            for _ in range(10)
+        ]
+        events2 = [
+            factory2.generate_event(EventType.INVENTORY_UPDATED, test_timestamp)
+            for _ in range(10)
+        ]
 
         payloads1 = [e.payload for e in events1 if e]
         payloads2 = [e.payload for e in events2 if e]

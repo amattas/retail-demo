@@ -441,7 +441,6 @@ class TestDimensionModels:
         sale_price = msrp * Decimal("0.80")  # 20% discount
         sale_price * Decimal("0.70")  # 70% of sale price
 
-
         # product = ProductMaster(**product_data)
         # assert product.Cost < product.SalePrice <= product.MSRP
 

@@ -27,9 +27,7 @@ class TestConfigurationLoading:
         """Test that configuration loads correctly from JSON."""
         from retail_datagen.config.models import RetailConfig
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(sample_config_data, f)
             f.flush()
             config_path = f.name
@@ -59,9 +57,7 @@ class TestConfigurationLoading:
             },
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(invalid_config, f)
             f.flush()
             config_path = f.name
@@ -77,7 +73,9 @@ class TestDictionaryLoading:
     """Test dictionary file loading."""
 
     @pytest.mark.integration
-    def test_dictionary_loader_caches_data(self, temp_data_dirs, sample_geography_dict_data):
+    def test_dictionary_loader_caches_data(
+        self, temp_data_dirs, sample_geography_dict_data
+    ):
         """Test that dictionary loader caches loaded data."""
         from retail_datagen.shared.dictionary_loader import DictionaryLoader
 
@@ -290,26 +288,47 @@ class TestCampaignAttribution:
         )
 
         store = Store(
-            ID=1, StoreNumber="ST001", Address="123 Test St",
-            GeographyID=1, tax_rate=Decimal("0.08")
+            ID=1,
+            StoreNumber="ST001",
+            Address="123 Test St",
+            GeographyID=1,
+            tax_rate=Decimal("0.08"),
         )
         customer = Customer(
-            ID=100, FirstName="Test", LastName="User", Address="100 Test Ave",
-            GeographyID=1, LoyaltyCard="LC001", Phone="555-555-0100",
-            BLEId="BLE001", AdId="AD001"
+            ID=100,
+            FirstName="Test",
+            LastName="User",
+            Address="100 Test Ave",
+            GeographyID=1,
+            LoyaltyCard="LC001",
+            Phone="555-555-0100",
+            BLEId="BLE001",
+            AdId="AD001",
         )
         product = ProductMaster(
-            ID=1, ProductName="Test Product", Brand="TestBrand",
-            Company="TestCo", Department="Test", Category="Test",
-            Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
-            SalePrice=Decimal("10.00"), RequiresRefrigeration=False,
-            LaunchDate=datetime(2023, 1, 1)
+            ID=1,
+            ProductName="Test Product",
+            Brand="TestBrand",
+            Company="TestCo",
+            Department="Test",
+            Category="Test",
+            Subcategory="Test",
+            Cost=Decimal("5.00"),
+            MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00"),
+            RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1),
         )
-        dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
+        dc = DistributionCenter(
+            ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1
+        )
 
         factory = EventFactory(
-            stores=[store], customers=[customer], products=[product],
-            distribution_centers=[dc], seed=42
+            stores=[store],
+            customers=[customer],
+            products=[product],
+            distribution_centers=[dc],
+            seed=42,
         )
 
         # Simulate a marketing conversion
@@ -343,8 +362,9 @@ class TestCampaignAttribution:
         if result is not None:
             payload, correlation_id, partition_key = result
             # Marketing-driven customer should have campaign_id
-            assert payload.campaign_id == "CAMP_TEST_001", \
+            assert payload.campaign_id == "CAMP_TEST_001", (
                 f"Expected campaign_id 'CAMP_TEST_001', got '{payload.campaign_id}'"
+            )
 
     @pytest.mark.integration
     def test_campaign_id_null_for_non_marketing_purchase(self):
@@ -360,26 +380,47 @@ class TestCampaignAttribution:
         from retail_datagen.streaming.event_factory import EventFactory
 
         store = Store(
-            ID=1, StoreNumber="ST001", Address="123 Test St",
-            GeographyID=1, tax_rate=Decimal("0.08")
+            ID=1,
+            StoreNumber="ST001",
+            Address="123 Test St",
+            GeographyID=1,
+            tax_rate=Decimal("0.08"),
         )
         customer = Customer(
-            ID=200, FirstName="Regular", LastName="Customer", Address="200 Test Ave",
-            GeographyID=1, LoyaltyCard="LC002", Phone="555-555-0200",
-            BLEId="BLE002", AdId="AD002"
+            ID=200,
+            FirstName="Regular",
+            LastName="Customer",
+            Address="200 Test Ave",
+            GeographyID=1,
+            LoyaltyCard="LC002",
+            Phone="555-555-0200",
+            BLEId="BLE002",
+            AdId="AD002",
         )
         product = ProductMaster(
-            ID=1, ProductName="Test Product", Brand="TestBrand",
-            Company="TestCo", Department="Test", Category="Test",
-            Subcategory="Test", Cost=Decimal("5.00"), MSRP=Decimal("12.00"),
-            SalePrice=Decimal("10.00"), RequiresRefrigeration=False,
-            LaunchDate=datetime(2023, 1, 1)
+            ID=1,
+            ProductName="Test Product",
+            Brand="TestBrand",
+            Company="TestCo",
+            Department="Test",
+            Category="Test",
+            Subcategory="Test",
+            Cost=Decimal("5.00"),
+            MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00"),
+            RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1),
         )
-        dc = DistributionCenter(ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1)
+        dc = DistributionCenter(
+            ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1
+        )
 
         factory = EventFactory(
-            stores=[store], customers=[customer], products=[product],
-            distribution_centers=[dc], seed=42
+            stores=[store],
+            customers=[customer],
+            products=[product],
+            distribution_centers=[dc],
+            seed=42,
         )
 
         # Create a non-marketing-driven customer session
@@ -401,8 +442,9 @@ class TestCampaignAttribution:
         if result is not None:
             payload, correlation_id, partition_key = result
             # Non-marketing customer should have no campaign_id
-            assert payload.campaign_id is None, \
+            assert payload.campaign_id is None, (
                 f"Expected campaign_id None, got '{payload.campaign_id}'"
+            )
 
     @pytest.mark.integration
     def test_backward_compatibility_with_null_campaign_id(self):
