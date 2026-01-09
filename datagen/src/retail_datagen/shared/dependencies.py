@@ -126,6 +126,9 @@ _task_status: dict[str, TaskStatus] = {}
 # Prevents race conditions when multiple threads/workers trigger cleanup
 _cleanup_lock = threading.Lock()
 
+# Track last cleanup time for cooldown logic
+_last_cleanup_time: datetime | None = None
+
 
 # ================================
 # ENVIRONMENT VARIABLE PARSING
@@ -157,8 +160,12 @@ def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
 
 # Task cleanup configuration
 # Bounds: max age 1-720 hours (1 hour to 30 days), threshold 100-100000 tasks
-TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int("TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, 720)
+MAX_TASK_AGE_HOURS = 720  # 30 days maximum retention
+MAX_TASK_AGE_LIMIT_HOURS = 8760  # 1 year absolute maximum for manual cleanup
+TASK_CLEANUP_MAX_AGE_HOURS = _parse_env_int("TASK_CLEANUP_MAX_AGE_HOURS", 24, 1, MAX_TASK_AGE_HOURS)
 TASK_CLEANUP_THRESHOLD = _parse_env_int("TASK_CLEANUP_THRESHOLD", 1000, 100, 100000)
+# Cooldown period between automatic cleanups (in seconds)
+TASK_CLEANUP_COOLDOWN_SECONDS = 300  # 5 minutes
 
 # Rate limiting storage configuration
 # These can be tuned via environment variables for different deployment scenarios
@@ -268,7 +275,7 @@ async def get_event_streamer(
 
 def _cleanup_old_tasks_locked(max_age_hours: int) -> int:
     """Remove completed/failed tasks older than max_age_hours (lock held)."""
-    global _background_tasks, _task_status
+    global _background_tasks, _task_status, _last_cleanup_time
 
     cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
     cleaned_count = 0
@@ -279,6 +286,9 @@ def _cleanup_old_tasks_locked(max_age_hours: int) -> int:
             _task_status.pop(task_id, None)
             _background_tasks.pop(task_id, None)
             cleaned_count += 1
+
+    # Update last cleanup time
+    _last_cleanup_time = datetime.now(UTC)
 
     if cleaned_count > 0:
         logger.info(
@@ -311,13 +321,28 @@ def create_background_task(task_id: str, coro, description: str = "") -> str:
     """Create and track a background task.
 
     Thread-safe: Uses _cleanup_lock to protect all dictionary operations.
+    Automatic cleanup is triggered when threshold is exceeded AND cooldown period
+    has elapsed since last cleanup to avoid excessive cleanup operations.
     """
-    global _background_tasks, _task_status
+    global _background_tasks, _task_status, _last_cleanup_time
 
     with _cleanup_lock:
-        # Cleanup old tasks if threshold exceeded (check inside lock)
-        if len(_task_status) >= TASK_CLEANUP_THRESHOLD:
+        # Cleanup old tasks if threshold exceeded AND cooldown has elapsed
+        should_cleanup = len(_task_status) >= TASK_CLEANUP_THRESHOLD
+        if should_cleanup and _last_cleanup_time is not None:
+            # Check if cooldown period has elapsed
+            elapsed = (datetime.now(UTC) - _last_cleanup_time).total_seconds()
+            should_cleanup = elapsed >= TASK_CLEANUP_COOLDOWN_SECONDS
+
+        if should_cleanup:
             # Call internal cleanup without re-acquiring lock
+            logger.debug(
+                "Triggering automatic cleanup",
+                extra={
+                    "task_count": len(_task_status),
+                    "threshold": TASK_CLEANUP_THRESHOLD,
+                },
+            )
             _cleanup_old_tasks_locked(TASK_CLEANUP_MAX_AGE_HOURS)
 
         if task_id in _background_tasks and not _background_tasks[task_id].done():
@@ -414,26 +439,28 @@ def cleanup_old_tasks(max_age_hours: int | None = None) -> int:
     Manually trigger cleanup of old background tasks.
 
     This is a public wrapper around _cleanup_old_tasks that can be called
-    from APIs or scheduled jobs.
+    from APIs or scheduled jobs. Unlike automatic cleanup, manual cleanup
+    is not subject to cooldown restrictions.
 
     Args:
         max_age_hours: Maximum age in hours for completed/failed tasks.
                       If None, uses TASK_CLEANUP_MAX_AGE_HOURS default.
-                      Must be non-negative if provided.
+                      Must be non-negative and not exceed MAX_TASK_AGE_LIMIT_HOURS.
 
     Returns:
         Number of tasks cleaned up
 
     Raises:
-        ValueError: If max_age_hours is negative
+        ValueError: If max_age_hours is negative or exceeds the limit
     """
     if max_age_hours is not None:
         if max_age_hours < 0:
             raise ValueError("max_age_hours must be non-negative")
-        if (
-            max_age_hours > 720
-        ):  # 30 days max, aligned with TASK_CLEANUP_MAX_AGE_HOURS bounds
-            raise ValueError("max_age_hours must not exceed 720 (30 days)")
+        if max_age_hours > MAX_TASK_AGE_LIMIT_HOURS:
+            raise ValueError(
+                f"max_age_hours must not exceed {MAX_TASK_AGE_LIMIT_HOURS} "
+                f"({MAX_TASK_AGE_LIMIT_HOURS // 24} days)"
+            )
     age = max_age_hours if max_age_hours is not None else TASK_CLEANUP_MAX_AGE_HOURS
     return _cleanup_old_tasks(max_age_hours=age)
 

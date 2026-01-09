@@ -33,18 +33,18 @@ class SyntheticDataValidator:
         self.real_brands = REAL_BRANDS
         self.real_address_patterns = REAL_ADDRESS_PATTERNS
 
-    def is_synthetic_first_name(self, name: str) -> bool:
+    def _validate_name_format_and_blocklist(
+        self, name: str, blocklist: set[str]
+    ) -> bool:
         """
-        Check if a first name is acceptable for synthetic data generation.
-
-        Validates that the name is not a common real name and meets basic
-        format requirements, as required by AGENTS.md and CLAUDE.md.
+        Common validation logic for name format and blocklist checking.
 
         Args:
-            name: First name to validate
+            name: Name to validate
+            blocklist: Set of real names to check against (case-insensitive)
 
         Returns:
-            True if synthetic and acceptable, False if real or invalid format
+            True if name passes validation, False otherwise
         """
         name_stripped = name.strip()
 
@@ -59,12 +59,27 @@ class SyntheticDataValidator:
         if not re.match(r"^[A-Za-z\s\-']+$", name_stripped):
             return False
 
-        # Check against real name blocklist
+        # Check against real name blocklist (case-insensitive)
         name_lower = name_stripped.lower()
-        if name_lower in self.real_first_names:
+        if name_lower in blocklist:
             return False
 
         return True
+
+    def is_synthetic_first_name(self, name: str) -> bool:
+        """
+        Check if a first name is acceptable for synthetic data generation.
+
+        Validates that the name is not a common real name and meets basic
+        format requirements, as required by AGENTS.md and CLAUDE.md.
+
+        Args:
+            name: First name to validate
+
+        Returns:
+            True if synthetic and acceptable, False if real or invalid format
+        """
+        return self._validate_name_format_and_blocklist(name, self.real_first_names)
 
     def is_synthetic_last_name(self, name: str) -> bool:
         """
@@ -79,25 +94,7 @@ class SyntheticDataValidator:
         Returns:
             True if synthetic and acceptable, False if real or invalid format
         """
-        name_stripped = name.strip()
-
-        # Basic format validation
-        if not name_stripped:
-            return False
-
-        if len(name_stripped) < 2 or len(name_stripped) > 50:
-            return False
-
-        # Allow letters, spaces, hyphens, and apostrophes
-        if not re.match(r"^[A-Za-z\s\-']+$", name_stripped):
-            return False
-
-        # Check against real name blocklist
-        name_lower = name_stripped.lower()
-        if name_lower in self.real_last_names:
-            return False
-
-        return True
+        return self._validate_name_format_and_blocklist(name, self.real_last_names)
 
     def is_synthetic_company(self, company: str) -> bool:
         """
