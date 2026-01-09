@@ -402,5 +402,3 @@ class TestPricingDistribution:
         # Results should be identical
         # for i, (individual, batch) in enumerate(zip(individual_results, batch_results)):
         #     assert individual == batch, f"Mismatch at index {i}"
-
-

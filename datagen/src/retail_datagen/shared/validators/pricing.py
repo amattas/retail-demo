@@ -141,5 +141,3 @@ class PricingCalculator:
             List of pricing dictionaries
         """
         return [self.calculate_full_pricing(price) for price in base_prices]
-
-
