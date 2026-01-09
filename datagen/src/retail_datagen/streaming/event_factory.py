@@ -247,16 +247,22 @@ class EventFactory:
             correlation_id = None
             partition_key = None
 
+            # Helper to safely unpack results that may be None
+            def _unpack_result(result):
+                if result is None:
+                    return None, None, None
+                return result
+
             if event_type == EventType.RECEIPT_CREATED:
-                payload, correlation_id, partition_key = self._generate_receipt_created(
-                    timestamp
+                payload, correlation_id, partition_key = _unpack_result(
+                    self._generate_receipt_created(timestamp)
                 )
             elif event_type == EventType.RECEIPT_LINE_ADDED:
-                payload, correlation_id, partition_key = (
+                payload, correlation_id, partition_key = _unpack_result(
                     self._generate_receipt_line_added(timestamp)
                 )
             elif event_type == EventType.PAYMENT_PROCESSED:
-                payload, correlation_id, partition_key = (
+                payload, correlation_id, partition_key = _unpack_result(
                     self._generate_payment_processed(timestamp)
                 )
             elif event_type == EventType.INVENTORY_UPDATED:
@@ -276,11 +282,11 @@ class EventFactory:
                     self._generate_customer_entered(timestamp)
                 )
             elif event_type == EventType.CUSTOMER_ZONE_CHANGED:
-                payload, correlation_id, partition_key = (
+                payload, correlation_id, partition_key = _unpack_result(
                     self._generate_customer_zone_changed(timestamp)
                 )
             elif event_type == EventType.BLE_PING_DETECTED:
-                payload, correlation_id, partition_key = (
+                payload, correlation_id, partition_key = _unpack_result(
                     self._generate_ble_ping_detected(timestamp)
                 )
             elif event_type == EventType.TRUCK_ARRIVED:
@@ -288,8 +294,8 @@ class EventFactory:
                     timestamp
                 )
             elif event_type == EventType.TRUCK_DEPARTED:
-                payload, correlation_id, partition_key = self._generate_truck_departed(
-                    timestamp
+                payload, correlation_id, partition_key = _unpack_result(
+                    self._generate_truck_departed(timestamp)
                 )
             elif event_type == EventType.STORE_OPENED:
                 payload, correlation_id, partition_key = self._generate_store_opened(
@@ -304,12 +310,8 @@ class EventFactory:
                     timestamp
                 )
             elif event_type == EventType.PROMOTION_APPLIED:
-                payload, correlation_id, partition_key = (
+                payload, correlation_id, partition_key = _unpack_result(
                     self._generate_promotion_applied(timestamp)
-                )
-            elif event_type == EventType.ONLINE_ORDER_CREATED:
-                payload, correlation_id, partition_key = (
-                    self._generate_online_order_created(timestamp)
                 )
             elif event_type == EventType.ONLINE_ORDER_CREATED:
                 payload, correlation_id, partition_key = (

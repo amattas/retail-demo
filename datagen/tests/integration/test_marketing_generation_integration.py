@@ -5,6 +5,7 @@ Tests end-to-end workflows for marketing campaign generation,
 validates bug fixes, and ensures system integration.
 """
 
+import asyncio
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -81,8 +82,10 @@ class TestMarketingGenerationIntegration:
         start_date = datetime(2024, 1, 1)
         end_date = datetime(2024, 1, 30)
 
-        # Generate historical data
-        generator_with_master_data.generate_historical_data(start_date, end_date)
+        # Generate historical data (async function - run with asyncio)
+        asyncio.run(
+            generator_with_master_data.generate_historical_data(start_date, end_date)
+        )
 
         # Read all marketing CSV files
         marketing_dir = test_output_dir / "facts" / "marketing"
@@ -291,8 +294,10 @@ class TestMarketingGenerationIntegration:
         if marketing_feb_dir.exists():
             shutil.rmtree(marketing_feb_dir)
 
-        # Generate data
-        generator_with_master_data.generate_historical_data(start_date, end_date)
+        # Generate data (async function - run with asyncio)
+        asyncio.run(
+            generator_with_master_data.generate_historical_data(start_date, end_date)
+        )
 
         # Read generated data
         marketing_files = list(marketing_feb_dir.rglob("*.csv"))
@@ -340,8 +345,8 @@ class TestMarketingGenerationIntegration:
         start_date = datetime(2024, 3, 1)
         end_date = datetime(2024, 3, 7)
 
-        summary = generator_with_master_data.generate_historical_data(
-            start_date, end_date
+        summary = asyncio.run(
+            generator_with_master_data.generate_historical_data(start_date, end_date)
         )
 
         # Expected fact tables
@@ -596,10 +601,12 @@ class TestMarketingBugFixValidation:
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()
 
-        # Generate facts
+        # Generate facts (async function - run with asyncio)
         generator = FactDataGenerator(config)
         generator.load_master_data()
-        generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+        asyncio.run(
+            generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+        )
 
         # Read marketing data
         marketing_dir = output_dir / "facts" / "marketing"
@@ -634,10 +641,12 @@ class TestMarketingBugFixValidation:
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()
 
-        # Generate facts
+        # Generate facts (async function - run with asyncio)
         generator = FactDataGenerator(config)
         generator.load_master_data()
-        generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+        asyncio.run(
+            generator.generate_historical_data(datetime(2024, 1, 1), datetime(2024, 1, 30))
+        )
 
         # Read marketing data
         marketing_dir = output_dir / "facts" / "marketing"
@@ -695,12 +704,14 @@ class TestMarketingBugFixValidation:
         master_gen = MasterDataGenerator(config)
         master_gen.generate_all_master_data()
 
-        # Generate facts
+        # Generate facts (async function - run with asyncio)
         generator = FactDataGenerator(config)
         generator.load_master_data()
-        generator.generate_historical_data(
-            datetime(2024, 1, 1),
-            datetime(2024, 1, 14),  # 2 weeks
+        asyncio.run(
+            generator.generate_historical_data(
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 14),  # 2 weeks
+            )
         )
 
         # Read marketing data

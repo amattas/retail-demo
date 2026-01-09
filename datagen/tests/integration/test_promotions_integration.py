@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import pytest
+import pytest_asyncio
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def small_test_config(temp_data_dirs):
     return RetailConfig(**config_data)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def generator_with_master_data(small_test_config, set_test_mode):
     """Create generator with minimal master data."""
     from retail_datagen.generators.fact_generator import FactDataGenerator

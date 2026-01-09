@@ -9,7 +9,7 @@ state management, and API endpoints.
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -248,33 +248,34 @@ async def test_full_streaming_flow(
         distribution_centers=sample_dcs,
     )
 
-    # Replace Azure client with mock
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        # Initialize streamer
-        success = await streamer.initialize()
-        assert success, "Streamer initialization failed"
+    # Set mock client BEFORE initializing (initialize() will skip creating a new client)
+    streamer._azure_client = mock_event_hub_client
 
-        # Start streaming for short duration
-        duration = timedelta(seconds=2)
-        asyncio.create_task(streamer.start(duration))
+    # Initialize streamer
+    success = await streamer.initialize()
+    assert success, "Streamer initialization failed"
 
-        # Allow streaming to run
-        await asyncio.sleep(2.5)
+    # Start streaming for short duration
+    duration = timedelta(seconds=2)
+    asyncio.create_task(streamer.start(duration))
 
-        # Verify events were generated
-        stats = await streamer.get_statistics()
-        assert stats["events_generated"] > 0, "No events were generated"
-        assert stats["is_streaming"] is False, "Streaming should have stopped"
+    # Allow streaming to run
+    await asyncio.sleep(2.5)
 
-        # Verify mock client was called
-        mock_event_hub_client.send_events.assert_called()
+    # Verify events were generated
+    stats = await streamer.get_statistics()
+    assert stats["events_generated"] > 0, "No events were generated"
+    assert stats["is_streaming"] is False, "Streaming should have stopped"
 
-        # Stop streaming
-        await streamer.stop()
+    # Verify mock client was called
+    mock_event_hub_client.send_events.assert_called()
 
-        # Verify cleanup
-        final_stats = await streamer.get_statistics()
-        assert final_stats["is_streaming"] is False
+    # Stop streaming
+    await streamer.stop()
+
+    # Verify cleanup
+    final_stats = await streamer.get_statistics()
+    assert final_stats["is_streaming"] is False
 
 
 # ================================
@@ -388,26 +389,28 @@ async def test_dlq_flow(
     mock_client.connect = AsyncMock(return_value=True)
     mock_client.is_connected = Mock(return_value=True)
 
-    with patch.object(streamer, "_azure_client", mock_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_client
 
-        # Generate events manually and try to send
-        timestamp = datetime.now(UTC)
-        events = streamer._event_factory.generate_mixed_events(
-            count=10, timestamp=timestamp
-        )
+    await streamer.initialize()
 
-        # Add to buffer
-        async with streamer._buffer_lock:
-            streamer._event_buffer.extend(events)
+    # Generate events manually and try to send
+    timestamp = datetime.now(UTC)
+    events = streamer._event_factory.generate_mixed_events(
+        count=10, timestamp=timestamp
+    )
 
-        # Try to flush (will fail)
-        await streamer._flush_event_buffer()
+    # Add to buffer
+    async with streamer._buffer_lock:
+        streamer._event_buffer.extend(events)
 
-        # Verify events in DLQ
-        stats = await streamer.get_statistics()
-        assert stats["dead_letter_queue_size"] > 0, "DLQ should contain failed events"
-        assert stats["events_failed"] > 0, "Failed events count should increase"
+    # Try to flush (will fail)
+    await streamer._flush_event_buffer()
+
+    # Verify events in DLQ
+    stats = await streamer.get_statistics()
+    assert stats["dead_letter_queue_size"] > 0, "DLQ should contain failed events"
+    assert stats["events_failed"] > 0, "Failed events count should increase"
 
 
 # ================================
@@ -580,33 +583,35 @@ async def test_statistics_collection(
         distribution_centers=sample_dcs,
     )
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Generate known number of events
-        timestamp = datetime.now(UTC)
-        events = streamer._event_factory.generate_mixed_events(
-            count=50, timestamp=timestamp
-        )
+    await streamer.initialize()
 
-        # Add to buffer and flush
-        async with streamer._buffer_lock:
-            streamer._event_buffer.extend(events)
+    # Generate known number of events
+    timestamp = datetime.now(UTC)
+    events = streamer._event_factory.generate_mixed_events(
+        count=50, timestamp=timestamp
+    )
 
-        # Update statistics manually
-        async with streamer._stats_lock:
-            streamer._statistics.events_generated = len(events)
-            streamer._statistics.events_sent_successfully = len(events)
-            streamer._statistics.batches_sent = 1
+    # Add to buffer and flush
+    async with streamer._buffer_lock:
+        streamer._event_buffer.extend(events)
 
-        # Get statistics
-        stats = await streamer.get_statistics()
+    # Update statistics manually
+    async with streamer._stats_lock:
+        streamer._statistics.events_generated = len(events)
+        streamer._statistics.events_sent_successfully = len(events)
+        streamer._statistics.batches_sent = 1
 
-        # Verify counters match
-        assert stats["events_generated"] == len(events), "Generated count mismatch"
-        assert stats["events_sent_successfully"] == len(events), "Sent count mismatch"
-        assert stats["batches_sent"] == 1, "Batch count mismatch"
-        assert stats["events_failed"] == 0, "Should have no failures"
+    # Get statistics
+    stats = await streamer.get_statistics()
+
+    # Verify counters match
+    assert stats["events_generated"] == len(events), "Generated count mismatch"
+    assert stats["events_sent_successfully"] == len(events), "Sent count mismatch"
+    assert stats["batches_sent"] == 1, "Batch count mismatch"
+    assert stats["events_failed"] == 0, "Should have no failures"
 
 
 # ================================
@@ -712,20 +717,22 @@ async def test_monitoring_and_health(
         distribution_centers=sample_dcs,
     )
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Get health status
-        health = await streamer.get_health_status()
+    await streamer.initialize()
 
-        assert "overall_healthy" in health
-        assert "components" in health
-        assert "azure_event_hub" in health["components"]
-        assert "event_factory" in health["components"]
+    # Get health status
+    health = await streamer.get_health_status()
 
-        # Verify Azure client health
-        azure_health = health["components"]["azure_event_hub"]
-        assert azure_health["healthy"] is True
+    assert "overall_healthy" in health
+    assert "components" in health
+    assert "azure_event_hub" in health["components"]
+    assert "event_factory" in health["components"]
+
+    # Verify Azure client health
+    azure_health = health["components"]["azure_event_hub"]
+    assert azure_health["healthy"] is True
 
 
 # ================================
@@ -786,24 +793,26 @@ async def test_concurrent_statistics_access(
         distribution_centers=sample_dcs,
     )
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Create multiple tasks that access statistics concurrently
-        async def read_stats():
-            for _ in range(10):
-                stats = await streamer.get_statistics()
-                assert isinstance(stats, dict)
-                await asyncio.sleep(0.01)
+    await streamer.initialize()
 
-        # Run multiple concurrent readers
-        tasks = [asyncio.create_task(read_stats()) for _ in range(5)]
+    # Create multiple tasks that access statistics concurrently
+    async def read_stats():
+        for _ in range(10):
+            stats = await streamer.get_statistics()
+            assert isinstance(stats, dict)
+            await asyncio.sleep(0.01)
 
-        # Wait for all tasks
-        await asyncio.gather(*tasks)
+    # Run multiple concurrent readers
+    tasks = [asyncio.create_task(read_stats()) for _ in range(5)]
 
-        # Verify no race conditions occurred (no exceptions thrown)
-        # If we got here, concurrent access was safe
+    # Wait for all tasks
+    await asyncio.gather(*tasks)
+
+    # Verify no race conditions occurred (no exceptions thrown)
+    # If we got here, concurrent access was safe
 
 
 # ================================
@@ -854,18 +863,18 @@ async def test_event_hooks(
     streamer.add_batch_sent_hook(on_batch_sent)
     streamer.add_error_hook(on_error)
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Generate events
-        timestamp = datetime.now(UTC)
-        events = await streamer._generate_event_burst(timestamp)
+    await streamer.initialize()
 
-        # Verify generated hooks called
-        assert len(generated_events) > 0, "Generated hooks should be called"
-        assert len(generated_events) == len(events), (
-            "Hook should be called for each event"
-        )
+    # Generate events
+    timestamp = datetime.now(UTC)
+    events = await streamer._generate_event_burst(timestamp)
+
+    # Verify generated hooks called
+    assert len(generated_events) > 0, "Generated hooks should be called"
+    assert len(generated_events) == len(events), "Hook should be called for each event"
 
 
 # ================================
@@ -978,21 +987,172 @@ async def test_stream_duration_handling(
         distribution_centers=sample_dcs,
     )
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Start streaming for 1 second
-        duration = timedelta(seconds=1)
-        start_time = datetime.now(UTC)
+    await streamer.initialize()
 
-        await streamer.start(duration)
+    # Start streaming for 1 second
+    duration = timedelta(seconds=1)
+    start_time = datetime.now(UTC)
 
-        end_time = datetime.now(UTC)
-        elapsed = (end_time - start_time).total_seconds()
+    await streamer.start(duration)
 
-        # Should complete within reasonable time (1 second + some overhead)
-        assert elapsed < 3.0, f"Streaming took too long: {elapsed:.2f}s"
-        assert elapsed >= 1.0, f"Streaming ended too early: {elapsed:.2f}s"
+    end_time = datetime.now(UTC)
+    elapsed = (end_time - start_time).total_seconds()
+
+    # Should complete within reasonable time (1 second + some overhead)
+    assert elapsed < 3.0, f"Streaming took too long: {elapsed:.2f}s"
+    assert elapsed >= 1.0, f"Streaming ended too early: {elapsed:.2f}s"
+
+
+# ================================
+# TEST: Pre-configured Client Behavior
+# ================================
+
+
+@pytest.mark.asyncio
+async def test_preconfigured_client_with_connection_string(
+    test_config,
+    sample_stores,
+    sample_customers,
+    sample_products,
+    sample_dcs,
+    mock_event_hub_client,
+):
+    """Test behavior when client is pre-configured and connection string is also provided.
+
+    This test verifies that when a pre-configured Azure client is set before
+    initialize() is called, the pre-configured client is used and any
+    connection string in config is ignored. This is the expected behavior
+    for testing scenarios where mock clients are injected.
+
+    See PR review: There's no test verifying behavior when `_azure_client`
+    is pre-set but `initialize()` is called with a connection string.
+    """
+    # Create streamer with config that has a connection string
+    assert test_config.realtime.azure_connection_string, (
+        "Test config should have connection string"
+    )
+
+    streamer = EventStreamer(
+        config=test_config,
+        stores=sample_stores,
+        customers=sample_customers,
+        products=sample_products,
+        distribution_centers=sample_dcs,
+    )
+
+    # Pre-configure the client BEFORE calling initialize()
+    streamer._azure_client = mock_event_hub_client
+
+    # Verify client is pre-set
+    assert streamer._azure_client is mock_event_hub_client
+
+    # Initialize the streamer - this should NOT replace our pre-configured client
+    success = await streamer.initialize()
+    assert success, "Streamer initialization should succeed"
+
+    # CRITICAL: Verify the pre-configured client was preserved (not replaced)
+    assert streamer._azure_client is mock_event_hub_client, (
+        "Pre-configured client should be preserved despite connection string in config"
+    )
+
+    # Verify the client works correctly
+    await mock_event_hub_client.connect()
+    assert mock_event_hub_client.is_connected(), "Mock client should be connected"
+
+    # Generate and send some events to verify everything works
+    timestamp = datetime.now(UTC)
+    events = streamer._event_factory.generate_mixed_events(count=5, timestamp=timestamp)
+
+    async with streamer._buffer_lock:
+        streamer._event_buffer.extend(events)
+
+    await streamer._flush_event_buffer()
+
+    # Verify mock client was used for sending
+    mock_event_hub_client.send_events.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_no_client_with_empty_connection_string(
+    tmp_path,
+    sample_stores,
+    sample_customers,
+    sample_products,
+    sample_dcs,
+):
+    """Test behavior when no client is pre-configured and no connection string.
+
+    This verifies the streamer handles the case where:
+    - No pre-configured client is set
+    - No connection string is provided in config
+
+    Expected behavior: Initialize succeeds and creates a default/mock client
+    for local-only operation mode (events generated but not sent to Azure).
+    """
+    # Create config without connection string
+    config_data = {
+        "seed": 42,
+        "volume": {
+            "stores": 5,
+            "dcs": 2,
+            "total_customers": 100,
+            "customers_per_day": 20,
+            "items_per_ticket_mean": 4.2,
+        },
+        "realtime": {
+            "emit_interval_ms": 100,
+            "burst": 50,
+            # No azure_connection_string - intentionally omitted
+        },
+        "paths": {
+            "dict": str(tmp_path / "dictionaries"),
+            "master": str(tmp_path / "master"),
+            "facts": str(tmp_path / "facts"),
+        },
+        "stream": {"hub": "test-retail-events"},
+    }
+
+    (tmp_path / "dictionaries").mkdir()
+    (tmp_path / "master").mkdir()
+    (tmp_path / "facts").mkdir()
+
+    config = RetailConfig(**config_data)
+
+    # Verify no connection string in config
+    assert not config.realtime.azure_connection_string, (
+        "Config should have no connection string for this test"
+    )
+
+    streamer = EventStreamer(
+        config=config,
+        stores=sample_stores,
+        customers=sample_customers,
+        products=sample_products,
+        distribution_centers=sample_dcs,
+    )
+
+    # Before initialization, client should be None
+    assert streamer._azure_client is None, (
+        "Client should be None before initialization"
+    )
+
+    # Initialize should succeed (creates default client for local operation)
+    success = await streamer.initialize()
+    assert success, "Initialization should succeed even without connection string"
+
+    # After initialization, a default client should be created
+    # (The streamer creates a client with empty connection string for local testing)
+    assert streamer._azure_client is not None, (
+        "A default client should be created for local-only operation"
+    )
+
+    # Verify the client was created with the expected hub name from config
+    assert streamer._azure_client.hub_name == "test-retail-events", (
+        "Client should be configured with the hub name from config"
+    )
 
 
 # ================================
@@ -1019,29 +1179,29 @@ async def test_buffer_management(
         distribution_centers=sample_dcs,
     )
 
-    with patch.object(streamer, "_azure_client", mock_event_hub_client):
-        await streamer.initialize()
+    # Set mock client BEFORE initializing
+    streamer._azure_client = mock_event_hub_client
 
-        # Generate events and add to buffer
-        timestamp = datetime.now(UTC)
-        events = streamer._event_factory.generate_mixed_events(
-            count=10, timestamp=timestamp
-        )
+    await streamer.initialize()
 
-        async with streamer._buffer_lock:
-            streamer._event_buffer.extend(events)
-            initial_buffer_size = len(streamer._event_buffer)
+    # Generate events and add to buffer
+    timestamp = datetime.now(UTC)
+    events = streamer._event_factory.generate_mixed_events(
+        count=10, timestamp=timestamp
+    )
 
-        assert initial_buffer_size == 10, "Buffer should contain 10 events"
+    async with streamer._buffer_lock:
+        streamer._event_buffer.extend(events)
+        initial_buffer_size = len(streamer._event_buffer)
 
-        # Flush buffer
-        await streamer._flush_event_buffer()
+    assert initial_buffer_size == 10, "Buffer should contain 10 events"
 
-        # Verify buffer is empty
-        async with streamer._buffer_lock:
-            assert len(streamer._event_buffer) == 0, (
-                "Buffer should be empty after flush"
-            )
+    # Flush buffer
+    await streamer._flush_event_buffer()
 
-        # Verify events were sent
-        mock_event_hub_client.send_events.assert_called()
+    # Verify buffer is empty
+    async with streamer._buffer_lock:
+        assert len(streamer._event_buffer) == 0, "Buffer should be empty after flush"
+
+    # Verify events were sent
+    mock_event_hub_client.send_events.assert_called()

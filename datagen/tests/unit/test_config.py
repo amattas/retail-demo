@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 _hyp = pytest.importorskip("hypothesis")
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
@@ -86,6 +86,11 @@ class TestVolumeConfig:
         with pytest.raises(ValidationError):
             VolumeConfig(**invalid_volume)
 
+    # Suppress HealthCheck.too_slow because generating floats with hypothesis
+    # can trigger slow data generation warnings. The items_per_ticket_mean float
+    # strategy occasionally takes longer than hypothesis's default threshold,
+    # but this is acceptable for property-based testing of configuration validation.
+    @settings(suppress_health_check=[HealthCheck.too_slow])
     @given(
         stores=st.integers(min_value=1, max_value=10000),
         dcs=st.integers(min_value=1, max_value=100),

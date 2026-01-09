@@ -3,118 +3,149 @@ Blocklist data for synthetic data validation.
 
 Contains sets of real names, brands, companies, and address patterns
 that should be avoided or flagged in synthetic data generation.
+
+CONFIGURATION:
+    Set environment variable RETAIL_DATAGEN_DEMO_MODE=true to disable
+    name blocklist enforcement, allowing realistic names in demo data.
+    This is useful for demos where realistic-looking names are preferred.
+
+SECURITY NOTE:
+    When DEMO_MODE is enabled, generated customer names may appear
+    similar to real people's names. This is intentional for demo purposes
+    but should be documented when demo data is shared externally.
+    Brand blocklists remain active regardless of demo mode setting.
 """
 
-# Common real first names to avoid
-REAL_FIRST_NAMES = {
-    "john",
-    "mary",
-    "michael",
-    "jennifer",
-    "william",
-    "elizabeth",
-    "david",
-    "patricia",
-    "robert",
-    "linda",
-    "christopher",
-    "barbara",
-    "daniel",
-    "sandra",
-    "matthew",
-    "betty",
-    "anthony",
-    "helen",
-    "mark",
-    "nancy",
-    "donald",
-    "karen",
-    "steven",
-    "lisa",
-    "paul",
-    "anna",
-    "andrew",
-    "brenda",
-    "joshua",
-    "emma",
-    "kenneth",
-    "olivia",
-    "kevin",
-    "sophia",
-    "brian",
-    "cynthia",
-    "george",
-    "marie",
-    "edward",
-    "janet",
-    "ronald",
-    "catherine",
-    "timothy",
-    "frances",
-    "jason",
-    "samantha",
-    "jeffrey",
-    "debra",
+import os
+
+# Check for demo mode - when enabled, name blocklists are empty to allow realistic names
+_demo_mode = os.getenv("RETAIL_DATAGEN_DEMO_MODE", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
 }
 
-# Common real last names to avoid
-REAL_LAST_NAMES = {
-    "smith",
-    "johnson",
-    "williams",
-    "brown",
-    "jones",
-    "garcia",
-    "miller",
-    "davis",
-    "rodriguez",
-    "martinez",
-    "hernandez",
-    "lopez",
-    "gonzales",
-    "wilson",
-    "anderson",
-    "thomas",
-    "taylor",
-    "moore",
-    "jackson",
-    "martin",
-    "lee",
-    "perez",
-    "thompson",
-    "white",
-    "harris",
-    "sanchez",
-    "clark",
-    "ramirez",
-    "lewis",
-    "robinson",
-    "walker",
-    "young",
-    "allen",
-    "king",
-    "wright",
-    "scott",
-    "torres",
-    "nguyen",
-    "hill",
-    "flores",
-    "green",
-    "adams",
-    "nelson",
-    "baker",
-    "hall",
-    "rivera",
-    "campbell",
-    "mitchell",
-    "carter",
-    "roberts",
-}
+# Common real first names to avoid (disabled in demo mode)
+# Note: This set is empty when DEMO_MODE is enabled to allow realistic names in demo data
+REAL_FIRST_NAMES: set[str] = (
+    set()
+    if _demo_mode
+    else {
+        "john",
+        "mary",
+        "michael",
+        "jennifer",
+        "william",
+        "elizabeth",
+        "david",
+        "patricia",
+        "robert",
+        "linda",
+        "christopher",
+        "barbara",
+        "daniel",
+        "sandra",
+        "matthew",
+        "betty",
+        "anthony",
+        "helen",
+        "mark",
+        "nancy",
+        "donald",
+        "karen",
+        "steven",
+        "lisa",
+        "paul",
+        "anna",
+        "andrew",
+        "brenda",
+        "joshua",
+        "emma",
+        "kenneth",
+        "olivia",
+        "kevin",
+        "sophia",
+        "brian",
+        "cynthia",
+        "george",
+        "marie",
+        "edward",
+        "janet",
+        "ronald",
+        "catherine",
+        "timothy",
+        "frances",
+        "jason",
+        "samantha",
+        "jeffrey",
+        "debra",
+    }
+)
+
+# Common real last names to avoid (disabled in demo mode)
+# Note: This set is empty when DEMO_MODE is enabled to allow realistic names in demo data
+REAL_LAST_NAMES: set[str] = (
+    set()
+    if _demo_mode
+    else {
+        "smith",
+        "johnson",
+        "williams",
+        "brown",
+        "jones",
+        "garcia",
+        "miller",
+        "davis",
+        "rodriguez",
+        "martinez",
+        "hernandez",
+        "lopez",
+        "gonzales",
+        "wilson",
+        "anderson",
+        "thomas",
+        "taylor",
+        "moore",
+        "jackson",
+        "martin",
+        "lee",
+        "perez",
+        "thompson",
+        "white",
+        "harris",
+        "sanchez",
+        "clark",
+        "ramirez",
+        "lewis",
+        "robinson",
+        "walker",
+        "young",
+        "allen",
+        "king",
+        "wright",
+        "scott",
+        "torres",
+        "nguyen",
+        "hill",
+        "flores",
+        "green",
+        "adams",
+        "nelson",
+        "baker",
+        "hall",
+        "rivera",
+        "campbell",
+        "mitchell",
+        "carter",
+        "roberts",
+    }
+)
 
 # Real company names to avoid (now empty as all data should be synthetic)
 REAL_COMPANIES: set[str] = set()
 
 # Comprehensive real brand blocklist - major retail, technology, automotive, and consumer brands
+# NOTE: Brand blocklist remains active regardless of demo mode to prevent trademark issues
 REAL_BRANDS = {
     # Technology brands
     "apple",
@@ -883,3 +914,21 @@ REAL_ADDRESS_PATTERNS = [
     r".*1 microsoft way.*",  # Microsoft
     r".*1600 amphitheatre.*",  # Google
 ]
+
+
+def is_demo_mode() -> bool:
+    """Check if demo mode is enabled.
+
+    Returns:
+        True if RETAIL_DATAGEN_DEMO_MODE environment variable is set to
+        a truthy value (1, true, yes), False otherwise.
+
+    Note:
+        This function dynamically checks the environment variable each time
+        it's called, allowing tests to modify the behavior at runtime.
+    """
+    return os.getenv("RETAIL_DATAGEN_DEMO_MODE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
