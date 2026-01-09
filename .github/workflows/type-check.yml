@@ -3,12 +3,19 @@ name: Type Check
 on:
   push:
     branches: [main]
+    paths:
+      - 'datagen/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'datagen/**'
 
 jobs:
   mypy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: datagen
     steps:
       - uses: actions/checkout@v4
 
@@ -17,6 +24,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: datagen/pyproject.toml
 
       - name: Install dependencies
         run: |

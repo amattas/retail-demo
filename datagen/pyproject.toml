@@ -69,8 +69,8 @@ markers = [
 
 [tool.mypy]
 python_version = "3.11"
-# Relaxed from strict=true to allow gradual typing adoption
-# Enable specific checks incrementally as codebase matures
+# Gradual typing adoption - enable stricter checks incrementally
+# See GitHub issues for tracking re-enabling disabled codes
 warn_return_any = false
 warn_unused_configs = true
 warn_redundant_casts = true
@@ -81,28 +81,30 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 no_implicit_optional = true
 exclude = ["data/.*", "tests/.*"]
-# Disable noisy error codes for gradual adoption
-# These can be enabled incrementally as type coverage improves
+
+# Disabled error codes - track progress via GitHub issues
+# Priority order for re-enabling: var-annotated > index > misc > func-returns-value > assignment > return-value > operator > override > arg-type > union-attr > call-arg
 disable_error_code = [
-    "call-arg",         # Missing/extra function arguments
-    "union-attr",       # Accessing attrs on optional types
-    "arg-type",         # Argument type mismatches
-    "override",         # Method override signature mismatches
-    "operator",         # Operator type issues
-    "index",            # Indexing issues
-    "misc",             # Miscellaneous errors
-    "func-returns-value",  # Stub methods with ... body
-    "var-annotated",    # Missing variable type annotations
-    "assignment",       # Type mismatches in assignments
-    "return-value",     # Return type mismatches
-    "dict-item",        # Dict literal type issues
-    "type-var",         # Type variable issues
-    "call-overload",    # Overload call issues
-    "no-redef",         # Redefinition errors
-    "str-bytes-safe",   # Bytes in f-string warnings
-    "valid-type",       # Invalid type annotations
-    "import-untyped",   # Missing library stubs
-    "import-not-found", # Import not found
+    # High-volume structural issues (need significant refactoring)
+    "call-arg",           # ~184 errors: mixin cross-calls
+    "union-attr",         # ~76 errors: Optional access without None checks
+    "arg-type",           # ~51 errors: type mismatches in function args
+    # Medium-volume issues (incremental fixes possible)
+    "index",              # ~30 errors: indexing optional/union types
+    "misc",               # ~25 errors: await types, property issues
+    "func-returns-value", # ~26 errors: stub method return types
+    "override",           # ~22 errors: mixin method signature mismatches
+    "operator",           # ~23 errors: operator type issues
+    # Lower-volume issues (quick fixes)
+    "var-annotated",      # ~15 errors: missing variable type annotations
+    "assignment",         # ~14 errors: type mismatches in assignments
+    "return-value",       # ~10 errors: return type mismatches
+    "dict-item",          # ~6 errors: dict literal type issues
+    "no-redef",           # ~4 errors: name redefinitions
+    "str-bytes-safe",     # ~2 errors: bytes in f-strings
+    "valid-type",         # ~1 error: invalid type annotation
+    "type-var",           # ~1 error: type variable issues
+    "call-overload",      # ~1 error: numpy overload issues
 ]
 
 # Ignore missing imports for third-party libs without stubs
