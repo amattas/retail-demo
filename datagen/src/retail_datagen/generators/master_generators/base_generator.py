@@ -13,7 +13,6 @@ from retail_datagen.shared.cache import CacheManager
 from retail_datagen.shared.validators import (
     ForeignKeyValidator,
     PricingCalculator,
-    SyntheticDataValidator,
 )
 
 from ..progress_tracker import TableProgressTracker
@@ -57,7 +56,6 @@ class BaseGenerator:
 
         # Initialize validators and utilities
         self.pricing_calculator = PricingCalculator(config.seed)
-        self.synthetic_validator = SyntheticDataValidator()
         self.fk_validator = ForeignKeyValidator()
 
         # Progress callback for UI updates

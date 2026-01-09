@@ -9,7 +9,7 @@ This is a **synthetic retail data generator** that produces realistic but entire
 2. **Historical Data**: Generate fact tables with temporal patterns (receipts, inventory, logistics, etc.)
 3. **Real-Time Streaming**: Stream incremental events to Azure Event Hub
 
-**Critical Safety Rule**: All data is 100% synthetic. No real brands or famous addresses. Brand validation enforced by `SyntheticDataValidator`. Names and companies come from curated dictionary files.
+**Critical Safety Rule**: All data is 100% synthetic. Names, companies, brands, and addresses all come from curated dictionary files or are randomly generated from safe components.
 
 ## 🚨 REQUIRED DEVELOPMENT WORKFLOW 🚨
 
@@ -366,10 +366,10 @@ When implementing features (after planning with Opus 4.1):
 ## Important Constraints
 
 ### Data Safety
-- **Never use real brands or famous addresses**
-- Brand blocklist enforced by `SyntheticDataValidator`
-- Names and companies sourced from curated dictionary files
-- All identifiers are synthetically generated
+- All data sourced from curated dictionary files or generated from safe components
+- Names, companies, and brands come from fictional dictionary CSVs
+- Addresses randomly generated from generic street name components
+- All identifiers (loyalty cards, BLE IDs, ad IDs) are synthetically generated
 
 ### Pricing Rules
 - Enforced by Pydantic validators in `ProductMaster` model
