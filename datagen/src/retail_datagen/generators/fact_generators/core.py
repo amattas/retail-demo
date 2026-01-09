@@ -125,9 +125,8 @@ class FactDataGenerator(
         "reorders",
     ]
 
-    # Note: Truck unload duration constants (MIN_UNLOAD_DURATION_MINUTES,
-    # DEFAULT_UNLOAD_DURATION_MINUTES) are defined in LogisticsMixin and
-    # inherited by this class. Do not duplicate them here.
+    # Note: Truck unload duration constants are defined in LogisticsMixin
+    # (MIN_UNLOAD_DURATION_MINUTES, DEFAULT_UNLOAD_DURATION_MINUTES).
 
     def __init__(
         self,

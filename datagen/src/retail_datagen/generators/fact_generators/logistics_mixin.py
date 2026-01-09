@@ -53,6 +53,7 @@ class LogisticsMixin:
         if deficit_pct >= cls.REORDER_PRIORITY_HIGH_THRESHOLD:
             return "HIGH"
         return "NORMAL"
+
     def _generate_truck_movements(
         self, date: datetime, store_transactions: list[dict]
     ) -> tuple[list[dict], list[dict]]:
