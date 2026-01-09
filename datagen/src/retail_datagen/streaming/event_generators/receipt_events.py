@@ -13,8 +13,10 @@ from retail_datagen.streaming.schemas import (
     ReceiptLineAddedPayload,
 )
 
+from .base_types import EventGeneratorBase
 
-class ReceiptEventsMixin:
+
+class ReceiptEventsMixin(EventGeneratorBase):
     """
     Mixin providing receipt-related event generation.
 

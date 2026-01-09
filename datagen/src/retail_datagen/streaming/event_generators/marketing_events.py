@@ -13,8 +13,10 @@ from retail_datagen.streaming.schemas import (
     PromotionAppliedPayload,
 )
 
+from .base_types import EventGeneratorBase
 
-class MarketingEventsMixin:
+
+class MarketingEventsMixin(EventGeneratorBase):
     """
     Mixin providing marketing-related event generation.
 

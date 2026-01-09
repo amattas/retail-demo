@@ -260,6 +260,19 @@ class FactGeneratorBase:
         """Generate marketing activity for a date."""
         ...
 
+    # DC inventory methods (inventory_mixin)
+    def _generate_dc_inventory_transactions(
+        self, date: datetime, multiplier: float
+    ) -> list[dict]:
+        """Generate DC inventory transactions for a day."""
+        ...
+
+    def _generate_dc_inventory_txn(
+        self, date: datetime, multiplier: float
+    ) -> list[dict]:
+        """Generate DC inventory transactions (alias)."""
+        ...
+
     # Logistics mixin methods
     def _generate_truck_movements(
         self, date: datetime, multiplier: float

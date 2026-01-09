@@ -12,8 +12,10 @@ from retail_datagen.streaming.schemas import (
     TruckDepartedPayload,
 )
 
+from .base_types import EventGeneratorBase
 
-class LogisticsEventsMixin:
+
+class LogisticsEventsMixin(EventGeneratorBase):
     """
     Mixin providing logistics-related event generation.
 

@@ -13,8 +13,10 @@ from retail_datagen.streaming.schemas import (
     StockoutDetectedPayload,
 )
 
+from .base_types import EventGeneratorBase
 
-class InventoryEventsMixin:
+
+class InventoryEventsMixin(EventGeneratorBase):
     """
     Mixin providing inventory-related event generation.
 

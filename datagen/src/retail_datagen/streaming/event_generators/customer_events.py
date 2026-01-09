@@ -12,8 +12,10 @@ from retail_datagen.streaming.schemas import (
     CustomerZoneChangedPayload,
 )
 
+from .base_types import EventGeneratorBase
 
-class CustomerEventsMixin:
+
+class CustomerEventsMixin(EventGeneratorBase):
     """
     Mixin providing customer-related event generation.
 
