@@ -1446,13 +1446,15 @@ class TestLockInitialization:
         # add_to_buffer should work even before connect() (lazy init)
         await client.add_to_buffer(event)
 
-        # Locks should have been created by lazy initialization
+        # Buffer lock should have been created by add_to_buffer's lazy initialization
         assert client._buffer_lock is not None
-        assert client._stats_lock is not None
 
-        # Buffer should contain the event
+        # Buffer should contain the event - get_statistics() will initialize stats_lock
         stats = await client.get_statistics()
         assert stats["buffer_size"] == 1
+
+        # Stats lock should now be initialized after get_statistics() call
+        assert client._stats_lock is not None
 
 
 class TestConcurrentBufferAccess:
