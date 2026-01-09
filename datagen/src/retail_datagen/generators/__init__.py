@@ -25,7 +25,6 @@ from .utils import (
     AddressGenerator,
     GeographicDistribution,
     IdentifierGenerator,
-    SyntheticNameGenerator,
 )
 
 __all__ = [
@@ -42,6 +41,5 @@ __all__ = [
     "DictionaryLoader",
     "AddressGenerator",
     "IdentifierGenerator",
-    "SyntheticNameGenerator",
     "GeographicDistribution",
 ]

@@ -8,9 +8,6 @@ including pricing constraints, FK relationships, and synthetic data safety.
 from .blocklists import (
     REAL_ADDRESS_PATTERNS,
     REAL_BRANDS,
-    REAL_COMPANIES,
-    REAL_FIRST_NAMES,
-    REAL_LAST_NAMES,
 )
 from .business_rules import BusinessRuleValidator
 from .foreign_key import ForeignKeyValidator
@@ -28,9 +25,6 @@ __all__ = [
     # Business rules
     "BusinessRuleValidator",
     # Blocklists (for direct access if needed)
-    "REAL_FIRST_NAMES",
-    "REAL_LAST_NAMES",
-    "REAL_COMPANIES",
     "REAL_BRANDS",
     "REAL_ADDRESS_PATTERNS",
 ]

@@ -12,7 +12,6 @@ from ..utils import (
     GeographicDistribution,
     IdentifierGenerator,
     ProgressReporter,
-    SyntheticNameGenerator,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,6 @@ class CustomerGeneratorMixin:
         # Initialize utilities
         geo_distribution = GeographicDistribution(selected_geography_data, seed + 2000)
         address_generator = AddressGenerator(selected_geography_data, seed + 2000)
-        SyntheticNameGenerator(first_names, last_names, seed + 2000)
         id_generator = IdentifierGenerator(seed + 2000)
 
         # Build a fast key index

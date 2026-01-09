@@ -156,7 +156,6 @@ class IdentifierGenerator:
             seed: Random seed for reproducibility
         """
         self._rng = random.Random(seed)
-        self.validator = SyntheticDataValidator()
 
     def generate_store_number(self, store_id: int) -> str:
         """Generate store number in format S000001."""
@@ -263,55 +262,6 @@ class IdentifierGenerator:
         digits = "".join(id_rng.choice(string.digits) for _ in range(4))
 
         return f"{letters}{digits}"
-
-
-class SyntheticNameGenerator:
-    """Generates combinations of synthetic names with safety validation."""
-
-    def __init__(self, first_names: list[str], last_names: list[str], seed: int = 42):
-        """
-        Initialize name generator.
-
-        Args:
-            first_names: List of synthetic first names
-            last_names: List of synthetic last names
-            seed: Random seed for reproducibility
-        """
-        self.first_names = first_names
-        self.last_names = last_names
-        self._rng = random.Random(seed)
-        self.validator = SyntheticDataValidator()
-
-        # Validate all names are synthetic
-        self._validate_synthetic_names()
-
-    def _validate_synthetic_names(self):
-        """Validate that all provided names are synthetic."""
-        for first_name in self.first_names:
-            if not self.validator.is_synthetic_first_name(first_name):
-                raise ValueError(
-                    f"First name '{first_name}' appears to be real, not synthetic"
-                )
-
-        for last_name in self.last_names:
-            if not self.validator.is_synthetic_last_name(last_name):
-                raise ValueError(
-                    f"Last name '{last_name}' appears to be real, not synthetic"
-                )
-
-    def generate_name_pair(self) -> tuple[str, str]:
-        """Generate a synthetic first name, last name pair."""
-        first_name = self._rng.choice(self.first_names)
-        last_name = self._rng.choice(self.last_names)
-
-        # Double-check synthetic safety (paranoid)
-        if not (
-            self.validator.is_synthetic_first_name(first_name)
-            and self.validator.is_synthetic_last_name(last_name)
-        ):
-            raise ValueError("Generated name failed synthetic validation")
-
-        return first_name, last_name
 
 
 class GeographicDistribution:
