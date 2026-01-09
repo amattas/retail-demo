@@ -843,11 +843,15 @@ class PersistenceMixin(FactGeneratorBase):
                 receipts_model = self._get_model_for_table("receipts")
                 from sqlalchemy import select
 
+                # SQLAlchemy ORM columns are dynamically defined; mypy can't see them
                 rows = (
                     await session.execute(
                         select(
-                            receipts_model.receipt_id, receipts_model.receipt_id_ext
-                        ).where(receipts_model.receipt_id_ext.in_(ext_ids))
+                            receipts_model.receipt_id,  # type: ignore[attr-defined]
+                            receipts_model.receipt_id_ext,  # type: ignore[attr-defined]
+                        ).where(
+                            receipts_model.receipt_id_ext.in_(ext_ids)  # type: ignore[attr-defined]
+                        )
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -880,11 +884,15 @@ class PersistenceMixin(FactGeneratorBase):
                 headers_model = self._get_model_for_table("online_orders")
                 from sqlalchemy import select
 
+                # SQLAlchemy ORM columns are dynamically defined; mypy can't see them
                 rows = (
                     await session.execute(
                         select(
-                            headers_model.order_id, headers_model.order_id_ext
-                        ).where(headers_model.order_id_ext.in_(ext_ids))
+                            headers_model.order_id,  # type: ignore[attr-defined]
+                            headers_model.order_id_ext,  # type: ignore[attr-defined]
+                        ).where(
+                            headers_model.order_id_ext.in_(ext_ids)  # type: ignore[attr-defined]
+                        )
                     )
                 ).all()
                 id_map = {ext: pk for (pk, ext) in rows}
@@ -954,7 +962,10 @@ class PersistenceMixin(FactGeneratorBase):
 
                 # Use bulk insert for performance
                 # Note: This doesn't populate auto-increment IDs back to Python objects
-                await session.execute(model_class.__table__.insert(), batch)
+                # __table__ is typed as FromClause but is actually Table at runtime
+                await session.execute(
+                    model_class.__table__.insert(), batch  # type: ignore[attr-defined]
+                )
                 # Flush to DB
                 await session.flush()
 
