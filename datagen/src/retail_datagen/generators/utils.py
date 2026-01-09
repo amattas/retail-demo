@@ -129,7 +129,10 @@ class AddressGenerator:
         street_type = self._rng.choice(self.street_types)
 
         # Compose address
-        return f"{street_number} {prefix}{street_name} {street_type}, {geography.City}, {geography.State} {geography.Zip}"
+        return (
+            f"{street_number} {prefix}{street_name} {street_type}, "
+            f"{geography.City}, {geography.State} {geography.Zip}"
+        )
 
 
 class IdentifierGenerator:
@@ -375,7 +378,8 @@ class GeographicDistribution:
         return [geo for geo, weight in geo_weight_pairs[:selected_count]]
 
 
-# DataFrameExporter removed - use SQLAlchemy for data writes, db.migration for CSV reading
+# DataFrameExporter removed - use SQLAlchemy for data writes,
+# db.migration for CSV reading
 
 
 class ProgressReporter:

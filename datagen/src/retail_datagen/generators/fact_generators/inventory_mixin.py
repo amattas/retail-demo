@@ -255,11 +255,11 @@ class InventoryMixin:
             "store_inventory_txn": total_days * len(self.stores) * 20,
             "marketing": total_days * 10,
             "supply_chain_disruption": total_days * 2,
-            "reorders": total_days
-            * len(self.stores)
-            * 2,  # Average 2 reorders per store per day
-            "online_orders": total_days
-            * max(0, int(self.config.volume.online_orders_per_day)),
+            # Average 2 reorders per store per day
+            "reorders": total_days * len(self.stores) * 2,
+            "online_orders": (
+                total_days * max(0, int(self.config.volume.online_orders_per_day))
+            ),
         }
         expected_records = {
             k: v for k, v in expected_records_all.items() if k in active_tables
@@ -278,8 +278,10 @@ class InventoryMixin:
                 from sqlalchemy import text
 
                 # Check if column exists
-                res = await session.execute(text("PRAGMA table_info('fact_receipts')"))
-                cols = [row[1] for row in res.fetchall()]
+                result = await session.execute(
+                    text("PRAGMA table_info('fact_receipts')")
+                )
+                cols = [row[1] for row in result.fetchall()]
                 # receipt_id_ext
                 if "receipt_id_ext" not in cols:
                     await session.execute(
@@ -287,7 +289,8 @@ class InventoryMixin:
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext "
+                            "ON fact_receipts (receipt_id_ext)"
                         )
                     )
                     logger.info(
@@ -298,12 +301,14 @@ class InventoryMixin:
                 if "receipt_type" not in cols:
                     await session.execute(
                         text(
-                            "ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"
+                            "ALTER TABLE fact_receipts "
+                            "ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"
                         )
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type "
+                            "ON fact_receipts (receipt_type)"
                         )
                     )
                     logger.info(
@@ -314,16 +319,19 @@ class InventoryMixin:
                 if "return_for_receipt_id" not in cols:
                     await session.execute(
                         text(
-                            "ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"
+                            "ALTER TABLE fact_receipts "
+                            "ADD COLUMN return_for_receipt_id INTEGER"
                         )
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for "
+                            "ON fact_receipts (return_for_receipt_id)"
                         )
                     )
                     logger.info(
-                        "Migrated fact_receipts: added return_for_receipt_id column and index"
+                        "Migrated fact_receipts: "
+                        "added return_for_receipt_id column and index"
                     )
 
                 # Ensure online order lines table exists
@@ -343,12 +351,15 @@ class InventoryMixin:
                 )
                 await session.execute(
                     text(
-                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order "
+                        "ON fact_online_order_lines (order_id)"
                     )
                 )
                 await session.execute(
                     text(
-                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"
+                        "CREATE INDEX IF NOT EXISTS "
+                        "ix_online_order_lines_order_product "
+                        "ON fact_online_order_lines (order_id, product_id)"
                     )
                 )
 
@@ -372,7 +383,8 @@ class InventoryMixin:
             # Ensure schema is compatible (adds new columns/tables if missing)
             if not self._use_duckdb:
                 await _ensure_required_schema(self._session)
-            # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
+            # Drop nonessential indexes for faster bulk loads
+            # (SQLite only; skipped in DuckDB)
             dropped_indexes: list[tuple[str, str]] = []
             try:
                 if not self._use_duckdb:
@@ -400,7 +412,7 @@ class InventoryMixin:
             while current_date <= end_date:
                 day_counter += 1
 
-                # Generate daily facts (progress updates now happen during actual generation)
+                # Generate daily facts (progress updates happen during generation)
                 daily_facts = await self._generate_daily_facts(
                     current_date, active_tables, day_counter, total_days
                 )
@@ -461,7 +473,8 @@ class InventoryMixin:
                     tables_completed=tables_completed,
                     tables_in_progress=tables_in_progress,
                     tables_remaining=tables_remaining,
-                    # For UI tiles prefer DB-written counts if available, otherwise generation counts
+                    # For UI tiles prefer DB-written counts if available,
+                    # otherwise generation counts
                     table_counts=(
                         self._table_insert_counts.copy()
                         if getattr(self, "_table_insert_counts", None)
@@ -531,7 +544,11 @@ class InventoryMixin:
         return summary
 
     async def _generate_daily_facts(
-        self, date: datetime, active_tables: list[str], day_index: int, total_days: int
+        self,
+        date: datetime,
+        active_tables: list[str],
+        day_index: int,
+        total_days: int,
     ) -> dict[str, list[dict]]:
         """
         Generate all fact data for a single day.
@@ -579,14 +596,16 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    # Update progress for this daily-generated table
+                    # (track all 24 hours as complete)
                     for hour in range(24):
                         self.hourly_tracker.update_hourly_progress(
                             "dc_inventory_txn", day_index, hour, total_days
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert dc_inventory_txn for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
         # 2. Generate marketing campaigns and impressions
@@ -598,16 +617,18 @@ class InventoryMixin:
                 marketing_boost = self._compute_marketing_multiplier(date)
             except Exception as e:
                 logger.warning(
-                    f"Failed to compute marketing multiplier for {date}, using default 1.0: {e}"
+                    f"Failed to compute marketing multiplier for {date}, "
+                    f"using default 1.0: {e}"
                 )
             marketing_records = self._generate_marketing_activity(date, marketing_boost)
             if marketing_records:
                 logger.debug(
-                    f"Generated {len(marketing_records)} marketing records for {date.strftime('%Y-%m-%d')}"
+                    f"Generated {len(marketing_records)} marketing records "
+                    f"for {date.strftime('%Y-%m-%d')}"
                 )
             daily_facts["marketing"].extend(marketing_records)
 
-            # NEW: Update marketing progress (treated as completing all 24 hours at once)
+            # NEW: Update marketing progress (treated as completing all 24 hours)
             for hour in range(24):
                 self.hourly_tracker.update_hourly_progress(
                     table="marketing", day=day_index, hour=hour, total_days=total_days
@@ -623,7 +644,8 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    # Update progress for this daily-generated table
+                    # (track all 24 hours as complete)
                     for hour in range(24):
                         self.hourly_tracker.update_hourly_progress(
                             "marketing", day_index, hour, total_days
@@ -639,16 +661,19 @@ class InventoryMixin:
                             )
                         ).scalar() or 0
                         logger.info(
-                            f"marketing verification (daily): inserted={len(marketing_records)}, db_total={int(total_db)}"
+                            f"marketing verification (daily): "
+                            f"inserted={len(marketing_records)}, "
+                            f"db_total={int(total_db)}"
                         )
                     except Exception as ve:
                         logger.debug(f"Marketing verification skipped: {ve}")
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert marketing for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert marketing for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
-        # 3. Generate and write store operations hour-by-hour to minimize memory usage
+        # 3. Generate and write store operations hour-by-hour to minimize memory
         # Define which tables are generated hourly (others are generated daily)
         hourly_generated_tables = [
             "receipts",
@@ -662,10 +687,12 @@ class InventoryMixin:
 
         # Log hourly data processing for debugging
         logger.debug(
-            f"Day {day_index}/{total_days} ({date.strftime('%Y-%m-%d')}): Processing 24 hours"
+            f"Day {day_index}/{total_days} ({date.strftime('%Y-%m-%d')}): "
+            f"Processing 24 hours"
         )
 
-        # Generate and export each hour immediately to avoid accumulating all 24 hours in memory
+        # Generate and export each hour immediately to avoid accumulating
+        # all 24 hours in memory
         for hour_idx in range(24):
             # Generate data for this specific hour only
             hour_datetime = date.replace(
@@ -682,7 +709,8 @@ class InventoryMixin:
                     self._send_throttled_progress_update(
                         day_counter=day_index,
                         message=(
-                            f"Preparing hour {hour_idx + 1}/24 for {date.strftime('%Y-%m-%d')}"
+                            f"Preparing hour {hour_idx + 1}/24 for "
+                            f"{date.strftime('%Y-%m-%d')}"
                         ),
                         total_days=total_days,
                         table_progress=progress_state.get("per_table_progress", {}),
@@ -741,7 +769,8 @@ class InventoryMixin:
                         # Log receipts progress at debug level
                         if table == "receipts":
                             logger.debug(
-                                f"Receipts progress updated: day={day_index}, hour={hour_idx}, total_days={total_days}"
+                                f"Receipts progress updated: day={day_index}, "
+                                f"hour={hour_idx}, total_days={total_days}"
                             )
 
                 # NEW: Send progress update after hourly exports complete (throttled)
@@ -753,14 +782,17 @@ class InventoryMixin:
                     # Log thread info for debugging
                     thread_name = threading.current_thread().name
                     logger.debug(
-                        f"[{thread_name}] Sending hourly progress: day {day_index}/{total_days}, "
-                        f"hour {hour_idx + 1}/24"
+                        f"[{thread_name}] Sending hourly progress: "
+                        f"day {day_index}/{total_days}, hour {hour_idx + 1}/24"
                     )
 
                     # Send throttled progress update with hourly detail
                     self._send_throttled_progress_update(
                         day_counter=day_index,
-                        message=f"Generating {date.strftime('%Y-%m-%d')} (day {day_index}/{total_days}, hour {hour_idx + 1}/24)",
+                        message=(
+                            f"Generating {date.strftime('%Y-%m-%d')} "
+                            f"(day {day_index}/{total_days}, hour {hour_idx + 1}/24)"
+                        ),
                         total_days=total_days,
                         table_progress=table_progress,
                         tables_in_progress=progress_data.get("tables_in_progress", []),
@@ -784,7 +816,8 @@ class InventoryMixin:
             if "reorders" in active_tables and reorder_records:
                 daily_facts["reorders"].extend(reorder_records)
 
-            # Process all active shipments and generate status progression throughout the day
+            # Process all active shipments and generate status progression
+            # throughout the day
             truck_lifecycle_records, dc_outbound_txn, store_inbound_txn = (
                 self._process_truck_lifecycle(date)
             )
@@ -811,7 +844,8 @@ class InventoryMixin:
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert lifecycle dc_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert lifecycle dc_inventory_txn for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
             # Add store inbound transactions (when trucks are unloaded)
@@ -833,7 +867,8 @@ class InventoryMixin:
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert lifecycle store_inventory_txn for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert lifecycle store_inventory_txn for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
             # Write all truck_moves records (including lifecycle progression)
@@ -847,14 +882,16 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    # Update progress for this daily-generated table
+                    # (track all 24 hours as complete)
                     for hour in range(24):
                         self.hourly_tracker.update_hourly_progress(
                             "truck_moves", day_index, hour, total_days
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert truck_moves for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
         # 4a. Generate truck inventory tracking events
@@ -876,7 +913,8 @@ class InventoryMixin:
                         "LocationType": event["LocationType"],
                     }
                 )
-            # Update progress for this daily-generated table (treated as complete across hours)
+            # Update progress for this daily-generated table
+            # (treated as complete across hours)
             for hour in range(24):
                 self.hourly_tracker.update_hourly_progress(
                     "truck_inventory", day_index, hour, total_days
@@ -893,7 +931,8 @@ class InventoryMixin:
                 # Only add if not already added by lifecycle processing
                 # This prevents double-counting
                 logger.debug(
-                    f"Legacy delivery processing added {len(delivery_transactions)} transactions"
+                    f"Legacy delivery processing added "
+                    f"{len(delivery_transactions)} transactions"
                 )
                 # Skip adding these since _process_truck_lifecycle handles it
                 pass
@@ -926,14 +965,16 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    # Update progress for this daily-generated table
+                    # (track all 24 hours as complete)
                     for hour in range(24):
                         self.hourly_tracker.update_hourly_progress(
                             "online_orders", day_index, hour, total_days
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert online_orders for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert online_orders for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Then write online order lines (daily batch)
             if online_order_lines:
@@ -952,11 +993,12 @@ class InventoryMixin:
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert online_order_lines for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert online_order_lines for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Insert online order payments (separate from hourly in-store payments)
             # Note: In-store payments are tracked via the hourly loop. Online order
-            # payments need explicit tracking here to ensure accurate progress reporting.
+            # payments need explicit tracking here to ensure accurate progress.
             if online_order_payments:
                 try:
                     await self._insert_hourly_to_db(
@@ -973,7 +1015,8 @@ class InventoryMixin:
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert online order payments for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert online order payments for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
             # Cascade inventory effects
             if "store_inventory_txn" in active_tables and online_store_txn:
@@ -1000,14 +1043,16 @@ class InventoryMixin:
                         hour=0,
                         commit_every_batches=0,
                     )
-                    # Update progress for this daily-generated table (track all 24 hours as complete)
+                    # Update progress for this daily-generated table
+                    # (track all 24 hours as complete)
                     for hour in range(24):
                         self.hourly_tracker.update_hourly_progress(
                             "store_ops", day_index, hour, total_days
                         )
                 except Exception as e:
                     logger.error(
-                        f"Failed to insert store_ops for {date.strftime('%Y-%m-%d')}: {e}"
+                        f"Failed to insert store_ops for "
+                        f"{date.strftime('%Y-%m-%d')}: {e}"
                     )
 
         # 8. Generate supply chain disruptions

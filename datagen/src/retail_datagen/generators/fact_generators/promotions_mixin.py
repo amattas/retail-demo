@@ -75,7 +75,7 @@ class PromotionsMixin:
             product_ids = []
 
             for line in lines:
-                # Get line discount (calculated as difference between pre and post discount)
+                # Get line discount (difference between pre and post discount)
                 unit_price = Decimal(str(line.get("UnitPrice", "0.00")))
                 ext_price = Decimal(str(line.get("ExtPrice", "0.00")))
                 qty = int(line.get("Qty", 1))

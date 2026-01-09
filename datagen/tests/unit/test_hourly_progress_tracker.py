@@ -302,7 +302,10 @@ class TestThreadSafety:
                     actual_hour = (thread_id * 8) + hour
                     if actual_hour < 24:
                         tracker.update_hourly_progress(
-                            "receipts", day=day, hour=actual_hour, total_days=total_days
+                            "receipts",
+                            day=day,
+                            hour=actual_hour,
+                            total_days=total_days,
                         )
 
         threads = []
@@ -316,7 +319,7 @@ class TestThreadSafety:
 
         # Verify updates from all threads were recorded
         progress = tracker.get_current_progress()
-        # Each thread updates 8 hours * 2 days = 16 hours, but some overlap at 24-hour boundary
+        # Each thread updates 8 hours * 2 days = 16 hours, but some overlap
         # Actual count depends on hour distribution
         assert progress["completed_hours"]["receipts"] > 0
 

@@ -1,10 +1,11 @@
 """
 Unit tests for update_task_progress() state pass-through behavior.
 
-Tests verify that update_task_progress() in dependencies.py correctly passes through
-table state lists (tables_completed, tables_in_progress, tables_remaining, tables_failed)
-without deriving them from progress percentages. This ensures TableProgressTracker
-remains the authoritative source for table lifecycle states.
+Tests verify that update_task_progress() in dependencies.py correctly passes
+through table state lists (tables_completed, tables_in_progress,
+tables_remaining, tables_failed) without deriving them from progress
+percentages. This ensures TableProgressTracker remains the authoritative
+source for table lifecycle states.
 
 Key Test Areas:
     1. State Pass-Through: Verify state lists pass through unchanged
@@ -34,7 +35,8 @@ def clean_task_store():
     """
     Clean task status store before and after each test.
 
-    Ensures tests start with a fresh global state to avoid cross-test contamination.
+    Ensures tests start with a fresh global state to avoid cross-test
+    contamination.
     """
     global _task_status
     _task_status.clear()
@@ -82,7 +84,7 @@ class TestStatePassThrough:
         )  # Should be a different list object
 
     def test_tables_in_progress_passed_through(self, initialized_task):
-        """Test that tables_in_progress list is passed through without modification."""
+        """Test tables_in_progress list is passed through without modification."""
         task_id = initialized_task
         in_progress = ["dc_inventory_txn", "store_inventory_txn"]
 
@@ -98,7 +100,7 @@ class TestStatePassThrough:
         assert status.tables_in_progress == in_progress
 
     def test_tables_remaining_passed_through(self, initialized_task):
-        """Test that tables_remaining list is passed through without modification."""
+        """Test tables_remaining list is passed through without modification."""
         task_id = initialized_task
         remaining = ["foot_traffic", "ble_pings", "truck_moves"]
 
@@ -197,7 +199,11 @@ class TestNoOverrideBehavior:
             task_id=task_id,
             progress=1.0,
             message="All done",
-            table_progress={"receipts": 1.0, "receipt_lines": 1.0, "marketing": 1.0},
+            table_progress={
+                "receipts": 1.0,
+                "receipt_lines": 1.0,
+                "marketing": 1.0,
+            },
             tables_completed=[],  # Explicitly empty
             tables_in_progress=[
                 "receipts",
@@ -209,7 +215,11 @@ class TestNoOverrideBehavior:
         status = get_task_status(task_id)
         assert status is not None
         assert status.tables_completed == []  # Should remain empty
-        assert status.tables_in_progress == ["receipts", "receipt_lines", "marketing"]
+        assert status.tables_in_progress == [
+            "receipts",
+            "receipt_lines",
+            "marketing",
+        ]
         # Progress shows 100%, but state is still in_progress - they're independent
 
     def test_zero_percent_progress_does_not_affect_completed_state(
@@ -426,7 +436,7 @@ class TestEdgeCases:
         assert status.tables_remaining == []
 
     def test_duplicate_table_names_across_states(self, initialized_task):
-        """Test behavior when same table appears in multiple state lists (edge case)."""
+        """Test behavior when same table appears in multiple state lists."""
         task_id = initialized_task
 
         # Note: This is an invalid state from TableProgressTracker perspective,
@@ -466,7 +476,11 @@ class TestTableProgressMerging:
         update_task_progress(
             task_id=task_id,
             progress=0.5,
-            table_progress={"receipts": 0.6, "receipt_lines": 0.2, "marketing": 0.1},
+            table_progress={
+                "receipts": 0.6,
+                "receipt_lines": 0.2,
+                "marketing": 0.1,
+            },
         )
 
         status = get_task_status(task_id)
@@ -498,7 +512,7 @@ class TestTableProgressMerging:
 
 
 class TestIntegrationWithTableProgressTracker:
-    """Test scenarios simulating calls from fact_generator with TableProgressTracker states."""
+    """Test scenarios simulating calls from fact_generator with tracker states."""
 
     def test_tracker_state_passed_through_during_generation(self, initialized_task):
         """
@@ -693,7 +707,7 @@ class TestProgressClamping:
     """Test that progress clamping still works with state pass-through."""
 
     def test_progress_clamped_regardless_of_states(self, initialized_task):
-        """Test that overall progress is clamped to [0.0, 1.0] independent of states."""
+        """Test overall progress is clamped to [0.0, 1.0] independent of states."""
         task_id = initialized_task
 
         # Try to set progress > 1.0

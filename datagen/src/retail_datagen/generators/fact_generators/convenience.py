@@ -24,9 +24,10 @@ def generate_historical_facts(
     from retail_datagen.config.models import RetailConfig
 
     RetailConfig.from_file(config_path)
-    # NOTE: This convenience function is legacy; in API flow we construct with an AsyncSession.
-    # Here we construct a temporary generator without DB session which is not supported in DB mode.
-    # Users should use the FastAPI endpoints instead.
+    # NOTE: This convenience function is legacy; in API flow we construct
+    # with an AsyncSession. Here we construct a temporary generator without
+    # DB session which is not supported in DB mode. Users should use the
+    # FastAPI endpoints instead.
     raise RuntimeError("Use API endpoints for historical generation in SQLite mode")
 
     # Unreachable in DB mode

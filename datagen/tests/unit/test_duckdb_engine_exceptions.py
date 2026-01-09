@@ -192,7 +192,7 @@ def test_validate_column_name_rejects_empty():
 
 
 def test_insert_dataframe_validates_columns():
-    """Integration test: Verify malicious column names are blocked in insert_dataframe."""
+    """Integration test: Verify malicious column names are blocked."""
     import pandas as pd
 
     # Create a DataFrame with a malicious column name

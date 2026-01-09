@@ -68,7 +68,8 @@ class ReceiptsMixin:
         # Use precomputed per-store sampling to select customers for this hour in bulk
         if expected_customers > 0:
             if store.ID in self._store_customer_sampling_np:
-                # Vectorized sampling via NumPy over index array, then map back to customers
+                # Vectorized sampling via NumPy over index array,
+                # then map back to customers
                 idx_arr, p = self._store_customer_sampling_np[store.ID]
                 if len(idx_arr) > 0:
                     chosen_idx = self._np_rng.choice(
@@ -116,8 +117,9 @@ class ReceiptsMixin:
                 # Note: All receipts get a payment record, including DECLINED ones.
                 # In this synthetic data model, declined payments represent attempted
                 # transactions where the customer successfully retried with another
-                # payment method (retry flow not explicitly modeled). This simplification
-                # allows analysis of payment decline rates without complex retry logic.
+                # payment method (retry flow not explicitly modeled). This
+                # simplification allows analysis of payment decline rates without
+                # complex retry logic.
                 payment = self._generate_payment_for_receipt(
                     receipt_data["receipt"], hour_datetime
                 )
@@ -181,10 +183,12 @@ class ReceiptsMixin:
         # TODO(#78): Implement campaign_id attribution for historical data generation.
         # This requires:
         # 1. Track ad impressions per customer during marketing generation
-        # 2. When generating receipts, check if customer had impression within attribution window
+        # 2. When generating receipts, check if customer had impression within
+        #    attribution window
         # 3. If yes, pass campaign_id to receipt record
-        # For now, _campaign_id parameter is accepted but not used in historical generation.
-        # Real-time streaming (event_factory.py) already implements this logic.
+        # For now, _campaign_id parameter is accepted but not used in historical
+        # generation. Real-time streaming (event_factory.py) already implements
+        # this logic.
 
         # CRITICAL: Validate basket has at least 1 item
         # Empty receipts violate business rules and should never be generated
@@ -234,7 +238,7 @@ class ReceiptsMixin:
         def _tax_cents(
             amount_cents: int, rate: Decimal, taxability: ProductTaxability
         ) -> int:
-            # rate to basis points (1/100 of a percent), multiplier as integer percentage
+            # rate to basis points (1/100 of a percent), multiplier as int pct
             rate_bps = int((rate * 10000).quantize(Decimal("1")))
             mult_pct = (
                 100

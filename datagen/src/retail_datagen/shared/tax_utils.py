@@ -91,7 +91,8 @@ class TaxCalculator:
                         self.tax_rates_path = fallback
                     else:
                         raise FileNotFoundError(
-                            f"Tax rates file not found: {self.tax_rates_path} (also tried {fallback})"
+                            f"Tax rates file not found: {self.tax_rates_path} "
+                            f"(also tried {fallback})"
                         )
                 except Exception:
                     raise FileNotFoundError(
@@ -150,9 +151,10 @@ class TaxCalculator:
                 state_rates[state].append(rate)
 
             # Build county cache (average of city rates in each county)
-            # Use Decimal.quantize() for consistent precision without float conversion
-            # 5 decimal places: tax rates are typically 4 decimals (e.g., 0.0825 = 8.25%)
-            # but averaging can produce more; extra precision avoids rounding artifacts
+            # Use Decimal.quantize() for consistent precision without float
+            # conversion. 5 decimal places: tax rates are typically 4 decimals
+            # (e.g., 0.0825 = 8.25%) but averaging can produce more; extra
+            # precision avoids rounding artifacts
             precision = Decimal("0.00001")
             for county_key, rates in county_rates.items():
                 avg_rate = sum(rates) / len(rates)
@@ -220,12 +222,14 @@ class TaxCalculator:
             county = county.strip()
             county_key = (state, county)
             if county_key in self.county_cache:
+                rate = self.county_cache[county_key]
                 logger.debug(
-                    f"Using county-level tax rate for {county}, {state}: {self.county_cache[county_key]}"
+                    f"Using county-level tax rate for {county}, {state}: {rate}"
                 )
                 return self.county_cache[county_key]
             logger.debug(
-                f"No county-level tax rate for {county}, {state}. Trying state fallback."
+                f"No county-level tax rate for {county}, {state}. "
+                "Trying state fallback."
             )
 
         # Step 3: Try State-only fallback (average of all cities in state)

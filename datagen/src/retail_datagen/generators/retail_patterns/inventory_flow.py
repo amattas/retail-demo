@@ -84,7 +84,8 @@ class InventoryFlowSimulator:
         # truck_id -> datetime when truck returns to DC
         self._truck_availability: dict[int, datetime] = {}
         # Queue of pending shipments waiting for available trucks
-        # Each entry: {"dc_id": int, "store_id": int, "reorder_list": list, "requested_time": datetime}
+        # Each entry: {"dc_id": int, "store_id": int, "reorder_list": list,
+        #              "requested_time": datetime}
         self._shipment_queue: list[dict] = []
         # Track in-transit inventory per store/product to prevent over-ordering
         # (store_id, product_id) -> quantity already in transit
@@ -111,7 +112,9 @@ class InventoryFlowSimulator:
     def _select_truck_for_shipment(
         self, dc_id: int, current_time: datetime
     ) -> int | str | None:
-        """Select an available truck for a shipment, preferring trucks assigned to the DC.
+        """Select an available truck for a shipment.
+
+        Prefers trucks assigned to the DC.
 
         Args:
             dc_id: Distribution center ID
@@ -189,7 +192,8 @@ class InventoryFlowSimulator:
             current_time: Current simulation time
 
         Returns:
-            Datetime when next truck becomes available, or None if trucks are available now
+            Datetime when next truck becomes available, or None if trucks
+            are available now
         """
         dc_list = self._trucks_by_dc.get(dc_id) or []
         pool_list = self._trucks_by_dc.get(None) or []
@@ -273,7 +277,8 @@ class InventoryFlowSimulator:
                 key = (dc_id, product.ID)
                 self._dc_inventory[key] = self._dc_inventory.get(key, 0) + receive_qty
 
-                # Output dict: keys use PascalCase to match DCInventoryTransaction schema
+                # Output dict: keys use PascalCase to match
+                # DCInventoryTransaction schema
                 transactions.append(
                     {
                         "DCID": dc_id,
@@ -333,7 +338,8 @@ class InventoryFlowSimulator:
                 # Update inventory
                 self._store_inventory[key] = current_inventory - sale_qty
 
-                # Output dict: keys use PascalCase to match StoreInventoryTransaction schema
+                # Output dict: keys use PascalCase to match
+                # StoreInventoryTransaction schema
                 transactions.append(
                     {
                         "StoreID": store_id,
@@ -409,7 +415,8 @@ class InventoryFlowSimulator:
         for product_id, qty in reorder_list:
             if qty < 0:
                 raise ValueError(
-                    f"Invalid negative quantity {qty} for product {product_id} in shipment"
+                    f"Invalid negative quantity {qty} for product "
+                    f"{product_id} in shipment"
                 )
 
         # Enforce truck capacity - truncate if necessary
@@ -420,12 +427,13 @@ class InventoryFlowSimulator:
             logger.warning(
                 f"Shipment to store {store_id} exceeds truck capacity "
                 f"({total_requested} > {capacity}). Truncating to fit. "
-                f"Consider using generate_truck_shipments() for multi-truck support."
+                "Consider using generate_truck_shipments() for multi-truck "
+                "support."
             )
             warnings.warn(
                 "Order exceeds truck capacity and will be truncated. "
-                "Use generate_truck_shipments() for automatic multi-truck splitting "
-                "to avoid data loss.",
+                "Use generate_truck_shipments() for automatic multi-truck "
+                "splitting to avoid data loss.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -441,7 +449,9 @@ class InventoryFlowSimulator:
             reorder_list = truncated_list
 
         # Generate unique shipment ID
-        shipment_id = f"SHIP{departure_time.strftime('%Y%m%d')}{dc_id:02d}{store_id:03d}{self._rng.randint(100, 999)}"
+        date_str = departure_time.strftime("%Y%m%d")
+        rand_suffix = self._rng.randint(100, 999)
+        shipment_id = f"SHIP{date_str}{dc_id:02d}{store_id:03d}{rand_suffix}"
 
         # Choose a real truck when available to maintain referential integrity
         # If no truck available, wait for the next one
@@ -471,8 +481,9 @@ class InventoryFlowSimulator:
             dc_id, actual_departure_time
         )
 
-        # Add delays for disruptions (inverse of capacity - lower capacity = more delays)
-        base_travel_hours = self._rng.randint(2, 12)  # 2-12 hours base travel time
+        # Add delays for disruptions (inverse of capacity - lower capacity
+        # = more delays)
+        base_travel_hours = self._rng.randint(2, 12)  # 2-12 hours base
         delay_multiplier = 2.0 - capacity_multiplier  # 1.0 to 2.0 range
         travel_hours = int(base_travel_hours * delay_multiplier)
 
@@ -550,7 +561,8 @@ class InventoryFlowSimulator:
         for product_id, qty in reorder_list:
             if qty < 0:
                 raise ValueError(
-                    f"Invalid negative quantity {qty} for product {product_id} in shipment"
+                    f"Invalid negative quantity {qty} for product "
+                    f"{product_id} in shipment"
                 )
 
         capacity = self._truck_capacity
@@ -605,8 +617,9 @@ class InventoryFlowSimulator:
             shipments.append(shipment)
 
         logger.info(
-            f"Large order for store {store_id} split across {len(shipments)} trucks "
-            f"(total items: {total_items}, capacity per truck: {capacity})"
+            f"Large order for store {store_id} split across "
+            f"{len(shipments)} trucks (total items: {total_items}, "
+            f"capacity per truck: {capacity})"
         )
 
         return shipments
@@ -677,10 +690,11 @@ class InventoryFlowSimulator:
             return True
 
         # Log warning for invalid transition
+        valid_values = [s.value for s in valid_next_states]
         logger.warning(
             f"Invalid state transition for shipment {shipment_id}: "
             f"{current_state.value} -> {new_state.value}. "
-            f"Valid transitions from {current_state.value}: {[s.value for s in valid_next_states]}"
+            f"Valid transitions from {current_state.value}: {valid_values}"
         )
         return False
 
@@ -804,7 +818,8 @@ class InventoryFlowSimulator:
 
                 # Log state transitions for debugging
                 logger.debug(
-                    f"Shipment {shipment_id} transitioned: {old_status.value} -> {target_status.value}"
+                    f"Shipment {shipment_id} transitioned: "
+                    f"{old_status.value} -> {target_status.value}"
                 )
 
                 # Remove from active tracking if completed
@@ -848,22 +863,25 @@ class InventoryFlowSimulator:
 
                 if stepping_status != current_status:
                     logger.info(
-                        f"Shipment {shipment_id} recovered by stepping through {steps_taken} states: "
-                        f"{current_status.value} -> {stepping_status.value} (target was {target_status.value})"
+                        f"Shipment {shipment_id} recovered by stepping through "
+                        f"{steps_taken} states: {current_status.value} -> "
+                        f"{stepping_status.value} (target was {target_status.value})"
                     )
                     shipment["status"] = stepping_status
 
                     # Warn if we couldn't reach the target state
                     if stepping_status != target_status:
                         logger.warning(
-                            f"Shipment {shipment_id} recovery stopped at {stepping_status.value}, "
-                            f"could not reach target {target_status.value}. May need manual intervention."
+                            f"Shipment {shipment_id} recovery stopped at "
+                            f"{stepping_status.value}, could not reach target "
+                            f"{target_status.value}. May need manual intervention."
                         )
 
                     # Clear old state entry times and set new one.
-                    # Note: Only current state entry time is tracked; historical times are
-                    # discarded to keep shipment dict lightweight. For state duration analysis,
-                    # use the truck_moves event stream which records each transition.
+                    # Note: Only current state entry time is tracked;
+                    # historical times are discarded to keep shipment dict
+                    # lightweight. For state duration analysis, use the
+                    # truck_moves event stream which records each transition.
                     for key in list(shipment.keys()):
                         if key.startswith("_state_entered_"):
                             del shipment[key]
@@ -939,7 +957,8 @@ class InventoryFlowSimulator:
             load_time: When loading occurs
 
         Returns:
-            List of truck inventory loading records (dict keys use PascalCase per TruckInventory schema)
+            List of truck inventory loading records (dict keys use
+            PascalCase per TruckInventory schema)
 
         Note:
             Converts from internal snake_case keys (truck_id, shipment_id, dc_id) to
@@ -970,15 +989,16 @@ class InventoryFlowSimulator:
         """
         Generate DC outbound inventory transactions when truck loading starts.
 
-        These transactions link to the truck shipment via shipment_id in the Source field,
-        creating an audit trail from DC → Truck → Store.
+        These transactions link to the truck shipment via shipment_id in
+        the Source field, creating an audit trail from DC -> Truck -> Store.
 
         Args:
             shipment_info: Shipment information with snake_case keys (internal format)
             load_time: When loading occurs (truck status = LOADING)
 
         Returns:
-            List of DC inventory transaction records (dict keys use PascalCase per schema)
+            List of DC inventory transaction records (dict keys use
+            PascalCase per schema)
         """
         dc_transactions = []
         dc_id = shipment_info["dc_id"]
@@ -1012,8 +1032,8 @@ class InventoryFlowSimulator:
         """
         Generate store inbound inventory transactions when truck unloading starts.
 
-        These transactions link to the truck shipment via shipment_id in the Source field,
-        creating an audit trail from DC → Truck → Store.
+        These transactions link to the truck shipment via shipment_id in
+        the Source field, creating an audit trail from DC -> Truck -> Store.
 
         Also clears the in-transit inventory tracking since items have now arrived.
 
@@ -1022,7 +1042,8 @@ class InventoryFlowSimulator:
             unload_time: When unloading occurs (truck status = UNLOADING)
 
         Returns:
-            List of store inventory transaction records (dict keys use PascalCase per schema)
+            List of store inventory transaction records (dict keys use
+            PascalCase per schema)
         """
         store_transactions = []
         store_id = shipment_info["store_id"]
@@ -1067,7 +1088,8 @@ class InventoryFlowSimulator:
             unload_time: When unloading occurs
 
         Returns:
-            List of truck inventory unloading records (dict keys use PascalCase per TruckInventory schema)
+            List of truck inventory unloading records (dict keys use
+            PascalCase per TruckInventory schema)
 
         Note:
             Converts from internal snake_case keys (truck_id, shipment_id, store_id) to
@@ -1229,11 +1251,19 @@ class InventoryFlowSimulator:
 
         # Generate description
         descriptions = {
-            DisruptionType.CAPACITY_CONSTRAINT: "Reduced capacity due to high demand surge",
-            DisruptionType.EQUIPMENT_FAILURE: "Equipment failure in sorting/loading systems",
-            DisruptionType.WEATHER_DELAY: "Weather-related delays affecting inbound shipments",
+            DisruptionType.CAPACITY_CONSTRAINT: (
+                "Reduced capacity due to high demand surge"
+            ),
+            DisruptionType.EQUIPMENT_FAILURE: (
+                "Equipment failure in sorting/loading systems"
+            ),
+            DisruptionType.WEATHER_DELAY: (
+                "Weather-related delays affecting inbound shipments"
+            ),
             DisruptionType.LABOR_SHORTAGE: "Staff shortage impacting operations",
-            DisruptionType.SYSTEM_OUTAGE: "IT system outage affecting inventory management",
+            DisruptionType.SYSTEM_OUTAGE: (
+                "IT system outage affecting inventory management"
+            ),
         }
 
         return {

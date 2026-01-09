@@ -119,7 +119,10 @@ class StoreProfile:
 
 
 class StoreProfiler:
-    """Assigns profiles to stores based on geographic and demographic characteristics."""
+    """
+    Assigns profiles to stores based on geographic and demographic
+    characteristics.
+    """
 
     # Volume class distribution targets (should sum to 1.0)
     VOLUME_DISTRIBUTION = {
@@ -163,7 +166,8 @@ class StoreProfiler:
 
         Args:
             stores: List of Store objects (must have ID, GeographyID)
-            geographies: List of GeographyMaster objects (must have ID, Region, State, City)
+            geographies: List of GeographyMaster objects
+                (must have ID, Region, State, City)
             seed: Random seed for reproducible profiling
         """
         self.stores = stores
@@ -177,7 +181,8 @@ class StoreProfiler:
         self._urban_classification = self._classify_geographies()
 
         logger.info(
-            f"StoreProfiler initialized for {len(stores)} stores across {len(geographies)} geographies"
+            f"StoreProfiler initialized for {len(stores)} stores "
+            f"across {len(geographies)} geographies"
         )
 
     def _classify_geographies(self) -> dict[int, str]:
@@ -495,7 +500,8 @@ class StoreProfiler:
         min_mult = min(multipliers)
         max_mult = max(multipliers)
         logger.info(
-            f"\nTraffic Multipliers: min={min_mult:.2f}, avg={avg_mult:.2f}, max={max_mult:.2f}"
+            f"\nTraffic Multipliers: min={min_mult:.2f}, "
+            f"avg={avg_mult:.2f}, max={max_mult:.2f}"
         )
 
         # Basket size stats
@@ -504,5 +510,6 @@ class StoreProfiler:
         min_basket = min(basket_sizes)
         max_basket = max(basket_sizes)
         logger.info(
-            f"Basket Sizes: min={min_basket:.1f}, avg={avg_basket:.1f}, max={max_basket:.1f} items"
+            f"Basket Sizes: min={min_basket:.1f}, avg={avg_basket:.1f}, "
+            f"max={max_basket:.1f} items"
         )

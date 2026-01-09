@@ -33,7 +33,8 @@ class MarketingMixin:
 
         # Lightweight trace (DEBUG to avoid perf impact)
         logger.debug(
-            f"_generate_marketing_activity: date={date}, mult={multiplier}, active={len(self._active_campaigns)}"
+            f"_generate_marketing_activity: date={date}, mult={multiplier}, "
+            f"active={len(self._active_campaigns)}"
         )
 
         marketing_records = []
@@ -61,18 +62,21 @@ class MarketingMixin:
                     f"(end_date: {campaign_info['end_date']})"
                 )
                 logger.debug(
-                    f"Campaign {campaign_id} added (total: {len(self._active_campaigns)})"
+                    f"Campaign {campaign_id} added "
+                    f"(total: {len(self._active_campaigns)})"
                 )
             else:
                 logger.error(f"Campaign {campaign_id} failed to create in simulator")
                 logger.debug(
-                    f"Simulator active campaigns: {list(self.marketing_campaign_sim._active_campaigns.keys())}"
+                    f"Simulator active campaigns: "
+                    f"{list(self.marketing_campaign_sim._active_campaigns.keys())}"
                 )
                 # Critical failure - don't continue processing this day
 
         # Debug: Log state before sync
         logger.debug(
-            f"Campaigns: fact_gen={len(self._active_campaigns)} sim={len(self.marketing_campaign_sim._active_campaigns)}"
+            f"Campaigns: fact_gen={len(self._active_campaigns)} "
+            f"sim={len(self.marketing_campaign_sim._active_campaigns)}"
         )
 
         # Sync: Remove orphaned campaigns that exist in tracking but not in simulator
@@ -105,14 +109,16 @@ class MarketingMixin:
             # CRITICAL: Detect state corruption
             if campaign is None:
                 logger.error(
-                    f"STATE CORRUPTION: Campaign {campaign_id} tracked in fact_gen "
-                    f"but missing from simulator. Removing from fact_gen."
+                    f"STATE CORRUPTION: Campaign {campaign_id} tracked in "
+                    f"fact_gen but missing from simulator. "
+                    f"Removing from fact_gen."
                 )
                 del self._active_campaigns[campaign_id]
                 continue  # Skip this campaign entirely
 
             logger.debug(
-                f"Campaign: {campaign.get('type', 'unknown')} end={campaign.get('end_date', 'unknown')}"
+                f"Campaign: {campaign.get('type', 'unknown')} "
+                f"end={campaign.get('end_date', 'unknown')}"
             )
 
             if date > campaign["end_date"]:
@@ -190,7 +196,8 @@ class MarketingMixin:
                             emitted += take
                         if emitted >= daily_cap:
                             logger.warning(
-                                f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                                f"Marketing daily cap reached ({daily_cap}) "
+                                f"on {date}. Truncating impressions."
                             )
                             break
                 else:
@@ -200,11 +207,13 @@ class MarketingMixin:
             except Exception as e:
                 # Fallback to original loop
                 logger.warning(
-                    f"Failed to process impressions via optimized path, using fallback: {e}"
+                    f"Failed to process impressions via optimized path, "
+                    f"using fallback: {e}"
                 )
                 for impression in impressions:
                     logger.debug(
-                        f"      Creating marketing record: {impression.get('channel', 'unknown')}"
+                        f"      Creating marketing record: "
+                        f"{impression.get('channel', 'unknown')}"
                     )
                     customer_id = None
                     if self._rng.random() < 0.05:
@@ -231,7 +240,8 @@ class MarketingMixin:
                     emitted += 1
                     if emitted >= daily_cap:
                         logger.warning(
-                            f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                            f"Marketing daily cap reached ({daily_cap}) "
+                            f"on {date}. Truncating impressions."
                         )
                         break
 
@@ -243,10 +253,11 @@ class MarketingMixin:
         )
         return marketing_records
 
-    # NOTE: _generate_hourly_store_activity was removed in favor of inline hour-by-hour
-    # generation to reduce memory usage. The logic is now inlined in _generate_daily_facts
-    # starting at line ~1015 to write each hour to the database immediately instead of
-    # accumulating all 24 hours in memory first.
+    # NOTE: _generate_hourly_store_activity was removed in favor of inline
+    # hour-by-hour generation to reduce memory usage. The logic is now inlined
+    # in _generate_daily_facts starting at line ~1015 to write each hour to
+    # the database immediately instead of accumulating all 24 hours in memory
+    # first.
 
     def _compute_marketing_multiplier(self, date: datetime) -> float:
         # Conservative boosts; configurable later

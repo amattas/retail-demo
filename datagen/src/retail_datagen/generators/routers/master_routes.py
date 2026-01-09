@@ -103,7 +103,8 @@ async def generate_all_master_data(
 
             table_progress = {table: 0.0 for table in tables_to_generate}
 
-            # Short-circuit when everything already exists in DuckDB and regeneration not forced
+            # Short-circuit when everything already exists in DuckDB
+            # and regeneration not forced
             if not request.force_regenerate:
                 try:
                     from retail_datagen.db.duckdb_engine import get_duckdb_conn
@@ -209,7 +210,8 @@ async def generate_all_master_data(
             )
 
             # Run full generation once (progress callback handles per-table reporting)
-            # DuckDB-only path: clear existing tables and regenerate; no SQLAlchemy session required
+            # DuckDB-only path: clear existing tables and regenerate;
+            # no SQLAlchemy session required
             try:
                 from retail_datagen.db.duckdb_engine import get_duckdb_conn
 
@@ -266,7 +268,8 @@ async def generate_all_master_data(
                     )
             except Exception as count_exc:
                 logger.warning(
-                    f"Failed to query DB counts; falling back to in-memory counts: {count_exc}"
+                    f"Failed to query DB counts; "
+                    f"falling back to in-memory counts: {count_exc}"
                 )
                 final_counts = {
                     "geographies_master": len(master_generator.geography_master),

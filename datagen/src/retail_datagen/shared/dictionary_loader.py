@@ -287,12 +287,13 @@ class DictionaryLoader:
             try:
                 logger.debug(f"Trying to read {file_path} with encoding {encoding}")
 
+                # Preserve leading zeros and avoid implicit numeric coercion
                 df = pd.read_csv(
                     file_path,
                     encoding=encoding,
                     skipinitialspace=True,
                     na_filter=False,  # Don't convert empty strings to NaN
-                    dtype=str,  # Preserve leading zeros and avoid implicit numeric coercion
+                    dtype=str,
                 )
 
                 # Remove any completely empty rows
@@ -354,7 +355,8 @@ class DictionaryLoader:
                         # Consider optional with default None
                         is_req = False
                     else:
-                        # Some fields have no default attribute in v1; leave as optional by default
+                        # Some fields have no default attribute in v1;
+                        # leave as optional by default
                         pass
             if is_req:
                 required_fields.append(name)
@@ -408,9 +410,8 @@ class DictionaryLoader:
                     msg = error.get("msg", "Unknown validation error")
                     error_details.append(f"{field}: {msg}")
 
-                validation_errors.append(
-                    f"Row {idx + 2}: {'; '.join(error_details)}"  # +2 for 1-based + header
-                )
+                # +2 for 1-based index + header row
+                validation_errors.append(f"Row {idx + 2}: {'; '.join(error_details)}")
 
             except Exception as e:
                 validation_errors.append(f"Row {idx + 2}: Unexpected error: {e}")

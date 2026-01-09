@@ -29,7 +29,8 @@ intentional and documented:
    - Status: TODO - implement proper fixtures for these tests
 
 To run tests excluding skipped categories:
-    pytest tests/ -v --ignore=tests/validation/ --ignore=tests/unit/test_retail_engine.py
+    pytest tests/ -v --ignore=tests/validation/ \
+        --ignore=tests/unit/test_retail_engine.py
 """
 
 # pytest_plugins moved to root conftest.py (required by pytest 8.x+)

@@ -80,13 +80,15 @@ async def clear_all_data(config: RetailConfig = Depends(get_config)):
         if errors:
             logger.warning(f"Data clearing completed with some errors: {errors}")
         logger.info(
-            f"All data cleared by resetting DuckDB ({len(deleted_files)} files) and resetting state/cache"
+            f"All data cleared by resetting DuckDB ({len(deleted_files)} files) "
+            "and resetting state/cache"
         )
 
         return OperationResult(
             success=True,
             message=(
-                "All data cleared by resetting DuckDB; caches and legacy files removed. "
+                "All data cleared by resetting DuckDB; "
+                "caches and legacy files removed. "
                 f"Deleted {len(deleted_files)} files."
             ),
             started_at=datetime.now(UTC),

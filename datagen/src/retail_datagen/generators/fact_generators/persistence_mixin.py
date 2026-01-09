@@ -102,13 +102,15 @@ class PersistenceMixin:
             "customer_zone_changes": "customer_zone_changed",
             "marketing": "ad_impression",
             "online_orders": "online_order_created",
-            "online_order_lines": "online_order_picked",  # may change based on timestamps
+            # may change based on timestamps
+            "online_order_lines": "online_order_picked",
             "fact_payments": "payment_processed",
             "reorders": "reorder_triggered",
             "store_ops": "store_opened",  # may change based on operation_type
             "stockouts": "stockout_detected",
             "promotions": "promotion_applied",
-            "promo_lines": "promotion_applied",  # Promo line records don't have separate events
+            # Promo line records don't have separate events
+            "promo_lines": "promotion_applied",
         }
 
         default_type = base_type_map.get(table_name, "receipt_created")
@@ -148,7 +150,8 @@ class PersistenceMixin:
                     # Truck departed after completing unloading
                     message_type = "truck_departed"
                 # Note: LOADING and IN_TRANSIT are internal states and don't
-                # generate separate streaming events - they're tracked in fact table only
+                # generate separate streaming events - they're tracked in
+                # fact table only
 
             # Partition key preference: store_id -> dc_id
             store_id = get_field(rec, "store_id")
@@ -220,8 +223,10 @@ class PersistenceMixin:
         Notes:
             - TraceId field is skipped (not in DB models)
             - balance field (DC/Store inventory) not in generator output - will be NULL
-            - Some generator fields don't map to DB (e.g., ReceiptId string, OrderId string)
-            - Receipts table: discount_amount field not in generator - will default to 0.0
+            - Some generator fields don't map to DB (e.g., ReceiptId string,
+              OrderId string)
+            - Receipts table: discount_amount field not in generator -
+              will default to 0.0
         """
         # Define field mappings for each table
         # Generator fields -> Database fields
@@ -301,7 +306,8 @@ class PersistenceMixin:
                 "BeaconId": "beacon_id",
                 "RSSI": "rssi",
                 "Zone": "zone",
-                # Note: customer_id field in DB is nullable (requires lookup from BLE ID)
+                # Note: customer_id field in DB is nullable
+                # (requires lookup from BLE ID)
             },
             "marketing": {
                 **common_mappings,
@@ -426,7 +432,8 @@ class PersistenceMixin:
             db_field = mapping.get(gen_field, gen_field.lower())
             mapped_record[db_field] = value
 
-        # DuckDB fast-path: keep external linking keys on line tables to avoid FK lookups
+        # DuckDB fast-path: keep external linking keys on line tables
+        # to avoid FK lookups
         if getattr(self, "_use_duckdb", False):
             if table_name == "receipt_lines":
                 ext = record.get("ReceiptId")
@@ -443,10 +450,11 @@ class PersistenceMixin:
         self, session: AsyncSession, generator_table_names: list[str]
     ) -> list[tuple[str, str]]:
         """
-        Capture and drop nonessential indexes for specified tables to speed bulk inserts.
+        Capture and drop nonessential indexes for tables to speed bulk inserts.
 
         Returns a list of (index_name, create_sql) to recreate later.
-        Keeps indexes that are critical to linkage lookups (receipt_id_ext, order_id_ext).
+        Keeps indexes that are critical to linkage lookups
+        (receipt_id_ext, order_id_ext).
         """
         from sqlalchemy import text
 
@@ -476,7 +484,8 @@ class PersistenceMixin:
                         continue
                     lname = str(name).lower()
                     lsql = str(sql).lower()
-                    # Keep ext-id linkage indexes to avoid slow lookups during generation
+                    # Keep ext-id linkage indexes to avoid slow lookups
+                    # during generation
                     if (
                         ("receipt" in lname and "ext" in lname)
                         or ("order" in lname and "ext" in lname)
@@ -554,7 +563,8 @@ class PersistenceMixin:
         except (ImportError, AttributeError) as e:
             # If pandas not available, assume list path
             logger.warning(
-                f"Failed to process data via pandas for {table_name}, using fallback: {e}"
+                f"Failed to process data via pandas for {table_name}, "
+                f"using fallback: {e}"
             )
             records = list(data or [])  # type: ignore[arg-type]
         if not records:
@@ -588,7 +598,8 @@ class PersistenceMixin:
                     and records
                     and isinstance(records[0], dict)
                 ):
-                    # Build dict-of-lists for existing keys across a small sample to avoid missing columns
+                    # Build dict-of-lists for existing keys across a small
+                    # sample to avoid missing columns
                     sample_keys = set()
                     for r in records[:10]:
                         sample_keys.update(r.keys())
@@ -768,7 +779,8 @@ class PersistenceMixin:
                 )
 
                 inserted = insert_dataframe(self._duckdb_conn, duck_table, df)
-                # Optionally mirror to streaming outbox (only for outbox-driven realtime)
+                # Optionally mirror to streaming outbox
+                # (only for outbox-driven realtime)
                 if getattr(self, "_publish_to_outbox", False):
                     try:
                         outbox_rows = self._build_outbox_rows_from_df(table_name, df)
@@ -776,7 +788,8 @@ class PersistenceMixin:
                             outbox_insert_records(self._duckdb_conn, outbox_rows)
                     except Exception as _outbox_exc:
                         logger.debug(
-                            f"Outbox insert skipped for {table_name} hour {hour}: {_outbox_exc}"
+                            f"Outbox insert skipped for {table_name} "
+                            f"hour {hour}: {_outbox_exc}"
                         )
 
                 # Update per-table counts and emit progress
@@ -796,11 +809,13 @@ class PersistenceMixin:
                     per_table_fraction = min(
                         1.0, (completed_hours + 1.0) / total_hours_expected
                     )
+                    count = self._table_insert_counts[table_name]
+                    msg = f"Writing {table_name.replace('_', ' ')} ({count:,})"
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,
-                        f"Writing {table_name.replace('_', ' ')} ({self._table_insert_counts[table_name]:,})",
-                        {table_name: self._table_insert_counts[table_name]},
+                        msg,
+                        {table_name: count},
                     )
                 except Exception as e:
                     logger.debug(f"Failed to emit progress for {table_name}: {e}")
@@ -841,7 +856,8 @@ class PersistenceMixin:
                     ext = record.get("ReceiptId")
                     pk = id_map.get(ext)
                     if not pk:
-                        # No matching receipt yet; skip this line to preserve FK integrity
+                        # No matching receipt yet; skip this line to
+                        # preserve FK integrity
                         logger.debug(
                             f"Skipping receipt_line with unknown ReceiptId={ext}"
                         )
@@ -911,7 +927,8 @@ class PersistenceMixin:
                 normalized.append(clean)
             mapped_records = normalized
         except (ImportError, AttributeError) as e:
-            # If pandas isn't available or any issue occurs, proceed without normalization
+            # If pandas isn't available or any issue occurs, proceed
+            # without normalization
             logger.debug(f"Failed to normalize pandas NA values for {table_name}: {e}")
 
         # Filter out any keys that are not actual columns in the target table
@@ -939,9 +956,10 @@ class PersistenceMixin:
                 # Flush to DB
                 await session.flush()
 
+                batch_num = i // batch_size + 1
                 logger.debug(
-                    f"Inserted batch {i // batch_size + 1} for {table_name} hour {hour}: "
-                    f"{len(batch)} rows"
+                    f"Inserted batch {batch_num} for {table_name} "
+                    f"hour {hour}: {len(batch)} rows"
                 )
 
                 # Live per-table progress and counts (master-style tiles)
@@ -953,7 +971,8 @@ class PersistenceMixin:
                         self._table_insert_counts.get(table_name, 0) + len(batch)
                     )
 
-                    # Compute fractional progress across the whole range using hourly tracker state
+                    # Compute fractional progress across the whole range
+                    # using hourly tracker state
                     tracker_state = self.hourly_tracker.get_current_progress()
                     completed_hours = tracker_state.get("completed_hours", {}).get(
                         table_name, 0
@@ -970,12 +989,15 @@ class PersistenceMixin:
                         1.0, (completed_hours + partial_hour) / total_hours_expected
                     )
 
-                    # Emit per-table progress callback (router merges counts and recomputes overall)
+                    # Emit per-table progress callback
+                    # (router merges counts and recomputes overall)
+                    count = self._table_insert_counts[table_name]
+                    msg = f"Writing {table_name.replace('_', ' ')} ({count:,})"
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,
-                        f"Writing {table_name.replace('_', ' ')} ({self._table_insert_counts[table_name]:,})",
-                        {table_name: self._table_insert_counts[table_name]},
+                        msg,
+                        {table_name: count},
                     )
                 except Exception as _:
                     # Non-fatal: progress updates should not break inserts
@@ -989,7 +1011,8 @@ class PersistenceMixin:
                     try:
                         await session.commit()
                         logger.debug(
-                            f"Committed {len(batch)} rows for {table_name} hour {hour}, batch {batch_index}"
+                            f"Committed {len(batch)} rows for {table_name} "
+                            f"hour {hour}, batch {batch_index}"
                         )
                     except Exception as e:
                         logger.warning(
@@ -1018,8 +1041,11 @@ class PersistenceMixin:
                     prev = int(self._fact_db_counts.get(table_name, 0))
                     added = int(total_db) - prev
                     self._fact_db_counts[table_name] = int(total_db)
+                    expected = len(mapped_records)
                     logger.info(
-                        f"{table_name} verification (hour {hour}): added={added}, expected={len(mapped_records)}, db_total={total_db}"
+                        f"{table_name} verification (hour {hour}): "
+                        f"added={added}, expected={expected}, "
+                        f"db_total={total_db}"
                     )
             except Exception as e:
                 logger.debug(f"Verification skipped for {table_name} hour {hour}: {e}")

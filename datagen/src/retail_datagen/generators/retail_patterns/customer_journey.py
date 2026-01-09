@@ -222,7 +222,8 @@ class CustomerJourneySimulator:
         Args:
             customer_id: Customer ID
             behavior_type: Override shopping behavior (optional)
-            store: Store where shopping is occurring (optional, for format-based adjustment)
+            store: Store where shopping is occurring (optional, for
+                format-based adjustment)
 
         Returns:
             ShoppingBasket with realistic product combinations

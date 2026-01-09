@@ -148,7 +148,8 @@ class TestStoreProfileAssignment:
         cv = std_dev / mean_mult
 
         assert cv > 0.3, (
-            f"Coefficient of variation ({cv:.2f}) should be > 0.3 for sufficient variability"
+            f"Coefficient of variation ({cv:.2f}) should be > 0.3 "
+            "for sufficient variability"
         )
 
     def test_flagship_stores_have_high_multipliers(self, profiler):
@@ -207,7 +208,8 @@ class TestStoreProfileAssignment:
             )
 
             assert avg_hypermarket > avg_express, (
-                "Hypermarkets should have larger average basket sizes than express stores"
+                "Hypermarkets should have larger average basket sizes "
+                "than express stores"
             )
 
     def test_operating_hours_assigned(self, profiler):

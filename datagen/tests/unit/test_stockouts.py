@@ -4,7 +4,9 @@ Unit tests for stockouts detection and generation.
 
 from datetime import UTC, datetime
 
-from retail_datagen.generators.fact_generators.stockouts_mixin import StockoutsMixin
+from retail_datagen.generators.fact_generators.stockouts_mixin import (
+    StockoutsMixin,
+)
 
 
 class MockStockoutsGenerator(StockoutsMixin):
@@ -185,7 +187,7 @@ class TestStockoutsDetection:
         assert dc_stockouts[0]["DCID"] == 5
 
     def test_negative_last_known_quantity_converted_to_positive(self):
-        """Test that negative quantity deltas are converted to positive last known qty."""
+        """Test that negative quantity deltas are converted to positive."""
         generator = MockStockoutsGenerator()
 
         store_txns = [

@@ -183,7 +183,10 @@ class Store(BaseModel):
         None,
         ge=0,
         le=Decimal("0.20"),
-        description="Combined state/county/city tax rate for this store (0-20%, e.g., 0.0825 for 8.25%)",
+        description=(
+            "Combined state/county/city tax rate for this store "
+            "(0-20%, e.g., 0.0825 for 8.25%)"
+        ),
     )
     # Store profile fields for realistic variability
     volume_class: str | None = Field(
@@ -245,7 +248,10 @@ class Truck(BaseModel):
     DCID: int | None = Field(
         None,
         ge=1,
-        description="Home distribution center for this truck. NULL indicates pool/rental trucks not assigned to a specific DC.",
+        description=(
+            "Home distribution center for this truck. NULL indicates "
+            "pool/rental trucks not assigned to a specific DC."
+        ),
     )
 
 
@@ -329,10 +335,12 @@ class ProductMaster(BaseModel):
         """
         if not (self.Cost < self.SalePrice <= self.MSRP):
             raise ValueError(
-                f"Pricing constraint violated: Cost ({self.Cost}) < SalePrice ({self.SalePrice}) <= MSRP ({self.MSRP})"
+                f"Pricing constraint violated: Cost ({self.Cost}) < "
+                f"SalePrice ({self.SalePrice}) <= MSRP ({self.MSRP})"
             )
 
-        # Check cost is 50-85% of sale price (with tolerance for floating-point precision)
+        # Check cost is 50-85% of sale price
+        # (with tolerance for floating-point precision)
         cost_ratio = self.Cost / self.SalePrice
         if not (Decimal("0.4999") <= cost_ratio <= Decimal("0.8520")):
             raise ValueError(
@@ -524,11 +532,16 @@ class StoreInventoryTransaction(BaseModel):
     QtyDelta: int = Field(..., description="Quantity change")
     Reason: InventoryReason | None = Field(
         None,
-        description="Reason for inventory change (INBOUND_SHIPMENT, SALE, RETURN, etc.)",
+        description=(
+            "Reason for inventory change (INBOUND_SHIPMENT, SALE, RETURN, etc.)"
+        ),
     )
     Source: str | None = Field(
         None,
-        description="Source of inventory transaction (truck ID, receipt ID, adjustment ID, etc.)",
+        description=(
+            "Source of inventory transaction "
+            "(truck ID, receipt ID, adjustment ID, etc.)"
+        ),
     )
 
 
@@ -553,7 +566,8 @@ class Receipt(BaseModel):
         expected_total = self.Subtotal + self.Tax
         if abs(self.Total - expected_total) > Decimal("0.01"):  # Allow for rounding
             raise ValueError(
-                f"Total ({self.Total}) must equal Subtotal ({self.Subtotal}) + Tax ({self.Tax})"
+                f"Total ({self.Total}) must equal Subtotal ({self.Subtotal}) "
+                f"+ Tax ({self.Tax})"
             )
         return self
 
@@ -579,7 +593,8 @@ class ReceiptLine(BaseModel):
             "0.01"
         ):  # Allow for rounding
             raise ValueError(
-                f"ExtPrice ({self.ExtPrice}) must equal UnitPrice ({self.UnitPrice}) * Qty ({self.Qty})"
+                f"ExtPrice ({self.ExtPrice}) must equal "
+                f"UnitPrice ({self.UnitPrice}) * Qty ({self.Qty})"
             )
         return self
 
@@ -695,7 +710,8 @@ class OnlineOrder(BaseModel):
         expected_total = self.Subtotal + self.Tax
         if abs(self.Total - expected_total) > Decimal("0.01"):  # Allow for rounding
             raise ValueError(
-                f"Total ({self.Total}) must equal Subtotal ({self.Subtotal}) + Tax ({self.Tax})"
+                f"Total ({self.Total}) must equal Subtotal ({self.Subtotal}) "
+                f"+ Tax ({self.Tax})"
             )
         return self
 

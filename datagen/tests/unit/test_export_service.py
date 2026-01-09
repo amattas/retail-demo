@@ -86,7 +86,12 @@ class TestExportMasterTables:
                 {
                     "ID": [1, 2, 3, 4],
                     "FirstName": ["Alex", "Blake", "Casey", "Drew"],
-                    "LastName": ["Anderson", "Brightwell", "Clearwater", "Dalewood"],
+                    "LastName": [
+                        "Anderson",
+                        "Brightwell",
+                        "Clearwater",
+                        "Dalewood",
+                    ],
                 }
             ),
         }
@@ -135,7 +140,9 @@ class TestExportMasterTables:
 
             asyncio.run(
                 service.export_master_tables(
-                    mock_session, format="parquet", progress_callback=progress_callback
+                    mock_session,
+                    format="parquet",
+                    progress_callback=progress_callback,
                 )
             )
 
@@ -301,7 +308,8 @@ class TestExportFactTables:
                 service.export_fact_tables(mock_session, format="parquet")
             )
 
-        # Verify monthly grouping: sample data has only January dates, so one file per table
+        # Verify monthly grouping: sample data has only January dates,
+        # so one file per table
         for files in result.values():
             assert len(files) == 1
             assert files[0].suffix == ".parquet"
@@ -348,7 +356,9 @@ class TestExportFactTables:
 
             asyncio.run(
                 service.export_fact_tables(
-                    mock_session, format="parquet", progress_callback=progress_callback
+                    mock_session,
+                    format="parquet",
+                    progress_callback=progress_callback,
                 )
             )
 

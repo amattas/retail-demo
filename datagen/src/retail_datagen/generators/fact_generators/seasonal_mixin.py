@@ -171,7 +171,10 @@ class SeasonalMixin:
         return 1.0
 
     def _apply_holiday_overlay_to_basket(self, date: datetime, basket) -> None:
-        """Adjust basket in-place based on holiday overlay (qty boosts + occasional extra lines)."""
+        """Adjust basket in-place based on holiday overlay.
+
+        Applies qty boosts and occasional extra lines.
+        """
         if not getattr(basket, "items", None):
             return
         # Increase quantity for existing targeted items

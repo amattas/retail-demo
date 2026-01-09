@@ -132,7 +132,8 @@ convenience_start, convenience_end = find_class_or_function(
 )
 if convenience_start:
     print(
-        f"generate_historical_facts function: lines {convenience_start + 1} to {convenience_end}"
+        f"generate_historical_facts function: "
+        f"lines {convenience_start + 1} to {convenience_end}"
     )
 
 print("\n" + "=" * 60)

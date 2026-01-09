@@ -156,7 +156,9 @@ class MonitoringManager:
                         if self._last_pause_time
                         else None
                     ),
-                    "events_sent_before_pause": self._statistics.events_sent_successfully,
+                    "events_sent_before_pause": (
+                        self._statistics.events_sent_successfully
+                    ),
                 }
 
             # Set pause state

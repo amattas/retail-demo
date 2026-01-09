@@ -72,13 +72,17 @@ async def create_disruption(request: DisruptionRequest):
     active_disruptions[disruption_id] = disruption_data
 
     logger.info(
-        f"Created disruption {disruption_id}: {request.disruption_type} affecting target {request.target_id}"
+        f"Created disruption {disruption_id}: {request.disruption_type} "
+        f"affecting target {request.target_id}"
     )
 
     return DisruptionResponse(
         success=True,
         disruption_id=disruption_id,
-        message=f"Created {request.disruption_type} disruption for target {request.target_id}",
+        message=(
+            f"Created {request.disruption_type} disruption "
+            f"for target {request.target_id}"
+        ),
         active_until=active_until,
     )
 
@@ -105,7 +109,8 @@ async def list_active_disruptions():
             "created_at": data["created_at"],
             "active_until": data["active_until"],
             "time_remaining_minutes": max(
-                0, (data["active_until"] - datetime.now(UTC)).total_seconds() / 60
+                0,
+                (data["active_until"] - datetime.now(UTC)).total_seconds() / 60,
             ),
             "events_affected": data.get("events_affected", 0),
             "status": data["status"],
@@ -113,7 +118,9 @@ async def list_active_disruptions():
         disruptions.append(disruption_info)
 
     return ActiveDisruptionsResponse(
-        disruptions=disruptions, count=len(disruptions), timestamp=datetime.now(UTC)
+        disruptions=disruptions,
+        count=len(disruptions),
+        timestamp=datetime.now(UTC),
     )
 
 

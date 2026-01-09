@@ -111,8 +111,9 @@ class StockoutsMixin:
                 event_ts = txn.get("EventTS")
                 qty_delta = txn.get("QtyDelta", 0)
 
-                # Last known quantity is the absolute value of the delta that brought us to zero
-                # (if delta is negative, it represents the sale/usage that depleted inventory)
+                # Last known quantity is the absolute value of the delta that
+                # brought us to zero (if delta is negative, it represents the
+                # sale/usage that depleted inventory)
                 last_known_qty = abs(qty_delta) if qty_delta < 0 else 0
 
                 stockout = self._detect_and_record_stockout(
@@ -154,7 +155,8 @@ class StockoutsMixin:
 
         if stockout_records:
             logger.info(
-                f"Generated {len(stockout_records)} stockout events from inventory transactions"
+                f"Generated {len(stockout_records)} stockout events "
+                "from inventory transactions"
             )
 
         return stockout_records

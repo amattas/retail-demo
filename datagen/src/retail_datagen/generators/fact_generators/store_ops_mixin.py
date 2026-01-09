@@ -31,9 +31,11 @@ class StoreOpsMixin:
             - Returns (0, 24) for 24/7 stores
             - Returns (8, 22) as default for standard hours
             - For late-night stores that close after midnight (e.g., "10pm-2am"),
-              close_hour uses values > 24 to represent next-day hours (e.g., 26 for 2am).
-              This simplifies time range checks: if close_hour > 24, store closes after midnight.
-              The actual close event timestamp is generated correctly using datetime arithmetic.
+              close_hour uses values > 24 to represent next-day hours
+              (e.g., 26 for 2am). This simplifies time range checks:
+              if close_hour > 24, store closes after midnight.
+              The actual close event timestamp is generated correctly
+              using datetime arithmetic.
         """
         if not hours_str:
             # Default to standard hours (8am-10pm)
@@ -98,7 +100,8 @@ class StoreOpsMixin:
         # Values above this likely indicate parsing errors
         if close_hour > 36:
             logger.warning(
-                f"Invalid close_hour {close_hour} for '{hours_str}', using default 8am-10pm"
+                f"Invalid close_hour {close_hour} for '{hours_str}', "
+                "using default 8am-10pm"
             )
             return (8, 22)
 
@@ -140,7 +143,8 @@ class StoreOpsMixin:
         )
 
         # Generate closed event
-        # Handle midnight close (close_hour == 24) and late-night closes (close_hour > 24)
+        # Handle midnight close (close_hour == 24) and late-night closes
+        # (close_hour > 24)
         if close_hour == 24:
             # Midnight: use 23:59:59 on the same day
             close_time = day_date.replace(hour=23, minute=59, second=59, microsecond=0)

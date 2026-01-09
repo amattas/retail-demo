@@ -244,7 +244,9 @@ class MarketingCampaignSimulator:
 
         logger.info(f"      Generating impressions for campaign {campaign_id}")
         logger.info(
-            f"        Config: daily_impressions={config.get('daily_impressions', 'MISSING')}, channels={len(config.get('channels', []))}"
+            f"        Config: daily_impressions="
+            f"{config.get('daily_impressions', 'MISSING')}, "
+            f"channels={len(config.get('channels', []))}"
         )
         logger.info(f"        Traffic multiplier: {traffic_multiplier}")
 
@@ -260,7 +262,8 @@ class MarketingCampaignSimulator:
         if traffic_multiplier == 0:
             base_impressions = 0
         else:
-            # Ensure minimum TOTAL impressions across all channels (account for integer division)
+            # Ensure minimum TOTAL impressions across all channels
+            # (account for integer division)
             # Multiply minimum by channels to ensure we meet threshold after division
             min_impressions_total = min_daily_impressions * num_channels
             base_impressions = max(
@@ -277,7 +280,8 @@ class MarketingCampaignSimulator:
         for channel in config["channels"]:
             channel_impressions = base_impressions // len(config["channels"])
             logger.info(
-                f"          Channel {channel}: {channel_impressions} impressions to generate"
+                f"          Channel {channel}: "
+                f"{channel_impressions} impressions to generate"
             )
 
             for _ in range(channel_impressions):
@@ -296,7 +300,12 @@ class MarketingCampaignSimulator:
                 device = self._rng.choices(device_options, weights=device_weights)[0]
 
                 # Generate creative ID
-                creative_id = f"CREAT{campaign_id[-4:]}{channel.value[:3]}{self._rng.randint(1, 99):02d}"
+                campaign_suffix = campaign_id[-4:]
+                channel_prefix = channel.value[:3]
+                random_suffix = self._rng.randint(1, 99)
+                creative_id = (
+                    f"CREAT{campaign_suffix}{channel_prefix}{random_suffix:02d}"
+                )
 
                 # Generate unique impression ID using counter
                 self._impression_counter += 1

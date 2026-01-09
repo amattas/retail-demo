@@ -109,8 +109,9 @@ class UtilsMixin:
     ) -> None:
         """DuckDB-native returns generator using external receipt IDs for linkage.
 
-        Samples same-day SALE receipts, creates RETURN headers/lines, and emits corresponding
-        store inventory transactions including dispositions (damaged/RTV/restock).
+        Samples same-day SALE receipts, creates RETURN headers/lines, and
+        emits corresponding store inventory transactions including
+        dispositions (damaged/RTV/restock).
         """
         if "receipts" not in active_tables or "receipt_lines" not in active_tables:
             return
@@ -155,7 +156,10 @@ class UtilsMixin:
             if not line_rows:
                 continue
 
-            return_id_ext = f"RET{date.strftime('%Y%m%d')}{int(store_id):03d}{self._rng.randint(1000, 9999)}"
+            return_id_ext = (
+                f"RET{date.strftime('%Y%m%d')}"
+                f"{int(store_id):03d}{self._rng.randint(1000, 9999)}"
+            )
             trace_id = self._generate_trace_id()
             store_tax_rate = store_rates.get(int(store_id), Decimal("0.07407"))
             subtotal = Decimal("0.00")
@@ -331,7 +335,9 @@ class UtilsMixin:
     async def _generate_and_insert_returns(
         self, date: datetime, active_tables: list[str]
     ) -> None:
-        """Generate return receipts for this date (baseline + Dec 26 spike) and insert into DB.
+        """Generate return receipts for this date (baseline + Dec 26 spike).
+
+        Insert into DB.
 
         Strategy: sample a small subset of recent receipts, build negative receipts with
         corresponding inventory transactions and dispositions.
@@ -355,7 +361,8 @@ class UtilsMixin:
             await self._session.execute(
                 text(
                     "SELECT receipt_id, store_id, event_ts FROM fact_receipts "
-                    "WHERE date(event_ts)=:d AND (receipt_type IS NULL OR receipt_type='SALE')"
+                    "WHERE date(event_ts)=:d "
+                    "AND (receipt_type IS NULL OR receipt_type='SALE')"
                 ),
                 {"d": date.strftime("%Y-%m-%d")},
             )
@@ -386,7 +393,8 @@ class UtilsMixin:
             line_rows = (
                 await self._session.execute(
                     text(
-                        "SELECT product_id, quantity, unit_price, ext_price, line_num FROM fact_receipt_lines WHERE receipt_id=:rid"
+                        "SELECT product_id, quantity, unit_price, ext_price, "
+                        "line_num FROM fact_receipt_lines WHERE receipt_id=:rid"
                     ),
                     {"rid": orig_receipt_pk},
                 )
@@ -395,7 +403,10 @@ class UtilsMixin:
                 continue
 
             # Build return header
-            return_id_ext = f"RET{date.strftime('%Y%m%d')}{store_id:03d}{self._rng.randint(1000, 9999)}"
+            return_id_ext = (
+                f"RET{date.strftime('%Y%m%d')}"
+                f"{store_id:03d}{self._rng.randint(1000, 9999)}"
+            )
             trace_id = self._generate_trace_id()
             store_tax_rate = store_rates.get(store_id, Decimal("0.07407"))
             subtotal = Decimal("0.00")
@@ -410,7 +421,8 @@ class UtilsMixin:
                 nqty = int(qty) * -1
                 unit_price_dec = self._to_decimal(unit_price)
                 (unit_price_dec * nqty).quantize(Decimal("0.01"))
-                # ext_price could be used, but recompute to ensure consistency with negative qty
+                # ext_price could be used, but recompute to ensure consistency
+                # with negative qty
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
                 # Taxability

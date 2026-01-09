@@ -1020,7 +1020,7 @@ async def test_preconfigured_client_with_connection_string(
     sample_dcs,
     mock_event_hub_client,
 ):
-    """Test behavior when client is pre-configured and connection string is also provided.
+    """Test behavior when client is pre-configured and connection string provided.
 
     This test verifies that when a pre-configured Azure client is set before
     initialize() is called, the pre-configured client is used and any

@@ -46,15 +46,18 @@ logger = logging.getLogger(__name__)
 APP_NAME = "Retail Data Generator API"
 APP_VERSION = "1.0.0"
 APP_DESCRIPTION = """
-**Retail Data Generator API** provides comprehensive endpoints for generating synthetic retail data.
+**Retail Data Generator API** provides comprehensive endpoints for generating
+synthetic retail data.
 
 ## Features
 
 ### 🏪 Master Data Generation
-Generate dimension tables including stores, customers, products, and distribution centers.
+Generate dimension tables including stores, customers, products, and
+distribution centers.
 
 ### 📊 Historical Data Generation
-Create fact tables with realistic transaction data, inventory movements, and analytics events.
+Create fact tables with realistic transaction data, inventory movements,
+and analytics events.
 
 ### 🔄 Real-Time Streaming
 Stream live events to Azure Event Hub for real-time analytics and monitoring.
@@ -63,7 +66,8 @@ Stream live events to Azure Event Hub for real-time analytics and monitoring.
 Update generation parameters, streaming settings, and system configuration.
 
 ## Data Safety
-All generated data is **synthetic and fictitious**. No real personal information is used or generated.
+All generated data is **synthetic and fictitious**. No real personal
+information is used or generated.
 
 ## Modes
 1. **Master Data**: Generate dimension tables from dictionary data
@@ -71,7 +75,8 @@ All generated data is **synthetic and fictitious**. No real personal information
 3. **Real-Time**: Stream incremental events to Azure Event Hub
 
 ## Authentication
-Some endpoints may require API key authentication. Include the API key in the Authorization header:
+Some endpoints may require API key authentication. Include the API key in
+the Authorization header:
 ```
 Authorization: Bearer your-api-key-here
 ```
@@ -217,7 +222,8 @@ if _templates_dir.exists():
     templates = Jinja2Templates(directory=str(_templates_dir))
 else:
     logger.warning(
-        f"Templates directory not found at {_templates_dir}; some routes may be disabled"
+        f"Templates directory not found at {_templates_dir}; "
+        "some routes may be disabled"
     )
     # Fallback empty templates to avoid import-time errors in tests
     templates = Jinja2Templates(directory=str(_repo_root))
@@ -448,7 +454,9 @@ async def get_version():
 @app.get(
     "/metrics",
     summary="Prometheus metrics",
-    description="Prometheus metrics endpoint for monitoring streaming health and performance",
+    description=(
+        "Prometheus metrics endpoint for monitoring streaming health and performance"
+    ),
     tags=["Monitoring"],
 )
 async def prometheus_metrics():

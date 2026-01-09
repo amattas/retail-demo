@@ -80,7 +80,9 @@ async def test_online_orders():
     created_df = df[df["FulfillmentStatus"] == "created"]
     products_in_orders = created_df.groupby("OrderId")["ProductID"].count()
     print(
-        f"     Min: {products_in_orders.min()}, Max: {products_in_orders.max()}, Mean: {products_in_orders.mean():.2f}"
+        f"     Min: {products_in_orders.min()}, "
+        f"Max: {products_in_orders.max()}, "
+        f"Mean: {products_in_orders.mean():.2f}"
     )
 
     # 2. Status progression
@@ -176,11 +178,14 @@ async def test_online_orders():
         print(f"\nOrder: {order_id}")
         print(f"  Customer: {order_df.iloc[0]['CustomerID']}")
         print(
-            f"  Fulfillment: {order_df.iloc[0]['FulfillmentMode']} from {order_df.iloc[0]['NodeType']} {order_df.iloc[0]['NodeID']}"
+            f"  Fulfillment: {order_df.iloc[0]['FulfillmentMode']} "
+            f"from {order_df.iloc[0]['NodeType']} {order_df.iloc[0]['NodeID']}"
         )
         print(f"  Tender: {order_df.iloc[0]['TenderType']}")
         print(
-            f"  Subtotal: ${order_df.iloc[0]['Subtotal']}, Tax: ${order_df.iloc[0]['Tax']}, Total: ${order_df.iloc[0]['Total']}"
+            f"  Subtotal: ${order_df.iloc[0]['Subtotal']}, "
+            f"Tax: ${order_df.iloc[0]['Tax']}, "
+            f"Total: ${order_df.iloc[0]['Total']}"
         )
         print("  Products:")
 

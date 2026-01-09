@@ -45,7 +45,9 @@ class TestPricingRules:
 
     @given(
         base_price=st.decimals(
-            min_value=Decimal("0.01"), max_value=Decimal("10000.00"), places=2
+            min_value=Decimal("0.01"),
+            max_value=Decimal("10000.00"),
+            places=2,
         )
     )
     def test_msrp_variance_rule_property_based(self, base_price: Decimal):
@@ -102,7 +104,9 @@ class TestPricingRules:
 
     @given(
         sale_price=st.decimals(
-            min_value=Decimal("1.00"), max_value=Decimal("1000.00"), places=2
+            min_value=Decimal("1.00"),
+            max_value=Decimal("1000.00"),
+            places=2,
         )
     )
     def test_cost_percentage_range_property_based(self, sale_price: Decimal):
@@ -377,7 +381,9 @@ class TestPricingDistribution:
     @given(
         base_prices=st.lists(
             st.decimals(
-                min_value=Decimal("1.00"), max_value=Decimal("1000.00"), places=2
+                min_value=Decimal("1.00"),
+                max_value=Decimal("1000.00"),
+                places=2,
             ),
             min_size=10,
             max_size=50,
@@ -400,5 +406,6 @@ class TestPricingDistribution:
         # batch_results = batch_calc.calculate_batch_pricing(base_prices)
 
         # Results should be identical
-        # for i, (individual, batch) in enumerate(zip(individual_results, batch_results)):
+        # results_pairs = zip(individual_results, batch_results)
+        # for i, (individual, batch) in enumerate(results_pairs):
         #     assert individual == batch, f"Mismatch at index {i}"

@@ -32,9 +32,10 @@ def generate_online_orders_with_lifecycle(
     generate_trace_id_func,
     basket_adjuster=None,
 ) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    """Generate online orders for the given date with complete lifecycle and corresponding inventory effects.
+    """Generate online orders for the given date with complete lifecycle.
 
-    Creates orders with status progression (created -> picked -> shipped -> delivered)
+    Creates orders with corresponding inventory effects and status progression
+    (created -> picked -> shipped -> delivered)
     and proper financial calculations based on fulfillment location tax rates.
 
     Args:
@@ -85,8 +86,9 @@ def generate_online_orders_with_lifecycle(
             except Exception:
                 pass
 
-        # Online-specific downsizing: customers typically buy fewer distinct items online.
-        # Target distribution: 60% → 1–3 lines, 30% → 2–5 lines, 10% → 5–8 lines.
+        # Online-specific downsizing: customers typically buy fewer distinct
+        # items online.
+        # Target distribution: 60% -> 1-3 lines, 30% -> 2-5 lines, 10% -> 5-8
         items = list(basket.items)
         r = rng.random()
         if r < 0.60:
@@ -106,7 +108,8 @@ def generate_online_orders_with_lifecycle(
             adjusted_items.append((product, qty))
         items = adjusted_items
 
-        # Choose header-level mode/node for pricing (tax base), but allow per-line routing below
+        # Choose header-level mode/node for pricing (tax base), but allow
+        # per-line routing below
         # Distribution: 60% DC, 30% Store, 10% BOPIS
         mode = rng.choices(
             ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"], weights=[0.60, 0.30, 0.10]
@@ -132,7 +135,8 @@ def generate_online_orders_with_lifecycle(
                 )
             else:
                 node_id = dc.ID
-                # Approximate DC taxation using customer's local rate (store in same geo if available)
+                # Approximate DC taxation using customer's local rate
+                # (store in same geo if available)
                 customer_geo = next(
                     (g for g in geographies if g.ID == customer.GeographyID), None
                 )
@@ -164,7 +168,8 @@ def generate_online_orders_with_lifecycle(
         order_id = f"ONL{date.strftime('%Y%m%d')}{i:05d}{rng.randint(100, 999)}"
 
         # Calculate status progression timestamps
-        # created (T+0) -> picked (T+15-30min) -> shipped (T+2-4hrs) -> delivered (T+1-3days)
+        # created (T+0) -> picked (T+15-30min) -> shipped (T+2-4hrs)
+        # -> delivered (T+1-3days)
         picked_minutes = rng.randint(15, 30)
         picked_ts = created_ts + timedelta(minutes=picked_minutes)
 
@@ -377,7 +382,8 @@ def generate_online_orders_with_lifecycle(
                 for dt in ((_delivered_ts if "delivered_ts" in locals() else None),)
                 if dt is not None
             ]
-            # Fallback: use delivered_ts computed above for lines; recompute from order_lines list
+            # Fallback: use delivered_ts computed above for lines;
+            # recompute from order_lines list
             if not delivered_times:
                 delivered_times = [
                     ol.get("DeliveredTS")
@@ -415,7 +421,8 @@ def generate_online_orders_with_lifecycle(
             }
         )
 
-        # Status 2: picked - no longer creates an additional order row (avoid multi-status rows)
+        # Status 2: picked - no longer creates an additional order row
+        # (avoid multi-status rows)
         trace_id_picked = generate_trace_id_func()
 
         # Create inventory effects at picked stage (when items leave shelf)

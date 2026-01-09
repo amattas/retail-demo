@@ -175,7 +175,8 @@ class EventFactory:
         hour = current_time.hour
         day_of_week = current_time.weekday()  # 0=Monday, 6=Sunday
 
-        # Business hours factor (more activity 9 AM - 8 PM). Online orders allowed 24/7 with evening bias.
+        # Business hours factor (more activity 9 AM - 8 PM).
+        # Online orders allowed 24/7 with evening bias.
         if event_type == EventType.ONLINE_ORDER_CREATED:
             if 18 <= hour <= 23:
                 business_factor = 1.0
@@ -462,7 +463,10 @@ class EventFactory:
     def _generate_receipt_created(
         self, timestamp: datetime
     ) -> tuple[ReceiptCreatedPayload, str, str] | None:
-        """Generate receipt created event - respects marketing-driven purchase likelihood."""
+        """Generate receipt created event.
+
+        Respects marketing-driven purchase likelihood.
+        """
         # Get customers who are currently in stores and haven't made a purchase yet
         eligible_sessions = [
             session
@@ -681,7 +685,10 @@ class EventFactory:
     def _generate_customer_entered(
         self, timestamp: datetime
     ) -> tuple[CustomerEnteredPayload, str, str]:
-        """Generate customer entered event with session tracking and marketing conversions."""
+        """Generate customer entered event.
+
+        Includes session tracking and marketing conversions.
+        """
         store_id = self.rng.choice(list(self.stores.keys()))
         sensor_id = f"SENSOR_{store_id}_1"  # Use store-specific entrance sensor
         zone = "ENTRANCE"  # Always start at entrance
@@ -747,7 +754,8 @@ class EventFactory:
                 session_id = f"{customer.ID}_{store_id}"
                 base_visit_duration = self.rng.randint(10, 45)
 
-                # Marketing-driven customers tend to stay longer and are more likely to purchase
+                # Marketing-driven customers tend to stay longer and are more
+                # likely to purchase
                 is_marketing_driven = any(
                     customer == mc[0]
                     for mc in marketing_driven_customers

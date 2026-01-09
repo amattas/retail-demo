@@ -89,7 +89,8 @@ class TestVolumeConfig:
     # Suppress HealthCheck.too_slow because generating floats with hypothesis
     # can trigger slow data generation warnings. The items_per_ticket_mean float
     # strategy occasionally takes longer than hypothesis's default threshold,
-    # but this is acceptable for property-based testing of configuration validation.
+    # but this is acceptable for property-based testing of configuration
+    # validation.
     @settings(suppress_health_check=[HealthCheck.too_slow])
     @given(
         stores=st.integers(min_value=1, max_value=10000),
@@ -164,7 +165,11 @@ class TestPathsConfig:
 
     def test_paths_config_empty_dict_path(self):
         """Test that empty dictionary path is invalid."""
-        invalid_paths = {"dict": "", "master": "data/master", "facts": "data/facts"}
+        invalid_paths = {
+            "dict": "",
+            "master": "data/master",
+            "facts": "data/facts",
+        }
         with pytest.raises(ValidationError):
             PathsConfig(**invalid_paths)
 
@@ -403,7 +408,10 @@ class TestConfig:
                 "customers_per_day": 20000,
                 "items_per_ticket_mean": 4.2,
             },
-            "realtime": {"emit_interval_ms": 0, "burst": 100},  # Invalid interval
+            "realtime": {
+                "emit_interval_ms": 0,
+                "burst": 100,
+            },  # Invalid interval
             "paths": {
                 "dict": "",  # Invalid path
                 "master": "data/master",
@@ -421,7 +429,10 @@ class TestConfig:
 
 
 class TestCircuitBreakerConfigPropagation:
-    """Test circuit breaker config propagation from RealtimeConfig to StreamingConfig."""
+    """Test circuit breaker config propagation.
+
+    Tests propagation from RealtimeConfig to StreamingConfig.
+    """
 
     def test_circuit_breaker_default_values(self):
         """Test that circuit breaker has correct default values."""
@@ -462,7 +473,10 @@ class TestCircuitBreakerConfigPropagation:
             )
 
     def test_circuit_breaker_config_propagation(self):
-        """Test that circuit breaker config propagates from RetailConfig to StreamingConfig."""
+        """Test circuit breaker config propagates.
+
+        Verifies propagation from RetailConfig to StreamingConfig.
+        """
         from retail_datagen.streaming.event_streaming.config import StreamingConfig
 
         # Create a RetailConfig with custom circuit breaker settings
@@ -497,7 +511,7 @@ class TestCircuitBreakerConfigPropagation:
         assert streaming_config.circuit_breaker_recovery_timeout == 120
 
     def test_circuit_breaker_enabled_propagation(self):
-        """Test that circuit_breaker_enabled propagates correctly when set to False."""
+        """Test circuit_breaker_enabled propagates correctly when set to False."""
         from retail_datagen.streaming.event_streaming.config import StreamingConfig
 
         # Create a RetailConfig with circuit breaker disabled

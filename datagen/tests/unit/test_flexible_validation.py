@@ -24,7 +24,10 @@ class TestFlexibleValidation:
 
     def test_strict_mode_rejects_short_connection_string(self):
         """Strict mode should reject connection strings that are too short."""
-        short_conn = "Endpoint=sb://test.servicebus.windows.net/;SharedAccessKeyName=key;SharedAccessKey=short"
+        short_conn = (
+            "Endpoint=sb://test.servicebus.windows.net/;"
+            "SharedAccessKeyName=key;SharedAccessKey=short"
+        )
 
         is_valid, error = validate_eventhub_connection_string(short_conn, strict=True)
 
@@ -72,7 +75,8 @@ class TestFlexibleValidation:
         )
 
         assert not is_valid
-        # Mock string "mock://localhost/test-hub" is too short and lacks proper structure
+        # Mock string "mock://localhost/test-hub" is too short and lacks
+        # proper structure
         assert any(
             phrase in error.lower()
             for phrase in ["missing required part", "endpoint", "too short"]
