@@ -950,7 +950,8 @@ class TestTaskCleanup:
     def test_cleanup_exceeds_max_hours_raises_error(self):
         """Test that max_age_hours > MAX_TASK_AGE_LIMIT_HOURS raises ValueError."""
         with pytest.raises(
-            ValueError, match=f"max_age_hours must not exceed {MAX_TASK_AGE_LIMIT_HOURS}"
+            ValueError,
+            match=f"max_age_hours must not exceed {MAX_TASK_AGE_LIMIT_HOURS}",
         ):
             cleanup_old_tasks(max_age_hours=MAX_TASK_AGE_LIMIT_HOURS + 1)
 

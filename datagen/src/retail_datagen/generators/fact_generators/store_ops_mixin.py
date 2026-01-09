@@ -94,8 +94,9 @@ class StoreOpsMixin:
                 close_hour += 24
 
         # Validate that close_hour is not unreasonably far in the future
-        # (more than 48 hours would indicate a parsing error)
-        if close_hour > 48:
+        # Max of 36 allows stores open until noon next day (reasonable limit)
+        # Values above this likely indicate parsing errors
+        if close_hour > 36:
             logger.warning(
                 f"Invalid close_hour {close_hour} for '{hours_str}', using default 8am-10pm"
             )

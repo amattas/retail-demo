@@ -83,7 +83,7 @@ class TestStoreOpsMixin:
         [
             ("10pm-2am", 22, 26),  # 10pm to 2am next day
             ("11pm-1am", 23, 25),  # 11pm to 1am next day
-            ("8pm-6am", 20, 30),   # 8pm to 6am next day (overnight shift)
+            ("8pm-6am", 20, 30),  # 8pm to 6am next day (overnight shift)
             ("6pm-midnight", 18, 24),  # 6pm to midnight (should not add 24)
         ],
     )
@@ -182,3 +182,33 @@ class TestStoreOpsMixin:
         trace_ids = [op["trace_id"] for op in operations]
         # All trace IDs should be unique
         assert len(trace_ids) == len(set(trace_ids))
+
+    def test_late_night_close_generates_next_day_timestamp(self, generator):
+        """Test that late-night closes generate correct next-day timestamps."""
+        # Store that closes at 2am next day (10pm-2am)
+        late_night_store = Store(
+            ID=3,
+            StoreNumber="S003",
+            Address="789 Night Ave",
+            GeographyID=1,
+            operating_hours="10pm-2am",
+        )
+
+        test_date = datetime(2024, 1, 15, 0, 0, 0)
+        operations = generator._generate_store_operations_for_day(
+            late_night_store, test_date
+        )
+
+        assert len(operations) == 2
+
+        # Check opened event - should be on Jan 15 at 10pm
+        opened = operations[0]
+        assert opened["operation_time"].day == 15
+        assert opened["operation_time"].hour == 22
+
+        # Check closed event - should be on Jan 16 at 2am (next day)
+        closed = operations[1]
+        assert closed["operation_time"].day == 16
+        assert closed["operation_time"].hour == 2
+        assert closed["operation_time"].month == 1
+        assert closed["operation_time"].year == 2024
