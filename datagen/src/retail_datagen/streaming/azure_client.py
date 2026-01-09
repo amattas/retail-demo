@@ -175,8 +175,12 @@ class AzureEventHubClient:
         self._client: EventHubProducerClient | None = None
         self._is_connected = False
         self._event_buffer: list[EventEnvelope] = []
-        self._buffer_lock: asyncio.Lock | None = None  # Lazy-initialized in async context
-        self._is_flushing = False  # Prevents multiple concurrent flush tasks
+        # Lock for buffer operations: Lazy-initialized via _get_buffer_lock() to ensure
+        # it's created in an async context rather than during __init__ which may run
+        # outside an event loop
+        self._buffer_lock: asyncio.Lock | None = None
+        # Flag to prevent multiple concurrent auto-flush tasks from being scheduled
+        self._is_flushing = False
         self._statistics = {
             "events_sent": 0,
             "events_failed": 0,
@@ -463,6 +467,10 @@ class AzureEventHubClient:
         """
         Add event to internal buffer for batching.
 
+        Thread-safety: This method uses an async lock to protect buffer access.
+        The decision to flush is made atomically while holding the lock, but the
+        flush is scheduled outside the lock to avoid holding it during I/O.
+
         Args:
             event: Event to buffer
 
@@ -483,19 +491,18 @@ class AzureEventHubClient:
         # Note: We schedule outside the lock to avoid holding lock during I/O,
         # but the decision to flush is made atomically inside the lock.
         if should_schedule_flush:
-            try:
-                # Create task directly - we're already in an async context
-                asyncio.create_task(self._flush_and_reset())
-            except RuntimeError:
-                # No running event loop - reset flag synchronously
-                # Direct assignment is safe here as it's atomic for simple types
-                self._is_flushing = False
+            # Create task directly - we're already in an async context (this is an async method)
+            # If this fails, _is_flushing will be reset by the caller or on next flush attempt
+            asyncio.create_task(self._flush_and_reset())
 
         return needs_flush
 
     async def flush_buffer(self) -> bool:
         """
         Flush all buffered events to Event Hub.
+
+        Thread-safety: Uses async lock to safely copy and clear the buffer.
+        The actual send happens outside the lock to minimize lock hold time.
 
         Returns:
             bool: True if all events sent successfully, False otherwise
@@ -514,7 +521,11 @@ class AzureEventHubClient:
         Internal method that flushes buffer and resets the flushing flag.
 
         This method is called by the auto-flush mechanism to ensure the
-        _is_flushing flag is properly reset after flush completes.
+        _is_flushing flag is properly reset after flush completes, whether
+        the flush succeeds or fails.
+
+        Thread-safety: The _is_flushing flag is reset under lock protection
+        in the finally block to ensure proper synchronization.
 
         Returns:
             bool: True if flush succeeded, False otherwise
@@ -529,8 +540,18 @@ class AzureEventHubClient:
         """
         Get client statistics and performance metrics.
 
+        Thread-safety: Reads buffer_size under lock protection. The _statistics
+        dict and other fields are read outside the lock. This is acceptable as
+        dict operations are atomic in CPython and these fields are updated
+        infrequently during connection management.
+
         Returns:
-            dict: Statistics about client performance
+            dict: Statistics about client performance including:
+                - buffer_size: Current number of events in buffer
+                - events_sent: Total events successfully sent
+                - batches_sent: Total batches sent
+                - is_connected: Current connection status
+                - circuit_breaker_state: Current circuit breaker state
         """
         async with self._get_buffer_lock():
             buffer_size = len(self._event_buffer)
