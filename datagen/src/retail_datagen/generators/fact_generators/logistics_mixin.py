@@ -34,17 +34,31 @@ def _is_beyond_end_date(event_ts: datetime | None, end_date: datetime | None) ->
 class LogisticsMixin:
     """Truck logistics including movements, lifecycle, and deliveries"""
 
-    # Reorder priority thresholds (percentage below reorder point)
-    REORDER_PRIORITY_URGENT_THRESHOLD = 50.0  # 50%+ below reorder point (critical stockout risk)
-    REORDER_PRIORITY_HIGH_THRESHOLD = 25.0  # 25-50% below reorder point (significant risk)
+    #: Percentage below reorder point indicating critical stockout risk (triggers URGENT priority)
+    REORDER_PRIORITY_URGENT_THRESHOLD = 50.0
 
-    # Minimum and default unload durations (minutes)
+    #: Percentage below reorder point indicating significant risk (triggers HIGH priority)
+    REORDER_PRIORITY_HIGH_THRESHOLD = 25.0
+
+    #: Minimum unload duration in minutes (enforced even if calculated duration is shorter)
     MIN_UNLOAD_DURATION_MINUTES = 30
+
+    #: Default unload duration in minutes (used when ETA is not available)
     DEFAULT_UNLOAD_DURATION_MINUTES = 60
 
     @classmethod
-    def _calculate_reorder_priority(cls, reorder_point: int, current_qty: int) -> str:
-        """Calculate reorder priority based on inventory deficit percentage."""
+    def _calculate_reorder_priority(
+        cls, reorder_point: int, current_qty: int
+    ) -> str:
+        """Calculate reorder priority based on inventory deficit percentage.
+
+        Args:
+            reorder_point: Minimum stock level triggering reorder
+            current_qty: Current inventory quantity
+
+        Returns:
+            Priority level: "URGENT", "HIGH", or "NORMAL"
+        """
         if reorder_point <= 0:
             return "NORMAL"
         deficit_pct = (reorder_point - current_qty) / reorder_point * 100
