@@ -99,12 +99,14 @@ class HourlyProgressTracker:
 
         Returns:
             Dictionary containing:
-            - overall_progress: float (0.0 to 1.0) - aggregate progress across all tables
+            - overall_progress: float (0.0 to 1.0) - aggregate progress
+              across all tables
             - tables_in_progress: list[str] - tables currently being processed
             - current_day: int - most recent day being processed
             - current_hour: int - most recent hour being processed
-            - per_table_progress: dict[str, float] - progress for each table (0.0 to 1.0)
-            - completed_hours: dict[str, int] - number of completed hours per table
+            - per_table_progress: dict[str, float] - progress for each table
+              (0.0 to 1.0)
+            - completed_hours: dict[str, int] - completed hours per table
         """
         with self._lock:
             # Calculate per-table progress
@@ -130,8 +132,9 @@ class HourlyProgressTracker:
                 if 0 < progress < 1.0:
                     tables_in_progress.append(table)
 
-            # Calculate overall progress based on hours completed (not per-table average)
-            # Since all tables are generated hour-by-hour together, use max hours completed
+            # Calculate overall progress based on hours completed
+            # (not per-table average). Since all tables are generated
+            # hour-by-hour together, use max hours completed
             max_completed_hours = (
                 max(completed_hours_map.values()) if completed_hours_map else 0
             )
@@ -141,15 +144,17 @@ class HourlyProgressTracker:
                 else 0.0
             )
 
-            # All tables are "in progress" until all hours are complete (since they move together)
-            # Only show tables as in_progress if we've started and haven't finished
+            # All tables are "in progress" until all hours are complete
+            # (since they move together). Only show tables as in_progress
+            # if we've started and haven't finished
             if 0 < overall_progress < 1.0:
                 tables_in_progress = sorted(self._fact_tables)
             else:
                 tables_in_progress = []
 
-            # Find the most advanced position across all tables
-            # Return None instead of 0 to avoid validation issues (current_day must be >= 1)
+            # Find the most advanced position across all tables.
+            # Return None instead of 0 to avoid validation issues
+            # (current_day must be >= 1)
             max_day = max(self._current_day.values()) if self._current_day else None
             max_hour = max(self._current_hour.values()) if self._current_hour else None
 

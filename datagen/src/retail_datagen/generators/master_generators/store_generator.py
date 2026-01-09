@@ -65,7 +65,8 @@ class StoreGeneratorMixin:
                 dc_states.add(dc_geo.State)
 
         print(
-            f"Constraining stores to {len(dc_states)} states with DCs: {sorted(dc_states)}"
+            f"Constraining stores to {len(dc_states)} states with DCs: "
+            f"{sorted(dc_states)}"
         )
 
         # Filter geography data to only include states with DCs

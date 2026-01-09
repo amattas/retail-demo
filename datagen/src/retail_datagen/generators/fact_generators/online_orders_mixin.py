@@ -20,9 +20,11 @@ class OnlineOrdersMixin:
     def _generate_online_orders(
         self, date: datetime
     ) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-        """Generate online orders for the given date with complete lifecycle and corresponding inventory effects.
+        """Generate online orders for the given date with complete lifecycle.
 
-        Delegates to generate_online_orders_with_lifecycle for full implementation including:
+        Generates online orders with corresponding inventory effects.
+        Delegates to generate_online_orders_with_lifecycle for full
+        implementation including:
         - Multi-line orders (1-5 items per order via basket generation)
         - Status progression (created -> picked -> shipped -> delivered)
         - Proper tax calculation based on fulfillment location

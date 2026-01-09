@@ -142,7 +142,10 @@ class TestPaymentForReceipt:
         assert payment["CustomerID"] == sample_receipt["CustomerID"]
 
     def test_event_ts_after_transaction(self, payments_mixin, sample_receipt):
-        """Payment timestamp should be after transaction time (processing time added)."""
+        """Payment timestamp should be after transaction time.
+
+        Processing time is added to the transaction time.
+        """
         transaction_time = datetime(2024, 1, 15, 12, 0, 0)
         payment = payments_mixin._generate_payment_for_receipt(
             sample_receipt, transaction_time
@@ -245,10 +248,8 @@ class TestProcessingTime:
 
     def test_processing_time_within_range(self, payments_mixin):
         """Processing time should be within expected ranges."""
-        for method, (
-            min_ms,
-            max_ms,
-        ) in MockPaymentsMixin._PROCESSING_TIME_RANGES.items():
+        time_ranges = MockPaymentsMixin._PROCESSING_TIME_RANGES
+        for method, (min_ms, max_ms) in time_ranges.items():
             for _ in range(10):
                 time_ms = payments_mixin._simulate_processing_time_ms(method)
                 assert min_ms <= time_ms <= max_ms, (

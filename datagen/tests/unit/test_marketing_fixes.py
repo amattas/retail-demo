@@ -118,7 +118,8 @@ class TestMarketingBugFixes:
         not dependent on traffic_multiplier.
         """
         assert CAMPAIGN_START_PROBABILITY == 0.90, (
-            f"Expected CAMPAIGN_START_PROBABILITY to be 0.90, got {CAMPAIGN_START_PROBABILITY}"
+            f"Expected CAMPAIGN_START_PROBABILITY to be 0.90, "
+            f"got {CAMPAIGN_START_PROBABILITY}"
         )
 
     def test_campaign_probability_independent_of_traffic(self, marketing_simulator):
@@ -138,8 +139,9 @@ class TestMarketingBugFixes:
             # Reset the random seed for reproducibility
             marketing_simulator._rng = random.Random(123)
 
-            # The method should_start_campaign internally uses CAMPAIGN_START_PROBABILITY
-            # which should be 0.90 regardless of traffic_multiplier
+            # The method should_start_campaign internally uses
+            # CAMPAIGN_START_PROBABILITY which should be 0.90 regardless of
+            # traffic_multiplier
             result = marketing_simulator.should_start_campaign(
                 test_date, traffic_multiplier=traffic_mult
             )
@@ -404,7 +406,8 @@ class TestMarketingBugFixes:
         total_impressions = len(impressions)
 
         assert total_impressions >= DEFAULT_MIN_DAILY_IMPRESSIONS, (
-            f"Expected at least {DEFAULT_MIN_DAILY_IMPRESSIONS} impressions, got {total_impressions}"
+            f"Expected at least {DEFAULT_MIN_DAILY_IMPRESSIONS} impressions, "
+            f"got {total_impressions}"
         )
 
     def test_impressions_zero_when_store_closed(
@@ -475,7 +478,9 @@ class TestMarketingBugFixes:
             else:
                 # For other cases, should be at least expected_min
                 assert total_impressions >= expected_min_impressions, (
-                    f"With traffic={traffic_mult}, expected at least {expected_min_impressions} impressions, got {total_impressions}"
+                    f"With traffic={traffic_mult}, expected at least "
+                    f"{expected_min_impressions} impressions, "
+                    f"got {total_impressions}"
                 )
 
     def test_impressions_uses_config_minimum(self, marketing_simulator):
@@ -507,7 +512,8 @@ class TestMarketingBugFixes:
         total_impressions = len(impressions)
 
         assert total_impressions >= custom_min, (
-            f"Expected at least {custom_min} impressions with custom minimum, got {total_impressions}"
+            f"Expected at least {custom_min} impressions with custom minimum, "
+            f"got {total_impressions}"
         )
 
     # ========================================================================
@@ -577,7 +583,8 @@ class TestMarketingBugFixes:
                         )
                     elif traffic < 0.2:  # Very low traffic
                         assert len(impressions) >= DEFAULT_MIN_DAILY_IMPRESSIONS, (
-                            f"Low traffic should enforce minimum {DEFAULT_MIN_DAILY_IMPRESSIONS} impressions"
+                            f"Low traffic should enforce minimum "
+                            f"{DEFAULT_MIN_DAILY_IMPRESSIONS} impressions"
                         )
 
         # Verify campaign lifecycle (Bug #2)
@@ -614,17 +621,20 @@ class TestConstantsAndConfiguration:
             "DEFAULT_MIN_DAILY_IMPRESSIONS should be an integer"
         )
         assert DEFAULT_MIN_DAILY_IMPRESSIONS == 100, (
-            f"Expected DEFAULT_MIN_DAILY_IMPRESSIONS to be 100, got {DEFAULT_MIN_DAILY_IMPRESSIONS}"
+            f"Expected DEFAULT_MIN_DAILY_IMPRESSIONS to be 100, "
+            f"got {DEFAULT_MIN_DAILY_IMPRESSIONS}"
         )
 
     def test_campaign_start_probability_in_valid_range(self):
         """Verify CAMPAIGN_START_PROBABILITY is in valid probability range."""
         assert 0 <= CAMPAIGN_START_PROBABILITY <= 1.0, (
-            f"CAMPAIGN_START_PROBABILITY should be between 0 and 1, got {CAMPAIGN_START_PROBABILITY}"
+            f"CAMPAIGN_START_PROBABILITY should be between 0 and 1, "
+            f"got {CAMPAIGN_START_PROBABILITY}"
         )
 
     def test_default_min_impressions_is_positive(self):
         """Verify DEFAULT_MIN_DAILY_IMPRESSIONS is positive."""
         assert DEFAULT_MIN_DAILY_IMPRESSIONS > 0, (
-            f"DEFAULT_MIN_DAILY_IMPRESSIONS should be positive, got {DEFAULT_MIN_DAILY_IMPRESSIONS}"
+            f"DEFAULT_MIN_DAILY_IMPRESSIONS should be positive, "
+            f"got {DEFAULT_MIN_DAILY_IMPRESSIONS}"
         )

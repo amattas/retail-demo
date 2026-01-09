@@ -321,9 +321,11 @@ class TestMarketingGenerationIntegration:
             daily_campaign_impressions
         )
 
-        # Should be at least 70% of campaign-days (allowing for some low-traffic periods)
+        # Should be at least 70% of campaign-days (allowing for some
+        # low-traffic periods)
         assert high_impression_percentage >= 0.70, (
-            f"Expected >= 70% of days with 100+ impressions, got {high_impression_percentage:.1%}"
+            f"Expected >= 70% of days with 100+ impressions, "
+            f"got {high_impression_percentage:.1%}"
         )
 
         # Verify no campaigns have all zeros
@@ -538,16 +540,19 @@ class TestMarketingGenerationIntegration:
         # At least 70% of campaign-days should meet the threshold
         # (allowing for some low-traffic days due to temporal patterns)
         assert threshold_percentage >= 0.70, (
-            f"Only {threshold_percentage:.1%} of campaign-days meet 100 impression threshold"
+            f"Only {threshold_percentage:.1%} of campaign-days meet "
+            "100 impression threshold"
         )
 
         # Log statistics
         print(f"\nImpression threshold compliance: {threshold_percentage:.1%}")
         print(
-            f"Average impressions per campaign-day: {daily_impressions['impressions'].mean():.0f}"
+            f"Average impressions per campaign-day: "
+            f"{daily_impressions['impressions'].mean():.0f}"
         )
         print(
-            f"Minimum impressions per campaign-day: {daily_impressions['impressions'].min()}"
+            f"Minimum impressions per campaign-day: "
+            f"{daily_impressions['impressions'].min()}"
         )
 
 
@@ -590,8 +595,8 @@ class TestMarketingBugFixValidation:
         """
         Validate Bug #1 Fix: Campaign start probability increased to 90%.
 
-        With 90% probability, over 30 days we expect approximately 27 new campaign starts.
-        This should result in 80-95% day coverage.
+        With 90% probability, over 30 days we expect approximately 27 new
+        campaign starts. This should result in 80-95% day coverage.
         """
         config, output_dir = small_test_config
 
@@ -631,9 +636,10 @@ class TestMarketingBugFixValidation:
 
     def test_bug_2_campaigns_not_deleted_on_zero_impressions(self, small_test_config):
         """
-        Validate Bug #2 Fix: Campaigns only deleted after end_date, not on zero impressions.
+        Validate Bug #2 Fix: Campaigns only deleted after end_date.
 
-        Campaigns should persist through low-traffic days and only end when end_date is reached.
+        Campaigns should persist through low-traffic days and only end when
+        end_date is reached, not on zero impressions.
         """
         config, output_dir = small_test_config
 
@@ -685,7 +691,8 @@ class TestMarketingBugFixValidation:
             full_range = pd.date_range(span["min"], span["max"], freq="D").date
             actual_dates = set(campaign_data["Date"])
 
-            # It's OK to have gaps (zero-impression days) - campaign should NOT be deleted
+            # It's OK to have gaps (zero-impression days) - campaign should
+            # NOT be deleted
             # Just verify campaign didn't end prematurely
             if len(full_range) > 1:
                 # Multi-day campaign should have reasonable coverage
@@ -738,9 +745,11 @@ class TestMarketingBugFixValidation:
         meets_threshold = daily_impressions[daily_impressions["impressions"] >= 100]
         threshold_percentage = len(meets_threshold) / len(daily_impressions)
 
-        # Most campaign-days should meet the threshold (allowing for temporal variations)
+        # Most campaign-days should meet the threshold (allowing for
+        # temporal variations)
         assert threshold_percentage >= 0.65, (
-            f"Only {threshold_percentage:.1%} of campaign-days meet 100 impression threshold"
+            f"Only {threshold_percentage:.1%} of campaign-days meet "
+            "100 impression threshold"
         )
 
         # Verify average is well above threshold

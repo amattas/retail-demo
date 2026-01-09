@@ -273,7 +273,7 @@ class TestConversionExpiryCleanup:
     def test_cleanup_removes_from_both_data_structures(
         self, event_factory, test_timestamp
     ):
-        """Verify cleanup removes from both marketing_conversions and customer_to_campaign."""
+        """Verify cleanup removes from both conversion tracking data structures."""
         impression_id = "IMP_001"
         customer_id = 1
         old_time = test_timestamp - timedelta(hours=100)

@@ -156,7 +156,8 @@ class FactDataGenerator(
             self._duckdb_conn = get_duckdb_conn()
         except Exception as e:
             logger.warning(
-                f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}"
+                f"Failed to initialize DuckDB connection, "
+                f"falling back to in-memory mode: {e}"
             )
             self._use_duckdb = False
 
@@ -189,7 +190,8 @@ class FactDataGenerator(
         # Customer geography and store selector (initialized after loading master data)
         self.store_selector: StoreSelector | None = None
 
-        # Customer pools per store (for efficient selection during transaction generation)
+        # Customer pools per store
+        # (for efficient selection during transaction generation)
         # Maps store_id -> list of (customer, weight) tuples
         self._store_customer_pools: dict[int, list[tuple[Customer, float]]] = {}
 
@@ -225,7 +227,8 @@ class FactDataGenerator(
         # Fast CRM join map: AdId -> CustomerID (populated after master load)
         self._adid_to_customer_id: dict[str, int] = {}
 
-        # Generation end date for filtering future-dated shipments (set during generate_historical_data)
+        # Generation end date for filtering future-dated shipments
+        # (set during generate_historical_data)
         self._generation_end_date: datetime | None = None
 
         # Stockout tracking (StockoutsMixin)
@@ -353,9 +356,10 @@ class FactDataGenerator(
             "foot_traffic": total_days * len(self.stores) * 100,
             "ble_pings": total_days * len(self.stores) * 500,
             # Estimated: ~60% of BLE pings result in zone changes
+            # 60% of BLE pings (500 per store per day)
             "customer_zone_changes": total_days
             * len(self.stores)
-            * int(500 * 0.6),  # 60% of BLE pings (500 per store per day)
+            * int(500 * 0.6),
             "dc_inventory_txn": total_days * len(self.distribution_centers) * 50,
             "truck_moves": total_days * 10,
             "truck_inventory": total_days * 20,
@@ -394,7 +398,8 @@ class FactDataGenerator(
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext ON fact_receipts (receipt_id_ext)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_ext "
+                            "ON fact_receipts (receipt_id_ext)"
                         )
                     )
                     logger.info(
@@ -405,12 +410,14 @@ class FactDataGenerator(
                 if "receipt_type" not in cols:
                     await session.execute(
                         text(
-                            "ALTER TABLE fact_receipts ADD COLUMN receipt_type TEXT NOT NULL DEFAULT 'SALE'"
+                            "ALTER TABLE fact_receipts ADD COLUMN receipt_type "
+                            "TEXT NOT NULL DEFAULT 'SALE'"
                         )
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type ON fact_receipts (receipt_type)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_type "
+                            "ON fact_receipts (receipt_type)"
                         )
                     )
                     logger.info(
@@ -421,16 +428,19 @@ class FactDataGenerator(
                 if "return_for_receipt_id" not in cols:
                     await session.execute(
                         text(
-                            "ALTER TABLE fact_receipts ADD COLUMN return_for_receipt_id INTEGER"
+                            "ALTER TABLE fact_receipts "
+                            "ADD COLUMN return_for_receipt_id INTEGER"
                         )
                     )
                     await session.execute(
                         text(
-                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for ON fact_receipts (return_for_receipt_id)"
+                            "CREATE INDEX IF NOT EXISTS ix_fact_receipts_return_for "
+                            "ON fact_receipts (return_for_receipt_id)"
                         )
                     )
                     logger.info(
-                        "Migrated fact_receipts: added return_for_receipt_id column and index"
+                        "Migrated fact_receipts: "
+                        "added return_for_receipt_id column and index"
                     )
 
                 # Ensure online order lines table exists
@@ -450,12 +460,15 @@ class FactDataGenerator(
                 )
                 await session.execute(
                     text(
-                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order ON fact_online_order_lines (order_id)"
+                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order "
+                        "ON fact_online_order_lines (order_id)"
                     )
                 )
                 await session.execute(
                     text(
-                        "CREATE INDEX IF NOT EXISTS ix_online_order_lines_order_product ON fact_online_order_lines (order_id, product_id)"
+                        "CREATE INDEX IF NOT EXISTS "
+                        "ix_online_order_lines_order_product "
+                        "ON fact_online_order_lines (order_id, product_id)"
                     )
                 )
 
@@ -479,7 +492,8 @@ class FactDataGenerator(
             # Ensure schema is compatible (adds new columns/tables if missing)
             if not self._use_duckdb:
                 await _ensure_required_schema(self._session)
-            # Drop nonessential indexes for faster bulk loads (SQLite only; skipped in DuckDB)
+            # Drop nonessential indexes for faster bulk loads
+            # (SQLite only; skipped in DuckDB)
             dropped_indexes: list[tuple[str, str]] = []
             try:
                 if not self._use_duckdb:
@@ -507,7 +521,8 @@ class FactDataGenerator(
             while current_date <= end_date:
                 day_counter += 1
 
-                # Generate daily facts (progress updates now happen during actual generation)
+                # Generate daily facts
+                # (progress updates now happen during actual generation)
                 daily_facts = await self._generate_daily_facts(
                     current_date, active_tables, day_counter, total_days
                 )
@@ -568,7 +583,8 @@ class FactDataGenerator(
                     tables_completed=tables_completed,
                     tables_in_progress=tables_in_progress,
                     tables_remaining=tables_remaining,
-                    # For UI tiles prefer DB-written counts if available, otherwise generation counts
+                    # For UI tiles prefer DB-written counts if available,
+                    # otherwise generation counts
                     table_counts=(
                         self._table_insert_counts.copy()
                         if getattr(self, "_table_insert_counts", None)

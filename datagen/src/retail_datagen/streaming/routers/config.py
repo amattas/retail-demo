@@ -10,7 +10,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
-from ...api.models import ConnectionTestResponse, OperationResult, StreamingConfigUpdate
+from ...api.models import (
+    ConnectionTestResponse,
+    OperationResult,
+    StreamingConfigUpdate,
+)
 from ...config.models import RetailConfig
 from ...shared.credential_utils import (
     get_connection_string_metadata,
@@ -67,7 +71,10 @@ async def update_streaming_config(
         if task_status and task_status["status"] == "running":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot update configuration while streaming is active. Stop streaming first.",
+                detail=(
+                    "Cannot update configuration while streaming is active. "
+                    "Stop streaming first."
+                ),
             )
 
     try:
@@ -127,7 +134,10 @@ async def test_azure_connection(
     if not connection_string:
         return ConnectionTestResponse(
             success=False,
-            message="No connection string configured. Set AZURE_EVENTHUB_CONNECTION_STRING env var or update config.json",
+            message=(
+                "No connection string configured. "
+                "Set AZURE_EVENTHUB_CONNECTION_STRING env var or update config.json"
+            ),
             response_time_ms=0.0,
             details={},
         )
@@ -161,7 +171,10 @@ async def test_azure_connection(
         # Sanitize connection string for logging
         sanitized_conn = sanitize_connection_string(connection_string)
         logger.info(
-            f"Connection test {'succeeded' if success else 'failed'}: {message} (connection: {sanitized_conn})"
+            "Connection test %s: %s (connection: %s)",
+            "succeeded" if success else "failed",
+            message,
+            sanitized_conn,
         )
 
         return ConnectionTestResponse(
@@ -194,7 +207,9 @@ async def test_azure_connection(
 @router.post(
     "/stream/validate-connection",
     summary="Validate connection string format",
-    description="Validate Event Hub connection string format without testing connection",
+    description=(
+        "Validate Event Hub connection string format without testing connection"
+    ),
 )
 @rate_limit(max_requests=20, window_seconds=60)
 async def validate_connection(
@@ -202,7 +217,8 @@ async def validate_connection(
         ..., description="Event Hub connection string to validate"
     ),
     strict: bool = Body(
-        default=True, description="Enable strict validation (disable for testing)"
+        default=True,
+        description="Enable strict validation (disable for testing)",
     ),
 ):
     """Validate Event Hub connection string format."""
@@ -223,10 +239,14 @@ async def validate_connection(
 
     response = {
         "valid": is_valid and fabric_valid,
-        "error": error if not is_valid else (None if fabric_valid else fabric_message),
-        "message": "Connection string is valid"
-        if (is_valid and fabric_valid)
-        else "Invalid connection string",
+        "error": (
+            error if not is_valid else (None if fabric_valid else fabric_message)
+        ),
+        "message": (
+            "Connection string is valid"
+            if (is_valid and fabric_valid)
+            else "Invalid connection string"
+        ),
         "strict_mode": strict,
         "metadata": {
             "endpoint": metadata.get("endpoint"),
@@ -276,7 +296,8 @@ async def validate_streaming_config(
     # Validate connection string
     if not conn_str:
         errors.append(
-            "No connection string configured. Set AZURE_EVENTHUB_CONNECTION_STRING or update config.json"
+            "No connection string configured. "
+            "Set AZURE_EVENTHUB_CONNECTION_STRING or update config.json"
         )
     elif not conn_str.startswith(("mock://", "test://")):
         # Format validation
@@ -288,8 +309,8 @@ async def validate_streaming_config(
             metadata = get_connection_string_metadata(conn_str)
 
             # Fabric RTI specific validation
-            is_fabric_valid, fabric_msg, fabric_metadata = validate_fabric_rti_specific(
-                conn_str
+            is_fabric_valid, fabric_msg, fabric_metadata = (
+                validate_fabric_rti_specific(conn_str)
             )
             metadata.update(fabric_metadata)
 
@@ -299,14 +320,17 @@ async def validate_streaming_config(
             # Add recommendations based on metadata
             if metadata.get("is_fabric_rti"):
                 recommendations.append(
-                    "Detected Fabric RTI connection - ensure workspace has proper permissions"
+                    "Detected Fabric RTI connection - "
+                    "ensure workspace has proper permissions"
                 )
                 recommendations.append(
-                    "Fabric RTI automatically scales - monitor usage in Fabric portal"
+                    "Fabric RTI automatically scales - "
+                    "monitor usage in Fabric portal"
                 )
             else:
                 recommendations.append(
-                    "Standard Event Hub detected - monitor partition count and throughput"
+                    "Standard Event Hub detected - "
+                    "monitor partition count and throughput"
                 )
 
     # Validate configuration parameters
@@ -314,13 +338,16 @@ async def validate_streaming_config(
         # Check emit_interval
         if test_config_obj.realtime.emit_interval_ms < 100:
             warnings.append(
-                f"Very low emit_interval ({test_config_obj.realtime.emit_interval_ms}ms) may cause high CPU usage"
+                f"Very low emit_interval "
+                f"({test_config_obj.realtime.emit_interval_ms}ms) "
+                "may cause high CPU usage"
             )
 
         # Check burst size
         if test_config_obj.realtime.burst > 1000:
             warnings.append(
-                f"Large burst size ({test_config_obj.realtime.burst}) may exceed Event Hub limits"
+                f"Large burst size ({test_config_obj.realtime.burst}) "
+                "may exceed Event Hub limits"
             )
 
         # Check batch size

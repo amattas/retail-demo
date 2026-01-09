@@ -76,7 +76,8 @@ class ProgressReportingMixin:
         Matches the pattern used by MasterDataGenerator for consistency.
 
         Args:
-            callback: Progress callback function(day_num, message, **kwargs), or None to clear
+            callback: Progress callback function(day_num, message, **kwargs),
+                or None to clear
         """
         self._progress_callback = callback
 
@@ -145,7 +146,8 @@ class ProgressReportingMixin:
             time_since_last = current_time - self._last_progress_update_time
             if time_since_last < 0.05:
                 logger.debug(
-                    f"[{thread_name}] Throttling progress update (too soon: {time_since_last * 1000:.1f}ms < 50ms)"
+                    f"[{thread_name}] Throttling progress update "
+                    f"(too soon: {time_since_last * 1000:.1f}ms < 50ms)"
                 )
                 return
 
@@ -184,10 +186,12 @@ class ProgressReportingMixin:
                 "estimated_seconds_remaining": eta,
                 "progress_rate": progress_rate,
                 "table_counts": table_counts,
-                # NEW: Add hourly progress fields (note: current_day is passed as first positional arg, don't duplicate)
+                # NEW: Add hourly progress fields
+                # (current_day is passed as first positional arg, don't duplicate)
                 "current_hour": hourly_progress_data.get("current_hour"),
                 "hourly_progress": hourly_progress_data.get("per_table_progress"),
-                # Use the most advanced table's completed hours; all tables move together
+                # Use the most advanced table's completed hours;
+                # all tables move together
                 "total_hours_completed": (
                     max(hourly_progress_data.get("completed_hours", {}).values())
                     if hourly_progress_data.get("completed_hours")
@@ -201,7 +205,8 @@ class ProgressReportingMixin:
             try:
                 self._progress_callback(day_counter, message, **filtered_kwargs)
                 logger.debug(
-                    f"Progress update sent: {progress:.2%} (day {day_counter}/{total_days}) "
+                    f"Progress update sent: {progress:.2%} "
+                    f"(day {day_counter}/{total_days}) "
                     f"ETA: {eta:.0f}s, tables_in_progress: {tables_in_progress}"
                     if eta
                     else f"at {current_time:.3f}"
@@ -211,7 +216,8 @@ class ProgressReportingMixin:
                 try:
                     self._progress_callback(day_counter, message)
                     logger.debug(
-                        f"Progress update sent (legacy): {progress:.2%} at {current_time:.3f}"
+                        f"Progress update sent (legacy): {progress:.2%} "
+                        f"at {current_time:.3f}"
                     )
                 except TypeError:
                     logger.debug(
@@ -240,7 +246,8 @@ class ProgressReportingMixin:
         try:
             signature = inspect.signature(callback)
         except (TypeError, ValueError):
-            # If the signature can't be inspected, assume callback can handle everything we pass now
+            # If the signature can't be inspected, assume callback can handle
+            # everything we pass now
             return cleaned_kwargs
 
         if any(
@@ -257,7 +264,8 @@ class ProgressReportingMixin:
             ):
                 accepted_names.add(name)
 
-        # Remove the first positional parameters since we pass them positionally (day, message)
+        # Remove the first positional parameters since we pass them
+        # positionally (day, message)
         positional_count = 0
         for name, param in signature.parameters.items():
             if param.kind in (

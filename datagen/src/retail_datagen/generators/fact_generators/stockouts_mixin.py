@@ -54,7 +54,9 @@ class StockoutsMixin:
         # Only record new stockouts if enough time has passed (1 day min)
         if key in self._last_stockout_detection:
             last_detection = self._last_stockout_detection[key]
-            hours_since_last = (detection_time - last_detection).total_seconds() / 3600
+            hours_since_last = (
+                (detection_time - last_detection).total_seconds() / 3600
+            )
             # Require at least 24 hours between stockout detections for same product
             # This prevents recording multiple stockouts during the same depletion
             if hours_since_last < 24:
@@ -111,8 +113,9 @@ class StockoutsMixin:
                 event_ts = txn.get("EventTS")
                 qty_delta = txn.get("QtyDelta", 0)
 
-                # Last known quantity is the absolute value of the delta that brought us to zero
-                # (if delta is negative, it represents the sale/usage that depleted inventory)
+                # Last known quantity is the absolute value of the delta that
+                # brought us to zero (if delta is negative, it represents the
+                # sale/usage that depleted inventory)
                 last_known_qty = abs(qty_delta) if qty_delta < 0 else 0
 
                 stockout = self._detect_and_record_stockout(
@@ -154,7 +157,8 @@ class StockoutsMixin:
 
         if stockout_records:
             logger.info(
-                f"Generated {len(stockout_records)} stockout events from inventory transactions"
+                f"Generated {len(stockout_records)} stockout events "
+                "from inventory transactions"
             )
 
         return stockout_records

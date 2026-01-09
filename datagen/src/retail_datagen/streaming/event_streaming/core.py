@@ -83,7 +83,7 @@ class StreamingCore:
         self._allowed_event_types = allowed if allowed else None
 
     def compute_daily_targets(self, stores_count: int, dcs_count: int, config_volume):
-        """Compute rough daily targets for key event types based on config and master sizes."""
+        """Compute daily targets for key events based on config and master sizes."""
         cpd = getattr(config_volume, "customers_per_day", 20000) or 20000
         ood = getattr(config_volume, "online_orders_per_day", 2500) or 2500
         targets = {

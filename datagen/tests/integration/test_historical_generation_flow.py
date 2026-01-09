@@ -201,7 +201,10 @@ class TestHistoricalGenerationStateTransitions:
     """Test state transitions during historical generation."""
 
     def test_table_progress_tracker_state_lifecycle(self):
-        """Test TableProgressTracker state lifecycle: not_started -> in_progress -> completed."""
+        """Test TableProgressTracker state lifecycle.
+
+        Tests transitions: not_started -> in_progress -> completed.
+        """
         # Create tracker with fact tables
         tracker = TableProgressTracker(FACT_TABLES)
 
@@ -226,26 +229,32 @@ class TestHistoricalGenerationStateTransitions:
         # Mark first table as started
         tracker.mark_table_started(FACT_TABLES[0])
         assert (
-            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0])
+            == TableProgressTracker.STATE_IN_PROGRESS
         )
 
         # Update progress (should NOT change state)
         tracker.update_progress(FACT_TABLES[0], 0.5)
         assert (
-            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0])
+            == TableProgressTracker.STATE_IN_PROGRESS
         )
         assert tracker.get_progress(FACT_TABLES[0]) == 0.5
 
         # Even at 100% progress, state should remain in_progress
         tracker.update_progress(FACT_TABLES[0], 1.0)
         assert (
-            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0])
+            == TableProgressTracker.STATE_IN_PROGRESS
         )
         assert tracker.get_progress(FACT_TABLES[0]) == 1.0
 
         # Mark generation complete (transitions all in_progress -> completed)
         tracker.mark_generation_complete()
-        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_COMPLETED
+        assert (
+            tracker.get_state(FACT_TABLES[0])
+            == TableProgressTracker.STATE_COMPLETED
+        )
 
         # Check state lists after completion
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
@@ -285,14 +294,16 @@ class TestHistoricalGenerationStateTransitions:
             assert tracker.get_state(table) == TableProgressTracker.STATE_COMPLETED
 
     def test_state_lists_consistency(self):
-        """Test that state lists (completed, in_progress, remaining) are mutually exclusive."""
+        """Test that state lists (completed, in_progress, remaining) are exclusive."""
         tracker = TableProgressTracker(FACT_TABLES)
 
         # Start some tables
         tracker.mark_table_started(FACT_TABLES[0])
         tracker.mark_table_started(FACT_TABLES[1])
 
-        remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        remaining = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
         in_progress = tracker.get_tables_by_state(
             TableProgressTracker.STATE_IN_PROGRESS
         )
@@ -309,7 +320,9 @@ class TestHistoricalGenerationStateTransitions:
         # Mark generation complete
         tracker.mark_generation_complete()
 
-        remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        remaining = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
         in_progress = tracker.get_tables_by_state(
             TableProgressTracker.STATE_IN_PROGRESS
         )
@@ -351,7 +364,7 @@ class TestDependenciesIntegration:
     """Test dependencies.py integration with TableProgressTracker."""
 
     def test_update_task_progress_passes_through_state_lists(self):
-        """Test that update_task_progress passes through tracker state lists unmodified."""
+        """Test that update_task_progress passes through tracker state lists."""
         # Clear any existing task status
         _task_status.clear()
 
@@ -391,7 +404,7 @@ class TestDependenciesIntegration:
         assert status.tables_remaining == tables_remaining
 
     def test_state_lists_not_derived_from_progress(self):
-        """Test that state lists are not incorrectly derived from progress percentages."""
+        """Test that state lists are not derived from progress percentages."""
         _task_status.clear()
 
         task_id = "test_task_456"
@@ -435,7 +448,9 @@ class TestDependenciesIntegration:
 class TestEndToEndGenerationFlow:
     """Test complete end-to-end generation flows with real API requests."""
 
-    @pytest.mark.skip(reason="Requires full application setup with FastAPI TestClient")
+    @pytest.mark.skip(
+        reason="Requires full application setup with FastAPI TestClient"
+    )
     async def test_full_generation_with_state_polling(
         self, small_test_config, temp_master_data
     ):
@@ -493,7 +508,9 @@ class TestEndToEndGenerationFlow:
                 # Check if complete
                 if status_data["status"] == "completed":
                     # Verify all tables are completed
-                    assert len(status_data["tables_completed"]) == len(FACT_TABLES)
+                    assert (
+                        len(status_data["tables_completed"]) == len(FACT_TABLES)
+                    )
                     assert len(status_data["tables_in_progress"]) == 0
                     break
 
@@ -553,7 +570,7 @@ class TestMultipleGenerationRuns:
         assert len(completed) == 3
 
     def test_incremental_generation_extends_existing_data(self):
-        """Test that incremental generation (extending date range) maintains state consistency."""
+        """Test incremental generation (extending date range) maintains state."""
         tracker = TableProgressTracker(FACT_TABLES[:2])
 
         # Initial run: partial completion
@@ -562,9 +579,13 @@ class TestMultipleGenerationRuns:
         tracker.mark_generation_complete()
 
         # Verify first table completed
-        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_COMPLETED
         assert (
-            tracker.get_state(FACT_TABLES[1]) == TableProgressTracker.STATE_NOT_STARTED
+            tracker.get_state(FACT_TABLES[0])
+            == TableProgressTracker.STATE_COMPLETED
+        )
+        assert (
+            tracker.get_state(FACT_TABLES[1])
+            == TableProgressTracker.STATE_NOT_STARTED
         )
 
         # Incremental run: reset and continue
@@ -618,7 +639,7 @@ class TestStateTransitionEdgeCases:
         tracker.mark_generation_complete()  # Should not error
 
     def test_concurrent_state_updates(self):
-        """Test thread-safe state updates (simulating concurrent progress callbacks)."""
+        """Test thread-safe state updates (simulating concurrent progress)."""
         import threading
 
         tracker = TableProgressTracker(FACT_TABLES[:5])
@@ -635,7 +656,10 @@ class TestStateTransitionEdgeCases:
 
         threads = []
         for i, table in enumerate(FACT_TABLES[:5]):
-            t = threading.Thread(target=update_table_progress, args=(table, i * 0.1))
+            t = threading.Thread(
+                target=update_table_progress,
+                args=(table, i * 0.1),
+            )
             threads.append(t)
             t.start()
 
@@ -698,7 +722,7 @@ class TestUIStateRendering:
         assert len(completed) == 3
 
     def test_ui_state_lists_remain_consistent_during_polling(self):
-        """Test that state lists don't flicker or change inconsistently during generation."""
+        """Test state lists don't flicker or change inconsistently during gen."""
         tracker = TableProgressTracker(FACT_TABLES[:5])
 
         # Simulate UI polling during generation
@@ -751,30 +775,30 @@ Test Coverage Summary:
 ======================
 
 1. TableProgressTracker Lifecycle:
-   ✓ State transitions (not_started -> in_progress -> completed)
-   ✓ Progress vs state separation
-   ✓ State list consistency (mutually exclusive)
-   ✓ Reset functionality
+   - State transitions (not_started -> in_progress -> completed)
+   - Progress vs state separation
+   - State list consistency (mutually exclusive)
+   - Reset functionality
 
 2. Dependencies Integration:
-   ✓ update_task_progress passes through state lists unmodified
-   ✓ State lists not derived from progress percentages
+   - update_task_progress passes through state lists unmodified
+   - State lists not derived from progress percentages
 
 3. End-to-End Flows:
-   ✓ Full generation with status polling (skipped - requires full app setup)
+   - Full generation with status polling (skipped - requires full app setup)
 
 4. Multiple Generation Runs:
-   ✓ Sequential runs reset state correctly
-   ✓ Incremental generation maintains consistency
+   - Sequential runs reset state correctly
+   - Incremental generation maintains consistency
 
 5. Edge Cases:
-   ✓ Partial table completion
-   ✓ Empty table list
-   ✓ Concurrent state updates (thread-safety)
+   - Partial table completion
+   - Empty table list
+   - Concurrent state updates (thread-safety)
 
 6. UI State Rendering:
-   ✓ Tiles don't turn green until generation complete
-   ✓ State lists remain consistent during polling
+   - Tiles don't turn green until generation complete
+   - State lists remain consistent during polling
 
 Total Test Scenarios: 18
 Focus: State transition correctness and UI consistency

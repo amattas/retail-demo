@@ -153,14 +153,17 @@ class AzureEventHubClient:
 
         Args:
             connection_string: Azure Event Hub connection string
-            hub_name: Name of the Event Hub (can be empty if EntityPath is in connection string)
+            hub_name: Name of the Event Hub (can be empty if EntityPath is
+                in connection string)
             max_batch_size: Maximum events per batch
             batch_timeout_ms: Maximum time to wait for batch completion
             retry_attempts: Number of retry attempts on failures
             backoff_multiplier: Multiplier for exponential backoff
             circuit_breaker_enabled: Whether to use circuit breaker pattern
-            circuit_breaker_failure_threshold: Number of failures before circuit breaker opens
-            circuit_breaker_recovery_timeout: Seconds to wait before attempting to close circuit breaker
+            circuit_breaker_failure_threshold: Number of failures before circuit
+                breaker opens
+            circuit_breaker_recovery_timeout: Seconds to wait before attempting
+                to close circuit breaker
         """
         if not AZURE_AVAILABLE:
             logger.warning("Azure Event Hub SDK not available - using mock client")
@@ -566,8 +569,9 @@ class AzureEventHubClient:
                 # Create task directly - we're already in an async context
                 asyncio.create_task(self._flush_and_reset())
             except Exception as e:
-                # If task creation fails, reset the flushing flag to avoid deadlock
-                # where _is_flushing stays True forever, blocking all future auto-flushes
+                # If task creation fails, reset the flushing flag to avoid
+                # deadlock where _is_flushing stays True forever, blocking
+                # all future auto-flushes
                 logger.error(f"Failed to schedule auto-flush task: {e}")
                 async with self._get_buffer_lock():
                     self._is_flushing = False
@@ -755,7 +759,8 @@ class AzureEventHubClient:
             tuple: (success, message, metadata)
                 - success: True if connection test passed
                 - message: Descriptive message about the test result
-                - metadata: Dictionary with connection details (endpoint, partition info, etc.)
+                - metadata: Dictionary with connection details
+                    (endpoint, partition info, etc.)
 
         Example:
             success, msg, metadata = await client.test_connection()
@@ -775,7 +780,10 @@ class AzureEventHubClient:
             if not hub_name:
                 return (
                     False,
-                    "Hub name not specified and EntityPath not found in connection string",
+                    (
+                        "Hub name not specified and EntityPath not found "
+                        "in connection string"
+                    ),
                     {},
                 )
 
@@ -805,7 +813,8 @@ class AzureEventHubClient:
                 )
 
                 logger.info(
-                    f"Successfully connected to Event Hub '{hub_name}' with {len(properties.partition_ids)} partitions"
+                    f"Successfully connected to Event Hub '{hub_name}' "
+                    f"with {len(properties.partition_ids)} partitions"
                 )
 
                 return True, "Connection successful", metadata

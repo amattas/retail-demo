@@ -46,7 +46,8 @@ class GeographyGeneratorMixin:
         available_count = len(geography_data)
         if geography_count > available_count:
             print(
-                f"Warning: Requested {geography_count} geographies but only {available_count} available. Using all."
+                f"Warning: Requested {geography_count} geographies but only "
+                f"{available_count} available. Using all."
             )
             geography_count = available_count
 

@@ -342,7 +342,8 @@ class TestDimensionModels:
             "SalePrice": Decimal("16.99"),
             "RequiresRefrigeration": False,
             "LaunchDate": datetime.now(),
-            "taxability": "REDUCED_RATE",  # Some states have reduced rates for health items
+            # Some states have reduced rates for health items
+            "taxability": "REDUCED_RATE",
         }
         ProductMaster(**valid_product)  # Should not raise
 
@@ -886,7 +887,10 @@ class TestFactModels:
 
     @given(
         qty=st.integers(min_value=1, max_value=100),
-        unit_price=st.decimals(min_value=Decimal("0.01"), max_value=Decimal("1000.00")),
+        unit_price=st.decimals(
+            min_value=Decimal("0.01"),
+            max_value=Decimal("1000.00"),
+        ),
     )
     def test_receipt_line_ext_price_calculation_property_based(
         self, qty: int, unit_price: Decimal

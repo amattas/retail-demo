@@ -324,14 +324,16 @@ def insert_dataframe(
             # Create with explicit column list to ensure validation is applied
             # (SELECT * would bypass column name validation)
             conn.execute(
-                f"CREATE TABLE {validated_table} AS SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
+                f"CREATE TABLE {validated_table} AS "
+                f"SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
             )
         else:
             # Align columns by name to avoid positional mismatches
             # Ensure any new columns are added before INSERT
             _ensure_columns(conn, validated_table, df)
             conn.execute(
-                f"INSERT INTO {validated_table} ({col_list}) SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
+                f"INSERT INTO {validated_table} ({col_list}) "
+                f"SELECT {col_list} FROM {_INTERNAL_TMP_TABLE}"
             )
     finally:
         conn.unregister(_INTERNAL_TMP_TABLE)
@@ -440,7 +442,8 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
                 try:
                     if default_sql is not None:
                         conn.execute(
-                            f"ALTER TABLE streaming_outbox ADD COLUMN {col} {type_sql} DEFAULT {default_sql}"
+                            f"ALTER TABLE streaming_outbox ADD COLUMN {col} "
+                            f"{type_sql} DEFAULT {default_sql}"
                         )
                     else:
                         conn.execute(
@@ -470,7 +473,8 @@ def _ensure_outbox_table(conn: duckdb.DuckDBPyConnection) -> None:
     # Lightweight indexes for draining
     try:
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_outbox_status_ts ON streaming_outbox(status, event_ts)"
+            "CREATE INDEX IF NOT EXISTS idx_outbox_status_ts "
+            "ON streaming_outbox(status, event_ts)"
         )
     except Exception as e:
         logger.debug(f"Failed to create index on streaming_outbox: {e}")
@@ -509,26 +513,31 @@ def outbox_has_pending(conn: duckdb.DuckDBPyConnection) -> bool:
 def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
     """Lease the next pending outbox row (oldest-first).
 
-    Returns the row as a dict with keys: outbox_id, event_ts, message_type, payload, partition_key, trace_id.
+    Returns the row as a dict with keys: outbox_id, event_ts, message_type,
+    payload, partition_key, trace_id.
     """
     _ensure_outbox_table(conn)
     # Select candidate id
     row = conn.execute(
-        "SELECT outbox_id FROM streaming_outbox WHERE status='pending' ORDER BY event_ts, outbox_id LIMIT 1"
+        "SELECT outbox_id FROM streaming_outbox "
+        "WHERE status='pending' ORDER BY event_ts, outbox_id LIMIT 1"
     ).fetchone()
     if not row:
         return None
     oid = int(row[0])
     # Try to mark as processing with guard
     updated = conn.execute(
-        "UPDATE streaming_outbox SET status='processing', last_attempt_ts=now(), attempts=attempts+1 WHERE outbox_id=? AND status='pending'",
+        "UPDATE streaming_outbox SET status='processing', "
+        "last_attempt_ts=now(), attempts=attempts+1 "
+        "WHERE outbox_id=? AND status='pending'",
         [oid],
     ).rowcount
     if updated != 1:
         return None
     # Fetch full row
     cur = conn.execute(
-        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id FROM streaming_outbox WHERE outbox_id=?",
+        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id "
+        "FROM streaming_outbox WHERE outbox_id=?",
         [oid],
     )
     r = cur.fetchone()
@@ -548,7 +557,8 @@ def outbox_ack_sent(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
 def outbox_nack_retry(conn: duckdb.DuckDBPyConnection, outbox_id: int) -> None:
     """Return a processing row to pending for retry."""
     conn.execute(
-        "UPDATE streaming_outbox SET status='pending' WHERE outbox_id=? AND status='processing'",
+        "UPDATE streaming_outbox SET status='pending' "
+        "WHERE outbox_id=? AND status='processing'",
         [outbox_id],
     )
 
@@ -735,7 +745,9 @@ def pending_shipments_get_ready(
     conn: duckdb.DuckDBPyConnection,
     up_to_time: datetime,
 ) -> list[dict]:
-    """Get pending shipments that are ready to be processed (departure_time <= up_to_time).
+    """Get pending shipments ready to be processed.
+
+    Retrieves shipments where departure_time <= up_to_time.
 
     Args:
         conn: DuckDB connection
@@ -795,7 +807,8 @@ def pending_shipments_delete(
         # DuckDB supports IN with list
         placeholders = ", ".join(["?" for _ in staging_ids])
         result = conn.execute(
-            f"DELETE FROM {_STAGING_PENDING_SHIPMENTS} WHERE staging_id IN ({placeholders})",
+            f"DELETE FROM {_STAGING_PENDING_SHIPMENTS} "
+            f"WHERE staging_id IN ({placeholders})",
             staging_ids,
         )
         deleted = result.rowcount
@@ -842,7 +855,8 @@ def pending_shipments_get_date_range(
 
     try:
         row = conn.execute(
-            f"SELECT MIN(departure_time), MAX(departure_time) FROM {_STAGING_PENDING_SHIPMENTS}"
+            f"SELECT MIN(departure_time), MAX(departure_time) "
+            f"FROM {_STAGING_PENDING_SHIPMENTS}"
         ).fetchone()
         if row and row[0] is not None:
             return row[0], row[1]

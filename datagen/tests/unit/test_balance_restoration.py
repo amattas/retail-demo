@@ -123,11 +123,13 @@ class TestInventoryFlowSimulatorBalanceGetters:
 
         # Should have initial inventory (100-1000 range from _initialize_inventory)
         assert balance >= 100, "DC should have initial inventory"
-        assert balance <= 1000, "DC initial inventory should be within expected range"
+        assert balance <= 1000, "DC initial inventory should be within range"
         assert isinstance(balance, int), "Balance should be an integer"
 
-    def test_get_dc_balance_returns_zero_for_nonexistent_key(self, inventory_simulator):
-        """Test get_dc_balance returns 0 for non-existent DC/product combinations."""
+    def test_get_dc_balance_returns_zero_for_nonexistent_key(
+        self, inventory_simulator
+    ):
+        """Test get_dc_balance returns 0 for non-existent DC/product combos."""
         # Test with non-existent IDs
         nonexistent_dc_id = 9999
         nonexistent_product_id = 9999
@@ -150,13 +152,13 @@ class TestInventoryFlowSimulatorBalanceGetters:
 
         # Should have initial inventory (10-100 range from _initialize_inventory)
         assert balance >= 10, "Store should have initial inventory"
-        assert balance <= 100, "Store initial inventory should be within expected range"
+        assert balance <= 100, "Store initial inventory should be within range"
         assert isinstance(balance, int), "Balance should be an integer"
 
     def test_get_store_balance_returns_zero_for_nonexistent_key(
         self, inventory_simulator
     ):
-        """Test get_store_balance returns 0 for non-existent store/product combinations."""
+        """Test get_store_balance returns 0 for non-existent store/product."""
         # Test with non-existent IDs
         nonexistent_store_id = 9999
         nonexistent_product_id = 9999
@@ -287,7 +289,8 @@ class TestInventoryFlowSimulatorBalanceGetters:
         # Check all store inventory balances are non-negative
         for (sid, pid), qty in inventory_simulator._store_inventory.items():
             assert qty >= 0, (
-                f"Balance should never be negative (Store {sid}, Product {pid}: {qty})"
+                f"Balance should never be negative "
+                f"(Store {sid}, Product {pid}: {qty})"
             )
 
 
@@ -474,7 +477,7 @@ class TestStoreInventoryTransactionBalanceField:
             assert "Reason" in txn, "Transaction should have Reason"
 
             # This will FAIL until Balance is implemented
-            # assert "Balance" in txn, "Sale transaction should have Balance field"
+            # assert "Balance" in txn, "Sale transaction should have Balance"
 
     def test_store_delivery_transaction_includes_balance_field(
         self, inventory_simulator, sample_stores, sample_products
@@ -505,7 +508,7 @@ class TestStoreInventoryTransactionBalanceField:
             assert txn["QtyDelta"] > 0, "Delivery should have positive QtyDelta"
 
             # This will FAIL until Balance is implemented
-            # assert "Balance" in txn, "Delivery transaction should have Balance field"
+            # assert "Balance" in txn, "Delivery transaction should have Balance"
 
 
 class TestBalanceFieldMapping:
@@ -544,7 +547,7 @@ class TestBalanceFieldMapping:
         # Database column mapping tested in integration tests
 
     def test_store_inventory_balance_field_mapping(self):
-        """Test that 'Balance' maps to 'balance' in store_inventory_txn table."""
+        """Test that 'Balance' maps to 'balance' in store_inventory_txn."""
         # Test data with Balance field
         sample_transaction = {
             "StoreID": 1,
@@ -690,4 +693,4 @@ class TestBalanceEdgeCases:
         balance = inventory_simulator._dc_inventory.get(key, 0)
 
         assert balance == large_qty, "Balance should handle large quantities"
-        assert isinstance(balance, int), "Large balance should still be integer type"
+        assert isinstance(balance, int), "Large balance should still be integer"

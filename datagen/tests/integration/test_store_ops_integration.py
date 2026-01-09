@@ -82,7 +82,8 @@ async def test_store_ops_generation_integration(test_config):
 
     # Verify data structure
     result = conn.execute(
-        "SELECT store_id, operation_type, event_ts FROM fact_store_ops ORDER BY store_id, event_ts LIMIT 10"
+        "SELECT store_id, operation_type, event_ts FROM fact_store_ops "
+        "ORDER BY store_id, event_ts LIMIT 10"
     ).fetchall()
     assert len(result) > 0
 

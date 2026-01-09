@@ -87,7 +87,8 @@ class BaseGenerator:
             self._duckdb_conn = get_duckdb_conn()
         except Exception as e:
             logger.warning(
-                f"Failed to initialize DuckDB connection, falling back to in-memory mode: {e}"
+                "Failed to initialize DuckDB connection, "
+                f"falling back to in-memory mode: {e}"
             )
             self._use_duckdb = False
 
@@ -177,14 +178,17 @@ class BaseGenerator:
 
                 # Emit final progress as completed
                 if ui_table_name:
+                    table_display = ui_table_name.replace('_', ' ')
+                    msg = f"Writing {table_display} ({inserted:,}/{total_records:,})"
                     self._emit_progress(
                         ui_table_name,
                         1.0,
-                        f"Writing {ui_table_name.replace('_', ' ')} ({inserted:,}/{total_records:,})",
+                        msg,
                         {ui_table_name: int(inserted)},
                     )
                 logger.info(
-                    f"Inserted {inserted:,} / {total_records:,} rows into {table_name} (DuckDB)"
+                    f"Inserted {inserted:,} / {total_records:,} rows "
+                    f"into {table_name} (DuckDB)"
                 )
                 return
 
@@ -199,7 +203,8 @@ class BaseGenerator:
 
                 records_inserted = min(i + batch_size, total_records)
                 logger.info(
-                    f"Inserted {records_inserted:,} / {total_records:,} rows into {table_name}"
+                    f"Inserted {records_inserted:,} / {total_records:,} rows "
+                    f"into {table_name}"
                 )
 
                 # Emit incremental progress every batch
@@ -207,10 +212,15 @@ class BaseGenerator:
                     fraction = (
                         records_inserted / total_records if total_records else 1.0
                     )
+                    table_display = ui_table_name.replace('_', ' ')
+                    msg = (
+                        f"Writing {table_display} "
+                        f"({records_inserted:,}/{total_records:,})"
+                    )
                     self._emit_progress(
                         ui_table_name,
                         fraction,
-                        f"Writing {ui_table_name.replace('_', ' ')} ({records_inserted:,}/{total_records:,})",
+                        msg,
                         {ui_table_name: records_inserted},
                     )
 
@@ -225,7 +235,8 @@ class BaseGenerator:
                         )
                     except Exception as e:
                         logger.warning(
-                            f"Commit failed after batch {batch_index} for {table_name}: {e}"
+                            f"Commit failed after batch {batch_index} "
+                            f"for {table_name}: {e}"
                         )
 
             logger.info(
@@ -233,7 +244,10 @@ class BaseGenerator:
             )
 
         except Exception as e:
-            logger.error(f"Failed to insert data into {table_name}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to insert data into {table_name}: {e}",
+                exc_info=True,
+            )
             raise
 
     def _map_pydantic_to_db_columns(

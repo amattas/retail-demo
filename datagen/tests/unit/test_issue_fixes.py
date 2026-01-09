@@ -72,7 +72,8 @@ NY,New York,New York,0.0880
         calc = TaxCalculator(temp_tax_csv)
         # Unknown county in known state should fall back to state average
         rate = calc.get_tax_rate("CA", county="Unknown County")
-        # CA has 5 cities with rates: (0.0950 + 0.0925 + 0.0900 + 0.0775 + 0.0800) / 5 = 0.087
+        # CA has 5 cities with rates:
+        # (0.0950 + 0.0925 + 0.0900 + 0.0775 + 0.0800) / 5 = 0.087
         assert rate == Decimal("0.087")
 
     def test_default_fallback(self, temp_tax_csv):
@@ -516,7 +517,7 @@ class TestEdgeCases:
     def test_state_machine_recovery_steps_through_multiple_states(
         self, mock_inventory_simulator
     ):
-        """Test that state machine recovery steps through multiple intermediate states."""
+        """Test state machine recovery steps through multiple intermediate states."""
         sim = mock_inventory_simulator
 
         # Create a shipment in SCHEDULED state
@@ -603,7 +604,8 @@ class TestEdgeCases:
 
         # BRAND_LOYAL should use top 50% (prices >= $30)
         # With 10 products per category, threshold_idx = int(10 * (1.0 - 0.5)) = 5
-        # So prices >= sorted_prices[5] = $30 (sorted: $5,$10,$15,$20,$25,$30,$35,$40,$45,$50)
+        # So prices >= sorted_prices[5] = $30
+        # (sorted: $5,$10,$15,$20,$25,$30,$35,$40,$45,$50)
         prices = [item[0].SalePrice for item in basket]
         # All selected items should be >= $30 (top 50% of price range)
         assert all(p >= Decimal("30.00") for p in prices), f"Got prices: {prices}"
@@ -673,7 +675,7 @@ class TestEdgeCases:
     def test_negative_quantity_in_generate_truck_shipments(
         self, mock_inventory_simulator
     ):
-        """Test that negative quantities raise ValueError in generate_truck_shipments()."""
+        """Test negative quantities raise ValueError in generate_truck_shipments()."""
         sim = mock_inventory_simulator
         departure_time = datetime(2024, 1, 15, 8, 0)
 
@@ -686,7 +688,7 @@ class TestEdgeCases:
     def test_timeout_recovery_via_update_shipment_status(
         self, mock_inventory_simulator
     ):
-        """Test that stuck shipments are recovered via timeout in update_shipment_status()."""
+        """Test stuck shipments recovered via timeout in update_shipment_status()."""
         sim = mock_inventory_simulator
 
         # Create a shipment stuck in LOADING state for > 8 hours

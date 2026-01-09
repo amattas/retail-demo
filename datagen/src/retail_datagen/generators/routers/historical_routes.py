@@ -149,12 +149,14 @@ async def generate_historical_data(
                 update_task_progress(
                     task_id,
                     0.01,
-                    f"Dimensions ready: {geo_cnt} geos, {store_cnt} stores, {dc_cnt} DCs, {cust_cnt} customers, {prod_cnt} products",
+                    f"Dimensions ready: {geo_cnt} geos, {store_cnt} stores, "
+                    f"{dc_cnt} DCs, {cust_cnt} customers, {prod_cnt} products",
                 )
 
                 if store_cnt == 0 or cust_cnt == 0 or prod_cnt == 0:
                     raise RuntimeError(
-                        "DuckDB missing required data. Ensure master generation completed successfully."
+                        "DuckDB missing required data. "
+                        "Ensure master generation completed successfully."
                     )
             except Exception as pre_exc:
                 update_task_progress(
@@ -233,7 +235,8 @@ async def generate_historical_data(
                     total_hours_completed=total_hours_completed,
                 )
 
-            # Also wire a master-style per-table progress callback for consistent UI updates
+            # Also wire a master-style per-table progress callback for
+            # consistent UI updates
             per_table_progress: dict[str, float] = {
                 table: 0.0 for table in tables_to_generate
             }
@@ -320,7 +323,8 @@ async def generate_historical_data(
                 pass
 
             logger.info(
-                f"Starting historical generation from {start_date.date()} to {end_date.date()}"
+                f"Starting historical generation from {start_date.date()} "
+                f"to {end_date.date()}"
             )
 
             # Generate historical data using the fact generator

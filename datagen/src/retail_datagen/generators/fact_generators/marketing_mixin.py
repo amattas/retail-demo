@@ -33,7 +33,8 @@ class MarketingMixin:
 
         # Lightweight trace (DEBUG to avoid perf impact)
         logger.debug(
-            f"_generate_marketing_activity: date={date}, mult={multiplier}, active={len(self._active_campaigns)}"
+            f"_generate_marketing_activity: date={date}, mult={multiplier}, "
+            f"active={len(self._active_campaigns)}"
         )
 
         marketing_records = []
@@ -61,18 +62,23 @@ class MarketingMixin:
                     f"(end_date: {campaign_info['end_date']})"
                 )
                 logger.debug(
-                    f"Campaign {campaign_id} added (total: {len(self._active_campaigns)})"
+                    f"Campaign {campaign_id} added "
+                    f"(total: {len(self._active_campaigns)})"
                 )
             else:
-                logger.error(f"Campaign {campaign_id} failed to create in simulator")
+                logger.error(
+                    f"Campaign {campaign_id} failed to create in simulator"
+                )
                 logger.debug(
-                    f"Simulator active campaigns: {list(self.marketing_campaign_sim._active_campaigns.keys())}"
+                    f"Simulator active campaigns: "
+                    f"{list(self.marketing_campaign_sim._active_campaigns.keys())}"
                 )
                 # Critical failure - don't continue processing this day
 
         # Debug: Log state before sync
         logger.debug(
-            f"Campaigns: fact_gen={len(self._active_campaigns)} sim={len(self.marketing_campaign_sim._active_campaigns)}"
+            f"Campaigns: fact_gen={len(self._active_campaigns)} "
+            f"sim={len(self.marketing_campaign_sim._active_campaigns)}"
         )
 
         # Sync: Remove orphaned campaigns that exist in tracking but not in simulator
@@ -80,17 +86,22 @@ class MarketingMixin:
             self.marketing_campaign_sim._active_campaigns.keys()
         )
         if orphaned:
-            logger.warning(f"Found {len(orphaned)} orphaned campaigns: {orphaned}")
+            logger.warning(
+                f"Found {len(orphaned)} orphaned campaigns: {orphaned}"
+            )
 
         for campaign_id in orphaned:
             logger.debug(f"Removing orphaned campaign {campaign_id}")
             del self._active_campaigns[campaign_id]
 
-        logger.debug(f"After sync: fact_gen campaigns={len(self._active_campaigns)}")
+        logger.debug(
+            f"After sync: fact_gen campaigns={len(self._active_campaigns)}"
+        )
 
         # Performance guard: cap total impressions/day (scaled by multiplier)
         base_cap = (
-            getattr(self.config.volume, "marketing_impressions_per_day", 10000) or 10000
+            getattr(self.config.volume, "marketing_impressions_per_day", 10000)
+            or 10000
         )
         daily_cap = max(1000, int(base_cap * max(0.5, min(multiplier, 2.0))))
         emitted = 0
@@ -100,19 +111,23 @@ class MarketingMixin:
             logger.debug(f"Processing campaign {campaign_id}")
 
             # Check if campaign has reached its end date
-            campaign = self.marketing_campaign_sim._active_campaigns.get(campaign_id)
+            campaign = self.marketing_campaign_sim._active_campaigns.get(
+                campaign_id
+            )
 
             # CRITICAL: Detect state corruption
             if campaign is None:
                 logger.error(
-                    f"STATE CORRUPTION: Campaign {campaign_id} tracked in fact_gen "
-                    f"but missing from simulator. Removing from fact_gen."
+                    f"STATE CORRUPTION: Campaign {campaign_id} tracked in "
+                    f"fact_gen but missing from simulator. "
+                    f"Removing from fact_gen."
                 )
                 del self._active_campaigns[campaign_id]
                 continue  # Skip this campaign entirely
 
             logger.debug(
-                f"Campaign: {campaign.get('type', 'unknown')} end={campaign.get('end_date', 'unknown')}"
+                f"Campaign: {campaign.get('type', 'unknown')} "
+                f"end={campaign.get('end_date', 'unknown')}"
             )
 
             if date > campaign["end_date"]:
@@ -122,15 +137,20 @@ class MarketingMixin:
                 logger.info(f"    Campaign {campaign_id} DELETED (expired)")
                 continue
 
-            logger.debug(f"Campaign {campaign_id} active, generating impressions...")
+            logger.debug(
+                f"Campaign {campaign_id} active, generating impressions..."
+            )
 
             try:
-                impressions = self.marketing_campaign_sim.generate_campaign_impressions(
-                    campaign_id, date, multiplier
+                impressions = (
+                    self.marketing_campaign_sim.generate_campaign_impressions(
+                        campaign_id, date, multiplier
+                    )
                 )
             except Exception as e:
                 logger.error(
-                    f"generate_campaign_impressions failed for {campaign_id}: {e}"
+                    f"generate_campaign_impressions failed for {campaign_id}: "
+                    f"{e}"
                 )
                 impressions = []
 
@@ -154,22 +174,32 @@ class MarketingMixin:
                         # Map AdId -> CustomerID for known subset
                         adids = df.get("CustomerAdId")
                         cust_ids = [None] * n
-                        if adids is not None and len(self._adid_to_customer_id) > 0:
-                            mapped = [self._adid_to_customer_id.get(a) for a in adids]
+                        if (
+                            adids is not None
+                            and len(self._adid_to_customer_id) > 0
+                        ):
+                            mapped = [
+                                self._adid_to_customer_id.get(a) for a in adids
+                            ]
                             for i in range(n):
                                 if crm_mask[i]:
                                     cust_ids[i] = mapped[i]
                         # Event timestamps and trace ids
                         event_ts = [
-                            self._randomize_time_within_day(date) for _ in range(n)
+                            self._randomize_time_within_day(date)
+                            for _ in range(n)
                         ]
-                        trace_ids = [self._generate_trace_id() for _ in range(n)]
+                        trace_ids = [
+                            self._generate_trace_id() for _ in range(n)
+                        ]
                         # Build output records
                         out = _pd.DataFrame(
                             {
                                 "TraceId": trace_ids,
                                 "EventTS": event_ts,
-                                "Channel": df["Channel"].apply(lambda c: c.value),
+                                "Channel": df["Channel"].apply(
+                                    lambda c: c.value
+                                ),
                                 "CampaignId": df["CampaignId"],
                                 "CreativeId": df["CreativeId"],
                                 "CustomerAdId": df["CustomerAdId"],
@@ -177,9 +207,13 @@ class MarketingMixin:
                                 "ImpressionId": df["ImpressionId"],
                                 "Cost": df["Cost"].apply(lambda d: str(d)),
                                 "CostCents": df["Cost"].apply(
-                                    lambda d: int((d * 100).quantize(Decimal("1")))
+                                    lambda d: int(
+                                        (d * 100).quantize(Decimal("1"))
+                                    )
                                 ),
-                                "Device": df["Device"].apply(lambda d: d.value),
+                                "Device": df["Device"].apply(
+                                    lambda d: d.value
+                                ),
                             }
                         )
                         recs = out.to_dict("records")
@@ -190,21 +224,25 @@ class MarketingMixin:
                             emitted += take
                         if emitted >= daily_cap:
                             logger.warning(
-                                f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                                f"Marketing daily cap reached ({daily_cap}) "
+                                f"on {date}. Truncating impressions."
                             )
                             break
                 else:
                     logger.warning(
-                        f"    No impressions generated for campaign {campaign_id}"
+                        f"    No impressions generated for campaign "
+                        f"{campaign_id}"
                     )
             except Exception as e:
                 # Fallback to original loop
                 logger.warning(
-                    f"Failed to process impressions via optimized path, using fallback: {e}"
+                    f"Failed to process impressions via optimized path, "
+                    f"using fallback: {e}"
                 )
                 for impression in impressions:
                     logger.debug(
-                        f"      Creating marketing record: {impression.get('channel', 'unknown')}"
+                        f"      Creating marketing record: "
+                        f"{impression.get('channel', 'unknown')}"
                     )
                     customer_id = None
                     if self._rng.random() < 0.05:
@@ -223,7 +261,9 @@ class MarketingMixin:
                             "ImpressionId": impression["ImpressionId"],
                             "Cost": str(impression["Cost"]),
                             "CostCents": int(
-                                (impression["Cost"] * 100).quantize(Decimal("1"))
+                                (impression["Cost"] * 100).quantize(
+                                    Decimal("1")
+                                )
                             ),
                             "Device": impression["Device"].value,
                         }
@@ -231,7 +271,8 @@ class MarketingMixin:
                     emitted += 1
                     if emitted >= daily_cap:
                         logger.warning(
-                            f"Marketing daily cap reached ({daily_cap}) on {date}. Truncating impressions."
+                            f"Marketing daily cap reached ({daily_cap}) "
+                            f"on {date}. Truncating impressions."
                         )
                         break
 
@@ -239,14 +280,16 @@ class MarketingMixin:
                 break
 
         logger.debug(
-            f"_generate_marketing_activity complete: {len(marketing_records)} total"
+            f"_generate_marketing_activity complete: "
+            f"{len(marketing_records)} total"
         )
         return marketing_records
 
-    # NOTE: _generate_hourly_store_activity was removed in favor of inline hour-by-hour
-    # generation to reduce memory usage. The logic is now inlined in _generate_daily_facts
-    # starting at line ~1015 to write each hour to the database immediately instead of
-    # accumulating all 24 hours in memory first.
+    # NOTE: _generate_hourly_store_activity was removed in favor of inline
+    # hour-by-hour generation to reduce memory usage. The logic is now inlined
+    # in _generate_daily_facts starting at line ~1015 to write each hour to
+    # the database immediately instead of accumulating all 24 hours in memory
+    # first.
 
     def _compute_marketing_multiplier(self, date: datetime) -> float:
         # Conservative boosts; configurable later

@@ -127,7 +127,8 @@ class PaymentsMixin:
         """Generate a payment record for an online order.
 
         Args:
-            order: The online order dict containing OrderId, TotalCents, TenderType, etc.
+            order: The online order dict containing OrderId, TotalCents,
+                TenderType, etc.
             transaction_time: The order creation timestamp.
 
         Returns:

@@ -62,7 +62,8 @@ def upload_paths_to_blob(
         from azure.storage.blob import BlobServiceClient
     except Exception as e:
         raise ImportError(
-            "Azure upload requires 'azure-storage-blob'. Install with: pip install azure-storage-blob"
+            "Azure upload requires 'azure-storage-blob'. "
+            "Install with: pip install azure-storage-blob"
         ) from e
 
     account_url, container, uri_prefix = _parse_account_and_container(account_uri)

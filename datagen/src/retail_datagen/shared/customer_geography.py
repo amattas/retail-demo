@@ -344,7 +344,8 @@ class GeographyAssigner:
             home_geo = self._geo_lookup.get(customer.GeographyID)
             if not home_geo:
                 logger.warning(
-                    f"Customer {customer.ID} has invalid GeographyID {customer.GeographyID}, skipping"
+                    f"Customer {customer.ID} has invalid GeographyID "
+                    f"{customer.GeographyID}, skipping"
                 )
                 continue
 
@@ -352,7 +353,8 @@ class GeographyAssigner:
             home_coords = self._geo_coordinates.get(home_geo.ID)
             if not home_coords:
                 logger.warning(
-                    f"No coordinates for geography {home_geo.ID}, skipping customer {customer.ID}"
+                    f"No coordinates for geography {home_geo.ID}, "
+                    f"skipping customer {customer.ID}"
                 )
                 continue
 
@@ -362,7 +364,8 @@ class GeographyAssigner:
             store_distances = self._calculate_store_distances(customer.GeographyID)
             if not store_distances:
                 logger.warning(
-                    f"Could not calculate store distances for customer {customer.ID}, skipping"
+                    f"Could not calculate store distances for customer "
+                    f"{customer.ID}, skipping"
                 )
                 continue
 
@@ -475,7 +478,8 @@ class StoreSelector:
         self._store_lookup = {store.ID: store for store in stores}
 
         logger.info(
-            f"StoreSelector initialized with {len(customer_geographies):,} customer geographies"
+            f"StoreSelector initialized with "
+            f"{len(customer_geographies):,} customer geographies"
         )
 
     def select_store_for_customer(self, customer_id: int) -> Store | None:

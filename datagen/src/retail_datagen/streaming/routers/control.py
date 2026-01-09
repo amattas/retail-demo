@@ -118,7 +118,10 @@ async def start_streaming(
     if not state_manager.can_start_realtime():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Historical data must be generated before starting real-time streaming",
+            detail=(
+                "Historical data must be generated before "
+                "starting real-time streaming"
+            ),
         )
 
     # Check Azure connection string
@@ -157,7 +160,8 @@ async def start_streaming(
                 }
             except Exception as db_error:
                 logger.warning(
-                    f"DuckDB batch streaming failed, falling back to real-time: {db_error}"
+                    f"DuckDB batch streaming failed, falling back to real-time: "
+                    f"{db_error}"
                 )
                 # Fall through to real-time mode
 

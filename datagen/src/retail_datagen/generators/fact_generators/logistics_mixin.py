@@ -34,13 +34,16 @@ def _is_beyond_end_date(event_ts: datetime | None, end_date: datetime | None) ->
 class LogisticsMixin:
     """Truck logistics including movements, lifecycle, and deliveries"""
 
-    #: Percentage below reorder point indicating critical stockout risk (triggers URGENT priority)
+    #: Percentage below reorder point indicating critical stockout risk
+    #: (triggers URGENT priority)
     REORDER_PRIORITY_URGENT_THRESHOLD = 50.0
 
-    #: Percentage below reorder point indicating significant risk (triggers HIGH priority)
+    #: Percentage below reorder point indicating significant risk
+    #: (triggers HIGH priority)
     REORDER_PRIORITY_HIGH_THRESHOLD = 25.0
 
-    #: Minimum unload duration in minutes (enforced even if calculated duration is shorter)
+    #: Minimum unload duration in minutes
+    #: (enforced even if calculated duration is shorter)
     MIN_UNLOAD_DURATION_MINUTES = 30
 
     #: Default unload duration in minutes (used when ETA is not available)
@@ -100,7 +103,8 @@ class LogisticsMixin:
         if restored_movements:
             truck_movements.extend(restored_movements)
             logger.info(
-                f"Restored {len(restored_movements)} pending shipments for {date.date()}"
+                f"Restored {len(restored_movements)} pending shipments "
+                f"for {date.date()}"
             )
 
         # Analyze store inventory needs (vectorized when possible)
@@ -170,9 +174,10 @@ class LogisticsMixin:
                         )
 
                         # Calculate priority based on how far below reorder point
-                        # Edge case: When reorder_point is 0, this indicates a product with no
-                        # minimum stock requirement (e.g., seasonal items, promotional products).
-                        # In this case, deficit_pct defaults to 0 and priority is NORMAL.
+                        # Edge case: When reorder_point is 0, this indicates a
+                        # product with no minimum stock requirement (e.g.,
+                        # seasonal items, promotional products). In this case,
+                        # deficit_pct defaults to 0 and priority is NORMAL.
                         priority = self._calculate_reorder_priority(
                             reorder_point, current_qty
                         )
@@ -191,7 +196,8 @@ class LogisticsMixin:
                             }
                         )
 
-                    # Generate truck shipments (may be multiple if order exceeds capacity)
+                    # Generate truck shipments
+                    # (may be multiple if order exceeds capacity)
                     departure_time = date.replace(hour=6, minute=0)  # 6 AM departure
                     shipments = self.inventory_flow_sim.generate_truck_shipments(
                         dc.ID, store_id, reorder_list, departure_time
@@ -214,20 +220,23 @@ class LogisticsMixin:
                             "DepartureTime": event_ts,
                         }
 
-                        # Check if shipment departure is beyond current day OR generation end date
-                        # Stage if beyond current day to prevent "stuck in SCHEDULED" warnings
+                        # Check if shipment departure is beyond current day
+                        # OR generation end date. Stage if beyond current day
+                        # to prevent "stuck in SCHEDULED" warnings
                         is_beyond_today = event_ts > current_day_end
                         is_beyond_generation = _is_beyond_end_date(
                             event_ts, generation_end_date
                         )
 
                         if is_beyond_today or is_beyond_generation:
-                            # Stage for future processing instead of writing to fact table
-                            # Do NOT add to _active_shipments - will be restored when generating future dates
+                            # Stage for future processing instead of writing
+                            # to fact table. Do NOT add to _active_shipments -
+                            # will be restored when generating future dates
                             pending_shipments.append(truck_record)
                             logger.debug(
-                                f"Staging shipment {shipment_info['shipment_id']} with "
-                                f"departure {event_ts} (beyond current day {date.date()} or end date {generation_end_date})"
+                                f"Staging shipment {shipment_info['shipment_id']} "
+                                f"with departure {event_ts} (beyond current day "
+                                f"{date.date()} or end date {generation_end_date})"
                             )
                         else:
                             truck_movements.append(truck_record)
@@ -402,7 +411,8 @@ class LogisticsMixin:
                                     "QtyDelta": txn["QtyDelta"],
                                     "Reason": txn["Reason"].value,
                                     "Source": txn["Source"],
-                                    # Ensure NOT NULL balance is populated for DC inventory
+                                    # Ensure NOT NULL balance is populated
+                                    # for DC inventory
                                     "Balance": txn.get(
                                         "Balance",
                                         self.inventory_flow_sim.get_dc_balance(
@@ -433,7 +443,8 @@ class LogisticsMixin:
                                 }
                             )
                     elif current_status == TruckStatus.ARRIVED:
-                        # Also emit store INBOUND at ARRIVED to guarantee receipt at store
+                        # Also emit store INBOUND at ARRIVED to guarantee
+                        # receipt at store
                         store_txn = (
                             self.inventory_flow_sim.generate_store_inbound_transactions(
                                 updated_info, check_time

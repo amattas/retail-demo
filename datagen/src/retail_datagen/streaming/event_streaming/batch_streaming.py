@@ -238,7 +238,8 @@ class BatchStreamingManager:
                             )
 
                             self.log.info(
-                                f"Published {len(envelopes)} events from {fact_table_name}",
+                                f"Published {len(envelopes)} events "
+                                f"from {fact_table_name}",
                                 session_id=self._session_id,
                             )
                         else:
@@ -359,7 +360,11 @@ class BatchStreamingManager:
         if duckdb_conn is None:
             return []
         # Pull rows in window
-        q = f"SELECT * FROM {duck_table} WHERE event_ts >= ? AND event_ts < ? ORDER BY event_ts LIMIT ?"
+        q = (
+            f"SELECT * FROM {duck_table} "
+            f"WHERE event_ts >= ? AND event_ts < ? "
+            f"ORDER BY event_ts LIMIT ?"
+        )
         cur = duckdb_conn.execute(q, [start_ts, end_ts, batch_size])
         rows = cur.fetchall()
         cols = [d[0] for d in (cur.description or [])]
@@ -586,7 +591,8 @@ class BatchStreamingManager:
             if staging_ids:
                 deleted = pending_shipments_delete(duckdb_conn, staging_ids)
                 self.log.info(
-                    f"Published {len(envelopes)} pending shipments, removed {deleted} from staging",
+                    f"Published {len(envelopes)} pending shipments, "
+                    f"removed {deleted} from staging",
                     session_id=self._session_id,
                 )
 

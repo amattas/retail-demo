@@ -151,7 +151,10 @@ class DictionarySchemaError(DictionaryValidationError):
         self.expected_columns = expected_columns
         self.actual_columns = actual_columns
 
-        message = f"Schema mismatch - Expected columns: {expected_columns}, Found: {actual_columns}"
+        message = (
+            f"Schema mismatch - Expected columns: {expected_columns}, "
+            f"Found: {actual_columns}"
+        )
 
         super().__init__(message, file_path)
 

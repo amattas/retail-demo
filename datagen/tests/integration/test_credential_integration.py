@@ -186,7 +186,7 @@ class TestSecurityWarnings:
     """Tests for security warning behavior."""
 
     def test_security_warning_fires_when_credential_in_config_only(self, caplog):
-        """Test that security warning fires when credential is in config but not env var."""
+        """Test security warning fires when credential is in config not env var."""
         import logging
 
         caplog.set_level(logging.WARNING)

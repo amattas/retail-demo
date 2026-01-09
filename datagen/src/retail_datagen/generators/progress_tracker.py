@@ -170,7 +170,8 @@ class TableProgressTracker:
             self._states[table_name] = self.STATE_COMPLETED
 
             logger.debug(
-                f"Table '{table_name}' state transition: {old_state} → {self.STATE_COMPLETED}"
+                f"Table '{table_name}' state transition: "
+                f"{old_state} → {self.STATE_COMPLETED}"
             )
 
     def get_state(self, table_name: str) -> str:

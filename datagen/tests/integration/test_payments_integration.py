@@ -48,7 +48,7 @@ class TestPaymentsIntegration:
         assert issubclass(FactDataGenerator, PaymentsMixin)
 
     def test_receipts_mixin_has_payments_key(self):
-        """ReceiptsMixin._generate_store_hour_activity should initialize fact_payments."""
+        """ReceiptsMixin._generate_store_hour_activity should init fact_payments."""
         import inspect
 
         from retail_datagen.generators.fact_generators import receipts_mixin

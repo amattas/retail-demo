@@ -10,7 +10,8 @@ Test Requirements:
 - Test event envelope compliance
 - Test payload validation
 - Python 3.11 compatible
-- Run with: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/unit/streaming/test_event_factory.py
+- Run with: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest \
+    tests/unit/streaming/test_event_factory.py
 """
 
 import random
@@ -409,7 +410,7 @@ class TestTraceIdGeneration:
         trace1 = event_factory.generate_trace_id(timestamp1)
         trace2 = event_factory.generate_trace_id(timestamp2)
 
-        # Same timestamp should produce same epoch (first two parts may differ in sequence)
+        # Same timestamp should produce same epoch (parts may differ in sequence)
         epoch1 = trace1.split("_")[1]
         epoch2 = trace2.split("_")[1]
         assert epoch1 == epoch2
@@ -459,14 +460,18 @@ class TestShouldGenerateEvent:
         weekday_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, weekday)
+            if event_factory.should_generate_event(
+                EventType.RECEIPT_CREATED, weekday
+            )
         )
 
         event_factory.rng = random.Random(42)
         weekend_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, weekend)
+            if event_factory.should_generate_event(
+                EventType.RECEIPT_CREATED, weekend
+            )
         )
 
         # Temporal model boosts weekends; allow weekend >= weekday
@@ -526,7 +531,7 @@ STATELESS_EVENT_TYPES = [
 
 @pytest.mark.parametrize("event_type", STATELESS_EVENT_TYPES)
 class TestEventEnvelopeCompliance:
-    """Parametrized tests for event envelope structure across stateless event types."""
+    """Parametrized tests for event envelope structure across stateless types."""
 
     def test_event_has_required_envelope_fields(
         self, event_factory, test_timestamp, event_type
@@ -679,7 +684,13 @@ RECEIPT_REQUIRED_EVENTS = [
     ),
     (
         EventType.PROMOTION_APPLIED,
-        ["receipt_id", "promo_code", "discount_amount", "discount_type", "product_ids"],
+        [
+            "receipt_id",
+            "promo_code",
+            "discount_amount",
+            "discount_type",
+            "product_ids",
+        ],
     ),
 ]
 
@@ -820,7 +831,9 @@ class TestReceiptLineBehaviors:
         )
 
         payload = event.payload
-        assert payload["extended_price"] == payload["quantity"] * payload["unit_price"]
+        assert payload["extended_price"] == (
+            payload["quantity"] * payload["unit_price"]
+        )
 
     def test_uses_valid_product(self, factory_with_active_receipt, test_timestamp):
         """Test receipt line uses valid product from master data."""
@@ -952,7 +965,9 @@ class TestInventoryUpdatedBehaviors:
         ]
 
         inbound_events = [
-            e for e in events if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]
+            e
+            for e in events
+            if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]
         ]
         if inbound_events:
             for event in inbound_events:
@@ -969,12 +984,16 @@ class TestCustomerEventBehaviors:
 
     def test_customer_entered_zone_is_entrance(self, event_factory, test_timestamp):
         """Test customers always enter at ENTRANCE zone."""
-        event = event_factory.generate_event(EventType.CUSTOMER_ENTERED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.CUSTOMER_ENTERED, test_timestamp
+        )
         assert event.payload["zone"] == "ENTRANCE"
 
     def test_customer_entered_sensor_id_format(self, event_factory, test_timestamp):
         """Test sensor ID has correct format."""
-        event = event_factory.generate_event(EventType.CUSTOMER_ENTERED, test_timestamp)
+        event = event_factory.generate_event(
+            EventType.CUSTOMER_ENTERED, test_timestamp
+        )
         assert event.payload["sensor_id"].startswith("SENSOR_")
 
     def test_zone_changed_different_zones(self, event_factory, test_timestamp):
@@ -1158,7 +1177,11 @@ class TestMarketingEventBehaviors:
         event = factory_with_active_receipt.generate_event(
             EventType.PROMOTION_APPLIED, test_timestamp
         )
-        assert event.payload["discount_type"] in ["PERCENTAGE", "FIXED_AMOUNT", "BOGO"]
+        assert event.payload["discount_type"] in [
+            "PERCENTAGE",
+            "FIXED_AMOUNT",
+            "BOGO",
+        ]
 
     def test_promotion_discount_type_distribution(
         self, factory_with_active_receipt, test_timestamp
@@ -1185,7 +1208,9 @@ class TestMarketingEventBehaviors:
         assert 100 < fixed_count < 400, (
             f"FIXED_AMOUNT count {fixed_count} outside expected range"
         )
-        assert bogo_count < 150, f"BOGO count {bogo_count} outside expected range"
+        assert bogo_count < 150, (
+            f"BOGO count {bogo_count} outside expected range"
+        )
 
 
 # ================================

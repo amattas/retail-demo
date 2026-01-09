@@ -87,8 +87,12 @@ class DistributionGeneratorMixin:
             raise ValueError("Geography master data must be generated first")
 
         # Initialize utilities
-        geo_distribution = GeographicDistribution(selected_geography_data, seed + 1000)
-        address_generator = AddressGenerator(selected_geography_data, seed + 1000)
+        geo_distribution = GeographicDistribution(
+            selected_geography_data, seed + 1000
+        )
+        address_generator = AddressGenerator(
+            selected_geography_data, seed + 1000
+        )
         id_generator = IdentifierGenerator(seed + 1000)
 
         # DCs should be strategically placed in highest-weight regions
@@ -156,7 +160,8 @@ class DistributionGeneratorMixin:
             assignment_strategy = "fixed"
             print(f"Using fixed assignment: {trucks_per_dc_config} trucks per DC")
             print(
-                f"  - Assigned trucks: {num_assigned_trucks} ({trucks_per_dc_config} × {dc_count} DCs)"
+                f"  - Assigned trucks: {num_assigned_trucks} "
+                f"({trucks_per_dc_config} × {dc_count} DCs)"
             )
             print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
         else:
@@ -166,7 +171,8 @@ class DistributionGeneratorMixin:
             assignment_strategy = "percentage"
             trucks_per_dc_config = 0
             print(
-                f"Using percentage-based assignment: {truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
+                f"Using percentage-based assignment: "
+                f"{truck_dc_assignment_rate:.1%} of trucks assigned to DCs"
             )
             print(f"  - Assigned trucks: {num_assigned_trucks}")
             print(f"  - Pool trucks (DCID=NULL): {num_pool_trucks}")
@@ -305,7 +311,8 @@ class DistributionGeneratorMixin:
 
         print(
             f"\nGenerating {supplier_total} supplier trucks "
-            f"({supplier_refrigerated} refrigerated, {supplier_non_refrigerated} non-refrigerated)"
+            f"({supplier_refrigerated} refrigerated, "
+            f"{supplier_non_refrigerated} non-refrigerated)"
         )
 
         # Generate supplier refrigerated trucks
@@ -372,7 +379,8 @@ class DistributionGeneratorMixin:
                 total_dc = counts["refrigerated"] + counts["non_refrigerated"]
                 print(
                     f"  DC {dc_id}: {total_dc} trucks "
-                    f"({counts['refrigerated']} refrigerated, {counts['non_refrigerated']} non-refrigerated)"
+                    f"({counts['refrigerated']} refrigerated, "
+                    f"{counts['non_refrigerated']} non-refrigerated)"
                 )
 
     def generate_trucks(
@@ -404,7 +412,8 @@ class DistributionGeneratorMixin:
             total_dc_trucks = refrigerated_count + non_refrigerated_count
             print(
                 f"DC-to-Store trucks to generate: {total_dc_trucks} "
-                f"({refrigerated_count} refrigerated, {non_refrigerated_count} non-refrigerated)"
+                f"({refrigerated_count} refrigerated, "
+                f"{non_refrigerated_count} non-refrigerated)"
             )
 
             # Calculate allocation strategy

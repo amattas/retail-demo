@@ -50,7 +50,10 @@ class TestGetMasterTablePath:
         manager = ExportFileManager(base_dir=tmp_path)
 
         path = manager.get_master_table_path("dim_customers", "parquet")
-        assert path == tmp_path / "export" / "dim_customers" / "dim_customers.parquet"
+        expected = (
+            tmp_path / "export" / "dim_customers" / "dim_customers.parquet"
+        )
+        assert path == expected
         assert path.suffix == ".parquet"
 
     def test_get_master_table_path_various_names(self, tmp_path):
@@ -80,11 +83,16 @@ class TestGetMasterTablePath:
 class TestGetFactTableMonthPath:
     def test_get_fact_table_month_path(self, tmp_path):
         manager = ExportFileManager(base_dir=tmp_path)
-        path = manager.get_fact_table_month_path("fact_receipts", 2024, 1, "parquet")
-        assert (
-            path
-            == tmp_path / "export" / "fact_receipts" / "fact_receipts_2024-01.parquet"
+        path = manager.get_fact_table_month_path(
+            "fact_receipts", 2024, 1, "parquet"
         )
+        expected = (
+            tmp_path
+            / "export"
+            / "fact_receipts"
+            / "fact_receipts_2024-01.parquet"
+        )
+        assert path == expected
         assert path.suffix == ".parquet"
 
 
@@ -135,9 +143,11 @@ class TestEnsureDirectory:
         with pytest.raises(ValueError, match="outside allowed base directory"):
             manager.ensure_directory(outside_path)
 
-    @pytest.mark.skipif(os.geteuid() == 0, reason="Root bypasses permission checks")
+    @pytest.mark.skipif(
+        os.geteuid() == 0, reason="Root bypasses permission checks"
+    )
     def test_ensure_directory_handles_permission_error(self, tmp_path):
-        """Should raise an error on permission issues (message may vary by OS)."""
+        """Should raise an error on permission issues (message may vary)."""
         manager = ExportFileManager(base_dir=tmp_path)
 
         # Create read-only parent directory
@@ -148,7 +158,8 @@ class TestEnsureDirectory:
         nested_dir = readonly_dir / "nested"
 
         try:
-            # Some OS/filesystems raise PermissionError during path stat, others on mkdir
+            # Some OS/filesystems raise PermissionError during path stat,
+            # others on mkdir
             with pytest.raises((PermissionError, OSError)):
                 manager.ensure_directory(nested_dir)
         finally:

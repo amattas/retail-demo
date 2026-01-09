@@ -23,7 +23,8 @@ def validate_eventhub_connection_string(
 
     Args:
         conn_str: Connection string to validate
-        strict: If True, enforce all validation rules. If False, allow shorter/simpler strings.
+        strict: If True, enforce all validation rules.
+            If False, allow shorter/simpler strings.
         allow_mock: If True, allow mock:// and test:// prefixes
 
     Returns:
@@ -70,7 +71,8 @@ def validate_eventhub_connection_string(
         if strict:
             return (
                 False,
-                f"Invalid Event Hub endpoint domain. Must end with {' or '.join(valid_domains)}",
+                "Invalid Event Hub endpoint domain. "
+                f"Must end with {' or '.join(valid_domains)}",
             )
         # In non-strict mode, check for at least .servicebus. pattern
         elif ".servicebus." not in conn_str:
@@ -129,8 +131,10 @@ def sanitize_connection_string(conn_str: str) -> str:
         Sanitized connection string with keys redacted
 
     Example:
-        Input:  "Endpoint=sb://test.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=abc123"
-        Output: "Endpoint=sb://test.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=***REDACTED***"
+        Input:  "Endpoint=sb://test.servicebus.windows.net/;SharedAccessKeyName=
+                RootManageSharedAccessKey;SharedAccessKey=abc123"
+        Output: "Endpoint=sb://test.servicebus.windows.net/;SharedAccessKeyName=
+                RootManageSharedAccessKey;SharedAccessKey=***REDACTED***"
     """
     if not conn_str:
         return "[empty]"

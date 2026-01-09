@@ -42,7 +42,8 @@ class BusinessRulesEngine:
         tolerance = Decimal("0.01")
         if abs(calculated_total - receipt_total) > tolerance:
             self._validation_errors.append(
-                f"Receipt total mismatch: calculated={calculated_total}, expected={receipt_total}"
+                f"Receipt total mismatch: calculated={calculated_total}, "
+                f"expected={receipt_total}"
             )
             return False
 
@@ -127,7 +128,8 @@ class BusinessRulesEngine:
                 if store_geo and customer_geo and store_geo != customer_geo:
                     # This is a warning, not an error (customers can travel)
                     self._warnings.append(
-                        f"Customer {record['CustomerID']} shopping outside home geography"
+                        f"Customer {record['CustomerID']} "
+                        "shopping outside home geography"
                     )
 
         return True

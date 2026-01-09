@@ -102,7 +102,8 @@ class TestPromotionsIntegration:
         assert summary.facts_generated.get("receipts", 0) > 0
 
         # Check if any promotions were generated
-        # Note: Not all receipts have promotions, but in Black Friday period we should get some
+        # Note: Not all receipts have promotions, but in Black Friday period
+        # we should get some
         promo_count = summary.facts_generated.get("promotions", 0)
         promo_line_count = summary.facts_generated.get("promo_lines", 0)
 

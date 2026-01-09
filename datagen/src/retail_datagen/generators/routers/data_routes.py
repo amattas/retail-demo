@@ -62,7 +62,9 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
                     tables_with_data.append(logical)
             except Exception:
                 pass
-        return TableListResponse(tables=tables_with_data, count=len(tables_with_data))
+        return TableListResponse(
+            tables=tables_with_data, count=len(tables_with_data)
+        )
     except Exception as e:
         logger.warning(f"Falling back to empty fact table list due to error: {e}")
         return TableListResponse(tables=[], count=0)
@@ -127,7 +129,9 @@ async def get_table_summary(table_name: str):
 @router.get(
     "/{table_name}/summary",
     summary="Get table summary (unified)",
-    description="Get record counts and metadata for any table (master or fact) via unified path",
+    description=(
+        "Get record counts and metadata for any table (master or fact) via unified path"
+    ),
 )
 async def get_table_summary_unified(table_name: str):
     # Reuse the existing implementation
@@ -260,7 +264,9 @@ async def preview_master_table_alias(
     "/facts/{table_name}",
     response_model=TablePreviewResponse,
     summary="Preview fact table (UI alias)",
-    description="Alias used by UI to preview fact tables; returns empty preview when no data",
+    description=(
+        "Alias used by UI to preview fact tables; returns empty preview when no data"
+    ),
 )
 async def preview_fact_table_alias(
     table_name: str,
@@ -372,7 +378,7 @@ async def preview_recent_fact_alias(
     description="Get live table counts from DuckDB (no cache)",
 )
 async def get_dashboard_counts():
-    """Get live table counts for dashboard (queries unified retail database directly)."""
+    """Get live table counts for dashboard (queries unified retail DB directly)."""
 
     master_counts: dict[str, int] = {}
     fact_counts: dict[str, int] = {}

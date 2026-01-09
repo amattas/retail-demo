@@ -195,12 +195,14 @@ class MasterDataGenerator(
                     avg = sum(rates) / Decimal(str(len(rates)))
                 except (ZeroDivisionError, ArithmeticError) as e:
                     logger.warning(
-                        f"Failed to calculate average tax rate for {state}: {e}, using default"
+                        f"Failed to calculate average tax rate for {state}: "
+                        f"{e}, using default"
                     )
                     avg = Decimal("0.07407")
                 self._state_tax_avg[state] = avg
             print(
-                f"Computed state-level tax averages for {len(self._state_tax_avg)} states"
+                f"Computed state-level tax averages for "
+                f"{len(self._state_tax_avg)} states"
             )
 
         if self._tax_rate_mapping:
@@ -420,7 +422,11 @@ class MasterDataGenerator(
 
         # Write to DuckDB
         await self._insert_to_db(
-            None, CustomerModel, self.customers, batch_size=5000, commit_every_batches=1
+            None,
+            CustomerModel,
+            self.customers,
+            batch_size=5000,
+            commit_every_batches=1,
         )
 
         if self._progress_tracker:
@@ -524,7 +530,8 @@ class MasterDataGenerator(
         for customer in sample_customers:
             if not self.fk_validator.validate_geography_fk(customer.GeographyID):
                 validation_errors.append(
-                    f"Customer {customer.ID} has invalid GeographyID {customer.GeographyID}"
+                    f"Customer {customer.ID} has invalid GeographyID "
+                    f"{customer.GeographyID}"
                 )
 
         if validation_errors:

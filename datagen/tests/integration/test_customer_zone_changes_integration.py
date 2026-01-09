@@ -38,7 +38,7 @@ def small_config():
 
 @pytest.mark.asyncio
 async def test_customer_zone_changes_generation(small_config):
-    """Test that customer zone changes are generated during historical data generation."""
+    """Test customer zone changes are generated during historical data gen."""
     # Reset DuckDB to start fresh
     reset_duckdb()
 
@@ -83,12 +83,14 @@ async def test_customer_zone_changes_generation(small_config):
         print(f"Generated {zone_change_count} zone change records")
 
         # Also verify BLE pings were generated (prerequisite for zone changes)
-        ble_ping_result = conn.execute("SELECT COUNT(*) FROM fact_ble_pings").fetchone()
+        ble_ping_result = conn.execute(
+            "SELECT COUNT(*) FROM fact_ble_pings"
+        ).fetchone()
         ble_ping_count = ble_ping_result[0] if ble_ping_result else 0
 
         print(f"Generated {ble_ping_count} BLE ping records")
 
-        # Zone changes should be <= BLE pings (not every ping creates a zone change)
+        # Zone changes should be <= BLE pings (not every ping creates a change)
         assert zone_change_count <= ble_ping_count
 
         # If we have BLE pings, we should have at least some zone changes
@@ -188,10 +190,11 @@ async def test_zone_changes_follow_ble_pings(small_config):
         ).fetchall()
 
         print(
-            f"Customer {customer_ble_id}: {len(pings)} pings, {len(changes)} zone changes"
+            f"Customer {customer_ble_id}: {len(pings)} pings, "
+            f"{len(changes)} zone changes"
         )
 
-        # Each zone change should correspond to an actual zone transition in BLE pings
+        # Each zone change should correspond to a zone transition in BLE pings
         if len(changes) > 0:
             # Verify that FromZone and ToZone are different
             for change in changes:

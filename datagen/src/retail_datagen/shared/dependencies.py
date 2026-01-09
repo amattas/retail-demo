@@ -49,7 +49,9 @@ class TaskStatus(BaseModel):
     # Per-table progress tracking (optional for backwards compatibility)
     table_progress: dict[str, float] | None = Field(
         default=None,
-        description="Progress per table (e.g., {'receipts': 0.8, 'dc_inventory_txn': 1.0})",
+        description=(
+            "Progress per table (e.g., {'receipts': 0.8, 'dc_inventory_txn': 1.0})"
+        ),
     )
     current_table: str | None = Field(
         default=None, description="Currently processing table name"
@@ -176,7 +178,8 @@ RATE_LIMIT_MAXSIZE = _parse_env_int("RATE_LIMIT_MAXSIZE", 10000, 100, 100000)
 RATE_LIMIT_TTL = _parse_env_int("RATE_LIMIT_TTL", 3600, 60, 86400)
 
 # TTLCache uses Time-To-Live (TTL): entries expire after TTL seconds from insertion.
-# Reading an entry does NOT reset the timer; only re-assigning (cache[key] = value) does.
+# Reading an entry does NOT reset the timer; only re-assigning
+# (cache[key] = value) does.
 # IMPORTANT: In-place list modification (append, [:]=) does NOT reset TTL.
 # This means IPs are evicted after RATE_LIMIT_TTL seconds from their first request,
 # regardless of continued activity. This is acceptable since:
@@ -208,7 +211,10 @@ async def get_config() -> RetailConfig:
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Configuration not initialized. Please provide a valid config.json file.",
+                detail=(
+                    "Configuration not initialized. "
+                    "Please provide a valid config.json file."
+                ),
             )
     return _config
 
@@ -220,7 +226,8 @@ async def update_config(new_config: RetailConfig) -> None:
 
     # Reinitialize generators with new config
     _master_generator = MasterDataGenerator(new_config)
-    # Defer FactDataGenerator creation until requested so we can supply a fresh DB session
+    # Defer FactDataGenerator creation until requested so we can supply
+    # a fresh DB session
     _fact_generator = None
     _event_streamer = EventStreamer(new_config)
 
@@ -624,7 +631,10 @@ def rate_limit(max_requests: int = 100, window_seconds: int = 60):
             if len(request_times) >= max_requests:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds} seconds",
+                    detail=(
+                        f"Rate limit exceeded: {max_requests} requests "
+                        f"per {window_seconds} seconds"
+                    ),
                 )
 
             # Record this request

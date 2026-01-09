@@ -142,7 +142,8 @@ class EventStreamer:
             streaming_config=self.streaming_config,
         )
 
-        # Initialize streaming core with placeholder values (will be updated in initialize())
+        # Initialize streaming core with placeholder values
+        # (will be updated in initialize())
         self._streaming_core = StreamingCore(
             log=self.log,
             session_id=self._session_id,
@@ -245,7 +246,8 @@ class EventStreamer:
                     )
                 else:
                     self.log.warning(
-                        "No Azure connection string provided - events will be generated but not sent",
+                        "No Azure connection string provided - "
+                        "events will be generated but not sent",
                         session_id=self._session_id,
                     )
                     # Create mock client for testing
@@ -344,7 +346,7 @@ class EventStreamer:
             if not self._distribution_centers:
                 self._distribution_centers = read_distribution_centers()
         except Exception as e:
-            # Fallback: synthesize a minimal set of master data to allow simulation/tests
+            # Fallback: synthesize minimal master data for simulation/tests
             self.log.error(
                 "Failed to load master data from DuckDB",
                 session_id=self._session_id,

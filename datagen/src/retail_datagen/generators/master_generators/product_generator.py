@@ -103,9 +103,10 @@ class ProductGeneratorMixin:
                     for brand_idx, _ in category_brands:
                         valid_combinations.append((product_idx, brand_idx))
 
+                combo_count = len(category_brands) * len(category_products)
                 print(
                     f"Category '{category}': {len(category_brands)} brands × "
-                    f"{len(category_products)} products = {len(category_brands) * len(category_products)} combinations"
+                    f"{len(category_products)} products = {combo_count} combinations"
                 )
 
         print(f"Total valid category-matched combinations: {len(valid_combinations):,}")
@@ -186,7 +187,8 @@ class ProductGeneratorMixin:
                 if retry == max_retries - 1:
                     print(
                         f"Warning: Failed to generate valid pricing for "
-                        f"{product.ProductName} + {brand.Brand} after {max_retries} attempts: {e}"
+                        f"{product.ProductName} + {brand.Brand} after "
+                        f"{max_retries} attempts: {e}"
                     )
 
         return None
@@ -297,7 +299,8 @@ class ProductGeneratorMixin:
             if combination_idx >= max_total_attempts:
                 raise RuntimeError(
                     f"Failed to generate {target_product_count} products after "
-                    f"{max_total_attempts} attempts. Generated {successful_products} products, "
+                    f"{max_total_attempts} attempts. "
+                    f"Generated {successful_products} products, "
                     f"{failed_validations} failed validations."
                 )
 
@@ -367,11 +370,13 @@ class ProductGeneratorMixin:
             )
         if len(products_master) != target_product_count:
             raise ValueError(
-                f"Expected {target_product_count} products in list, got {len(products_master)}"
+                f"Expected {target_product_count} products in list, "
+                f"got {len(products_master)}"
             )
 
         print(
-            f"Generated {len(products_master)} product master records with brand combinations"
+            f"Generated {len(products_master)} product master records "
+            "with brand combinations"
         )
         return products_master
 
@@ -502,9 +507,13 @@ class ProductGeneratorMixin:
             return "Home"
 
     def _calculate_product_launch_date(
-        self, product_id: int, total_products: int, historical_start: datetime, rng: Any
+        self,
+        product_id: int,
+        total_products: int,
+        historical_start: datetime,
+        rng: Any,
     ) -> datetime:
-        """Calculate product launch date for realistic product introduction over time."""
+        """Calculate product launch date for realistic product introduction."""
         # Define product introduction windows
         established_products_pct = 0.60  # 60% already established
         early_launch_pct = 0.30  # 30% launch in first 6 months

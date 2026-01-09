@@ -86,7 +86,12 @@ class TestExportMasterTables:
                 {
                     "ID": [1, 2, 3, 4],
                     "FirstName": ["Alex", "Blake", "Casey", "Drew"],
-                    "LastName": ["Anderson", "Brightwell", "Clearwater", "Dalewood"],
+                    "LastName": [
+                        "Anderson",
+                        "Brightwell",
+                        "Clearwater",
+                        "Dalewood",
+                    ],
                 }
             ),
         }
@@ -135,7 +140,9 @@ class TestExportMasterTables:
 
             asyncio.run(
                 service.export_master_tables(
-                    mock_session, format="parquet", progress_callback=progress_callback
+                    mock_session,
+                    format="parquet",
+                    progress_callback=progress_callback,
                 )
             )
 
@@ -196,7 +203,9 @@ class TestExportMasterTables:
 
                 with pytest.raises(IOError, match="Disk full"):
                     asyncio.run(
-                        service.export_master_tables(mock_session, format="parquet")
+                        service.export_master_tables(
+                            mock_session, format="parquet"
+                        )
                     )
 
         # Verify cleanup was attempted
@@ -238,7 +247,9 @@ class TestExportMasterTables:
         ) as mock_read:
             mock_read.return_value = sample_master_data
 
-            asyncio.run(service.export_master_tables(mock_session, format="parquet"))
+            asyncio.run(
+                service.export_master_tables(mock_session, format="parquet")
+            )
 
         # File tracking should be reset after success
         assert service.file_manager.get_tracked_file_count() == 0
@@ -301,7 +312,8 @@ class TestExportFactTables:
                 service.export_fact_tables(mock_session, format="parquet")
             )
 
-        # Verify monthly grouping: sample data has only January dates, so one file per table
+        # Verify monthly grouping: sample data has only January dates,
+        # so one file per table
         for files in result.values():
             assert len(files) == 1
             assert files[0].suffix == ".parquet"
@@ -348,7 +360,9 @@ class TestExportFactTables:
 
             asyncio.run(
                 service.export_fact_tables(
-                    mock_session, format="parquet", progress_callback=progress_callback
+                    mock_session,
+                    format="parquet",
+                    progress_callback=progress_callback,
                 )
             )
 
@@ -383,7 +397,9 @@ class TestExportFactTables:
         assert "fact_empty" in result
         assert result["fact_empty"] == []
 
-    def test_export_fact_tables_missing_event_ts_column(self, tmp_path, mock_session):
+    def test_export_fact_tables_missing_event_ts_column(
+        self, tmp_path, mock_session
+    ):
         """Should raise ValueError if event_ts column is missing."""
         service = ExportService(base_dir=tmp_path)
 
@@ -402,8 +418,12 @@ class TestExportFactTables:
         ) as mock_read:
             mock_read.return_value = fact_data
 
-            with pytest.raises(ValueError, match="Cannot determine timestamp column"):
-                asyncio.run(service.export_fact_tables(mock_session, format="parquet"))
+            with pytest.raises(
+                ValueError, match="Cannot determine timestamp column"
+            ):
+                asyncio.run(
+                    service.export_fact_tables(mock_session, format="parquet")
+                )
 
     def test_export_fact_tables_partitions_by_date(self, tmp_path, mock_session):
         """Should create separate files for each date partition."""
@@ -460,7 +480,9 @@ class TestExportFactTables:
 
                 with pytest.raises(IOError):
                     asyncio.run(
-                        service.export_fact_tables(mock_session, format="parquet")
+                        service.export_fact_tables(
+                            mock_session, format="parquet"
+                        )
                     )
 
         # Verify cleanup was called
@@ -483,7 +505,9 @@ class TestExportFactTables:
         ) as mock_read:
             mock_read.return_value = sample_fact_data
 
-            asyncio.run(service.export_fact_tables(mock_session, format="parquet"))
+            asyncio.run(
+                service.export_fact_tables(mock_session, format="parquet")
+            )
 
         # File tracking should be reset after success
         assert service.file_manager.get_tracked_file_count() == 0

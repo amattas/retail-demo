@@ -102,7 +102,8 @@ class GenerationStateManager:
 
         Returns:
             (start_date, end_date) tuple where:
-            - start_date: Either config start date (first run) or last generated timestamp (subsequent runs)
+            - start_date: Either config start date (first run) or last generated
+                timestamp (subsequent runs)
             - end_date: Current datetime
         """
         state = self.load_state()
