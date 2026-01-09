@@ -12,13 +12,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from .base_types import FactGeneratorBase
+
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
 
 
-class PromotionsMixin:
+class PromotionsMixin(FactGeneratorBase):
     """Promotion tracking for marketing ROI analytics.
 
     Generates fact_promotions and fact_promo_lines records with realistic:

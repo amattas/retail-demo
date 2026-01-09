@@ -19,6 +19,7 @@ from retail_datagen.shared.models import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from .base_types import FactGeneratorBase
 from .models import FactGenerationSummary
 
 # SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
@@ -32,7 +33,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class InventoryMixin:
+class InventoryMixin(FactGeneratorBase):
     """Inventory management for distribution centers and stores"""
 
     def _generate_dc_inventory_transactions(

@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from .base_types import FactGeneratorBase
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PersistenceMixin:
+class PersistenceMixin(FactGeneratorBase):
     """Database persistence and data mapping methods."""
 
     def _get_model_for_table(self, table_name: str) -> type[DeclarativeBase]:

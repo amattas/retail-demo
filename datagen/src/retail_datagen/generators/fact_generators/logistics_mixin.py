@@ -11,6 +11,8 @@ from retail_datagen.shared.models import (
     TruckStatus,
 )
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +33,7 @@ def _is_beyond_end_date(event_ts: datetime | None, end_date: datetime | None) ->
     return event_ts > end_of_day
 
 
-class LogisticsMixin:
+class LogisticsMixin(FactGeneratorBase):
     """Truck logistics including movements, lifecycle, and deliveries"""
 
     #: Percentage below reorder point indicating critical stockout risk

@@ -11,13 +11,15 @@ import logging
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from .base_types import FactGeneratorBase
+
 if TYPE_CHECKING:
     import random
 
 logger = logging.getLogger(__name__)
 
 
-class PaymentsMixin:
+class PaymentsMixin(FactGeneratorBase):
     """Payment generation for receipts and online orders.
 
     Generates fact_payments records with realistic:

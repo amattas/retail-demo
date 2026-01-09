@@ -8,10 +8,12 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class MarketingMixin:
+class MarketingMixin(FactGeneratorBase):
     """Marketing campaign generation and effectiveness tracking"""
 
     def _generate_marketing_activity(

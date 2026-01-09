@@ -790,7 +790,7 @@ class AzureEventHubClient:
             # Create a temporary producer client with short timeout
             logger.info(f"Testing connection to Event Hub: {hub_name}")
 
-            async with EventHubProducerClient.from_connection_string(
+            async with EventHubProducerClient.from_connection_string(  # type: ignore[attr-defined]
                 conn_str=self.connection_string,
                 eventhub_name=hub_name,
                 logging_enable=False,

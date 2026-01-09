@@ -16,10 +16,12 @@ from retail_datagen.shared.models import (
     TenderType,
 )
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class ReceiptsMixin:
+class ReceiptsMixin(FactGeneratorBase):
     """Receipt generation and in-store customer activity"""
 
     def _generate_store_hour_activity(

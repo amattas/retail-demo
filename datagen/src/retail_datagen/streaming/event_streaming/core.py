@@ -68,6 +68,11 @@ class StreamingCore:
         self._daily_counts: dict[EventType, int] = {}
         self._current_day: str | None = None
 
+        # Master data references (set by streamer after initialization)
+        self._config_volume: Any = None
+        self._stores: list[Any] | None = None
+        self._distribution_centers: list[Any] | None = None
+
     def set_allowed_event_types(self, event_type_names: list[str] | None):
         """Optionally restrict emitted events to a subset of EventType names."""
         if not event_type_names:

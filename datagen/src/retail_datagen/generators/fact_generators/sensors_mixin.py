@@ -12,10 +12,12 @@ import numpy as np
 
 from retail_datagen.shared.models import Customer, Store
 
+from .base_types import FactGeneratorBase
+
 logger = logging.getLogger(__name__)
 
 
-class SensorsMixin:
+class SensorsMixin(FactGeneratorBase):
     """Sensor data generation (foot traffic and BLE pings)"""
 
     def _generate_foot_traffic(

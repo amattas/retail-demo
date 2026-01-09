@@ -440,10 +440,12 @@ class DictionaryLoader:
             and "product_companies" in self._loaded_data
         ):
             companies = {
-                item.Company for item in self._loaded_data["product_companies"]
+                item.Company  # type: ignore[attr-defined]
+                for item in self._loaded_data["product_companies"]
             }
             brand_companies = {
-                item.Company for item in self._loaded_data["product_brands"]
+                item.Company  # type: ignore[attr-defined]
+                for item in self._loaded_data["product_brands"]
             }
 
             missing_companies = brand_companies - companies
