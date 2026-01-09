@@ -520,9 +520,7 @@ class DbOperationsMixin(FieldMappingMixin):
                 if not pk:
                     # No matching receipt yet; skip this line to
                     # preserve FK integrity
-                    logger.debug(
-                        f"Skipping receipt_line with unknown ReceiptId={ext}"
-                    )
+                    logger.debug(f"Skipping receipt_line with unknown ReceiptId={ext}")
                     continue
                 mapped["receipt_id"] = int(pk)
                 mapped_records.append(mapped)
@@ -748,9 +746,7 @@ class DbOperationsMixin(FieldMappingMixin):
                 from sqlalchemy import func, select
 
                 total_db = (
-                    await session.execute(
-                        select(func.count()).select_from(model_class)
-                    )
+                    await session.execute(select(func.count()).select_from(model_class))
                 ).scalar() or 0
                 prev = 0
                 if not hasattr(self, "_fact_db_counts"):

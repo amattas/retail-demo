@@ -14,10 +14,12 @@ from retail_datagen.shared.models import (
     DisruptionType,
 )
 
+from .base_types import InventoryFlowBase
+
 logger = logging.getLogger(__name__)
 
 
-class DisruptionMixin:
+class DisruptionMixin(InventoryFlowBase):
     """
     Mixin providing supply chain disruption functionality.
 

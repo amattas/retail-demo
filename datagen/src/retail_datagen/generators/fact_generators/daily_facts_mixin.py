@@ -498,8 +498,7 @@ class DailyFactsMixin(FactGeneratorBase):
                     )
             except Exception as e:
                 logger.error(
-                    f"Failed to insert truck_moves for "
-                    f"{date.strftime('%Y-%m-%d')}: {e}"
+                    f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}"
                 )
 
     def _generate_truck_inventory_section(
@@ -514,8 +513,8 @@ class DailyFactsMixin(FactGeneratorBase):
         if "truck_inventory" not in active_tables:
             return
 
-        truck_inventory_events = (
-            self.inventory_flow_sim.track_truck_inventory_status(date)
+        truck_inventory_events = self.inventory_flow_sim.track_truck_inventory_status(
+            date
         )
         for event in truck_inventory_events:
             daily_facts["truck_inventory"].append(
@@ -665,8 +664,7 @@ class DailyFactsMixin(FactGeneratorBase):
                     )
             except Exception as e:
                 logger.error(
-                    f"Failed to insert store_ops for "
-                    f"{date.strftime('%Y-%m-%d')}: {e}"
+                    f"Failed to insert store_ops for {date.strftime('%Y-%m-%d')}: {e}"
                 )
 
     def _generate_supply_chain_section(
@@ -679,8 +677,8 @@ class DailyFactsMixin(FactGeneratorBase):
         if "supply_chain_disruption" not in active_tables:
             return
 
-        disruption_events = (
-            self.inventory_flow_sim.simulate_supply_chain_disruptions(date)
+        disruption_events = self.inventory_flow_sim.simulate_supply_chain_disruptions(
+            date
         )
         for disruption in disruption_events:
             daily_facts["supply_chain_disruption"].append(

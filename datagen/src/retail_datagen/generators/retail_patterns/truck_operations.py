@@ -14,10 +14,12 @@ from retail_datagen.shared.models import (
     TruckStatus,
 )
 
+from .base_types import InventoryFlowBase
+
 logger = logging.getLogger(__name__)
 
 
-class TruckOperationsMixin:
+class TruckOperationsMixin(InventoryFlowBase):
     """
     Mixin providing truck operation functionality for inventory simulation.
 

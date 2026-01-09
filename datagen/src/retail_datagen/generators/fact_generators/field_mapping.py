@@ -172,17 +172,13 @@ class FieldMappingMixin(FactGeneratorBase):
             elif table_name == "receipt_lines":
                 rid = get_field(rec, "receipt_id_ext") or get_field(rec, "receipt_id")
                 ln = get_field(rec, "line_num")
-                trace_id = (
-                    f"{rid}-{ln}" if rid is not None and ln is not None else None
-                )
+                trace_id = f"{rid}-{ln}" if rid is not None and ln is not None else None
             elif table_name == "online_orders":
                 trace_id = get_field(rec, "order_id_ext")
             elif table_name == "online_order_lines":
                 oid = get_field(rec, "order_id_ext") or get_field(rec, "order_id")
                 ln = get_field(rec, "line_num")
-                trace_id = (
-                    f"{oid}-{ln}" if oid is not None and ln is not None else None
-                )
+                trace_id = f"{oid}-{ln}" if oid is not None and ln is not None else None
             elif table_name == "marketing":
                 trace_id = get_field(rec, "impression_id_ext")
             elif table_name == "promotions":
