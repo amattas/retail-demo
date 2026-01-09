@@ -1089,8 +1089,8 @@ async def test_no_client_with_empty_connection_string(
     - No pre-configured client is set
     - No connection string is provided in config
 
-    Expected behavior: Initialize succeeds but Azure client is None,
-    indicating local-only operation mode.
+    Expected behavior: Initialize succeeds and creates a default/mock client
+    for local-only operation mode (events generated but not sent to Azure).
     """
     # Create config without connection string
     config_data = {
@@ -1105,7 +1105,7 @@ async def test_no_client_with_empty_connection_string(
         "realtime": {
             "emit_interval_ms": 100,
             "burst": 50,
-            # No azure_connection_string
+            # No azure_connection_string - intentionally omitted
         },
         "paths": {
             "dict": str(tmp_path / "dictionaries"),
@@ -1121,8 +1121,10 @@ async def test_no_client_with_empty_connection_string(
 
     config = RetailConfig(**config_data)
 
-    # Verify no connection string
-    assert not config.realtime.azure_connection_string
+    # Verify no connection string in config
+    assert not config.realtime.azure_connection_string, (
+        "Config should have no connection string for this test"
+    )
 
     streamer = EventStreamer(
         config=config,
@@ -1132,16 +1134,25 @@ async def test_no_client_with_empty_connection_string(
         distribution_centers=sample_dcs,
     )
 
-    # Don't set any client - let initialize() handle it
-    assert streamer._azure_client is None
+    # Before initialization, client should be None
+    assert streamer._azure_client is None, (
+        "Client should be None before initialization"
+    )
 
-    # Initialize should still succeed (operates in local-only mode)
+    # Initialize should succeed (creates default client for local operation)
     success = await streamer.initialize()
     assert success, "Initialization should succeed even without connection string"
 
-    # Client should still be None (no connection string to create one)
-    # This is valid for local development/testing without Azure
-    # Note: The actual behavior depends on EventStreamer implementation
+    # After initialization, a default client should be created
+    # (The streamer creates a client with empty connection string for local testing)
+    assert streamer._azure_client is not None, (
+        "A default client should be created for local-only operation"
+    )
+
+    # Verify the client was created with the expected hub name from config
+    assert streamer._azure_client.hub_name == "test-retail-events", (
+        "Client should be configured with the hub name from config"
+    )
 
 
 # ================================
