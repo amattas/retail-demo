@@ -963,9 +963,8 @@ class PersistenceMixin(FactGeneratorBase):
                 # Use bulk insert for performance
                 # Note: This doesn't populate auto-increment IDs back to Python objects
                 # __table__ is typed as FromClause but is actually Table at runtime
-                await session.execute(
-                    model_class.__table__.insert(), batch  # type: ignore[attr-defined]
-                )
+                stmt = model_class.__table__.insert()  # type: ignore[attr-defined]
+                await session.execute(stmt, batch)
                 # Flush to DB
                 await session.flush()
 
