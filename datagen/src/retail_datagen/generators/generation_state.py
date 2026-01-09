@@ -9,8 +9,28 @@ historical and real-time modes.
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict
 
 from pydantic import BaseModel, Field
+
+
+class ClearDataResult(TypedDict):
+    """Result type for clear_all_data method."""
+
+    state_reset: bool
+    master_data_cleared: bool
+    facts_data_cleared: bool
+    files_deleted: list[str]
+    errors: list[str]
+
+
+class ClearFactDataResult(TypedDict):
+    """Result type for clear_fact_data method (preserves master data)."""
+
+    state_reset: bool
+    facts_data_cleared: bool
+    files_deleted: list[str]
+    errors: list[str]
 
 
 class GenerationState(BaseModel):
@@ -176,7 +196,7 @@ class GenerationStateManager:
         self._state = GenerationState()
         self.save_state()
 
-    def clear_all_data(self, config_paths: dict) -> dict:
+    def clear_all_data(self, config_paths: dict) -> ClearDataResult:
         """
         Clear all generated data and reset state.
 
@@ -184,11 +204,11 @@ class GenerationStateManager:
             config_paths: Dictionary with 'master' and 'facts' paths from config
 
         Returns:
-            Dictionary with deletion results
+            ClearDataResult with deletion results
         """
         from pathlib import Path
 
-        results: dict[str, bool | list[str]] = {
+        results: ClearDataResult = {
             "state_reset": False,
             "master_data_cleared": False,
             "facts_data_cleared": False,
@@ -227,7 +247,7 @@ class GenerationStateManager:
 
         return results
 
-    def clear_fact_data(self, config_paths: dict) -> dict:
+    def clear_fact_data(self, config_paths: dict) -> ClearFactDataResult:
         """
         Clear only fact data and reset generation state, preserving master data.
 
@@ -235,12 +255,12 @@ class GenerationStateManager:
             config_paths: Dictionary with 'facts' path from config
 
         Returns:
-            Dictionary with deletion results
+            ClearFactDataResult with deletion results
         """
         import shutil
         from pathlib import Path
 
-        results: dict[str, bool | list[str]] = {
+        results: ClearFactDataResult = {
             "state_reset": False,
             "facts_data_cleared": False,
             "files_deleted": [],
