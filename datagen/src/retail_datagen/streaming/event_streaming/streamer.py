@@ -520,6 +520,13 @@ class EventStreamer:
             )
             return False
         finally:
+            # Flush any remaining events before cleanup
+            if self._streaming_core:
+                await self._streaming_core.flush_remaining_events(self._dlq_manager)
+
+            # Record streaming stop in metrics
+            self.metrics.stop_streaming()
+
             await self._cleanup()
 
     async def start_batch_streaming(self) -> bool:

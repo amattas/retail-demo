@@ -922,5 +922,13 @@ def is_demo_mode() -> bool:
     Returns:
         True if RETAIL_DATAGEN_DEMO_MODE environment variable is set to
         a truthy value (1, true, yes), False otherwise.
+
+    Note:
+        This function dynamically checks the environment variable each time
+        it's called, allowing tests to modify the behavior at runtime.
     """
-    return _demo_mode
+    return os.getenv("RETAIL_DATAGEN_DEMO_MODE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }

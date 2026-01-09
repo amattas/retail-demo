@@ -14,6 +14,7 @@ from .blocklists import (
     REAL_COMPANIES,
     REAL_FIRST_NAMES,
     REAL_LAST_NAMES,
+    is_demo_mode,
 )
 
 
@@ -26,12 +27,31 @@ class SyntheticDataValidator:
     """
 
     def __init__(self) -> None:
-        """Initialize with blocklists of real data to avoid."""
-        self.real_first_names = REAL_FIRST_NAMES
-        self.real_last_names = REAL_LAST_NAMES
+        """Initialize with blocklists of real data to avoid.
+
+        Note: Name blocklists are evaluated dynamically based on demo mode,
+        allowing tests to modify RETAIL_DATAGEN_DEMO_MODE at runtime.
+        """
+        # Store references to blocklist sets (will check demo mode dynamically)
+        self._real_first_names = REAL_FIRST_NAMES
+        self._real_last_names = REAL_LAST_NAMES
         self.real_companies = REAL_COMPANIES
         self.real_brands = REAL_BRANDS
         self.real_address_patterns = REAL_ADDRESS_PATTERNS
+
+    @property
+    def real_first_names(self) -> set[str]:
+        """Get first name blocklist, respecting demo mode setting."""
+        if is_demo_mode():
+            return set()
+        return self._real_first_names
+
+    @property
+    def real_last_names(self) -> set[str]:
+        """Get last name blocklist, respecting demo mode setting."""
+        if is_demo_mode():
+            return set()
+        return self._real_last_names
 
     def _validate_name_format_and_blocklist(
         self, name: str, blocklist: set[str]
