@@ -179,6 +179,9 @@ class AzureEventHubClient:
         # it's created in an async context rather than during __init__ which may run
         # outside an event loop
         self._buffer_lock: asyncio.Lock | None = None
+        # Lock for statistics updates: Separate from buffer lock to avoid contention
+        # between buffer operations and send operations
+        self._stats_lock: asyncio.Lock | None = None
         # Flag to prevent multiple concurrent auto-flush tasks from being scheduled
         self._is_flushing = False
         self._statistics = {
@@ -229,6 +232,47 @@ class AzureEventHubClient:
         if self._buffer_lock is None:
             self._buffer_lock = asyncio.Lock()
         return self._buffer_lock
+
+    def _get_stats_lock(self) -> asyncio.Lock:
+        """Get the statistics lock, lazily initializing it if needed.
+
+        Separate from buffer lock to avoid contention between buffer
+        operations and statistics updates during send operations.
+
+        Returns:
+            The asyncio.Lock instance for statistics synchronization
+        """
+        if self._stats_lock is None:
+            self._stats_lock = asyncio.Lock()
+        return self._stats_lock
+
+    async def _update_statistics(
+        self,
+        events_sent: int = 0,
+        events_failed: int = 0,
+        batches_sent: int = 0,
+        update_last_send_time: bool = False,
+    ) -> None:
+        """Update statistics counters with lock protection.
+
+        Thread-safety: Uses async lock to ensure atomic counter updates
+        during concurrent send operations.
+
+        Args:
+            events_sent: Number of events successfully sent to add
+            events_failed: Number of events that failed to add
+            batches_sent: Number of batches sent to add
+            update_last_send_time: Whether to update last_send_time to now
+        """
+        async with self._get_stats_lock():
+            if events_sent:
+                self._statistics["events_sent"] += events_sent
+            if events_failed:
+                self._statistics["events_failed"] += events_failed
+            if batches_sent:
+                self._statistics["batches_sent"] += batches_sent
+            if update_last_send_time:
+                self._statistics["last_send_time"] = datetime.now(UTC)
 
     def _initialize_client(self):
         """Initialize the Azure Event Hub producer client."""
@@ -395,15 +439,17 @@ class AzureEventHubClient:
                     success = await self._send_batch_direct(events)
 
                 if success:
-                    self._statistics["events_sent"] += len(events)
-                    self._statistics["batches_sent"] += 1
-                    self._statistics["last_send_time"] = datetime.now(UTC)
+                    await self._update_statistics(
+                        events_sent=len(events),
+                        batches_sent=1,
+                        update_last_send_time=True,
+                    )
                     logger.debug(f"Successfully sent batch of {len(events)} events")
                     return True
 
             except Exception as e:
                 attempt += 1
-                self._statistics["events_failed"] += len(events)
+                await self._update_statistics(events_failed=len(events))
                 logger.warning(
                     f"Batch send attempt {attempt}/{self.retry_attempts} failed: {e}"
                 )
@@ -491,9 +537,15 @@ class AzureEventHubClient:
         # Note: We schedule outside the lock to avoid holding lock during I/O,
         # but the decision to flush is made atomically inside the lock.
         if should_schedule_flush:
-            # Create task directly - we're already in an async context (this is an async method)
-            # If this fails, _is_flushing will be reset by the caller or on next flush attempt
-            asyncio.create_task(self._flush_and_reset())
+            try:
+                # Create task directly - we're already in an async context
+                asyncio.create_task(self._flush_and_reset())
+            except Exception as e:
+                # If task creation fails, reset the flushing flag to avoid deadlock
+                # where _is_flushing stays True forever, blocking all future auto-flushes
+                logger.error(f"Failed to schedule auto-flush task: {e}")
+                async with self._get_buffer_lock():
+                    self._is_flushing = False
 
         return needs_flush
 
@@ -540,10 +592,8 @@ class AzureEventHubClient:
         """
         Get client statistics and performance metrics.
 
-        Thread-safety: Reads buffer_size under lock protection. The _statistics
-        dict and other fields are read outside the lock. This is acceptable as
-        dict operations are atomic in CPython and these fields are updated
-        infrequently during connection management.
+        Thread-safety: Reads buffer_size under buffer lock, and reads _statistics
+        under stats lock. This ensures consistent reads during concurrent operations.
 
         Returns:
             dict: Statistics about client performance including:
@@ -555,6 +605,7 @@ class AzureEventHubClient:
         """
         async with self._get_buffer_lock():
             buffer_size = len(self._event_buffer)
+        async with self._get_stats_lock():
             # Copy statistics under lock for consistency
             stats = self._statistics.copy()
         stats.update(

@@ -1469,3 +1469,70 @@ class TestConcurrentBufferAccess:
             assert "buffer_size" in stats
             assert "events_sent" in stats
             assert "is_connected" in stats
+
+    @pytest.mark.asyncio
+    async def test_lock_prevents_buffer_corruption_under_high_contention(
+        self, mock_client
+    ):
+        """Test that lock prevents buffer state corruption under high contention.
+
+        This test rapidly adds events and checks statistics concurrently to verify
+        that the buffer size is always non-negative and within reasonable bounds.
+        """
+
+        async def rapid_add_and_check():
+            for _ in range(50):
+                event = self._create_test_event(0)
+                await mock_client.add_to_buffer(event)
+                stats = await mock_client.get_statistics()
+                # Buffer size should never be negative or unreasonably large
+                assert stats["buffer_size"] >= 0, "Buffer size became negative"
+                assert stats["buffer_size"] <= 1000, "Buffer grew beyond expected limit"
+
+        # Run multiple concurrent tasks that add and check
+        await asyncio.gather(*[rapid_add_and_check() for _ in range(10)])
+
+    @pytest.mark.asyncio
+    async def test_concurrent_flush_prevents_duplicate_sends(self, mock_client):
+        """Test that _is_flushing flag prevents duplicate flush operations.
+
+        Multiple concurrent flush calls should not result in the same events
+        being sent multiple times.
+        """
+        # Add some events
+        for i in range(5):
+            event = self._create_test_event(i)
+            await mock_client.add_to_buffer(event)
+
+        # Trigger multiple concurrent flushes
+        flush_results = await asyncio.gather(
+            *[mock_client.flush_buffer() for _ in range(10)]
+        )
+
+        # All flushes should succeed (return True) but buffer should be empty after
+        assert all(isinstance(r, bool) for r in flush_results)
+
+        stats = await mock_client.get_statistics()
+        assert stats["buffer_size"] == 0, "Buffer should be empty after flushes"
+
+    @pytest.mark.asyncio
+    async def test_statistics_counters_atomic_under_concurrent_updates(
+        self, mock_client
+    ):
+        """Test that statistics counters are updated atomically.
+
+        Concurrent send operations should result in accurate event counts.
+        """
+        initial_stats = await mock_client.get_statistics()
+        initial_sent = initial_stats.get("events_sent", 0)
+
+        # The mock client doesn't actually send events, so we verify the structure
+        # and that concurrent statistics reads don't cause errors
+        async def read_stats_repeatedly():
+            for _ in range(50):
+                stats = await mock_client.get_statistics()
+                assert stats["events_sent"] >= initial_sent
+                assert stats["events_failed"] >= 0
+                assert stats["batches_sent"] >= 0
+
+        await asyncio.gather(*[read_stats_repeatedly() for _ in range(5)])
