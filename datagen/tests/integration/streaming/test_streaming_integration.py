@@ -199,7 +199,7 @@ def mock_event_hub_client():
             "last_send_time": datetime.now(UTC),
         }
     )
-    client.get_statistics = Mock(
+    client.get_statistics = AsyncMock(
         return_value={
             "events_sent": 0,
             "events_failed": 0,

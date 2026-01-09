@@ -162,7 +162,7 @@ def mock_azure_client():
     client.health_check = AsyncMock(
         return_value={"healthy": True, "status": "connected"}
     )
-    client.get_statistics = Mock(
+    client.get_statistics = AsyncMock(
         return_value={
             "total_sent": 100,
             "total_failed": 0,

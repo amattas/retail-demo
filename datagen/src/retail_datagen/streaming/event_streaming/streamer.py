@@ -774,3 +774,11 @@ class EventStreamer:
         """Backward compatibility: delegate to streaming core."""
         if self._streaming_core:
             await self._streaming_core.flush_event_buffer(self._dlq_manager)
+
+    async def _handle_send_failure(self, events, exception):
+        """Backward compatibility: delegate to streaming core."""
+        if self._streaming_core:
+            return await self._streaming_core._handle_send_failure(
+                events, exception, self._dlq_manager
+            )
+        return False

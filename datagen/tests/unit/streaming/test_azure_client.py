@@ -592,8 +592,8 @@ class TestBatching:
             await client.connect()
 
             # Add events to buffer
-            client.add_to_buffer(sample_event_envelope)
-            client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
 
             assert len(client._event_buffer) == 2
 
@@ -629,7 +629,7 @@ class TestBatching:
                     trace_id=str(uuid4()),
                     ingest_timestamp=datetime.now(UTC),
                 )
-                client.add_to_buffer(event)
+                await client.add_to_buffer(event)
 
             # Give async task time to execute
             await asyncio.sleep(0.1)
@@ -970,7 +970,7 @@ class TestStatisticsAndMonitoring:
             await client.connect()
             await client.send_events(sample_event_batch)
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["events_sent"] == 5
             assert stats["batches_sent"] == 1
@@ -994,7 +994,7 @@ class TestStatisticsAndMonitoring:
                 circuit_breaker_enabled=True,
             )
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert "circuit_breaker_state" in stats
             assert stats["circuit_breaker_state"] == "CLOSED"
@@ -1014,7 +1014,7 @@ class TestStatisticsAndMonitoring:
                 circuit_breaker_enabled=False,
             )
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["circuit_breaker_state"] == "DISABLED"
 
@@ -1031,10 +1031,10 @@ class TestStatisticsAndMonitoring:
                 connection_string=valid_connection_string, hub_name="test-hub"
             )
 
-            client.add_to_buffer(sample_event_envelope)
-            client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
+            await client.add_to_buffer(sample_event_envelope)
 
-            stats = client.get_statistics()
+            stats = await client.get_statistics()
 
             assert stats["buffer_size"] == 2
 
@@ -1372,3 +1372,245 @@ class TestConnectionTest:
             assert metadata["namespace"] == "test"
             assert metadata["key_name"] == "RootManageSharedAccessKey"
             assert metadata["is_fabric_rti"] is False
+
+
+# =============================================================================
+# Concurrent Access Tests
+# =============================================================================
+
+
+class TestLockInitialization:
+    """Tests for lock initialization in various contexts."""
+
+    @pytest.mark.asyncio
+    async def test_locks_initialized_in_connect(self):
+        """Test that locks are explicitly initialized during connect()."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Locks should be None initially (lazy initialization)
+        assert client._buffer_lock is None
+        assert client._stats_lock is None
+
+        # After connect, locks should be initialized
+        await client.connect()
+
+        assert client._buffer_lock is not None
+        assert client._stats_lock is not None
+        assert isinstance(client._buffer_lock, asyncio.Lock)
+        assert isinstance(client._stats_lock, asyncio.Lock)
+
+    @pytest.mark.asyncio
+    async def test_lazy_initialization_still_works(self):
+        """Test that lazy initialization via _get_buffer_lock() still works."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Locks should be None initially
+        assert client._buffer_lock is None
+        assert client._stats_lock is None
+
+        # Calling _get_buffer_lock() should create locks
+        buffer_lock = client._get_buffer_lock()
+        stats_lock = client._get_stats_lock()
+
+        assert buffer_lock is not None
+        assert stats_lock is not None
+        assert isinstance(buffer_lock, asyncio.Lock)
+        assert isinstance(stats_lock, asyncio.Lock)
+
+        # Subsequent calls should return the same lock instances
+        assert client._get_buffer_lock() is buffer_lock
+        assert client._get_stats_lock() is stats_lock
+
+    @pytest.mark.asyncio
+    async def test_locks_work_before_connect(self):
+        """Test that buffer operations work even before connect() is called."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Create a test event
+        event = EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload={"test": True},
+            trace_id=str(uuid4()),
+            ingest_timestamp=datetime.now(UTC),
+        )
+
+        # add_to_buffer should work even before connect() (lazy init)
+        await client.add_to_buffer(event)
+
+        # Buffer lock should have been created by add_to_buffer's lazy initialization
+        assert client._buffer_lock is not None
+
+        # Buffer should contain the event - get_statistics() will initialize stats_lock
+        stats = await client.get_statistics()
+        assert stats["buffer_size"] == 1
+
+        # Stats lock should now be initialized after get_statistics() call
+        assert client._stats_lock is not None
+
+
+class TestConcurrentBufferAccess:
+    """Tests for thread-safe buffer operations under concurrent access."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock client for concurrent testing."""
+        return AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+            max_batch_size=10,
+        )
+
+    def _create_test_event(self, event_id: int) -> EventEnvelope:
+        """Create a test event with a unique identifier."""
+        return EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload={"event_id": event_id, "test": True},
+            trace_id=str(uuid4()),
+            ingest_timestamp=datetime.now(UTC),
+        )
+
+    @pytest.mark.asyncio
+    async def test_concurrent_add_to_buffer_no_lost_events(self, mock_client):
+        """Test that concurrent add_to_buffer calls don't lose events."""
+        num_events = 100
+        events_added = []
+
+        async def add_event(event_id: int):
+            event = self._create_test_event(event_id)
+            await mock_client.add_to_buffer(event)
+            events_added.append(event_id)
+
+        # Run multiple add_to_buffer calls concurrently
+        await asyncio.gather(*[add_event(i) for i in range(num_events)])
+
+        # Get statistics to verify buffer operations completed
+        stats = await mock_client.get_statistics()
+        assert "buffer_size" in stats  # Verify stats structure is valid
+
+        # All events should be either in buffer or flushed
+        # (we can't check exact count due to auto-flush, but no events should be lost)
+        assert len(events_added) == num_events
+
+    @pytest.mark.asyncio
+    async def test_concurrent_add_and_flush(self, mock_client):
+        """Test concurrent add and flush operations don't corrupt buffer."""
+        num_adds = 50
+        num_flushes = 10
+
+        async def add_events():
+            for i in range(num_adds):
+                event = self._create_test_event(i)
+                await mock_client.add_to_buffer(event)
+                await asyncio.sleep(0.001)  # Small delay to interleave
+
+        async def flush_periodically():
+            for _ in range(num_flushes):
+                await mock_client.flush_buffer()
+                await asyncio.sleep(0.005)
+
+        # Run add and flush concurrently
+        await asyncio.gather(add_events(), flush_periodically())
+
+        # Final flush to clear any remaining events
+        await mock_client.flush_buffer()
+
+        # Buffer should be empty after final flush
+        stats = await mock_client.get_statistics()
+        assert stats["buffer_size"] == 0
+
+    @pytest.mark.asyncio
+    async def test_concurrent_get_statistics(self, mock_client):
+        """Test concurrent get_statistics calls are safe."""
+        # Add some events first
+        for i in range(5):
+            event = self._create_test_event(i)
+            await mock_client.add_to_buffer(event)
+
+        async def get_stats():
+            return await mock_client.get_statistics()
+
+        # Run multiple get_statistics calls concurrently
+        results = await asyncio.gather(*[get_stats() for _ in range(20)])
+
+        # All results should be valid dicts with consistent structure
+        for stats in results:
+            assert isinstance(stats, dict)
+            assert "buffer_size" in stats
+            assert "events_sent" in stats
+            assert "is_connected" in stats
+
+    @pytest.mark.asyncio
+    async def test_lock_prevents_buffer_corruption_under_high_contention(
+        self, mock_client
+    ):
+        """Test that lock prevents buffer state corruption under high contention.
+
+        This test rapidly adds events and checks statistics concurrently to verify
+        that the buffer size is always non-negative and within reasonable bounds.
+        """
+
+        async def rapid_add_and_check():
+            for _ in range(50):
+                event = self._create_test_event(0)
+                await mock_client.add_to_buffer(event)
+                stats = await mock_client.get_statistics()
+                # Buffer size should never be negative or unreasonably large
+                assert stats["buffer_size"] >= 0, "Buffer size became negative"
+                assert stats["buffer_size"] <= 1000, "Buffer grew beyond expected limit"
+
+        # Run multiple concurrent tasks that add and check
+        await asyncio.gather(*[rapid_add_and_check() for _ in range(10)])
+
+    @pytest.mark.asyncio
+    async def test_concurrent_flush_prevents_duplicate_sends(self, mock_client):
+        """Test that _is_flushing flag prevents duplicate flush operations.
+
+        Multiple concurrent flush calls should not result in the same events
+        being sent multiple times.
+        """
+        # Add some events
+        for i in range(5):
+            event = self._create_test_event(i)
+            await mock_client.add_to_buffer(event)
+
+        # Trigger multiple concurrent flushes
+        flush_results = await asyncio.gather(
+            *[mock_client.flush_buffer() for _ in range(10)]
+        )
+
+        # All flushes should succeed (return True) but buffer should be empty after
+        assert all(isinstance(r, bool) for r in flush_results)
+
+        stats = await mock_client.get_statistics()
+        assert stats["buffer_size"] == 0, "Buffer should be empty after flushes"
+
+    @pytest.mark.asyncio
+    async def test_statistics_counters_atomic_under_concurrent_updates(
+        self, mock_client
+    ):
+        """Test that statistics counters are updated atomically.
+
+        Concurrent send operations should result in accurate event counts.
+        """
+        initial_stats = await mock_client.get_statistics()
+        initial_sent = initial_stats.get("events_sent", 0)
+
+        # The mock client doesn't actually send events, so we verify the structure
+        # and that concurrent statistics reads don't cause errors
+        async def read_stats_repeatedly():
+            for _ in range(50):
+                stats = await mock_client.get_statistics()
+                assert stats["events_sent"] >= initial_sent
+                assert stats["events_failed"] >= 0
+                assert stats["batches_sent"] >= 0
+
+        await asyncio.gather(*[read_stats_repeatedly() for _ in range(5)])

@@ -290,7 +290,7 @@ class MonitoringManager:
 
             # Add Azure client statistics if available
             if azure_client:
-                azure_stats = azure_client.get_statistics()
+                azure_stats = await azure_client.get_statistics()
                 stats.update({"azure_client": azure_stats})
 
             return stats
