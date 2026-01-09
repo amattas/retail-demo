@@ -942,9 +942,7 @@ class TestTaskCleanup:
     def test_cleanup_uses_default_max_age(self):
         """Test that cleanup uses default max_age when None provided."""
         # Create a task older than default (24 hours)
-        old_time = datetime.now(UTC) - timedelta(
-            hours=TASK_CLEANUP_MAX_AGE_HOURS + 1
-        )
+        old_time = datetime.now(UTC) - timedelta(hours=TASK_CLEANUP_MAX_AGE_HOURS + 1)
         _task_status["old_task"] = TaskStatus(
             status="completed",
             started_at=old_time,

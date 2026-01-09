@@ -449,7 +449,7 @@ class InventoryFlowSimulator:
             reorder_list = truncated_list
 
         # Generate unique shipment ID
-        date_str = departure_time.strftime('%Y%m%d')
+        date_str = departure_time.strftime("%Y%m%d")
         rand_suffix = self._rng.randint(100, 999)
         shipment_id = f"SHIP{date_str}{dc_id:02d}{store_id:03d}{rand_suffix}"
 

@@ -87,12 +87,8 @@ class DistributionGeneratorMixin:
             raise ValueError("Geography master data must be generated first")
 
         # Initialize utilities
-        geo_distribution = GeographicDistribution(
-            selected_geography_data, seed + 1000
-        )
-        address_generator = AddressGenerator(
-            selected_geography_data, seed + 1000
-        )
+        geo_distribution = GeographicDistribution(selected_geography_data, seed + 1000)
+        address_generator = AddressGenerator(selected_geography_data, seed + 1000)
         id_generator = IdentifierGenerator(seed + 1000)
 
         # DCs should be strategically placed in highest-weight regions

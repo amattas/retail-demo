@@ -229,32 +229,26 @@ class TestHistoricalGenerationStateTransitions:
         # Mark first table as started
         tracker.mark_table_started(FACT_TABLES[0])
         assert (
-            tracker.get_state(FACT_TABLES[0])
-            == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
         )
 
         # Update progress (should NOT change state)
         tracker.update_progress(FACT_TABLES[0], 0.5)
         assert (
-            tracker.get_state(FACT_TABLES[0])
-            == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
         )
         assert tracker.get_progress(FACT_TABLES[0]) == 0.5
 
         # Even at 100% progress, state should remain in_progress
         tracker.update_progress(FACT_TABLES[0], 1.0)
         assert (
-            tracker.get_state(FACT_TABLES[0])
-            == TableProgressTracker.STATE_IN_PROGRESS
+            tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_IN_PROGRESS
         )
         assert tracker.get_progress(FACT_TABLES[0]) == 1.0
 
         # Mark generation complete (transitions all in_progress -> completed)
         tracker.mark_generation_complete()
-        assert (
-            tracker.get_state(FACT_TABLES[0])
-            == TableProgressTracker.STATE_COMPLETED
-        )
+        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_COMPLETED
 
         # Check state lists after completion
         completed = tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
@@ -301,9 +295,7 @@ class TestHistoricalGenerationStateTransitions:
         tracker.mark_table_started(FACT_TABLES[0])
         tracker.mark_table_started(FACT_TABLES[1])
 
-        remaining = tracker.get_tables_by_state(
-            TableProgressTracker.STATE_NOT_STARTED
-        )
+        remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
         in_progress = tracker.get_tables_by_state(
             TableProgressTracker.STATE_IN_PROGRESS
         )
@@ -320,9 +312,7 @@ class TestHistoricalGenerationStateTransitions:
         # Mark generation complete
         tracker.mark_generation_complete()
 
-        remaining = tracker.get_tables_by_state(
-            TableProgressTracker.STATE_NOT_STARTED
-        )
+        remaining = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
         in_progress = tracker.get_tables_by_state(
             TableProgressTracker.STATE_IN_PROGRESS
         )
@@ -448,9 +438,7 @@ class TestDependenciesIntegration:
 class TestEndToEndGenerationFlow:
     """Test complete end-to-end generation flows with real API requests."""
 
-    @pytest.mark.skip(
-        reason="Requires full application setup with FastAPI TestClient"
-    )
+    @pytest.mark.skip(reason="Requires full application setup with FastAPI TestClient")
     async def test_full_generation_with_state_polling(
         self, small_test_config, temp_master_data
     ):
@@ -508,9 +496,7 @@ class TestEndToEndGenerationFlow:
                 # Check if complete
                 if status_data["status"] == "completed":
                     # Verify all tables are completed
-                    assert (
-                        len(status_data["tables_completed"]) == len(FACT_TABLES)
-                    )
+                    assert len(status_data["tables_completed"]) == len(FACT_TABLES)
                     assert len(status_data["tables_in_progress"]) == 0
                     break
 
@@ -579,13 +565,9 @@ class TestMultipleGenerationRuns:
         tracker.mark_generation_complete()
 
         # Verify first table completed
+        assert tracker.get_state(FACT_TABLES[0]) == TableProgressTracker.STATE_COMPLETED
         assert (
-            tracker.get_state(FACT_TABLES[0])
-            == TableProgressTracker.STATE_COMPLETED
-        )
-        assert (
-            tracker.get_state(FACT_TABLES[1])
-            == TableProgressTracker.STATE_NOT_STARTED
+            tracker.get_state(FACT_TABLES[1]) == TableProgressTracker.STATE_NOT_STARTED
         )
 
         # Incremental run: reset and continue

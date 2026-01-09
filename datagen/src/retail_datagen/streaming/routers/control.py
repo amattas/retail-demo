@@ -119,8 +119,7 @@ async def start_streaming(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Historical data must be generated before "
-                "starting real-time streaming"
+                "Historical data must be generated before starting real-time streaming"
             ),
         )
 

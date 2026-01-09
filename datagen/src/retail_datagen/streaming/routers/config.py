@@ -309,8 +309,8 @@ async def validate_streaming_config(
             metadata = get_connection_string_metadata(conn_str)
 
             # Fabric RTI specific validation
-            is_fabric_valid, fabric_msg, fabric_metadata = (
-                validate_fabric_rti_specific(conn_str)
+            is_fabric_valid, fabric_msg, fabric_metadata = validate_fabric_rti_specific(
+                conn_str
             )
             metadata.update(fabric_metadata)
 
@@ -324,8 +324,7 @@ async def validate_streaming_config(
                     "ensure workspace has proper permissions"
                 )
                 recommendations.append(
-                    "Fabric RTI automatically scales - "
-                    "monitor usage in Fabric portal"
+                    "Fabric RTI automatically scales - monitor usage in Fabric portal"
                 )
             else:
                 recommendations.append(

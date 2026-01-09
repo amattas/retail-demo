@@ -27,10 +27,7 @@ def test_reset_duckdb_handles_close_failure(caplog):
             # Should not raise, but should log warning
             duckdb_engine.reset_duckdb()
 
-            assert (
-                "Failed to close" in caplog.text
-                or "close" in caplog.text.lower()
-            )
+            assert "Failed to close" in caplog.text or "close" in caplog.text.lower()
 
 
 def test_reset_duckdb_handles_file_deletion_failure(caplog):
@@ -39,9 +36,7 @@ def test_reset_duckdb_handles_file_deletion_failure(caplog):
     with patch.object(duckdb_engine, "_conn", None):
         # Patch get_duckdb_path to return a known path
         test_path = Path("/tmp/test.db")
-        with patch.object(
-            duckdb_engine, "get_duckdb_path", return_value=test_path
-        ):
+        with patch.object(duckdb_engine, "get_duckdb_path", return_value=test_path):
             # Mock Path.exists to return True and unlink to fail
             with patch.object(Path, "exists", return_value=True):
                 with patch.object(
@@ -73,9 +68,7 @@ def test_close_duckdb_handles_exception(caplog):
 def test_table_exists_handles_catalog_exception(caplog):
     """Test that _table_exists handles CatalogException gracefully."""
     mock_conn = MagicMock()
-    mock_conn.execute.side_effect = duckdb.CatalogException(
-        "Table does not exist"
-    )
+    mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
     # Use a valid table name from the allowlist
     result = duckdb_engine._table_exists(mock_conn, "dim_geographies")
@@ -102,9 +95,7 @@ def test_table_exists_rejects_invalid_table_name():
 
     # Invalid table name should raise ValueError
     with pytest.raises(ValueError) as exc_info:
-        duckdb_engine._table_exists(
-            mock_conn, "malicious_table; DROP TABLE users;--"
-        )
+        duckdb_engine._table_exists(mock_conn, "malicious_table; DROP TABLE users;--")
 
     assert "Invalid table name" in str(exc_info.value)
     # Connection should not be called
@@ -114,9 +105,7 @@ def test_table_exists_rejects_invalid_table_name():
 def test_current_columns_handles_catalog_exception():
     """Test that _current_columns returns empty set for missing table."""
     mock_conn = MagicMock()
-    mock_conn.execute.side_effect = duckdb.CatalogException(
-        "Table does not exist"
-    )
+    mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
     # Use a valid table name from the allowlist
     result = duckdb_engine._current_columns(mock_conn, "dim_geographies")
@@ -353,8 +342,6 @@ def test_ensure_columns_allows_valid_column_names():
 
     # Verify ALTER TABLE was called for each column
     alter_calls = [
-        call
-        for call in mock_conn.execute.call_args_list
-        if "ALTER TABLE" in str(call)
+        call for call in mock_conn.execute.call_args_list if "ALTER TABLE" in str(call)
     ]
     assert len(alter_calls) == 3

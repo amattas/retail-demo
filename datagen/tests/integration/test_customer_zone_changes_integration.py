@@ -83,9 +83,7 @@ async def test_customer_zone_changes_generation(small_config):
         print(f"Generated {zone_change_count} zone change records")
 
         # Also verify BLE pings were generated (prerequisite for zone changes)
-        ble_ping_result = conn.execute(
-            "SELECT COUNT(*) FROM fact_ble_pings"
-        ).fetchone()
+        ble_ping_result = conn.execute("SELECT COUNT(*) FROM fact_ble_pings").fetchone()
         ble_ping_count = ble_ping_result[0] if ble_ping_result else 0
 
         print(f"Generated {ble_ping_count} BLE ping records")

@@ -455,8 +455,7 @@ async def get_version():
     "/metrics",
     summary="Prometheus metrics",
     description=(
-        "Prometheus metrics endpoint for monitoring streaming health "
-        "and performance"
+        "Prometheus metrics endpoint for monitoring streaming health and performance"
     ),
     tags=["Monitoring"],
 )

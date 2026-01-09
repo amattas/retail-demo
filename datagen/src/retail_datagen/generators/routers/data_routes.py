@@ -62,9 +62,7 @@ async def list_fact_tables(config: RetailConfig = Depends(get_config)):
                     tables_with_data.append(logical)
             except Exception:
                 pass
-        return TableListResponse(
-            tables=tables_with_data, count=len(tables_with_data)
-        )
+        return TableListResponse(tables=tables_with_data, count=len(tables_with_data))
     except Exception as e:
         logger.warning(f"Falling back to empty fact table list due to error: {e}")
         return TableListResponse(tables=[], count=0)

@@ -178,7 +178,7 @@ class BaseGenerator:
 
                 # Emit final progress as completed
                 if ui_table_name:
-                    table_display = ui_table_name.replace('_', ' ')
+                    table_display = ui_table_name.replace("_", " ")
                     msg = f"Writing {table_display} ({inserted:,}/{total_records:,})"
                     self._emit_progress(
                         ui_table_name,
@@ -212,7 +212,7 @@ class BaseGenerator:
                     fraction = (
                         records_inserted / total_records if total_records else 1.0
                     )
-                    table_display = ui_table_name.replace('_', ' ')
+                    table_display = ui_table_name.replace("_", " ")
                     msg = (
                         f"Writing {table_display} "
                         f"({records_inserted:,}/{total_records:,})"

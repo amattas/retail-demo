@@ -810,9 +810,7 @@ class PersistenceMixin:
                         1.0, (completed_hours + 1.0) / total_hours_expected
                     )
                     count = self._table_insert_counts[table_name]
-                    msg = (
-                        f"Writing {table_name.replace('_', ' ')} ({count:,})"
-                    )
+                    msg = f"Writing {table_name.replace('_', ' ')} ({count:,})"
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,
@@ -820,13 +818,9 @@ class PersistenceMixin:
                         {table_name: count},
                     )
                 except Exception as e:
-                    logger.debug(
-                        f"Failed to emit progress for {table_name}: {e}"
-                    )
+                    logger.debug(f"Failed to emit progress for {table_name}: {e}")
             except Exception as e:
-                logger.error(
-                    f"DuckDB insert failed for {table_name}: {e}"
-                )
+                logger.error(f"DuckDB insert failed for {table_name}: {e}")
             return
 
         # Map table name to model (SQLite path)
@@ -935,9 +929,7 @@ class PersistenceMixin:
         except (ImportError, AttributeError) as e:
             # If pandas isn't available or any issue occurs, proceed
             # without normalization
-            logger.debug(
-                f"Failed to normalize pandas NA values for {table_name}: {e}"
-            )
+            logger.debug(f"Failed to normalize pandas NA values for {table_name}: {e}")
 
         # Filter out any keys that are not actual columns in the target table
         try:
@@ -1000,9 +992,7 @@ class PersistenceMixin:
                     # Emit per-table progress callback
                     # (router merges counts and recomputes overall)
                     count = self._table_insert_counts[table_name]
-                    msg = (
-                        f"Writing {table_name.replace('_', ' ')} ({count:,})"
-                    )
+                    msg = f"Writing {table_name.replace('_', ' ')} ({count:,})"
                     self._emit_table_progress(
                         table_name,
                         per_table_fraction,

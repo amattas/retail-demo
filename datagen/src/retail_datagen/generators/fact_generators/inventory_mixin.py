@@ -43,9 +43,7 @@ class InventoryMixin:
 
         # Each DC receives shipments
         for dc in self.distribution_centers:
-            dc_transactions = self.inventory_flow_sim.simulate_dc_receiving(
-                dc.ID, date
-            )
+            dc_transactions = self.inventory_flow_sim.simulate_dc_receiving(dc.ID, date)
 
             for transaction in dc_transactions:
                 # Get current balance after this transaction
@@ -125,9 +123,7 @@ class InventoryMixin:
 
             self._store_customer_sampling[store_id] = (customers_list, weights_list)
         # Also cache NumPy-ready arrays for fast vector sampling
-        self._store_customer_sampling_np: dict[
-            int, tuple[np.ndarray, np.ndarray]
-        ] = {}
+        self._store_customer_sampling_np: dict[int, tuple[np.ndarray, np.ndarray]] = {}
         for sid, (clist, wlist) in self._store_customer_sampling.items():
             try:
                 idx = np.arange(len(clist), dtype=np.int32)
@@ -186,8 +182,7 @@ class InventoryMixin:
         # (e.g., _insert_hourly_to_db) can mirror to streaming_outbox
         self._publish_to_outbox = bool(publish_to_outbox)
         print(
-            f"Starting historical fact data generation from "
-            f"{start_date} to {end_date}"
+            f"Starting historical fact data generation from {start_date} to {end_date}"
         )
 
         # Reset table states for new generation run
@@ -290,10 +285,7 @@ class InventoryMixin:
                 # receipt_id_ext
                 if "receipt_id_ext" not in cols:
                     await session.execute(
-                        text(
-                            "ALTER TABLE fact_receipts "
-                            "ADD COLUMN receipt_id_ext TEXT"
-                        )
+                        text("ALTER TABLE fact_receipts ADD COLUMN receipt_id_ext TEXT")
                     )
                     await session.execute(
                         text(
@@ -520,9 +512,7 @@ class InventoryMixin:
         validation_results = self.business_rules.get_validation_summary()
 
         generation_end_time = datetime.now(UTC)
-        generation_time = (
-            generation_end_time - generation_start_time
-        ).total_seconds()
+        generation_time = (generation_end_time - generation_start_time).total_seconds()
 
         total_records = sum(facts_generated.values())
 
@@ -724,9 +714,7 @@ class InventoryMixin:
                         ),
                         total_days=total_days,
                         table_progress=progress_state.get("per_table_progress", {}),
-                        tables_in_progress=progress_state.get(
-                            "tables_in_progress", []
-                        ),
+                        tables_in_progress=progress_state.get("tables_in_progress", []),
                     )
             except Exception as e:
                 logger.debug(
@@ -1177,8 +1165,7 @@ class InventoryMixin:
                         )
             except Exception as e:
                 logger.warning(
-                    f"Stockout generation failed for "
-                    f"{date.strftime('%Y-%m-%d')}: {e}"
+                    f"Stockout generation failed for {date.strftime('%Y-%m-%d')}: {e}"
                 )
 
         # 9. Generate return receipts and inventory effects (baseline + holiday spikes)

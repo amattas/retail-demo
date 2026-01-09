@@ -285,9 +285,7 @@ class GeographicDistribution:
                 base_weight *= 1.5
 
             # Metro areas (simplified detection)
-            if any(
-                term in geo.District.lower() for term in ["metro", "urban", "city"]
-            ):
+            if any(term in geo.District.lower() for term in ["metro", "urban", "city"]):
                 base_weight *= 2.0
 
             # Add some randomness to avoid completely predictable patterns

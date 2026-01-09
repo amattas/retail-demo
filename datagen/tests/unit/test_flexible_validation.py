@@ -29,9 +29,7 @@ class TestFlexibleValidation:
             "SharedAccessKeyName=key;SharedAccessKey=short"
         )
 
-        is_valid, error = validate_eventhub_connection_string(
-            short_conn, strict=True
-        )
+        is_valid, error = validate_eventhub_connection_string(short_conn, strict=True)
 
         assert not is_valid
         assert "too short" in error.lower() or "invalid" in error.lower()
@@ -183,9 +181,7 @@ class TestFlexibleValidation:
         is_valid, error = validate_eventhub_connection_string(
             custom_conn, strict=False, allow_mock=True
         )
-        assert is_valid, (
-            f"Custom connection string should be valid, got error: {error}"
-        )
+        assert is_valid, f"Custom connection string should be valid, got error: {error}"
 
     def test_non_strict_allows_non_standard_domains(self):
         """Non-strict mode should allow non-standard servicebus domains."""
@@ -206,9 +202,7 @@ class TestFlexibleValidation:
         is_valid_relaxed, error = validate_eventhub_connection_string(
             custom_domain_conn, strict=False, allow_mock=True
         )
-        assert is_valid_relaxed, (
-            f"Non-strict should allow custom domains, got: {error}"
-        )
+        assert is_valid_relaxed, f"Non-strict should allow custom domains, got: {error}"
 
     def test_empty_connection_string_always_invalid(self):
         """Empty connection strings should always be invalid."""

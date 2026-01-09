@@ -533,8 +533,7 @@ class StoreInventoryTransaction(BaseModel):
     Reason: InventoryReason | None = Field(
         None,
         description=(
-            "Reason for inventory change "
-            "(INBOUND_SHIPMENT, SALE, RETURN, etc.)"
+            "Reason for inventory change (INBOUND_SHIPMENT, SALE, RETURN, etc.)"
         ),
     )
     Source: str | None = Field(

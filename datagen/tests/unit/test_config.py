@@ -306,9 +306,7 @@ class TestConfig:
             "stream": {"hub": "retail-events"},
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
             temp_path = f.name
 
@@ -322,9 +320,7 @@ class TestConfig:
 
     def test_config_from_invalid_json_file(self):
         """Test that invalid JSON file raises appropriate error."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("{ invalid json }")
             temp_path = f.name
 

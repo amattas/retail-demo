@@ -460,18 +460,14 @@ class TestShouldGenerateEvent:
         weekday_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(
-                EventType.RECEIPT_CREATED, weekday
-            )
+            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, weekday)
         )
 
         event_factory.rng = random.Random(42)
         weekend_count = sum(
             1
             for _ in range(1000)
-            if event_factory.should_generate_event(
-                EventType.RECEIPT_CREATED, weekend
-            )
+            if event_factory.should_generate_event(EventType.RECEIPT_CREATED, weekend)
         )
 
         # Temporal model boosts weekends; allow weekend >= weekday
@@ -965,9 +961,7 @@ class TestInventoryUpdatedBehaviors:
         ]
 
         inbound_events = [
-            e
-            for e in events
-            if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]
+            e for e in events if e.payload["reason"] not in ["SALE", "DAMAGED", "LOST"]
         ]
         if inbound_events:
             for event in inbound_events:
@@ -984,16 +978,12 @@ class TestCustomerEventBehaviors:
 
     def test_customer_entered_zone_is_entrance(self, event_factory, test_timestamp):
         """Test customers always enter at ENTRANCE zone."""
-        event = event_factory.generate_event(
-            EventType.CUSTOMER_ENTERED, test_timestamp
-        )
+        event = event_factory.generate_event(EventType.CUSTOMER_ENTERED, test_timestamp)
         assert event.payload["zone"] == "ENTRANCE"
 
     def test_customer_entered_sensor_id_format(self, event_factory, test_timestamp):
         """Test sensor ID has correct format."""
-        event = event_factory.generate_event(
-            EventType.CUSTOMER_ENTERED, test_timestamp
-        )
+        event = event_factory.generate_event(EventType.CUSTOMER_ENTERED, test_timestamp)
         assert event.payload["sensor_id"].startswith("SENSOR_")
 
     def test_zone_changed_different_zones(self, event_factory, test_timestamp):
@@ -1208,9 +1198,7 @@ class TestMarketingEventBehaviors:
         assert 100 < fixed_count < 400, (
             f"FIXED_AMOUNT count {fixed_count} outside expected range"
         )
-        assert bogo_count < 150, (
-            f"BOGO count {bogo_count} outside expected range"
-        )
+        assert bogo_count < 150, f"BOGO count {bogo_count} outside expected range"
 
 
 # ================================

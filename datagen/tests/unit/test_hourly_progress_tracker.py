@@ -84,9 +84,7 @@ class TestProgressUpdates:
     def test_update_different_tables(self, tracker):
         """Should track progress for different tables independently."""
         tracker.update_hourly_progress("receipts", day=1, hour=0, total_days=5)
-        tracker.update_hourly_progress(
-            "receipt_lines", day=1, hour=5, total_days=5
-        )
+        tracker.update_hourly_progress("receipt_lines", day=1, hour=5, total_days=5)
 
         progress = tracker.get_current_progress()
         assert progress["completed_hours"]["receipts"] == 1
@@ -95,9 +93,7 @@ class TestProgressUpdates:
     def test_update_unknown_table(self, tracker):
         """Should handle updates for unknown tables gracefully."""
         # Should not raise exception
-        tracker.update_hourly_progress(
-            "unknown_table", day=1, hour=0, total_days=5
-        )
+        tracker.update_hourly_progress("unknown_table", day=1, hour=0, total_days=5)
 
         progress = tracker.get_current_progress()
         # Should not affect existing tables
@@ -168,9 +164,7 @@ class TestProgressCalculation:
         total_days = 2
 
         # receipts: started but not complete
-        tracker.update_hourly_progress(
-            "receipts", day=1, hour=0, total_days=total_days
-        )
+        tracker.update_hourly_progress("receipts", day=1, hour=0, total_days=total_days)
 
         progress = tracker.get_current_progress()
         # In the new implementation, all tables are shown as "in progress"
@@ -198,15 +192,9 @@ class TestProgressCalculation:
         """Should accurately track completed hours per table."""
         total_days = 3
 
-        tracker.update_hourly_progress(
-            "receipts", day=1, hour=0, total_days=total_days
-        )
-        tracker.update_hourly_progress(
-            "receipts", day=1, hour=5, total_days=total_days
-        )
-        tracker.update_hourly_progress(
-            "receipts", day=2, hour=0, total_days=total_days
-        )
+        tracker.update_hourly_progress("receipts", day=1, hour=0, total_days=total_days)
+        tracker.update_hourly_progress("receipts", day=1, hour=5, total_days=total_days)
+        tracker.update_hourly_progress("receipts", day=2, hour=0, total_days=total_days)
 
         progress = tracker.get_current_progress()
         assert progress["completed_hours"]["receipts"] == 3
@@ -233,9 +221,7 @@ class TestReset:
         """Reset should clear all tracking state."""
         # Add some progress
         tracker.update_hourly_progress("receipts", day=1, hour=0, total_days=5)
-        tracker.update_hourly_progress(
-            "receipt_lines", day=1, hour=1, total_days=5
-        )
+        tracker.update_hourly_progress("receipt_lines", day=1, hour=1, total_days=5)
 
         # Reset
         tracker.reset()

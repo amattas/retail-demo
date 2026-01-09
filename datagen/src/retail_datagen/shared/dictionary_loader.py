@@ -411,14 +411,10 @@ class DictionaryLoader:
                     error_details.append(f"{field}: {msg}")
 
                 # +2 for 1-based index + header row
-                validation_errors.append(
-                    f"Row {idx + 2}: {'; '.join(error_details)}"
-                )
+                validation_errors.append(f"Row {idx + 2}: {'; '.join(error_details)}")
 
             except Exception as e:
-                validation_errors.append(
-                    f"Row {idx + 2}: Unexpected error: {e}"
-                )
+                validation_errors.append(f"Row {idx + 2}: Unexpected error: {e}")
 
         # Check expected row count
         if dict_info.expected_rows and len(validated_data) != dict_info.expected_rows:

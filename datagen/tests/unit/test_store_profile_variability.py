@@ -84,9 +84,7 @@ class TestStoreProfileAssignment:
         """Create StoreProfiler instance."""
         return StoreProfiler(sample_stores, sample_geographies, seed=42)
 
-    def test_profiler_initialization(
-        self, profiler, sample_stores, sample_geographies
-    ):
+    def test_profiler_initialization(self, profiler, sample_stores, sample_geographies):
         """Test that profiler initializes correctly."""
         assert profiler.stores == sample_stores
         assert profiler.geographies == sample_geographies
@@ -159,9 +157,7 @@ class TestStoreProfileAssignment:
         profiles = profiler.assign_profiles()
 
         flagship_profiles = [
-            p
-            for p in profiles.values()
-            if p.volume_class == StoreVolumeClass.FLAGSHIP
+            p for p in profiles.values() if p.volume_class == StoreVolumeClass.FLAGSHIP
         ]
 
         if flagship_profiles:  # Only test if we have flagship stores
@@ -183,9 +179,7 @@ class TestStoreProfileAssignment:
         ]
 
         if kiosk_profiles:  # Only test if we have kiosk stores
-            kiosk_mults = [
-                float(p.daily_traffic_multiplier) for p in kiosk_profiles
-            ]
+            kiosk_mults = [float(p.daily_traffic_multiplier) for p in kiosk_profiles]
 
             # All kiosk stores should have multipliers <= 0.5
             assert all(m <= 0.5 for m in kiosk_mults), (
@@ -205,10 +199,7 @@ class TestStoreProfileAssignment:
             by_format[fmt].append(profile.avg_basket_size)
 
         # If we have multiple formats, larger formats should have larger baskets
-        if (
-            StoreFormat.HYPERMARKET in by_format
-            and StoreFormat.EXPRESS in by_format
-        ):
+        if StoreFormat.HYPERMARKET in by_format and StoreFormat.EXPRESS in by_format:
             avg_hypermarket = sum(by_format[StoreFormat.HYPERMARKET]) / len(
                 by_format[StoreFormat.HYPERMARKET]
             )
@@ -333,8 +324,7 @@ class TestTrafficMultiplierRanges:
         cv = std_dev / mean_mult
 
         assert cv >= 0.5, (
-            f"Coefficient of variation ({cv:.2f}) should be >= 0.5 "
-            "for good variability"
+            f"Coefficient of variation ({cv:.2f}) should be >= 0.5 for good variability"
         )
 
     def test_volume_class_percentages(self, large_store_set, sample_geographies):

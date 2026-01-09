@@ -126,9 +126,7 @@ class TestInventoryFlowSimulatorBalanceGetters:
         assert balance <= 1000, "DC initial inventory should be within range"
         assert isinstance(balance, int), "Balance should be an integer"
 
-    def test_get_dc_balance_returns_zero_for_nonexistent_key(
-        self, inventory_simulator
-    ):
+    def test_get_dc_balance_returns_zero_for_nonexistent_key(self, inventory_simulator):
         """Test get_dc_balance returns 0 for non-existent DC/product combos."""
         # Test with non-existent IDs
         nonexistent_dc_id = 9999
@@ -289,8 +287,7 @@ class TestInventoryFlowSimulatorBalanceGetters:
         # Check all store inventory balances are non-negative
         for (sid, pid), qty in inventory_simulator._store_inventory.items():
             assert qty >= 0, (
-                f"Balance should never be negative "
-                f"(Store {sid}, Product {pid}: {qty})"
+                f"Balance should never be negative (Store {sid}, Product {pid}: {qty})"
             )
 
 

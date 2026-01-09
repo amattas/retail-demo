@@ -54,9 +54,7 @@ class StockoutsMixin:
         # Only record new stockouts if enough time has passed (1 day min)
         if key in self._last_stockout_detection:
             last_detection = self._last_stockout_detection[key]
-            hours_since_last = (
-                (detection_time - last_detection).total_seconds() / 3600
-            )
+            hours_since_last = (detection_time - last_detection).total_seconds() / 3600
             # Require at least 24 hours between stockout detections for same product
             # This prevents recording multiple stockouts during the same depletion
             if hours_since_last < 24:
