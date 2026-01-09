@@ -295,9 +295,20 @@ class AzureEventHubClient:
         """
         Establish connection to Azure Event Hub.
 
+        This method explicitly initializes async locks in an async context to ensure
+        they are created within a running event loop. This prevents potential
+        RuntimeError exceptions if locks are accessed before the event loop is ready.
+
         Returns:
             bool: True if connection successful, False otherwise
         """
+        # Explicitly initialize locks in async context
+        # This ensures locks are created within a running event loop
+        if self._buffer_lock is None:
+            self._buffer_lock = asyncio.Lock()
+        if self._stats_lock is None:
+            self._stats_lock = asyncio.Lock()
+
         if self._is_mock:
             logger.info("Mock Azure client - connection simulated")
             self._is_connected = True
@@ -361,8 +372,22 @@ class AzureEventHubClient:
         This method is called from flush_buffer() which may be triggered by
         add_to_buffer(). To prevent deadlocks, this method and any methods it
         calls (e.g., _send_batch, _send_batch_direct) must NEVER attempt to
-        acquire _buffer_lock or call methods that do (add_to_buffer, flush_buffer,
-        get_statistics). If this constraint is violated, a deadlock will occur.
+        acquire _buffer_lock or call methods that do (add_to_buffer, flush_buffer).
+
+        Verification Checklist for Future Modifications:
+        1. ✓ send_events() does not acquire _buffer_lock
+        2. ✓ _send_batch() does not acquire _buffer_lock
+        3. ✓ _send_batch_direct() does not acquire _buffer_lock
+        4. ✓ _update_statistics() uses _stats_lock only (separate from _buffer_lock)
+        5. ✓ No calls to add_to_buffer() or flush_buffer() in send path
+
+        If this constraint is violated, the following deadlock sequence occurs:
+        - Task A: add_to_buffer() → acquires _buffer_lock → calls flush_buffer()
+        - Task B: flush_buffer() tries to acquire _buffer_lock (already held) → deadlock
+
+        The current implementation avoids this by:
+        - Using asyncio.create_task() to schedule flush outside the lock
+        - Ensuring send path never acquires _buffer_lock
 
         Args:
             events: List of event envelopes to send

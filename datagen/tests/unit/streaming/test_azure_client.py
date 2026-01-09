@@ -1379,6 +1379,82 @@ class TestConnectionTest:
 # =============================================================================
 
 
+class TestLockInitialization:
+    """Tests for lock initialization in various contexts."""
+
+    @pytest.mark.asyncio
+    async def test_locks_initialized_in_connect(self):
+        """Test that locks are explicitly initialized during connect()."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Locks should be None initially (lazy initialization)
+        assert client._buffer_lock is None
+        assert client._stats_lock is None
+
+        # After connect, locks should be initialized
+        await client.connect()
+
+        assert client._buffer_lock is not None
+        assert client._stats_lock is not None
+        assert isinstance(client._buffer_lock, asyncio.Lock)
+        assert isinstance(client._stats_lock, asyncio.Lock)
+
+    @pytest.mark.asyncio
+    async def test_lazy_initialization_still_works(self):
+        """Test that lazy initialization via _get_buffer_lock() still works."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Locks should be None initially
+        assert client._buffer_lock is None
+        assert client._stats_lock is None
+
+        # Calling _get_buffer_lock() should create locks
+        buffer_lock = client._get_buffer_lock()
+        stats_lock = client._get_stats_lock()
+
+        assert buffer_lock is not None
+        assert stats_lock is not None
+        assert isinstance(buffer_lock, asyncio.Lock)
+        assert isinstance(stats_lock, asyncio.Lock)
+
+        # Subsequent calls should return the same lock instances
+        assert client._get_buffer_lock() is buffer_lock
+        assert client._get_stats_lock() is stats_lock
+
+    @pytest.mark.asyncio
+    async def test_locks_work_before_connect(self):
+        """Test that buffer operations work even before connect() is called."""
+        client = AzureEventHubClient(
+            connection_string="mock://localhost",
+            hub_name="test-hub",
+        )
+
+        # Create a test event
+        event = EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload={"test": True},
+            trace_id=str(uuid4()),
+            ingest_timestamp=datetime.now(UTC),
+        )
+
+        # add_to_buffer should work even before connect() (lazy init)
+        await client.add_to_buffer(event)
+
+        # Locks should have been created by lazy initialization
+        assert client._buffer_lock is not None
+        assert client._stats_lock is not None
+
+        # Buffer should contain the event
+        stats = await client.get_statistics()
+        assert stats["buffer_size"] == 1
+
+
 class TestConcurrentBufferAccess:
     """Tests for thread-safe buffer operations under concurrent access."""
 
