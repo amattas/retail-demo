@@ -234,7 +234,7 @@ class TestTaxCalculatorIntegration:
         # Receipt items
         items = [
             Decimal("12.99"),  # Item 1
-            Decimal("5.49"),   # Item 2
+            Decimal("5.49"),  # Item 2
             Decimal("23.75"),  # Item 3
         ]
         subtotal = sum(items)

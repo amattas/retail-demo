@@ -89,7 +89,9 @@ class TestStateTransitions:
         """Test that marking unknown table started raises KeyError."""
         tracker = TableProgressTracker(["receipts"])
 
-        with pytest.raises(KeyError, match="Table 'unknown_table' is not being tracked"):
+        with pytest.raises(
+            KeyError, match="Table 'unknown_table' is not being tracked"
+        ):
             tracker.mark_table_started("unknown_table")
 
     def test_mark_generation_complete(self):
@@ -125,7 +127,9 @@ class TestStateTransitions:
         tracker.mark_generation_complete()
 
         assert tracker.get_state("receipts") == TableProgressTracker.STATE_COMPLETED
-        assert tracker.get_state("receipt_lines") == TableProgressTracker.STATE_COMPLETED
+        assert (
+            tracker.get_state("receipt_lines") == TableProgressTracker.STATE_COMPLETED
+        )
         assert tracker.get_state("marketing") == TableProgressTracker.STATE_NOT_STARTED
 
     def test_mark_generation_complete_no_in_progress_tables(self):
@@ -197,7 +201,9 @@ class TestProgressUpdates:
         """Test that updating unknown table raises KeyError."""
         tracker = TableProgressTracker(["receipts"])
 
-        with pytest.raises(KeyError, match="Table 'unknown_table' is not being tracked"):
+        with pytest.raises(
+            KeyError, match="Table 'unknown_table' is not being tracked"
+        ):
             tracker.update_progress("unknown_table", 0.5)
 
     def test_update_progress_incremental(self):
@@ -237,7 +243,9 @@ class TestQueryMethods:
         """Test that getting state for unknown table raises KeyError."""
         tracker = TableProgressTracker(["receipts"])
 
-        with pytest.raises(KeyError, match="Table 'unknown_table' is not being tracked"):
+        with pytest.raises(
+            KeyError, match="Table 'unknown_table' is not being tracked"
+        ):
             tracker.get_state("unknown_table")
 
     def test_get_progress_valid_table(self):
@@ -252,7 +260,9 @@ class TestQueryMethods:
         """Test that getting progress for unknown table raises KeyError."""
         tracker = TableProgressTracker(["receipts"])
 
-        with pytest.raises(KeyError, match="Table 'unknown_table' is not being tracked"):
+        with pytest.raises(
+            KeyError, match="Table 'unknown_table' is not being tracked"
+        ):
             tracker.get_progress("unknown_table")
 
     def test_get_tables_by_state(self):
@@ -261,7 +271,9 @@ class TestQueryMethods:
         tracker = TableProgressTracker(tables)
 
         # Initially all not_started
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
         assert set(not_started) == set(tables)
         assert tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS) == []
 
@@ -269,8 +281,12 @@ class TestQueryMethods:
         tracker.mark_table_started("receipts")
         tracker.mark_table_started("receipt_lines")
 
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
 
         assert set(in_progress) == {"receipts", "receipt_lines"}
         assert set(not_started) == {"marketing", "foot_traffic"}
@@ -342,7 +358,9 @@ class TestReset:
 
         # Verify pre-reset state
         assert tracker.get_state("receipts") == TableProgressTracker.STATE_COMPLETED
-        assert tracker.get_state("receipt_lines") == TableProgressTracker.STATE_COMPLETED
+        assert (
+            tracker.get_state("receipt_lines") == TableProgressTracker.STATE_COMPLETED
+        )
         assert tracker.get_progress("receipts") == 0.8
 
         # Reset
@@ -540,7 +558,11 @@ class TestThreadSafety:
             tracker.mark_table_started(table_name)
             for i in range(10):
                 tracker.update_progress(table_name, i / 10.0)
-            return table_name, tracker.get_state(table_name), tracker.get_progress(table_name)
+            return (
+                table_name,
+                tracker.get_state(table_name),
+                tracker.get_progress(table_name),
+            )
 
         # Use ThreadPoolExecutor for concurrent execution
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -573,7 +595,10 @@ class TestIntegrationScenarios:
         tracker = TableProgressTracker(tables)
 
         # Initial state: all not_started
-        assert tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED) == tables
+        assert (
+            tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+            == tables
+        )
         assert tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS) == []
         assert tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED) == []
 
@@ -589,13 +614,17 @@ class TestIntegrationScenarios:
 
             # Verify final progress
             assert tracker.get_progress(table) == 1.0
-            assert tracker.get_state(table) == TableProgressTracker.STATE_IN_PROGRESS  # Still in_progress
+            assert (
+                tracker.get_state(table) == TableProgressTracker.STATE_IN_PROGRESS
+            )  # Still in_progress
 
         # Mark entire generation complete
         tracker.mark_generation_complete()
 
         # All tables should be completed
-        assert tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED) == tables
+        assert (
+            tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED) == tables
+        )
         assert tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS) == []
 
     def test_partial_generation(self):
@@ -611,11 +640,15 @@ class TestIntegrationScenarios:
         tracker.update_progress("receipt_lines", 0.3)
 
         # Query states
-        assert set(tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)) == {
+        assert set(
+            tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        ) == {
             "receipts",
             "receipt_lines",
         }
-        assert set(tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)) == {
+        assert set(
+            tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        ) == {
             "marketing",
             "foot_traffic",
         }
@@ -623,11 +656,15 @@ class TestIntegrationScenarios:
         # Mark complete (only in_progress should complete)
         tracker.mark_generation_complete()
 
-        assert set(tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)) == {
+        assert set(
+            tracker.get_tables_by_state(TableProgressTracker.STATE_COMPLETED)
+        ) == {
             "receipts",
             "receipt_lines",
         }
-        assert set(tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)) == {
+        assert set(
+            tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        ) == {
             "marketing",
             "foot_traffic",
         }
@@ -711,7 +748,9 @@ class TestIntegrationScenarios:
 
         assert tracker.get_state("receipts") == TableProgressTracker.STATE_IN_PROGRESS
         assert tracker.get_progress("receipts") == 0.2
-        assert tracker.get_state("receipt_lines") == TableProgressTracker.STATE_NOT_STARTED
+        assert (
+            tracker.get_state("receipt_lines") == TableProgressTracker.STATE_NOT_STARTED
+        )
         assert tracker.get_progress("receipt_lines") == 0.0
 
     def test_incremental_table_addition_workflow(self):
@@ -732,8 +771,12 @@ class TestIntegrationScenarios:
         tracker.update_progress("receipt_lines", 0.5)
 
         # Check current state
-        in_progress = tracker.get_tables_by_state(TableProgressTracker.STATE_IN_PROGRESS)
+        in_progress = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_IN_PROGRESS
+        )
         assert set(in_progress) == {"receipts", "receipt_lines"}
 
-        not_started = tracker.get_tables_by_state(TableProgressTracker.STATE_NOT_STARTED)
+        not_started = tracker.get_tables_by_state(
+            TableProgressTracker.STATE_NOT_STARTED
+        )
         assert set(not_started) == {"marketing"}

@@ -340,7 +340,6 @@ class TestPricingDistribution:
         """Test sale price distribution follows 60/40 rule."""
         Decimal("50.00")
 
-
         for i in range(10000):  # Large sample for statistical accuracy
             # calc = PricingCalculator(seed=i)
             # sale_price = calc.calculate_sale_price(msrp)

@@ -21,8 +21,7 @@ def test_read_all_master_tables_returns_expected_structure():
     mock_conn.execute.return_value = mock_cursor
 
     with patch(
-        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
-        return_value=mock_conn
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
     ):
         data = db_reader.read_all_master_tables()
 
@@ -48,8 +47,7 @@ def test_read_all_fact_tables_returns_expected_structure():
     mock_conn.execute.return_value = mock_cursor
 
     with patch(
-        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
-        return_value=mock_conn
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
     ):
         result = db_reader.read_all_fact_tables()
 
@@ -64,17 +62,13 @@ def test_get_all_fact_table_date_ranges_returns_expected_structure():
 
     # Create mock cursor that returns date range
     mock_cursor = MagicMock()
-    mock_cursor.fetchone.return_value = (
-        datetime(2024, 1, 1),
-        datetime(2024, 12, 31)
-    )
+    mock_cursor.fetchone.return_value = (datetime(2024, 1, 1), datetime(2024, 12, 31))
 
     mock_conn = MagicMock()
     mock_conn.execute.return_value = mock_cursor
 
     with patch(
-        'retail_datagen.services.duckdb_reader.get_duckdb_conn',
-        return_value=mock_conn
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
     ):
         ranges = db_reader.get_all_fact_table_date_ranges()
 
@@ -91,13 +85,16 @@ def test_get_all_fact_table_date_ranges_returns_expected_structure():
 def test_read_all_master_tables_handles_catalog_exception(caplog):
     """Test that CatalogException for missing master table is logged appropriately."""
     import logging
+
     caplog.set_level(logging.DEBUG)
 
     # Mock get_duckdb_conn to return a connection that raises CatalogException
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+    with patch(
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
+    ):
         # Should return dict with empty DataFrames instead of raising
         result = db_reader.read_all_master_tables()
 
@@ -117,7 +114,9 @@ def test_read_all_master_tables_handles_unexpected_exception(caplog):
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("Unexpected database error")
 
-    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+    with patch(
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
+    ):
         result = db_reader.read_all_master_tables()
 
         assert isinstance(result, dict)
@@ -133,12 +132,15 @@ def test_read_all_master_tables_handles_unexpected_exception(caplog):
 def test_read_all_fact_tables_handles_catalog_exception(caplog):
     """Test that missing fact tables are handled gracefully."""
     import logging
+
     caplog.set_level(logging.DEBUG)
 
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+    with patch(
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
+    ):
         result = db_reader.read_all_fact_tables()
 
         assert isinstance(result, dict)
@@ -153,12 +155,15 @@ def test_read_all_fact_tables_handles_catalog_exception(caplog):
 def test_get_fact_table_date_range_handles_catalog_exception(caplog):
     """Test that date range query for missing table returns None."""
     import logging
+
     caplog.set_level(logging.DEBUG)
 
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = duckdb.CatalogException("Table does not exist")
 
-    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+    with patch(
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
+    ):
         # Use a valid table name from the allowlist
         result = db_reader.get_fact_table_date_range("fact_receipts")
 
@@ -171,7 +176,9 @@ def test_get_fact_table_date_range_handles_unexpected_exception(caplog):
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("Unexpected error")
 
-    with patch('retail_datagen.services.duckdb_reader.get_duckdb_conn', return_value=mock_conn):
+    with patch(
+        "retail_datagen.services.duckdb_reader.get_duckdb_conn", return_value=mock_conn
+    ):
         # Use a valid table name from the allowlist
         result = db_reader.get_fact_table_date_range("fact_receipts")
 

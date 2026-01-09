@@ -270,9 +270,7 @@ class TestCircuitBreaker:
     """Tests for circuit breaker behavior."""
 
     @pytest.mark.asyncio
-    async def test_circuit_opens_after_threshold_failures(
-        self, mock_producer_client
-    ):
+    async def test_circuit_opens_after_threshold_failures(self, mock_producer_client):
         """Test circuit breaker opens after consecutive failures."""
         client = mock_producer_client()
         client._should_fail_send = True
@@ -345,7 +343,9 @@ class TestDeadLetterQueue:
     """Tests for dead letter queue handling."""
 
     @pytest.mark.asyncio
-    async def test_failed_event_added_to_dlq(self, mock_producer_client, mock_event_data):
+    async def test_failed_event_added_to_dlq(
+        self, mock_producer_client, mock_event_data
+    ):
         """Test that failed events are added to DLQ."""
         client = mock_producer_client()
         client._should_fail_send = True
@@ -359,18 +359,22 @@ class TestDeadLetterQueue:
             await client.send_batch(batch)
         except Exception as e:
             # Add to DLQ on failure
-            dlq.append({
-                "event": event,
-                "error": str(e),
-                "timestamp": datetime.now(),
-                "retry_count": 0,
-            })
+            dlq.append(
+                {
+                    "event": event,
+                    "error": str(e),
+                    "timestamp": datetime.now(),
+                    "retry_count": 0,
+                }
+            )
 
         assert len(dlq) == 1
         assert dlq[0]["retry_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_dlq_retry_increments_count(self, mock_producer_client, mock_event_data):
+    async def test_dlq_retry_increments_count(
+        self, mock_producer_client, mock_event_data
+    ):
         """Test that DLQ retry increments retry count."""
         client = mock_producer_client()
         client._transient_failure_count = 3
@@ -399,7 +403,9 @@ class TestDeadLetterQueue:
         assert dlq_entry is None
 
     @pytest.mark.asyncio
-    async def test_dlq_preserves_event_data(self, mock_producer_client, mock_event_data):
+    async def test_dlq_preserves_event_data(
+        self, mock_producer_client, mock_event_data
+    ):
         """Test that DLQ preserves original event data."""
         client = mock_producer_client()
         client._should_fail_send = True
@@ -414,11 +420,13 @@ class TestDeadLetterQueue:
         try:
             await client.send_batch(batch)
         except Exception as e:
-            dlq.append({
-                "event": event,
-                "original_body": event.body,
-                "error": str(e),
-            })
+            dlq.append(
+                {
+                    "event": event,
+                    "original_body": event.body,
+                    "error": str(e),
+                }
+            )
 
         assert len(dlq) == 1
         assert dlq[0]["original_body"] == original_data
@@ -433,7 +441,9 @@ class TestBatchSizeLimits:
     """Tests for batch size limit handling."""
 
     @pytest.mark.asyncio
-    async def test_batch_size_limit_enforced(self, mock_producer_client, mock_event_data):
+    async def test_batch_size_limit_enforced(
+        self, mock_producer_client, mock_event_data
+    ):
         """Test that batch size limits are enforced."""
         client = mock_producer_client()
 

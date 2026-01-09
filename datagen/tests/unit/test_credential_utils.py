@@ -5,7 +5,6 @@ Tests validation, sanitization, and metadata extraction for
 Event Hub connection strings.
 """
 
-
 from retail_datagen.shared.credential_utils import (
     get_connection_string_metadata,
     is_fabric_rti_connection_string,

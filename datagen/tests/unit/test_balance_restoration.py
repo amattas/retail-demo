@@ -66,6 +66,7 @@ class TestInventoryFlowSimulatorBalanceGetters:
     def sample_products(self):
         """Create sample products for testing."""
         from datetime import datetime
+
         return [
             ProductMaster(
                 ID=1,
@@ -125,9 +126,7 @@ class TestInventoryFlowSimulatorBalanceGetters:
         assert balance <= 1000, "DC initial inventory should be within expected range"
         assert isinstance(balance, int), "Balance should be an integer"
 
-    def test_get_dc_balance_returns_zero_for_nonexistent_key(
-        self, inventory_simulator
-    ):
+    def test_get_dc_balance_returns_zero_for_nonexistent_key(self, inventory_simulator):
         """Test get_dc_balance returns 0 for non-existent DC/product combinations."""
         # Test with non-existent IDs
         nonexistent_dc_id = 9999
@@ -186,9 +185,9 @@ class TestInventoryFlowSimulatorBalanceGetters:
         updated_balance = inventory_simulator._dc_inventory.get(key, 0)
 
         # Balance should have increased (or stayed same if product not in shipment)
-        assert (
-            updated_balance >= initial_balance
-        ), "DC balance should increase after receiving"
+        assert updated_balance >= initial_balance, (
+            "DC balance should increase after receiving"
+        )
 
         # If this product was in the transactions, balance must have increased
         product_received = any(
@@ -199,9 +198,9 @@ class TestInventoryFlowSimulatorBalanceGetters:
         )
 
         if product_received:
-            assert (
-                updated_balance > initial_balance
-            ), "Balance must increase when product is received"
+            assert updated_balance > initial_balance, (
+                "Balance must increase when product is received"
+            )
 
     def test_store_balance_updates_after_delivery(
         self, inventory_simulator, sample_stores, sample_products
@@ -231,9 +230,9 @@ class TestInventoryFlowSimulatorBalanceGetters:
         updated_balance = inventory_simulator._store_inventory.get(key, 0)
 
         # Balance should have increased by 50
-        assert (
-            updated_balance == initial_balance + 50
-        ), "Store balance should increase by delivery quantity"
+        assert updated_balance == initial_balance + 50, (
+            "Store balance should increase by delivery quantity"
+        )
 
     def test_store_balance_decreases_after_sale(
         self, inventory_simulator, sample_stores
@@ -264,15 +263,15 @@ class TestInventoryFlowSimulatorBalanceGetters:
 
         # If any sales occurred, total should have decreased
         if transactions:
-            assert (
-                updated_total < initial_total
-            ), "Store total inventory should decrease after sales"
+            assert updated_total < initial_total, (
+                "Store total inventory should decrease after sales"
+            )
 
             # Verify each sale transaction has negative QtyDelta
             for txn in transactions:
-                assert (
-                    txn["QtyDelta"] < 0
-                ), "Sale transactions should have negative QtyDelta"
+                assert txn["QtyDelta"] < 0, (
+                    "Sale transactions should have negative QtyDelta"
+                )
 
     def test_balance_never_goes_negative(
         self, inventory_simulator, sample_stores, sample_products
@@ -287,7 +286,9 @@ class TestInventoryFlowSimulatorBalanceGetters:
 
         # Check all store inventory balances are non-negative
         for (sid, pid), qty in inventory_simulator._store_inventory.items():
-            assert qty >= 0, f"Balance should never be negative (Store {sid}, Product {pid}: {qty})"
+            assert qty >= 0, (
+                f"Balance should never be negative (Store {sid}, Product {pid}: {qty})"
+            )
 
 
 class TestDCInventoryTransactionBalanceField:
@@ -321,6 +322,7 @@ class TestDCInventoryTransactionBalanceField:
     def sample_products(self):
         """Create sample products for testing."""
         from datetime import datetime
+
         return [
             ProductMaster(
                 ID=1,
@@ -408,6 +410,7 @@ class TestStoreInventoryTransactionBalanceField:
     def sample_products(self):
         """Create sample products for testing."""
         from datetime import datetime
+
         return [
             ProductMaster(
                 ID=1,
@@ -524,16 +527,20 @@ class TestBalanceFieldMapping:
         }
 
         # Verify field exists in expected format
-        assert "Balance" in sample_transaction, "Balance field should exist in transaction"
-        assert isinstance(
-            sample_transaction["Balance"], int
-        ), "Balance should be integer"
+        assert "Balance" in sample_transaction, (
+            "Balance field should exist in transaction"
+        )
+        assert isinstance(sample_transaction["Balance"], int), (
+            "Balance should be integer"
+        )
 
         # The actual mapping happens in fact_generator.py during database insert
         # This test documents the expected behavior
         expected_python_field = "Balance"  # PascalCase in Python dict
 
-        assert expected_python_field in sample_transaction, "Python field should use PascalCase 'Balance'"
+        assert expected_python_field in sample_transaction, (
+            "Python field should use PascalCase 'Balance'"
+        )
         # Database column mapping tested in integration tests
 
     def test_store_inventory_balance_field_mapping(self):
@@ -550,15 +557,19 @@ class TestBalanceFieldMapping:
         }
 
         # Verify field exists in expected format
-        assert "Balance" in sample_transaction, "Balance field should exist in transaction"
-        assert isinstance(
-            sample_transaction["Balance"], int
-        ), "Balance should be integer"
+        assert "Balance" in sample_transaction, (
+            "Balance field should exist in transaction"
+        )
+        assert isinstance(sample_transaction["Balance"], int), (
+            "Balance should be integer"
+        )
 
         # Document expected mapping
         expected_python_field = "Balance"  # PascalCase in Python dict
 
-        assert expected_python_field in sample_transaction, "Python field should use PascalCase 'Balance'"
+        assert expected_python_field in sample_transaction, (
+            "Python field should use PascalCase 'Balance'"
+        )
         # Database column mapping tested in integration tests
 
 
@@ -593,6 +604,7 @@ class TestBalanceEdgeCases:
     def sample_products(self):
         """Create sample products for testing."""
         from datetime import datetime
+
         return [
             ProductMaster(
                 ID=1,

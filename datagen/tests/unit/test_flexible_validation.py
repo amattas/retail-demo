@@ -73,11 +73,10 @@ class TestFlexibleValidation:
 
         assert not is_valid
         # Mock string "mock://localhost/test-hub" is too short and lacks proper structure
-        assert any(phrase in error.lower() for phrase in [
-            "missing required part",
-            "endpoint",
-            "too short"
-        ])
+        assert any(
+            phrase in error.lower()
+            for phrase in ["missing required part", "endpoint", "too short"]
+        )
 
     def test_valid_test_connection_string(self):
         """Test helper should create valid connection strings."""
@@ -97,7 +96,9 @@ class TestFlexibleValidation:
             conn_str, strict=False, allow_mock=True
         )
 
-        assert is_valid, f"Expected valid Fabric RTI connection string, got error: {error}"
+        assert is_valid, (
+            f"Expected valid Fabric RTI connection string, got error: {error}"
+        )
         assert "eventstream-" in conn_str
         assert "es_" in conn_str
 

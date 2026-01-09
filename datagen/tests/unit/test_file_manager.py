@@ -80,7 +80,10 @@ class TestGetFactTableMonthPath:
     def test_get_fact_table_month_path(self, tmp_path):
         manager = ExportFileManager(base_dir=tmp_path)
         path = manager.get_fact_table_month_path("fact_receipts", 2024, 1, "parquet")
-        assert path == tmp_path / "export" / "fact_receipts" / "fact_receipts_2024-01.parquet"
+        assert (
+            path
+            == tmp_path / "export" / "fact_receipts" / "fact_receipts_2024-01.parquet"
+        )
         assert path.suffix == ".parquet"
 
 
@@ -259,7 +262,8 @@ class TestCleanup:
             return original_unlink(self, *args, **kwargs)
 
         from unittest import mock
-        with mock.patch.object(Path, 'unlink', tracked_unlink):
+
+        with mock.patch.object(Path, "unlink", tracked_unlink):
             manager.cleanup()
 
         # Should remove in reverse order (last tracked removed first)
