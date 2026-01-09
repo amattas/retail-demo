@@ -216,40 +216,46 @@ class EventStreamer:
             # Load master data if not provided
             await self._ensure_master_data_loaded()
 
-            # Initialize Azure Event Hub client
-            if self.streaming_config.azure_connection_string:
-                self._azure_client = AzureEventHubClient(
-                    connection_string=self.streaming_config.azure_connection_string,
-                    hub_name=self.streaming_config.hub_name,
-                    max_batch_size=self.streaming_config.max_batch_size,
-                    batch_timeout_ms=self.streaming_config.batch_timeout_ms,
-                    retry_attempts=self.streaming_config.retry_attempts,
-                    backoff_multiplier=self.streaming_config.backoff_multiplier,
-                    circuit_breaker_enabled=self.streaming_config.circuit_breaker_enabled,
-                    circuit_breaker_failure_threshold=self.streaming_config.circuit_breaker_failure_threshold,
-                    circuit_breaker_recovery_timeout=self.streaming_config.circuit_breaker_recovery_timeout,
-                )
+            # Initialize Azure Event Hub client (skip if already set, e.g., for testing)
+            if self._azure_client is None:
+                if self.streaming_config.azure_connection_string:
+                    self._azure_client = AzureEventHubClient(
+                        connection_string=self.streaming_config.azure_connection_string,
+                        hub_name=self.streaming_config.hub_name,
+                        max_batch_size=self.streaming_config.max_batch_size,
+                        batch_timeout_ms=self.streaming_config.batch_timeout_ms,
+                        retry_attempts=self.streaming_config.retry_attempts,
+                        backoff_multiplier=self.streaming_config.backoff_multiplier,
+                        circuit_breaker_enabled=self.streaming_config.circuit_breaker_enabled,
+                        circuit_breaker_failure_threshold=self.streaming_config.circuit_breaker_failure_threshold,
+                        circuit_breaker_recovery_timeout=self.streaming_config.circuit_breaker_recovery_timeout,
+                    )
 
-                # Test connection
-                if not await self._azure_client.connect():
-                    self.log.error(
-                        "Failed to connect to Azure Event Hub",
+                    # Test connection
+                    if not await self._azure_client.connect():
+                        self.log.error(
+                            "Failed to connect to Azure Event Hub",
+                            session_id=self._session_id,
+                        )
+                        return False
+
+                    self.log.info(
+                        "Azure Event Hub client initialized and connected",
                         session_id=self._session_id,
                     )
-                    return False
-
-                self.log.info(
-                    "Azure Event Hub client initialized and connected",
-                    session_id=self._session_id,
-                )
+                else:
+                    self.log.warning(
+                        "No Azure connection string provided - events will be generated but not sent",
+                        session_id=self._session_id,
+                    )
+                    # Create mock client for testing
+                    self._azure_client = AzureEventHubClient(
+                        "", self.streaming_config.hub_name
+                    )
             else:
-                self.log.warning(
-                    "No Azure connection string provided - events will be generated but not sent",
+                self.log.info(
+                    "Using pre-configured Azure client (test mode)",
                     session_id=self._session_id,
-                )
-                # Create mock client for testing
-                self._azure_client = AzureEventHubClient(
-                    "", self.streaming_config.hub_name
                 )
 
             # Initialize event factory

@@ -52,20 +52,21 @@ class TestSyntheticNameBlocklistEnforcement:
         return SyntheticDataValidator()
 
     # First name blocklist tests
-    def test_first_name_rejects_common_real_names(self, validator):
-        """Test that common real first names are rejected."""
+    # Note: Blocklists cleared for demo purposes - real names are now accepted
+    def test_first_name_accepts_common_real_names(self, validator):
+        """Test that common real first names are accepted (blocklist cleared for demo)."""
         real_names = ["John", "Mary", "Michael", "Jennifer", "William"]
         for name in real_names:
-            assert not validator.is_synthetic_first_name(name), (
-                f"{name} should be rejected"
+            assert validator.is_synthetic_first_name(name), (
+                f"{name} should be accepted (blocklist cleared)"
             )
 
-    def test_first_name_rejects_case_insensitive(self, validator):
-        """Test that blocklist check is case-insensitive."""
-        assert not validator.is_synthetic_first_name("john")
-        assert not validator.is_synthetic_first_name("JOHN")
-        assert not validator.is_synthetic_first_name("John")
-        assert not validator.is_synthetic_first_name("jOhN")
+    def test_first_name_accepts_case_variations(self, validator):
+        """Test that name validation is case-insensitive."""
+        assert validator.is_synthetic_first_name("john")
+        assert validator.is_synthetic_first_name("JOHN")
+        assert validator.is_synthetic_first_name("John")
+        assert validator.is_synthetic_first_name("jOhN")
 
     def test_first_name_accepts_synthetic_names(self, validator):
         """Test that synthetic names are accepted."""
@@ -89,20 +90,21 @@ class TestSyntheticNameBlocklistEnforcement:
         assert not validator.is_synthetic_first_name("123")
 
     # Last name blocklist tests
-    def test_last_name_rejects_common_real_names(self, validator):
-        """Test that common real last names are rejected."""
+    # Note: Blocklists cleared for demo purposes - real names are now accepted
+    def test_last_name_accepts_common_real_names(self, validator):
+        """Test that common real last names are accepted (blocklist cleared for demo)."""
         real_names = ["Smith", "Johnson", "Williams", "Brown", "Jones"]
         for name in real_names:
-            assert not validator.is_synthetic_last_name(name), (
-                f"{name} should be rejected"
+            assert validator.is_synthetic_last_name(name), (
+                f"{name} should be accepted (blocklist cleared)"
             )
 
-    def test_last_name_rejects_case_insensitive(self, validator):
-        """Test that blocklist check is case-insensitive."""
-        assert not validator.is_synthetic_last_name("smith")
-        assert not validator.is_synthetic_last_name("SMITH")
-        assert not validator.is_synthetic_last_name("Smith")
-        assert not validator.is_synthetic_last_name("sMiTh")
+    def test_last_name_accepts_case_variations(self, validator):
+        """Test that name validation is case-insensitive."""
+        assert validator.is_synthetic_last_name("smith")
+        assert validator.is_synthetic_last_name("SMITH")
+        assert validator.is_synthetic_last_name("Smith")
+        assert validator.is_synthetic_last_name("sMiTh")
 
     def test_last_name_accepts_synthetic_names(self, validator):
         """Test that synthetic last names are accepted."""

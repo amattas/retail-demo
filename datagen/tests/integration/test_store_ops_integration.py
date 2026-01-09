@@ -26,6 +26,7 @@ def test_config():
             dcs=1,
             total_customers=100,
             customers_per_day=10,
+            items_per_ticket_mean=3.0,
         ),
         paths=PathsConfig(
             dict="data/dictionaries",

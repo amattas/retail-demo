@@ -5,6 +5,7 @@ Tests file system management for data exports including path resolution,
 directory creation, file tracking, and cleanup operations.
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -134,6 +135,7 @@ class TestEnsureDirectory:
         with pytest.raises(ValueError, match="outside allowed base directory"):
             manager.ensure_directory(outside_path)
 
+    @pytest.mark.skipif(os.geteuid() == 0, reason="Root bypasses permission checks")
     def test_ensure_directory_handles_permission_error(self, tmp_path):
         """Should raise an error on permission issues (message may vary by OS)."""
         manager = ExportFileManager(base_dir=tmp_path)
