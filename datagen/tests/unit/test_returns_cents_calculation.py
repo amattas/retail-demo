@@ -8,8 +8,6 @@ UnitCents, ExtCents).
 
 from decimal import Decimal
 
-import pytest
-
 from retail_datagen.generators.fact_generators.utils_mixin import (
     UtilsMixin,
 )
