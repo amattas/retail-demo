@@ -23,6 +23,46 @@ logger = logging.getLogger(__name__)
 class UtilsMixin(FactGeneratorBase):
     """Utility helper methods for fact generation."""
 
+    @staticmethod
+    def _to_cents(d: Decimal) -> int:
+        """
+        Convert a Decimal dollar amount to integer cents.
+
+        Args:
+            d: Decimal dollar amount (e.g., Decimal("10.50"))
+
+        Returns:
+            Integer cents (e.g., 1050)
+
+        Examples:
+            >>> _to_cents(Decimal("10.50"))
+            1050
+            >>> _to_cents(Decimal("-5.25"))
+            -525
+        """
+        return int((d * 100).quantize(Decimal("1")))
+
+    @staticmethod
+    def _fmt_cents(c: int) -> str:
+        """
+        Format integer cents as a dollar string.
+
+        Args:
+            c: Integer cents (e.g., 1050)
+
+        Returns:
+            Formatted dollar string (e.g., "10.50")
+
+        Examples:
+            >>> _fmt_cents(1050)
+            "10.50"
+            >>> _fmt_cents(-525)
+            "-5.25"
+        """
+        sign = "-" if c < 0 else ""
+        c = abs(c)
+        return f"{sign}{c // 100}.{c % 100:02d}"
+
     def _get_available_products_for_date(self, date: datetime) -> list[ProductMaster]:
         """Get products that have been launched by the given date."""
         return [
@@ -185,6 +225,10 @@ class UtilsMixin(FactGeneratorBase):
                 unit_price_dec = self._to_decimal(unit_price)
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
+                # Convert to cents for consistency with normal receipts
+                unit_cents = self._to_cents(unit_price_dec)
+                ext_cents = self._to_cents(neg_ext)
+
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
                 tax_mult = (
                     Decimal("1.0")
@@ -210,8 +254,10 @@ class UtilsMixin(FactGeneratorBase):
                         "Line": int(line_num),
                         "ProductID": int(product_id),
                         "Qty": nqty,
-                        "UnitPrice": str(unit_price_dec.quantize(Decimal("0.01"))),
-                        "ExtPrice": str(neg_ext),
+                        "UnitPrice": self._fmt_cents(unit_cents),
+                        "ExtPrice": self._fmt_cents(ext_cents),
+                        "UnitCents": unit_cents,
+                        "ExtCents": ext_cents,
                         "PromoCode": "RETURN",
                     }
                 )
@@ -302,6 +348,12 @@ class UtilsMixin(FactGeneratorBase):
                         )
 
             total = (subtotal + total_tax).quantize(Decimal("0.01"))
+
+            # Convert to cents for consistency with normal receipts
+            subtotal_cents = self._to_cents(subtotal)
+            tax_cents = self._to_cents(total_tax)
+            total_cents = self._to_cents(total)
+
             return_receipts.append(
                 {
                     "TraceId": trace_id,
@@ -311,10 +363,13 @@ class UtilsMixin(FactGeneratorBase):
                     "ReceiptId": return_id_ext,
                     "ReceiptType": "RETURN",
                     "ReturnForReceiptIdExt": str(orig_receipt_ext),
-                    "Subtotal": str(subtotal),
-                    "DiscountAmount": str(Decimal("0.00")),
-                    "Tax": str(total_tax),
-                    "Total": str(total),
+                    "Subtotal": self._fmt_cents(subtotal_cents),
+                    "DiscountAmount": "0.00",
+                    "Tax": self._fmt_cents(tax_cents),
+                    "Total": self._fmt_cents(total_cents),
+                    "SubtotalCents": subtotal_cents,
+                    "TaxCents": tax_cents,
+                    "TotalCents": total_cents,
                     "TenderType": TenderType.CREDIT_CARD.value,
                 }
             )
@@ -437,6 +492,10 @@ class UtilsMixin(FactGeneratorBase):
                 # with negative qty
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
+                # Convert to cents for consistency with normal receipts
+                unit_cents = self._to_cents(unit_price_dec)
+                ext_cents = self._to_cents(neg_ext)
+
                 # Taxability
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
                 if taxability == ProductTaxability.TAXABLE:
@@ -461,8 +520,10 @@ class UtilsMixin(FactGeneratorBase):
                         "Line": int(line_num),
                         "ProductID": int(product_id),
                         "Qty": nqty,
-                        "UnitPrice": str(unit_price_dec.quantize(Decimal("0.01"))),
-                        "ExtPrice": str(neg_ext),
+                        "UnitPrice": self._fmt_cents(unit_cents),
+                        "ExtPrice": self._fmt_cents(ext_cents),
+                        "UnitCents": unit_cents,
+                        "ExtCents": ext_cents,
                         "PromoCode": "RETURN",
                     }
                 )
@@ -562,6 +623,12 @@ class UtilsMixin(FactGeneratorBase):
                         )
 
             total = (subtotal + total_tax).quantize(Decimal("0.01"))
+
+            # Convert to cents for consistency with normal receipts
+            subtotal_cents = self._to_cents(subtotal)
+            tax_cents = self._to_cents(total_tax)
+            total_cents = self._to_cents(total)
+
             return_receipts.append(
                 {
                     "TraceId": trace_id,
@@ -571,10 +638,13 @@ class UtilsMixin(FactGeneratorBase):
                     "ReceiptId": return_id_ext,
                     "ReceiptType": "RETURN",
                     "ReturnForReceiptId": int(orig_receipt_pk),
-                    "Subtotal": str(subtotal),
-                    "DiscountAmount": str(Decimal("0.00")),
-                    "Tax": str(total_tax),
-                    "Total": str(total),
+                    "Subtotal": self._fmt_cents(subtotal_cents),
+                    "DiscountAmount": "0.00",
+                    "Tax": self._fmt_cents(tax_cents),
+                    "Total": self._fmt_cents(total_cents),
+                    "SubtotalCents": subtotal_cents,
+                    "TaxCents": tax_cents,
+                    "TotalCents": total_cents,
                     "TenderType": TenderType.CREDIT_CARD.value,
                 }
             )

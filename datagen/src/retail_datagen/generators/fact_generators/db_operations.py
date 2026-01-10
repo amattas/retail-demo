@@ -212,6 +212,18 @@ class DbOperationsMixin(FieldMappingMixin):
             # Apply column renaming
             df = self._apply_duckdb_column_rename(table_name, df)
 
+            # Defense-in-depth: Ensure OrderIdExt is VARCHAR even though
+            # ensure_fact_payments_table() creates the schema explicitly.
+            # This guards against edge cases where table creation might fail
+            # or be bypassed, preventing DuckDB from inferring INT32 type
+            # when it first sees NULL values from receipt payments.
+            # OrderIdExt stores both receipt IDs (NULL) and online order IDs (strings),
+            # requiring VARCHAR type for proper data insertion.
+            if table_name == "fact_payments" and "order_id_ext" in df.columns:
+                df["order_id_ext"] = df["order_id_ext"].astype(str)
+                # Replace 'None' strings with actual None
+                df.loc[df["order_id_ext"] == "None", "order_id_ext"] = None
+
             duck_table = self._get_duckdb_table_name(table_name)
             from retail_datagen.db.duckdb_engine import (
                 insert_dataframe,
@@ -379,6 +391,20 @@ class DbOperationsMixin(FieldMappingMixin):
                 "FulfillmentMode": "fulfillment_mode",
                 "NodeType": "node_type",
                 "NodeID": "node_id",
+            },
+            "fact_payments": {
+                **common,
+                "ReceiptIdExt": "receipt_id_ext",
+                "OrderIdExt": "order_id_ext",
+                "PaymentMethod": "payment_method",
+                "AmountCents": "amount_cents",
+                "Amount": "amount",
+                "TransactionId": "transaction_id",
+                "ProcessingTimeMs": "processing_time_ms",
+                "Status": "status",
+                "DeclineReason": "decline_reason",
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
             },
         }
         mp = mapping_tbl.get(table_name, common)

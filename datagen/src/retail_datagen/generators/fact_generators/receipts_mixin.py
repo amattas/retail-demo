@@ -17,6 +17,7 @@ from retail_datagen.shared.models import (
 )
 
 from .base_types import FactGeneratorBase
+from .utils_mixin import UtilsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -226,16 +227,8 @@ class ReceiptsMixin(FactGeneratorBase):
                 transaction_date=transaction_time,
             )
         )
-        # Helpers for integer-cents math
+        # Helper for integer-cents tax calculation
         from retail_datagen.shared.models import ProductTaxability
-
-        def _to_cents(d: Decimal) -> int:
-            return int((d * 100).quantize(Decimal("1")))
-
-        def _fmt_cents(c: int) -> str:
-            sign = "-" if c < 0 else ""
-            c = abs(c)
-            return f"{sign}{c // 100}.{c % 100:02d}"
 
         def _tax_cents(
             amount_cents: int, rate: Decimal, taxability: ProductTaxability
@@ -268,10 +261,12 @@ class ReceiptsMixin(FactGeneratorBase):
             product = item_data["product"]
             qty = int(item_data["qty"])  # ensure int
             promo_code = item_data.get("promo_code")
-            line_discount_cents = _to_cents(item_data.get("discount", Decimal("0.00")))
+            line_discount_cents = UtilsMixin._to_cents(
+                item_data.get("discount", Decimal("0.00"))
+            )
 
             # Calculate unit price and ext price in cents
-            unit_price_cents = _to_cents(product.SalePrice)
+            unit_price_cents = UtilsMixin._to_cents(product.SalePrice)
             ext_before_cents = unit_price_cents * qty
             ext_after_cents = max(0, ext_before_cents - line_discount_cents)
 
@@ -290,8 +285,8 @@ class ReceiptsMixin(FactGeneratorBase):
                 "Line": line_num,
                 "ProductID": product.ID,
                 "Qty": qty,
-                "UnitPrice": _fmt_cents(unit_price_cents),
-                "ExtPrice": _fmt_cents(ext_after_cents),
+                "UnitPrice": UtilsMixin._fmt_cents(unit_price_cents),
+                "ExtPrice": UtilsMixin._fmt_cents(ext_after_cents),
                 "UnitCents": unit_price_cents,
                 "ExtCents": ext_after_cents,
                 "PromoCode": promo_code,
@@ -320,13 +315,13 @@ class ReceiptsMixin(FactGeneratorBase):
             inventory_transactions.append(inventory_transaction)
 
         # Header-level totals (preserve existing formula: Subtotal - Discount + Tax)
-        discount_amount_cents = _to_cents(discount_amount)
+        discount_amount_cents = UtilsMixin._to_cents(discount_amount)
         total_cents = subtotal_cents - discount_amount_cents + total_tax_cents
 
         # Validate subtotal (sanity check)
         try:
             calculated_subtotal_cents = sum(
-                _to_cents(Decimal(line["ExtPrice"])) for line in lines
+                UtilsMixin._to_cents(Decimal(line["ExtPrice"])) for line in lines
             )
             if abs(calculated_subtotal_cents - subtotal_cents) > 1:
                 logger.error(
@@ -344,12 +339,12 @@ class ReceiptsMixin(FactGeneratorBase):
             "CustomerID": customer.ID,
             "ReceiptId": receipt_id,
             "ReceiptType": "SALE",
-            "Subtotal": _fmt_cents(subtotal_cents),
-            "DiscountAmount": _fmt_cents(
+            "Subtotal": UtilsMixin._fmt_cents(subtotal_cents),
+            "DiscountAmount": UtilsMixin._fmt_cents(
                 discount_amount_cents
             ),  # Phase 2.2: Promotional discounts
-            "Tax": _fmt_cents(total_tax_cents),
-            "Total": _fmt_cents(total_cents),
+            "Tax": UtilsMixin._fmt_cents(total_tax_cents),
+            "Total": UtilsMixin._fmt_cents(total_cents),
             "SubtotalCents": subtotal_cents,
             "TaxCents": total_tax_cents,
             "TotalCents": total_cents,
