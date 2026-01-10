@@ -483,15 +483,17 @@ def ensure_fact_receipt_lines_table(conn: duckdb.DuckDBPyConnection) -> None:
             if result:
                 current_type = result[0].upper()
                 if current_type != "VARCHAR" and "INT" in current_type:
-                    logger.info(
-                        f"Migrating promo_code column from {current_type} to VARCHAR"
+                    logger.warning(
+                        f"SCHEMA FIX: Dropping fact_receipt_lines table to migrate "
+                        f"promo_code from {current_type} to VARCHAR. "
+                        f"All existing data will be lost and must be regenerated."
                     )
                     # DuckDB doesn't support ALTER COLUMN TYPE directly, so we need
                     # to recreate the table. Since this is a schema fix, we drop
                     # and recreate (data will be regenerated).
                     conn.execute("DROP TABLE fact_receipt_lines")
         except Exception as e:
-            logger.debug(f"Failed to check promo_code type: {e}")
+            logger.warning(f"Failed to check promo_code type, skipping migration: {e}")
 
     conn.execute(
         """

@@ -86,6 +86,8 @@ class DailyFactsMixin(FactGeneratorBase):
         # - DC inventory: writes to _dc_inventory and daily_facts["dc_inventory_txn"]
         # - Marketing: writes only to daily_facts["marketing"]
         # - Store ops: writes only to daily_facts["store_ops"]
+        # Note: asyncio is single-threaded cooperative multitasking, so dict
+        # operations are safe (only one coroutine runs at a time).
         await asyncio.gather(
             self._generate_dc_inventory_section(
                 date, base_multiplier, active_tables, daily_facts, day_index, total_days
@@ -98,7 +100,7 @@ class DailyFactsMixin(FactGeneratorBase):
             ),
         )
 
-        # Supply chain disruptions (sync, runs quickly, no dependencies)
+        # Supply chain disruptions (sync, writes to daily_facts["supply_chain"])
         self._generate_supply_chain_section(date, active_tables, daily_facts)
 
         # Phase 2: Hourly store section (generates core data others depend on)
