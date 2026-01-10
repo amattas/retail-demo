@@ -419,29 +419,30 @@ def ensure_fact_payments_table(conn: duckdb.DuckDBPyConnection) -> None:
     with OrderIdExt explicitly set as VARCHAR to prevent type inference issues.
 
     Schema Design Notes:
-    - OrderIdExt: VARCHAR to support both receipt IDs (NULL) and
+    - order_id_ext: VARCHAR to support both receipt IDs (NULL) and
       online order IDs (strings)
-    - Mutual exclusivity: Either ReceiptIdExt OR OrderIdExt is populated,
+    - Mutual exclusivity: Either receipt_id_ext OR order_id_ext is populated,
       never both
     - Without explicit schema, DuckDB would infer INT32 when first seeing NULLs
       from receipt payments, causing conversion errors for online order payments
     - Pre-creating schema prevents type inference and ensures data integrity
+    - Column names use snake_case to match codebase convention
     """
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS fact_payments (
             event_ts TIMESTAMP,
-            ReceiptIdExt VARCHAR,
-            OrderIdExt VARCHAR,
-            PaymentMethod VARCHAR,
-            AmountCents BIGINT,
-            Amount VARCHAR,
-            TransactionId VARCHAR,
-            ProcessingTimeMs BIGINT,
-            Status VARCHAR,
-            DeclineReason VARCHAR,
-            StoreID BIGINT,
-            CustomerID BIGINT
+            receipt_id_ext VARCHAR,
+            order_id_ext VARCHAR,
+            payment_method VARCHAR,
+            amount_cents BIGINT,
+            amount VARCHAR,
+            transaction_id VARCHAR,
+            processing_time_ms BIGINT,
+            status VARCHAR,
+            decline_reason VARCHAR,
+            store_id BIGINT,
+            customer_id BIGINT
         );
         """
     )

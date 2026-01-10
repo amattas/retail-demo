@@ -199,15 +199,6 @@ class UtilsMixin(FactGeneratorBase):
         }
         products_by_id = {p.ID: p for p in self.products}
 
-        # Helper functions for cents conversion (same as receipts_mixin.py)
-        def _to_cents(d: Decimal) -> int:
-            return int((d * 100).quantize(Decimal("1")))
-
-        def _fmt_cents(c: int) -> str:
-            sign = "-" if c < 0 else ""
-            c = abs(c)
-            return f"{sign}{c / 100}.{c % 100:02d}"
-
         for orig_receipt_ext, store_id in sampled:
             lq = (
                 "SELECT product_id, quantity, unit_price, ext_price, line_num "
@@ -235,8 +226,8 @@ class UtilsMixin(FactGeneratorBase):
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
                 # Convert to cents for consistency with normal receipts
-                unit_cents = _to_cents(unit_price_dec)
-                ext_cents = _to_cents(neg_ext)
+                unit_cents = self._to_cents(unit_price_dec)
+                ext_cents = self._to_cents(neg_ext)
 
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
                 tax_mult = (
@@ -263,8 +254,8 @@ class UtilsMixin(FactGeneratorBase):
                         "Line": int(line_num),
                         "ProductID": int(product_id),
                         "Qty": nqty,
-                        "UnitPrice": _fmt_cents(unit_cents),
-                        "ExtPrice": _fmt_cents(ext_cents),
+                        "UnitPrice": self._fmt_cents(unit_cents),
+                        "ExtPrice": self._fmt_cents(ext_cents),
                         "UnitCents": unit_cents,
                         "ExtCents": ext_cents,
                         "PromoCode": "RETURN",
@@ -359,9 +350,9 @@ class UtilsMixin(FactGeneratorBase):
             total = (subtotal + total_tax).quantize(Decimal("0.01"))
 
             # Convert to cents for consistency with normal receipts
-            subtotal_cents = _to_cents(subtotal)
-            tax_cents = _to_cents(total_tax)
-            total_cents = _to_cents(total)
+            subtotal_cents = self._to_cents(subtotal)
+            tax_cents = self._to_cents(total_tax)
+            total_cents = self._to_cents(total)
 
             return_receipts.append(
                 {
@@ -372,10 +363,10 @@ class UtilsMixin(FactGeneratorBase):
                     "ReceiptId": return_id_ext,
                     "ReceiptType": "RETURN",
                     "ReturnForReceiptIdExt": str(orig_receipt_ext),
-                    "Subtotal": _fmt_cents(subtotal_cents),
+                    "Subtotal": self._fmt_cents(subtotal_cents),
                     "DiscountAmount": "0.00",
-                    "Tax": _fmt_cents(tax_cents),
-                    "Total": _fmt_cents(total_cents),
+                    "Tax": self._fmt_cents(tax_cents),
+                    "Total": self._fmt_cents(total_cents),
                     "SubtotalCents": subtotal_cents,
                     "TaxCents": tax_cents,
                     "TotalCents": total_cents,
@@ -464,15 +455,6 @@ class UtilsMixin(FactGeneratorBase):
         }
         products_by_id = {p.ID: p for p in self.products}
 
-        # Helper functions for cents conversion (same as receipts_mixin.py)
-        def _to_cents(d: Decimal) -> int:
-            return int((d * 100).quantize(Decimal("1")))
-
-        def _fmt_cents(c: int) -> str:
-            sign = "-" if c < 0 else ""
-            c = abs(c)
-            return f"{sign}{c / 100}.{c % 100:02d}"
-
         for orig_receipt_pk, store_id, event_ts in sampled:
             # Fetch lines for original receipt
             line_rows = (
@@ -511,8 +493,8 @@ class UtilsMixin(FactGeneratorBase):
                 neg_ext = (unit_price_dec * Decimal(nqty)).quantize(Decimal("0.01"))
 
                 # Convert to cents for consistency with normal receipts
-                unit_cents = _to_cents(unit_price_dec)
-                ext_cents = _to_cents(neg_ext)
+                unit_cents = self._to_cents(unit_price_dec)
+                ext_cents = self._to_cents(neg_ext)
 
                 # Taxability
                 taxability = getattr(product, "taxability", ProductTaxability.TAXABLE)
@@ -538,8 +520,8 @@ class UtilsMixin(FactGeneratorBase):
                         "Line": int(line_num),
                         "ProductID": int(product_id),
                         "Qty": nqty,
-                        "UnitPrice": _fmt_cents(unit_cents),
-                        "ExtPrice": _fmt_cents(ext_cents),
+                        "UnitPrice": self._fmt_cents(unit_cents),
+                        "ExtPrice": self._fmt_cents(ext_cents),
                         "UnitCents": unit_cents,
                         "ExtCents": ext_cents,
                         "PromoCode": "RETURN",
@@ -643,9 +625,9 @@ class UtilsMixin(FactGeneratorBase):
             total = (subtotal + total_tax).quantize(Decimal("0.01"))
 
             # Convert to cents for consistency with normal receipts
-            subtotal_cents = _to_cents(subtotal)
-            tax_cents = _to_cents(total_tax)
-            total_cents = _to_cents(total)
+            subtotal_cents = self._to_cents(subtotal)
+            tax_cents = self._to_cents(total_tax)
+            total_cents = self._to_cents(total)
 
             return_receipts.append(
                 {
@@ -656,10 +638,10 @@ class UtilsMixin(FactGeneratorBase):
                     "ReceiptId": return_id_ext,
                     "ReceiptType": "RETURN",
                     "ReturnForReceiptId": int(orig_receipt_pk),
-                    "Subtotal": _fmt_cents(subtotal_cents),
+                    "Subtotal": self._fmt_cents(subtotal_cents),
                     "DiscountAmount": "0.00",
-                    "Tax": _fmt_cents(tax_cents),
-                    "Total": _fmt_cents(total_cents),
+                    "Tax": self._fmt_cents(tax_cents),
+                    "Total": self._fmt_cents(total_cents),
                     "SubtotalCents": subtotal_cents,
                     "TaxCents": tax_cents,
                     "TotalCents": total_cents,

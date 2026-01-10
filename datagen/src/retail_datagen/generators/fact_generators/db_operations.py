@@ -392,6 +392,20 @@ class DbOperationsMixin(FieldMappingMixin):
                 "NodeType": "node_type",
                 "NodeID": "node_id",
             },
+            "fact_payments": {
+                **common,
+                "ReceiptIdExt": "receipt_id_ext",
+                "OrderIdExt": "order_id_ext",
+                "PaymentMethod": "payment_method",
+                "AmountCents": "amount_cents",
+                "Amount": "amount",
+                "TransactionId": "transaction_id",
+                "ProcessingTimeMs": "processing_time_ms",
+                "Status": "status",
+                "DeclineReason": "decline_reason",
+                "StoreID": "store_id",
+                "CustomerID": "customer_id",
+            },
         }
         mp = mapping_tbl.get(table_name, common)
         rename_map = {k: v for k, v in mp.items() if k in df.columns and k != v}
