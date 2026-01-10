@@ -62,3 +62,4 @@ htmlcov/
 data/*.db
 data/*.db-shm
 data/*.db-wal
+quick_test_output.txt
