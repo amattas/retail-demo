@@ -101,7 +101,7 @@ class DailyFactsMixin(FactGeneratorBase):
         )
 
         # 4a. Generate truck inventory tracking events
-        self._generate_truck_inventory_section(
+        await self._generate_truck_inventory_section(
             date, active_tables, daily_facts, day_index, total_days
         )
 
@@ -168,11 +168,7 @@ class DailyFactsMixin(FactGeneratorBase):
         if "dc_inventory_txn" not in active_tables:
             return
 
-        dc_transactions = (
-            self._generate_dc_inventory_txn(date, base_multiplier)
-            if hasattr(self, "_generate_dc_inventory_txn")
-            else self._generate_dc_inventory_transactions(date, base_multiplier)
-        )
+        dc_transactions = self._generate_dc_inventory_transactions(date, base_multiplier)
         daily_facts["dc_inventory_txn"].extend(dc_transactions)
 
         # Insert daily DC transactions immediately (not hourly)
@@ -286,6 +282,8 @@ class DailyFactsMixin(FactGeneratorBase):
             "ble_pings",
             "fact_payments",
             "customer_zone_changes",
+            "promotions",
+            "promo_lines",
         ]
 
         logger.debug(
@@ -385,6 +383,8 @@ class DailyFactsMixin(FactGeneratorBase):
                 "ble_pings": [],
                 "fact_payments": [],
                 "customer_zone_changes": [],
+                "promotions": [],
+                "promo_lines": [],
             }
 
         hour_data: dict[str, list[dict]] = {
@@ -395,6 +395,8 @@ class DailyFactsMixin(FactGeneratorBase):
             "ble_pings": [],
             "fact_payments": [],
             "customer_zone_changes": [],
+            "promotions": [],
+            "promo_lines": [],
         }
 
         hour_datetime = date.replace(hour=hour_idx, minute=0, second=0, microsecond=0)
@@ -427,9 +429,26 @@ class DailyFactsMixin(FactGeneratorBase):
         )
         daily_facts["truck_moves"].extend(truck_movements)
 
-        # Add reorder records to daily facts
+        # Add reorder records to daily facts and insert to DuckDB
         if "reorders" in active_tables and reorder_records:
             daily_facts["reorders"].extend(reorder_records)
+            try:
+                await self._insert_hourly_to_db(
+                    self._session,
+                    "reorders",
+                    reorder_records,
+                    hour=0,
+                    commit_every_batches=0,
+                )
+                # Update progress for this daily-generated table
+                for hour in range(24):
+                    self.hourly_tracker.update_hourly_progress(
+                        "reorders", day_index, hour, total_days
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Failed to insert reorders for {date.strftime('%Y-%m-%d')}: {e}"
+                )
 
         # Process all active shipments and generate status progression
         truck_lifecycle_records, dc_outbound_txn, store_inbound_txn = (
@@ -501,7 +520,7 @@ class DailyFactsMixin(FactGeneratorBase):
                     f"Failed to insert truck_moves for {date.strftime('%Y-%m-%d')}: {e}"
                 )
 
-    def _generate_truck_inventory_section(
+    async def _generate_truck_inventory_section(
         self,
         date: datetime,
         active_tables: list[str],
@@ -516,26 +535,40 @@ class DailyFactsMixin(FactGeneratorBase):
         truck_inventory_events = self.inventory_flow_sim.track_truck_inventory_status(
             date
         )
+        truck_inventory_records = []
         for event in truck_inventory_events:
-            daily_facts["truck_inventory"].append(
-                {
-                    "TraceId": self._generate_trace_id(),
-                    "EventTS": self._randomize_time_within_day(event["EventTS"]),
-                    "TruckId": event["TruckId"],
-                    "ShipmentId": event["ShipmentId"],
-                    "ProductID": event["ProductID"],
-                    "Quantity": event["Quantity"],
-                    "Action": event["Action"],
-                    "LocationID": event["LocationID"],
-                    "LocationType": event["LocationType"],
-                }
-            )
+            record = {
+                "TraceId": self._generate_trace_id(),
+                "EventTS": self._randomize_time_within_day(event["EventTS"]),
+                "TruckId": event["TruckId"],
+                "ShipmentId": event["ShipmentId"],
+                "ProductID": event["ProductID"],
+                "Quantity": event["Quantity"],
+                "Action": event["Action"],
+                "LocationID": event["LocationID"],
+                "LocationType": event["LocationType"],
+            }
+            daily_facts["truck_inventory"].append(record)
+            truck_inventory_records.append(record)
 
-        # Update progress for this daily-generated table
-        for hour in range(24):
-            self.hourly_tracker.update_hourly_progress(
-                "truck_inventory", day_index, hour, total_days
-            )
+        # Insert truck inventory tracking events immediately (not hourly)
+        if truck_inventory_records:
+            try:
+                await self._insert_hourly_to_db(
+                    self._session,
+                    "truck_inventory",
+                    truck_inventory_records,
+                    hour=0,
+                    commit_every_batches=0,
+                )
+                # Update progress for this daily-generated table
+                for hour in range(24):
+                    self.hourly_tracker.update_hourly_progress(
+                        "truck_inventory", day_index, hour, total_days
+                    )
+            except Exception as e:
+                logger.error(f"Failed to insert truck_inventory records: {e}")
+                raise
 
     async def _generate_online_orders_section(
         self,

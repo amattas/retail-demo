@@ -707,9 +707,16 @@ def validate_table_name(table_name: str, table_type: str = "master") -> str:
             "receipt_lines",
             "foot_traffic",
             "ble_pings",
+            "customer_zone_changes",
             "marketing",
             "online_orders",
             "online_order_lines",
+            "fact_payments",
+            "store_ops",
+            "stockouts",
+            "promotions",
+            "promo_lines",
+            "reorders",
         ]
     else:
         raise ValueError(f"Invalid table type: {table_type}")

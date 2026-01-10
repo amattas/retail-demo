@@ -359,7 +359,9 @@ async def generate_historical_data(
             }
 
         except Exception as e:
+            import traceback
             logger.error(f"Historical data generation failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # Surface error to task status for UI
             update_task_progress(
                 task_id,

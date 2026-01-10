@@ -30,14 +30,22 @@ MASTER_TABLES = [
 FACT_TABLES = [
     "fact_dc_inventory_txn",
     "fact_truck_moves",
+    "fact_truck_inventory",
     "fact_store_inventory_txn",
     "fact_receipts",
     "fact_receipt_lines",
     "fact_foot_traffic",
     "fact_ble_pings",
+    "fact_customer_zone_changes",
     "fact_marketing",
     "fact_online_order_headers",
     "fact_online_order_lines",
+    "fact_payments",
+    "fact_store_ops",
+    "fact_stockouts",
+    "fact_promotions",
+    "fact_promo_lines",
+    "fact_reorders",
 ]
 
 
@@ -84,7 +92,7 @@ def read_all_fact_tables(
             if start_dt is None:
                 df = conn.execute(f"SELECT * FROM {validated_table}").df()
             else:
-                # Special-case tables without event_ts
+                # Special-case tables without event_ts or with different timestamp columns
                 if table == "fact_online_order_lines":
                     # Join with headers to get order creation timestamp
                     # for partitioning pending orders with NULL timestamps.
@@ -108,6 +116,20 @@ def read_all_fact_tables(
                         )
                     """
                     df = conn.execute(query, [start_dt, end_dt, start_dt, end_dt]).df()
+                elif table == "fact_store_ops":
+                    # Uses operation_time instead of event_ts
+                    query = (
+                        f"SELECT * FROM {validated_table} "
+                        f"WHERE operation_time >= ? AND operation_time < ?"
+                    )
+                    df = conn.execute(query, [start_dt, end_dt]).df()
+                elif table == "fact_reorders":
+                    # Uses event_ts (standard case, but listed for clarity)
+                    query = (
+                        f"SELECT * FROM {validated_table} "
+                        f"WHERE event_ts >= ? AND event_ts < ?"
+                    )
+                    df = conn.execute(query, [start_dt, end_dt]).df()
                 else:
                     query = (
                         f"SELECT * FROM {validated_table} "
