@@ -571,8 +571,10 @@ class DailyFactsMixin(FactGeneratorBase):
                         "truck_inventory", day_index, hour, total_days
                     )
             except Exception as e:
-                logger.error(f"Failed to insert truck_inventory records: {e}")
-                raise
+                logger.error(
+                    f"Failed to insert truck_inventory for "
+                    f"{date.strftime('%Y-%m-%d')}: {e}"
+                )
 
     async def _generate_online_orders_section(
         self,
