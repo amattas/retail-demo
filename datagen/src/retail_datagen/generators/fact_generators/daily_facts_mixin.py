@@ -83,7 +83,7 @@ class DailyFactsMixin(FactGeneratorBase):
 
         # Phase 1: Run independent sections in parallel
         # These sections have no shared state dependencies:
-        # - DC inventory: writes only to _dc_inventory and daily_facts["dc_inventory_txn"]
+        # - DC inventory: writes to _dc_inventory and daily_facts["dc_inventory_txn"]
         # - Marketing: writes only to daily_facts["marketing"]
         # - Store ops: writes only to daily_facts["store_ops"]
         await asyncio.gather(

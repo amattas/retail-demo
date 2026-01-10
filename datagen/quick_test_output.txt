@@ -1,0 +1,192 @@
+Progress callback is None! Cannot send update: Preparing historical data generation
+DuckDB insert failed for receipt_lines: Conversion Error: Could not convert string 'SAVE15' to INT32 when casting from source column promo_code
+
+LINE 1: ...id_ext) SELECT ext_price, ext_cents, unit_price, line_num, promo_code, unit_cents, product_id, event_ts, quantity,...
+                                                                      ^
+DuckDB insert failed for receipt_lines: Conversion Error: Could not convert string 'SAVE10' to INT32 when casting from source column promo_code
+
+LINE 1: ...id_ext) SELECT ext_price, ext_cents, unit_price, line_num, promo_code, unit_cents, product_id, event_ts, quantity,...
+                                                                      ^
+DuckDB insert failed for receipt_lines: Conversion Error: Could not convert string 'BOGO50' to INT32 when casting from source column promo_code
+
+LINE 1: ...id_ext) SELECT ext_price, ext_cents, unit_price, line_num, promo_code, unit_cents, product_id, event_ts, quantity,...
+                                                                      ^
+DuckDB insert failed for receipt_lines: Conversion Error: Could not convert string 'NEWYEAR15' to INT32 when casting from source column promo_code
+
+LINE 1: ...id_ext) SELECT ext_price, ext_cents, unit_price, line_num, promo_code, unit_cents, product_id, event_ts, quantity,...
+                                                                      ^
+DuckDB insert failed for receipt_lines: Conversion Error: Could not convert string 'SAVE20' to INT32 when casting from source column promo_code
+
+LINE 1: ...id_ext) SELECT ext_price, ext_cents, unit_price, line_num, promo_code, unit_cents, product_id, event_ts, quantity,...
+                                                                      ^
+Invalid state transition for SHIP2024010101004533: LOADING -> ARRIVED
+Progress callback is None! Cannot send update: Generating data for 2024-01-01 (day 1/1) (0/18 tables complete)
+================================================================================
+QUICK TEST: Master + 1 Day + Export + Validation
+================================================================================
+
+1. Generating master data...
+MasterDataGenerator initialized with seed 42
+Starting master data generation...
+Loading dictionary data...
+Dictionary path: /Users/amattas/GitHub/retail-demo/datagen/data/dictionaries
+Loaded 579 geographies
+Loaded 313 first names
+Loaded 364 last names
+Loaded 670 products
+Loaded 28 brands
+  Sample brand: 'Care Choice' | Company=PharmaCare Corporation | Category='Health'
+Loaded 111 companies
+  Sample company: 'Fresh Corp' | Category='Food'
+Loaded 78 product tag overlays
+Loaded 163 tax jurisdictions
+Created tax rate mapping with 163 entries
+Computed state-level tax averages for 50 states
+  Sample: Birmingham, AL -> 0.0900
+Dictionary data loading complete
+
+Phase 1: Generating geographic dependencies (sequential)...
+Generating geography master data...
+Generated 20 geography master records
+Generating distribution center data...
+Generated 2 distribution center records
+Generating store data...
+Constraining stores to 2 states with DCs: ['CA', 'CO']
+Generated 10 store records
+Assigning store profiles for realistic variability...
+Assigned profiles to 10 stores
+Generating truck data...
+Distribution centers available: 2
+DC-to-Store trucks to generate: 20 (8 refrigerated, 12 non-refrigerated)
+Using percentage-based assignment: 85.0% of trucks assigned to DCs
+  - Assigned trucks: 17
+  - Pool trucks (DCID=NULL): 3
+
+Generating 30 supplier trucks (12 refrigerated, 18 non-refrigerated)
+
+=== Truck Generation Summary ===
+Total trucks generated: 50
+
+DC-to-Store Fleet (20 trucks):
+  - Assigned to DCs: 17
+    • Refrigerated: 7
+    • Non-refrigerated: 10
+  - Pool trucks (DCID=NULL): 3
+    • Refrigerated: 1
+    • Non-refrigerated: 2
+
+Supplier-to-DC Fleet (30 trucks):
+  - All pool trucks (DCID=NULL)
+    • Refrigerated: 12
+    • Non-refrigerated: 18
+
+Per-DC Assignment (round-robin distribution):
+  DC 1: 9 trucks (4 refrigerated, 5 non-refrigerated)
+  DC 2: 8 trucks (3 refrigerated, 5 non-refrigerated)
+
+Phase 2: Generating customers and products...
+Generating customer data...
+Generating customers: Complete (1000/1000)
+Generated 1000 customer records
+Generating product master data with brand combinations...
+Target products: 10000
+Available base products: 670
+Available brands: 28
+Available companies: 111
+Creating category-aware brand-product combinations...
+Brand categories: ['Food', 'Health', 'Home', 'Office']
+Product categories mapped to: ['Automotive', 'Clothing', 'Electronics', 'Food', 'Health', 'Home', 'Office', 'Pet', 'Sports']
+Category 'Health': 8 brands × 3 products = 24 combinations
+Category 'Office': 15 brands × 8 products = 120 combinations
+Category 'Home': 4 brands × 63 products = 252 combinations
+Category 'Food': 1 brands × 552 products = 552 combinations
+Total valid category-matched combinations: 948
+Selected 10000 category-matched combinations
+Generating product combinations: 1000/10000 (10.0%)
+Generating product combinations: 2000/10000 (20.0%)
+Generating product combinations: 3000/10000 (30.0%)
+Generating product combinations: 4000/10000 (40.0%)
+Generating product combinations: 5000/10000 (50.0%)
+Generating product combinations: 6000/10000 (60.0%)
+Generating product combinations: 7000/10000 (70.0%)
+Generating product combinations: 8000/10000 (80.0%)
+Generating product combinations: 9000/10000 (90.0%)
+Generating product combinations: 10000/10000 (100.0%)
+Generating product combinations: Complete (10000/10000)
+
+=== Product Generation Summary ===
+Target products: 10000
+Total combinations processed: 10000
+Successful products: 10000
+Failed validations: 0
+Final product count: 10000
+Generated 10000 product master records with brand combinations
+
+Phase 3: Generating inventory snapshots...
+Generating DC inventory snapshots...
+Generating 20,000 DC inventory records (vectorized)...
+Generated 20,000 DC inventory records (vectorized)
+Generating store inventory snapshots...
+Generating 100,000 store inventory records (vectorized)...
+Generated 100,000 store inventory records (vectorized)
+Validating foreign key relationships...
+FK validation passed: {'geographies': 20, 'stores': 10, 'dcs': 2, 'trucks': 50, 'customers': 1000, 'products': 10000, 'receipts': 0}
+Master data counts cached successfully
+Master data generation complete!
+   ✓ Master data generated
+
+2. Generating facts for 2024-01-01...
+FactDataGenerator initialized with seed 42
+Starting historical fact data generation from 2024-01-01 00:00:00 to 2024-01-01 23:59:59
+Loading master data from DuckDB for fact generation...
+Assigning customer geographies and store affinities...
+Building customer pools for each store...
+Loaded master data (DuckDB): 20 geographies, 10 stores, 2 DCs, 1000 customers, 10000 products, 50 trucks
+Generating historical data: 1/1 (100.0%)
+Generating historical data: Complete (1/1)
+Historical data generation complete: 9289 records in 0.5s
+Generated 18 fact tables
+   ✓ Facts generated
+
+3. Exporting to parquet...
+   ✓ fact_dc_inventory_txn: 1,040 rows
+   ✓ fact_truck_moves: 52 rows
+   ✗ fact_truck_inventory: Error - Catalog Error: Table with name fact_truck_inventory does not exist!
+Did you mean "fact_truck_moves"?
+
+LINE 1: SELECT COUNT(*) FROM fact_truck_inventory
+                             ^
+   ✓ fact_store_inventory_txn: 2,470 rows
+   ✓ fact_receipts: 57 rows
+   ✓ fact_receipt_lines: 224 rows
+   ✓ fact_foot_traffic: 525 rows
+   ✓ fact_ble_pings: 1,150 rows
+   ✓ fact_marketing: 1,998 rows
+   ✓ fact_online_order_headers: 14 rows
+   ✓ fact_online_order_lines: 36 rows
+   ✓ fact_payments: 71 rows
+   ✓ fact_store_ops: 20 rows
+
+4. Validating fact_payments columns...
+   Total payments: 71
+   ReceiptIdExt populated: 57
+   OrderIdExt populated: 14
+   AmountCents populated: 71
+   PaymentMethod populated: 71
+   ✓ All payments have amount_cents
+
+5. Validating receipts cents fields...
+   Total receipts: 57
+   SubtotalCents populated: 57
+   TaxCents populated: 57
+   TotalCents populated: 57
+   Returns: 0
+   ✓ All receipts have cents fields
+   Total receipt lines: 224
+   UnitCents populated: 224
+   ExtCents populated: 224
+   ✓ All receipt lines have cents fields
+
+================================================================================
+✅ ALL VALIDATION CHECKS PASSED
+================================================================================

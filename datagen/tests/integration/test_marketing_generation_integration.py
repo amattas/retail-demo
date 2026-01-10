@@ -93,7 +93,8 @@ class TestMarketingGenerationIntegration:
         conn = get_duckdb_conn()
         # Check if table exists first
         tables = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_name = 'fact_marketing'"
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_name = 'fact_marketing'"
         ).fetchall()
         if not tables:
             print("WARNING: fact_marketing table does not exist in DuckDB")
@@ -391,7 +392,8 @@ class TestMarketingGenerationIntegration:
         for internal_name, duck_table in expected_tables.items():
             # Check table exists in DuckDB
             table_exists = conn.execute(
-                f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{duck_table}'"
+                "SELECT COUNT(*) FROM information_schema.tables "
+                f"WHERE table_name = '{duck_table}'"
             ).fetchone()[0]
             assert table_exists > 0, f"Missing DuckDB table: {duck_table}"
 
@@ -412,18 +414,23 @@ class TestMarketingGenerationIntegration:
             # Query date range from each table
             try:
                 result = conn.execute(
-                    f"SELECT COUNT(DISTINCT DATE(event_ts)) as day_count FROM {duck_table}"
+                    f"SELECT COUNT(DISTINCT DATE(event_ts)) as day_count "
+                    f"FROM {duck_table}"
                 ).fetchone()
                 day_count = result[0] if result else 0
 
-                # Should have data for most days in range (allowing for some variability)
+                # Should have data for most days in range (some variability OK)
                 # Marketing may not have all days due to campaign scheduling
                 if internal_name == "marketing":
-                    assert day_count >= 5, f"{duck_table} should have at least 5 days of data"
+                    assert day_count >= 5, (
+                        f"{duck_table} should have at least 5 days of data"
+                    )
                 else:
                     # Other tables should have more consistent daily data
-                    assert day_count >= 6, f"{duck_table} should have at least 6 days of data"
-            except Exception as e:
+                    assert day_count >= 6, (
+                        f"{duck_table} should have at least 6 days of data"
+                    )
+            except Exception:
                 # Some tables may not have event_ts column, skip date check
                 pass
 
