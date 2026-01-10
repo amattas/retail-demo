@@ -18,7 +18,7 @@ from retail_datagen.generators.utils import ProgressReporter
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from .base_types import FactGeneratorBase
+from .daily_facts_mixin import DailyFactsMixin
 from .models import FactGenerationSummary
 
 # SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
@@ -32,8 +32,12 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class InventoryMixin(FactGeneratorBase):
-    """Inventory management for distribution centers and stores."""
+class InventoryMixin(DailyFactsMixin):
+    """Inventory management for distribution centers and stores.
+
+    Inherits from:
+        DailyFactsMixin: Daily fact generation orchestration
+    """
 
     def _generate_dc_inventory_transactions(
         self, date: datetime, multiplier: float
