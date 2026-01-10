@@ -6,6 +6,7 @@ with comprehensive status tracking and validation.
 """
 
 import logging
+import traceback
 from datetime import UTC, datetime
 from threading import Lock
 from uuid import uuid4
@@ -359,8 +360,6 @@ async def generate_historical_data(
             }
 
         except Exception as e:
-            import traceback
-
             logger.error(f"Historical data generation failed: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Surface error to task status for UI
