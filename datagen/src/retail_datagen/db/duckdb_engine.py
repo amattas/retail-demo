@@ -417,6 +417,13 @@ def ensure_fact_payments_table(conn: duckdb.DuckDBPyConnection) -> None:
 
     This ensures the table schema is defined before any inserts,
     with OrderIdExt explicitly set as VARCHAR to prevent type inference issues.
+
+    Schema Design Notes:
+    - OrderIdExt: VARCHAR to support both receipt IDs (NULL) and online order IDs (strings)
+    - Mutual exclusivity: Either ReceiptIdExt OR OrderIdExt is populated, never both
+    - Without explicit schema, DuckDB would infer INT32 when first seeing NULLs
+      from receipt payments, causing conversion errors for online order payments
+    - Pre-creating schema prevents type inference and ensures data integrity
     """
     conn.execute(
         """

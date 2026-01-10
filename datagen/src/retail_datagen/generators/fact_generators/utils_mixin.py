@@ -23,6 +23,46 @@ logger = logging.getLogger(__name__)
 class UtilsMixin(FactGeneratorBase):
     """Utility helper methods for fact generation."""
 
+    @staticmethod
+    def _to_cents(d: Decimal) -> int:
+        """
+        Convert a Decimal dollar amount to integer cents.
+
+        Args:
+            d: Decimal dollar amount (e.g., Decimal("10.50"))
+
+        Returns:
+            Integer cents (e.g., 1050)
+
+        Examples:
+            >>> _to_cents(Decimal("10.50"))
+            1050
+            >>> _to_cents(Decimal("-5.25"))
+            -525
+        """
+        return int((d * 100).quantize(Decimal("1")))
+
+    @staticmethod
+    def _fmt_cents(c: int) -> str:
+        """
+        Format integer cents as a dollar string.
+
+        Args:
+            c: Integer cents (e.g., 1050)
+
+        Returns:
+            Formatted dollar string (e.g., "10.50")
+
+        Examples:
+            >>> _fmt_cents(1050)
+            "10.50"
+            >>> _fmt_cents(-525)
+            "-5.25"
+        """
+        sign = "-" if c < 0 else ""
+        c = abs(c)
+        return f"{sign}{c / 100}.{c % 100:02d}"
+
     def _get_available_products_for_date(self, date: datetime) -> list[ProductMaster]:
         """Get products that have been launched by the given date."""
         return [

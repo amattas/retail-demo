@@ -212,7 +212,13 @@ class DbOperationsMixin(FieldMappingMixin):
             # Apply column renaming
             df = self._apply_duckdb_column_rename(table_name, df)
 
-            # Ensure string-type columns are explicitly typed (fix for OrderIdExt)
+            # Defense-in-depth: Ensure OrderIdExt is VARCHAR even though
+            # ensure_fact_payments_table() creates the schema explicitly.
+            # This guards against edge cases where table creation might fail
+            # or be bypassed, preventing DuckDB from inferring INT32 type
+            # when it first sees NULL values from receipt payments.
+            # OrderIdExt stores both receipt IDs (NULL) and online order IDs (strings),
+            # requiring VARCHAR type for proper data insertion.
             if table_name == "fact_payments" and "order_id_ext" in df.columns:
                 df["order_id_ext"] = df["order_id_ext"].astype(str)
                 # Replace 'None' strings with actual None
