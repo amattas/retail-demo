@@ -8,6 +8,7 @@ data type.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 from datetime import datetime
@@ -80,17 +81,28 @@ class DailyFactsMixin(FactGeneratorBase):
         # Generate base activity level for the day
         base_multiplier = self.temporal_patterns.get_overall_multiplier(date)
 
-        # 1. Generate DC inventory transactions (supplier deliveries)
-        await self._generate_dc_inventory_section(
-            date, base_multiplier, active_tables, daily_facts, day_index, total_days
+        # Phase 1: Run independent sections in parallel
+        # These sections have no shared state dependencies:
+        # - DC inventory: writes only to _dc_inventory and daily_facts["dc_inventory_txn"]
+        # - Marketing: writes only to daily_facts["marketing"]
+        # - Store ops: writes only to daily_facts["store_ops"]
+        await asyncio.gather(
+            self._generate_dc_inventory_section(
+                date, base_multiplier, active_tables, daily_facts, day_index, total_days
+            ),
+            self._generate_marketing_section(
+                date, active_tables, daily_facts, day_index, total_days
+            ),
+            self._generate_store_ops_section(
+                date, active_tables, daily_facts, day_index, total_days
+            ),
         )
 
-        # 2. Generate marketing campaigns and impressions
-        await self._generate_marketing_section(
-            date, active_tables, daily_facts, day_index, total_days
-        )
+        # Supply chain disruptions (sync, runs quickly, no dependencies)
+        self._generate_supply_chain_section(date, active_tables, daily_facts)
 
-        # 3. Generate and write store operations hour-by-hour to minimize memory
+        # Phase 2: Hourly store section (generates core data others depend on)
+        # Must complete before truck movements, online orders, stockouts, returns
         await self._generate_hourly_store_section(
             date, active_tables, daily_facts, day_index, total_days
         )
@@ -119,20 +131,13 @@ class DailyFactsMixin(FactGeneratorBase):
                 )
                 # Skip adding these since _process_truck_lifecycle handles it
 
-        # 6. Generate online orders and integrate inventory effects
+        # Phase 3: Online orders (touches inventory, must be after hourly store)
         await self._generate_online_orders_section(
             date, active_tables, daily_facts, day_index, total_days
         )
 
-        # 7. Generate store operations (open/close events)
-        await self._generate_store_ops_section(
-            date, active_tables, daily_facts, day_index, total_days
-        )
-
-        # 8. Generate supply chain disruptions
-        self._generate_supply_chain_section(date, active_tables, daily_facts)
-
-        # 8. Small store inventory adjustments for audit realism
+        # Phase 4: Post-processing sections
+        # Small store inventory adjustments for audit realism
         await self._generate_inventory_adjustments_section(
             date, active_tables, day_index, total_days
         )

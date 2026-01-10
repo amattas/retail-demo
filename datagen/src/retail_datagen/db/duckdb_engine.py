@@ -176,6 +176,14 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     logger.warning(
                         f"Failed to create fact_payments table during init: {e}"
                     )
+                # Ensure fact_receipt_lines table exists with proper schema
+                # (promo_code must be VARCHAR, not INT)
+                try:
+                    ensure_fact_receipt_lines_table(new_conn)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create fact_receipt_lines table during init: {e}"
+                    )
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -443,6 +451,62 @@ def ensure_fact_payments_table(conn: duckdb.DuckDBPyConnection) -> None:
             decline_reason VARCHAR,
             store_id BIGINT,
             customer_id BIGINT
+        );
+        """
+    )
+
+
+def ensure_fact_receipt_lines_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create the fact_receipt_lines table if it does not exist.
+
+    This ensures the table schema is defined before any inserts,
+    with promo_code explicitly set as VARCHAR to prevent type inference issues.
+
+    Schema Design Notes:
+    - promo_code: VARCHAR to support promotional codes like 'SAVE20', 'BOGO50'
+    - Without explicit schema, DuckDB would infer INT32 when first seeing NULLs
+      (receipts without promotions), causing conversion errors when actual
+      promo codes are inserted later
+    - Pre-creating schema prevents type inference and ensures data integrity
+    - If table exists with wrong promo_code type (INT), it will be migrated
+    """
+    # Check if table exists
+    if _table_exists(conn, "fact_receipt_lines"):
+        # Check if promo_code column has wrong type and fix it
+        try:
+            result = conn.execute(
+                """
+                SELECT data_type FROM information_schema.columns
+                WHERE table_name = 'fact_receipt_lines' AND column_name = 'promo_code'
+                """
+            ).fetchone()
+            if result:
+                current_type = result[0].upper()
+                if current_type != "VARCHAR" and "INT" in current_type:
+                    logger.info(
+                        f"Migrating promo_code column from {current_type} to VARCHAR"
+                    )
+                    # DuckDB doesn't support ALTER COLUMN TYPE directly, so we need
+                    # to recreate the table. Since this is a schema fix, we drop
+                    # and recreate (data will be regenerated).
+                    conn.execute("DROP TABLE fact_receipt_lines")
+        except Exception as e:
+            logger.debug(f"Failed to check promo_code type: {e}")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fact_receipt_lines (
+            receipt_id BIGINT,
+            receipt_id_ext VARCHAR,
+            event_ts TIMESTAMP,
+            product_id BIGINT,
+            line_num INTEGER,
+            quantity INTEGER,
+            unit_price VARCHAR,
+            ext_price VARCHAR,
+            unit_cents BIGINT,
+            ext_cents BIGINT,
+            promo_code VARCHAR
         );
         """
     )
