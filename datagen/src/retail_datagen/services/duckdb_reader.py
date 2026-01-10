@@ -92,7 +92,7 @@ def read_all_fact_tables(
             if start_dt is None:
                 df = conn.execute(f"SELECT * FROM {validated_table}").df()
             else:
-                # Special-case tables without event_ts or with different timestamp columns
+                # Special-case tables with different timestamp columns
                 if table == "fact_online_order_lines":
                     # Join with headers to get order creation timestamp
                     # for partitioning pending orders with NULL timestamps.
