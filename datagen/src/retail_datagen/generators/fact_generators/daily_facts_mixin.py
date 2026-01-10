@@ -168,7 +168,9 @@ class DailyFactsMixin(FactGeneratorBase):
         if "dc_inventory_txn" not in active_tables:
             return
 
-        dc_transactions = self._generate_dc_inventory_transactions(date, base_multiplier)
+        dc_transactions = self._generate_dc_inventory_transactions(
+            date, base_multiplier
+        )
         daily_facts["dc_inventory_txn"].extend(dc_transactions)
 
         # Insert daily DC transactions immediately (not hourly)

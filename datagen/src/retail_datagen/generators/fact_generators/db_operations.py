@@ -212,6 +212,12 @@ class DbOperationsMixin(FieldMappingMixin):
             # Apply column renaming
             df = self._apply_duckdb_column_rename(table_name, df)
 
+            # Ensure string-type columns are explicitly typed (fix for OrderIdExt)
+            if table_name == "fact_payments" and "order_id_ext" in df.columns:
+                df["order_id_ext"] = df["order_id_ext"].astype(str)
+                # Replace 'None' strings with actual None
+                df.loc[df["order_id_ext"] == "None", "order_id_ext"] = None
+
             duck_table = self._get_duckdb_table_name(table_name)
             from retail_datagen.db.duckdb_engine import (
                 insert_dataframe,

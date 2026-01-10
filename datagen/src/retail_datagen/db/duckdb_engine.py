@@ -169,6 +169,13 @@ def get_duckdb_conn() -> duckdb.DuckDBPyConnection:
                     logger.warning(
                         f"Failed to create fact_store_ops table during init: {e}"
                     )
+                # Ensure fact_payments table exists with proper schema
+                try:
+                    ensure_fact_payments_table(new_conn)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create fact_payments table during init: {e}"
+                    )
                 # Only assign to global after successful initialization
                 _conn = new_conn
             except Exception as e:
@@ -403,6 +410,32 @@ def ensure_fact_store_ops_table(conn: duckdb.DuckDBPyConnection) -> None:
         _ensure("operation_type", "VARCHAR")
     except Exception as e:
         logger.warning(f"Failed to ensure columns on fact_store_ops: {e}")
+
+
+def ensure_fact_payments_table(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create the fact_payments table if it does not exist.
+
+    This ensures the table schema is defined before any inserts,
+    with OrderIdExt explicitly set as VARCHAR to prevent type inference issues.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fact_payments (
+            event_ts TIMESTAMP,
+            ReceiptIdExt VARCHAR,
+            OrderIdExt VARCHAR,
+            PaymentMethod VARCHAR,
+            AmountCents BIGINT,
+            Amount VARCHAR,
+            TransactionId VARCHAR,
+            ProcessingTimeMs BIGINT,
+            Status VARCHAR,
+            DeclineReason VARCHAR,
+            StoreID BIGINT,
+            CustomerID BIGINT
+        );
+        """
+    )
 
 
 # ================================
