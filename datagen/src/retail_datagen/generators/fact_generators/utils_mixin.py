@@ -61,7 +61,7 @@ class UtilsMixin(FactGeneratorBase):
         """
         sign = "-" if c < 0 else ""
         c = abs(c)
-        return f"{sign}{c / 100}.{c % 100:02d}"
+        return f"{sign}{c // 100}.{c % 100:02d}"
 
     def _get_available_products_for_date(self, date: datetime) -> list[ProductMaster]:
         """Get products that have been launched by the given date."""
