@@ -290,6 +290,7 @@ class ExportService:
                     "completed_ts",
                     "eta",
                     "etd",
+                    "operation_time",
                 ]
                 ts_col = next((c for c in ts_candidates if c in df.columns), None)
 

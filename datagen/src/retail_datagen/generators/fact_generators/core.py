@@ -50,6 +50,7 @@ from ..retail_patterns import (
     MarketingCampaignSimulator,
 )
 from .customer_zone_changes_mixin import CustomerZoneChangesMixin
+from .daily_facts_mixin import DailyFactsMixin
 from .data_loading_mixin import DataLoadingMixin
 from .inventory_mixin import InventoryMixin
 from .logistics_mixin import LogisticsMixin
@@ -88,6 +89,7 @@ class FactDataGenerator(
     StockoutsMixin,
     StoreOpsMixin,
     UtilsMixin,
+    DailyFactsMixin,
 ):
     """
     Main historical fact data generation engine.

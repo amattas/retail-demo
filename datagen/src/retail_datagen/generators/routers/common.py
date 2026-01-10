@@ -33,32 +33,44 @@ DUCK_MASTER_MAP = {
 DUCK_FACT_MAP = {
     "dc_inventory_txn": "fact_dc_inventory_txn",
     "truck_moves": "fact_truck_moves",
+    "truck_inventory": "fact_truck_inventory",
     "store_inventory_txn": "fact_store_inventory_txn",
     "receipts": "fact_receipts",
     "receipt_lines": "fact_receipt_lines",
-    "reorders": "fact_reorders",
     "foot_traffic": "fact_foot_traffic",
     "ble_pings": "fact_ble_pings",
+    "customer_zone_changes": "fact_customer_zone_changes",
     "marketing": "fact_marketing",
     "online_orders": "fact_online_order_headers",
     "online_order_lines": "fact_online_order_lines",
     "fact_payments": "fact_payments",
+    "store_ops": "fact_store_ops",
+    "stockouts": "fact_stockouts",
+    "promotions": "fact_promotions",
+    "promo_lines": "fact_promo_lines",
+    "reorders": "fact_reorders",
 }
 
-# Available fact tables
+# Available fact tables (must match FactDataGenerator.FACT_TABLES in core.py)
 FACT_TABLES = [
     "dc_inventory_txn",
     "truck_moves",
+    "truck_inventory",
     "store_inventory_txn",
     "receipts",
     "receipt_lines",
-    "reorders",
     "foot_traffic",
     "ble_pings",
+    "customer_zone_changes",
     "marketing",
     "online_orders",
     "online_order_lines",
     "fact_payments",
+    "store_ops",
+    "stockouts",
+    "promotions",
+    "promo_lines",
+    "reorders",
 ]
 
 # Combined mapping for unified lookups

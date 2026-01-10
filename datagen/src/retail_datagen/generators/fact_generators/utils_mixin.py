@@ -49,9 +49,19 @@ class UtilsMixin(FactGeneratorBase):
             "store_inventory_txn",
             "dc_inventory_txn",
             "truck_moves",
+            "truck_inventory",
             "foot_traffic",
             "ble_pings",
+            "customer_zone_changes",
+            "marketing",
             "online_orders",
+            "online_order_lines",
+            "fact_payments",
+            "promotions",
+            "promo_lines",
+            "store_ops",
+            "stockouts",
+            "reorders",
         ]
         batch_hours = 1
         try:

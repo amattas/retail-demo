@@ -44,6 +44,7 @@ ALLOWED_TABLES: frozenset[str] = frozenset(
         # Fact tables (current)
         "fact_dc_inventory_txn",
         "fact_truck_moves",
+        "fact_truck_inventory",
         "fact_store_inventory_txn",
         "fact_receipts",
         "fact_receipt_lines",
