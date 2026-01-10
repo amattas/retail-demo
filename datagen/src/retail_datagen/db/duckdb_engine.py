@@ -498,7 +498,6 @@ def ensure_fact_receipt_lines_table(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS fact_receipt_lines (
-            receipt_id BIGINT,
             receipt_id_ext VARCHAR,
             event_ts TIMESTAMP,
             product_id BIGINT,
