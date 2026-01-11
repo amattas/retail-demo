@@ -81,6 +81,26 @@ Pydantic model in shared/models.py:
 - **Type Safety**: IDE autocomplete and validation
 - **Profile Switching**: One-line change in default.py
 - **Protection**: Can't be accidentally deleted or corrupted
+
+## Memory Considerations for Multiple Profiles
+
+When scaling to many profiles (10+), consider these memory implications:
+
+1. **Import-time Loading**: Python loads module data when imported. Each profile
+   uses ~1-5MB RAM depending on data size. With 10 profiles, this is 10-50MB.
+
+2. **Lazy Loading**: Only the `default` profile and explicitly imported profiles
+   are loaded. Unused profiles don't consume memory.
+
+3. **Shared Pydantic Models**: Validated data (Pydantic instances) is created
+   on first load and cached in DictionaryLoader._loaded_data. Multiple loaders
+   may create duplicate instances.
+
+4. **Recommendations for Large Scale**:
+   - Keep profiles modular (don't import all profiles in __init__.py)
+   - Use lazy imports: `from retail_datagen.sourcedata import fashion` only when needed
+   - For 50+ profiles, consider a registry pattern with dynamic imports
+   - Monitor memory with: `import sys; print(sys.getsizeof(GEOGRAPHIES))`
 """
 
 from retail_datagen.sourcedata import supercenter

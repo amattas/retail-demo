@@ -594,6 +594,16 @@ class DictionaryLoader:
             pass
 
         # Try loading from sourcedata module first (faster, no file I/O)
+        #
+        # CACHING NOTE: Sourcedata loading bypasses the file-based DictionaryCache
+        # because there's no file to track modification times for. Instead, data is
+        # cached in _loaded_data (in-memory dict). This is appropriate because:
+        # 1. Sourcedata is immutable at runtime (compiled into the module)
+        # 2. No file I/O means no need for mtime-based invalidation
+        # 3. The _loaded_data cache provides the same deduplication benefit
+        #
+        # If sourcedata caching with persistence becomes needed (e.g., for very large
+        # profiles), consider using a synthetic cache key like "sourcedata:{name}".
         sourcedata_result = self._load_from_sourcedata(dict_info)
         if sourcedata_result is not None:
             validated_data, validation_errors, warnings = sourcedata_result

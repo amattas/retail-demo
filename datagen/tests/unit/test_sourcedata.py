@@ -47,12 +47,24 @@ class TestSourcedataModuleStructure:
 
 
 class TestSupercenterProfileData:
-    """Test supercenter profile data integrity."""
+    """Test supercenter profile data integrity.
+
+    ROW COUNT ASSERTIONS:
+    The exact row counts (e.g., 579 geographies, 670 products) are intentional
+    and act as regression guards. If data is added or removed from a profile,
+    these tests will catch it immediately. This prevents accidental data loss
+    and ensures downstream systems receive consistent data volumes.
+
+    If you intentionally change data counts, update the corresponding test
+    assertion to match. Range checks (e.g., `> 100`) are avoided because they
+    don't catch data loss as effectively.
+    """
 
     def test_geographies_structure(self):
         """Test geography data has correct structure."""
         from retail_datagen.sourcedata.supercenter import GEOGRAPHIES
 
+        # Exact count is intentional - catches accidental data loss
         assert len(GEOGRAPHIES) == 579
 
         # Check first item structure
@@ -241,3 +253,81 @@ class TestProfileSwitching:
         assert PRODUCT_COMPANIES is supercenter.PRODUCT_COMPANIES
         assert PRODUCT_TAGS is supercenter.PRODUCT_TAGS
         assert TAX_RATES is supercenter.TAX_RATES
+
+
+class TestSourcedataAttrValidation:
+    """Test that all DictionaryLoader sourcedata_attr references are valid.
+
+    These tests catch missing constants during development - if a new dictionary
+    is added to DICTIONARIES but the corresponding constant isn't in sourcedata,
+    these tests will fail before runtime.
+    """
+
+    def test_all_sourcedata_attrs_exist_in_default(self):
+        """Verify all sourcedata_attr values exist in the default module."""
+        from retail_datagen.shared.dictionary_loader import DictionaryLoader
+        from retail_datagen.sourcedata import default as sourcedata_default
+
+        missing = []
+        for name, dict_info in DictionaryLoader.DICTIONARIES.items():
+            if dict_info.sourcedata_attr is not None:
+                if not hasattr(sourcedata_default, dict_info.sourcedata_attr):
+                    missing.append(
+                        f"{name}: sourcedata_attr='{dict_info.sourcedata_attr}' "
+                        f"not found in sourcedata.default"
+                    )
+
+        assert not missing, (
+            f"Missing sourcedata constants:\n" + "\n".join(missing)
+        )
+
+    def test_all_sourcedata_attrs_are_non_empty_lists(self):
+        """Verify all sourcedata constants are non-empty lists of dicts."""
+        from retail_datagen.shared.dictionary_loader import DictionaryLoader
+        from retail_datagen.sourcedata import default as sourcedata_default
+
+        errors = []
+        for name, dict_info in DictionaryLoader.DICTIONARIES.items():
+            if dict_info.sourcedata_attr is None:
+                continue
+
+            data = getattr(sourcedata_default, dict_info.sourcedata_attr, None)
+
+            if data is None:
+                errors.append(f"{name}: {dict_info.sourcedata_attr} is None")
+            elif not isinstance(data, list):
+                errors.append(
+                    f"{name}: {dict_info.sourcedata_attr} is {type(data).__name__}, "
+                    f"expected list"
+                )
+            elif len(data) == 0:
+                errors.append(f"{name}: {dict_info.sourcedata_attr} is empty")
+            elif not isinstance(data[0], dict):
+                errors.append(
+                    f"{name}: {dict_info.sourcedata_attr}[0] is "
+                    f"{type(data[0]).__name__}, expected dict"
+                )
+
+        assert not errors, (
+            f"Invalid sourcedata constants:\n" + "\n".join(errors)
+        )
+
+    def test_sourcedata_attr_naming_convention(self):
+        """Verify sourcedata_attr follows UPPER_SNAKE_CASE convention."""
+        from retail_datagen.shared.dictionary_loader import DictionaryLoader
+
+        violations = []
+        for name, dict_info in DictionaryLoader.DICTIONARIES.items():
+            if dict_info.sourcedata_attr is None:
+                continue
+
+            attr = dict_info.sourcedata_attr
+            if attr != attr.upper():
+                violations.append(
+                    f"{name}: sourcedata_attr='{attr}' should be "
+                    f"UPPER_SNAKE_CASE ('{attr.upper()}')"
+                )
+
+        assert not violations, (
+            f"Naming convention violations:\n" + "\n".join(violations)
+        )
