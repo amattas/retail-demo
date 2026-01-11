@@ -1,4 +1,4 @@
-// 02 Tables
+// 01 Tables
 // Purpose: Create event tables for streaming ingestion from Eventstream
 // Run this entire script at once using .execute database script
 // ============================================================================
@@ -33,12 +33,6 @@
 
 .execute database script with (ContinueOnErrors=true) <|
 
-// ----------------------------------------------------------------------------
-// CLUSTER POLICY
-// ----------------------------------------------------------------------------
-
-.alter cluster policy caching hot = 7d
-
 // ============================================================================
 // TABLE DEFINITIONS
 // ============================================================================
@@ -57,7 +51,7 @@
     total:real,
     tender_type:string,
     item_count:long,
-    campaign_id:string?,  // Null for non-campaign purchases; use isnull(campaign_id, '') in queries
+    campaign_id:string,  // Null for non-campaign purchases; use isnull(campaign_id, '') in queries
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -445,25 +439,254 @@
 .alter-merge table online_order_shipped policy retention softdelete = 30d
 
 // ============================================================================
-// RETENTION POLICY VALIDATION
+// STREAMING INGESTION POLICIES
 // ============================================================================
-// Run this query after applying policies to verify they were set correctly:
+// Enable streaming ingestion on all event tables to allow real-time data flow
+// from Eventstream. Without this, data would only arrive via batch ingestion.
+// ============================================================================
+
+// --- TRANSACTION EVENTS ---
+.alter table receipt_created policy streamingingestion enable
+
+.alter table receipt_line_added policy streamingingestion enable
+
+.alter table payment_processed policy streamingingestion enable
+
+// --- INVENTORY EVENTS ---
+.alter table inventory_updated policy streamingingestion enable
+
+.alter table stockout_detected policy streamingingestion enable
+
+.alter table reorder_triggered policy streamingingestion enable
+
+// --- CUSTOMER EVENTS ---
+.alter table customer_entered policy streamingingestion enable
+
+.alter table customer_zone_changed policy streamingingestion enable
+
+.alter table ble_ping_detected policy streamingingestion enable
+
+// --- OPERATIONAL EVENTS ---
+.alter table truck_arrived policy streamingingestion enable
+
+.alter table truck_departed policy streamingingestion enable
+
+.alter table store_opened policy streamingingestion enable
+
+.alter table store_closed policy streamingingestion enable
+
+// --- MARKETING EVENTS ---
+.alter table ad_impression policy streamingingestion enable
+
+.alter table promotion_applied policy streamingingestion enable
+
+// --- OMNICHANNEL EVENTS ---
+.alter table online_order_created policy streamingingestion enable
+
+.alter table online_order_picked policy streamingingestion enable
+
+.alter table online_order_shipped policy streamingingestion enable
+
+// ============================================================================
+// INGESTION BATCHING POLICIES
+// ============================================================================
+// Configure batching behavior for optimal throughput vs. latency trade-off.
 //
-// .show tables
-// | project TableName, RetentionPolicy=parse_json(RetentionPolicy).SoftDeletePeriod
-// | where TableName in (
-//     'receipt_created', 'receipt_line_added', 'payment_processed',
-//     'inventory_updated', 'stockout_detected', 'reorder_triggered',
-//     'customer_entered', 'customer_zone_changed', 'ble_ping_detected',
-//     'truck_arrived', 'truck_departed', 'store_opened', 'store_closed',
-//     'ad_impression', 'promotion_applied',
-//     'online_order_created', 'online_order_picked', 'online_order_shipped'
-// )
-// | extend ExpectedRetention = case(
-//     TableName in ('receipt_created', 'receipt_line_added', 'payment_processed',
-//                   'online_order_created', 'online_order_picked', 'online_order_shipped'), '30.00:00:00',
-//     TableName in ('customer_entered', 'customer_zone_changed', 'ble_ping_detected'), '7.00:00:00',
-//     '14.00:00:00'  // All others: inventory, operations, marketing
-// )
-// | extend PolicyCorrect = (RetentionPolicy == ExpectedRetention)
-// | order by PolicyCorrect asc, TableName asc
+// Parameters:
+// - MaximumBatchingTimeSpan: Max time to wait before flushing (default: 5 min)
+// - MaximumNumberOfItems: Max events per batch (default: 1000)
+// - MaximumRawDataSizeMB: Max batch size in MB (default: 1024)
+//
+// High-volume tables use smaller batching windows for faster availability.
+// ============================================================================
+
+// --- HIGH-VOLUME TABLES: 30 second batching ---
+
+.alter table receipt_created policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table receipt_line_added policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table inventory_updated policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table customer_entered policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+// --- MEDIUM-VOLUME TABLES: 1 minute batching ---
+
+.alter table payment_processed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table stockout_detected policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table reorder_triggered policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table customer_zone_changed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table ble_ping_detected policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table ad_impression policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table promotion_applied policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+// --- LOW-VOLUME TABLES: 2 minute batching ---
+
+.alter table truck_arrived policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 100,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table truck_departed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 100,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table store_opened policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 10
+}
+```
+
+.alter table store_closed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 10
+}
+```
+
+.alter table online_order_created policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table online_order_picked policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table online_order_shipped policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+// ============================================================================
+// POLICY VALIDATION QUERIES
+// ============================================================================
+// Run these queries to verify policies are configured correctly:
+//
+// -- Check retention policies:
+// .show table * policy retention
+// | project TableName, SoftDeletePeriod
+//
+// -- Check streaming ingestion status:
+// .show table * policy streamingingestion
+// | project TableName, IsEnabled
+//
+// -- Check ingestion batching settings:
+// .show table * policy ingestionbatching
+// | project TableName, MaximumBatchingTimeSpan, MaximumNumberOfItems
+//
+// -- Verify Eventstream connection is working:
+// receipt_created
+// | where ingest_timestamp > ago(5m)
+// | count
+// ============================================================================

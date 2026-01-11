@@ -322,9 +322,9 @@ curl -X POST http://localhost:8000/api/generators/historical/start
 
 ## Next Steps
 
-- **API Usage**: See [STREAMING_API.md](STREAMING_API.md) for endpoint documentation
-- **Operations**: See [STREAMING_OPERATIONS.md](STREAMING_OPERATIONS.md) for monitoring and troubleshooting
-- **Security**: See [CREDENTIALS.md](CREDENTIALS.md) for credential management best practices
+- **API Usage**: See [streaming-api.md](streaming-api.md) for endpoint documentation
+- **Operations**: See [streaming-operations.md](streaming-operations.md) for monitoring and troubleshooting
+- **Security**: See [credentials.md](credentials.md) for credential management best practices
 - **Web UI**: Access http://localhost:8000 for browser-based control
 
 ## Security Best Practices
@@ -342,5 +342,5 @@ curl -X POST http://localhost:8000/api/generators/historical/start
 For issues or questions:
 - Check logs: `tail -f retail_datagen.log`
 - Enable debug logging: Set `LOG_LEVEL=DEBUG` environment variable
-- Review [STREAMING_OPERATIONS.md](STREAMING_OPERATIONS.md) troubleshooting section
+- Review [streaming-operations.md](streaming-operations.md) troubleshooting section
 - Check Azure Event Hub metrics in Azure Portal

@@ -119,7 +119,95 @@ Event types defined in `datagen/src/retail_datagen/streaming/schemas.py`.
 
 ## Deployment
 
-See `fabric/README.md` for deployment instructions. Requires:
+See [Deployment Guide](deployment.md) for deployment instructions. Requires:
 - Azure Event Hubs namespace
 - Microsoft Fabric workspace with Eventhouse and Lakehouse
+
+---
+
+## Bronze Layer Architecture
+
+The Bronze layer (`cusn` schema) serves as the unified data ingestion layer in the Medallion architecture. It creates Lakehouse shortcuts to both batch historical data (ADLSv2 parquet) and real-time streaming data (Eventhouse).
+
+### Schema Naming Convention
+
+| Schema | Layer | Purpose |
+|--------|-------|---------|
+| `cusn` | Bronze | Raw shortcuts to source data |
+| `ag` | Silver | Cleaned, deduplicated, typed Delta tables |
+| `au` | Gold | Pre-aggregated KPIs for dashboards |
+
+### Data Sources
+
+#### ADLSv2 Parquet (Batch Historical Data)
+- **Storage Account**: `stdretail`
+- **Container**: `supermarket`
+- **Format**: Parquet (monthly partitions for fact tables)
+- **Tables**: 24 (6 dimensions + 18 facts)
+
+**Dimension Tables (6):**
+- `cusn.dim_geographies`, `cusn.dim_stores`, `cusn.dim_distribution_centers`
+- `cusn.dim_trucks`, `cusn.dim_customers`, `cusn.dim_products`
+
+**Fact Tables (18):**
+- `cusn.fact_receipts`, `cusn.fact_receipt_lines`, `cusn.fact_store_inventory_txn`
+- `cusn.fact_dc_inventory_txn`, `cusn.fact_truck_moves`, `cusn.fact_truck_inventory`
+- `cusn.fact_foot_traffic`, `cusn.fact_ble_pings`, `cusn.fact_customer_zone_changes`
+- `cusn.fact_marketing`, `cusn.fact_online_order_headers`, `cusn.fact_online_order_lines`
+- `cusn.fact_payments`, `cusn.fact_store_ops`, `cusn.fact_stockouts`
+- `cusn.fact_promotions`, `cusn.fact_promo_lines`, `cusn.fact_reorders`
+
+#### Eventhouse (Real-Time Streaming Data)
+- **Database**: `kql_retail_db`
+- **Format**: KQL tables (streaming events)
+- **Tables**: 18 event tables
+
+**Event Tables by Category:**
+- **Transaction (3):** `receipt_created`, `receipt_line_added`, `payment_processed`
+- **Inventory (3):** `inventory_updated`, `stockout_detected`, `reorder_triggered`
+- **Customer (3):** `customer_entered`, `customer_zone_changed`, `ble_ping_detected`
+- **Operational (4):** `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`
+- **Marketing (2):** `ad_impression`, `promotion_applied`
+- **Omnichannel (3):** `online_order_created`, `online_order_picked`, `online_order_shipped`
+
+### Total Bronze Shortcuts: 42
+- **Batch Parquet**: 24 shortcuts (6 dims + 18 facts)
+- **Streaming Events**: 18 shortcuts
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ADLSv2 Parquet (Historical)        Eventhouse (Real-Time)  │
+│ - 6 Dimension Tables               - 18 Event Tables        │
+│ - 18 Fact Tables                   - Streaming from APIs    │
+│ - Monthly partitions               - Live events            │
+└─────────────────┬───────────────────────────┬───────────────┘
+                  │                           │
+                  └───────────┬───────────────┘
+                              │ (shortcuts)
+                  ┌───────────▼───────────────┐
+                  │ Bronze Layer (cusn)       │
+                  │ - 24 batch shortcuts      │
+                  │ - 18 streaming shortcuts  │
+                  │ - Total: 42 tables        │
+                  └───────────┬───────────────┘
+                              │ (read & transform)
+                  ┌───────────▼───────────────┐
+                  │ Silver Layer (ag)         │
+                  │ - Combine batch+streaming │
+                  │ - Validate & transform    │
+                  │ - Delta format            │
+                  └───────────┬───────────────┘
+                              │ (aggregate)
+                  ┌───────────▼───────────────┐
+                  │ Gold Layer (au)           │
+                  │ - Pre-aggregated KPIs     │
+                  │ - Dashboard-ready         │
+                  └───────────────────────────┘
+```
+
+### Implementation
+
+The Bronze layer is created via notebook: `fabric/lakehouse/00-create-bronze-shortcuts.ipynb`
 

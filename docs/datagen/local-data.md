@@ -27,7 +27,7 @@ The Local Data tab consolidates dimension and fact generation in one place.
 - Uploads (if configured):
   - Master: `datagen/export/master/<timestamp>`
   - Facts: `datagen/export/facts/<timestamp>`
-- Configure Azure Storage in `config.json` or environment variables. See [Upload Data](UPLOAD_DATA.md).
+- Configure Azure Storage in `config.json` or environment variables. See [Upload Data](upload-data.md).
 
 ## Streaming Outbox
 - The outbox queue is only populated by the realtime outbox path.

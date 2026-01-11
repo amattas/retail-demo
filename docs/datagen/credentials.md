@@ -803,6 +803,6 @@ az monitor activity-log list \
 
 ## Next Steps
 
-- **Setup**: See [STREAMING_SETUP.md](STREAMING_SETUP.md) for initial configuration
-- **Operations**: See [STREAMING_OPERATIONS.md](STREAMING_OPERATIONS.md) for monitoring
-- **API Reference**: See [STREAMING_API.md](STREAMING_API.md) for endpoint documentation
+- **Setup**: See [streaming-setup.md](streaming-setup.md) for initial configuration
+- **Operations**: See [streaming-operations.md](streaming-operations.md) for monitoring
+- **API Reference**: See [streaming-api.md](streaming-api.md) for endpoint documentation

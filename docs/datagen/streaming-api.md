@@ -462,6 +462,211 @@ curl http://localhost:8000/api/stream/event-types
 
 ---
 
+## Dead Letter Queue (DLQ) Endpoints
+
+Manage failed events in the dead letter queue.
+
+### Get DLQ Summary
+
+Get summary statistics of DLQ contents.
+
+```http
+GET /stream/dlq/summary
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "size": 15,
+  "by_category": {
+    "connection_timeout": 10,
+    "throttling": 5
+  },
+  "by_severity": {
+    "transient": 12,
+    "permanent": 3
+  },
+  "oldest_entry": "2024-01-15T10:30:00Z",
+  "newest_entry": "2024-01-15T10:45:00Z"
+}
+```
+
+---
+
+### Get DLQ Events
+
+Get events from DLQ with optional filtering.
+
+```http
+GET /stream/dlq/events?limit=100&category=connection_timeout
+```
+
+**Query Parameters:**
+- `limit` (integer): Max events to return (1-1000). Default: 100
+- `category` (string, optional): Filter by error category
+
+**Response (200 OK):**
+
+```json
+{
+  "events": [
+    {
+      "trace_id": "TR_20240115_abc123",
+      "event_type": "receipt_created",
+      "error_message": "Connection timeout after 30s",
+      "error_category": "connection_timeout",
+      "error_severity": "transient",
+      "timestamp": "2024-01-15T10:40:00Z",
+      "retry_count": 2,
+      "last_retry_timestamp": "2024-01-15T10:42:00Z"
+    }
+  ],
+  "total": 15,
+  "returned": 15
+}
+```
+
+---
+
+### Retry DLQ Events
+
+Retry events from the dead letter queue.
+
+```http
+POST /stream/dlq/retry
+```
+
+**Request Body:**
+
+```json
+{
+  "max_retries": 3
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "retried": 10,
+  "succeeded": 8,
+  "failed": 2,
+  "remaining_in_dlq": 7
+}
+```
+
+---
+
+## Streaming Outbox Endpoints
+
+Manage the streaming outbox queue for batch event delivery.
+
+### Get Outbox Status
+
+Get counts of events by status in the outbox.
+
+```http
+GET /stream/outbox/status
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "pending": 150,
+  "processing": 10,
+  "sent": 5000,
+  "failed": 5
+}
+```
+
+---
+
+### Preview Outbox
+
+Preview rows from the streaming outbox table.
+
+```http
+GET /stream/outbox/preview?status_filter=pending&limit=100
+```
+
+**Query Parameters:**
+- `status_filter` (string, optional): Filter by status (pending, processing, sent)
+- `limit` (integer): Number of rows to return (1-1000). Default: 100
+
+**Response (200 OK):**
+
+```json
+{
+  "table_name": "streaming_outbox",
+  "columns": ["outbox_id", "event_ts", "message_type", "status", "attempts"],
+  "row_count": 5165,
+  "preview_rows": [
+    {
+      "outbox_id": 12345,
+      "event_ts": "2024-01-15T10:40:00Z",
+      "message_type": "receipt_created",
+      "status": "pending",
+      "attempts": 0
+    }
+  ]
+}
+```
+
+---
+
+### Drain Outbox
+
+Drain all pending outbox events to Event Hub with pacing.
+
+```http
+POST /stream/outbox/drain
+```
+
+**Request Body:**
+
+```json
+{
+  "emit_interval_ms": 500
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Outbox drain started",
+  "operation_id": "drain_outbox_a1b2c3d4",
+  "started_at": "2024-01-15T10:50:00Z"
+}
+```
+
+**Note:** This runs as a background task. Use `/api/tasks/{operation_id}/status` to monitor progress.
+
+---
+
+### Clear Outbox
+
+Drop and recreate the streaming outbox table (fast reset).
+
+```http
+DELETE /stream/outbox/clear
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Outbox cleared"
+}
+```
+
+---
+
 ## Supply Chain Disruption Endpoints
 
 Simulate supply chain disruptions that affect streaming events.
@@ -983,6 +1188,6 @@ curl -X POST http://localhost:8000/api/stream/stop
 
 ## Next Steps
 
-- **Setup**: See [STREAMING_SETUP.md](STREAMING_SETUP.md) for configuration
-- **Operations**: See [STREAMING_OPERATIONS.md](STREAMING_OPERATIONS.md) for monitoring
-- **Security**: See [CREDENTIALS.md](CREDENTIALS.md) for credential management
+- **Setup**: See [streaming-setup.md](streaming-setup.md) for configuration
+- **Operations**: See [streaming-operations.md](streaming-operations.md) for monitoring
+- **Security**: See [credentials.md](credentials.md) for credential management

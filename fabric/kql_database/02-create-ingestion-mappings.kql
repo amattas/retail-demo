@@ -1,5 +1,6 @@
-// 01 Ingestion Mappings
+// 02 Ingestion Mappings
 // Purpose: Create JSON ingestion mappings for Eventstream → KQL DB
+// Run AFTER 01-create-tables.kql (tables must exist before mappings)
 // Run this entire script at once using .execute database script
 // ============================================================================
 

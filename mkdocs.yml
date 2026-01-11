@@ -1,17 +1,16 @@
 site_name: Retail Fabric RTI Demo
 site_description: Microsoft Fabric Real-Time Intelligence demo for retail
 repo_url: https://github.com/amattas/retail-demo
+
 theme:
   name: material
   palette:
-    # Light mode
     - scheme: default
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
     - scheme: slate
       primary: custom
       accent: custom
@@ -34,19 +33,61 @@ theme:
     - toc.follow
   icon:
     repo: fontawesome/brands/github
+
 extra_css:
   - stylesheets/extra.css
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
 nav:
   - Home: index.md
-  - Architecture: architecture.md
-  - Data Schema: data-schema.md
-  - Fabric Assets: fabric-assets.md
-  - Deploy: deploy-fabric.md
-  - Lakehouse Schemas: lakehouse-schemas.md
-  - Data Validation: data-validation.md
-  - Demo Script: demo-script.md
-  - Use Cases: use-cases.md
-  - AI Integration: ai-integration.md
-  - Setup: setup.md
+  - Getting Started:
+    - Deployment: deployment.md
+  - Architecture:
+    - Overview: architecture.md
+    - Data Schema: data-schema.md
+    - Streaming Status: streaming-implementation-status.md
+    - Schema Mapping: schema-mapping-batch-streaming.md
+  - Data Generator:
+    - Overview: datagen/index.md
+    - Configuration: datagen/configuration.md
+    - Local Data: datagen/local-data.md
+    - Upload to Azure: datagen/upload-data.md
+    - Streaming:
+      - Overview: datagen/streaming.md
+      - Setup: datagen/streaming-setup.md
+      - API Reference: datagen/streaming-api.md
+      - Operations: datagen/streaming-operations.md
+    - Reference:
+      - Fact Generation: datagen/fact-generation.md
+      - Store Profiles: datagen/store-profiles.md
+      - Credentials: datagen/credentials.md
+      - Validation: datagen/validation.md
+  - Fabric Components:
+    - Overview: fabric/index.md
+    - KQL Database: fabric/kql-database.md
+    - Lakehouse: fabric/lakehouse.md
+    - Eventstream: fabric/eventstream.md
+    - Pipelines: fabric/pipelines.md
+    - Querysets: fabric/querysets.md
+    - Rules: fabric/rules.md
+    - Dashboards: fabric/dashboards.md
+    - Semantic Model: fabric/semantic-model.md
+  - Operations:
+    - Monitoring: fabric-monitoring.md
+    - Security: fabric-security.md
+  - Demos:
+    - Demo Script: demo-script.md
+    - Use Cases: use-cases.md
   - Roadmap: roadmap.md
+
 docs_dir: docs

@@ -50,20 +50,20 @@ Uploads use prefixes:
   - DELETE `/api/stream/outbox/clear` (fast reset)
 
 See also:
-- [Streaming Setup](STREAMING_SETUP.md)
-- [Streaming API](STREAMING_API.md)
-- [Streaming Operations](STREAMING_OPERATIONS.md)
+- [Streaming Setup](streaming-setup.md)
+- [Streaming API](streaming-api.md)
+- [Streaming Operations](streaming-operations.md)
 
 ## Fact Generation
 
 - Intelligent date ranges on first and subsequent runs
 - 9 fact tables with integrity and realistic behavior
 
-See: [FACT_GENERATION.md](FACT_GENERATION.md)
+See: [fact-generation.md](fact-generation.md)
 
 ## Security
 
 - Event Hub credentials: environment, Key Vault, or config
 - Storage credentials (for upload): account URI + key
-- See [CREDENTIALS.md](CREDENTIALS.md)
+- See [credentials.md](credentials.md)
 
