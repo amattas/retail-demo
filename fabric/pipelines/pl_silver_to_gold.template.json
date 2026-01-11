@@ -1,5 +1,6 @@
 {
   "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
+  "// NOTE": "Using preview API version - update to stable version when available",
   "name": "pl_silver_to_gold",
   "description": "Runs the Silver → Gold aggregates notebook on a schedule (reads from ag schema, writes to au schema)",
   "activities": [
@@ -11,7 +12,12 @@
         "parameters": {
           "SILVER_DB": "ag",
           "GOLD_DB": "au"
-        },
+        }
+      },
+      "policy": {
+        "retry": 3,
+        "retryIntervalInSeconds": 30,
+        "secureOutput": false,
         "timeout": "00:30:00"
       }
     }

@@ -1,5 +1,6 @@
 {
   "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
+  "// NOTE": "Using preview API version - update to stable version when available",
   "name": "pl_bronze_to_silver",
   "description": "Runs the Bronze → Silver notebook on a schedule (reads from cusn schema, writes to ag schema)",
   "activities": [
@@ -11,7 +12,12 @@
         "parameters": {
           "SILVER_DB": "ag",
           "BRONZE_SCHEMA": "cusn"
-        },
+        }
+      },
+      "policy": {
+        "retry": 3,
+        "retryIntervalInSeconds": 30,
+        "secureOutput": false,
         "timeout": "01:00:00"
       }
     }
