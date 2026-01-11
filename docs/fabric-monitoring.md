@@ -419,12 +419,12 @@ Create a comprehensive monitoring notebook that runs on a schedule:
 ```python
 # monitoring-dashboard.ipynb
 from pyspark.sql import functions as F
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 print("="*80)
 print("FABRIC MONITORING DASHBOARD")
 print("="*80)
-print(f"Generated: {datetime.now().isoformat()}")
+print(f"Generated: {datetime.now(timezone.utc).isoformat()}")
 print()
 
 # 1. Data Freshness
@@ -435,7 +435,11 @@ for table in fact_tables:
     try:
         df = spark.table(f"ag.{table}")
         max_ts = df.agg(F.max("event_ts")).collect()[0][0]
-        age_min = (datetime.now() - max_ts).total_seconds() / 60
+        # Use timezone-aware datetime for consistent comparisons
+        now = datetime.now(timezone.utc)
+        if max_ts.tzinfo is None:
+            max_ts = max_ts.replace(tzinfo=timezone.utc)
+        age_min = (now - max_ts).total_seconds() / 60
         status = "✓" if age_min < 30 else "⚠️"
         print(f"  {status} {table:30s} {age_min:6.1f} min ago")
     except Exception:
@@ -445,7 +449,7 @@ print()
 # 2. Row Counts
 print("2. ROW COUNTS (Last 24 Hours)")
 print("-"*80)
-cutoff = datetime.now() - timedelta(days=1)
+cutoff = datetime.now(timezone.utc) - timedelta(days=1)
 for table in fact_tables:
     try:
         df = spark.table(f"ag.{table}")
