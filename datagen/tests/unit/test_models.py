@@ -118,10 +118,14 @@ class TestDictionaryModels:
         ProductBrandDict(**valid_brand)  # Should not raise
 
     def test_product_brand_dict_missing_company(self):
-        """Test that brand without company is invalid."""
-        # Company is optional in current model; missing Company should be accepted
-        valid_missing_company = {"Brand": "SuperBrand", "Category": "Electronics"}
-        ProductBrandDict(**valid_missing_company)  # Should not raise
+        """Test that brand without company is rejected."""
+        # Company is required - missing Company should raise ValidationError
+        import pytest
+        from pydantic import ValidationError
+
+        invalid_missing_company = {"Brand": "SuperBrand", "Category": "Electronics"}
+        with pytest.raises(ValidationError):
+            ProductBrandDict(**invalid_missing_company)
 
     def test_product_dict_valid(self):
         """Test valid product dictionary entry."""

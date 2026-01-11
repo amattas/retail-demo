@@ -36,7 +36,6 @@ from .models import (
     GeographyDict,
     LastNameDict,
     ProductBrandDict,
-    ProductCompanyDict,
     ProductDict,
     ProductTagDict,
     TaxJurisdiction,
@@ -174,14 +173,6 @@ class DictionaryLoader:
             expected_rows=250,
             description="Synthetic last names",
             sourcedata_attr="LAST_NAMES",
-        ),
-        "product_companies": DictionaryInfo(
-            name="product_companies",
-            filename="product_companies.csv",
-            model_class=ProductCompanyDict,
-            expected_rows=100,
-            description="Synthetic product companies",
-            sourcedata_attr="PRODUCT_COMPANIES",
         ),
         "product_brands": DictionaryInfo(
             name="product_brands",
@@ -456,30 +447,6 @@ class DictionaryLoader:
         """
         if not self._loaded_data:
             return
-
-        # Check brand-company consistency
-        if (
-            "product_brands" in self._loaded_data
-            and "product_companies" in self._loaded_data
-        ):
-            # _loaded_data is typed as dict[str, list[BaseModel]] for flexibility,
-            # but at runtime these are ProductCompanyDict/ProductBrandDict with Company
-            companies = {
-                item.Company  # type: ignore[attr-defined]
-                for item in self._loaded_data["product_companies"]
-            }
-            brand_companies = {
-                item.Company  # type: ignore[attr-defined]
-                for item in self._loaded_data["product_brands"]
-                if item.Company is not None  # type: ignore[attr-defined]
-            }
-
-            missing_companies = brand_companies - companies
-            if missing_companies:
-                raise DictionaryConsistencyError(
-                    "Brand references companies not found in product_companies",
-                    {"missing_companies": list(missing_companies)},
-                )
 
         logger.debug("Data consistency checks passed")
 
@@ -865,12 +832,6 @@ class DictionaryLoader:
         if not self.is_loaded("product_brands"):
             self.load_dictionary("product_brands")
         return self.get_data("product_brands")
-
-    def load_product_companies(self) -> list[ProductCompanyDict]:
-        """Load and return product companies dictionary data."""
-        if not self.is_loaded("product_companies"):
-            self.load_dictionary("product_companies")
-        return self.get_data("product_companies")
 
     def load_tax_rates(self) -> list[TaxJurisdiction]:
         """Load and return tax rates dictionary data."""

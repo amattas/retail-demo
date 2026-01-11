@@ -12,7 +12,6 @@ import numpy as np
 
 from retail_datagen.shared.models import (
     ProductBrandDict,
-    ProductCompanyDict,
     ProductDict,
     ProductMaster,
     ProductTaxability,
@@ -33,8 +32,6 @@ _MAX_GENERATION_ATTEMPTS_MULTIPLIER = 10
 class ProductCategoryData:
     """Organized product and brand data by category."""
 
-    companies_by_category: dict[str, list[str]]
-    company_names: list[str]
     brands_by_category: dict[str, list[tuple[int, Any]]]
     products_by_category: dict[str, list[tuple[int, Any]]]
 
@@ -46,19 +43,8 @@ class ProductGeneratorMixin:
         self,
         product_data: list[ProductDict],
         brand_data: list[ProductBrandDict],
-        company_data: list[ProductCompanyDict],
     ) -> ProductCategoryData:
-        """Organize products, brands, and companies by category for smart matching."""
-        # Group companies by category
-        companies_by_category: dict[str, list[str]] = {}
-        for company in company_data:
-            category = company.Category
-            if category not in companies_by_category:
-                companies_by_category[category] = []
-            companies_by_category[category].append(company.Company)
-
-        company_names = [company.Company for company in company_data]
-
+        """Organize products and brands by category for smart matching."""
         # Group brands by category
         brands_by_category: dict[str, list[tuple[int, Any]]] = {}
         for brand_idx, brand in enumerate(brand_data):
@@ -81,8 +67,6 @@ class ProductGeneratorMixin:
         print(f"Product categories mapped to: {sorted(products_by_category.keys())}")
 
         return ProductCategoryData(
-            companies_by_category=companies_by_category,
-            company_names=company_names,
             brands_by_category=brands_by_category,
             products_by_category=products_by_category,
         )
@@ -117,7 +101,6 @@ class ProductGeneratorMixin:
         product_id: int,
         product_idx: int,
         brand_idx: int,
-        category_data: ProductCategoryData,
         product_data: list[ProductDict],
         brand_data: list[ProductBrandDict],
         target_product_count: int,
@@ -130,15 +113,8 @@ class ProductGeneratorMixin:
         product = product_data[product_idx]
         brand = brand_data[brand_idx]
 
-        # Match company to brand by category
-        brand_category = brand.Category
-        if (
-            brand_category in category_data.companies_by_category
-            and category_data.companies_by_category[brand_category]
-        ):
-            company = rng.choice(category_data.companies_by_category[brand_category])
-        else:
-            company = rng.choice(category_data.company_names)
+        # Use the brand's assigned company directly
+        company = brand.Company
 
         base_price = float(product.BasePrice)
         max_retries = 5
@@ -214,7 +190,6 @@ class ProductGeneratorMixin:
         target_product_count: int,
         product_data: list[ProductDict],
         brand_data: list[ProductBrandDict],
-        company_data: list[ProductCompanyDict],
         product_tags_overlay: dict[str, str],
         pricing_calculator: PricingCalculator,
         historical_start_date: str,
@@ -227,8 +202,7 @@ class ProductGeneratorMixin:
         Args:
             target_product_count: Number of products to generate
             product_data: Product dictionary data
-            brand_data: Brand dictionary data
-            company_data: Company dictionary data
+            brand_data: Brand dictionary data (includes company assignments)
             product_tags_overlay: Optional product tags
             pricing_calculator: Pricing calculator utility
             historical_start_date: Start date for launch date calculation
@@ -240,13 +214,12 @@ class ProductGeneratorMixin:
         """
         print("Generating product master data with brand combinations...")
 
-        if not product_data or not brand_data or not company_data:
+        if not product_data or not brand_data:
             raise ValueError("Product dictionary data not loaded")
 
         print(f"Target products: {target_product_count}")
         print(f"Available base products: {len(product_data)}")
         print(f"Available brands: {len(brand_data)}")
-        print(f"Available companies: {len(company_data)}")
 
         # Parse historical start date
         historical_start = datetime.strptime(historical_start_date, "%Y-%m-%d")
@@ -254,7 +227,7 @@ class ProductGeneratorMixin:
         # Organize data by category
         print("Creating category-aware brand-product combinations...")
         category_data = self._organize_products_and_brands_by_category(
-            product_data, brand_data, company_data
+            product_data, brand_data
         )
 
         # Create valid combinations
@@ -327,7 +300,6 @@ class ProductGeneratorMixin:
                 product_id,
                 product_idx,
                 brand_idx,
-                category_data,
                 product_data,
                 brand_data,
                 target_product_count,
