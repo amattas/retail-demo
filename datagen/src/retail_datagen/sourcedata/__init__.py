@@ -28,7 +28,6 @@ Each profile is a Python package containing data modules:
         ├── first_names.py   # FIRST_NAMES = [{"FirstName": ...}, ...]
         ├── last_names.py    # LAST_NAMES = [{"LastName": ...}, ...]
         ├── product_brands.py
-        ├── product_companies.py
         ├── product_tags.py
         └── tax_rates.py
 
@@ -69,8 +68,7 @@ Pydantic model in shared/models.py:
 - PRODUCTS -> ProductDict (ProductName, BasePrice, Department, Category, Subcategory)
 - FIRST_NAMES -> FirstNameDict (FirstName)
 - LAST_NAMES -> LastNameDict (LastName)
-- PRODUCT_BRANDS -> ProductBrandDict (Brand, Company)
-- PRODUCT_COMPANIES -> ProductCompanyDict (Company, Category)
+- PRODUCT_BRANDS -> ProductBrandDict (Brand, Company, Category)
 - PRODUCT_TAGS -> ProductTagDict (ProductName, Tags)
 - TAX_RATES -> TaxJurisdiction (StateCode, County, City, CombinedRate)
 

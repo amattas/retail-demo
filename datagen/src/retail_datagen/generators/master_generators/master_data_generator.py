@@ -20,7 +20,6 @@ from retail_datagen.shared.models import (
     GeographyDict,
     GeographyMaster,
     ProductBrandDict,
-    ProductCompanyDict,
     ProductDict,
     ProductMaster,
     Store,
@@ -92,7 +91,6 @@ class MasterDataGenerator(
         self._last_names: list[str] | None = None
         self._product_data: list[ProductDict] | None = None
         self._brand_data: list[ProductBrandDict] | None = None
-        self._company_data: list[ProductCompanyDict] | None = None
         self._product_tags_overlay: dict[str, str] = {}
         self._tax_rate_mapping: dict[tuple[str, str], Decimal] = {}
         self._state_tax_avg: dict[str, Decimal] = {}
@@ -149,14 +147,6 @@ class MasterDataGenerator(
                 f"Category='{raw_brand_data[0].Category}'"
             )
         self._brand_data = raw_brand_data
-
-        self._company_data = self.dictionary_loader.load_product_companies()
-        print(f"Loaded {len(self._company_data)} companies")
-        if self._company_data:
-            print(
-                f"  Sample company: '{self._company_data[0].Company}' | "
-                f"Category='{self._company_data[0].Category}'"
-            )
 
         # Optional product tag overlay
         try:
@@ -444,7 +434,6 @@ class MasterDataGenerator(
             target_product_count,
             self._product_data,
             self._brand_data,
-            self._company_data,
             self._product_tags_overlay,
             self.pricing_calculator,
             self.config.historical.start_date,
