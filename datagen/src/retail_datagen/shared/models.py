@@ -101,25 +101,15 @@ class ProductCompanyDict(BaseModel):
 
 
 class ProductBrandDict(BaseModel):
-    """Dictionary model for product brands CSV input (500 brands)."""
+    """Dictionary model for product brands (608 unique brands)."""
 
-    Brand: str = Field(..., min_length=1, description="Brand name")
-    Company: str | None = Field(
-        None, min_length=1, description="Parent company name (optional)"
-    )
+    Brand: str = Field(..., min_length=1, description="Brand name (unique)")
+    Company: str = Field(..., min_length=1, description="Parent company name")
     Category: str = Field(
         ...,
         min_length=1,
         description="Industry category (Food, Electronics, Clothing, etc.)",
     )
-
-    @field_validator("Company", mode="before")
-    @classmethod
-    def empty_company_to_none(cls, v: str | None) -> str | None:
-        """Treat empty strings as None for optional Company field."""
-        if isinstance(v, str) and v.strip() == "":
-            return None
-        return v
 
 
 class ProductDict(BaseModel):
