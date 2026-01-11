@@ -797,6 +797,206 @@ After completing this deployment:
 
 ---
 
+## Rollback & Disaster Recovery
+
+If you need to rollback the medallion architecture deployment or recover from issues, follow these procedures:
+
+### Rollback Bronze Layer
+
+To remove Bronze shortcuts and start fresh:
+
+```python
+# Run in Fabric notebook
+BRONZE_SCHEMA = "cusn"
+
+# List all shortcuts in Bronze schema
+shortcuts = spark.sql(f"SHOW TABLES IN {BRONZE_SCHEMA}").collect()
+
+# Drop schema (removes all shortcuts)
+spark.sql(f"DROP SCHEMA IF EXISTS {BRONZE_SCHEMA} CASCADE")
+
+print(f"Dropped Bronze schema: {BRONZE_SCHEMA}")
+print(f"Removed {len(shortcuts)} shortcuts")
+```
+
+**Manual Cleanup** (if programmatic drop fails):
+1. Navigate to Lakehouse in Fabric workspace
+2. Expand Tables → `cusn` folder
+3. Right-click each shortcut → Delete
+4. Confirm deletion for all 42 shortcuts
+
+**Recreate Bronze Layer**:
+- Re-run `00-create-bronze-shortcuts.ipynb` to recreate shortcuts
+
+### Rollback Silver Layer
+
+To remove Silver Delta tables:
+
+```python
+# Run in Fabric notebook or via portal
+SILVER_DB = "ag"
+
+# List all tables in Silver schema
+tables = spark.sql(f"SHOW TABLES IN {SILVER_DB}").collect()
+
+# Drop database (removes all Delta tables)
+spark.sql(f"DROP DATABASE IF EXISTS {SILVER_DB} CASCADE")
+
+print(f"Dropped Silver database: {SILVER_DB}")
+print(f"Removed {len(tables)} tables")
+```
+
+**Manual Cleanup** (if programmatic drop fails):
+1. Navigate to Lakehouse SQL Endpoint
+2. Expand Schemas → `ag`
+3. Right-click schema → Delete
+4. Confirm deletion
+
+**Recreate Silver Layer**:
+- Re-run `02-onelake-to-silver.ipynb` or `pl_bronze_to_silver` pipeline
+
+### Rollback Gold Layer
+
+To remove Gold aggregation tables:
+
+```python
+# Run in Fabric notebook or via portal
+GOLD_DB = "au"
+
+# List all tables in Gold schema
+tables = spark.sql(f"SHOW TABLES IN {GOLD_DB}").collect()
+
+# Drop database (removes all Delta tables)
+spark.sql(f"DROP DATABASE IF EXISTS {GOLD_DB} CASCADE")
+
+print(f"Dropped Gold database: {GOLD_DB}")
+print(f"Removed {len(tables)} tables")
+```
+
+**Manual Cleanup** (if programmatic drop fails):
+1. Navigate to Lakehouse SQL Endpoint
+2. Expand Schemas → `au`
+3. Right-click schema → Delete
+4. Confirm deletion
+
+**Recreate Gold Layer**:
+- Re-run `03-silver-to-gold.ipynb` or `pl_silver_to_gold` pipeline
+
+### Rollback Pipelines
+
+To remove deployed pipelines:
+
+**Via Fabric Portal**:
+1. Navigate to Data Factory in your Fabric workspace
+2. Select Pipelines
+3. Right-click each pipeline → Delete
+   - `pl_bronze_to_silver`
+   - `pl_silver_to_gold`
+   - `pl_maintenance` (if deployed)
+4. Confirm deletion
+
+**Via PowerShell** (optional):
+```powershell
+# Requires Fabric PowerShell module
+$workspaceId = "<your-workspace-id>"
+$pipelines = @("pl_bronze_to_silver", "pl_silver_to_gold", "pl_maintenance")
+
+foreach ($pipeline in $pipelines) {
+    Remove-FabricPipeline -WorkspaceId $workspaceId -Name $pipeline
+    Write-Host "Deleted pipeline: $pipeline"
+}
+```
+
+**Recreate Pipelines**:
+- Re-deploy using Fabric portal or PowerShell with template files
+
+### Rollback Semantic Model
+
+To remove or reset the semantic model:
+
+**Via Fabric Portal**:
+1. Navigate to your workspace
+2. Find semantic model (e.g., `RetailDemoModel`)
+3. Right-click → Delete
+4. Confirm deletion
+
+**Update Existing Model**:
+If you need to revert table references:
+1. Open semantic model in Power BI Desktop
+2. Transform Data → Advanced Editor
+3. Update table source paths:
+   - Gold: `/Tables/au/*` → `/Tables/gold/*`
+   - Silver: `/Tables/ag/*` → `/Tables/silver/*`
+4. Refresh and re-publish
+
+**Recreate Semantic Model**:
+- Re-deploy using `fabric/semantic_model/model.tmdl`
+
+### Disaster Recovery Scenarios
+
+#### Scenario 1: Corrupted Silver Tables
+**Symptoms**: Silver tables have incorrect data, schema mismatches, or duplicate records
+
+**Recovery**:
+```python
+# Drop and recreate specific table
+table_name = "fact_receipts"
+spark.sql(f"DROP TABLE IF EXISTS ag.{table_name}")
+
+# Re-run Silver transformation
+# This will recreate the table from Bronze shortcuts
+%run ./02-onelake-to-silver.ipynb
+```
+
+#### Scenario 2: Missing Bronze Shortcuts
+**Symptoms**: Bronze shortcuts lost connection or deleted accidentally
+
+**Recovery**:
+1. Run validation script: `python validate-bronze-shortcuts.py`
+2. Identify missing shortcuts from output
+3. Re-run Bronze creation notebook: `00-create-bronze-shortcuts.ipynb`
+4. Verify with validation script again
+
+#### Scenario 3: Pipeline Failures
+**Symptoms**: Pipelines failing with schema mismatch or connection errors
+
+**Recovery**:
+1. Check pipeline parameters (SILVER_DB, BRONZE_SCHEMA, GOLD_DB)
+2. Verify environment variables:
+   - Set `FAIL_ON_SCHEMA_MISMATCH=false` for testing
+   - Set `REQUIRE_EVENTHOUSE=false` if Eventhouse unavailable
+3. Re-run pipeline with corrected parameters
+4. Check logs for specific error messages
+
+#### Scenario 4: Complete Environment Reset
+**Symptoms**: Need to start over completely
+
+**Recovery** (in order):
+1. Stop all running pipelines
+2. Rollback Gold layer (drop `au` database)
+3. Rollback Silver layer (drop `ag` database)
+4. Rollback Bronze layer (drop `cusn` shortcuts)
+5. Delete pipelines via Fabric portal
+6. Delete semantic model
+7. Re-run complete deployment from Phase 1
+
+**Backup Recommendations**:
+- Export Fabric workspace as JSON (for pipelines, notebooks)
+- Document custom configuration values
+- Maintain copy of connection strings in Azure Key Vault
+- Version control all notebook and pipeline templates
+
+**Data Preservation**:
+- Bronze shortcuts reference source data (ADLSv2, Eventhouse) - no data loss on rollback
+- Silver/Gold Delta tables can be backed up via:
+  ```python
+  # Export to Parquet before rollback
+  df = spark.table("ag.fact_receipts")
+  df.write.parquet("abfss://backup@storage.dfs.core.windows.net/silver_backup/fact_receipts")
+  ```
+
+---
+
 ## Support & Resources
 
 - **Documentation**: `/docs/` folder in repository
