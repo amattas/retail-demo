@@ -14,7 +14,7 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 
 | Notebook | Schedule | Description |
 |----------|----------|-------------|
-| `00-create-bronze-shortcuts.ipynb` | Once | Creates 42 shortcuts to batch and streaming data |
+| `01-create-bronze-shortcuts.ipynb` | Once | Creates 42 shortcuts to batch and streaming data |
 | `02-onelake-to-silver.ipynb` | Every 5 min | Bronze → Silver transforms (JSON normalization) |
 | `03-silver-to-gold.ipynb` | Every 15 min | Silver → Gold aggregations |
 | `04-maintain-delta-tables.ipynb` | Daily | OPTIMIZE and VACUUM routines |
@@ -23,7 +23,7 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 
 For initial setup:
 
-1. Run `00-create-bronze-shortcuts.ipynb` to create Bronze layer
+1. Run `01-create-bronze-shortcuts.ipynb` to create Bronze layer
 2. Verify shortcuts with `SELECT * FROM cusn.{table} LIMIT 10`
 3. Run `02-onelake-to-silver.ipynb` to populate Silver
 4. Run `03-silver-to-gold.ipynb` to populate Gold
