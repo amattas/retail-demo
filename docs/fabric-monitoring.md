@@ -438,7 +438,7 @@ for table in fact_tables:
         age_min = (datetime.now() - max_ts).total_seconds() / 60
         status = "✓" if age_min < 30 else "⚠️"
         print(f"  {status} {table:30s} {age_min:6.1f} min ago")
-    except:
+    except Exception:
         print(f"  ✗ {table:30s} ERROR")
 print()
 
@@ -451,7 +451,7 @@ for table in fact_tables:
         df = spark.table(f"ag.{table}")
         count = df.filter(F.col("event_ts") > cutoff).count()
         print(f"  {table:30s} {count:>10,} rows")
-    except:
+    except Exception:
         print(f"  {table:30s} ERROR")
 print()
 
@@ -472,7 +472,7 @@ try:
         success_rate = (row.successes / row.runs) * 100
         status = "✓" if success_rate >= 95 else "⚠️"
         print(f"  {status} {row.notebook_name:30s} {row.runs} runs, {success_rate:.1f}% success, {row.avg_time:.1f}s avg")
-except:
+except Exception:
     print("  ⚠️  No pipeline execution log found")
 print()
 
@@ -484,7 +484,7 @@ for schema in ["ag", "au"]:
         tables = spark.sql(f"SHOW TABLES IN {schema}").collect()
         total_tables = len(tables)
         print(f"  {schema:4s} schema: {total_tables} tables")
-    except:
+    except Exception:
         print(f"  {schema:4s} schema: ERROR")
 print()
 
