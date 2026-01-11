@@ -102,10 +102,10 @@ class TestPaymentPersistenceMapping:
 
     def test_outbox_type_mapping(self):
         """fact_payments should map to payment_processed event type."""
-        from retail_datagen.generators.fact_generators import persistence_mixin
+        from retail_datagen.generators.fact_generators import field_mapping
 
-        # Read the source to verify the mapping exists
-        source_file = persistence_mixin.__file__
+        # Read the source to verify the mapping exists in field_mapping module
+        source_file = field_mapping.__file__
         with open(source_file) as f:
             source = f.read()
 
@@ -113,10 +113,10 @@ class TestPaymentPersistenceMapping:
 
     def test_duckdb_table_mapping(self):
         """fact_payments should have correct DuckDB table mapping."""
-        from retail_datagen.generators.fact_generators import persistence_mixin
+        from retail_datagen.generators.routers import common
 
-        # Read the source to verify the duck_table mapping exists
-        source_file = persistence_mixin.__file__
+        # Read the source to verify the duck_table mapping exists in common module
+        source_file = common.__file__
         with open(source_file) as f:
             source = f.read()
 

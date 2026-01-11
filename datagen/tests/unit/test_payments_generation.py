@@ -196,7 +196,7 @@ class TestDeclineLogic:
         """Cash payments should never decline."""
         # Test many times to ensure no declines
         for _ in range(100):
-            is_declined, reason = payments_mixin._should_decline_payment("CASH", 10000)
+            is_declined, reason = payments_mixin._should_decline_payment("CASH")
             assert is_declined is False
             assert reason is None
 
@@ -206,9 +206,7 @@ class TestDeclineLogic:
         declined_count = 0
         for i in range(1000):
             payments_mixin._rng.seed(i)  # Different seed each time
-            is_declined, reason = payments_mixin._should_decline_payment(
-                "CREDIT_CARD", 10000
-            )
+            is_declined, reason = payments_mixin._should_decline_payment("CREDIT_CARD")
             if is_declined:
                 declined_count += 1
                 assert reason is not None
@@ -221,9 +219,7 @@ class TestDeclineLogic:
         """Approved payments should not have a decline reason."""
         # Reset with known seed that produces approval
         payments_mixin._rng.seed(42)
-        is_declined, reason = payments_mixin._should_decline_payment(
-            "CREDIT_CARD", 10000
-        )
+        is_declined, reason = payments_mixin._should_decline_payment("CREDIT_CARD")
         if not is_declined:
             assert reason is None
 
@@ -234,7 +230,7 @@ class TestDeclineLogic:
         total = 10000
 
         for _ in range(total):
-            is_declined, _ = mixin._should_decline_payment("CREDIT_CARD", 5000)
+            is_declined, _ = mixin._should_decline_payment("CREDIT_CARD")
             if is_declined:
                 declined += 1
 
