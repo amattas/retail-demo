@@ -1,15 +1,18 @@
 {
   "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
-  "name": "pl_bronze_to_silver_streaming",
-  "description": "Runs the Bronze → Silver notebook on a schedule",
+  "name": "pl_bronze_to_silver",
+  "description": "Runs the Bronze → Silver notebook on a schedule (reads from cusn schema, writes to ag schema)",
   "activities": [
     {
       "name": "BronzeToSilverNotebook",
       "type": "Notebook",
       "properties": {
-        "notebookResourceId": "<fabric-notebook-resource-id: bronze_to_silver>",
-        "parameters": {},
-        "timeout": "00:30:00"
+        "notebookResourceId": "<fabric-notebook-resource-id: 02-onelake-to-silver>",
+        "parameters": {
+          "SILVER_DB": "ag",
+          "BRONZE_SCHEMA": "cusn"
+        },
+        "timeout": "01:00:00"
       }
     }
   ],
