@@ -114,13 +114,21 @@ SILVER_DB = "ag"
 
 def check_data_freshness(table_name, max_age_minutes=30):
     """Check if table has recent data."""
+    from datetime import timezone
+    
     df = spark.table(f"{SILVER_DB}.{table_name}")
     max_ts = df.agg(F.max("event_ts")).collect()[0][0]
     
     if max_ts is None:
         return False, "No data in table"
     
-    age_minutes = (datetime.now() - max_ts).total_seconds() / 60
+    # Use timezone-aware datetime for consistent comparisons
+    now = datetime.now(timezone.utc)
+    if max_ts.tzinfo is None:
+        # Assume UTC if timestamp is naive
+        max_ts = max_ts.replace(tzinfo=timezone.utc)
+    
+    age_minutes = (now - max_ts).total_seconds() / 60
     
     if age_minutes > max_age_minutes:
         return False, f"Data is {age_minutes:.1f} minutes old (max: {max_age_minutes})"
