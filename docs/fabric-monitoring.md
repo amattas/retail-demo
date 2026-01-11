@@ -108,14 +108,12 @@ Create a monitoring notebook that runs after Silver layer refresh to validate da
 ```python
 # data-quality-monitor.ipynb
 from pyspark.sql import functions as F
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 SILVER_DB = "ag"
 
 def check_data_freshness(table_name, max_age_minutes=30):
     """Check if table has recent data."""
-    from datetime import timezone
-    
     df = spark.table(f"{SILVER_DB}.{table_name}")
     max_ts = df.agg(F.max("event_ts")).collect()[0][0]
     
