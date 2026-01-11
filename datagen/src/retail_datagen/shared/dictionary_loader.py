@@ -1,9 +1,13 @@
 """
 Dictionary data loading system for the retail data generator.
 
-This module provides a comprehensive system for loading CSV dictionary files
-from the data/dictionaries directory and validating them against Pydantic models.
-It includes caching, error handling, and performance optimizations.
+This module provides a comprehensive system for loading dictionary data
+from Python sourcedata modules (preferred) or CSV files (fallback).
+Data is validated against Pydantic models with caching and error handling.
+
+The sourcedata module provides pre-curated data organized by retail profile
+(e.g., supercenter, fashion). This eliminates file I/O and ensures data
+is version-controlled with the code.
 """
 
 import logging
@@ -38,6 +42,15 @@ from .models import (
     TaxJurisdiction,
 )
 
+# Import sourcedata for Python-based dictionary loading
+try:
+    from retail_datagen.sourcedata import default as sourcedata_default
+
+    SOURCEDATA_AVAILABLE = True
+except ImportError:
+    SOURCEDATA_AVAILABLE = False
+    sourcedata_default = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,6 +64,8 @@ class DictionaryInfo:
     required: bool = True
     expected_rows: int | None = None
     description: str = ""
+    # Name of the attribute in sourcedata module (e.g., "GEOGRAPHIES")
+    sourcedata_attr: str | None = None
 
 
 @dataclass
@@ -133,6 +148,7 @@ class DictionaryLoader:
             model_class=GeographyDict,
             expected_rows=1000,
             description="Geographic locations with synthetic addresses",
+            sourcedata_attr="GEOGRAPHIES",
         ),
         "product_tags": DictionaryInfo(
             name="product_tags",
@@ -141,6 +157,7 @@ class DictionaryLoader:
             required=False,
             expected_rows=None,
             description="Optional product tag overlay (ProductName, Tags)",
+            sourcedata_attr="PRODUCT_TAGS",
         ),
         "first_names": DictionaryInfo(
             name="first_names",
@@ -148,6 +165,7 @@ class DictionaryLoader:
             model_class=FirstNameDict,
             expected_rows=250,
             description="Synthetic first names",
+            sourcedata_attr="FIRST_NAMES",
         ),
         "last_names": DictionaryInfo(
             name="last_names",
@@ -155,6 +173,7 @@ class DictionaryLoader:
             model_class=LastNameDict,
             expected_rows=250,
             description="Synthetic last names",
+            sourcedata_attr="LAST_NAMES",
         ),
         "product_companies": DictionaryInfo(
             name="product_companies",
@@ -162,6 +181,7 @@ class DictionaryLoader:
             model_class=ProductCompanyDict,
             expected_rows=100,
             description="Synthetic product companies",
+            sourcedata_attr="PRODUCT_COMPANIES",
         ),
         "product_brands": DictionaryInfo(
             name="product_brands",
@@ -169,6 +189,7 @@ class DictionaryLoader:
             model_class=ProductBrandDict,
             expected_rows=500,
             description="Product brands with company relationships",
+            sourcedata_attr="PRODUCT_BRANDS",
         ),
         "products": DictionaryInfo(
             name="products",
@@ -176,6 +197,7 @@ class DictionaryLoader:
             model_class=ProductDict,
             expected_rows=10000,
             description="Product catalog with base pricing",
+            sourcedata_attr="PRODUCTS",
         ),
         "tax_rates": DictionaryInfo(
             name="tax_rates",
@@ -183,6 +205,7 @@ class DictionaryLoader:
             model_class=TaxJurisdiction,
             expected_rows=164,
             description="Tax rates by jurisdiction (state, county, city)",
+            sourcedata_attr="TAX_RATES",
         ),
     }
 
@@ -212,7 +235,7 @@ class DictionaryLoader:
         if dictionary_path:
             self.dictionary_path = Path(dictionary_path)
         else:
-            self.dictionary_path = Path(self.config.paths["dict"])
+            self.dictionary_path = Path(self.config.paths.dictionaries)
 
         self.encoding = encoding
         self.chunk_size = chunk_size
@@ -448,6 +471,7 @@ class DictionaryLoader:
             brand_companies = {
                 item.Company  # type: ignore[attr-defined]
                 for item in self._loaded_data["product_brands"]
+                if item.Company is not None  # type: ignore[attr-defined]
             }
 
             missing_companies = brand_companies - companies
@@ -459,9 +483,72 @@ class DictionaryLoader:
 
         logger.debug("Data consistency checks passed")
 
+    def _load_from_sourcedata(
+        self, dict_info: DictionaryInfo
+    ) -> tuple[list[BaseModel], list[str], list[str]] | None:
+        """
+        Try to load dictionary data from the sourcedata module.
+
+        Args:
+            dict_info: Dictionary information
+
+        Returns:
+            Tuple of (validated_data, validation_errors, warnings) or None if
+            sourcedata is not available.
+        """
+        if not SOURCEDATA_AVAILABLE or sourcedata_default is None:
+            return None
+
+        if dict_info.sourcedata_attr is None:
+            return None
+
+        # Try to get the data from sourcedata
+        try:
+            raw_data = getattr(sourcedata_default, dict_info.sourcedata_attr, None)
+        except Exception as e:
+            logger.debug(
+                f"Failed to get {dict_info.sourcedata_attr} from sourcedata: {e}"
+            )
+            return None
+
+        if raw_data is None:
+            return None
+
+        # Validate each row against the Pydantic model
+        validated_data = []
+        validation_errors = []
+        warnings = []
+
+        for idx, row_dict in enumerate(raw_data):
+            try:
+                instance = dict_info.model_class(**row_dict)
+                validated_data.append(instance)
+            except ValidationError as e:
+                error_details = []
+                for error in e.errors():
+                    field = error.get("loc", ["unknown"])[0]
+                    msg = error.get("msg", "Unknown validation error")
+                    error_details.append(f"{field}: {msg}")
+                validation_errors.append(f"Row {idx + 1}: {'; '.join(error_details)}")
+            except Exception as e:
+                validation_errors.append(f"Row {idx + 1}: Unexpected error: {e}")
+
+        # Check expected row count
+        if dict_info.expected_rows and len(validated_data) != dict_info.expected_rows:
+            warnings.append(
+                f"Expected {dict_info.expected_rows} rows, got {len(validated_data)}"
+            )
+
+        warnings.append("Loaded from sourcedata module")
+
+        return validated_data, validation_errors, warnings
+
     def load_dictionary(self, name: str, force_reload: bool = False) -> LoadResult:
         """
-        Load a single dictionary file.
+        Load a single dictionary.
+
+        Attempts to load from sourcedata module first (faster, no file I/O),
+        then falls back to CSV file if sourcedata is not available.
 
         Args:
             name: Name of dictionary to load
@@ -480,12 +567,13 @@ class DictionaryLoader:
             )
 
         dict_info = self.DICTIONARIES[name]
-        file_path = self._find_file(dict_info.filename)
-
         start_time = time.time()
 
+        # Try cache first (if enabled and not forcing reload)
+        # Note: We need a file_path for cache key, so try to find it first
+        file_path = None
         try:
-            # Try cache first (if enabled and not forcing reload)
+            file_path = self._find_file(dict_info.filename)
             if self.cache and not force_reload:
                 cached_data = self.cache.get(file_path)
                 if cached_data is not None:
@@ -501,7 +589,42 @@ class DictionaryLoader:
                     self._loaded_data[name] = cached_data
                     self._load_results[name] = result
                     return result
+        except DictionaryFileNotFoundError:
+            # File not found, but that's OK - we'll try sourcedata first
+            pass
 
+        # Try loading from sourcedata module first (faster, no file I/O)
+        sourcedata_result = self._load_from_sourcedata(dict_info)
+        if sourcedata_result is not None:
+            validated_data, validation_errors, warnings = sourcedata_result
+            load_time = time.time() - start_time
+
+            result = LoadResult(
+                name=name,
+                data=validated_data,
+                load_time=load_time,
+                row_count=len(validated_data),
+                validation_errors=validation_errors,
+                warnings=warnings,
+            )
+
+            self._loaded_data[name] = validated_data
+            self._load_results[name] = result
+
+            logger.info(
+                f"Loaded {name} from sourcedata: {len(validated_data)} rows, "
+                f"{len(validation_errors)} errors "
+                f"in {load_time:.2f}s"
+            )
+
+            return result
+
+        # Fall back to CSV file loading
+        if file_path is None:
+            # Try to find the file again (will raise if not found)
+            file_path = self._find_file(dict_info.filename)
+
+        try:
             logger.info(f"Loading dictionary: {name} from {file_path}")
 
             # Read CSV file
