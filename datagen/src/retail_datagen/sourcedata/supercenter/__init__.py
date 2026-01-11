@@ -12,7 +12,6 @@ from retail_datagen.sourcedata.supercenter.first_names import FIRST_NAMES
 from retail_datagen.sourcedata.supercenter.geographies import GEOGRAPHIES
 from retail_datagen.sourcedata.supercenter.last_names import LAST_NAMES
 from retail_datagen.sourcedata.supercenter.product_brands import PRODUCT_BRANDS
-from retail_datagen.sourcedata.supercenter.product_companies import PRODUCT_COMPANIES
 from retail_datagen.sourcedata.supercenter.product_tags import PRODUCT_TAGS
 from retail_datagen.sourcedata.supercenter.products import PRODUCTS
 from retail_datagen.sourcedata.supercenter.tax_rates import TAX_RATES
@@ -23,7 +22,6 @@ __all__ = [
     "FIRST_NAMES",
     "LAST_NAMES",
     "PRODUCT_BRANDS",
-    "PRODUCT_COMPANIES",
     "PRODUCT_TAGS",
     "TAX_RATES",
 ]

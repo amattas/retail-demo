@@ -29,7 +29,6 @@ class TestSourcedataModuleStructure:
             GEOGRAPHIES,
             LAST_NAMES,
             PRODUCT_BRANDS,
-            PRODUCT_COMPANIES,
             PRODUCT_TAGS,
             PRODUCTS,
             TAX_RATES,
@@ -41,7 +40,6 @@ class TestSourcedataModuleStructure:
         assert len(FIRST_NAMES) > 0
         assert len(LAST_NAMES) > 0
         assert len(PRODUCT_BRANDS) > 0
-        assert len(PRODUCT_COMPANIES) > 0
         assert len(PRODUCT_TAGS) > 0
         assert len(TAX_RATES) > 0
 
@@ -115,21 +113,16 @@ class TestSupercenterProfileData:
         """Test product brands data has correct structure."""
         from retail_datagen.sourcedata.supercenter import PRODUCT_BRANDS
 
-        assert len(PRODUCT_BRANDS) == 628
+        assert len(PRODUCT_BRANDS) == 608  # Deduplicated - each brand name is unique
 
         brand = PRODUCT_BRANDS[0]
         assert "Brand" in brand
-        # Company can be None for some brands
+        assert "Company" in brand  # Company is now required for all brands
+        assert "Category" in brand
 
-    def test_product_companies_structure(self):
-        """Test product companies data has correct structure."""
-        from retail_datagen.sourcedata.supercenter import PRODUCT_COMPANIES
-
-        assert len(PRODUCT_COMPANIES) == 111
-
-        company = PRODUCT_COMPANIES[0]
-        assert "Company" in company
-        assert "Category" in company
+        # Verify no duplicate brand names
+        brand_names = [b["Brand"] for b in PRODUCT_BRANDS]
+        assert len(brand_names) == len(set(brand_names)), "Brand names must be unique"
 
     def test_product_tags_structure(self):
         """Test product tags data has correct structure."""
@@ -213,11 +206,10 @@ class TestDictionaryLoaderSourcedataIntegration:
 
         loader = DictionaryLoader()
 
-        # Load brands and companies - triggers consistency check
-        loader.load_dictionary("product_companies")
+        # Load brands - company is now embedded in brand data
         loader.load_dictionary("product_brands")
 
-        # Should not raise - all brand companies exist in companies list
+        # Should not raise - data validation passes
         loader._check_data_consistency()
 
 
@@ -239,7 +231,6 @@ class TestProfileSwitching:
             GEOGRAPHIES,
             LAST_NAMES,
             PRODUCT_BRANDS,
-            PRODUCT_COMPANIES,
             PRODUCT_TAGS,
             PRODUCTS,
             TAX_RATES,
@@ -250,7 +241,6 @@ class TestProfileSwitching:
         assert FIRST_NAMES is supercenter.FIRST_NAMES
         assert LAST_NAMES is supercenter.LAST_NAMES
         assert PRODUCT_BRANDS is supercenter.PRODUCT_BRANDS
-        assert PRODUCT_COMPANIES is supercenter.PRODUCT_COMPANIES
         assert PRODUCT_TAGS is supercenter.PRODUCT_TAGS
         assert TAX_RATES is supercenter.TAX_RATES
 

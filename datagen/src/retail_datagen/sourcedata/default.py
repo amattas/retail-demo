@@ -15,7 +15,6 @@ from retail_datagen.sourcedata.supercenter import (
     GEOGRAPHIES,
     LAST_NAMES,
     PRODUCT_BRANDS,
-    PRODUCT_COMPANIES,
     PRODUCT_TAGS,
     PRODUCTS,
     TAX_RATES,
@@ -27,7 +26,6 @@ __all__ = [
     "FIRST_NAMES",
     "LAST_NAMES",
     "PRODUCT_BRANDS",
-    "PRODUCT_COMPANIES",
     "PRODUCT_TAGS",
     "TAX_RATES",
 ]
