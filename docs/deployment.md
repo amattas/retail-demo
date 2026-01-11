@@ -157,7 +157,7 @@ The Bronze layer creates shortcuts to both batch historical data (ADLSv2) and st
 2. **Create Eventhouse KQL Database**:
    - New → Eventhouse
    - Name: `retail_eventhouse`
-   - Create KQL Database: `kql_retail_db`
+   - Create KQL Database: `retail_eventhouse`
 
 ### Step 2.2: Set Up KQL Event Tables
 
@@ -194,7 +194,7 @@ The Bronze layer creates shortcuts to both batch historical data (ADLSv2) and st
 3. **Add Destinations** (2 destinations):
 
    **Destination 1: KQL Database**
-   - Target: `kql_retail_db` (from Step 2.1)
+   - Target: `retail_eventhouse` (from Step 2.1)
    - Input data format: JSON
    - Routing: Route by `event_type` field
    - Auto-create tables: ✅ Enabled
@@ -233,7 +233,7 @@ receipt_created | take 10
    ADLS_ACCOUNT = "stdretail"
    ADLS_CONTAINER = "supermarket"
    EVENTHOUSE_URI = "https://YOUR-EVENTHOUSE.kusto.windows.net"
-   EVENTHOUSE_DATABASE = "kql_retail_db"
+   EVENTHOUSE_DATABASE = "retail_eventhouse"
    BRONZE_SCHEMA = "cusn"
    REQUIRE_EVENTHOUSE = "true"  # Fail if Eventhouse not configured
    ```
@@ -472,7 +472,7 @@ LIMIT 7;
      - Tables: `dim_stores`, `dim_products`
 
    - **Real-Time KQL** (DirectQuery):
-     - Source: `kql_retail_db`
+     - Source: `retail_eventhouse`
      - Tables: Materialized views (optional for 7-day hot data)
 
 3. **Define Relationships**:
@@ -502,7 +502,7 @@ LIMIT 7;
      - Open Stockouts (24h)
 
 3. **Configure Data Source**:
-   - All tiles → Data source: `kql_retail_db`
+   - All tiles → Data source: `retail_eventhouse`
 
 4. **Set Auto-Refresh**:
    - Refresh interval: 30 seconds
@@ -750,7 +750,7 @@ mv_store_sales_minute | count
 | `ADLS_ACCOUNT` | Yes | `stdretail` | Storage account name |
 | `ADLS_CONTAINER` | Yes | `supermarket` | Container name |
 | `EVENTHOUSE_URI` | Yes | - | Eventhouse query URI |
-| `EVENTHOUSE_DATABASE` | Yes | `kql_retail_db` | KQL database name |
+| `EVENTHOUSE_DATABASE` | Yes | `retail_eventhouse` | KQL database name |
 | `BRONZE_SCHEMA` | No | `cusn` | Bronze schema name |
 | `REQUIRE_EVENTHOUSE` | No | `false` | Fail if Eventhouse not configured |
 | **Silver Layer** ||||

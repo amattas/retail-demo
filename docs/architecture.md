@@ -158,7 +158,7 @@ The Bronze layer (`cusn` schema) serves as the unified data ingestion layer in t
 - `cusn.fact_promotions`, `cusn.fact_promo_lines`, `cusn.fact_reorders`
 
 #### Eventhouse (Real-Time Streaming Data)
-- **Database**: `kql_retail_db`
+- **Database**: `retail_eventhouse`
 - **Format**: KQL tables (streaming events)
 - **Tables**: 18 event tables
 

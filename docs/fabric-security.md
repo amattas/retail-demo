@@ -133,13 +133,13 @@ Bronze layer streaming shortcuts require read access to Eventhouse tables.
 **Assign via KQL:**
 ```kql
 // Grant viewer access
-.add database kql_retail_db viewers ('aaduser=user@domain.com')
+.add database retail_eventhouse viewers ('aaduser=user@domain.com')
 
 // Grant user access (includes write)
-.add database kql_retail_db users ('aaduser=user@domain.com')
+.add database retail_eventhouse users ('aaduser=user@domain.com')
 
 // Grant to service principal
-.add database kql_retail_db viewers ('aadapp=<app-id>')
+.add database retail_eventhouse viewers ('aadapp=<app-id>')
 ```
 
 ---
@@ -344,7 +344,7 @@ role: RegionalManagers
 - Network connectivity issues
 
 **Solutions:**
-1. Verify Eventhouse permissions via KQL: `.show database kql_retail_db principals`
+1. Verify Eventhouse permissions via KQL: `.show database retail_eventhouse principals`
 2. Manually create Eventhouse shortcuts via Fabric Portal
 3. Test connectivity: Run query in Eventhouse KQL Queryset
 4. Check Eventhouse cluster is running (not paused)
