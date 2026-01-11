@@ -92,9 +92,7 @@ class PaymentsMixin(FactGeneratorBase):
         amount_str = receipt.get("Total", "0.00")
 
         # Determine if payment should be declined
-        is_declined, decline_reason = self._should_decline_payment(
-            payment_method, amount_cents
-        )
+        is_declined, decline_reason = self._should_decline_payment(payment_method)
 
         # Simulate processing time
         processing_time_ms = self._simulate_processing_time_ms(payment_method)
@@ -144,9 +142,7 @@ class PaymentsMixin(FactGeneratorBase):
         amount_str = order.get("Total", "0.00")
 
         # Determine if payment should be declined
-        is_declined, decline_reason = self._should_decline_payment(
-            payment_method, amount_cents
-        )
+        is_declined, decline_reason = self._should_decline_payment(payment_method)
 
         # Simulate processing time
         processing_time_ms = self._simulate_processing_time_ms(payment_method)
@@ -176,7 +172,6 @@ class PaymentsMixin(FactGeneratorBase):
     def _should_decline_payment(
         self,
         payment_method: str,
-        amount_cents: int,  # noqa: ARG002 - reserved for future use
     ) -> tuple[bool, str | None]:
         """Determine if a payment should be declined.
 
@@ -185,7 +180,6 @@ class PaymentsMixin(FactGeneratorBase):
 
         Args:
             payment_method: The payment method (CREDIT_CARD, CASH, etc.)
-            amount_cents: Payment amount in cents (reserved for future high-value logic)
 
         Returns:
             Tuple of (is_declined, decline_reason).

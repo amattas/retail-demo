@@ -645,29 +645,6 @@ class Marketing(BaseModel):
     Device: DeviceType = Field(..., description="Device type")
 
 
-class SupplyChainDisruption(BaseModel):
-    """Supply chain disruption event fact."""
-
-    TraceId: str = Field(..., description="Unique trace identifier")
-    EventTS: datetime = Field(..., description="Event timestamp")
-    DCID: int = Field(..., gt=0, description="Distribution center ID")
-    Type: DisruptionType = Field(..., description="Type of disruption")
-    Severity: DisruptionSeverity = Field(..., description="Severity level")
-    Description: str = Field(
-        ..., min_length=1, description="Human readable description"
-    )
-    StartTime: datetime = Field(..., description="Disruption start time")
-    EndTime: datetime | None = Field(
-        None, description="Disruption end time (null if ongoing)"
-    )
-    ImpactPercentage: float = Field(
-        ..., ge=0, le=100, description="Percentage impact on capacity"
-    )
-    AffectedProducts: str | None = Field(
-        None, description="JSON array of affected product IDs"
-    )
-
-
 class OnlineOrder(BaseModel):
     """
     Online order fact table.
@@ -738,35 +715,3 @@ class StoreOperation(BaseModel):
         if v.lower() not in ["opened", "closed"]:
             raise ValueError("OperationType must be either 'opened' or 'closed'")
         return v.lower()
-
-
-# ================================
-# ALIASES FOR TEST COMPATIBILITY
-# ================================
-
-# Dictionary model aliases
-GeographyDict = GeographyDict
-FirstNameDict = FirstNameDict
-LastNameDict = LastNameDict
-ProductCompanyDict = ProductCompanyDict
-ProductBrandDict = ProductBrandDict
-ProductDict = ProductDict
-
-# Dimension model aliases
-GeographyMaster = GeographyMaster
-Store = Store
-DistributionCenter = DistributionCenter
-Customer = Customer
-ProductMaster = ProductMaster
-
-# Fact model aliases
-DCInventoryTransaction = DCInventoryTransaction
-TruckMove = TruckMove
-StoreInventoryTransaction = StoreInventoryTransaction
-Receipt = Receipt
-ReceiptLine = ReceiptLine
-FootTraffic = FootTraffic
-BLEPing = BLEPing
-Marketing = Marketing
-OnlineOrder = OnlineOrder
-StoreOperation = StoreOperation
