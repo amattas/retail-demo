@@ -1,14 +1,17 @@
 {
   "$schema": "https://fabric.microsoft.com/schemas/pipeline/2024-01-01-preview",
-  "name": "pl_silver_to_gold_aggregates",
-  "description": "Runs the Silver → Gold aggregates notebook on a schedule",
+  "name": "pl_silver_to_gold",
+  "description": "Runs the Silver → Gold aggregates notebook on a schedule (reads from ag schema, writes to au schema)",
   "activities": [
     {
       "name": "SilverToGoldNotebook",
       "type": "Notebook",
       "properties": {
-        "notebookResourceId": "<fabric-notebook-resource-id: silver_to_gold>",
-        "parameters": {},
+        "notebookResourceId": "<fabric-notebook-resource-id: 03-silver-to-gold>",
+        "parameters": {
+          "SILVER_DB": "ag",
+          "GOLD_DB": "au"
+        },
         "timeout": "00:30:00"
       }
     }
