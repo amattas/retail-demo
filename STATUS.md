@@ -1,16 +1,20 @@
 # STATUS.md - Retail Demo
 
 ## Current State
-- **Wave**: D (Implementation)
-- **Last Updated**: 2025-01-03
+- **Wave**: E (Review & Packaging)
+- **Last Updated**: 2026-01-11
+
+## Summary
+
+Microsoft Fabric Real-Time Intelligence demo powered by synthetic retail data generation. The datagen package is fully functional with 18 fact tables. Fabric components (KQL, Lakehouse, notebooks) are implemented and ready for deployment.
+
+---
 
 ## Completed Work
 
 ### Wave A: Context Gathering
-- [x] Repository scanned
-- [x] Dependencies mapped (datagen, Fabric items)
-- [ ] Performance baseline (pending)
-- [ ] Test coverage baseline (pending)
+- [x] Repository scanned (`context/repo-map.md`)
+- [x] Dependencies mapped (`context/dependency-graph.md`)
 
 ### Wave B: Design & Analysis
 - [x] KQL tables designed (streaming events)
@@ -18,25 +22,47 @@
 - [x] Lakehouse Silver schema in notebook
 - [x] Gold layer aggregations designed
 
-### Wave D: Implementation (In Progress)
-- [x] KQL event tables (02 tables.kql)
-- [x] KQL ingestion mappings (README.md)
-- [x] OneLake to Eventhouse shortcut approach
-- [x] Functions (04 functions.kql)
-- [x] Materialized views (05, 06 .kql files)
-- [x] 02-onelake-to-silver.ipynb
-- [x] 03-silver-to-gold.ipynb (created, pending datagen updates)
-- [ ] Eventstream configuration
-- [ ] Real-time dashboards
-- [ ] Semantic model
+### Wave D: Implementation
+- [x] **Datagen package** - 18 fact tables fully implemented
+  - Master data: geographies, stores, DCs, trucks, customers, products
+  - Fact tables: receipts, receipt_lines, inventory, logistics, marketing, etc.
+  - Modularized architecture: master_generators/, fact_generators/, retail_patterns/
+- [x] **KQL Database** - `fabric/kql_database/`
+  - Event tables (02-create-tables.kql)
+  - Functions (04-functions.kql)
+  - Materialized views (05, 06 .kql files)
+- [x] **Lakehouse notebooks** - `fabric/lakehouse/`
+  - 02-onelake-to-silver.ipynb (Bronze → Silver)
+  - 03-silver-to-gold.ipynb (Silver → Gold aggregations)
+- [x] **Code quality** - mypy, ruff, tests passing
 
-## Open Issues
-- #7-#13: Missing fact tables in datagen (payments, stockouts, reorders, promotions, store_ops, customer_zone_changes, truck_departed)
+### Wave E: Review & Packaging
+- [x] All GitHub issues (#7-#159) resolved
+- [x] Unused code removed
+- [x] Test suite fixed and passing
+- [ ] Eventstream configuration (deployment step)
+- [ ] Real-time dashboards (deployment step)
+- [ ] Semantic model (deployment step)
 
-## Blockers
-- Gold tables (stockouts, reorders, promotions, store_ops) stubbed pending datagen fact table additions
+---
 
-## Next Steps
-1. Configure Eventstream routes to KQL tables
-2. Build real-time dashboards using materialized views
-3. Create semantic model for Power BI
+## Deployment Pending
+
+These items require access to a Microsoft Fabric workspace:
+
+1. **Eventstream** - Configure routes from Event Hubs to KQL tables
+2. **Dashboards** - Build real-time dashboards using materialized views
+3. **Semantic Model** - Create Power BI semantic model
+
+---
+
+## Quick Start
+
+```bash
+# Start datagen server
+cd datagen && ./launch.sh
+# Access: http://localhost:8000
+
+# Run tests
+cd datagen && python -m pytest -q
+```
