@@ -12,8 +12,7 @@
         "parameters": {
           "SILVER_DB": "ag",
           "BRONZE_SCHEMA": "cusn"
-        },
-        "timeout": "01:00:00"
+        }
       },
       "policy": {
         "retry": 3,
