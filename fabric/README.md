@@ -5,7 +5,7 @@ This folder organizes Microsoft Fabric Real-Time Intelligence assets for the ret
 Subprojects:
 - `eventstream/` – Ingest retail events from Azure Event Hubs and route to KQL DB + Lakehouse.
 - `kql_database/` – Real-Time Analytics KQL database, tables, retention policies, materialized views.
-- `querysets/` – KQL queries for dashboards, investigations, and operational runbooks.
+- `kql_database/` – KQL scripts for tables, functions, materialized views, querysets, and alert rules
 - `rules/` – Real-time rules (alerts/actions) for stockouts, reorders, late trucks, etc.
 - `dashboards/` – Real-Time Dashboards (and/or Power BI) for operations and CX.
 - `lakehouse/` – Bronze/Silver/Gold tables, Delta schemas, shortcuts, and medallion flows.

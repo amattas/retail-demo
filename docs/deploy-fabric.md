@@ -83,8 +83,8 @@ curl http://localhost:8000/api/stream/status
 - In Lakehouse Files: confirm partitions under `/Tables/bronze/events/event_type=*/date=*`.
 
 11) Build dashboards/rules
-- Use Querysets under `fabric/querysets/*.kql` to seed dashboard tiles.
-- Create rules based on `fabric/rules/definitions.kql` and wire to Teams/Email.
+- Use Querysets under `fabric/kql_database/querysets/*.kql` to seed dashboard tiles.
+- Create rules based on `fabric/kql_database/rules/definitions.kql` and wire to Teams/Email.
 - Optional: import the minimal dashboard template at `fabric/dashboards/retail-ops.template.json` and set the KQL DB resource.
 
 Notes

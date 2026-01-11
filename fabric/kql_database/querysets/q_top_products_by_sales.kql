@@ -1,0 +1,6 @@
+let window = 15m;
+receipt_line_added
+| where ingest_timestamp > ago(window)
+| summarize revenue = sum(extended_price), units = sum(quantity) by product_id
+| top 25 by revenue desc
+

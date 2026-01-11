@@ -1,0 +1,10 @@
+let window = 15m;
+online_order_created
+| where ingest_timestamp > ago(window)
+| summarize orders = count(),
+            subtotal = sum(subtotal),
+            tax = sum(tax),
+            total = sum(total)
+| extend aov = toreal(total) / toreal(orders)
+| project orders, subtotal, tax, total, aov
+

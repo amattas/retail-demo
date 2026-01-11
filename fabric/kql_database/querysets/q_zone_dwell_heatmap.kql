@@ -1,0 +1,6 @@
+let window = 30m;
+mv_zone_dwell_minute
+| where ts > ago(window)
+| summarize avg_dwell = avg(avg_dwell), customers = sum(customers) by store_id, zone
+| order by customers desc
+

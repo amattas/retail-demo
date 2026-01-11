@@ -121,7 +121,7 @@ Advanced users leverage Copilot to accelerate analysis:
 - "Suggest optimizations for this slow-running query"
 
 **Implementation:**
-- Fabric Copilot in notebooks, KQL querysets, and data pipelines
+- Fabric Copilot in notebooks, KQL querysets (under kql_database/querysets/), and data pipelines
 - Code generation and explanation
 - Query optimization suggestions
 - Automated documentation
@@ -148,7 +148,7 @@ Advanced users leverage Copilot to accelerate analysis:
 
 ### Phase 4: Foundation (Q1 2025)
 - [ ] Enable Fabric Copilot on KQL database
-- [ ] Validate natural language queries against querysets
+- [ ] Validate natural language queries against KQL querysets (kql_database/querysets/)
 - [ ] Train initial anomaly detection models on historical data
 - [ ] Create sample prompts and expected responses for demos
 

@@ -25,9 +25,9 @@ Agenda (15–20 minutes)
 4) Hot-path queries (KQL DB)
 - Run: `receipt_created | take 5` then `count()`.
 - Run: `mv_store_sales_minute | where ts > ago(10m) | summarize sum(total_sales) by store_id`.
-- Show top products: run `fabric/querysets/q_top_products_by_sales.kql`.
-- Presence/dwell: run `fabric/querysets/q_zone_dwell_heatmap.kql`.
-- Logistics: run `fabric/querysets/q_truck_dwell_by_site.kql`.
+- Show top products: run `fabric/kql_database/querysets/q_top_products_by_sales.kql`.
+- Presence/dwell: run `fabric/kql_database/querysets/q_zone_dwell_heatmap.kql`.
+- Logistics: run `fabric/kql_database/querysets/q_truck_dwell_by_site.kql`.
 
 5) Dashboards (optional initial view)
 - Open Real-Time Dashboard with tiles wired to materialized views.
@@ -50,5 +50,5 @@ Key talk tracks
 Backup queries (if needed)
 - Sales trend: `receipt_created | summarize sum(total) by bin(ingest_timestamp, 1m)`.
 - Stockouts: `stockout_detected | summarize count() by store_id`.
-- Marketing funnel: `fabric/querysets/q_campaign_conversion_funnel.kql` (illustrative join).
+- Marketing funnel: `fabric/kql_database/querysets/q_campaign_conversion_funnel.kql` (illustrative join).
 

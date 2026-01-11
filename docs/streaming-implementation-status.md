@@ -235,7 +235,7 @@ When adding streaming support to a new fact table:
 
 ### 1. Verify Bronze Shortcuts Exist
 ```bash
-python fabric/lakehouse/validate-bronze-shortcuts.py
+%run fabric/lakehouse/05-validate-bronze-shortcuts.ipynb
 ```
 
 ### 2. Test Schema Alignment

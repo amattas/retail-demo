@@ -68,7 +68,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 
 **Dependencies**:
 - Phase 2 complete (KQL tables populated)
-- Sample queries documented in querysets/
+- Sample queries documented in kql_database/querysets/
 
 ---
 

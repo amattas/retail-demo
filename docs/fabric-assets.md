@@ -3,8 +3,7 @@
 Directories under `fabric/` define the build spec for each asset:
 - `eventstream/` – Ingest from Event Hubs, map to KQL, land to Lakehouse Bronze
 - `kql_database/` – Tables, ingestion mappings, policies, materialized views
-- `querysets/` – Curated KQL queries for dashboards and ops
-- `rules/` – Real-time alerts/actions
+- `kql_database/` – Tables, ingestion mappings, policies, materialized views, querysets, and rules
 - `dashboards/` – Real-Time Dashboards over KQL + history
 - `lakehouse/` – Bronze/Silver/Gold medallion and transforms (Silver now aligned to DuckDB fact_* schema)
 - `pipelines/` – Orchestration and maintenance
@@ -16,9 +15,9 @@ See each folder's README for details and next steps.
 Deployment
 - See `docs/deploy-fabric.md` to provision the KQL DB, Eventstream, and Lakehouse based on datagen schemas.
 - KQL assets: `fabric/kql_database/02 tables.kql`, `03 OneLake to EventHouse.kql`, `04 functions.kql`, `05 materialized_views.kql`, `06 more_materialized_views.kql`, and JSON ingestion mappings under `fabric/kql_database/ingestion_mappings/`.
-- Querysets added for new KPIs: `q_online_orders_15m.kql`, `q_fulfillment_pipeline_24h.kql`, `q_ble_presence_30m.kql`, `q_marketing_cost_24h.kql` under `fabric/querysets/`.
+- Querysets added for new KPIs: `q_online_orders_15m.kql`, `q_fulfillment_pipeline_24h.kql`, `q_ble_presence_30m.kql`, `q_marketing_cost_24h.kql` under `fabric/kql_database/querysets/`.
 - Eventstream mapping spec: `fabric/eventstream/mapping_spec.md` plus a template export in `fabric/eventstream/template.export.json`.
-- Querysets to seed dashboards: `fabric/querysets/*.kql`.
+- Querysets to seed dashboards: `fabric/kql_database/querysets/*.kql`.
 
 Current State
 - Event types defined in datagen: receipts, inventory, customer presence, operations, marketing, and online orders.

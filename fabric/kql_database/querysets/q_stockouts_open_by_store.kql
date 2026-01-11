@@ -1,0 +1,8 @@
+// Latest stockout events per product/store in last 24h
+let window = 24h;
+stockout_detected
+| where ingest_timestamp > ago(window)
+| summarize arg_max(ingest_timestamp, *) by store_id, product_id
+| project store_id, product_id, last_known_quantity, detection_time, last_event_ts = ingest_timestamp
+| order by detection_time desc
+

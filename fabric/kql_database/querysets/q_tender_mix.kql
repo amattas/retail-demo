@@ -1,0 +1,6 @@
+let window = 15m;
+payment_processed
+| where ingest_timestamp > ago(window)
+| summarize amount = sum(amount) by payment_method
+| order by amount desc
+

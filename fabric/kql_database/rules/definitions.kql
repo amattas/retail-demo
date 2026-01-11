@@ -1,0 +1,30 @@
+// Fabric Rules reference queries — pair each with delivery actions
+
+// Stockout detected: immediate alert
+stockout_detected
+| where ingest_timestamp > ago(5m)
+| project store_id, dc_id, product_id, last_known_quantity, detection_time, trace_id
+
+// Reorder URGENT
+reorder_triggered
+| where priority == 'URGENT' and ingest_timestamp > ago(10m)
+| project store_id, dc_id, product_id, reorder_quantity, reorder_point, current_quantity, trace_id
+
+// Truck dwell breach: arrived without depart > threshold
+let thresholdMinutes = 90m;
+truck_arrived
+| join kind=leftanti (truck_departed) on truck_id, dc_id, store_id, shipment_id
+| where datetime_diff('minute', now(), arrival_time) > thresholdMinutes
+| project truck_id, dc_id, store_id, shipment_id, arrival_time
+
+// Zone overcrowded: rolling 5-min window
+customer_entered
+| where ingest_timestamp > ago(5m)
+| summarize customers=sum(customer_count), avg_dwell=avg(dwell_time) by store_id, zone
+| where customers > 50 or avg_dwell > 600
+
+// High-value receipt: threshold on total
+receipt_created
+| where ingest_timestamp > ago(5m)
+| where total > 200.0
+| project store_id, receipt_id, total, trace_id

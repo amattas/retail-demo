@@ -490,7 +490,7 @@ LIMIT 7;
    - Name: `Retail Operations - Real-Time`
 
 2. **Add Tiles** using KQL Querysets:
-   - Import queries from: `fabric/querysets/*.kql`
+   - Import queries from: `fabric/kql_database/querysets/*.kql`
    - Example tiles:
      - Sales/min by Store (1h window)
      - Online Orders (15m window)
@@ -533,7 +533,7 @@ LIMIT 7;
 **Real-time alerts** for business events (optional).
 
 1. **Import Alert Definitions**:
-   - Rules definitions: `fabric/rules/definitions.kql`
+   - Rules definitions: `fabric/kql_database/rules/definitions.kql`
 
 2. **Create Alerts**:
    - **Stockout Alert**: When `stockout_detected` event fires
@@ -952,7 +952,7 @@ spark.sql(f"DROP TABLE IF EXISTS ag.{table_name}")
 **Symptoms**: Bronze shortcuts lost connection or deleted accidentally
 
 **Recovery**:
-1. Run validation script: `python validate-bronze-shortcuts.py`
+1. Run validation notebook: `05-validate-bronze-shortcuts.ipynb`
 2. Identify missing shortcuts from output
 3. Re-run Bronze creation notebook: `00-create-bronze-shortcuts.ipynb`
 4. Verify with validation script again
