@@ -44,7 +44,13 @@ dev = [
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-exclude = ["data/**/*"]
+# Excluded paths:
+# - data/**/*: Generated data files, not source code
+# - sourcedata/supercenter/*.py: Auto-generated from CSV dictionaries. These files
+#   contain large data literals (e.g., 579 geography dicts) that exceed line-length
+#   limits. Reformatting would hurt readability. Data is validated by Pydantic at
+#   runtime, so linting provides minimal value here.
+exclude = ["data/**/*", "src/retail_datagen/sourcedata/supercenter/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
