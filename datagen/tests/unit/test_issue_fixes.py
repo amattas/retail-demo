@@ -28,78 +28,73 @@ class TestTaxFallbackChain:
     """Tests for Issue #25: Tax fallback chain implementation."""
 
     @pytest.fixture
-    def temp_tax_csv(self):
-        """Create a temporary tax rates CSV for testing."""
-        csv_content = """StateCode,County,City,CombinedRate
-CA,Los Angeles,Los Angeles,0.0950
-CA,Los Angeles,Beverly Hills,0.0925
-CA,Los Angeles,Santa Monica,0.0900
-CA,Orange,Irvine,0.0775
-CA,Orange,Newport Beach,0.0800
-TX,Harris,Houston,0.0825
-TX,Harris,Pasadena,0.0825
-TX,Dallas,Dallas,0.0825
-NY,New York,New York,0.0880
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_content)
-            f.flush()
-            yield f.name
-        os.unlink(f.name)
+    def test_tax_rates(self):
+        """Create test tax rates data."""
+        return [
+            {"StateCode": "CA", "County": "Los Angeles", "City": "Los Angeles", "CombinedRate": "0.0950"},
+            {"StateCode": "CA", "County": "Los Angeles", "City": "Beverly Hills", "CombinedRate": "0.0925"},
+            {"StateCode": "CA", "County": "Los Angeles", "City": "Santa Monica", "CombinedRate": "0.0900"},
+            {"StateCode": "CA", "County": "Orange", "City": "Irvine", "CombinedRate": "0.0775"},
+            {"StateCode": "CA", "County": "Orange", "City": "Newport Beach", "CombinedRate": "0.0800"},
+            {"StateCode": "TX", "County": "Harris", "City": "Houston", "CombinedRate": "0.0825"},
+            {"StateCode": "TX", "County": "Harris", "City": "Pasadena", "CombinedRate": "0.0825"},
+            {"StateCode": "TX", "County": "Dallas", "City": "Dallas", "CombinedRate": "0.0825"},
+            {"StateCode": "NY", "County": "New York", "City": "New York", "CombinedRate": "0.0880"},
+        ]
 
-    def test_city_level_lookup(self, temp_tax_csv):
+    def test_city_level_lookup(self, test_tax_rates):
         """Test that city-level lookup returns exact match."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         rate = calc.get_tax_rate("CA", county="Los Angeles", city="Los Angeles")
         assert rate == Decimal("0.0950")
 
-    def test_county_fallback(self, temp_tax_csv):
+    def test_county_fallback(self, test_tax_rates):
         """Test county fallback when city not found."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         # Unknown city in known county should fall back to county average
         rate = calc.get_tax_rate("CA", county="Los Angeles", city="Unknown City")
         # Los Angeles county average of (0.0950 + 0.0925 + 0.0900) / 3 = 0.0925
         assert rate == Decimal("0.0925")
 
-    def test_state_fallback(self, temp_tax_csv):
+    def test_state_fallback(self, test_tax_rates):
         """Test state fallback when county not found."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         # Unknown county in known state should fall back to state average
         rate = calc.get_tax_rate("CA", county="Unknown County")
         # CA has 5 cities with rates:
         # (0.0950 + 0.0925 + 0.0900 + 0.0775 + 0.0800) / 5 = 0.087
         assert rate == Decimal("0.087")
 
-    def test_default_fallback(self, temp_tax_csv):
+    def test_default_fallback(self, test_tax_rates):
         """Test default rate fallback when state not found."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         # Unknown state should fall back to default
         rate = calc.get_tax_rate("ZZ", county="Unknown", city="Unknown")
         assert rate == Decimal("0.07407")  # Default rate
 
-    def test_county_cache_populated(self, temp_tax_csv):
+    def test_county_cache_populated(self, test_tax_rates):
         """Test that county cache is populated during loading."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         # Should have county entries for CA counties and TX counties
         assert ("CA", "Los Angeles") in calc.county_cache
         assert ("CA", "Orange") in calc.county_cache
         assert ("TX", "Harris") in calc.county_cache
 
-    def test_state_cache_populated(self, temp_tax_csv):
+    def test_state_cache_populated(self, test_tax_rates):
         """Test that state cache is populated during loading."""
         from retail_datagen.shared.tax_utils import TaxCalculator
 
-        calc = TaxCalculator(temp_tax_csv)
+        calc = TaxCalculator(tax_rates=test_tax_rates)
         assert "CA" in calc.state_cache
         assert "TX" in calc.state_cache
         assert "NY" in calc.state_cache

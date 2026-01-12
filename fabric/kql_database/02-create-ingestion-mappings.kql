@@ -1,0 +1,415 @@
+// 02 Ingestion Mappings
+// Purpose: Create JSON ingestion mappings for Eventstream → KQL DB
+// Run AFTER 01-create-tables.kql (tables must exist before mappings)
+// Run this entire script at once using .execute database script
+// ============================================================================
+
+.execute database script with (ContinueOnErrors=true) <|
+
+// ============================================================================
+// TRANSACTION EVENTS
+// ============================================================================
+
+.create-or-alter table receipt_created ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
+  {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"subtotal","path":"$.payload.subtotal","datatype":"real"},
+  {"column":"tax","path":"$.payload.tax","datatype":"real"},
+  {"column":"total","path":"$.payload.total","datatype":"real"},
+  {"column":"tender_type","path":"$.payload.tender_type","datatype":"string"},
+  {"column":"item_count","path":"$.payload.item_count","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table receipt_line_added ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"line_number","path":"$.payload.line_number","datatype":"long"},
+  {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
+  {"column":"quantity","path":"$.payload.quantity","datatype":"long"},
+  {"column":"unit_price","path":"$.payload.unit_price","datatype":"real"},
+  {"column":"extended_price","path":"$.payload.extended_price","datatype":"real"},
+  {"column":"promo_code","path":"$.payload.promo_code","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table payment_processed ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"payment_method","path":"$.payload.payment_method","datatype":"string"},
+  {"column":"amount","path":"$.payload.amount","datatype":"real"},
+  {"column":"amount_cents","path":"$.payload.amount_cents","datatype":"long"},
+  {"column":"transaction_id","path":"$.payload.transaction_id","datatype":"string"},
+  {"column":"processing_time","path":"$.payload.processing_time","datatype":"datetime"},
+  {"column":"processing_time_ms","path":"$.payload.processing_time_ms","datatype":"int"},
+  {"column":"status","path":"$.payload.status","datatype":"string"},
+  {"column":"decline_reason","path":"$.payload.decline_reason","datatype":"string"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+// ============================================================================
+// INVENTORY EVENTS
+// ============================================================================
+
+.create-or-alter table inventory_updated ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
+  {"column":"quantity_delta","path":"$.payload.quantity_delta","datatype":"long"},
+  {"column":"reason","path":"$.payload.reason","datatype":"string"},
+  {"column":"payload_source","path":"$.payload.source","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table stockout_detected ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
+  {"column":"last_known_quantity","path":"$.payload.last_known_quantity","datatype":"long"},
+  {"column":"detection_time","path":"$.payload.detection_time","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table reorder_triggered ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
+  {"column":"current_quantity","path":"$.payload.current_quantity","datatype":"long"},
+  {"column":"reorder_quantity","path":"$.payload.reorder_quantity","datatype":"long"},
+  {"column":"reorder_point","path":"$.payload.reorder_point","datatype":"long"},
+  {"column":"priority","path":"$.payload.priority","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+// ============================================================================
+// CUSTOMER EVENTS
+// ============================================================================
+
+.create-or-alter table customer_entered ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"sensor_id","path":"$.payload.sensor_id","datatype":"string"},
+  {"column":"zone","path":"$.payload.zone","datatype":"string"},
+  {"column":"customer_count","path":"$.payload.customer_count","datatype":"long"},
+  {"column":"dwell_time","path":"$.payload.dwell_time","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table customer_zone_changed ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"customer_ble_id","path":"$.payload.customer_ble_id","datatype":"string"},
+  {"column":"from_zone","path":"$.payload.from_zone","datatype":"string"},
+  {"column":"to_zone","path":"$.payload.to_zone","datatype":"string"},
+  {"column":"timestamp","path":"$.payload.timestamp","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table ble_ping_detected ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"beacon_id","path":"$.payload.beacon_id","datatype":"string"},
+  {"column":"customer_ble_id","path":"$.payload.customer_ble_id","datatype":"string"},
+  {"column":"rssi","path":"$.payload.rssi","datatype":"long"},
+  {"column":"zone","path":"$.payload.zone","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+// ============================================================================
+// OPERATIONAL EVENTS
+// ============================================================================
+
+.create-or-alter table truck_arrived ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"truck_id","path":"$.payload.truck_id","datatype":"string"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"shipment_id","path":"$.payload.shipment_id","datatype":"string"},
+  {"column":"arrival_time","path":"$.payload.arrival_time","datatype":"datetime"},
+  {"column":"estimated_unload_duration","path":"$.payload.estimated_unload_duration","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table truck_departed ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"truck_id","path":"$.payload.truck_id","datatype":"string"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"shipment_id","path":"$.payload.shipment_id","datatype":"string"},
+  {"column":"departure_time","path":"$.payload.departure_time","datatype":"datetime"},
+  {"column":"actual_unload_duration","path":"$.payload.actual_unload_duration","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table store_opened ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"operation_time","path":"$.payload.operation_time","datatype":"datetime"},
+  {"column":"operation_type","path":"$.payload.operation_type","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table store_closed ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"operation_time","path":"$.payload.operation_time","datatype":"datetime"},
+  {"column":"operation_type","path":"$.payload.operation_type","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+// ============================================================================
+// MARKETING EVENTS
+// ============================================================================
+
+.create-or-alter table ad_impression ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"channel","path":"$.payload.channel","datatype":"string"},
+  {"column":"campaign_id","path":"$.payload.campaign_id","datatype":"string"},
+  {"column":"creative_id","path":"$.payload.creative_id","datatype":"string"},
+  {"column":"customer_ad_id","path":"$.payload.customer_ad_id","datatype":"string"},
+  {"column":"impression_id","path":"$.payload.impression_id","datatype":"string"},
+  {"column":"cost","path":"$.payload.cost","datatype":"real"},
+  {"column":"device_type","path":"$.payload.device_type","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table promotion_applied ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"receipt_id","path":"$.payload.receipt_id","datatype":"string"},
+  {"column":"promo_code","path":"$.payload.promo_code","datatype":"string"},
+  {"column":"discount_amount","path":"$.payload.discount_amount","datatype":"real"},
+  {"column":"discount_cents","path":"$.payload.discount_cents","datatype":"long"},
+  {"column":"discount_type","path":"$.payload.discount_type","datatype":"string"},
+  {"column":"product_count","path":"$.payload.product_count","datatype":"long"},
+  {"column":"product_ids","path":"$.payload.product_ids","datatype":"dynamic"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+// ============================================================================
+// OMNICHANNEL / ONLINE ORDERS
+// ============================================================================
+
+.create-or-alter table online_order_created ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
+  {"column":"fulfillment_mode","path":"$.payload.fulfillment_mode","datatype":"string"},
+  {"column":"node_type","path":"$.payload.node_type","datatype":"string"},
+  {"column":"node_id","path":"$.payload.node_id","datatype":"long"},
+  {"column":"item_count","path":"$.payload.item_count","datatype":"long"},
+  {"column":"subtotal","path":"$.payload.subtotal","datatype":"real"},
+  {"column":"tax","path":"$.payload.tax","datatype":"real"},
+  {"column":"total","path":"$.payload.total","datatype":"real"},
+  {"column":"tender_type","path":"$.payload.tender_type","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table online_order_picked ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"node_type","path":"$.payload.node_type","datatype":"string"},
+  {"column":"node_id","path":"$.payload.node_id","datatype":"long"},
+  {"column":"fulfillment_mode","path":"$.payload.fulfillment_mode","datatype":"string"},
+  {"column":"picked_time","path":"$.payload.picked_time","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table online_order_shipped ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"node_type","path":"$.payload.node_type","datatype":"string"},
+  {"column":"node_id","path":"$.payload.node_id","datatype":"long"},
+  {"column":"fulfillment_mode","path":"$.payload.fulfillment_mode","datatype":"string"},
+  {"column":"shipped_time","path":"$.payload.shipped_time","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```

@@ -1,0 +1,692 @@
+// 01 Tables
+// Purpose: Create event tables for streaming ingestion from Eventstream
+// Run this entire script at once using .execute database script
+// ============================================================================
+//
+// FOREIGN KEY VALIDATION STRATEGY
+// ============================================================================
+// Event tables reference dimension IDs (store_id, customer_id, product_id, etc.)
+// without database-level FK constraints. Validation is handled as follows:
+//
+// 1. SOURCE VALIDATION (Primary): The datagen Python package validates all
+//    foreign key relationships before generating events. See:
+//    - datagen/src/retail_datagen/shared/validators.py (SyntheticDataValidator)
+//    - datagen/src/retail_datagen/generators/retail_patterns.py (BusinessRulesEngine)
+//
+// 2. POST-INGESTION QUERIES: For data quality monitoring, use these queries:
+//
+//    // Find orphan product references (if dim_products shortcut exists):
+//    receipt_line_added
+//    | where product_id !in (dim_products | project product_id)
+//    | summarize orphan_count = count() by bin(ingest_timestamp, 1h)
+//
+//    // Find orphan store references (if dim_stores shortcut exists):
+//    receipt_created
+//    | where store_id !in (dim_stores | project store_id)
+//    | summarize orphan_count = count() by bin(ingest_timestamp, 1h)
+//
+// 3. DIMENSION DATA: Master dimensions (dim_stores, dim_products, dim_customers,
+//    dim_distribution_centers) are loaded via Lakehouse shortcuts from Silver
+//    layer Delta tables. See fabric/lakehouse/02-onelake-to-silver.ipynb.
+//
+// ============================================================================
+
+.execute database script with (ContinueOnErrors=true) <|
+
+// ============================================================================
+// TABLE DEFINITIONS
+// ============================================================================
+
+// TRANSACTION EVENTS
+// NOTE: campaign_id added for attribution tracking (Issue #60). Field is nullable
+// for backward compatibility - existing events without campaign_id will have null.
+// Downstream queries should use isnull(campaign_id, "") or coalesce patterns.
+
+.create-merge table receipt_created (
+    store_id:long,
+    customer_id:long,
+    receipt_id:string,
+    subtotal:real,
+    tax:real,
+    total:real,
+    tender_type:string,
+    item_count:long,
+    campaign_id:string,  // Null for non-campaign purchases; use isnull(campaign_id, '') in queries
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table receipt_line_added (
+    receipt_id:string,
+    line_number:long,
+    product_id:long,
+    quantity:long,
+    unit_price:real,
+    extended_price:real,
+    promo_code:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table payment_processed (
+    receipt_id:string,
+    order_id:string,
+    payment_method:string,
+    amount:real,
+    amount_cents:long,
+    transaction_id:string,
+    processing_time:datetime,
+    processing_time_ms:int,
+    status:string,
+    decline_reason:string,
+    store_id:long,
+    customer_id:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// INVENTORY EVENTS
+
+.create-merge table inventory_updated (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    quantity_delta:long,
+    reason:string,
+    payload_source:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table stockout_detected (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    last_known_quantity:long,
+    detection_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table reorder_triggered (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    current_quantity:long,
+    reorder_quantity:long,
+    reorder_point:long,
+    priority:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// CUSTOMER EVENTS
+
+.create-merge table customer_entered (
+    store_id:long,
+    sensor_id:string,
+    zone:string,
+    customer_count:long,
+    dwell_time:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table customer_zone_changed (
+    store_id:long,
+    customer_ble_id:string,
+    from_zone:string,
+    to_zone:string,
+    timestamp:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table ble_ping_detected (
+    store_id:long,
+    beacon_id:string,
+    customer_ble_id:string,
+    rssi:long,
+    zone:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// OPERATIONAL EVENTS
+
+.create-merge table truck_arrived (
+    truck_id:string,
+    dc_id:long,
+    store_id:long,
+    shipment_id:string,
+    arrival_time:datetime,
+    estimated_unload_duration:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table truck_departed (
+    truck_id:string,
+    dc_id:long,
+    store_id:long,
+    shipment_id:string,
+    departure_time:datetime,
+    actual_unload_duration:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table store_opened (
+    store_id:long,
+    operation_time:datetime,
+    operation_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table store_closed (
+    store_id:long,
+    operation_time:datetime,
+    operation_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// MARKETING EVENTS
+
+.create-merge table ad_impression (
+    channel:string,
+    campaign_id:string,
+    creative_id:string,
+    customer_ad_id:string,
+    impression_id:string,
+    cost:real,
+    device_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table promotion_applied (
+    receipt_id:string,
+    promo_code:string,
+    discount_amount:real,
+    discount_cents:long,
+    discount_type:string,
+    product_count:long,
+    product_ids:dynamic,
+    store_id:long,
+    customer_id:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// OMNICHANNEL / ONLINE ORDERS
+
+.create-merge table online_order_created (
+    order_id:string,
+    customer_id:long,
+    fulfillment_mode:string,
+    node_type:string,
+    node_id:long,
+    item_count:long,
+    subtotal:real,
+    tax:real,
+    total:real,
+    tender_type:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table online_order_picked (
+    order_id:string,
+    node_type:string,
+    node_id:long,
+    fulfillment_mode:string,
+    picked_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table online_order_shipped (
+    order_id:string,
+    node_type:string,
+    node_id:long,
+    fulfillment_mode:string,
+    shipped_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// ============================================================================
+// RETENTION POLICIES
+// ============================================================================
+// Retention policies vary by data category based on business requirements:
+//
+// - TRANSACTIONS (30d): Financial/audit data for compliance and reconciliation
+// - INVENTORY (14d): Operational data with moderate retention needs
+// - OPERATIONS (14d): Logistics and store operations data
+// - CUSTOMER LOCATION (7d): PII-adjacent data with shorter retention for privacy
+// - MARKETING (14d): Campaign and promotion data
+// - OMNICHANNEL (30d): Online order data for fulfillment tracking
+// ============================================================================
+
+// --- TRANSACTIONS: 30 days for compliance/audit ---
+.alter-merge table receipt_created policy retention softdelete = 30d
+
+.alter-merge table receipt_line_added policy retention softdelete = 30d
+
+.alter-merge table payment_processed policy retention softdelete = 30d
+
+// --- INVENTORY: 14 days for operational visibility ---
+.alter-merge table inventory_updated policy retention softdelete = 14d
+
+.alter-merge table stockout_detected policy retention softdelete = 14d
+
+.alter-merge table reorder_triggered policy retention softdelete = 14d
+
+// --- CUSTOMER TRAFFIC: 7 days for privacy (PII-adjacent) ---
+.alter-merge table customer_entered policy retention softdelete = 7d
+
+.alter-merge table customer_zone_changed policy retention softdelete = 7d
+
+.alter-merge table ble_ping_detected policy retention softdelete = 7d
+
+// --- OPERATIONS: 14 days for logistics tracking ---
+.alter-merge table truck_arrived policy retention softdelete = 14d
+
+.alter-merge table truck_departed policy retention softdelete = 14d
+
+.alter-merge table store_opened policy retention softdelete = 14d
+
+.alter-merge table store_closed policy retention softdelete = 14d
+
+// --- MARKETING: 14 days for campaign analytics ---
+.alter-merge table ad_impression policy retention softdelete = 14d
+
+.alter-merge table promotion_applied policy retention softdelete = 14d
+
+// --- OMNICHANNEL: 30 days for fulfillment tracking ---
+.alter-merge table online_order_created policy retention softdelete = 30d
+
+.alter-merge table online_order_picked policy retention softdelete = 30d
+
+.alter-merge table online_order_shipped policy retention softdelete = 30d
+
+// ============================================================================
+// STREAMING INGESTION POLICIES
+// ============================================================================
+// Enable streaming ingestion on all event tables to allow real-time data flow
+// from Eventstream. Without this, data would only arrive via batch ingestion.
+// ============================================================================
+
+// --- TRANSACTION EVENTS ---
+.alter table receipt_created policy streamingingestion enable
+
+.alter table receipt_line_added policy streamingingestion enable
+
+.alter table payment_processed policy streamingingestion enable
+
+// --- INVENTORY EVENTS ---
+.alter table inventory_updated policy streamingingestion enable
+
+.alter table stockout_detected policy streamingingestion enable
+
+.alter table reorder_triggered policy streamingingestion enable
+
+// --- CUSTOMER EVENTS ---
+.alter table customer_entered policy streamingingestion enable
+
+.alter table customer_zone_changed policy streamingingestion enable
+
+.alter table ble_ping_detected policy streamingingestion enable
+
+// --- OPERATIONAL EVENTS ---
+.alter table truck_arrived policy streamingingestion enable
+
+.alter table truck_departed policy streamingingestion enable
+
+.alter table store_opened policy streamingingestion enable
+
+.alter table store_closed policy streamingingestion enable
+
+// --- MARKETING EVENTS ---
+.alter table ad_impression policy streamingingestion enable
+
+.alter table promotion_applied policy streamingingestion enable
+
+// --- OMNICHANNEL EVENTS ---
+.alter table online_order_created policy streamingingestion enable
+
+.alter table online_order_picked policy streamingingestion enable
+
+.alter table online_order_shipped policy streamingingestion enable
+
+// ============================================================================
+// INGESTION BATCHING POLICIES
+// ============================================================================
+// Configure batching behavior for optimal throughput vs. latency trade-off.
+//
+// Parameters:
+// - MaximumBatchingTimeSpan: Max time to wait before flushing (default: 5 min)
+// - MaximumNumberOfItems: Max events per batch (default: 1000)
+// - MaximumRawDataSizeMB: Max batch size in MB (default: 1024)
+//
+// High-volume tables use smaller batching windows for faster availability.
+// ============================================================================
+
+// --- HIGH-VOLUME TABLES: 30 second batching ---
+
+.alter table receipt_created policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table receipt_line_added policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table inventory_updated policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table customer_entered policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:00:30",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+// --- MEDIUM-VOLUME TABLES: 1 minute batching ---
+
+.alter table payment_processed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table stockout_detected policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table reorder_triggered policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table customer_zone_changed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table ble_ping_detected policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table ad_impression policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table promotion_applied policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+// --- LOW-VOLUME TABLES: 2 minute batching ---
+
+.alter table truck_arrived policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 100,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table truck_departed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 100,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table store_opened policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 10
+}
+```
+
+.alter table store_closed policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 10
+}
+```
+
+.alter table online_order_created policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 500,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table online_order_picked policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+.alter table online_order_shipped policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+// ============================================================================
+// POLICY VALIDATION QUERIES
+// ============================================================================
+// Run these queries to verify policies are configured correctly:
+//
+// -- Check retention policies:
+// .show table * policy retention
+// | project TableName, SoftDeletePeriod
+//
+// -- Check streaming ingestion status:
+// .show table * policy streamingingestion
+// | project TableName, IsEnabled
+//
+// -- Check ingestion batching settings:
+// .show table * policy ingestionbatching
+// | project TableName, MaximumBatchingTimeSpan, MaximumNumberOfItems
+//
+// -- Verify Eventstream connection is working:
+// receipt_created
+// | where ingest_timestamp > ago(5m)
+// | count
+// ============================================================================

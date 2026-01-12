@@ -119,7 +119,118 @@ Event types defined in `datagen/src/retail_datagen/streaming/schemas.py`.
 
 ## Deployment
 
-See `fabric/README.md` for deployment instructions. Requires:
+See [Deployment Guide](deployment.md) for deployment instructions. Requires:
 - Azure Event Hubs namespace
 - Microsoft Fabric workspace with Eventhouse and Lakehouse
+
+---
+
+## Bronze Layer Architecture
+
+The Bronze layer serves as the data ingestion layer in the Medallion architecture, bringing together batch historical data (ADLSv2 parquet) and real-time streaming data (Eventhouse) into the Lakehouse.
+
+### Schema Naming Convention
+
+| Schema | Layer | Purpose |
+|--------|-------|---------|
+| `cusn` | Bronze | Eventhouse event table shortcuts (Tables/) |
+| `ag` | Silver | Cleaned, deduplicated, typed Delta tables |
+| `au` | Gold | Pre-aggregated KPIs for dashboards |
+
+**Note:** ADLS parquet shortcuts are stored in `Files/` (not in a schema).
+
+### Shortcut Locations
+
+| Source | Location | Count |
+|--------|----------|-------|
+| ADLS Gen2 (parquet) | **Files/** | 24 shortcuts |
+| Eventhouse (streaming) | **Tables/cusn/** | 18 shortcuts |
+
+### Data Sources
+
+#### ADLSv2 Parquet (Batch Historical Data) → Files/
+- **Storage Account**: `stdretail`
+- **Container**: `supermarket`
+- **Format**: Parquet (monthly partitions for fact tables)
+- **Shortcuts**: 24 folders in Files/
+
+**Dimension Folders (6):**
+- `Files/dim_geographies`, `Files/dim_stores`, `Files/dim_distribution_centers`
+- `Files/dim_trucks`, `Files/dim_customers`, `Files/dim_products`
+
+**Fact Folders (18):**
+- `Files/fact_receipts`, `Files/fact_receipt_lines`, `Files/fact_store_inventory_txn`
+- `Files/fact_dc_inventory_txn`, `Files/fact_truck_moves`, `Files/fact_truck_inventory`
+- `Files/fact_foot_traffic`, `Files/fact_ble_pings`, `Files/fact_customer_zone_changes`
+- `Files/fact_marketing`, `Files/fact_online_order_headers`, `Files/fact_online_order_lines`
+- `Files/fact_payments`, `Files/fact_store_ops`, `Files/fact_stockouts`
+- `Files/fact_promotions`, `Files/fact_promo_lines`, `Files/fact_reorders`
+
+#### Eventhouse (Real-Time Streaming Data) → Tables/cusn/
+- **Database**: `retail_eventhouse`
+- **Format**: KQL tables (streaming events)
+- **Shortcuts**: 18 tables in cusn schema
+
+**Event Tables by Category:**
+- **Transaction (3):** `cusn.receipt_created`, `cusn.receipt_line_added`, `cusn.payment_processed`
+- **Inventory (3):** `cusn.inventory_updated`, `cusn.stockout_detected`, `cusn.reorder_triggered`
+- **Customer (3):** `cusn.customer_entered`, `cusn.customer_zone_changed`, `cusn.ble_ping_detected`
+- **Operational (4):** `cusn.truck_arrived`, `cusn.truck_departed`, `cusn.store_opened`, `cusn.store_closed`
+- **Marketing (2):** `cusn.ad_impression`, `cusn.promotion_applied`
+- **Omnichannel (3):** `cusn.online_order_created`, `cusn.online_order_picked`, `cusn.online_order_shipped`
+
+### Total Bronze Shortcuts: 42
+- **Files/ (ADLS parquet)**: 24 shortcuts (6 dims + 18 facts)
+- **Tables/cusn/ (Eventhouse)**: 18 shortcuts
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ADLSv2 Parquet (Historical)        Eventhouse (Real-Time)  │
+│ - 6 Dimension Folders              - 18 Event Tables        │
+│ - 18 Fact Folders                  - Streaming from APIs    │
+│ - Monthly partitions               - Live events            │
+└─────────────────┬───────────────────────────┬───────────────┘
+                  │                           │
+                  │ (shortcuts)               │ (shortcuts)
+                  ▼                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Bronze Layer                             │
+│  ┌─────────────────────┐    ┌─────────────────────────┐    │
+│  │ Files/              │    │ Tables/cusn/            │    │
+│  │ - 24 parquet folders│    │ - 18 event tables       │    │
+│  │ - Read via path     │    │ - Read via schema.table │    │
+│  └─────────────────────┘    └─────────────────────────┘    │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │ (read & transform)
+                  ┌───────────────▼───────────────┐
+                  │ Silver Layer (ag)             │
+                  │ - Combine batch+streaming     │
+                  │ - Validate & transform        │
+                  │ - Delta format                │
+                  └───────────────┬───────────────┘
+                                  │ (aggregate)
+                  ┌───────────────▼───────────────┐
+                  │ Gold Layer (au)               │
+                  │ - Pre-aggregated KPIs         │
+                  │ - Dashboard-ready             │
+                  └───────────────────────────────┘
+```
+
+### Data Access Patterns
+
+```python
+# ADLS parquet (via Files/)
+df = spark.read.parquet("Files/dim_stores")
+df = spark.read.parquet("Files/fact_receipts")
+
+# Eventhouse (via Tables/cusn/)
+df = spark.table("cusn.receipt_created")
+df = spark.sql("SELECT * FROM cusn.inventory_updated")
+```
+
+### Implementation
+
+The Bronze layer shortcuts are created via notebook: `fabric/lakehouse/01-create-bronze-shortcuts.ipynb`
 

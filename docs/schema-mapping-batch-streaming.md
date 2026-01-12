@@ -350,7 +350,7 @@ To add streaming support for additional fact tables:
 
 ## Related Documentation
 
-- [Bronze Layer Architecture](./bronze-layer-architecture.md)
+- [Architecture](./architecture.md)
 - [Field Mapping Reference](../datagen/src/retail_datagen/generators/fact_generators/field_mapping.py)
 - [KQL Event Schemas](../fabric/kql_database/02-create-tables.kql)
 - [Silver Transformation Notebook](../fabric/lakehouse/02-onelake-to-silver.ipynb)

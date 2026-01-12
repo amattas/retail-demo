@@ -1,7 +1,6 @@
 """Unit tests for tax_utils module."""
 
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
@@ -9,36 +8,30 @@ from retail_datagen.shared.tax_utils import TaxCalculator
 
 
 @pytest.fixture
-def tax_rates_path():
-    """Path to tax rates CSV."""
-    return Path("data/dictionaries/tax_rates.csv")
-
-
-@pytest.fixture
-def tax_calculator(tax_rates_path):
-    """Create TaxCalculator instance."""
-    return TaxCalculator(tax_rates_path)
+def tax_calculator():
+    """Create TaxCalculator instance using default TAX_RATES."""
+    return TaxCalculator()
 
 
 class TestTaxCalculatorInit:
     """Test TaxCalculator initialization."""
 
-    def test_init_loads_tax_rates(self, tax_rates_path):
+    def test_init_loads_tax_rates(self):
         """Test that TaxCalculator loads tax rates on init."""
-        calc = TaxCalculator(tax_rates_path)
+        calc = TaxCalculator()
         assert len(calc.rate_cache) > 0
         assert calc.default_rate == Decimal("0.07407")
 
-    def test_init_with_custom_default(self, tax_rates_path):
+    def test_init_with_custom_default(self):
         """Test initialization with custom default rate."""
         custom_default = Decimal("0.08")
-        calc = TaxCalculator(tax_rates_path, default_rate=custom_default)
+        calc = TaxCalculator(default_rate=custom_default)
         assert calc.default_rate == custom_default
 
-    def test_init_missing_file(self):
-        """Test that FileNotFoundError is raised for missing file."""
-        with pytest.raises(FileNotFoundError):
-            TaxCalculator("nonexistent/path/tax_rates.csv")
+    def test_init_empty_data(self):
+        """Test that ValueError is raised for empty data."""
+        with pytest.raises(ValueError):
+            TaxCalculator(tax_rates=[])
 
 
 class TestGetTaxRate:
@@ -74,7 +67,7 @@ class TestGetTaxRate:
         nyc_rate = tax_calculator.get_tax_rate("NY", city="New York City")
         assert nyc_rate == Decimal("0.0875")
 
-        # Brooklyn (different entry in CSV)
+        # Brooklyn (different entry in tax_rates)
         brooklyn_rate = tax_calculator.get_tax_rate("NY", city="Brooklyn")
         assert brooklyn_rate == Decimal("0.0875")
 
@@ -173,7 +166,7 @@ class TestGetAllRatesForState:
         ca_rates = tax_calculator.get_all_rates_for_state("CA")
 
         # Should have multiple cities
-        assert len(ca_rates) >= 7  # At least 7 CA cities in CSV
+        assert len(ca_rates) >= 7  # At least 7 CA cities in tax_rates
 
         # Check specific cities
         assert "Los Angeles" in ca_rates

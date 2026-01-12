@@ -279,6 +279,6 @@ assert df_combined.count() == df_batch.count() + df_stream_mapped.count()
 ## Related Documentation
 
 - [Schema Mapping: Batch ↔ Streaming](./schema-mapping-batch-streaming.md) - Detailed field mappings
-- [Bronze Layer Architecture](./bronze-layer-architecture.md) - Bronze shortcut design
-- [End-to-End Deployment](./end-to-end-deployment.md) - Complete deployment guide
+- [Architecture](./architecture.md) - System architecture including Bronze layer design
+- [Deployment Guide](./deployment.md) - Complete deployment guide
 - Notebook: `fabric/lakehouse/02-onelake-to-silver.ipynb` - Silver transformation logic

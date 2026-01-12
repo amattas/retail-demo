@@ -1,8 +1,8 @@
 """Tax rate utilities for proper tax calculation.
 
 This module provides tax rate lookup and calculation utilities for the retail
-data generator. It loads tax rates from the tax_rates.csv dictionary and
-provides hierarchical lookups (City > County > State).
+data generator. It loads tax rates from the Python dictionary in sourcedata
+and provides hierarchical lookups (City > County > State).
 
 Note: The current implementation in master_generator.py uses a simple
 (State, City) mapping. This module provides an enhanced, more flexible
@@ -11,9 +11,8 @@ interface that could be used for future improvements.
 
 import logging
 from decimal import Decimal
-from pathlib import Path
 
-import pandas as pd
+from retail_datagen.sourcedata.supercenter.tax_rates import TAX_RATES
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 class TaxCalculator:
     """Handles tax rate lookups and calculations.
 
-    This class loads tax rates from the CSV dictionary and provides
+    This class loads tax rates from the Python dictionary and provides
     methods for looking up rates based on geographic location and
     calculating tax amounts with proper decimal precision.
 
@@ -32,7 +31,6 @@ class TaxCalculator:
     4. Default fallback: Uses default_rate
 
     Attributes:
-        tax_rates: DataFrame containing all loaded tax rates
         rate_cache: Dictionary cache of (state, city) -> rate lookups
         county_cache: Dictionary cache of (state, county) -> average rate
         state_cache: Dictionary cache of state -> average rate
@@ -40,19 +38,20 @@ class TaxCalculator:
     """
 
     def __init__(
-        self, tax_rates_path: str | Path, default_rate: Decimal = Decimal("0.07407")
+        self,
+        tax_rates: list[dict] | None = None,
+        default_rate: Decimal = Decimal("0.07407"),
     ):
-        """Load tax rates from CSV.
+        """Load tax rates from Python dictionary.
 
         Args:
-            tax_rates_path: Path to tax_rates.csv file
+            tax_rates: List of tax rate dictionaries (defaults to TAX_RATES)
             default_rate: Default tax rate to use when location not found
 
         Raises:
-            FileNotFoundError: If tax_rates.csv doesn't exist
-            ValueError: If CSV has invalid data
+            ValueError: If tax_rates has invalid data
         """
-        self.tax_rates_path = Path(tax_rates_path)
+        self.tax_rates_data = tax_rates if tax_rates is not None else TAX_RATES
         self.default_rate = default_rate
         self.rate_cache: dict[tuple[str, str], Decimal] = {}
         self.county_cache: dict[tuple[str, str], Decimal] = {}
@@ -63,68 +62,39 @@ class TaxCalculator:
         logger.info(
             f"Loaded {len(self.rate_cache)} city rates, "
             f"{len(self.county_cache)} county rates, "
-            f"{len(self.state_cache)} state rates from {self.tax_rates_path}"
+            f"{len(self.state_cache)} state rates"
         )
 
     def _load_tax_rates(self) -> None:
-        """Load tax rates from CSV and build lookup cache.
+        """Load tax rates from Python dictionary and build lookup cache.
 
-        Expected CSV columns: StateCode, County, City, CombinedRate
+        Expected dict keys: StateCode, County, City, CombinedRate
 
         Raises:
-            FileNotFoundError: If CSV file doesn't exist
-            ValueError: If CSV has missing or invalid columns
+            ValueError: If data has missing or invalid columns
         """
-        if not self.tax_rates_path.exists():
-            # Try repo-relative fallback only for default relative path usage
-            path_str = str(self.tax_rates_path)
-            if "data/dictionaries" in path_str or "data\\dictionaries" in path_str:
-                try:
-                    repo_datagen = Path(__file__).resolve().parents[3]
-                    fallback = (
-                        repo_datagen
-                        / "data"
-                        / "dictionaries"
-                        / self.tax_rates_path.name
-                    )
-                    if fallback.exists():
-                        self.tax_rates_path = fallback
-                    else:
-                        raise FileNotFoundError(
-                            f"Tax rates file not found: {self.tax_rates_path} "
-                            f"(also tried {fallback})"
-                        )
-                except Exception:
-                    raise FileNotFoundError(
-                        f"Tax rates file not found: {self.tax_rates_path}"
-                    )
-            else:
-                raise FileNotFoundError(
-                    f"Tax rates file not found: {self.tax_rates_path}"
-                )
+        if not self.tax_rates_data:
+            raise ValueError("Tax rates data is empty")
 
         try:
-            # Load CSV with pandas for efficient parsing
-            self.tax_rates = pd.read_csv(self.tax_rates_path)
+            # Validate required keys in first record
+            required_keys = {"StateCode", "County", "City", "CombinedRate"}
+            if self.tax_rates_data:
+                first_record = self.tax_rates_data[0]
+                if not required_keys.issubset(first_record.keys()):
+                    missing = required_keys - set(first_record.keys())
+                    raise ValueError(f"Missing required keys in tax_rates: {missing}")
 
-            # Validate required columns
-            required_columns = {"StateCode", "County", "City", "CombinedRate"}
-            if not required_columns.issubset(self.tax_rates.columns):
-                missing = required_columns - set(self.tax_rates.columns)
-                raise ValueError(
-                    f"Missing required columns in tax_rates.csv: {missing}"
-                )
-
-            # Build (StateCode, City) -> CombinedRate cache (use itertuples for speed)
+            # Build (StateCode, City) -> CombinedRate cache
             # Also collect rates by county and state for fallback calculations
             county_rates: dict[tuple[str, str], list[Decimal]] = {}
             state_rates: dict[str, list[Decimal]] = {}
 
-            for row in self.tax_rates.itertuples(index=False):
-                state = str(getattr(row, "StateCode")).strip().upper()
-                county = str(getattr(row, "County")).strip()
-                city = str(getattr(row, "City")).strip()
-                rate = Decimal(str(getattr(row, "CombinedRate")))
+            for row in self.tax_rates_data:
+                state = str(row["StateCode"]).strip().upper()
+                county = str(row["County"]).strip()
+                city = str(row["City"]).strip()
+                rate = Decimal(str(row["CombinedRate"]))
 
                 # Validate rate is in valid range (0-15%)
                 if not (Decimal("0") <= rate <= Decimal("0.15")):
@@ -165,8 +135,6 @@ class TaxCalculator:
                 avg_rate = sum(rates) / len(rates)
                 self.state_cache[state_code] = avg_rate.quantize(precision)
 
-        except pd.errors.EmptyDataError:
-            raise ValueError(f"Tax rates file is empty: {self.tax_rates_path}")
         except Exception as e:
             raise ValueError(f"Error loading tax rates: {e}")
 
@@ -190,7 +158,7 @@ class TaxCalculator:
             Tax rate as Decimal (e.g., Decimal("0.0950") for 9.5%)
 
         Examples:
-            >>> calc = TaxCalculator("data/dictionaries/tax_rates.csv")
+            >>> calc = TaxCalculator()
             >>> calc.get_tax_rate("CA", city="Los Angeles")
             Decimal('0.0950')
             >>> calc.get_tax_rate("TX", city="Houston")
@@ -256,7 +224,7 @@ class TaxCalculator:
             Tax amount rounded to 2 decimal places
 
         Examples:
-            >>> calc = TaxCalculator("data/dictionaries/tax_rates.csv")
+            >>> calc = TaxCalculator()
             >>> calc.calculate_tax(Decimal("100.00"), Decimal("0.0950"))
             Decimal('9.50')
             >>> calc.calculate_tax(Decimal("17.99"), Decimal("0.0825"))
@@ -277,7 +245,7 @@ class TaxCalculator:
             Dictionary mapping city name to tax rate
 
         Examples:
-            >>> calc = TaxCalculator("data/dictionaries/tax_rates.csv")
+            >>> calc = TaxCalculator()
             >>> ca_rates = calc.get_all_rates_for_state("CA")
             >>> ca_rates["Los Angeles"]
             Decimal('0.0950')
