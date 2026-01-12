@@ -6,9 +6,11 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 
 | Schema | Layer | Purpose |
 |--------|-------|---------|
-| `cusn` | Bronze | Raw shortcuts to source data (ADLSv2 + Eventhouse) |
+| `cusn` | Bronze | Eventhouse event table shortcuts (Tables/) |
 | `ag` | Silver | Cleaned, deduplicated, typed Delta tables |
 | `au` | Gold | Pre-aggregated KPIs for dashboards |
+
+**Note:** ADLS parquet shortcuts are stored in `Files/` (not in a schema).
 
 ## Notebooks
 
