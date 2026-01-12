@@ -627,6 +627,8 @@ def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
     """
     _ensure_outbox_table(conn)
     # Select candidate id
+    # Note: Using simple outbox_id ordering for stability
+    # hash(outbox_id) was causing DuckDB internal errors
     row = conn.execute(
         "SELECT outbox_id FROM streaming_outbox "
         "WHERE status='pending' ORDER BY event_ts, outbox_id LIMIT 1"
@@ -635,24 +637,29 @@ def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
         return None
     oid = int(row[0])
     # Try to mark as processing with guard
-    updated = conn.execute(
+    conn.execute(
         "UPDATE streaming_outbox SET status='processing', "
         "last_attempt_ts=now(), attempts=attempts+1 "
         "WHERE outbox_id=? AND status='pending'",
         [oid],
-    ).rowcount
-    if updated != 1:
-        return None
-    # Fetch full row
+    )
+    # NOTE: DuckDB may return rowcount=-1 (unknown) even for successful UPDATEs
+    # Instead of checking rowcount, verify the UPDATE by fetching the row
+    # Fetch full row and verify it's in 'processing' status
     cur = conn.execute(
-        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id "
+        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id, status "
         "FROM streaming_outbox WHERE outbox_id=?",
         [oid],
     )
     r = cur.fetchone()
     if not r:
         return None
-    cols = [d[0] for d in (cur.description or [])]
+    # Check if the row is now in 'processing' status (index 6)
+    if r[6] != 'processing':
+        # Another connection got it first, try again
+        return None
+    # Return the row without status column
+    cols = [d[0] for d in (cur.description or []) if d[0] != 'status']
     return {cols[i]: r[i] for i in range(len(cols))}
 
 

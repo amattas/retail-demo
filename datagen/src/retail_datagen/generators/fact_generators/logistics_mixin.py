@@ -164,8 +164,8 @@ class LogisticsMixin(FactGeneratorBase):
                 if reorder_list:
                     # Generate reorder events for analytics
                     reorder_time = date.replace(
-                        hour=4, minute=0
-                    )  # Reorders triggered at 4 AM
+                        hour=23, minute=0
+                    )  # Reorders triggered at 11 PM
                     for product_id, reorder_qty in reorder_list:
                         # Get current inventory levels
                         current_qty = self.inventory_flow_sim.get_store_balance(

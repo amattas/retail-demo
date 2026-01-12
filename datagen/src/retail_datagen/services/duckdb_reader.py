@@ -168,6 +168,13 @@ def get_fact_table_date_range(
                 f"FROM {validated_table}"
             )
             cur = conn.execute(query)
+        elif table_name == "fact_store_ops":
+            # Use operation_time instead of event_ts
+            query = (
+                f"SELECT MIN(operation_time) AS min_ts, MAX(operation_time) AS max_ts "
+                f"FROM {validated_table}"
+            )
+            cur = conn.execute(query)
         else:
             query = (
                 f"SELECT MIN(event_ts) AS min_ts, MAX(event_ts) AS max_ts "

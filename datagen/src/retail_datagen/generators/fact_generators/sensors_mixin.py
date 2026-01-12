@@ -201,8 +201,11 @@ class SensorsMixin(FactGeneratorBase):
             ble_ids = np.where(known_mask, customer.BLEId, anon_ids)
             cust_ids = np.where(known_mask, customer.ID, None)
 
+            # Add seconds for more realistic timestamp distribution
+            seconds_offsets = self._np_rng.integers(0, 60, size=total)
             event_ts_list = [
-                transaction_time + timedelta(minutes=int(m)) for m in offsets
+                transaction_time + timedelta(minutes=int(m), seconds=int(s))
+                for m, s in zip(offsets, seconds_offsets)
             ]
 
             df = _pd.DataFrame(

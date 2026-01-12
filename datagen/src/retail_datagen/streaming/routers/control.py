@@ -131,76 +131,12 @@ async def start_streaming(
         )
 
     new_session_id = f"streaming_{uuid4().hex[:8]}"
+    reset_streaming_state()  # Reset stats BEFORE setting session
     set_session(new_session_id, datetime.now(UTC))
-    reset_streaming_state()
-
-    async def streaming_task():
-        """Background task for event streaming via EventStreamer."""
-        try:
-            update_task_progress(new_session_id, 0.0, "Initializing event streaming")
-
-            # Prefer DuckDB batch streaming
-            try:
-                duck_streamer = EventStreamer(
-                    config=config,
-                    azure_connection_string=config.realtime.azure_connection_string,
-                )
-                # Start DuckDB batch streaming
-                await duck_streamer.start(duration=timedelta(seconds=0))
-                # start() will internally choose DuckDB batch path first
-                stats = await duck_streamer.get_statistics()
-                update_task_progress(new_session_id, 1.0, "Batch streaming completed")
-                return {
-                    "events_sent": stats.get("events_sent_successfully", 0),
-                    "duration_minutes": request.duration_minutes,
-                    "event_types": request.event_types or AVAILABLE_EVENT_TYPES,
-                    "end_reason": "batch_completed",
-                    "mode": "duckdb_batch",
-                }
-            except Exception as db_error:
-                logger.warning(
-                    f"DuckDB batch streaming failed, falling back to real-time: "
-                    f"{db_error}"
-                )
-                # Fall through to real-time mode
-
-            # Fall back to real-time generation mode
-            if request.event_types:
-                event_streamer.set_allowed_event_types(request.event_types)
-            duration = (
-                timedelta(minutes=request.duration_minutes)
-                if request.duration_minutes
-                else None
-            )
-
-            # Start streaming; runs until duration or stop
-            await event_streamer.start(duration=duration)
-
-            update_task_progress(new_session_id, 1.0, "Streaming completed")
-
-            stats = await event_streamer.get_statistics()
-            return {
-                "events_sent": stats.get("events_sent_successfully", 0),
-                "duration_minutes": request.duration_minutes,
-                "event_types": request.event_types or AVAILABLE_EVENT_TYPES,
-                "end_reason": (
-                    "duration_completed" if request.duration_minutes else "manual_stop"
-                ),
-                "mode": "real_time",
-            }
-
-        except asyncio.CancelledError:
-            update_task_progress(new_session_id, 1.0, "Streaming cancelled")
-            return {"events_sent": 0, "end_reason": "cancelled"}
-        except Exception as e:
-            logger.error(f"Streaming task failed: {e}")
-            streaming_statistics["connection_failures"] += 1
-            raise
-        finally:
-            set_session(None, None)
 
     async def streaming_task_outbox():
         """Background task: drain outbox with pacing; generate next day when empty."""
+        logger.info(f"🚀 Streaming task starting for session {new_session_id}")
         try:
             update_task_progress(new_session_id, 0.0, "Initializing outbox streaming")
 
@@ -231,23 +167,32 @@ async def start_streaming(
             fact_gen = await get_fact_generator(config)
             state_mgr = GenerationStateManager()
             total_sent = 0
+            events_checked = 0
+
+            logger.info("Starting outbox streaming loop")
 
             while True:
                 if end_at and datetime.now(UTC) >= end_at:
                     break
 
                 item = outbox_lease_next(conn)
+                events_checked += 1
+
                 if item:
+                    logger.info(f"Got event from outbox: ID={item.get('outbox_id')}, Type={item.get('message_type')}, Time={item.get('event_ts')}")
+
                     try:
                         mtype = str(item.get("message_type") or "receipt_created")
                         try:
                             etype = EventType(mtype)
                         except Exception:
+                            logger.warning(f"Invalid event type '{mtype}', using RECEIPT_CREATED")
                             etype = EventType.RECEIPT_CREATED
                         payload = {}
                         try:
                             payload = _json.loads(item.get("payload") or "{}")
-                        except Exception:
+                        except Exception as parse_err:
+                            logger.warning(f"Failed to parse payload: {parse_err}")
                             payload = {"raw": str(item.get("payload"))}
                         stamp = item.get("event_ts") or datetime.now(UTC)
                         env = EventEnvelope(
@@ -261,17 +206,27 @@ async def start_streaming(
                             source="retail-datagen-outbox",
                             partition_key=str(item.get("partition_key") or ""),
                         )
+
+                        logger.info(f"Sending event {item.get('outbox_id')} to Azure Event Hub...")
                         ok = await client.send_event(env)
+
+                        if ok:
+                            logger.info(f"✅ Event {item.get('outbox_id')} sent successfully")
+                            outbox_ack_sent(conn, int(item["outbox_id"]))
+                            total_sent += 1
+
+                            # Log progress every 100 events
+                            if total_sent % 100 == 0:
+                                logger.info(f"Progress: {total_sent} events sent")
+                        else:
+                            logger.warning(f"❌ Event {item.get('outbox_id')} send failed, will retry")
+                            outbox_nack_retry(conn, int(item["outbox_id"]))
+
                         update_streaming_statistics(
                             {"event_type": etype.value}, success=ok
                         )
-                        if ok:
-                            outbox_ack_sent(conn, int(item["outbox_id"]))
-                            total_sent += 1
-                        else:
-                            outbox_nack_retry(conn, int(item["outbox_id"]))
                     except Exception as send_err:
-                        logger.error(f"Outbox send error: {send_err}")
+                        logger.error(f"Outbox send error for ID {item.get('outbox_id')}: {send_err}", exc_info=True)
                         try:
                             outbox_nack_retry(conn, int(item["outbox_id"]))
                         except Exception:
@@ -282,6 +237,10 @@ async def start_streaming(
                     jitter = interval * (jitter_pct * (2 * random.random() - 1))
                     await _asyncio.sleep(max(0.0, interval + jitter))
                     continue
+                else:
+                    # Log when we check and find empty outbox
+                    if events_checked % 10 == 1:  # Log every 10 checks
+                        logger.info(f"Outbox empty after checking {events_checked} times, {total_sent} events sent so far")
 
                 # Outbox is empty: generate the next day of data and continue
                 try:
@@ -296,35 +255,57 @@ async def start_streaming(
                         ).date()
                     start_dt = datetime.combine(next_day, datetime.min.time())
                     end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
+
+                    logger.info(f"Outbox empty - generating {start_dt.date().isoformat()}")
                     update_task_progress(
                         new_session_id,
                         0.05,
                         f"Generating {start_dt.date().isoformat()}",
                     )
+
                     await fact_gen.generate_historical_data(
                         start_dt, end_dt, publish_to_outbox=True
                     )
                     state_mgr.update_fact_generation(end_dt)
+
+                    # Commit and verify events were written to outbox
+                    conn.commit()
+                    pending_count = conn.execute(
+                        "SELECT COUNT(*) FROM streaming_outbox WHERE status='pending'"
+                    ).fetchone()[0]
+
+                    logger.info(f"Generated day {start_dt.date()} - {pending_count:,} events in outbox")
+
+                    if pending_count == 0:
+                        logger.warning(f"No events written to outbox for {start_dt.date()} - generation may have failed")
+                        await _asyncio.sleep(5.0)  # Wait before retrying
+                    else:
+                        # Give a brief pause before starting to drain
+                        await _asyncio.sleep(0.1)
+
                 except Exception as gen_err:
                     logger.error(f"Generation failed: {gen_err}")
                     await _asyncio.sleep(1.0)
 
             await client.disconnect()
+            logger.info(f"🏁 Streaming completed normally. Total events sent: {total_sent}")
             update_task_progress(new_session_id, 1.0, "Streaming completed")
+            set_session(None, None)
             return {
                 "events_sent": total_sent,
                 "end_reason": "completed",
                 "mode": "outbox",
             }
         except _asyncio.CancelledError:
+            logger.info(f"🛑 Streaming cancelled by user")
             update_task_progress(new_session_id, 1.0, "Streaming cancelled")
+            set_session(None, None)
             return {"events_sent": 0, "end_reason": "cancelled"}
         except Exception as e:
-            logger.error(f"Streaming task failed: {e}")
+            logger.error(f"💥 Streaming task failed with exception: {e}", exc_info=True)
             streaming_statistics["connection_failures"] += 1
-            raise
-        finally:
             set_session(None, None)
+            raise
 
     create_background_task(
         new_session_id,
@@ -390,6 +371,12 @@ async def get_streaming_status():
     session_id = get_session_id()
     start_time = get_start_time()
 
+    logger.info(
+        f"📡 Status check: session_id={session_id}, "
+        f"start_time={start_time}, "
+        f"events_sent={streaming_statistics['events_sent_successfully']}"
+    )
+
     is_streaming = session_id is not None
     status_enum = "stopped"
     uptime_seconds = 0.0
@@ -399,6 +386,8 @@ async def get_streaming_status():
 
         # Check actual task status
         task_status = get_task_status(session_id)
+        logger.info(f"📡 Task status for {session_id}: {task_status}")
+
         if task_status:
             status_map = {
                 "running": "running",
@@ -409,6 +398,12 @@ async def get_streaming_status():
             status_enum = status_map.get(task_status["status"], "stopped")
         else:
             status_enum = "error"
+            logger.warning(f"⚠️ No task status found for session {session_id}")
+    else:
+        if session_id is None:
+            logger.info("📡 Status: No active session (session_id is None)")
+        else:
+            logger.info("📡 Status: Session exists but no start_time")
 
     return StreamingStatusResponse(
         is_streaming=is_streaming,
