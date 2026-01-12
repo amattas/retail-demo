@@ -13,7 +13,8 @@ from typing import Any
 
 try:
     from azure.core.exceptions import AzureError
-    from azure.eventhub import EventData, EventHubProducerClient
+    from azure.eventhub import EventData
+    from azure.eventhub.aio import EventHubProducerClient
     from azure.eventhub.exceptions import EventHubError
 
     AZURE_AVAILABLE = True
@@ -519,11 +520,27 @@ class AzureEventHubClient:
                 if event.partition_key:
                     event_data.partition_key = event.partition_key
 
+                # Set application properties for Eventstream routing
+                # "Table" property is used by Fabric Eventstream to route to KQL tables
+                event_data.properties = {"Table": event.event_type.value}
+
                 event_data_batch.append(event_data)
 
             # Send batch to Event Hub
-            async with self._client:
-                await self._client.send_batch(event_data_batch)
+            # Create a batch and add events, then send
+            batch = await self._client.create_batch()
+            for event_data in event_data_batch:
+                try:
+                    batch.add(event_data)
+                except ValueError:
+                    # Batch is full, send it and create a new one
+                    await self._client.send_batch(batch)
+                    batch = await self._client.create_batch()
+                    batch.add(event_data)
+
+            # Send any remaining events
+            if len(batch) > 0:
+                await self._client.send_batch(batch)
 
             return True
 
@@ -801,15 +818,23 @@ class AzureEventHubClient:
                 # Get Event Hub metadata (proves connection works)
                 properties = await producer.get_eventhub_properties()
 
+                # Handle both dict and object response formats (SDK version differences)
+                if isinstance(properties, dict):
+                    partition_ids = properties.get("partition_ids", [])
+                    created_at = properties.get("created_at")
+                else:
+                    partition_ids = properties.partition_ids
+                    created_at = properties.created_at
+
                 # Add partition information to metadata
                 metadata.update(
                     {
                         "hub_name": hub_name,
-                        "partition_count": len(properties.partition_ids),
-                        "partition_ids": list(properties.partition_ids),
+                        "partition_count": len(partition_ids),
+                        "partition_ids": list(partition_ids),
                         "created_at": (
-                            properties.created_at.isoformat()
-                            if properties.created_at
+                            created_at.isoformat()
+                            if created_at
                             else None
                         ),
                     }
@@ -817,7 +842,7 @@ class AzureEventHubClient:
 
                 logger.info(
                     f"Successfully connected to Event Hub '{hub_name}' "
-                    f"with {len(properties.partition_ids)} partitions"
+                    f"with {len(partition_ids)} partitions"
                 )
 
                 return True, "Connection successful", metadata
