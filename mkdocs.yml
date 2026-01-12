@@ -50,8 +50,21 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - Deployment: deployment.md
+  - Setup Guide:
+    - Overview: setup/index.md
+    - Phase 1 - Data Generation: setup/01-data-generation.md
+    - Phase 2 - Bronze Layer: setup/02-bronze-layer.md
+    - Phase 3 - Silver Layer: setup/03-silver-layer.md
+    - Phase 4 - Gold Layer: setup/04-gold-layer.md
+    - Phase 5 - Pipelines: setup/05-pipelines.md
+    - Phase 6 - Streaming: setup/06-streaming.md
+    - Phase 7 - Dashboards: setup/07-dashboards.md
+    - Reference:
+      - Validation: setup/validation.md
+      - Troubleshooting: setup/troubleshooting.md
+      - Configuration: setup/configuration.md
+      - Capacity Planning: setup/capacity-planning.md
+      - Disaster Recovery: setup/disaster-recovery.md
   - Architecture:
     - Overview: architecture.md
     - Data Schema: data-schema.md
