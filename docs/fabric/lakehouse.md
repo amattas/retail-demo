@@ -21,6 +21,7 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 | `03-streaming-to-silver.ipynb` | Every 5 min | Eventhouse events → Silver (incremental) |
 | `04-streaming-to-gold.ipynb` | Every 15 min | Silver → Gold aggregations |
 | `05-maintain-delta-tables.ipynb` | Daily | OPTIMIZE and VACUUM routines |
+| `99-reset-lakehouse.ipynb` | Manual | Drop all Silver/Gold tables and databases |
 
 ## Execution Order
 
