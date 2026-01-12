@@ -524,6 +524,7 @@ print("Dashboard complete")
 
 ---
 
+<<<<<<< HEAD
 ---
 
 ## Quick Validation Queries (KQL)
@@ -572,6 +573,8 @@ receipt_created | extend lag_ms = datetime_diff('millisecond', ingest_timestamp,
 
 ---
 
+=======
+>>>>>>> origin/main
 ## Related Documentation
 
 - [Fabric Monitoring Hub](https://learn.microsoft.com/fabric/admin/monitoring-hub)
