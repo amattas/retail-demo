@@ -16,9 +16,9 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generatio
 
 ### Reference Files
 - Event schemas: `datagen/src/retail_datagen/streaming/schemas.py`
-- KQL tables: `fabric/kql_database/02-create-tables.kql`
-- Silver transforms: `fabric/lakehouse/02-onelake-to-silver.ipynb`
-- Gold aggregations: `fabric/lakehouse/03-silver-to-gold.ipynb`
+- KQL tables: `fabric/kql_database/01-create-tables.kql`
+- Silver transforms: `fabric/lakehouse/03-streaming-to-silver.ipynb`
+- Gold aggregations: `fabric/lakehouse/04-streaming-to-gold.ipynb`
 
 ## Quickstart
 

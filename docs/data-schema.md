@@ -76,8 +76,8 @@ Gold tables are pre-aggregated for dashboards.
 ### Assets
 
 - **DDL scripts**: `fabric/lakehouse/silver/ddl.sql`, `fabric/lakehouse/gold/ddl.sql`
-- **Notebooks**: `02-onelake-to-silver.ipynb`, `03-silver-to-gold.ipynb`
-- **Pipelines**: `pl_bronze_to_silver.template.json`, `pl_silver_to_gold.template.json`
+- **Notebooks**: `02-historical-data-load.ipynb`, `03-streaming-to-silver.ipynb`, `04-streaming-to-gold.ipynb`
+- **Pipelines**: See `docs/fabric/pipelines.md` for pipeline configuration
 
 ### Notes
 
