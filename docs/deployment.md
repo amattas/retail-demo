@@ -13,9 +13,11 @@ This document provides step-by-step instructions for deploying the complete Reta
 3. [Phase 2: Bronze Layer Setup](#phase-2-bronze-layer-setup)
 4. [Phase 3: Silver Layer Transformation](#phase-3-silver-layer-transformation)
 5. [Phase 4: Gold Layer Aggregation](#phase-4-gold-layer-aggregation)
-6. [Phase 5: User-Facing Artifacts](#phase-5-user-facing-artifacts)
-7. [Validation & Testing](#validation--testing)
-8. [Troubleshooting](#troubleshooting)
+6. [Phase 5: Pipeline Setup](#phase-5-pipeline-setup)
+7. [Phase 6: Streaming Setup](#phase-6-streaming-setup)
+8. [Phase 7: User-Facing Artifacts](#phase-7-user-facing-artifacts)
+9. [Validation & Testing](#validation--testing)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -153,11 +155,12 @@ The Bronze layer creates shortcuts to both batch historical data (ADLSv2) and st
    - Navigate to your workspace
    - New → Lakehouse
    - Name: `retail_lakehouse`
+   - ⚠️ **Important**: Ensure the **Lakehouse Schemas** checkbox is enabled during creation
 
-2. **Create Eventhouse KQL Database**:
+2. **Create Eventhouse**:
    - New → Eventhouse
    - Name: `retail_eventhouse`
-   - Create KQL Database: `retail_eventhouse`
+   - ⚠️ **Note**: Creating an Eventhouse automatically creates a KQL Database with the same name (`retail_eventhouse`). Do not create a separate KQL Database.
 
 ### Step 2.2: Set Up KQL Event Tables
 
@@ -165,13 +168,18 @@ The Bronze layer creates shortcuts to both batch historical data (ADLSv2) and st
 
 ```bash
 # From retail-demo/fabric/kql_database/
-# 1. Create event tables
-02-create-tables.kql
 
-# 2. Add ingestion mappings
-# For each JSON file in ingestion_mappings/*.json:
-.create-or-alter table receipt_created ingestion json mapping 'mapping-json' '<paste JSON contents>'
-# Repeat for all 18 event tables
+# 1. Create event tables (18 streaming tables)
+01-create-tables.kql
+
+# 2. Create ingestion mappings (JSON mappings for each table)
+02-create-ingestion-mappings.kql
+
+# 3. Create reusable functions
+03-create-functions.kql
+
+# 4. Create materialized views for pre-aggregated KPIs
+04-create-materialized-views.kql
 ```
 
 **Tables Created**: 18 streaming event tables
@@ -179,45 +187,16 @@ The Bronze layer creates shortcuts to both batch historical data (ADLSv2) and st
 - `inventory_updated`, `stockout_detected`, `reorder_triggered`
 - _(... all 18 event types)_
 
-### Step 2.3: Configure Eventstream
+### Step 2.3: Enable OneLake Availability for Eventhouse
 
-**Create Eventstream for real-time ingestion**:
+Before creating shortcuts, enable OneLake availability for the Eventhouse database:
 
-1. New → Eventstream
-   - Name: `retail_events_stream`
+1. **In Eventhouse** → Select `retail_eventhouse` database
+2. Open **Database details** panel
+3. Enable **OneLake availability** toggle
+4. Wait for the setting to propagate (may take a few minutes)
 
-2. **Add Source**: Azure Event Hubs
-   - Connection: Your Event Hubs namespace
-   - Hub: `retail-events`
-   - Consumer Group: `$Default`
-
-3. **Add Destinations** (2 destinations):
-
-   **Destination 1: KQL Database**
-   - Target: `retail_eventhouse` (from Step 2.1)
-   - Input data format: JSON
-   - Routing: Route by `event_type` field
-   - Auto-create tables: ✅ Enabled
-   - Ingestion mapping: Use mappings from Step 2.2
-
-   **Destination 2: Lakehouse Files** (optional, for raw event backup)
-   - Target: `retail_lakehouse`
-   - Folder: `/Files/bronze/raw_events/`
-   - Partitioning: By `event_type` and `date` (from `ingest_timestamp`)
-
-4. **Start Eventstream**
-
-**✅ Verification**: Send test event via data generator
-```bash
-curl -X POST http://localhost:8000/api/stream/start \
-  -H "Content-Type: application/json" \
-  -d '{"duration_seconds": 60, "burst": 10}'
-```
-
-Check KQL Database:
-```kql
-receipt_created | take 10
-```
+This allows the Lakehouse to create shortcuts to Eventhouse tables.
 
 ### Step 2.4: Create Bronze Layer Shortcuts
 
@@ -225,7 +204,7 @@ receipt_created | take 10
 
 1. **Upload Notebook**:
    - In Lakehouse → Notebooks
-   - Import: `fabric/lakehouse/00-create-bronze-shortcuts.ipynb`
+   - Import: `fabric/lakehouse/01-create-bronze-shortcuts.ipynb`
 
 2. **Configure Environment Variables**:
    - In Fabric workspace settings or notebook parameters:
@@ -239,9 +218,8 @@ receipt_created | take 10
    ```
 
 3. **Run Notebook**:
-   - Creates `cusn` schema
-   - Creates 24 ADLSv2 parquet shortcuts
-   - Provides instructions for 18 Eventhouse shortcuts
+   - Creates 24 ADLSv2 parquet shortcuts in `Files/`
+   - Provides instructions for 18 Eventhouse shortcuts in `Tables/cusn/`
 
 4. **Create Eventhouse Shortcuts Manually**:
    - Eventhouse shortcuts cannot be created programmatically via Spark
@@ -250,6 +228,11 @@ receipt_created | take 10
      2. Source: Eventhouse
      3. Connection: Your Eventhouse URI
      4. For each of 18 event tables, create shortcut to `cusn` schema
+
+⚠️ **Important Notes**:
+- **Leave ADLS shortcuts as Parquet** - Do not convert to Delta format. The Silver and Gold layers handle Delta conversion automatically.
+- ADLS parquet shortcuts go in `Files/` (not Tables/)
+- Eventhouse shortcuts go in `Tables/cusn/`
 
 **✅ Verification**:
 ```sql
@@ -277,65 +260,35 @@ SELECT * FROM cusn.receipt_created LIMIT 10;
 
 The Silver layer combines batch historical data with streaming real-time data into validated Delta tables.
 
-### Step 3.1: Upload Silver Transformation Notebook
+### Step 3.1: Upload Lakehouse Notebooks
 
-1. **Upload Notebook**:
-   - In Lakehouse → Notebooks
-   - Import: `fabric/lakehouse/02-onelake-to-silver.ipynb`
+Upload the following notebooks to your Lakehouse:
 
-2. **Configure Environment Variables**:
-   ```python
-   SILVER_DB = "ag"
-   BRONZE_SCHEMA = "cusn"
-   FAIL_ON_SCHEMA_MISMATCH = "true"  # Production mode
-   ```
+1. **In Lakehouse → Notebooks → Import**:
+   - `fabric/lakehouse/01-create-bronze-shortcuts.ipynb`
+   - `fabric/lakehouse/02-historical-data-load.ipynb`
+   - `fabric/lakehouse/03-streaming-to-silver.ipynb`
+   - `fabric/lakehouse/04-streaming-to-gold.ipynb`
+   - `fabric/lakehouse/05-maintain-delta-tables.ipynb`
+   - `fabric/lakehouse/99-reset-lakehouse.ipynb` (optional, for testing)
 
-### Step 3.2: Run Silver Transformation
+### Step 3.2: Run Historical Data Load
 
-**Run the notebook** - it will:
-1. ✅ Load 6 dimension tables from Bronze (batch only)
-2. ✅ Load 18 fact tables from Bronze (batch + streaming combined)
-3. ✅ Validate schemas before UNION operations
-4. ✅ Write to `ag` schema as Delta tables
+**Run `02-historical-data-load.ipynb`** - it will:
+1. ✅ Load 6 dimension tables from Files/ parquet to Silver (ag)
+2. ✅ Load 18 fact tables from Files/ parquet to Silver (ag)
+3. ✅ Create Gold aggregation tables in (au)
+4. ✅ Handle schema conflicts in parquet files automatically
 
 **Processing Logic**:
-- **Dimensions**: Direct copy from batch parquet
+- **Dimensions**: Direct copy from Files/ parquet
 - **Facts**:
-  - Read batch parquet (`cusn.fact_receipts`)
-  - Read streaming events (`cusn.receipt_created`)
-  - Map streaming fields to batch schema
-  - Validate column compatibility
-  - UNION ALL (no deduplication - data generator ensures no overlap)
-  - Write to Delta (`ag.fact_receipts`)
+  - Read parquet files from Files/
+  - Handle schema conflicts (e.g., Source column type variations)
+  - Write to Delta tables in Silver (ag)
+- **Gold**: Aggregate Silver tables into pre-computed KPIs in Gold (au)
 
 **⏱️ Time Estimate**: 10-30 minutes (depends on data volume)
-
-### Step 3.3: Create Bronze → Silver Pipeline
-
-**Automate Silver transformation with scheduled pipeline**:
-
-1. **Create Pipeline**:
-   - New → Data pipeline
-   - Name: `pl_bronze_to_silver`
-
-2. **Add Notebook Activity**:
-   - Activity: Notebook
-   - Notebook: `02-onelake-to-silver` (from Step 3.1)
-   - Parameters:
-     ```json
-     {
-       "SILVER_DB": "ag",
-       "BRONZE_SCHEMA": "cusn",
-       "FAIL_ON_SCHEMA_MISMATCH": "true"
-     }
-     ```
-
-3. **Set Schedule**:
-   - Trigger: Scheduled
-   - Recurrence: Every 5 minutes
-   - Start time: Current UTC time
-
-4. **Save and Run**
 
 **✅ Verification**:
 ```sql
@@ -368,21 +321,15 @@ DESCRIBE TABLE ag.fact_receipt_lines;
 
 The Gold layer creates pre-aggregated KPI tables for fast dashboard queries.
 
-### Step 4.1: Upload Gold Aggregation Notebook
+### Step 4.1: Verify Gold Tables
 
-1. **Upload Notebook**:
-   - In Lakehouse → Notebooks
-   - Import: `fabric/lakehouse/03-silver-to-gold.ipynb`
+The Gold layer tables are created automatically by `02-historical-data-load.ipynb` (run in Phase 3).
 
-2. **Configure Environment Variables**:
-   ```python
-   SILVER_DB = "ag"
-   GOLD_DB = "au"
-   ```
+For ongoing streaming data, the Gold layer is updated by `04-streaming-to-gold.ipynb` which runs via pipeline (Phase 5).
 
-### Step 4.2: Run Gold Aggregation
+### Step 4.2: Gold Aggregation Tables
 
-**Run the notebook** - it creates 17+ aggregated tables:
+**Gold tables created** (9 aggregated tables):
 
 | Gold Table | Granularity | Source | Description |
 |------------|-------------|--------|-------------|
@@ -397,28 +344,6 @@ The Gold layer creates pre-aggregated KPI tables for fast dashboard queries.
 | _(... more KPI tables)_ | | | |
 
 **⏱️ Time Estimate**: 5-15 minutes
-
-### Step 4.3: Create Silver → Gold Pipeline
-
-1. **Create Pipeline**:
-   - New → Data pipeline
-   - Name: `pl_silver_to_gold`
-
-2. **Add Notebook Activity**:
-   - Activity: Notebook
-   - Notebook: `03-silver-to-gold`
-   - Parameters:
-     ```json
-     {
-       "SILVER_DB": "ag",
-       "GOLD_DB": "au"
-     }
-     ```
-
-3. **Set Schedule**:
-   - Trigger: Scheduled
-   - Recurrence: Every 15 minutes
-   - Start time: Current UTC time
 
 **✅ Verification**:
 ```sql
@@ -445,14 +370,171 @@ LIMIT 7;
 - **Schema**: `au`
 - **Tables**: 17+ aggregated KPI tables
 - **Format**: Delta Lake
-- **Refresh**: Every 15 minutes
 - **Purpose**: Fast dashboard queries
 
 ---
 
-## Phase 5: User-Facing Artifacts
+## Phase 5: Pipeline Setup
 
-### Step 5.1: Create Semantic Model
+Automate the data transformation pipelines for continuous processing.
+
+### Step 5.1: Create Historical Data Load Pipeline
+
+This pipeline loads initial historical data from Bronze to Silver and Gold.
+
+1. **Create Pipeline**:
+   - New → Data pipeline
+   - Name: `pl_historical_load`
+
+2. **Add Notebook Activity**:
+   - Activity: Notebook
+   - Notebook: `02-historical-data-load`
+   - Parameters:
+     ```json
+     {
+       "SILVER_DB": "ag",
+       "GOLD_DB": "au"
+     }
+     ```
+
+3. **Run Once**: Execute manually for initial data load
+
+### Step 7.2: Create Streaming to Silver Pipeline
+
+This pipeline incrementally processes Eventhouse events to Silver.
+
+1. **Create Pipeline**:
+   - New → Data pipeline
+   - Name: `pl_streaming_silver`
+
+2. **Add Notebook Activity**:
+   - Activity: Notebook
+   - Notebook: `03-streaming-to-silver`
+   - Parameters:
+     ```json
+     {
+       "SILVER_DB": "ag",
+       "BRONZE_SCHEMA": "cusn"
+     }
+     ```
+
+3. **Set Schedule**:
+   - Trigger: Scheduled
+   - Recurrence: Every 5 minutes
+   - Start time: Current UTC time
+
+### Step 7.3: Create Streaming to Gold Pipeline
+
+This pipeline aggregates Silver data to Gold.
+
+1. **Create Pipeline**:
+   - New → Data pipeline
+   - Name: `pl_streaming_gold`
+
+2. **Add Notebook Activity**:
+   - Activity: Notebook
+   - Notebook: `04-streaming-to-gold`
+   - Parameters:
+     ```json
+     {
+       "SILVER_DB": "ag",
+       "GOLD_DB": "au"
+     }
+     ```
+
+3. **Set Schedule**:
+   - Trigger: Scheduled
+   - Recurrence: Every 15 minutes
+   - Start time: Current UTC time
+
+### Step 7.4: Create Maintenance Pipeline
+
+This pipeline runs daily Delta table maintenance (OPTIMIZE, VACUUM).
+
+1. **Create Pipeline**:
+   - New → Data pipeline
+   - Name: `pl_maintenance`
+
+2. **Add Notebook Activity**:
+   - Activity: Notebook
+   - Notebook: `05-maintain-delta-tables`
+   - Parameters:
+     ```json
+     {
+       "SILVER_DB": "ag",
+       "GOLD_DB": "au"
+     }
+     ```
+
+3. **Set Schedule**:
+   - Trigger: Scheduled
+   - Recurrence: Daily at 3:00 AM UTC
+   - Start time: Current UTC time
+
+**Pipeline Configuration Notes**:
+- All pipelines: 3 retries, 30-second intervals, 1-hour timeout
+- Monitor pipeline runs via Fabric Portal → Data Factory → Pipelines → View runs
+
+---
+
+## Phase 6: Streaming Setup
+
+Configure Eventstream for real-time event ingestion from Event Hubs.
+
+### Step 6.1: Create Eventstream
+
+**Create Eventstream for real-time ingestion**:
+
+1. New → Eventstream
+   - Name: `retail_events_stream`
+
+2. **Add Source**: Azure Event Hubs
+   - Connection: Your Event Hubs namespace
+   - Hub: `retail-events`
+   - Consumer Group: `$Default`
+
+3. **Add Destinations** (2 destinations):
+
+   **Destination 1: KQL Database**
+   - Target: `retail_eventhouse` (from Step 2.1)
+   - Input data format: JSON
+   - Routing: Route by `event_type` field
+   - Auto-create tables: ✅ Enabled
+   - Ingestion mapping: Use mappings from Step 2.2
+
+   **Destination 2: Lakehouse Files** (optional, for raw event backup)
+   - Target: `retail_lakehouse`
+   - Folder: `/Files/bronze/raw_events/`
+   - Partitioning: By `event_type` and `date` (from `ingest_timestamp`)
+
+4. **Start Eventstream**
+
+### Step 6.2: Start Data Generator Streaming
+
+**Send test events via data generator**:
+
+```bash
+curl -X POST http://localhost:8000/api/stream/start \
+  -H "Content-Type: application/json" \
+  -d '{"duration_seconds": 300, "burst": 100}'
+```
+
+**✅ Verification**:
+
+Check KQL Database:
+```kql
+receipt_created | take 10
+```
+
+Check pipeline execution:
+- Verify `pl_streaming_silver` runs successfully after 5 minutes
+- Verify `pl_streaming_gold` runs successfully after 15 minutes
+
+---
+
+## Phase 7: User-Facing Artifacts
+
+### Step 7.1: Create Semantic Model
 
 **Power BI Semantic Model** provides unified view of Gold layer + KQL Database.
 
@@ -481,7 +563,7 @@ LIMIT 7;
 
 4. **Publish Model**
 
-### Step 5.2: Create Real-Time Dashboard
+### Step 7.2: Create Real-Time Dashboard
 
 **KQL-based dashboard** for operational metrics (last 24 hours).
 
@@ -509,13 +591,13 @@ LIMIT 7;
 
 **✅ Verification**: Dashboard should show live data updating every 30 seconds
 
-### Step 5.3: Create Power BI Report
+### Step 7.3: Create Power BI Report
 
 **Historical analytics report** using Semantic Model.
 
 1. **Create Report**:
    - New → Power BI report
-   - Connect to: Semantic model (from Step 5.1)
+   - Connect to: Semantic model (from Step 7.1)
 
 2. **Build Visualizations**:
    - Use Gold layer tables from `au` schema
@@ -528,7 +610,7 @@ LIMIT 7;
 
 3. **Publish Report**
 
-### Step 5.4: Configure Alerts & Rules
+### Step 7.4: Configure Alerts & Rules
 
 **Real-time alerts** for business events (optional).
 
