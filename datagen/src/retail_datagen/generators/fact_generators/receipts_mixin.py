@@ -106,8 +106,8 @@ class ReceiptsMixin(FactGeneratorBase):
                 except Exception as e:
                     logger.debug(f"Failed to apply holiday overlay to basket: {e}")
 
-                # Randomize transaction time within the hour to spread events
-                # Add random seconds (0-3599) and microseconds for realistic distribution
+                # Randomize transaction time within the hour
+                # Add random seconds (0-3599) and microseconds
                 random_seconds = self._rng.randint(0, 3599)
                 random_microseconds = self._rng.randint(0, 999999)
                 transaction_time = hour_datetime + timedelta(

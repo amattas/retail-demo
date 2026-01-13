@@ -647,8 +647,8 @@ def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
     # Instead of checking rowcount, verify the UPDATE by fetching the row
     # Fetch full row and verify it's in 'processing' status
     cur = conn.execute(
-        "SELECT outbox_id, event_ts, message_type, payload, partition_key, trace_id, status "
-        "FROM streaming_outbox WHERE outbox_id=?",
+        "SELECT outbox_id, event_ts, message_type, payload, partition_key, "
+        "trace_id, status FROM streaming_outbox WHERE outbox_id=?",
         [oid],
     )
     r = cur.fetchone()

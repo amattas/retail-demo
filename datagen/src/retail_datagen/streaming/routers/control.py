@@ -4,7 +4,6 @@ Streaming control endpoints (start, stop, pause, resume, status).
 This module handles the core streaming lifecycle operations.
 """
 
-import asyncio
 import asyncio as _asyncio
 import json as _json
 import logging
@@ -179,14 +178,21 @@ async def start_streaming(
                 events_checked += 1
 
                 if item:
-                    logger.info(f"Got event from outbox: ID={item.get('outbox_id')}, Type={item.get('message_type')}, Time={item.get('event_ts')}")
+                    logger.info(
+                        f"Got event from outbox: ID={item.get('outbox_id')}, "
+                        f"Type={item.get('message_type')}, "
+                        f"Time={item.get('event_ts')}"
+                    )
 
                     try:
                         mtype = str(item.get("message_type") or "receipt_created")
                         try:
                             etype = EventType(mtype)
                         except Exception:
-                            logger.warning(f"Invalid event type '{mtype}', using RECEIPT_CREATED")
+                            logger.warning(
+                                f"Invalid event type '{mtype}', "
+                                f"using RECEIPT_CREATED"
+                            )
                             etype = EventType.RECEIPT_CREATED
                         payload = {}
                         try:
@@ -207,11 +213,17 @@ async def start_streaming(
                             partition_key=str(item.get("partition_key") or ""),
                         )
 
-                        logger.info(f"Sending event {item.get('outbox_id')} to Azure Event Hub...")
+                        logger.info(
+                            f"Sending event {item.get('outbox_id')} "
+                            f"to Azure Event Hub..."
+                        )
                         ok = await client.send_event(env)
 
                         if ok:
-                            logger.info(f"✅ Event {item.get('outbox_id')} sent successfully")
+                            logger.info(
+                                f"✅ Event {item.get('outbox_id')} "
+                                f"sent successfully"
+                            )
                             outbox_ack_sent(conn, int(item["outbox_id"]))
                             total_sent += 1
 
@@ -219,14 +231,21 @@ async def start_streaming(
                             if total_sent % 100 == 0:
                                 logger.info(f"Progress: {total_sent} events sent")
                         else:
-                            logger.warning(f"❌ Event {item.get('outbox_id')} send failed, will retry")
+                            logger.warning(
+                                f"❌ Event {item.get('outbox_id')} "
+                                f"send failed, will retry"
+                            )
                             outbox_nack_retry(conn, int(item["outbox_id"]))
 
                         update_streaming_statistics(
                             {"event_type": etype.value}, success=ok
                         )
                     except Exception as send_err:
-                        logger.error(f"Outbox send error for ID {item.get('outbox_id')}: {send_err}", exc_info=True)
+                        logger.error(
+                            f"Outbox send error for ID {item.get('outbox_id')}: "
+                            f"{send_err}",
+                            exc_info=True,
+                        )
                         try:
                             outbox_nack_retry(conn, int(item["outbox_id"]))
                         except Exception:
@@ -240,7 +259,10 @@ async def start_streaming(
                 else:
                     # Log when we check and find empty outbox
                     if events_checked % 10 == 1:  # Log every 10 checks
-                        logger.info(f"Outbox empty after checking {events_checked} times, {total_sent} events sent so far")
+                        logger.info(
+                            f"Outbox empty after checking {events_checked} "
+                            f"times, {total_sent} events sent so far"
+                        )
 
                 # Outbox is empty: generate the next day of data and continue
                 try:
@@ -256,7 +278,9 @@ async def start_streaming(
                     start_dt = datetime.combine(next_day, datetime.min.time())
                     end_dt = start_dt + timedelta(days=1) - timedelta(seconds=1)
 
-                    logger.info(f"Outbox empty - generating {start_dt.date().isoformat()}")
+                    logger.info(
+                        f"Outbox empty - generating {start_dt.date().isoformat()}"
+                    )
                     update_task_progress(
                         new_session_id,
                         0.05,
@@ -274,10 +298,16 @@ async def start_streaming(
                         "SELECT COUNT(*) FROM streaming_outbox WHERE status='pending'"
                     ).fetchone()[0]
 
-                    logger.info(f"Generated day {start_dt.date()} - {pending_count:,} events in outbox")
+                    logger.info(
+                        f"Generated day {start_dt.date()} - "
+                        f"{pending_count:,} events in outbox"
+                    )
 
                     if pending_count == 0:
-                        logger.warning(f"No events written to outbox for {start_dt.date()} - generation may have failed")
+                        logger.warning(
+                            f"No events written to outbox for {start_dt.date()} - "
+                            f"generation may have failed"
+                        )
                         await _asyncio.sleep(5.0)  # Wait before retrying
                     else:
                         # Give a brief pause before starting to drain
@@ -288,7 +318,10 @@ async def start_streaming(
                     await _asyncio.sleep(1.0)
 
             await client.disconnect()
-            logger.info(f"🏁 Streaming completed normally. Total events sent: {total_sent}")
+            logger.info(
+                f"🏁 Streaming completed normally. "
+                f"Total events sent: {total_sent}"
+            )
             update_task_progress(new_session_id, 1.0, "Streaming completed")
             set_session(None, None)
             return {
@@ -297,7 +330,7 @@ async def start_streaming(
                 "mode": "outbox",
             }
         except _asyncio.CancelledError:
-            logger.info(f"🛑 Streaming cancelled by user")
+            logger.info("🛑 Streaming cancelled by user")
             update_task_progress(new_session_id, 1.0, "Streaming cancelled")
             set_session(None, None)
             return {"events_sent": 0, "end_reason": "cancelled"}

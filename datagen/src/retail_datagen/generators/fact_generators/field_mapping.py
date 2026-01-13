@@ -155,7 +155,9 @@ class FieldMappingMixin(FactGeneratorBase):
                 # departure_time
                 payload["departure_time"] = get_field("departure_time")
                 # actual_unload_duration
-                payload["actual_unload_duration"] = get_field("actual_unload_duration", 3600)
+                payload["actual_unload_duration"] = get_field(
+                    "actual_unload_duration", 3600
+                )
 
         elif table_name == "online_orders":
             # online_order_created event
@@ -200,9 +202,15 @@ class FieldMappingMixin(FactGeneratorBase):
             payload["customer_id"] = get_field("customer_id")
             # receipt_id_ext -> receipt_id
             payload["receipt_id"] = get_field("receipt_id_ext")
-            # Map to expected field names - try Subtotal (capitalized) or subtotal_amount
-            subtotal = get_field("subtotal_amount") or get_field("subtotal") or get_field("Subtotal")
-            payload["subtotal"] = subtotal if subtotal is not None else get_field("total_amount", 0)
+            # Try Subtotal (capitalized) or subtotal_amount
+            subtotal = (
+                get_field("subtotal_amount")
+                or get_field("subtotal")
+                or get_field("Subtotal")
+            )
+            payload["subtotal"] = (
+                subtotal if subtotal is not None else get_field("total_amount", 0)
+            )
             payload["tax"] = get_field("tax_amount", 0)
             payload["total"] = get_field("total_amount")
             # payment_method -> tender_type

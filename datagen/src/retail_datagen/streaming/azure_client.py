@@ -369,7 +369,10 @@ class AzureEventHubClient:
         Returns:
             bool: True if sent successfully, False otherwise
         """
-        logger.info(f"Azure client send_event: type={event.event_type}, connected={self._is_connected}")
+        logger.info(
+            f"Azure client send_event: type={event.event_type}, "
+            f"connected={self._is_connected}"
+        )
         result = await self.send_events([event])
         logger.info(f"Azure client send_event result: {result}")
         return result
@@ -538,7 +541,7 @@ class AzureEventHubClient:
                     event_data = EventData(event_json.encode('utf-8'))
 
                     # Set application properties for Eventstream routing
-                    # "Table" property is used by Fabric Eventstream to route to KQL tables
+                    # "Table" property routes to KQL tables
                     event_data.properties = {"Table": event.event_type.value}
 
                     event_data_list.append(event_data)
@@ -557,7 +560,9 @@ class AzureEventHubClient:
                         # Batch is full, send it and create a new one
                         await self._client.send_batch(batch)
                         if partition_key:
-                            batch = await self._client.create_batch(partition_key=partition_key)
+                            batch = await self._client.create_batch(
+                                partition_key=partition_key
+                            )
                         else:
                             batch = await self._client.create_batch()
                         batch.add(event_data)
