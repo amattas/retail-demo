@@ -722,7 +722,10 @@ class AzureEventHubClient:
                     if hub_props:
                         health_status["healthy"] = True
                         health_status["connection_status"] = "connected"
-                        health_status["partition_count"] = len(hub_props.partition_ids)
+                        # hub_props is EventHubProperties with partition_ids attribute
+                        health_status["partition_count"] = len(
+                            hub_props.partition_ids  # type: ignore[attr-defined]
+                        )
                 else:
                     # Mock client is always healthy when connected
                     health_status["healthy"] = True
