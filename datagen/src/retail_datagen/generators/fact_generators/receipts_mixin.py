@@ -5,7 +5,7 @@ Receipt generation and in-store customer activity
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -106,9 +106,17 @@ class ReceiptsMixin(FactGeneratorBase):
                 except Exception as e:
                     logger.debug(f"Failed to apply holiday overlay to basket: {e}")
 
+                # Randomize transaction time within the hour
+                # Add random seconds (0-3599) and microseconds
+                random_seconds = self._rng.randint(0, 3599)
+                random_microseconds = self._rng.randint(0, 999999)
+                transaction_time = hour_datetime + timedelta(
+                    seconds=random_seconds, microseconds=random_microseconds
+                )
+
                 # Create receipt
                 receipt_data = self._create_receipt(
-                    store, customer, basket, hour_datetime
+                    store, customer, basket, transaction_time
                 )
                 hour_data["receipts"].append(receipt_data["receipt"])
                 hour_data["receipt_lines"].extend(receipt_data["lines"])

@@ -77,6 +77,7 @@ nav:
     - Upload to Azure: datagen/upload-data.md
     - Streaming:
       - Overview: datagen/streaming.md
+      - Workflow: datagen/streaming-workflow.md
       - Setup: datagen/streaming-setup.md
       - API Reference: datagen/streaming-api.md
       - Operations: datagen/streaming-operations.md

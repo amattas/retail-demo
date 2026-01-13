@@ -72,6 +72,242 @@ class FieldMappingMixin(FactGeneratorBase):
 
         return mapping[table_name]
 
+    def _transform_db_fields_to_kql_payload(self, table_name: str, rec: dict) -> dict:
+        """Transform database field names to KQL-expected payload field names.
+
+        The database uses snake_case with _ext suffixes for external IDs,
+        but KQL expects specific field names without suffixes.
+        """
+
+        # Helper to get field value case-insensitively
+        def get_field(field_name: str, default=None):
+            # Try exact match first
+            if field_name in rec:
+                return rec[field_name]
+            # Try case-insensitive match
+            field_lower = field_name.lower()
+            for key in rec.keys():
+                if str(key).lower() == field_lower:
+                    return rec[key]
+            return default
+
+        # Create a clean payload with only KQL-expected fields
+        payload = {}
+
+        if table_name == "marketing":
+            # ad_impression event
+            payload["channel"] = get_field("channel")
+            payload["campaign_id"] = get_field("campaign_id")
+            payload["creative_id"] = get_field("creative_id")
+            payload["customer_ad_id"] = get_field("customer_ad_id")
+            # impression_id_ext -> impression_id
+            payload["impression_id"] = get_field("impression_id_ext")
+            payload["cost"] = get_field("cost")
+            # device -> device_type
+            payload["device_type"] = get_field("device")
+
+        elif table_name in ("dc_inventory_txn", "store_inventory_txn"):
+            # inventory_updated event
+            payload["store_id"] = get_field("store_id")
+            payload["dc_id"] = get_field("dc_id")
+            payload["product_id"] = get_field("product_id")
+            # quantity -> quantity_delta
+            payload["quantity_delta"] = get_field("quantity")
+            # txn_type -> reason
+            payload["reason"] = get_field("txn_type")
+            # source -> payload_source (renamed to avoid conflict with envelope source)
+            payload["payload_source"] = get_field("source", "SYSTEM")
+
+        elif table_name == "truck_moves":
+            # truck_arrived or truck_departed event
+            status = (get_field("status") or "").upper()
+            if status == "ARRIVED":
+                # truck_arrived
+                payload["truck_id"] = str(get_field("truck_id", ""))
+                payload["dc_id"] = get_field("dc_id")
+                payload["store_id"] = get_field("store_id")
+                payload["shipment_id"] = get_field("shipment_id")
+                # eta -> arrival_time
+                payload["arrival_time"] = get_field("eta")
+                # estimated_unload_duration: calculate from ETA to ETD
+                eta = get_field("eta")
+                etd = get_field("etd")
+                if eta and etd:
+                    try:
+                        from datetime import datetime
+
+                        if isinstance(eta, str):
+                            eta = datetime.fromisoformat(eta)
+                        if isinstance(etd, str):
+                            etd = datetime.fromisoformat(etd)
+                        duration_seconds = int((etd - eta).total_seconds())
+                        payload["estimated_unload_duration"] = duration_seconds
+                    except Exception:
+                        payload["estimated_unload_duration"] = 3600  # default 1 hour
+                else:
+                    payload["estimated_unload_duration"] = 3600
+            elif status == "COMPLETED":
+                # truck_departed
+                payload["truck_id"] = str(get_field("truck_id", ""))
+                payload["dc_id"] = get_field("dc_id")
+                payload["store_id"] = get_field("store_id")
+                payload["shipment_id"] = get_field("shipment_id")
+                # departure_time
+                payload["departure_time"] = get_field("departure_time")
+                # actual_unload_duration
+                payload["actual_unload_duration"] = get_field(
+                    "actual_unload_duration", 3600
+                )
+
+        elif table_name == "online_orders":
+            # online_order_created event
+            # order_id_ext -> order_id
+            payload["order_id"] = get_field("order_id_ext")
+            payload["customer_id"] = get_field("customer_id")
+            # Need to get these from online_order_lines or infer defaults
+            payload["fulfillment_mode"] = get_field("fulfillment_mode", "SHIP_FROM_DC")
+            payload["node_type"] = get_field("node_type", "DC")
+            payload["node_id"] = get_field("node_id", 1)
+            payload["item_count"] = get_field("item_count", 1)
+            # subtotal_amount -> subtotal
+            payload["subtotal"] = get_field("subtotal_amount")
+            # tax_amount -> tax
+            payload["tax"] = get_field("tax_amount")
+            # total_amount -> total
+            payload["total"] = get_field("total_amount")
+            # payment_method -> tender_type
+            payload["tender_type"] = get_field("payment_method")
+
+        elif table_name == "fact_payments":
+            # payment_processed event
+            # receipt_id_ext -> receipt_id
+            payload["receipt_id"] = get_field("receipt_id_ext")
+            # order_id_ext -> order_id
+            payload["order_id"] = get_field("order_id_ext")
+            payload["payment_method"] = get_field("payment_method")
+            payload["amount"] = get_field("amount")
+            payload["amount_cents"] = get_field("amount_cents")
+            payload["transaction_id"] = get_field("transaction_id")
+            # Add processing_time from event_ts if not present
+            payload["processing_time"] = get_field("event_ts")
+            payload["processing_time_ms"] = get_field("processing_time_ms")
+            payload["status"] = get_field("status")
+            payload["decline_reason"] = get_field("decline_reason")
+            payload["store_id"] = get_field("store_id")
+            payload["customer_id"] = get_field("customer_id")
+
+        elif table_name == "receipts":
+            # receipt_created event
+            payload["store_id"] = get_field("store_id")
+            payload["customer_id"] = get_field("customer_id")
+            # receipt_id_ext -> receipt_id
+            payload["receipt_id"] = get_field("receipt_id_ext")
+            # Try Subtotal (capitalized) or subtotal_amount
+            subtotal = (
+                get_field("subtotal_amount")
+                or get_field("subtotal")
+                or get_field("Subtotal")
+            )
+            payload["subtotal"] = (
+                subtotal if subtotal is not None else get_field("total_amount", 0)
+            )
+            payload["tax"] = get_field("tax_amount", 0)
+            payload["total"] = get_field("total_amount")
+            # payment_method -> tender_type
+            payload["tender_type"] = get_field("payment_method")
+            payload["item_count"] = get_field("item_count", 1)
+            payload["campaign_id"] = get_field("campaign_id")
+
+        elif table_name == "receipt_lines":
+            # receipt_line_added event
+            payload["receipt_id"] = get_field("receipt_id_ext")
+            payload["line_number"] = get_field("line_num")
+            payload["product_id"] = get_field("product_id")
+            payload["quantity"] = get_field("quantity")
+            payload["unit_price"] = get_field("unit_price")
+            payload["extended_price"] = get_field("ext_price")
+            payload["promo_code"] = get_field("promo_code")
+
+        elif table_name == "foot_traffic":
+            # customer_entered event
+            payload["store_id"] = get_field("store_id")
+            payload["sensor_id"] = get_field("sensor_id")
+            payload["zone"] = get_field("zone")
+            payload["customer_count"] = get_field("count")
+            # dwell_seconds -> dwell_time
+            payload["dwell_time"] = get_field("dwell_seconds")
+
+        elif table_name == "ble_pings":
+            # ble_ping_detected event
+            payload["store_id"] = get_field("store_id")
+            payload["beacon_id"] = get_field("beacon_id")
+            payload["customer_ble_id"] = get_field("customer_ble_id")
+            payload["rssi"] = get_field("rssi")
+            payload["zone"] = get_field("zone")
+
+        elif table_name == "customer_zone_changes":
+            # customer_zone_changed event
+            payload["store_id"] = get_field("store_id")
+            payload["customer_ble_id"] = get_field("customer_ble_id")
+            payload["from_zone"] = get_field("from_zone")
+            payload["to_zone"] = get_field("to_zone")
+            payload["timestamp"] = get_field("event_ts")
+
+        elif table_name == "store_ops":
+            # store_opened or store_closed event
+            payload["store_id"] = get_field("store_id")
+            payload["operation_time"] = get_field("operation_time")
+            payload["operation_type"] = get_field("operation_type")
+
+        elif table_name == "reorders":
+            # reorder_triggered event
+            payload["store_id"] = get_field("store_id")
+            payload["dc_id"] = get_field("dc_id")
+            payload["product_id"] = get_field("product_id")
+            payload["current_quantity"] = get_field("current_quantity")
+            payload["reorder_quantity"] = get_field("reorder_quantity")
+            payload["reorder_point"] = get_field("reorder_point")
+            payload["priority"] = get_field("priority")
+
+        elif table_name == "stockouts":
+            # stockout_detected event
+            payload["store_id"] = get_field("store_id")
+            payload["dc_id"] = get_field("dc_id")
+            payload["product_id"] = get_field("product_id")
+            payload["last_known_quantity"] = get_field("last_known_quantity")
+            payload["detection_time"] = get_field("detection_time")
+
+        elif table_name == "promotions":
+            # promotion_applied event
+            payload["receipt_id"] = get_field("receipt_id_ext")
+            payload["promo_code"] = get_field("promo_code")
+            payload["discount_amount"] = get_field("discount_amount")
+            payload["discount_cents"] = get_field("discount_cents")
+            payload["discount_type"] = get_field("discount_type")
+            payload["product_count"] = get_field("product_count")
+            payload["product_ids"] = get_field("product_ids")
+            payload["store_id"] = get_field("store_id")
+            payload["customer_id"] = get_field("customer_id")
+
+        elif table_name == "online_order_lines":
+            # online_order_picked or online_order_shipped event
+            payload["order_id"] = get_field("order_id_ext")
+            payload["node_type"] = get_field("node_type")
+            payload["node_id"] = get_field("node_id")
+            payload["fulfillment_mode"] = get_field("fulfillment_mode")
+            picked = get_field("picked_ts")
+            shipped = get_field("shipped_ts")
+            if picked:
+                payload["picked_time"] = picked
+            elif shipped:
+                payload["shipped_time"] = shipped
+        else:
+            # Unknown table - return record as-is
+            payload = rec.copy()
+
+        # Remove None values to keep payload clean
+        return {k: v for k, v in payload.items() if v is not None}
+
     def _build_outbox_rows_from_df(
         self, table_name: str, df: pd.DataFrame
     ) -> list[dict]:
@@ -197,12 +433,15 @@ class FieldMappingMixin(FactGeneratorBase):
                     else None
                 )
 
+            # Transform database fields to KQL-expected payload fields
             try:
-                payload_json = json.dumps(rec, default=str)
+                payload_dict = self._transform_db_fields_to_kql_payload(table_name, rec)
+                payload_json = json.dumps(payload_dict, default=str)
             except (TypeError, ValueError) as e:
                 # Fallback: stringify non-serializable values crudely
-                logger.debug(f"Failed to JSON serialize record, using fallback: {e}")
-                payload_json = json.dumps({k: str(v) for k, v in rec.items()})
+                logger.debug(f"Failed to JSON serialize payload, using fallback: {e}")
+                payload_dict = self._transform_db_fields_to_kql_payload(table_name, rec)
+                payload_json = json.dumps({k: str(v) for k, v in payload_dict.items()})
 
             rows.append(
                 {

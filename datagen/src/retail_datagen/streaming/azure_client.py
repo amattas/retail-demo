@@ -13,7 +13,8 @@ from typing import Any
 
 try:
     from azure.core.exceptions import AzureError
-    from azure.eventhub import EventData, EventHubProducerClient
+    from azure.eventhub import EventData
+    from azure.eventhub.aio import EventHubProducerClient
     from azure.eventhub.exceptions import EventHubError
 
     AZURE_AVAILABLE = True
@@ -305,6 +306,8 @@ class AzureEventHubClient:
         Returns:
             bool: True if connection successful, False otherwise
         """
+        logger.info("🔌 Attempting to connect to Azure Event Hub...")
+
         # Explicitly initialize locks in async context
         # This ensures locks are created within a running event loop
         if self._buffer_lock is None:
@@ -313,24 +316,26 @@ class AzureEventHubClient:
             self._stats_lock = asyncio.Lock()
 
         if self._is_mock:
-            logger.info("Mock Azure client - connection simulated")
+            logger.info("✅ Mock Azure client - connection simulated (test mode)")
             self._is_connected = True
             metrics_collector.update_connection_status(True)
             return True
 
         try:
             if not self._client:
+                logger.info("Initializing Azure Event Hub client...")
                 self._initialize_client()
 
+            logger.info("Testing connection by getting partition properties...")
             # Test connection by getting partition information
             partition_props = await self._client.get_partition_properties("0")
             if partition_props:
                 self._is_connected = True
                 metrics_collector.update_connection_status(True)
-                logger.info("Successfully connected to Azure Event Hub")
+                logger.info("✅ Successfully connected to Azure Event Hub")
                 return True
         except Exception as e:
-            logger.error(f"Failed to connect to Azure Event Hub: {e}")
+            logger.error(f"❌ Failed to connect to Azure Event Hub: {e}", exc_info=True)
             self._statistics["connection_failures"] += 1
             self._is_connected = False
             metrics_collector.update_connection_status(False)
@@ -364,7 +369,13 @@ class AzureEventHubClient:
         Returns:
             bool: True if sent successfully, False otherwise
         """
-        return await self.send_events([event])
+        logger.info(
+            f"Azure client send_event: type={event.event_type}, "
+            f"connected={self._is_connected}"
+        )
+        result = await self.send_events([event])
+        logger.info(f"Azure client send_event result: {result}")
+        return result
 
     async def send_events(self, events: list[EventEnvelope]) -> bool:
         """
@@ -497,6 +508,9 @@ class AzureEventHubClient:
         """
         Direct batch send to Event Hub without retry logic.
 
+        Groups events by partition_key since Azure EventDataBatch can only
+        have one partition_key per batch.
+
         Args:
             events: Events to send
 
@@ -509,21 +523,54 @@ class AzureEventHubClient:
             return True
 
         try:
-            # Convert events to Event Hub format
-            event_data_batch = []
+            # Group events by partition_key (None is a valid key for round-robin)
+            from collections import defaultdict
+
+            events_by_partition = defaultdict(list)
             for event in events:
-                event_json = event.model_dump_json()
-                event_data = EventData(event_json)
+                partition_key = event.partition_key if event.partition_key else None
+                events_by_partition[partition_key].append(event)
 
-                # Set partition key if provided
-                if event.partition_key:
-                    event_data.partition_key = event.partition_key
+            # Send each partition group separately
+            for partition_key, partition_events in events_by_partition.items():
+                # Create EventData objects for this partition
+                event_data_list = []
+                for event in partition_events:
+                    event_json = event.model_dump_json()
 
-                event_data_batch.append(event_data)
+                    # Encode JSON string to UTF-8 bytes for Azure Event Hub
+                    event_data = EventData(event_json.encode("utf-8"))
 
-            # Send batch to Event Hub
-            async with self._client:
-                await self._client.send_batch(event_data_batch)
+                    # Set application properties for Eventstream routing
+                    # "Table" property routes to KQL tables
+                    event_data.properties = {"Table": event.event_type.value}
+
+                    event_data_list.append(event_data)
+
+                # Create batch with partition_key (if not None)
+                if partition_key:
+                    batch = await self._client.create_batch(partition_key=partition_key)
+                else:
+                    batch = await self._client.create_batch()
+
+                # Add events to batch, handling overflow
+                for event_data in event_data_list:
+                    try:
+                        batch.add(event_data)
+                    except ValueError:
+                        # Batch is full, send it and create a new one
+                        await self._client.send_batch(batch)
+                        if partition_key:
+                            batch = await self._client.create_batch(
+                                partition_key=partition_key
+                            )
+                        else:
+                            batch = await self._client.create_batch()
+                        batch.add(event_data)
+
+                # Send any remaining events in this partition
+                if len(batch) > 0:
+                    await self._client.send_batch(batch)
 
             return True
 
@@ -675,7 +722,10 @@ class AzureEventHubClient:
                     if hub_props:
                         health_status["healthy"] = True
                         health_status["connection_status"] = "connected"
-                        health_status["partition_count"] = len(hub_props.partition_ids)
+                        # hub_props is EventHubProperties with partition_ids attribute
+                        health_status["partition_count"] = len(
+                            hub_props.partition_ids  # type: ignore[attr-defined]
+                        )
                 else:
                     # Mock client is always healthy when connected
                     health_status["healthy"] = True
@@ -801,23 +851,27 @@ class AzureEventHubClient:
                 # Get Event Hub metadata (proves connection works)
                 properties = await producer.get_eventhub_properties()
 
+                # Handle both dict and object response formats (SDK version differences)
+                if isinstance(properties, dict):
+                    partition_ids = properties.get("partition_ids", [])
+                    created_at = properties.get("created_at")
+                else:
+                    partition_ids = properties.partition_ids
+                    created_at = properties.created_at
+
                 # Add partition information to metadata
                 metadata.update(
                     {
                         "hub_name": hub_name,
-                        "partition_count": len(properties.partition_ids),
-                        "partition_ids": list(properties.partition_ids),
-                        "created_at": (
-                            properties.created_at.isoformat()
-                            if properties.created_at
-                            else None
-                        ),
+                        "partition_count": len(partition_ids),
+                        "partition_ids": list(partition_ids),
+                        "created_at": (created_at.isoformat() if created_at else None),
                     }
                 )
 
                 logger.info(
                     f"Successfully connected to Event Hub '{hub_name}' "
-                    f"with {len(properties.partition_ids)} partitions"
+                    f"with {len(partition_ids)} partitions"
                 )
 
                 return True, "Connection successful", metadata

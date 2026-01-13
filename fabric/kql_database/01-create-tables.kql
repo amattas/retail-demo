@@ -383,6 +383,23 @@
     parent_event_id:string
 )
 
+// CATCH-ALL FOR UNKNOWN EVENTS
+// This table captures any events that don't match a known event type.
+// The payload is stored as dynamic to preserve all data for investigation.
+
+.create-merge table unknown_event (
+    event_type:string,
+    payload:dynamic,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
 // ============================================================================
 // RETENTION POLICIES
 // ============================================================================
@@ -438,6 +455,9 @@
 
 .alter-merge table online_order_shipped policy retention softdelete = 30d
 
+// --- UNKNOWN EVENTS: 7 days for investigation ---
+.alter-merge table unknown_event policy retention softdelete = 7d
+
 // ============================================================================
 // STREAMING INGESTION POLICIES
 // ============================================================================
@@ -486,6 +506,9 @@
 .alter table online_order_picked policy streamingingestion enable
 
 .alter table online_order_shipped policy streamingingestion enable
+
+// --- UNKNOWN EVENTS ---
+.alter table unknown_event policy streamingingestion enable
 
 // ============================================================================
 // INGESTION BATCHING POLICIES
@@ -664,6 +687,16 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 50
+}
+```
+
+// --- UNKNOWN EVENTS: 1 minute batching ---
+.alter table unknown_event policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 100,
     "MaximumRawDataSizeMB": 50
 }
 ```

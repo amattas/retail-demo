@@ -5,9 +5,13 @@ This module contains the global state used by streaming router endpoints
 and utility functions for state management.
 """
 
+import logging
+import traceback
 from collections import deque
 from datetime import UTC, datetime
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Global streaming state
 streaming_session_id: str | None = None
@@ -94,12 +98,38 @@ def update_streaming_statistics(event_data: dict[str, Any], success: bool = True
 def set_session(session_id: str | None, start_time: datetime | None = None):
     """Set the current streaming session."""
     global streaming_session_id, streaming_start_time
+
+    # Log session state changes with stack trace for debugging
+    old_session = streaming_session_id
+    caller_stack = "".join(traceback.format_stack()[-3:-1])
+
+    if session_id is None and old_session is not None:
+        logger.warning(
+            f"🔴 Session being CLEARED: {old_session} -> None\n"
+            f"Called from:\n{caller_stack}"
+        )
+    elif session_id is not None and old_session is None:
+        logger.info(
+            f"🟢 Session being SET: None -> {session_id}\nCalled from:\n{caller_stack}"
+        )
+    elif session_id != old_session:
+        logger.info(
+            f"🟡 Session being CHANGED: {old_session} -> {session_id}\n"
+            f"Called from:\n{caller_stack}"
+        )
+
     streaming_session_id = session_id
     streaming_start_time = start_time
 
 
 def get_session_id() -> str | None:
     """Get the current streaming session ID."""
+    # Periodically log session state for monitoring
+    # Only log every ~10 calls to avoid spam
+    import random
+
+    if random.random() < 0.1:
+        logger.debug(f"📊 get_session_id() returning: {streaming_session_id}")
     return streaming_session_id
 
 
