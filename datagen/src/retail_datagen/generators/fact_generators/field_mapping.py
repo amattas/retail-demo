@@ -72,14 +72,13 @@ class FieldMappingMixin(FactGeneratorBase):
 
         return mapping[table_name]
 
-    def _transform_db_fields_to_kql_payload(
-        self, table_name: str, rec: dict
-    ) -> dict:
+    def _transform_db_fields_to_kql_payload(self, table_name: str, rec: dict) -> dict:
         """Transform database field names to KQL-expected payload field names.
 
         The database uses snake_case with _ext suffixes for external IDs,
         but KQL expects specific field names without suffixes.
         """
+
         # Helper to get field value case-insensitively
         def get_field(field_name: str, default=None):
             # Try exact match first
@@ -136,6 +135,7 @@ class FieldMappingMixin(FactGeneratorBase):
                 if eta and etd:
                     try:
                         from datetime import datetime
+
                         if isinstance(eta, str):
                             eta = datetime.fromisoformat(eta)
                         if isinstance(etd, str):

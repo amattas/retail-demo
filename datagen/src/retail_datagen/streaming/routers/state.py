@@ -101,7 +101,7 @@ def set_session(session_id: str | None, start_time: datetime | None = None):
 
     # Log session state changes with stack trace for debugging
     old_session = streaming_session_id
-    caller_stack = ''.join(traceback.format_stack()[-3:-1])
+    caller_stack = "".join(traceback.format_stack()[-3:-1])
 
     if session_id is None and old_session is not None:
         logger.warning(
@@ -110,8 +110,7 @@ def set_session(session_id: str | None, start_time: datetime | None = None):
         )
     elif session_id is not None and old_session is None:
         logger.info(
-            f"🟢 Session being SET: None -> {session_id}\n"
-            f"Called from:\n{caller_stack}"
+            f"🟢 Session being SET: None -> {session_id}\nCalled from:\n{caller_stack}"
         )
     elif session_id != old_session:
         logger.info(
@@ -128,6 +127,7 @@ def get_session_id() -> str | None:
     # Periodically log session state for monitoring
     # Only log every ~10 calls to avoid spam
     import random
+
     if random.random() < 0.1:
         logger.debug(f"📊 get_session_id() returning: {streaming_session_id}")
     return streaming_session_id

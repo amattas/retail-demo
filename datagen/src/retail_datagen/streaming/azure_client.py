@@ -525,6 +525,7 @@ class AzureEventHubClient:
         try:
             # Group events by partition_key (None is a valid key for round-robin)
             from collections import defaultdict
+
             events_by_partition = defaultdict(list)
             for event in events:
                 partition_key = event.partition_key if event.partition_key else None
@@ -538,7 +539,7 @@ class AzureEventHubClient:
                     event_json = event.model_dump_json()
 
                     # Encode JSON string to UTF-8 bytes for Azure Event Hub
-                    event_data = EventData(event_json.encode('utf-8'))
+                    event_data = EventData(event_json.encode("utf-8"))
 
                     # Set application properties for Eventstream routing
                     # "Table" property routes to KQL tables
@@ -861,11 +862,7 @@ class AzureEventHubClient:
                         "hub_name": hub_name,
                         "partition_count": len(partition_ids),
                         "partition_ids": list(partition_ids),
-                        "created_at": (
-                            created_at.isoformat()
-                            if created_at
-                            else None
-                        ),
+                        "created_at": (created_at.isoformat() if created_at else None),
                     }
                 )
 

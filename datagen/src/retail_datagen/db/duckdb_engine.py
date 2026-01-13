@@ -655,11 +655,11 @@ def outbox_lease_next(conn: duckdb.DuckDBPyConnection) -> dict | None:
     if not r:
         return None
     # Check if the row is now in 'processing' status (index 6)
-    if r[6] != 'processing':
+    if r[6] != "processing":
         # Another connection got it first, try again
         return None
     # Return the row without status column
-    cols = [d[0] for d in (cur.description or []) if d[0] != 'status']
+    cols = [d[0] for d in (cur.description or []) if d[0] != "status"]
     return {cols[i]: r[i] for i in range(len(cols))}
 
 

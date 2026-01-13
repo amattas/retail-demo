@@ -190,8 +190,7 @@ async def start_streaming(
                             etype = EventType(mtype)
                         except Exception:
                             logger.warning(
-                                f"Invalid event type '{mtype}', "
-                                f"using RECEIPT_CREATED"
+                                f"Invalid event type '{mtype}', using RECEIPT_CREATED"
                             )
                             etype = EventType.RECEIPT_CREATED
                         payload = {}
@@ -221,8 +220,7 @@ async def start_streaming(
 
                         if ok:
                             logger.info(
-                                f"✅ Event {item.get('outbox_id')} "
-                                f"sent successfully"
+                                f"✅ Event {item.get('outbox_id')} sent successfully"
                             )
                             outbox_ack_sent(conn, int(item["outbox_id"]))
                             total_sent += 1
@@ -319,8 +317,7 @@ async def start_streaming(
 
             await client.disconnect()
             logger.info(
-                f"🏁 Streaming completed normally. "
-                f"Total events sent: {total_sent}"
+                f"🏁 Streaming completed normally. Total events sent: {total_sent}"
             )
             update_task_progress(new_session_id, 1.0, "Streaming completed")
             set_session(None, None)
