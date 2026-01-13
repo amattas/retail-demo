@@ -43,6 +43,12 @@ def mock_azure_sdk():
     ) as mock_client:
         # Create mock instance
         mock_instance = MagicMock()
+
+        # Mock async batch operations
+        mock_batch = MagicMock()
+        mock_batch.add = MagicMock()
+        mock_batch.__len__ = MagicMock(return_value=1)  # Batch has events
+        mock_instance.create_batch = AsyncMock(return_value=mock_batch)
         mock_instance.send_batch = AsyncMock()
         mock_instance.close = AsyncMock()
         mock_instance.get_partition_properties = AsyncMock(
