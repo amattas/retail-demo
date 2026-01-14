@@ -1,0 +1,136 @@
+table dim_products
+	lineageTag: 08c4e53e-d187-434b-b1c8-04b82eebd95b
+	sourceLineageTag: [ag].[dim_products]
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: 5dee139a-8b6a-4391-be7c-02545461f7d8
+		sourceLineageTag: ID
+		summarizeBy: count
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductName
+		dataType: string
+		lineageTag: 532add1d-cf3f-497c-bef0-85cd697ecad7
+		sourceLineageTag: ProductName
+		summarizeBy: none
+		sourceColumn: ProductName
+
+		annotation SummarizationSetBy = Automatic
+
+	column Brand
+		dataType: string
+		lineageTag: 382a3e1c-ae8f-46b8-a529-755ba0a42b01
+		sourceLineageTag: Brand
+		summarizeBy: none
+		sourceColumn: Brand
+
+		annotation SummarizationSetBy = Automatic
+
+	column Company
+		dataType: string
+		lineageTag: 8efef247-e52e-4da2-81b7-1dcd36c8b7ab
+		sourceLineageTag: Company
+		summarizeBy: none
+		sourceColumn: Company
+
+		annotation SummarizationSetBy = Automatic
+
+	column Department
+		dataType: string
+		lineageTag: 062fcfed-b058-42cf-9b08-e7122dad9036
+		sourceLineageTag: Department
+		summarizeBy: none
+		sourceColumn: Department
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		lineageTag: ef35b251-0842-4886-83a6-d8ab94199d3e
+		sourceLineageTag: Category
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subcategory
+		dataType: string
+		lineageTag: f46284bc-c713-4f6a-bf4b-c21592a4b7e1
+		sourceLineageTag: Subcategory
+		summarizeBy: none
+		sourceColumn: Subcategory
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cost
+		dataType: double
+		lineageTag: 8087b4e0-4b7c-4ef8-a6e7-89e81bd1a5f0
+		sourceLineageTag: Cost
+		summarizeBy: sum
+		sourceColumn: Cost
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column MSRP
+		dataType: double
+		lineageTag: 005685e7-1f5e-43a4-9806-be8d20da0ff5
+		sourceLineageTag: MSRP
+		summarizeBy: sum
+		sourceColumn: MSRP
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column SalePrice
+		dataType: double
+		lineageTag: dc4ccb6b-3631-45c1-a8d5-f9ca33f57f30
+		sourceLineageTag: SalePrice
+		summarizeBy: sum
+		sourceColumn: SalePrice
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column RequiresRefrigeration
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: f04052ee-dccb-45ee-94f4-889979b77164
+		sourceLineageTag: RequiresRefrigeration
+		summarizeBy: none
+		sourceColumn: RequiresRefrigeration
+
+		annotation SummarizationSetBy = Automatic
+
+	column taxability
+		dataType: string
+		lineageTag: 037e9677-1b1e-4f03-80fe-0ec9c04c7d3e
+		sourceLineageTag: taxability
+		summarizeBy: none
+		sourceColumn: taxability
+
+		annotation SummarizationSetBy = Automatic
+
+	column Tags
+		dataType: string
+		lineageTag: 501968d2-647f-4813-b72b-fbe79ca6f75a
+		sourceLineageTag: Tags
+		summarizeBy: none
+		sourceColumn: Tags
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_products = entity
+		mode: directLake
+		source
+			entityName: dim_products
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

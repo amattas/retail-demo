@@ -1,214 +1,48 @@
-model RetailGold
-  compatibilityLevel: 1604
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_QueryOrder = ["DirectLake - retail_lakehouse"]
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_ProTooling = ["RemoteModeling","DirectLakeOnOneLakeCreatedInDesktop","DevMode"]
+
+ref table sales_minute_store
+ref table top_products_15m
+ref table inventory_position_current
+ref table truck_dwell_daily
+ref table online_sales_daily
+ref table zone_dwell_minute
+ref table marketing_cost_daily
+ref table dc_inventory_position_current
+ref table tender_mix_daily
+ref table dim_geographies
+ref table dim_stores
+ref table dim_distribution_centers
+ref table dim_trucks
+ref table dim_customers
+ref table dim_products
+ref table fact_receipts
+ref table fact_receipt_lines
+ref table fact_payments
+ref table fact_store_inventory_txn
+ref table fact_dc_inventory_txn
+ref table fact_truck_moves
+ref table fact_truck_inventory
+ref table fact_foot_traffic
+ref table fact_ble_pings
+ref table fact_customer_zone_changes
+ref table fact_marketing
+ref table fact_online_order_headers
+ref table fact_online_order_lines
+ref table fact_store_ops
+ref table fact_stockouts
+ref table fact_promotions
+ref table fact_promo_lines
+ref table fact_reorders
 
-  annotation fabric.lakehouseResourceId = "fc9ed7b6-6723-4116-8bf1-278135865270"
-
-table gold_sales_minute_store
-
-  partition DirectLake = entity
-    entityName: au.sales_minute_store
-    mode: directLake
-
-  measure 'Total Sales' = SUM('gold_sales_minute_store'[total_sales])
-
-  measure Receipts = SUM('gold_sales_minute_store'[receipts])
-
-  measure 'Avg Basket' = DIVIDE([Total Sales], [Receipts])
-
-  measure 'Sales (Last 60m)' = CALCULATE([Total Sales], KEEPFILTERS(DATESINPERIOD('gold_sales_minute_store'[ts], MAX('gold_sales_minute_store'[ts]), -60, MINUTE)))
-
-table gold_top_products_15m
-
-  partition DirectLake = entity
-    entityName: au.top_products_15m
-    mode: directLake
-
-  measure Revenue = SUM('gold_top_products_15m'[revenue])
-
-  measure Units = SUM('gold_top_products_15m'[units])
-
-table gold_inventory_position_current
-
-  partition DirectLake = entity
-    entityName: au.inventory_position_current
-    mode: directLake
-
-  measure 'On Hand' = SUM('gold_inventory_position_current'[on_hand])
-
-table gold_truck_dwell_daily
-
-  partition DirectLake = entity
-    entityName: au.truck_dwell_daily
-    mode: directLake
-
-  measure 'Avg Dwell (min)' = AVERAGE('gold_truck_dwell_daily'[avg_dwell_min])
-
-table dim_geographies
-
-  partition DirectLake = entity
-    entityName: ag.dim_geographies
-    mode: directLake
-
-table dim_stores
-
-  partition DirectLake = entity
-    entityName: ag.dim_stores
-    mode: directLake
-
-table dim_distribution_centers
-
-  partition DirectLake = entity
-    entityName: ag.dim_distribution_centers
-    mode: directLake
-
-table dim_trucks
-
-  partition DirectLake = entity
-    entityName: ag.dim_trucks
-    mode: directLake
-
-table dim_customers
-
-  partition DirectLake = entity
-    entityName: ag.dim_customers
-    mode: directLake
-
-table dim_products
-
-  partition DirectLake = entity
-    entityName: ag.dim_products
-    mode: directLake
-
-table gold_online_sales_daily
-
-  partition DirectLake = entity
-    entityName: au.online_sales_daily
-    mode: directLake
-
-  measure Orders = SUM('gold_online_sales_daily'[orders])
-
-  measure 'Online Total' = SUM('gold_online_sales_daily'[total])
-
-  measure AOV = DIVIDE([Online Total], [Orders])
-
-table gold_zone_dwell_minute
-
-  partition DirectLake = entity
-    entityName: au.zone_dwell_minute
-    mode: directLake
-
-  measure 'Avg Dwell (sec)' = AVERAGE('gold_zone_dwell_minute'[avg_dwell])
-
-  measure 'Customers (Minute)' = SUM('gold_zone_dwell_minute'[customers])
-
-table gold_marketing_cost_daily
-
-  partition DirectLake = entity
-    entityName: au.marketing_cost_daily
-    mode: directLake
-
-  measure Impressions = SUM('gold_marketing_cost_daily'[impressions])
-
-  measure Cost = SUM('gold_marketing_cost_daily'[cost])
-
-table gold_dc_inventory_position_current
-
-  partition DirectLake = entity
-    entityName: au.dc_inventory_position_current
-    mode: directLake
-
-  measure 'DC On Hand' = SUM('gold_dc_inventory_position_current'[on_hand])
-
-table gold_tender_mix_daily
-
-  partition DirectLake = entity
-    entityName: au.tender_mix_daily
-    mode: directLake
-
-  measure Transactions = SUM('gold_tender_mix_daily'[transactions])
-
-  measure 'Total Amount' = SUM('gold_tender_mix_daily'[total_amount])
-
-relationship Sales_to_Stores
-  fromColumn: gold_sales_minute_store.store_id
-  toColumn: dim_stores.ID
-  crossFilteringBehavior: oneDirection
-
-relationship InvCurrent_to_Stores
-  fromColumn: gold_inventory_position_current.store_id
-  toColumn: dim_stores.ID
-  crossFilteringBehavior: oneDirection
-
-relationship InvCurrent_to_Products
-  fromColumn: gold_inventory_position_current.product_id
-  toColumn: dim_products.ID
-  crossFilteringBehavior: oneDirection
-
-relationship TopProducts_to_Products
-  fromColumn: gold_top_products_15m.product_id
-  toColumn: dim_products.ID
-  crossFilteringBehavior: oneDirection
-
-relationship ZoneDwell_to_Stores
-  fromColumn: gold_zone_dwell_minute.store_id
-  toColumn: dim_stores.ID
-  crossFilteringBehavior: oneDirection
-
-relationship DCInv_to_DCs
-  fromColumn: gold_dc_inventory_position_current.dc_id
-  toColumn: dim_distribution_centers.ID
-  crossFilteringBehavior: oneDirection
-
-relationship Stores_to_Geographies
-  fromColumn: dim_stores.GeographyID
-  toColumn: dim_geographies.ID
-  crossFilteringBehavior: oneDirection
-
-relationship DCs_to_Geographies
-  fromColumn: dim_distribution_centers.GeographyID
-  toColumn: dim_geographies.ID
-  crossFilteringBehavior: oneDirection
-
-perspective Operations
-
-  perspectiveTable gold_sales_minute_store
-
-  perspectiveTable gold_inventory_position_current
-
-  perspectiveTable gold_dc_inventory_position_current
-
-  perspectiveTable dim_stores
-
-  perspectiveTable dim_geographies
-
-  perspectiveTable gold_zone_dwell_minute
-
-  perspectiveTable gold_tender_mix_daily
-
-  perspectiveTable dim_customers
-
-perspective Merchandising
-
-  perspectiveTable gold_top_products_15m
-
-  perspectiveTable gold_inventory_position_current
-
-  perspectiveTable dim_products
-
-  perspectiveTable gold_online_sales_daily
-
-perspective Logistics
-
-  perspectiveTable gold_truck_dwell_daily
-
-  perspectiveTable gold_dc_inventory_position_current
-
-  perspectiveTable dim_distribution_centers
-
-  perspectiveTable dim_trucks
-
-  perspectiveTable dim_geographies
-
-perspective Marketing
-
-  perspectiveTable gold_marketing_cost_daily

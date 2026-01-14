@@ -1,0 +1,134 @@
+table fact_online_order_lines
+	lineageTag: c5e6dfd9-a43a-40b6-a6a2-24f01b45da1b
+	sourceLineageTag: [ag].[fact_online_order_lines]
+
+	column order_id
+		dataType: string
+		lineageTag: 3cb642cc-b286-4380-8146-42f7b2d686a3
+		sourceLineageTag: order_id
+		summarizeBy: none
+		sourceColumn: order_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column unit_cents
+		dataType: int64
+		formatString: 0
+		lineageTag: 967b7284-5725-4796-accd-a8f2de90730d
+		sourceLineageTag: unit_cents
+		summarizeBy: sum
+		sourceColumn: unit_cents
+
+		annotation SummarizationSetBy = Automatic
+
+	column fulfillment_mode
+		dataType: string
+		lineageTag: 32c3eea4-e6dd-4d08-8a6d-a034b4bbfe3a
+		sourceLineageTag: fulfillment_mode
+		summarizeBy: none
+		sourceColumn: fulfillment_mode
+
+		annotation SummarizationSetBy = Automatic
+
+	column promo_code
+		dataType: string
+		lineageTag: c393cad6-d355-4462-a795-bdb45fb3a5b9
+		sourceLineageTag: promo_code
+		summarizeBy: none
+		sourceColumn: promo_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column node_type
+		dataType: string
+		lineageTag: ce77d10b-d7b5-4c9a-a658-bdd1b3e244c2
+		sourceLineageTag: node_type
+		summarizeBy: none
+		sourceColumn: node_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 040c4660-3542-45b9-818a-67fcb678abfd
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column ext_price
+		dataType: string
+		lineageTag: ff6e4b15-e03e-49c5-94cc-68d355c22f90
+		sourceLineageTag: ext_price
+		summarizeBy: none
+		sourceColumn: ext_price
+
+		annotation SummarizationSetBy = Automatic
+
+	column ext_cents
+		dataType: int64
+		formatString: 0
+		lineageTag: 645745a0-515e-4000-8c1b-6d8bf2354a69
+		sourceLineageTag: ext_cents
+		summarizeBy: sum
+		sourceColumn: ext_cents
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_num
+		dataType: int64
+		formatString: 0
+		lineageTag: 909c890b-f0c3-4bdc-900f-87ce124534bf
+		sourceLineageTag: line_num
+		summarizeBy: sum
+		sourceColumn: line_num
+
+		annotation SummarizationSetBy = Automatic
+
+	column fulfillment_status
+		dataType: string
+		lineageTag: 2a449a21-00eb-4ac3-84b2-a003a9b5f07a
+		sourceLineageTag: fulfillment_status
+		summarizeBy: none
+		sourceColumn: fulfillment_status
+
+		annotation SummarizationSetBy = Automatic
+
+	column unit_price
+		dataType: string
+		lineageTag: 51487ddb-e269-4a13-ae82-2eaad2232fd6
+		sourceLineageTag: unit_price
+		summarizeBy: none
+		sourceColumn: unit_price
+
+		annotation SummarizationSetBy = Automatic
+
+	column quantity
+		dataType: int64
+		formatString: 0
+		lineageTag: 552b4dc7-f224-42c5-b66e-bbdadc240449
+		sourceLineageTag: quantity
+		summarizeBy: sum
+		sourceColumn: quantity
+
+		annotation SummarizationSetBy = Automatic
+
+	column node_id
+		dataType: int64
+		formatString: 0
+		lineageTag: dc9148c3-d619-44b9-8a30-8f7787140f5a
+		sourceLineageTag: node_id
+		summarizeBy: sum
+		sourceColumn: node_id
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_online_order_lines = entity
+		mode: directLake
+		source
+			entityName: fact_online_order_lines
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

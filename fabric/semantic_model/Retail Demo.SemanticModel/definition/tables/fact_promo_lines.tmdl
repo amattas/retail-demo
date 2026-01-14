@@ -1,0 +1,78 @@
+table fact_promo_lines
+	lineageTag: 7960f0ae-2c44-44a8-82bc-a5e9c25332a3
+	sourceLineageTag: [ag].[fact_promo_lines]
+
+	column ReceiptId
+		dataType: string
+		lineageTag: cdbe60b2-4632-44c8-bd02-57551f3b028e
+		sourceLineageTag: ReceiptId
+		summarizeBy: none
+		sourceColumn: ReceiptId
+
+		annotation SummarizationSetBy = Automatic
+
+	column PromoCode
+		dataType: string
+		lineageTag: 30dfd6c3-7e53-4b79-b964-3afc55d77858
+		sourceLineageTag: PromoCode
+		summarizeBy: none
+		sourceColumn: PromoCode
+
+		annotation SummarizationSetBy = Automatic
+
+	column LineNumber
+		dataType: int64
+		formatString: 0
+		lineageTag: a4ec8fb1-4910-4972-9ee7-fbe87c3e29e4
+		sourceLineageTag: LineNumber
+		summarizeBy: sum
+		sourceColumn: LineNumber
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductID
+		dataType: int64
+		formatString: 0
+		lineageTag: 71d65db0-e38c-4468-8904-73f40ff0fa24
+		sourceLineageTag: ProductID
+		summarizeBy: count
+		sourceColumn: ProductID
+
+		annotation SummarizationSetBy = Automatic
+
+	column Qty
+		dataType: int64
+		formatString: 0
+		lineageTag: df9b1c40-e354-4ad1-abb0-3b1dbcd9f892
+		sourceLineageTag: Qty
+		summarizeBy: sum
+		sourceColumn: Qty
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountAmount
+		dataType: string
+		lineageTag: 33d9d2bd-b7cf-42fb-b638-c2f8954d4483
+		sourceLineageTag: DiscountAmount
+		summarizeBy: none
+		sourceColumn: DiscountAmount
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountCents
+		dataType: int64
+		formatString: 0
+		lineageTag: ea996207-d3c7-49e1-8fc8-05b141a9f1f1
+		sourceLineageTag: DiscountCents
+		summarizeBy: sum
+		sourceColumn: DiscountCents
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_promo_lines = entity
+		mode: directLake
+		source
+			entityName: fact_promo_lines
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

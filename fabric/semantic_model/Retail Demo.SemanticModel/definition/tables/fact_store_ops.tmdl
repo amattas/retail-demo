@@ -1,0 +1,39 @@
+table fact_store_ops
+	lineageTag: 80c6c104-b04f-4f32-80d8-171ee25124bc
+	sourceLineageTag: [ag].[fact_store_ops]
+
+	column trace_id
+		dataType: string
+		lineageTag: b6cd55a9-b6d5-4587-ba32-3c00512f17a4
+		sourceLineageTag: trace_id
+		summarizeBy: none
+		sourceColumn: trace_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 6e2b25da-73cc-45b1-8f50-d598bab31ac7
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column operation_type
+		dataType: string
+		lineageTag: 7bd75097-e7ac-4441-b76f-37cfbdf7ce61
+		sourceLineageTag: operation_type
+		summarizeBy: none
+		sourceColumn: operation_type
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_store_ops = entity
+		mode: directLake
+		source
+			entityName: fact_store_ops
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+
