@@ -1,7 +1,3 @@
-/// =============================================================================
-/// GEOGRAPHY HIERARCHY
-/// =============================================================================
-
 relationship 'dim_customers to dim_geographies'
 	fromColumn: dim_customers.GeographyID
 	toColumn: dim_geographies.ID
@@ -17,10 +13,6 @@ relationship 'dim_distribution_centers to dim_geographies'
 relationship 'dim_trucks to dim_distribution_centers'
 	fromColumn: dim_trucks.DCID
 	toColumn: dim_distribution_centers.ID
-
-/// =============================================================================
-/// IN-STORE TRANSACTIONS
-/// =============================================================================
 
 relationship 'fact_receipts to dim_customers'
 	fromColumn: fact_receipts.customer_id
@@ -54,10 +46,6 @@ relationship 'fact_payments to dim_customers'
 	fromColumn: fact_payments.customer_id
 	toColumn: dim_customers.ID
 
-/// =============================================================================
-/// ONLINE ORDERS
-/// =============================================================================
-
 relationship 'fact_online_order_headers to dim_customers'
 	fromColumn: fact_online_order_headers.customer_id
 	toColumn: dim_customers.ID
@@ -69,10 +57,6 @@ relationship 'fact_online_order_lines to fact_online_order_headers'
 relationship 'fact_online_order_lines to dim_products'
 	fromColumn: fact_online_order_lines.product_id
 	toColumn: dim_products.ID
-
-/// =============================================================================
-/// INVENTORY
-/// =============================================================================
 
 relationship 'fact_store_inventory_txn to dim_stores'
 	fromColumn: fact_store_inventory_txn.store_id
@@ -106,10 +90,6 @@ relationship 'fact_dc_inventory_txn to dim_products'
 	fromColumn: fact_dc_inventory_txn.product_id
 	toColumn: dim_products.ID
 
-/// =============================================================================
-/// TRUCKS & DISTRIBUTION
-/// =============================================================================
-
 relationship 'fact_truck_moves to dim_trucks'
 	fromColumn: fact_truck_moves.truck_id
 	toColumn: dim_trucks.ID
@@ -129,10 +109,6 @@ relationship 'fact_truck_inventory to dim_trucks'
 relationship 'fact_truck_inventory to dim_products'
 	fromColumn: fact_truck_inventory.product_id
 	toColumn: dim_products.ID
-
-/// =============================================================================
-/// STORE OPERATIONS
-/// =============================================================================
 
 relationship 'fact_foot_traffic to dim_stores'
 	fromColumn: fact_foot_traffic.store_id
@@ -166,10 +142,6 @@ relationship 'fact_store_ops to dim_stores'
 	fromColumn: fact_store_ops.store_id
 	toColumn: dim_stores.ID
 
-/// =============================================================================
-/// PROMOTIONS & MARKETING
-/// =============================================================================
-
 relationship 'fact_promotions to dim_stores'
 	fromColumn: fact_promotions.StoreID
 	toColumn: dim_stores.ID
@@ -181,10 +153,6 @@ relationship 'fact_promotions to dim_customers'
 relationship 'fact_promotions to fact_receipts'
 	fromColumn: fact_promotions.ReceiptId
 	toColumn: fact_receipts.receipt_id_ext
-
-/// =============================================================================
-/// GOLD AGGREGATION TABLES
-/// =============================================================================
 
 relationship 'sales_minute_store to dim_stores'
 	fromColumn: sales_minute_store.store_id
