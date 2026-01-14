@@ -37,6 +37,7 @@ relationship 'fact_payments to fact_receipts'
 	toColumn: fact_receipts.receipt_id_ext
 
 relationship 'fact_payments to fact_online_order_headers'
+	isActive: false
 	fromColumn: fact_payments.order_id_ext
 	toColumn: fact_online_order_headers.order_id_ext
 
