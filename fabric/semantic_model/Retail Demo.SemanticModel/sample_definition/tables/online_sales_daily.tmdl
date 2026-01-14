@@ -1,0 +1,75 @@
+table online_sales_daily
+	lineageTag: 7694ca79-90af-43dd-9bc2-b24be33cf620
+	sourceLineageTag: [au].[online_sales_daily]
+
+	column day
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 458494f3-bf25-4faa-b3a1-152874311d30
+		sourceLineageTag: day
+		summarizeBy: none
+		sourceColumn: day
+
+		annotation SummarizationSetBy = Automatic
+
+	column orders
+		dataType: int64
+		formatString: 0
+		lineageTag: 78e99614-8cf5-4e46-be5d-e2091dd4a0a2
+		sourceLineageTag: orders
+		summarizeBy: sum
+		sourceColumn: orders
+
+		annotation SummarizationSetBy = Automatic
+
+	column subtotal
+		dataType: double
+		lineageTag: b4d4b448-f125-40a6-9f26-c825ac8a4a6d
+		sourceLineageTag: subtotal
+		summarizeBy: sum
+		sourceColumn: subtotal
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column tax
+		dataType: double
+		lineageTag: 9a349301-6d5c-47f9-ba34-a90c7efd625d
+		sourceLineageTag: tax
+		summarizeBy: sum
+		sourceColumn: tax
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column total
+		dataType: double
+		lineageTag: e56f0470-3dd3-433c-95b2-2e0ba60c2950
+		sourceLineageTag: total
+		summarizeBy: sum
+		sourceColumn: total
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column avg_order_value
+		dataType: double
+		lineageTag: 6141597c-c1dd-4951-8d19-b01f648e00de
+		sourceLineageTag: avg_order_value
+		summarizeBy: sum
+		sourceColumn: avg_order_value
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition online_sales_daily = entity
+		mode: directLake
+		source
+			entityName: online_sales_daily
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

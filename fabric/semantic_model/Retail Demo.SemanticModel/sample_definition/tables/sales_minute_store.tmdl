@@ -1,0 +1,63 @@
+table sales_minute_store
+	lineageTag: de37c2ff-bf44-46b2-8759-b7e670aea198
+	sourceLineageTag: [au].[sales_minute_store]
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 5b1ba1bb-8dbe-4564-923a-daeaa95eef8c
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column ts
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 7442f992-891e-44e4-8091-37d25be1bc15
+		sourceLineageTag: ts
+		summarizeBy: none
+		sourceColumn: ts
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_sales
+		dataType: double
+		lineageTag: 5f826591-f281-435b-bebd-827f8775253e
+		sourceLineageTag: total_sales
+		summarizeBy: sum
+		sourceColumn: total_sales
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column receipts
+		dataType: int64
+		formatString: 0
+		lineageTag: a62cbf80-7a82-4e0c-a46a-b70e565757e8
+		sourceLineageTag: receipts
+		summarizeBy: sum
+		sourceColumn: receipts
+
+		annotation SummarizationSetBy = Automatic
+
+	column avg_basket
+		dataType: double
+		lineageTag: 562f683b-e69e-4b17-9983-682175af3206
+		sourceLineageTag: avg_basket
+		summarizeBy: sum
+		sourceColumn: avg_basket
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition sales_minute_store = entity
+		mode: directLake
+		source
+			entityName: sales_minute_store
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

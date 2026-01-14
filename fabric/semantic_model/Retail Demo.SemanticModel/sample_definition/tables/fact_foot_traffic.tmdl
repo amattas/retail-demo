@@ -1,0 +1,59 @@
+table fact_foot_traffic
+	lineageTag: 3250f077-8377-42f4-8068-e5b27ead2bbc
+	sourceLineageTag: [ag].[fact_foot_traffic]
+
+	column count
+		dataType: int64
+		formatString: 0
+		lineageTag: 52907b57-9e65-4f5b-99f0-31d922335294
+		sourceLineageTag: count
+		summarizeBy: sum
+		sourceColumn: count
+
+		annotation SummarizationSetBy = Automatic
+
+	column zone
+		dataType: string
+		lineageTag: 6ba6b8ca-45ca-4ebb-ade7-2bf3ad96a5c8
+		sourceLineageTag: zone
+		summarizeBy: none
+		sourceColumn: zone
+
+		annotation SummarizationSetBy = Automatic
+
+	column dwell_seconds
+		dataType: int64
+		formatString: 0
+		lineageTag: 7106abaa-14a6-479d-b3eb-6f527e55fe7a
+		sourceLineageTag: dwell_seconds
+		summarizeBy: sum
+		sourceColumn: dwell_seconds
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: aced004f-9bcd-4b5c-83b4-82bd62c7aee2
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column sensor_id
+		dataType: string
+		lineageTag: c2bf3432-f703-475a-9858-e4f5a9aede76
+		sourceLineageTag: sensor_id
+		summarizeBy: none
+		sourceColumn: sensor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_foot_traffic = entity
+		mode: directLake
+		source
+			entityName: fact_foot_traffic
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

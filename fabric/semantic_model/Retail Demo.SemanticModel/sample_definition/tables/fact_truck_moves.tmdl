@@ -1,0 +1,59 @@
+table fact_truck_moves
+	lineageTag: 6e9f34be-ff0b-441f-95bc-3919cb907efd
+	sourceLineageTag: [ag].[fact_truck_moves]
+
+	column status
+		dataType: string
+		lineageTag: f69b3456-425b-47ed-b8c1-2a03470803f6
+		sourceLineageTag: status
+		summarizeBy: none
+		sourceColumn: status
+
+		annotation SummarizationSetBy = Automatic
+
+	column shipment_id
+		dataType: string
+		lineageTag: b11aecb7-a0ae-442a-88bd-362fb4f2232f
+		sourceLineageTag: shipment_id
+		summarizeBy: none
+		sourceColumn: shipment_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column dc_id
+		dataType: int64
+		formatString: 0
+		lineageTag: ec9b04e6-9b9c-4a95-bac4-49a650b305b6
+		sourceLineageTag: dc_id
+		summarizeBy: sum
+		sourceColumn: dc_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column truck_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 98b48aec-fea8-494f-bde5-4b8b8e325f6a
+		sourceLineageTag: truck_id
+		summarizeBy: sum
+		sourceColumn: truck_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 05101263-ccf5-4ae0-924d-5f035cc103ac
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_truck_moves = entity
+		mode: directLake
+		source
+			entityName: fact_truck_moves
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

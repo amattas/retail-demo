@@ -1,0 +1,80 @@
+table fact_reorders
+	lineageTag: 19d0f60d-7c1e-464c-9fb5-114e950beca0
+	sourceLineageTag: [ag].[fact_reorders]
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: c82d9f99-4337-45ba-8436-43d78d1e5374
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column dc_id
+		dataType: int64
+		formatString: 0
+		lineageTag: dbe4adad-185a-476e-95da-18bd6e830701
+		sourceLineageTag: dc_id
+		summarizeBy: sum
+		sourceColumn: dc_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_id
+		dataType: int64
+		formatString: 0
+		lineageTag: a83e73e5-0747-46c2-803e-89ad43abe81e
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column current_quantity
+		dataType: int64
+		formatString: 0
+		lineageTag: 5aa2ea08-ad55-47e6-89a9-ce9af46aedaa
+		sourceLineageTag: current_quantity
+		summarizeBy: sum
+		sourceColumn: current_quantity
+
+		annotation SummarizationSetBy = Automatic
+
+	column reorder_quantity
+		dataType: int64
+		formatString: 0
+		lineageTag: 197ea118-6e26-4e9b-8930-509556bb7fef
+		sourceLineageTag: reorder_quantity
+		summarizeBy: sum
+		sourceColumn: reorder_quantity
+
+		annotation SummarizationSetBy = Automatic
+
+	column reorder_point
+		dataType: int64
+		formatString: 0
+		lineageTag: 8e49ccd8-76f0-44e0-a3d9-b63ff2ce9fe0
+		sourceLineageTag: reorder_point
+		summarizeBy: sum
+		sourceColumn: reorder_point
+
+		annotation SummarizationSetBy = Automatic
+
+	column priority
+		dataType: string
+		lineageTag: f0e05318-d1e0-4cda-98d5-7016a11a979b
+		sourceLineageTag: priority
+		summarizeBy: none
+		sourceColumn: priority
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_reorders = entity
+		mode: directLake
+		source
+			entityName: fact_reorders
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+
