@@ -2,6 +2,38 @@ table fact_receipts
 	lineageTag: dbb3a597-d860-42d1-9585-a7da0fc2a2a4
 	sourceLineageTag: [ag].[fact_receipts]
 
+	measure 'Total Sales' = SUM(fact_receipts[total_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000001
+
+	measure 'Total Tax' = SUM(fact_receipts[tax_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000002
+
+	measure 'Total Subtotal' = SUM(fact_receipts[subtotal_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000003
+
+	measure 'Receipt Count' = COUNTROWS(fact_receipts)
+		formatString: #,0
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000004
+
+	measure 'Average Basket Size' = DIVIDE([Total Sales], [Receipt Count], 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000005
+
+	measure 'Total Returns' =
+		CALCULATE(
+			[Total Sales],
+			fact_receipts[receipt_type] = "RETURN"
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000006
+
+	measure 'Net Sales' = [Total Sales] + [Total Returns]
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000007
+
 	column customer_id
 		dataType: int64
 		formatString: 0

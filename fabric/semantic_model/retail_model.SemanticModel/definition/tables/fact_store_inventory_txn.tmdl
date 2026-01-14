@@ -2,6 +2,14 @@ table fact_store_inventory_txn
 	lineageTag: 069e006d-82a8-46ab-abf7-39d781c37887
 	sourceLineageTag: [ag].[fact_store_inventory_txn]
 
+	measure 'Total Inventory Transactions' = COUNTROWS(fact_store_inventory_txn)
+		formatString: #,0
+		lineageTag: 01a1a1a6-0001-0001-0001-000000000001
+
+	measure 'Total Quantity Delta' = SUM(fact_store_inventory_txn[quantity])
+		formatString: #,0
+		lineageTag: 01a1a1a6-0001-0001-0001-000000000002
+
 	column txn_type
 		dataType: string
 		lineageTag: fcdbfd4d-1ec4-422f-b7bd-a6a83e8b03c9

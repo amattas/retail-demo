@@ -2,6 +2,10 @@ table dim_trucks
 	lineageTag: 7eb610bd-c508-404e-b04a-5cb53d07d17a
 	sourceLineageTag: [ag].[dim_trucks]
 
+	measure '# of Trucks' = COUNTROWS(dim_trucks)
+		formatString: #,0
+		lineageTag: 01a1a1b5-0001-0001-0001-000000000001
+
 	column ID
 		dataType: int64
 		formatString: 0

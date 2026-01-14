@@ -2,6 +2,10 @@ table dim_distribution_centers
 	lineageTag: ae706b9b-d53f-48e5-8f09-4c969f0d6b4a
 	sourceLineageTag: [ag].[dim_distribution_centers]
 
+	measure '# of Distribution Centers' = COUNTROWS(dim_distribution_centers)
+		formatString: #,0
+		lineageTag: 01a1a1b4-0001-0001-0001-000000000001
+
 	column ID
 		dataType: int64
 		formatString: 0

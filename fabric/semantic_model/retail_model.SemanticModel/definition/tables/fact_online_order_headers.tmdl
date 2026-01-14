@@ -2,6 +2,26 @@ table fact_online_order_headers
 	lineageTag: 930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd
 	sourceLineageTag: [ag].[fact_online_order_headers]
 
+	measure 'Total Online Sales' = SUM(fact_online_order_headers[total_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a3-0001-0001-0001-000000000001
+
+	measure 'Total Online Tax' = SUM(fact_online_order_headers[tax_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a3-0001-0001-0001-000000000002
+
+	measure 'Total Online Subtotal' = SUM(fact_online_order_headers[subtotal_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a3-0001-0001-0001-000000000003
+
+	measure 'Online Order Count' = COUNTROWS(fact_online_order_headers)
+		formatString: #,0
+		lineageTag: 01a1a1a3-0001-0001-0001-000000000004
+
+	measure 'Average Online Order Value' = DIVIDE([Total Online Sales], [Online Order Count], 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a3-0001-0001-0001-000000000005
+
 	column customer_id
 		dataType: int64
 		formatString: 0

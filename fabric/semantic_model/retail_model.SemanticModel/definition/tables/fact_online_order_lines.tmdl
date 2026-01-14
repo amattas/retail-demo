@@ -2,6 +2,18 @@ table fact_online_order_lines
 	lineageTag: ead55580-9419-45ac-91ff-f5ac29096866
 	sourceLineageTag: [ag].[fact_online_order_lines]
 
+	measure 'Total Online Units' = SUM(fact_online_order_lines[quantity])
+		formatString: #,0
+		lineageTag: 01a1a1a4-0001-0001-0001-000000000001
+
+	measure 'Online Line Revenue' = SUM(fact_online_order_lines[ext_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a4-0001-0001-0001-000000000002
+
+	measure 'Average Online Unit Price' = DIVIDE([Online Line Revenue], [Total Online Units], 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a4-0001-0001-0001-000000000003
+
 	column order_id
 		dataType: string
 		lineageTag: 8ed9dac6-9c06-4081-9067-1862bb870d3c

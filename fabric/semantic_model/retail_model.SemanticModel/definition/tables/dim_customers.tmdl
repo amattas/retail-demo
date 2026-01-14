@@ -2,6 +2,10 @@ table dim_customers
 	lineageTag: 5531b22c-bc78-4ae9-8d9f-64dcee879bad
 	sourceLineageTag: [ag].[dim_customers]
 
+	measure '# of Customers' = COUNTROWS(dim_customers)
+		formatString: #,0
+		lineageTag: 01a1a1b3-0001-0001-0001-000000000001
+
 	column ID
 		dataType: int64
 		formatString: 0

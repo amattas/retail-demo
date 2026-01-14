@@ -2,6 +2,10 @@ table dim_stores
 	lineageTag: 7a2501f0-2aab-403a-82e0-5f791cd939ef
 	sourceLineageTag: [ag].[dim_stores]
 
+	measure '# of Stores' = COUNTROWS(dim_stores)
+		formatString: #,0
+		lineageTag: 01a1a1b2-0001-0001-0001-000000000001
+
 	column ID
 		dataType: int64
 		formatString: 0

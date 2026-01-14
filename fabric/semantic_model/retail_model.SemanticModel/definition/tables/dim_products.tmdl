@@ -2,6 +2,18 @@ table dim_products
 	lineageTag: 7a341aa1-e4de-4e62-8737-d78ecfeea40b
 	sourceLineageTag: [ag].[dim_products]
 
+	measure '# of Products' = COUNTROWS(dim_products)
+		formatString: #,0
+		lineageTag: 01a1a1b1-0001-0001-0001-000000000001
+
+	measure 'Average Product Cost' = AVERAGE(dim_products[Cost])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1b1-0001-0001-0001-000000000002
+
+	measure 'Average Product Price' = AVERAGE(dim_products[SalePrice])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1b1-0001-0001-0001-000000000003
+
 	column ID
 		dataType: int64
 		formatString: 0

@@ -2,6 +2,26 @@ table inventory_position_current
 	lineageTag: 80253872-c9ec-4d0d-b638-c3c5163306c3
 	sourceLineageTag: [au].[inventory_position_current]
 
+	measure 'Total Units on Hand' = SUM(inventory_position_current[on_hand])
+		formatString: #,0
+		lineageTag: 01a1a1a5-0001-0001-0001-000000000001
+
+	measure 'Total Inventory Value' =
+		SUMX(
+			inventory_position_current,
+			inventory_position_current[on_hand] * RELATED(dim_products[Cost])
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a5-0001-0001-0001-000000000002
+
+	measure 'Total Inventory Retail Value' =
+		SUMX(
+			inventory_position_current,
+			inventory_position_current[on_hand] * RELATED(dim_products[SalePrice])
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a5-0001-0001-0001-000000000003
+
 	column store_id
 		dataType: int64
 		formatString: 0

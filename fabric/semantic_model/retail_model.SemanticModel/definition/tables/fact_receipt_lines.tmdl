@@ -2,6 +2,22 @@ table fact_receipt_lines
 	lineageTag: aab05dc7-35b4-4318-affd-bc107c21f8f7
 	sourceLineageTag: [ag].[fact_receipt_lines]
 
+	measure 'Total Units Sold' = SUM(fact_receipt_lines[quantity])
+		formatString: #,0
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000001
+
+	measure 'Line Revenue' = SUM(fact_receipt_lines[ext_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000002
+
+	measure 'Average Unit Price' = DIVIDE([Line Revenue], [Total Units Sold], 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000003
+
+	measure 'Total Lines' = COUNTROWS(fact_receipt_lines)
+		formatString: #,0
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000004
+
 	column receipt_id_ext
 		dataType: string
 		lineageTag: 9a782ca7-2110-4e68-994a-5c56e36c0200
