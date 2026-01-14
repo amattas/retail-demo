@@ -131,42 +131,42 @@ table gold_tender_mix_daily
 
 relationship Sales_to_Stores
   fromColumn: gold_sales_minute_store.store_id
-  toColumn: dim_stores.store_id
+  toColumn: dim_stores.ID
   crossFilteringBehavior: oneDirection
 
 relationship InvCurrent_to_Stores
   fromColumn: gold_inventory_position_current.store_id
-  toColumn: dim_stores.store_id
+  toColumn: dim_stores.ID
   crossFilteringBehavior: oneDirection
 
 relationship InvCurrent_to_Products
   fromColumn: gold_inventory_position_current.product_id
-  toColumn: dim_products.product_id
+  toColumn: dim_products.ID
   crossFilteringBehavior: oneDirection
 
 relationship TopProducts_to_Products
   fromColumn: gold_top_products_15m.product_id
-  toColumn: dim_products.product_id
+  toColumn: dim_products.ID
   crossFilteringBehavior: oneDirection
 
 relationship ZoneDwell_to_Stores
   fromColumn: gold_zone_dwell_minute.store_id
-  toColumn: dim_stores.store_id
+  toColumn: dim_stores.ID
   crossFilteringBehavior: oneDirection
 
 relationship DCInv_to_DCs
   fromColumn: gold_dc_inventory_position_current.dc_id
-  toColumn: dim_distribution_centers.dc_id
+  toColumn: dim_distribution_centers.ID
   crossFilteringBehavior: oneDirection
 
 relationship Stores_to_Geographies
-  fromColumn: dim_stores.geography_id
-  toColumn: dim_geographies.geography_id
+  fromColumn: dim_stores.GeographyID
+  toColumn: dim_geographies.ID
   crossFilteringBehavior: oneDirection
 
 relationship DCs_to_Geographies
-  fromColumn: dim_distribution_centers.geography_id
-  toColumn: dim_geographies.geography_id
+  fromColumn: dim_distribution_centers.GeographyID
+  toColumn: dim_geographies.ID
   crossFilteringBehavior: oneDirection
 
 perspective Operations
