@@ -22,11 +22,7 @@ table fact_receipts
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000005
 
-	measure 'Total Returns' =
-			CALCULATE(
-				[Total Sales],
-				fact_receipts[receipt_type] = "RETURN"
-			)
+	measure 'Total Returns' = CALCULATE([Total Sales], fact_receipts[receipt_type] = "RETURN")
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000006
 

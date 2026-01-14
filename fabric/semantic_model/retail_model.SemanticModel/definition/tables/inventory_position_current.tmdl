@@ -6,19 +6,11 @@ table inventory_position_current
 		formatString: #,0
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000001
 
-	measure 'Total Inventory Value' =
-			SUMX(
-				inventory_position_current,
-				inventory_position_current[on_hand] * RELATED(dim_products[Cost])
-			)
+	measure 'Total Inventory Value' = SUMX(inventory_position_current, inventory_position_current[on_hand] * RELATED(dim_products[Cost]))
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000002
 
-	measure 'Total Inventory Retail Value' =
-			SUMX(
-				inventory_position_current,
-				inventory_position_current[on_hand] * RELATED(dim_products[SalePrice])
-			)
+	measure 'Total Inventory Retail Value' = SUMX(inventory_position_current, inventory_position_current[on_hand] * RELATED(dim_products[SalePrice]))
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000003
 
