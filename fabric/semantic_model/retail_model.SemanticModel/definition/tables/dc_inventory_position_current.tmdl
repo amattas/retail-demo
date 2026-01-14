@@ -1,0 +1,41 @@
+table dc_inventory_position_current
+	lineageTag: 6e01fb51-1261-4586-97ec-01c0f7b73a13
+	sourceLineageTag: [au].[dc_inventory_position_current]
+
+	column dc_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 847804d1-5b60-4232-a3c8-4daa440a4ceb
+		sourceLineageTag: dc_id
+		summarizeBy: sum
+		sourceColumn: dc_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 637a2bb9-88bd-4b52-a68d-f453131dd46e
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column on_hand
+		dataType: int64
+		formatString: 0
+		lineageTag: 59670602-e36f-4c3f-ac16-f953603778a2
+		sourceLineageTag: on_hand
+		summarizeBy: sum
+		sourceColumn: on_hand
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dc_inventory_position_current = entity
+		mode: directLake
+		source
+			entityName: dc_inventory_position_current
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

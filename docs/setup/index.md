@@ -12,7 +12,8 @@ This guide provides step-by-step instructions for deploying the Retail Demo solu
 - [ ] **Phase 4**: [Gold Layer](04-gold-layer.md) - Verify aggregation tables
 - [ ] **Phase 5**: [Pipelines](05-pipelines.md) - Create scheduled pipelines
 - [ ] **Phase 6**: [Streaming](06-streaming.md) - Configure Eventstream for real-time data
-- [ ] **Phase 7**: [Dashboards](07-dashboards.md) - Create semantic model and dashboards
+- [ ] **Phase 7**: [Semantic Model](08-semantic-model-deployment.md) - Deploy Power BI semantic model
+- [ ] **Phase 8**: [Dashboards](07-dashboards.md) - Create reports and dashboards
 
 ## Prerequisites
 

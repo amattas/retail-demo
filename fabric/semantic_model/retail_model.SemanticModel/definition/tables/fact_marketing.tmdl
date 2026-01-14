@@ -1,0 +1,95 @@
+table fact_marketing
+	lineageTag: 0de63cc1-c6da-4354-8a04-602a3c737aa8
+	sourceLineageTag: [ag].[fact_marketing]
+
+	column CustomerId
+		dataType: double
+		lineageTag: af26fadf-1aa7-4813-b8f2-4b18a7d05aa7
+		sourceLineageTag: CustomerId
+		summarizeBy: count
+		sourceColumn: CustomerId
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column CostCents
+		dataType: int64
+		formatString: 0
+		lineageTag: e29f4b2f-b696-4df5-be7d-227c34ea126b
+		sourceLineageTag: CostCents
+		summarizeBy: sum
+		sourceColumn: CostCents
+
+		annotation SummarizationSetBy = Automatic
+
+	column device
+		dataType: string
+		lineageTag: b261ffc1-b0e5-4a33-ac71-797d936d6047
+		sourceLineageTag: device
+		summarizeBy: none
+		sourceColumn: device
+
+		annotation SummarizationSetBy = Automatic
+
+	column cost
+		dataType: string
+		lineageTag: 23c50c8e-33b2-47bd-aff8-9a84cad24506
+		sourceLineageTag: cost
+		summarizeBy: none
+		sourceColumn: cost
+
+		annotation SummarizationSetBy = Automatic
+
+	column customer_ad_id
+		dataType: string
+		lineageTag: a75aaf0c-3276-4cb6-b82b-5dd328e875de
+		sourceLineageTag: customer_ad_id
+		summarizeBy: none
+		sourceColumn: customer_ad_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column impression_id_ext
+		dataType: string
+		lineageTag: 89d38797-4885-4065-9195-4b0a2120f58e
+		sourceLineageTag: impression_id_ext
+		summarizeBy: none
+		sourceColumn: impression_id_ext
+
+		annotation SummarizationSetBy = Automatic
+
+	column campaign_id
+		dataType: string
+		lineageTag: aeee4a8b-9e31-4c4a-9a0f-e6d15a3d2459
+		sourceLineageTag: campaign_id
+		summarizeBy: none
+		sourceColumn: campaign_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column creative_id
+		dataType: string
+		lineageTag: b60cdc7a-5bde-4e67-a5be-f537896f9931
+		sourceLineageTag: creative_id
+		summarizeBy: none
+		sourceColumn: creative_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column channel
+		dataType: string
+		lineageTag: 8778e66d-7a6f-4276-bd3b-7abbc83893da
+		sourceLineageTag: channel
+		summarizeBy: none
+		sourceColumn: channel
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_marketing = entity
+		mode: directLake
+		source
+			entityName: fact_marketing
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

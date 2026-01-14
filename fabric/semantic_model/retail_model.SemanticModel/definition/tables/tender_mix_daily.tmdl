@@ -1,0 +1,51 @@
+table tender_mix_daily
+	lineageTag: 52b36092-c97d-40fd-82fa-5031db035dc5
+	sourceLineageTag: [au].[tender_mix_daily]
+
+	column day
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 4387d025-d6ea-4ec9-a05d-b596eee6282c
+		sourceLineageTag: day
+		summarizeBy: none
+		sourceColumn: day
+
+		annotation SummarizationSetBy = Automatic
+
+	column payment_method
+		dataType: string
+		lineageTag: 2043d77e-da13-4502-ab9c-d80e17bffaa4
+		sourceLineageTag: payment_method
+		summarizeBy: none
+		sourceColumn: payment_method
+
+		annotation SummarizationSetBy = Automatic
+
+	column transactions
+		dataType: int64
+		formatString: 0
+		lineageTag: d271d3a5-e547-4ce2-85fc-570fd5b748e6
+		sourceLineageTag: transactions
+		summarizeBy: sum
+		sourceColumn: transactions
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_amount
+		dataType: double
+		lineageTag: 6facbff4-fe61-4f8a-a4be-3dcdfb1d3e5e
+		sourceLineageTag: total_amount
+		summarizeBy: sum
+		sourceColumn: total_amount
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition tender_mix_daily = entity
+		mode: directLake
+		source
+			entityName: tender_mix_daily
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

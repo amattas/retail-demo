@@ -24,13 +24,15 @@ For ongoing streaming data, the Gold layer is updated by `04-streaming-to-gold.i
 | `zone_dwell_minute` | Per minute, per zone | fact_foot_traffic | Customer dwell times |
 | `marketing_cost_daily` | Daily, per campaign | fact_marketing | Marketing spend |
 
+**Note**: Additional aggregations (campaign revenue, fulfillment metrics, stockouts, reorders, store ops, promo performance, BLE presence) are planned for future releases.
+
 **Time Estimate**: 5-15 minutes
 
 ## Verification
 
 ```sql
 SHOW TABLES IN au;
--- Should show 9+ aggregated tables
+-- Should show 9 aggregated tables
 
 -- Check latest sales data
 SELECT * FROM au.sales_minute_store
@@ -53,7 +55,7 @@ LIMIT 7;
 | Component | Value |
 |-----------|-------|
 | **Schema** | `au` |
-| **Tables** | 9+ aggregated KPI tables |
+| **Tables** | 9 aggregated KPI tables |
 | **Format** | Delta Lake |
 | **Purpose** | Fast dashboard queries |
 

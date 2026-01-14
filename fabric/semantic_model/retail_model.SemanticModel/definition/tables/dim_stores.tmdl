@@ -1,0 +1,102 @@
+table dim_stores
+	lineageTag: 7a2501f0-2aab-403a-82e0-5f791cd939ef
+	sourceLineageTag: [ag].[dim_stores]
+
+	measure '# of Stores' = COUNTROWS(dim_stores)
+		formatString: #,0
+		lineageTag: 01a1a1b2-0001-0001-0001-000000000001
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: 2d99adc6-f14d-456a-8a96-828c3d9cf143
+		sourceLineageTag: ID
+		summarizeBy: none
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column StoreNumber
+		dataType: string
+		lineageTag: 26e6a058-d596-4bfe-8e69-52e779a7adfa
+		sourceLineageTag: StoreNumber
+		summarizeBy: none
+		sourceColumn: StoreNumber
+
+		annotation SummarizationSetBy = Automatic
+
+	column Address
+		dataType: string
+		lineageTag: c89d4703-0419-4d06-8a5b-4ee55f0006e0
+		sourceLineageTag: Address
+		summarizeBy: none
+		sourceColumn: Address
+
+		annotation SummarizationSetBy = Automatic
+
+	column GeographyID
+		dataType: int64
+		formatString: 0
+		lineageTag: 34b29980-f042-438f-bedc-96916d57be64
+		sourceLineageTag: GeographyID
+		summarizeBy: none
+		sourceColumn: GeographyID
+
+		annotation SummarizationSetBy = Automatic
+
+	column tax_rate
+		dataType: double
+		lineageTag: 5d48e6a7-58d4-4ae4-a1fb-af34db5aa099
+		sourceLineageTag: tax_rate
+		summarizeBy: none
+		sourceColumn: tax_rate
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column volume_class
+		dataType: string
+		lineageTag: 0295d16e-cf12-4f89-a22b-e19fa4c8e6ca
+		sourceLineageTag: volume_class
+		summarizeBy: none
+		sourceColumn: volume_class
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_format
+		dataType: string
+		lineageTag: 847e0428-24d0-4c22-adef-1d346945593c
+		sourceLineageTag: store_format
+		summarizeBy: none
+		sourceColumn: store_format
+
+		annotation SummarizationSetBy = Automatic
+
+	column operating_hours
+		dataType: string
+		lineageTag: 57c66eb7-47bd-47d8-a38e-14e7c857926b
+		sourceLineageTag: operating_hours
+		summarizeBy: none
+		sourceColumn: operating_hours
+
+		annotation SummarizationSetBy = Automatic
+
+	column daily_traffic_multiplier
+		dataType: double
+		lineageTag: 718f6419-bcf5-4a30-9ff5-3719ccd5ec78
+		sourceLineageTag: daily_traffic_multiplier
+		summarizeBy: none
+		sourceColumn: daily_traffic_multiplier
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition dim_stores = entity
+		mode: directLake
+		source
+			entityName: dim_stores
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

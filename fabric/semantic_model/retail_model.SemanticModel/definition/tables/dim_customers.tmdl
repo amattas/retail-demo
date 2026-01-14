@@ -1,0 +1,98 @@
+table dim_customers
+	lineageTag: 5531b22c-bc78-4ae9-8d9f-64dcee879bad
+	sourceLineageTag: [ag].[dim_customers]
+
+	measure '# of Customers' = COUNTROWS(dim_customers)
+		formatString: #,0
+		lineageTag: 01a1a1b3-0001-0001-0001-000000000001
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: ad551aee-05c1-4bf7-ac53-2c998c804b5c
+		sourceLineageTag: ID
+		summarizeBy: count
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column FirstName
+		dataType: string
+		lineageTag: 29fdf2eb-f734-4dca-a4d5-57494eb37a71
+		sourceLineageTag: FirstName
+		summarizeBy: none
+		sourceColumn: FirstName
+
+		annotation SummarizationSetBy = Automatic
+
+	column LastName
+		dataType: string
+		lineageTag: 485d56e0-0b8f-41da-bbcd-cb500561440c
+		sourceLineageTag: LastName
+		summarizeBy: none
+		sourceColumn: LastName
+
+		annotation SummarizationSetBy = Automatic
+
+	column Address
+		dataType: string
+		lineageTag: 5e291f37-d33f-4a56-8471-a0e21934d4f8
+		sourceLineageTag: Address
+		summarizeBy: none
+		sourceColumn: Address
+
+		annotation SummarizationSetBy = Automatic
+
+	column GeographyID
+		dataType: int64
+		formatString: 0
+		lineageTag: 1b0afb62-5a20-472d-9486-5f52b3dc74f6
+		sourceLineageTag: GeographyID
+		summarizeBy: count
+		sourceColumn: GeographyID
+
+		annotation SummarizationSetBy = Automatic
+
+	column LoyaltyCard
+		dataType: string
+		lineageTag: a9c05456-300a-4430-a34b-184f017b66ae
+		sourceLineageTag: LoyaltyCard
+		summarizeBy: none
+		sourceColumn: LoyaltyCard
+
+		annotation SummarizationSetBy = Automatic
+
+	column Phone
+		dataType: string
+		lineageTag: bc662af4-3541-423b-895c-51e94578bfb7
+		sourceLineageTag: Phone
+		summarizeBy: none
+		sourceColumn: Phone
+
+		annotation SummarizationSetBy = Automatic
+
+	column BLEId
+		dataType: string
+		lineageTag: be6bd21e-b728-46c6-b62b-5550e2abedba
+		sourceLineageTag: BLEId
+		summarizeBy: none
+		sourceColumn: BLEId
+
+		annotation SummarizationSetBy = Automatic
+
+	column AdId
+		dataType: string
+		lineageTag: 0d74302f-4f4b-472c-9b9b-48b57d298e6b
+		sourceLineageTag: AdId
+		summarizeBy: none
+		sourceColumn: AdId
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_customers = entity
+		mode: directLake
+		source
+			entityName: dim_customers
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

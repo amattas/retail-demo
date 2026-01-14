@@ -1,0 +1,53 @@
+table dim_distribution_centers
+	lineageTag: ae706b9b-d53f-48e5-8f09-4c969f0d6b4a
+	sourceLineageTag: [ag].[dim_distribution_centers]
+
+	measure '# of Distribution Centers' = COUNTROWS(dim_distribution_centers)
+		formatString: #,0
+		lineageTag: 01a1a1b4-0001-0001-0001-000000000001
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: 3afba350-57be-485b-a77f-7f375ca85abd
+		sourceLineageTag: ID
+		summarizeBy: count
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column DCNumber
+		dataType: string
+		lineageTag: 44b8d211-1e3a-4e3e-bd7b-db2bc8964e77
+		sourceLineageTag: DCNumber
+		summarizeBy: none
+		sourceColumn: DCNumber
+
+		annotation SummarizationSetBy = Automatic
+
+	column Address
+		dataType: string
+		lineageTag: efc18eac-da79-4b56-a520-1e03eab253bb
+		sourceLineageTag: Address
+		summarizeBy: none
+		sourceColumn: Address
+
+		annotation SummarizationSetBy = Automatic
+
+	column GeographyID
+		dataType: int64
+		formatString: 0
+		lineageTag: 4881f71c-36d7-4f39-968c-453678861c69
+		sourceLineageTag: GeographyID
+		summarizeBy: count
+		sourceColumn: GeographyID
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_distribution_centers = entity
+		mode: directLake
+		source
+			entityName: dim_distribution_centers
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

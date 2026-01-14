@@ -1,0 +1,161 @@
+table fact_receipts
+	lineageTag: dbb3a597-d860-42d1-9585-a7da0fc2a2a4
+	sourceLineageTag: [ag].[fact_receipts]
+
+	measure 'Total Sales' = SUM(fact_receipts[total_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000001
+
+	measure 'Total Tax' = SUM(fact_receipts[tax_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000002
+
+	measure 'Total Subtotal' = SUM(fact_receipts[subtotal_cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000003
+
+	measure 'Receipt Count' = COUNTROWS(fact_receipts)
+		formatString: #,0
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000004
+
+	measure 'Average Basket Size' = DIVIDE([Total Sales], [Receipt Count], 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000005
+
+	measure 'Total Returns' = CALCULATE([Total Sales], fact_receipts[receipt_type] = "RETURN")
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000006
+
+	measure 'Net Sales' = [Total Sales] + [Total Returns]
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 01a1a1a1-0001-0001-0001-000000000007
+
+	column customer_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 3c038d61-f1c4-4c76-b595-e823714c2eb0
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column discount_amount
+		dataType: string
+		lineageTag: d8fdc9a6-23b4-4899-adb4-bfe4d04448eb
+		sourceLineageTag: discount_amount
+		summarizeBy: none
+		sourceColumn: discount_amount
+
+		annotation SummarizationSetBy = Automatic
+
+	column subtotal_cents
+		dataType: int64
+		formatString: 0
+		lineageTag: d10cc217-8d54-4f48-9786-c2788f401552
+		sourceLineageTag: subtotal_cents
+		summarizeBy: sum
+		sourceColumn: subtotal_cents
+
+		annotation SummarizationSetBy = Automatic
+
+	column receipt_type
+		dataType: string
+		lineageTag: f8a25262-9dde-476e-b2f1-94341f833092
+		sourceLineageTag: receipt_type
+		summarizeBy: none
+		sourceColumn: receipt_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column payment_method
+		dataType: string
+		lineageTag: feff8b81-9380-4f52-8965-e1c810debcc0
+		sourceLineageTag: payment_method
+		summarizeBy: none
+		sourceColumn: payment_method
+
+		annotation SummarizationSetBy = Automatic
+
+	column receipt_id_ext
+		dataType: string
+		lineageTag: 63ca03aa-3389-4a3c-a601-c8fbf8359291
+		sourceLineageTag: receipt_id_ext
+		summarizeBy: none
+		sourceColumn: receipt_id_ext
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_amount
+		dataType: string
+		lineageTag: 74c4603e-8ab4-487a-8d69-19de12151b9a
+		sourceLineageTag: total_amount
+		summarizeBy: none
+		sourceColumn: total_amount
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_cents
+		dataType: int64
+		formatString: 0
+		lineageTag: 648ce335-e019-4757-b4bc-e88c0e005ef7
+		sourceLineageTag: total_cents
+		summarizeBy: sum
+		sourceColumn: total_cents
+
+		annotation SummarizationSetBy = Automatic
+
+	column tax_amount
+		dataType: string
+		lineageTag: c4521791-db0f-4658-bb3f-9ca3197a12b7
+		sourceLineageTag: tax_amount
+		summarizeBy: none
+		sourceColumn: tax_amount
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: aa658e70-f275-4c6d-91c8-63d908c09403
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subtotal
+		dataType: string
+		lineageTag: da77bc23-568e-4c61-ad68-49d35f133cd0
+		sourceLineageTag: Subtotal
+		summarizeBy: none
+		sourceColumn: Subtotal
+
+		annotation SummarizationSetBy = Automatic
+
+	column tax_cents
+		dataType: int64
+		formatString: 0
+		lineageTag: c4715f0e-a9e5-4470-ac33-ec16b9f046c2
+		sourceLineageTag: tax_cents
+		summarizeBy: sum
+		sourceColumn: tax_cents
+
+		annotation SummarizationSetBy = Automatic
+
+	column return_for_receipt_id_ext
+		dataType: string
+		lineageTag: 5d3868eb-9b06-4ce0-801e-7476ff6bba04
+		sourceLineageTag: return_for_receipt_id_ext
+		summarizeBy: none
+		sourceColumn: return_for_receipt_id_ext
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_receipts = entity
+		mode: directLake
+		source
+			entityName: fact_receipts
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+
