@@ -5,9 +5,11 @@ model RetailGold
 
 table gold_sales_minute_store
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/sales_minute_store
+    source
+      type: entity
+      entityName: sales_minute_store
 
   measure 'Total Sales' = SUM('gold_sales_minute_store'[total_sales])
 
@@ -19,9 +21,11 @@ table gold_sales_minute_store
 
 table gold_top_products_15m
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/top_products_15m
+    source
+      type: entity
+      entityName: top_products_15m
 
   measure Revenue = SUM('gold_top_products_15m'[revenue])
 
@@ -29,37 +33,47 @@ table gold_top_products_15m
 
 table gold_inventory_position_current
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/inventory_position_current
+    source
+      type: entity
+      entityName: inventory_position_current
 
   measure 'On Hand' = SUM('gold_inventory_position_current'[on_hand])
 
 table gold_truck_dwell_daily
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/truck_dwell_daily
+    source
+      type: entity
+      entityName: truck_dwell_daily
 
   measure 'Avg Dwell (min)' = AVERAGE('gold_truck_dwell_daily'[avg_dwell_min])
 
 table dim_stores
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/ag/dim_stores
+    source
+      type: entity
+      entityName: dim_stores
 
 table dim_products
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/ag/dim_products
+    source
+      type: entity
+      entityName: dim_products
 
 table gold_online_sales_daily
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/online_sales_daily
+    source
+      type: entity
+      entityName: online_sales_daily
 
   measure Orders = SUM('gold_online_sales_daily'[orders])
 
@@ -69,9 +83,11 @@ table gold_online_sales_daily
 
 table gold_zone_dwell_minute
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/zone_dwell_minute
+    source
+      type: entity
+      entityName: zone_dwell_minute
 
   measure 'Avg Dwell (sec)' = AVERAGE('gold_zone_dwell_minute'[avg_dwell])
 
@@ -79,9 +95,11 @@ table gold_zone_dwell_minute
 
 table gold_marketing_cost_daily
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/marketing_cost_daily
+    source
+      type: entity
+      entityName: marketing_cost_daily
 
   measure Impressions = SUM('gold_marketing_cost_daily'[impressions])
 
@@ -89,17 +107,21 @@ table gold_marketing_cost_daily
 
 table gold_dc_inventory_position_current
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/dc_inventory_position_current
+    source
+      type: entity
+      entityName: dc_inventory_position_current
 
   measure 'DC On Hand' = SUM('gold_dc_inventory_position_current'[on_hand])
 
 table gold_tender_mix_daily
 
-  partition DirectLake = directLake
+  partition DirectLake
     mode: directLake
-    source: /Tables/au/tender_mix_daily
+    source
+      type: entity
+      entityName: tender_mix_daily
 
   measure Transactions = SUM('gold_tender_mix_daily'[transactions])
 
