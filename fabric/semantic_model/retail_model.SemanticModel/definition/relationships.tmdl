@@ -162,3 +162,19 @@ relationship 'zone_dwell_minute to dim_stores'
 	fromColumn: zone_dwell_minute.store_id
 	toColumn: dim_stores.ID
 
+relationship 'online_sales_daily to dim_date'
+	fromColumn: online_sales_daily.day
+	toColumn: dim_date.date
+
+relationship 'tender_mix_daily to dim_date'
+	fromColumn: tender_mix_daily.day
+	toColumn: dim_date.date
+
+relationship 'marketing_cost_daily to dim_date'
+	fromColumn: marketing_cost_daily.day
+	toColumn: dim_date.date
+
+relationship 'truck_dwell_daily to dim_date'
+	fromColumn: truck_dwell_daily.day
+	toColumn: dim_date.date
+

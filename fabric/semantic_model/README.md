@@ -7,7 +7,7 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - **Dimension Tables** (DirectLake): Master data from `ag` schema (dim_stores, dim_products)
 - **KQL views** (optional): Near-real-time tiles via DirectQuery
 
-## Current Tables (11)
+## Current Tables (12)
 
 ### Gold Aggregations (9 tables)
 - `gold_sales_minute_store` - Sales velocity per minute/store
@@ -20,9 +20,10 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - `gold_zone_dwell_minute` - Customer dwell times by zone
 - `gold_marketing_cost_daily` - Marketing spend by campaign
 
-### Dimension Tables (2 tables)
+### Dimension Tables (3 tables)
 - `dim_stores` - Store master data
 - `dim_products` - Product master data
+- `dim_date` - Date dimension with YYYYMMDD key, fiscal calendar attributes
 
 ## Perspectives
 - **Operations**: Sales, inventory, dwell, tender mix
