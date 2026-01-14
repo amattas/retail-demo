@@ -11,11 +11,6 @@ relationship 'dim_distribution_centers to dim_geographies'
 	fromColumn: dim_distribution_centers.GeographyID
 	toColumn: dim_geographies.ID
 
-relationship 'dim_trucks to dim_distribution_centers'
-	isActive: false
-	fromColumn: dim_trucks.DCID
-	toColumn: dim_distribution_centers.ID
-
 relationship 'fact_receipts to dim_customers'
 	fromColumn: fact_receipts.customer_id
 	toColumn: dim_customers.ID
