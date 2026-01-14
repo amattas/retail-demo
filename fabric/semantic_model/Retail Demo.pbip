@@ -6,6 +6,11 @@
       "report": {
         "path": "Retail Demo.Report"
       }
+    },
+    {
+      "dataset": {
+        "path": "Retail Demo.SemanticModel"
+      }
     }
   ],
   "settings": {
