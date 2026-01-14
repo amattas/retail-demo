@@ -1,5 +1,5 @@
 model RetailGold
-  compatibilityLevel: 1603
+  compatibilityLevel: 1604
 
   annotation fabric.lakehouseResourceId = "<fabric-lakehouse-resource-id>"
 
