@@ -115,18 +115,9 @@ relationship 'fact_foot_traffic to dim_stores'
 	fromColumn: fact_foot_traffic.store_id
 	toColumn: dim_stores.ID
 
-relationship 'fact_stockouts to dim_stores'
-	fromColumn: fact_stockouts.StoreID
-	toColumn: dim_stores.ID
-
 relationship 'fact_stockouts to dim_products'
 	fromColumn: fact_stockouts.ProductID
 	toColumn: dim_products.ID
-
-relationship 'fact_stockouts to dim_distribution_centers'
-	isActive: false
-	fromColumn: fact_stockouts.DCID
-	toColumn: dim_distribution_centers.ID
 
 relationship 'fact_reorders to dim_stores'
 	fromColumn: fact_reorders.store_id
