@@ -1,4 +1,5 @@
 relationship 'dim_customers to dim_geographies'
+	isActive: false
 	fromColumn: dim_customers.GeographyID
 	toColumn: dim_geographies.ID
 
@@ -11,6 +12,7 @@ relationship 'dim_distribution_centers to dim_geographies'
 	toColumn: dim_geographies.ID
 
 relationship 'dim_trucks to dim_distribution_centers'
+	isActive: false
 	fromColumn: dim_trucks.DCID
 	toColumn: dim_distribution_centers.ID
 
@@ -39,10 +41,12 @@ relationship 'fact_payments to fact_online_order_headers'
 	toColumn: fact_online_order_headers.order_id_ext
 
 relationship 'fact_payments to dim_stores'
+	isActive: false
 	fromColumn: fact_payments.store_id
 	toColumn: dim_stores.ID
 
 relationship 'fact_payments to dim_customers'
+	isActive: false
 	fromColumn: fact_payments.customer_id
 	toColumn: dim_customers.ID
 
@@ -123,6 +127,7 @@ relationship 'fact_stockouts to dim_products'
 	toColumn: dim_products.ID
 
 relationship 'fact_stockouts to dim_distribution_centers'
+	isActive: false
 	fromColumn: fact_stockouts.DCID
 	toColumn: dim_distribution_centers.ID
 
@@ -135,6 +140,7 @@ relationship 'fact_reorders to dim_products'
 	toColumn: dim_products.ID
 
 relationship 'fact_reorders to dim_distribution_centers'
+	isActive: false
 	fromColumn: fact_reorders.dc_id
 	toColumn: dim_distribution_centers.ID
 
@@ -143,10 +149,12 @@ relationship 'fact_store_ops to dim_stores'
 	toColumn: dim_stores.ID
 
 relationship 'fact_promotions to dim_stores'
+	isActive: false
 	fromColumn: fact_promotions.StoreID
 	toColumn: dim_stores.ID
 
 relationship 'fact_promotions to dim_customers'
+	isActive: false
 	fromColumn: fact_promotions.CustomerID
 	toColumn: dim_customers.ID
 
