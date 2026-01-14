@@ -6,7 +6,7 @@ table dim_date
 		dataType: int64
 		isKey
 		formatString: 0
-		lineageTag: 3c7e9f1a-4b5d-6e8f-9a0b-1c2d3e4f5g6h
+		lineageTag: cb82fadf-1470-486d-8156-a89857b33a9c
 		sourceLineageTag: date_key
 		summarizeBy: none
 		sourceColumn: date_key
@@ -16,7 +16,7 @@ table dim_date
 	column date
 		dataType: dateTime
 		formatString: Short Date
-		lineageTag: 4d8f0e2b-5c6e-7f9g-0a1b-2c3d4e5f6g7h
+		lineageTag: 663140d5-bad2-44f0-85c4-d838593e15ec
 		sourceLineageTag: date
 		summarizeBy: none
 		sourceColumn: date
@@ -28,7 +28,7 @@ table dim_date
 	column year
 		dataType: int64
 		formatString: 0
-		lineageTag: 5e9f1f3c-6d7f-8g0h-1b2c-3d4e5f6g7h8i
+		lineageTag: 3cbeb486-9983-4ef0-b633-89271227d3a9
 		sourceLineageTag: year
 		summarizeBy: none
 		sourceColumn: year
@@ -38,7 +38,7 @@ table dim_date
 	column quarter
 		dataType: int64
 		formatString: 0
-		lineageTag: 6f0g2g4d-7e8g-9h1i-2c3d-4e5f6g7h8i9j
+		lineageTag: 94b46b9b-340d-4be7-b75c-41cbd74c17e0
 		sourceLineageTag: quarter
 		summarizeBy: none
 		sourceColumn: quarter
@@ -48,7 +48,7 @@ table dim_date
 	column month
 		dataType: int64
 		formatString: 0
-		lineageTag: 7g1h3h5e-8f9h-0i2j-3d4e-5f6g7h8i9j0k
+		lineageTag: fc5a6c34-f14e-4004-b991-36ebf22d1cfe
 		sourceLineageTag: month
 		summarizeBy: none
 		sourceColumn: month
@@ -57,7 +57,7 @@ table dim_date
 
 	column month_name
 		dataType: string
-		lineageTag: 8h2i4i6f-9g0i-1j3k-4e5f-6g7h8i9j0k1l
+		lineageTag: aa93e8de-fad2-4609-9ca1-cc51410c4d95
 		sourceLineageTag: month_name
 		summarizeBy: none
 		sourceColumn: month_name
@@ -67,7 +67,7 @@ table dim_date
 	column day
 		dataType: int64
 		formatString: 0
-		lineageTag: 9i3j5j7g-0h1j-2k4l-5f6g-7h8i9j0k1l2m
+		lineageTag: 7320cbff-3fdf-49f3-9676-ace53d312dde
 		sourceLineageTag: day
 		summarizeBy: none
 		sourceColumn: day
@@ -77,7 +77,7 @@ table dim_date
 	column day_of_week
 		dataType: int64
 		formatString: 0
-		lineageTag: 0j4k6k8h-1i2k-3l5m-6g7h-8i9j0k1l2m3n
+		lineageTag: 936c71b6-5eed-4352-ab5c-581cba9a4237
 		sourceLineageTag: day_of_week
 		summarizeBy: none
 		sourceColumn: day_of_week
@@ -86,7 +86,7 @@ table dim_date
 
 	column day_name
 		dataType: string
-		lineageTag: 1k5l7l9i-2j3l-4m6n-7h8i-9j0k1l2m3n4o
+		lineageTag: 868f4eb8-8b2e-4e62-97d3-6f59f18a09dd
 		sourceLineageTag: day_name
 		summarizeBy: none
 		sourceColumn: day_name
@@ -96,7 +96,7 @@ table dim_date
 	column week_of_year
 		dataType: int64
 		formatString: 0
-		lineageTag: 2l6m8m0j-3k4m-5n7o-8i9j-0k1l2m3n4o5p
+		lineageTag: f8a2a5e8-d83e-4e4c-a301-fb6fe12b6f75
 		sourceLineageTag: week_of_year
 		summarizeBy: none
 		sourceColumn: week_of_year
@@ -106,7 +106,7 @@ table dim_date
 	column is_weekend
 		dataType: int64
 		formatString: 0
-		lineageTag: 3m7n9n1k-4l5n-6o8p-9j0k-1l2m3n4o5p6q
+		lineageTag: a16bc468-9f30-4bc3-8fe7-01dc817b9d01
 		sourceLineageTag: is_weekend
 		summarizeBy: none
 		sourceColumn: is_weekend
@@ -116,7 +116,7 @@ table dim_date
 	column fiscal_year
 		dataType: int64
 		formatString: 0
-		lineageTag: 4n8o0o2l-5m6o-7p9q-0k1l-2m3n4o5p6q7r
+		lineageTag: 5f84809b-99e1-4134-a29d-8418f7e2e3f3
 		sourceLineageTag: fiscal_year
 		summarizeBy: none
 		sourceColumn: fiscal_year
@@ -126,7 +126,7 @@ table dim_date
 	column fiscal_quarter
 		dataType: int64
 		formatString: 0
-		lineageTag: 5o9p1p3m-6n7p-8q0r-1l2m-3n4o5p6q7r8s
+		lineageTag: 0e0b8933-f9c2-4d2c-95d0-e5f8207a6537
 		sourceLineageTag: fiscal_quarter
 		summarizeBy: none
 		sourceColumn: fiscal_quarter
