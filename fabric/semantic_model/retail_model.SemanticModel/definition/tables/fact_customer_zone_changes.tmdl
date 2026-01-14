@@ -1,0 +1,48 @@
+table fact_customer_zone_changes
+	lineageTag: edc61f90-5ee8-4618-9d9d-e496d674f557
+	sourceLineageTag: [ag].[fact_customer_zone_changes]
+
+	column StoreID
+		dataType: int64
+		formatString: 0
+		lineageTag: ca15bf52-0050-41fa-aa78-434135694b5d
+		sourceLineageTag: StoreID
+		summarizeBy: count
+		sourceColumn: StoreID
+
+		annotation SummarizationSetBy = Automatic
+
+	column CustomerBLEId
+		dataType: string
+		lineageTag: caa3482c-b4fa-4faa-bf95-459fdac0bbfa
+		sourceLineageTag: CustomerBLEId
+		summarizeBy: none
+		sourceColumn: CustomerBLEId
+
+		annotation SummarizationSetBy = Automatic
+
+	column FromZone
+		dataType: string
+		lineageTag: bda49b7c-f843-4f29-be11-46ede9eac12d
+		sourceLineageTag: FromZone
+		summarizeBy: none
+		sourceColumn: FromZone
+
+		annotation SummarizationSetBy = Automatic
+
+	column ToZone
+		dataType: string
+		lineageTag: 73a8db4f-652e-4273-afc2-a6e50a2e1408
+		sourceLineageTag: ToZone
+		summarizeBy: none
+		sourceColumn: ToZone
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_customer_zone_changes = entity
+		mode: directLake
+		source
+			entityName: fact_customer_zone_changes
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

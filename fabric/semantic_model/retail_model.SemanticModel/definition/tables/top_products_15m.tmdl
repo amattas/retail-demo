@@ -1,0 +1,42 @@
+table top_products_15m
+	lineageTag: eda9ac0d-bc37-4363-96b4-298c279801bc
+	sourceLineageTag: [au].[top_products_15m]
+
+	column product_id
+		dataType: int64
+		formatString: 0
+		lineageTag: f71dd371-de91-495f-ad76-db7f3c6fde8b
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column revenue
+		dataType: double
+		lineageTag: 95625462-5b71-47fe-8186-915a9a4f1d6a
+		sourceLineageTag: revenue
+		summarizeBy: sum
+		sourceColumn: revenue
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column units
+		dataType: int64
+		formatString: 0
+		lineageTag: 11114f49-2e94-4a9e-9066-1d07443626fc
+		sourceLineageTag: units
+		summarizeBy: sum
+		sourceColumn: units
+
+		annotation SummarizationSetBy = Automatic
+
+	partition top_products_15m = entity
+		mode: directLake
+		source
+			entityName: top_products_15m
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

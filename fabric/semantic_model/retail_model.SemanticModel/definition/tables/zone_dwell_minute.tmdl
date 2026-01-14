@@ -1,0 +1,61 @@
+table zone_dwell_minute
+	lineageTag: 0bf09335-5a4f-471c-9b09-32b6f8261fa6
+	sourceLineageTag: [au].[zone_dwell_minute]
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: cbd46151-4680-4fd3-9a7c-0e95183412ff
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column zone
+		dataType: string
+		lineageTag: 120f9883-3652-4a83-846c-b4d438b1a3ba
+		sourceLineageTag: zone
+		summarizeBy: none
+		sourceColumn: zone
+
+		annotation SummarizationSetBy = Automatic
+
+	column ts
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c26e9f9a-56af-4116-96f6-089843545694
+		sourceLineageTag: ts
+		summarizeBy: none
+		sourceColumn: ts
+
+		annotation SummarizationSetBy = Automatic
+
+	column avg_dwell
+		dataType: double
+		lineageTag: 3e664904-d5dc-47c4-9316-6313e996935b
+		sourceLineageTag: avg_dwell
+		summarizeBy: sum
+		sourceColumn: avg_dwell
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column customers
+		dataType: int64
+		formatString: 0
+		lineageTag: 88c3825c-bbdd-4e69-8b8e-9c36eca2a746
+		sourceLineageTag: customers
+		summarizeBy: sum
+		sourceColumn: customers
+
+		annotation SummarizationSetBy = Automatic
+
+	partition zone_dwell_minute = entity
+		mode: directLake
+		source
+			entityName: zone_dwell_minute
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

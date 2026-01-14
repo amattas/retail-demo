@@ -1,0 +1,53 @@
+table fact_stockouts
+	lineageTag: 620b34c9-377c-44fe-bad4-8159499fc668
+	sourceLineageTag: [ag].[fact_stockouts]
+
+	column StoreID
+		dataType: double
+		lineageTag: 60d4df49-5a17-4dd0-ba43-6c2c0cec2b4f
+		sourceLineageTag: StoreID
+		summarizeBy: count
+		sourceColumn: StoreID
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column DCID
+		dataType: double
+		lineageTag: 1eaacd0f-91e7-4ac9-8c55-b080a302b99e
+		sourceLineageTag: DCID
+		summarizeBy: count
+		sourceColumn: DCID
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ProductID
+		dataType: int64
+		formatString: 0
+		lineageTag: 248dacbe-d44f-4a93-beca-0443b0245698
+		sourceLineageTag: ProductID
+		summarizeBy: count
+		sourceColumn: ProductID
+
+		annotation SummarizationSetBy = Automatic
+
+	column LastKnownQuantity
+		dataType: int64
+		formatString: 0
+		lineageTag: 6ae92787-58f4-4902-b05f-83d24d6194b8
+		sourceLineageTag: LastKnownQuantity
+		summarizeBy: sum
+		sourceColumn: LastKnownQuantity
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_stockouts = entity
+		mode: directLake
+		source
+			entityName: fact_stockouts
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

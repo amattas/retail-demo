@@ -1,0 +1,69 @@
+table fact_store_inventory_txn
+	lineageTag: 069e006d-82a8-46ab-abf7-39d781c37887
+	sourceLineageTag: [ag].[fact_store_inventory_txn]
+
+	column txn_type
+		dataType: string
+		lineageTag: fcdbfd4d-1ec4-422f-b7bd-a6a83e8b03c9
+		sourceLineageTag: txn_type
+		summarizeBy: none
+		sourceColumn: txn_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column quantity
+		dataType: int64
+		formatString: 0
+		lineageTag: b4460922-757f-4b4e-8fbc-5c30dd6b3740
+		sourceLineageTag: quantity
+		summarizeBy: sum
+		sourceColumn: quantity
+
+		annotation SummarizationSetBy = Automatic
+
+	column balance
+		dataType: int64
+		formatString: 0
+		lineageTag: 34eee0a6-d403-445d-83a6-163c9c0da520
+		sourceLineageTag: balance
+		summarizeBy: sum
+		sourceColumn: balance
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 85ecab4a-5ef0-4c6a-bcbd-2db04af2a261
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_id
+		dataType: int64
+		formatString: 0
+		lineageTag: f9411773-fe61-4cc9-bd55-1a200d71cdf8
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column source
+		dataType: string
+		lineageTag: 4f1e13af-0613-492f-9b82-4b2c53340348
+		sourceLineageTag: source
+		summarizeBy: none
+		sourceColumn: source
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_store_inventory_txn = entity
+		mode: directLake
+		source
+			entityName: fact_store_inventory_txn
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

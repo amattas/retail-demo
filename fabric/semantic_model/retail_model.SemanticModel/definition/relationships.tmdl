@@ -1,0 +1,5 @@
+relationship 6dcbc268-d489-353a-3b81-4d45baebe08e
+	crossFilteringBehavior: bothDirections
+	fromColumn: fact_receipts.customer_id
+	toColumn: dim_stores.ID
+

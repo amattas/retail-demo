@@ -1,0 +1,96 @@
+table fact_promotions
+	lineageTag: 09104865-1d77-427a-bc33-b0148839d9a5
+	sourceLineageTag: [ag].[fact_promotions]
+
+	column ReceiptId
+		dataType: string
+		lineageTag: 699c67ab-2aec-4718-9aa8-7205385c40ab
+		sourceLineageTag: ReceiptId
+		summarizeBy: none
+		sourceColumn: ReceiptId
+
+		annotation SummarizationSetBy = Automatic
+
+	column PromoCode
+		dataType: string
+		lineageTag: b0238d92-2da9-40e5-8013-e322014a887a
+		sourceLineageTag: PromoCode
+		summarizeBy: none
+		sourceColumn: PromoCode
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountAmount
+		dataType: string
+		lineageTag: 19c7f4b0-852c-471c-95af-c20eaa73d0c5
+		sourceLineageTag: DiscountAmount
+		summarizeBy: none
+		sourceColumn: DiscountAmount
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountCents
+		dataType: int64
+		formatString: 0
+		lineageTag: 296dc317-642c-4a09-ba33-56b9c99d8c6d
+		sourceLineageTag: DiscountCents
+		summarizeBy: sum
+		sourceColumn: DiscountCents
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountType
+		dataType: string
+		lineageTag: 65790e25-52e4-4ea4-b186-e91c8b20359d
+		sourceLineageTag: DiscountType
+		summarizeBy: none
+		sourceColumn: DiscountType
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductCount
+		dataType: int64
+		formatString: 0
+		lineageTag: d9770793-f93b-410e-92bb-dbf5e4bd7b5f
+		sourceLineageTag: ProductCount
+		summarizeBy: sum
+		sourceColumn: ProductCount
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductIds
+		dataType: string
+		lineageTag: 76d783a3-362d-4a96-b40f-22ef3efec531
+		sourceLineageTag: ProductIds
+		summarizeBy: none
+		sourceColumn: ProductIds
+
+		annotation SummarizationSetBy = Automatic
+
+	column StoreID
+		dataType: int64
+		formatString: 0
+		lineageTag: 10e6f985-8df5-44d2-bfbf-95407d67e963
+		sourceLineageTag: StoreID
+		summarizeBy: count
+		sourceColumn: StoreID
+
+		annotation SummarizationSetBy = Automatic
+
+	column CustomerID
+		dataType: int64
+		formatString: 0
+		lineageTag: 2fc2d368-9347-4b26-83b0-f9542c60d2df
+		sourceLineageTag: CustomerID
+		summarizeBy: count
+		sourceColumn: CustomerID
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_promotions = entity
+		mode: directLake
+		source
+			entityName: fact_promotions
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

@@ -1,4 +1,0 @@
-relationship f75d02a8-0d39-5d4f-7dd4-44c2a18e6463
-	fromColumn: fact_online_order_headers.customer_id
-	toColumn: dim_customers.ID
-
