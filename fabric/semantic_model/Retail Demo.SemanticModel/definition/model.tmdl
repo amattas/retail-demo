@@ -105,26 +105,6 @@ table gold_tender_mix_daily
 
   measure 'Total Amount' = SUM('gold_tender_mix_daily'[total_amount])
 
-relationship Sales_to_Stores
-  fromColumn: gold_sales_minute_store.store_id
-  toColumn: dim_stores.ID
-  crossFilteringBehavior: oneDirection
-
-relationship InvCurrent_to_Stores
-  fromColumn: gold_inventory_position_current.store_id
-  toColumn: dim_stores.ID
-  crossFilteringBehavior: oneDirection
-
-relationship TopProducts_to_Products
-  fromColumn: gold_top_products_15m.product_id
-  toColumn: dim_products.ID
-  crossFilteringBehavior: oneDirection
-
-relationship InvCurrent_to_Products
-  fromColumn: gold_inventory_position_current.product_id
-  toColumn: dim_products.ID
-  crossFilteringBehavior: oneDirection
-
 perspective Operations
 
   perspectiveTable gold_sales_minute_store
