@@ -1,8 +1,8 @@
-table dc_inventory_position_current
+table 'DC Inventory Position'
 	lineageTag: 6e01fb51-1261-4586-97ec-01c0f7b73a13
 	sourceLineageTag: [au].[dc_inventory_position_current]
 
-	column dc_id
+	column 'DC ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 847804d1-5b60-4232-a3c8-4daa440a4ceb
@@ -10,9 +10,11 @@ table dc_inventory_position_current
 		summarizeBy: sum
 		sourceColumn: dc_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 637a2bb9-88bd-4b52-a68d-f453131dd46e
@@ -20,9 +22,11 @@ table dc_inventory_position_current
 		summarizeBy: sum
 		sourceColumn: product_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column on_hand
+	column 'On Hand'
 		dataType: int64
 		formatString: 0
 		lineageTag: 59670602-e36f-4c3f-ac16-f953603778a2
@@ -30,9 +34,11 @@ table dc_inventory_position_current
 		summarizeBy: sum
 		sourceColumn: on_hand
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition dc_inventory_position_current = entity
+	partition 'DC Inventory Position' = entity
 		mode: directLake
 		source
 			entityName: dc_inventory_position_current

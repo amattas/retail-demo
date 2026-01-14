@@ -1,8 +1,8 @@
-table dim_distribution_centers
+table 'Distribution Centers'
 	lineageTag: ae706b9b-d53f-48e5-8f09-4c969f0d6b4a
 	sourceLineageTag: [ag].[dim_distribution_centers]
 
-	measure '# of Distribution Centers' = COUNTROWS(dim_distribution_centers)
+	measure '# of Distribution Centers' = COUNTROWS('Distribution Centers')
 		formatString: #,0
 		lineageTag: 01a1a1b4-0001-0001-0001-000000000001
 
@@ -16,12 +16,13 @@ table dim_distribution_centers
 
 		annotation SummarizationSetBy = Automatic
 
-	column DCNumber
+	column 'DC Number'
 		dataType: string
 		lineageTag: 44b8d211-1e3a-4e3e-bd7b-db2bc8964e77
 		sourceLineageTag: DCNumber
 		summarizeBy: none
 		sourceColumn: DCNumber
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -34,17 +35,18 @@ table dim_distribution_centers
 
 		annotation SummarizationSetBy = Automatic
 
-	column GeographyID
+	column 'Geography ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 4881f71c-36d7-4f39-968c-453678861c69
 		sourceLineageTag: GeographyID
 		summarizeBy: count
 		sourceColumn: GeographyID
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	partition dim_distribution_centers = entity
+	partition 'Distribution Centers' = entity
 		mode: directLake
 		source
 			entityName: dim_distribution_centers

@@ -1,30 +1,34 @@
-table fact_stockouts
+table Stockouts
 	lineageTag: 620b34c9-377c-44fe-bad4-8159499fc668
 	sourceLineageTag: [ag].[fact_stockouts]
 
-	column StoreID
+	column 'Store ID'
 		dataType: double
 		lineageTag: 60d4df49-5a17-4dd0-ba43-6c2c0cec2b4f
 		sourceLineageTag: StoreID
 		summarizeBy: count
 		sourceColumn: StoreID
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column DCID
+	column 'DC ID'
 		dataType: double
 		lineageTag: 1eaacd0f-91e7-4ac9-8c55-b080a302b99e
 		sourceLineageTag: DCID
 		summarizeBy: count
 		sourceColumn: DCID
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column ProductID
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 248dacbe-d44f-4a93-beca-0443b0245698
@@ -32,9 +36,11 @@ table fact_stockouts
 		summarizeBy: count
 		sourceColumn: ProductID
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column LastKnownQuantity
+	column 'Last Known Quantity'
 		dataType: int64
 		formatString: 0
 		lineageTag: 6ae92787-58f4-4902-b05f-83d24d6194b8
@@ -42,9 +48,11 @@ table fact_stockouts
 		summarizeBy: sum
 		sourceColumn: LastKnownQuantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_stockouts = entity
+	partition Stockouts = entity
 		mode: directLake
 		source
 			entityName: fact_stockouts

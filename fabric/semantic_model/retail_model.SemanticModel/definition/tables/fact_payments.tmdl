@@ -1,14 +1,14 @@
-table fact_payments
+table Payments
 	lineageTag: a9ee5779-cb04-439d-8691-5ae9eb849b4e
 	sourceLineageTag: [ag].[fact_payments]
 
-	measure 'Total Amounts' = SUM([amount])
+	measure 'Total Amounts' = SUM(Payments[Amount])
 		formatString: 0
 		lineageTag: 79b75b7a-6c45-4df5-a579-ead43dd9e267
 
 		changedProperty = Name
 
-	column receipt_id_ext
+	column 'Receipt ID'
 		dataType: string
 		lineageTag: efbefad1-5a1b-4c7b-925f-848b4de594d5
 		sourceLineageTag: receipt_id_ext
@@ -17,7 +17,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column order_id_ext
+		changedProperty = Name
+
+	column 'Order ID'
 		dataType: string
 		lineageTag: 52dc2ac3-3b91-401d-acea-49838020c2fe
 		sourceLineageTag: order_id_ext
@@ -26,7 +28,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column payment_method
+		changedProperty = Name
+
+	column 'Payment Method'
 		dataType: string
 		lineageTag: 325aa4a0-21a6-4c72-918d-7d9872000f8c
 		sourceLineageTag: payment_method
@@ -35,7 +39,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column amount_cents
+		changedProperty = Name
+
+	column 'Amount Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: 72a5cd30-df81-4cea-8a0c-857458089bba
@@ -45,7 +51,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column amount
+		changedProperty = Name
+
+	column Amount
 		dataType: string
 		lineageTag: f0c241fa-f5f0-4ab3-b743-15761fcd487b
 		sourceLineageTag: amount
@@ -54,7 +62,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column transaction_id
+		changedProperty = Name
+
+	column 'Transaction ID'
 		dataType: string
 		lineageTag: 59a3a364-edd0-4bed-870d-3dafc0dfdd1a
 		sourceLineageTag: transaction_id
@@ -63,7 +73,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column processing_time_ms
+		changedProperty = Name
+
+	column 'Processing Time MS'
 		dataType: int64
 		formatString: 0
 		lineageTag: 1e22bae8-128a-41d4-bca5-d5f14abcdc70
@@ -73,7 +85,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column status
+		changedProperty = Name
+
+	column Status
 		dataType: string
 		lineageTag: 3544e80a-5367-46e2-a81d-55965f62ec8b
 		sourceLineageTag: status
@@ -82,7 +96,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column decline_reason
+		changedProperty = Name
+
+	column 'Decline Reason'
 		dataType: string
 		lineageTag: 52669962-9147-40a0-a3e5-1a1df7faac53
 		sourceLineageTag: decline_reason
@@ -91,7 +107,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column store_id
+		changedProperty = Name
+
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: d21b659a-0979-44b0-ad34-53109ed5050d
@@ -101,7 +119,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	column customer_id
+		changedProperty = Name
+
+	column 'Customer ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: ae5fe31f-a97a-4799-93fb-98b992cf414d
@@ -111,7 +131,9 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_payments = entity
+		changedProperty = Name
+
+	partition Payments = entity
 		mode: directLake
 		source
 			entityName: fact_payments

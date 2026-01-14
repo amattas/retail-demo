@@ -1,8 +1,10 @@
-table fact_foot_traffic
+table 'Foot Traffic'
 	lineageTag: c999b61a-43db-4db3-9783-626a4618f864
 	sourceLineageTag: [ag].[fact_foot_traffic]
 
-	column count
+	changedProperty = Name
+
+	column Count
 		dataType: int64
 		formatString: 0
 		lineageTag: 13698da9-5865-4083-92e8-31aa304ddb63
@@ -10,18 +12,22 @@ table fact_foot_traffic
 		summarizeBy: sum
 		sourceColumn: count
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column zone
+	column Zone
 		dataType: string
 		lineageTag: 557ac75c-0e4d-4954-981c-67823bfdd6e0
 		sourceLineageTag: zone
 		summarizeBy: none
 		sourceColumn: zone
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column dwell_seconds
+	column 'Dwell Seconds'
 		dataType: int64
 		formatString: 0
 		lineageTag: f6e707b1-08c4-41fa-ab1a-233ec061d176
@@ -29,9 +35,11 @@ table fact_foot_traffic
 		summarizeBy: sum
 		sourceColumn: dwell_seconds
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column store_id
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 569af1b5-d33d-496c-b590-76158423c9ce
@@ -39,18 +47,22 @@ table fact_foot_traffic
 		summarizeBy: sum
 		sourceColumn: store_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column sensor_id
+	column 'Sensor ID'
 		dataType: string
 		lineageTag: 347e7b41-cd79-4e79-8f79-45413192743c
 		sourceLineageTag: sensor_id
 		summarizeBy: none
 		sourceColumn: sensor_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_foot_traffic = entity
+	partition 'Foot Traffic' = entity
 		mode: directLake
 		source
 			entityName: fact_foot_traffic

@@ -1,8 +1,10 @@
-table fact_customer_zone_changes
+table 'Customer Zone Changes'
 	lineageTag: edc61f90-5ee8-4618-9d9d-e496d674f557
 	sourceLineageTag: [ag].[fact_customer_zone_changes]
 
-	column StoreID
+	changedProperty = Name
+
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: ca15bf52-0050-41fa-aa78-434135694b5d
@@ -10,36 +12,44 @@ table fact_customer_zone_changes
 		summarizeBy: count
 		sourceColumn: StoreID
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column CustomerBLEId
+	column 'Customer BLE ID'
 		dataType: string
 		lineageTag: caa3482c-b4fa-4faa-bf95-459fdac0bbfa
 		sourceLineageTag: CustomerBLEId
 		summarizeBy: none
 		sourceColumn: CustomerBLEId
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column FromZone
+	column 'From Zone'
 		dataType: string
 		lineageTag: bda49b7c-f843-4f29-be11-46ede9eac12d
 		sourceLineageTag: FromZone
 		summarizeBy: none
 		sourceColumn: FromZone
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column ToZone
+	column 'To Zone'
 		dataType: string
 		lineageTag: 73a8db4f-652e-4273-afc2-a6e50a2e1408
 		sourceLineageTag: ToZone
 		summarizeBy: none
 		sourceColumn: ToZone
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_customer_zone_changes = entity
+	partition 'Customer Zone Changes' = entity
 		mode: directLake
 		source
 			entityName: fact_customer_zone_changes

@@ -1,8 +1,8 @@
-table fact_truck_inventory
+table 'Truck Inventory'
 	lineageTag: d65dd252-405a-484b-9e2e-efc842442898
 	sourceLineageTag: [ag].[fact_truck_inventory]
 
-	column truck_id
+	column 'Truck ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: abe4d6b6-e6c5-457a-8b6d-7dd3c383dcfb
@@ -10,18 +10,22 @@ table fact_truck_inventory
 		summarizeBy: sum
 		sourceColumn: truck_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column shipment_id
+	column 'Shipment ID'
 		dataType: string
 		lineageTag: b309d174-b1a9-4822-a038-d2c67cc51022
 		sourceLineageTag: shipment_id
 		summarizeBy: none
 		sourceColumn: shipment_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 648fcce8-4a56-44b5-91b4-ffba8a16f659
@@ -29,9 +33,11 @@ table fact_truck_inventory
 		summarizeBy: sum
 		sourceColumn: product_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column quantity
+	column Quantity
 		dataType: int64
 		formatString: 0
 		lineageTag: 83b7b762-6d37-4aa1-ba97-e65cdfa61954
@@ -39,18 +45,22 @@ table fact_truck_inventory
 		summarizeBy: sum
 		sourceColumn: quantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column action
+	column Action
 		dataType: string
 		lineageTag: 38bede37-408e-4ef4-866c-68e663962402
 		sourceLineageTag: action
 		summarizeBy: none
 		sourceColumn: action
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column location_id
+	column 'Location ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 360d161e-5905-4982-bef4-21af95d6251f
@@ -58,18 +68,22 @@ table fact_truck_inventory
 		summarizeBy: sum
 		sourceColumn: location_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column location_type
+	column 'Location Type'
 		dataType: string
 		lineageTag: 7d6a6b97-2506-4985-b06d-47e16c6e8d5f
 		sourceLineageTag: location_type
 		summarizeBy: none
 		sourceColumn: location_type
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column __index_level_0__
+	column Index
 		dataType: int64
 		formatString: 0
 		lineageTag: f6d2291c-607f-4414-9647-1d840b908c0e
@@ -77,9 +91,11 @@ table fact_truck_inventory
 		summarizeBy: sum
 		sourceColumn: __index_level_0__
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_truck_inventory = entity
+	partition 'Truck Inventory' = entity
 		mode: directLake
 		source
 			entityName: fact_truck_inventory

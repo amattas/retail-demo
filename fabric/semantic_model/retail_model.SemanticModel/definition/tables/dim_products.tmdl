@@ -1,16 +1,16 @@
-table dim_products
+table Products
 	lineageTag: 7a341aa1-e4de-4e62-8737-d78ecfeea40b
 	sourceLineageTag: [ag].[dim_products]
 
-	measure '# of Products' = COUNTROWS(dim_products)
+	measure '# of Products' = COUNTROWS(Products)
 		formatString: #,0
 		lineageTag: 01a1a1b1-0001-0001-0001-000000000001
 
-	measure 'Average Product Cost' = AVERAGE(dim_products[Cost])
+	measure 'Average Product Cost' = AVERAGE(Products[Cost])
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1b1-0001-0001-0001-000000000002
 
-	measure 'Average Product Price' = AVERAGE(dim_products[SalePrice])
+	measure 'Average Product Price' = AVERAGE(Products[Sale Price])
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1b1-0001-0001-0001-000000000003
 
@@ -24,12 +24,13 @@ table dim_products
 
 		annotation SummarizationSetBy = Automatic
 
-	column ProductName
+	column 'Product Name'
 		dataType: string
 		lineageTag: cb4130e7-5394-4782-acf3-ab5644c978e8
 		sourceLineageTag: ProductName
 		summarizeBy: none
 		sourceColumn: ProductName
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -100,33 +101,36 @@ table dim_products
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column SalePrice
+	column 'Sale Price'
 		dataType: double
 		lineageTag: c24767c6-4fea-47f9-9065-cfb0bff80eae
 		sourceLineageTag: SalePrice
 		summarizeBy: sum
 		sourceColumn: SalePrice
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column RequiresRefrigeration
+	column 'Requires Refrigeration'
 		dataType: boolean
 		formatString: """TRUE"";""TRUE"";""FALSE"""
 		lineageTag: dd0cf621-be7f-44c8-b63e-462cfadd4b68
 		sourceLineageTag: RequiresRefrigeration
 		summarizeBy: none
 		sourceColumn: RequiresRefrigeration
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column taxability
+	column Taxability
 		dataType: string
 		lineageTag: 4496d2dc-3d8f-4844-9e61-57c6fd4c4bd5
 		sourceLineageTag: taxability
 		summarizeBy: none
 		sourceColumn: taxability
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -139,7 +143,7 @@ table dim_products
 
 		annotation SummarizationSetBy = Automatic
 
-	partition dim_products = entity
+	partition Products = entity
 		mode: directLake
 		source
 			entityName: dim_products

@@ -1,8 +1,8 @@
-table fact_reorders
+table Reorders
 	lineageTag: 5d56e188-c68e-4de1-a166-dba2aab94430
 	sourceLineageTag: [ag].[fact_reorders]
 
-	column store_id
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 9ba003b4-5818-4fdf-a7cb-e746a618a80f
@@ -10,9 +10,11 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: store_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column dc_id
+	column 'DC ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: e8cc3010-af1a-40d5-b05e-2ae21f44ae39
@@ -20,9 +22,11 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: dc_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: b38c131f-e4a2-4baa-b46c-144a36a860fa
@@ -30,9 +34,11 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: product_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column current_quantity
+	column 'Current Quantity'
 		dataType: int64
 		formatString: 0
 		lineageTag: 58404047-477c-40a4-bbc3-092f7accd81f
@@ -40,9 +46,11 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: current_quantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column reorder_quantity
+	column 'Reorder Quantity'
 		dataType: int64
 		formatString: 0
 		lineageTag: 439f2374-5ee5-4420-af92-32a2f9b26007
@@ -50,9 +58,11 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: reorder_quantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column reorder_point
+	column 'Reorder Point'
 		dataType: int64
 		formatString: 0
 		lineageTag: 61113c82-1df7-4479-a735-2380f417e406
@@ -60,18 +70,22 @@ table fact_reorders
 		summarizeBy: sum
 		sourceColumn: reorder_point
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column priority
+	column Priority
 		dataType: string
 		lineageTag: dfd389e7-46b4-4e7a-907f-1bfa0fb71f79
 		sourceLineageTag: priority
 		summarizeBy: none
 		sourceColumn: priority
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_reorders = entity
+	partition Reorders = entity
 		mode: directLake
 		source
 			entityName: fact_reorders
