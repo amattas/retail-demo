@@ -42,18 +42,6 @@ tables:
     measures:
       - name: Avg Dwell (min)
         expression: AVERAGE('gold_truck_dwell_daily'[avg_dwell_min])
-  - name: gold_campaign_revenue_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/campaign_revenue_daily
-    measures:
-      - name: Impressions
-        expression: SUM('gold_campaign_revenue_daily'[impressions])
-      - name: Conversions
-        expression: SUM('gold_campaign_revenue_daily'[conversions])
-      - name: Revenue
-        expression: SUM('gold_campaign_revenue_daily'[revenue])
   - name: dim_stores
     partitions:
       - name: DirectLake
@@ -64,6 +52,56 @@ tables:
       - name: DirectLake
         mode: DirectLake
         source: /Tables/ag/dim_products
+  - name: gold_online_sales_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/au/online_sales_daily
+    measures:
+      - name: Orders
+        expression: SUM('gold_online_sales_daily'[orders])
+      - name: Online Total
+        expression: SUM('gold_online_sales_daily'[total])
+      - name: AOV
+        expression: DIVIDE([Online Total], [Orders])
+  - name: gold_zone_dwell_minute
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/au/zone_dwell_minute
+    measures:
+      - name: Avg Dwell (sec)
+        expression: AVERAGE('gold_zone_dwell_minute'[avg_dwell])
+      - name: Customers (Minute)
+        expression: SUM('gold_zone_dwell_minute'[customers])
+  - name: gold_marketing_cost_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/au/marketing_cost_daily
+    measures:
+      - name: Impressions
+        expression: SUM('gold_marketing_cost_daily'[impressions])
+      - name: Cost
+        expression: SUM('gold_marketing_cost_daily'[cost])
+  - name: gold_dc_inventory_position_current
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/au/dc_inventory_position_current
+    measures:
+      - name: DC On Hand
+        expression: SUM('gold_dc_inventory_position_current'[on_hand])
+  - name: gold_tender_mix_daily
+    partitions:
+      - name: DirectLake
+        mode: DirectLake
+        source: /Tables/au/tender_mix_daily
+    measures:
+      - name: Transactions
+        expression: SUM('gold_tender_mix_daily'[transactions])
+      - name: Total Amount
+        expression: SUM('gold_tender_mix_daily'[total_amount])
 
 relationships:
   - name: Sales_to_Stores
@@ -99,8 +137,6 @@ perspectives:
       - gold_dc_inventory_position_current
       - dim_stores
       - gold_zone_dwell_minute
-      - gold_ble_presence_minute
-      - gold_store_ops_daily
       - gold_tender_mix_daily
   - name: Merchandising
     tables:
@@ -108,146 +144,15 @@ perspectives:
       - gold_inventory_position_current
       - dim_products
       - gold_online_sales_daily
-      - gold_fulfillment_daily
-      - gold_promo_performance_daily
   - name: Logistics
     tables:
       - gold_truck_dwell_daily
       - gold_dc_inventory_position_current
   - name: Marketing
     tables:
-      - gold_campaign_revenue_daily
       - gold_marketing_cost_daily
-      - gold_promo_performance_daily
-  - name: Supply Chain
-    tables:
-      - gold_stockouts_daily
-      - gold_reorders_daily
-      - gold_dc_inventory_position_current
-      - gold_inventory_position_current
 
 measures:
-  - table: gold_campaign_revenue_daily
-    name: Conversion Rate
-    expression: DIVIDE(SUM('gold_campaign_revenue_daily'[conversions]), SUM('gold_campaign_revenue_daily'[impressions]))
   - table: gold_sales_minute_store
     name: Sales (Last 60m)
     expression: CALCULATE([Total Sales], KEEPFILTERS(DATESINPERIOD('gold_sales_minute_store'[ts], MAX('gold_sales_minute_store'[ts]), -60, MINUTE)))
-  - name: gold_online_sales_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/online_sales_daily
-    measures:
-      - name: Orders
-        expression: SUM('gold_online_sales_daily'[orders])
-      - name: Online Total
-        expression: SUM('gold_online_sales_daily'[total])
-      - name: AOV
-        expression: DIVIDE([Online Total], [Orders])
-
-  - name: gold_fulfillment_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/fulfillment_daily
-    measures:
-      - name: Fulfillment Orders
-        expression: SUM('gold_fulfillment_daily'[orders])
-      - name: Fulfillment Units
-        expression: SUM('gold_fulfillment_daily'[units])
-
-  - name: gold_zone_dwell_minute
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/zone_dwell_minute
-    measures:
-      - name: Avg Dwell (sec)
-        expression: AVERAGE('gold_zone_dwell_minute'[avg_dwell])
-      - name: Customers (Minute)
-        expression: SUM('gold_zone_dwell_minute'[customers])
-
-  - name: gold_ble_presence_minute
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/ble_presence_minute
-    measures:
-      - name: Devices (Minute)
-        expression: SUM('gold_ble_presence_minute'[devices])
-
-  - name: gold_marketing_cost_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/marketing_cost_daily
-    measures:
-      - name: Impressions
-        expression: SUM('gold_marketing_cost_daily'[impressions])
-      - name: Cost
-        expression: SUM('gold_marketing_cost_daily'[cost])
-
-  - name: gold_dc_inventory_position_current
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/dc_inventory_position_current
-    measures:
-      - name: DC On Hand
-        expression: SUM('gold_dc_inventory_position_current'[on_hand])
-
-  - name: gold_stockouts_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/stockouts_daily
-    measures:
-      - name: Stockout Count
-        expression: SUM('gold_stockouts_daily'[stockout_count])
-      - name: Products Affected
-        expression: SUM('gold_stockouts_daily'[products_affected])
-
-  - name: gold_reorders_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/reorders_daily
-    measures:
-      - name: Reorder Count
-        expression: SUM('gold_reorders_daily'[reorder_count])
-      - name: Units Ordered
-        expression: SUM('gold_reorders_daily'[total_units_ordered])
-
-  - name: gold_tender_mix_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/tender_mix_daily
-    measures:
-      - name: Transactions
-        expression: SUM('gold_tender_mix_daily'[transactions])
-      - name: Total Amount
-        expression: SUM('gold_tender_mix_daily'[total_amount])
-
-  - name: gold_store_ops_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/store_ops_daily
-    measures:
-      - name: Operation Count
-        expression: SUM('gold_store_ops_daily'[operation_count])
-
-  - name: gold_promo_performance_daily
-    partitions:
-      - name: DirectLake
-        mode: DirectLake
-        source: /Tables/au/promo_performance_daily
-    measures:
-      - name: Times Applied
-        expression: SUM('gold_promo_performance_daily'[times_applied])
-      - name: Total Discount
-        expression: SUM('gold_promo_performance_daily'[total_discount])
-      - name: Products Discounted
-        expression: SUM('gold_promo_performance_daily'[products_discounted])

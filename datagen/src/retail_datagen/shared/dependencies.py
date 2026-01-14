@@ -748,7 +748,8 @@ def validate_date_range(start_date: datetime, end_date: datetime) -> None:
         )
 
     # Check for reasonable date range (max 2 years)
-    max_duration = timedelta(days=730)
+    # Allow 731 days to account for leap years (366 + 365 = 731)
+    max_duration = timedelta(days=731)
     if (end_date - start_date) > max_duration:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
