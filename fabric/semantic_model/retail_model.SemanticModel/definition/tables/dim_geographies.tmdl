@@ -1,8 +1,8 @@
-table dim_geographies
+table Geographies
 	lineageTag: 0182aad6-4ad2-40ca-ad96-bccd64f82380
 	sourceLineageTag: [ag].[dim_geographies]
 
-	measure '# of Locations' = COUNTROWS(dim_geographies)
+	measure '# of Locations' = COUNTROWS(Geographies)
 		formatString: #,0
 		lineageTag: 01a1a1b6-0001-0001-0001-000000000001
 
@@ -34,12 +34,13 @@ table dim_geographies
 
 		annotation SummarizationSetBy = Automatic
 
-	column ZipCode
+	column 'Zip Code'
 		dataType: string
 		lineageTag: 00fa76f8-35be-45d4-85ab-485a221637c1
 		sourceLineageTag: ZipCode
 		summarizeBy: none
 		sourceColumn: ZipCode
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -61,7 +62,7 @@ table dim_geographies
 
 		annotation SummarizationSetBy = Automatic
 
-	partition dim_geographies = entity
+	partition Geographies = entity
 		mode: directLake
 		source
 			entityName: dim_geographies

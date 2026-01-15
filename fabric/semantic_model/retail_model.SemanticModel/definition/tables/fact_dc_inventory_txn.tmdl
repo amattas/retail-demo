@@ -1,17 +1,19 @@
-table fact_dc_inventory_txn
+table 'DC Inventory Transactions'
 	lineageTag: 1f83be55-41e6-4951-8d58-fc6f4a5cfa45
 	sourceLineageTag: [ag].[fact_dc_inventory_txn]
 
-	column txn_type
+	column 'Transaction Type'
 		dataType: string
 		lineageTag: b8c7794a-d23b-4894-b0d0-274ab2539d08
 		sourceLineageTag: txn_type
 		summarizeBy: none
 		sourceColumn: txn_type
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column quantity
+	column Quantity
 		dataType: int64
 		formatString: 0
 		lineageTag: 8e8ce055-d5fe-4dda-9de3-85efc19e5767
@@ -19,9 +21,11 @@ table fact_dc_inventory_txn
 		summarizeBy: sum
 		sourceColumn: quantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column dc_id
+	column 'DC ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 7dde12d4-b2ad-4285-8593-6084695d1c99
@@ -29,9 +33,11 @@ table fact_dc_inventory_txn
 		summarizeBy: sum
 		sourceColumn: dc_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column balance
+	column Balance
 		dataType: int64
 		formatString: 0
 		lineageTag: 69936964-1b5e-4f95-aa6c-5327f4e8443e
@@ -39,15 +45,19 @@ table fact_dc_inventory_txn
 		summarizeBy: sum
 		sourceColumn: balance
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: a7168582-c6e8-4b62-89e2-de93b91dc4c9
 		sourceLineageTag: product_id
 		summarizeBy: sum
 		sourceColumn: product_id
+
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -60,7 +70,7 @@ table fact_dc_inventory_txn
 
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_dc_inventory_txn = entity
+	partition 'DC Inventory Transactions' = entity
 		mode: directLake
 		source
 			entityName: fact_dc_inventory_txn

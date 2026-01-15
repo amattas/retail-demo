@@ -1,180 +1,180 @@
-relationship 'dim_customers to dim_geographies'
+relationship 'Customers to Geographies'
 	isActive: false
-	fromColumn: dim_customers.GeographyID
-	toColumn: dim_geographies.ID
+	fromColumn: Customers.'Geography ID'
+	toColumn: Geographies.ID
 
-relationship 'dim_stores to dim_geographies'
-	fromColumn: dim_stores.GeographyID
-	toColumn: dim_geographies.ID
+relationship 'Stores to Geographies'
+	fromColumn: Stores.'Geography ID'
+	toColumn: Geographies.ID
 
-relationship 'dim_distribution_centers to dim_geographies'
-	fromColumn: dim_distribution_centers.GeographyID
-	toColumn: dim_geographies.ID
+relationship 'Distribution Centers to Geographies'
+	fromColumn: 'Distribution Centers'.'Geography ID'
+	toColumn: Geographies.ID
 
-relationship 'fact_receipts to dim_customers'
-	fromColumn: fact_receipts.customer_id
-	toColumn: dim_customers.ID
+relationship 'Receipts to Customers'
+	fromColumn: Receipts.'Customer ID'
+	toColumn: Customers.ID
 
-relationship 'fact_receipts to dim_stores'
-	fromColumn: fact_receipts.store_id
-	toColumn: dim_stores.ID
+relationship 'Receipts to Stores'
+	fromColumn: Receipts.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_receipt_lines to fact_receipts'
-	fromColumn: fact_receipt_lines.receipt_id_ext
-	toColumn: fact_receipts.receipt_id_ext
+relationship 'Receipt Lines to Receipts'
+	fromColumn: 'Receipt Lines'.'Receipt ID'
+	toColumn: Receipts.'Receipt ID'
 
-relationship 'fact_receipt_lines to dim_products'
-	fromColumn: fact_receipt_lines.product_id
-	toColumn: dim_products.ID
+relationship 'Receipt Lines to Products'
+	fromColumn: 'Receipt Lines'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_payments to fact_receipts'
-	fromColumn: fact_payments.receipt_id_ext
-	toColumn: fact_receipts.receipt_id_ext
+relationship 'Payments to Receipts'
+	fromColumn: Payments.'Receipt ID'
+	toColumn: Receipts.'Receipt ID'
 
-relationship 'fact_payments to fact_online_order_headers'
+relationship 'Payments to Online Orders'
 	isActive: false
-	fromColumn: fact_payments.order_id_ext
-	toColumn: fact_online_order_headers.order_id_ext
+	fromColumn: Payments.'Order ID'
+	toColumn: 'Online Orders'.'Order ID'
 
-relationship 'fact_payments to dim_stores'
+relationship 'Payments to Stores'
 	isActive: false
-	fromColumn: fact_payments.store_id
-	toColumn: dim_stores.ID
+	fromColumn: Payments.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_payments to dim_customers'
+relationship 'Payments to Customers'
 	isActive: false
-	fromColumn: fact_payments.customer_id
-	toColumn: dim_customers.ID
+	fromColumn: Payments.'Customer ID'
+	toColumn: Customers.ID
 
-relationship 'fact_online_order_headers to dim_customers'
-	fromColumn: fact_online_order_headers.customer_id
-	toColumn: dim_customers.ID
+relationship 'Online Orders to Customers'
+	fromColumn: 'Online Orders'.'Customer ID'
+	toColumn: Customers.ID
 
-relationship 'fact_online_order_lines to fact_online_order_headers'
-	fromColumn: fact_online_order_lines.order_id
-	toColumn: fact_online_order_headers.order_id_ext
+relationship 'Online Order Lines to Online Orders'
+	fromColumn: 'Online Order Lines'.'Order ID'
+	toColumn: 'Online Orders'.'Order ID'
 
-relationship 'fact_online_order_lines to dim_products'
-	fromColumn: fact_online_order_lines.product_id
-	toColumn: dim_products.ID
+relationship 'Online Order Lines to Products'
+	fromColumn: 'Online Order Lines'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_store_inventory_txn to dim_stores'
-	fromColumn: fact_store_inventory_txn.store_id
-	toColumn: dim_stores.ID
+relationship 'Store Inventory Transactions to Stores'
+	fromColumn: 'Store Inventory Transactions'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_store_inventory_txn to dim_products'
-	fromColumn: fact_store_inventory_txn.product_id
-	toColumn: dim_products.ID
+relationship 'Store Inventory Transactions to Products'
+	fromColumn: 'Store Inventory Transactions'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'inventory_position_current to dim_stores'
-	fromColumn: inventory_position_current.store_id
-	toColumn: dim_stores.ID
+relationship 'Store Inventory Position to Stores'
+	fromColumn: 'Store Inventory Position'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'inventory_position_current to dim_products'
-	fromColumn: inventory_position_current.product_id
-	toColumn: dim_products.ID
+relationship 'Store Inventory Position to Products'
+	fromColumn: 'Store Inventory Position'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'dc_inventory_position_current to dim_distribution_centers'
-	fromColumn: dc_inventory_position_current.dc_id
-	toColumn: dim_distribution_centers.ID
+relationship 'DC Inventory Position to Distribution Centers'
+	fromColumn: 'DC Inventory Position'.'DC ID'
+	toColumn: 'Distribution Centers'.ID
 
-relationship 'dc_inventory_position_current to dim_products'
-	fromColumn: dc_inventory_position_current.product_id
-	toColumn: dim_products.ID
+relationship 'DC Inventory Position to Products'
+	fromColumn: 'DC Inventory Position'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_dc_inventory_txn to dim_distribution_centers'
-	fromColumn: fact_dc_inventory_txn.dc_id
-	toColumn: dim_distribution_centers.ID
+relationship 'DC Inventory Transactions to Distribution Centers'
+	fromColumn: 'DC Inventory Transactions'.'DC ID'
+	toColumn: 'Distribution Centers'.ID
 
-relationship 'fact_dc_inventory_txn to dim_products'
-	fromColumn: fact_dc_inventory_txn.product_id
-	toColumn: dim_products.ID
+relationship 'DC Inventory Transactions to Products'
+	fromColumn: 'DC Inventory Transactions'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_truck_moves to dim_trucks'
-	fromColumn: fact_truck_moves.truck_id
-	toColumn: dim_trucks.ID
+relationship 'Truck Moves to Trucks'
+	fromColumn: 'Truck Moves'.'Truck ID'
+	toColumn: Trucks.ID
 
-relationship 'fact_truck_moves to dim_stores'
+relationship 'Truck Moves to Stores'
 	isActive: false
-	fromColumn: fact_truck_moves.store_id
-	toColumn: dim_stores.ID
+	fromColumn: 'Truck Moves'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_truck_moves to dim_distribution_centers'
-	fromColumn: fact_truck_moves.dc_id
-	toColumn: dim_distribution_centers.ID
+relationship 'Truck Moves to Distribution Centers'
+	fromColumn: 'Truck Moves'.'DC ID'
+	toColumn: 'Distribution Centers'.ID
 
-relationship 'fact_truck_inventory to dim_trucks'
-	fromColumn: fact_truck_inventory.truck_id
-	toColumn: dim_trucks.ID
+relationship 'Truck Inventory to Trucks'
+	fromColumn: 'Truck Inventory'.'Truck ID'
+	toColumn: Trucks.ID
 
-relationship 'fact_truck_inventory to dim_products'
-	fromColumn: fact_truck_inventory.product_id
-	toColumn: dim_products.ID
+relationship 'Truck Inventory to Products'
+	fromColumn: 'Truck Inventory'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_foot_traffic to dim_stores'
-	fromColumn: fact_foot_traffic.store_id
-	toColumn: dim_stores.ID
+relationship 'Foot Traffic to Stores'
+	fromColumn: 'Foot Traffic'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_stockouts to dim_products'
-	fromColumn: fact_stockouts.ProductID
-	toColumn: dim_products.ID
+relationship 'Stockouts to Products'
+	fromColumn: Stockouts.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_reorders to dim_stores'
-	fromColumn: fact_reorders.store_id
-	toColumn: dim_stores.ID
+relationship 'Reorders to Stores'
+	fromColumn: Reorders.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_reorders to dim_products'
-	fromColumn: fact_reorders.product_id
-	toColumn: dim_products.ID
+relationship 'Reorders to Products'
+	fromColumn: Reorders.'Product ID'
+	toColumn: Products.ID
 
-relationship 'fact_reorders to dim_distribution_centers'
+relationship 'Reorders to Distribution Centers'
 	isActive: false
-	fromColumn: fact_reorders.dc_id
-	toColumn: dim_distribution_centers.ID
+	fromColumn: Reorders.'DC ID'
+	toColumn: 'Distribution Centers'.ID
 
-relationship 'fact_store_ops to dim_stores'
-	fromColumn: fact_store_ops.store_id
-	toColumn: dim_stores.ID
+relationship 'Store Operations to Stores'
+	fromColumn: 'Store Operations'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_promotions to dim_stores'
+relationship 'Promotions to Stores'
 	isActive: false
-	fromColumn: fact_promotions.StoreID
-	toColumn: dim_stores.ID
+	fromColumn: Promotions.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'fact_promotions to dim_customers'
+relationship 'Promotions to Customers'
 	isActive: false
-	fromColumn: fact_promotions.CustomerID
-	toColumn: dim_customers.ID
+	fromColumn: Promotions.'Customer ID'
+	toColumn: Customers.ID
 
-relationship 'fact_promotions to fact_receipts'
-	fromColumn: fact_promotions.ReceiptId
-	toColumn: fact_receipts.receipt_id_ext
+relationship 'Promotions to Receipts'
+	fromColumn: Promotions.'Receipt ID'
+	toColumn: Receipts.'Receipt ID'
 
-relationship 'sales_minute_store to dim_stores'
-	fromColumn: sales_minute_store.store_id
-	toColumn: dim_stores.ID
+relationship 'Store Sales by Minute to Stores'
+	fromColumn: 'Store Sales by Minute'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'top_products_15m to dim_products'
-	fromColumn: top_products_15m.product_id
-	toColumn: dim_products.ID
+relationship 'Top Products 15 Min to Products'
+	fromColumn: 'Top Products 15 Min'.'Product ID'
+	toColumn: Products.ID
 
-relationship 'zone_dwell_minute to dim_stores'
-	fromColumn: zone_dwell_minute.store_id
-	toColumn: dim_stores.ID
+relationship 'Zone Dwell by Minute to Stores'
+	fromColumn: 'Zone Dwell by Minute'.'Store ID'
+	toColumn: Stores.ID
 
-relationship 'online_sales_daily to dim_date'
-	fromColumn: online_sales_daily.day
-	toColumn: dim_date.date
+relationship 'Online Sales Daily to Date'
+	fromColumn: 'Online Sales Daily'.Day
+	toColumn: Date.Date
 
-relationship 'tender_mix_daily to dim_date'
-	fromColumn: tender_mix_daily.day
-	toColumn: dim_date.date
+relationship 'Tender Mix Daily to Date'
+	fromColumn: 'Tender Mix Daily'.Day
+	toColumn: Date.Date
 
-relationship 'marketing_cost_daily to dim_date'
-	fromColumn: marketing_cost_daily.day
-	toColumn: dim_date.date
+relationship 'Marketing Cost Daily to Date'
+	fromColumn: 'Marketing Cost Daily'.Day
+	toColumn: Date.Date
 
-relationship 'truck_dwell_daily to dim_date'
-	fromColumn: truck_dwell_daily.day
-	toColumn: dim_date.date
+relationship 'Truck Dwell Daily to Date'
+	fromColumn: 'Truck Dwell Daily'.Day
+	toColumn: Date.Date
 

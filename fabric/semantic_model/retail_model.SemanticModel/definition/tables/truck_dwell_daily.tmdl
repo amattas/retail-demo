@@ -1,17 +1,19 @@
-table truck_dwell_daily
+table 'Truck Dwell Daily'
 	lineageTag: 27b86d53-bcc1-4b0c-a6b6-bef459bc35ed
 	sourceLineageTag: [au].[truck_dwell_daily]
 
-	column site
+	column Site
 		dataType: string
 		lineageTag: ad2e4e82-92c0-41a1-8e1a-15bbeb1093cb
 		sourceLineageTag: site
 		summarizeBy: none
 		sourceColumn: site
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column day
+	column Day
 		dataType: dateTime
 		formatString: General Date
 		lineageTag: 4bd080fb-437b-41f8-83ce-beb768501d61
@@ -19,20 +21,24 @@ table truck_dwell_daily
 		summarizeBy: none
 		sourceColumn: day
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column avg_dwell_min
+	column 'Average Dwell Minutes'
 		dataType: double
 		lineageTag: d8e13419-3a71-47f4-baea-c166a92a46db
 		sourceLineageTag: avg_dwell_min
 		summarizeBy: sum
 		sourceColumn: avg_dwell_min
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column trucks
+	column Trucks
 		dataType: int64
 		formatString: 0
 		lineageTag: 7908b1e2-0c3c-4dc5-9250-eb7bf836fde4
@@ -40,9 +46,11 @@ table truck_dwell_daily
 		summarizeBy: sum
 		sourceColumn: trucks
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition truck_dwell_daily = entity
+	partition 'Truck Dwell Daily' = entity
 		mode: directLake
 		source
 			entityName: truck_dwell_daily

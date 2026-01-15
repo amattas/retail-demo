@@ -1,8 +1,8 @@
-table dim_customers
+table Customers
 	lineageTag: 5531b22c-bc78-4ae9-8d9f-64dcee879bad
 	sourceLineageTag: [ag].[dim_customers]
 
-	measure '# of Customers' = COUNTROWS(dim_customers)
+	measure '# of Customers' = COUNTROWS(Customers)
 		formatString: #,0
 		lineageTag: 01a1a1b3-0001-0001-0001-000000000001
 
@@ -16,21 +16,23 @@ table dim_customers
 
 		annotation SummarizationSetBy = Automatic
 
-	column FirstName
+	column 'First Name'
 		dataType: string
 		lineageTag: 29fdf2eb-f734-4dca-a4d5-57494eb37a71
 		sourceLineageTag: FirstName
 		summarizeBy: none
 		sourceColumn: FirstName
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column LastName
+	column 'Last Name'
 		dataType: string
 		lineageTag: 485d56e0-0b8f-41da-bbcd-cb500561440c
 		sourceLineageTag: LastName
 		summarizeBy: none
 		sourceColumn: LastName
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -43,22 +45,24 @@ table dim_customers
 
 		annotation SummarizationSetBy = Automatic
 
-	column GeographyID
+	column 'Geography ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 1b0afb62-5a20-472d-9486-5f52b3dc74f6
 		sourceLineageTag: GeographyID
 		summarizeBy: count
 		sourceColumn: GeographyID
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column LoyaltyCard
+	column 'Loyalty Card'
 		dataType: string
 		lineageTag: a9c05456-300a-4430-a34b-184f017b66ae
 		sourceLineageTag: LoyaltyCard
 		summarizeBy: none
 		sourceColumn: LoyaltyCard
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -71,25 +75,27 @@ table dim_customers
 
 		annotation SummarizationSetBy = Automatic
 
-	column BLEId
+	column 'BLE ID'
 		dataType: string
 		lineageTag: be6bd21e-b728-46c6-b62b-5550e2abedba
 		sourceLineageTag: BLEId
 		summarizeBy: none
 		sourceColumn: BLEId
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column AdId
+	column 'Ad ID'
 		dataType: string
 		lineageTag: 0d74302f-4f4b-472c-9b9b-48b57d298e6b
 		sourceLineageTag: AdId
 		summarizeBy: none
 		sourceColumn: AdId
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	partition dim_customers = entity
+	partition Customers = entity
 		mode: directLake
 		source
 			entityName: dim_customers

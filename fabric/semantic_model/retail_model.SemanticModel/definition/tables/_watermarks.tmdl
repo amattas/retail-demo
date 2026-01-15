@@ -1,17 +1,19 @@
-table _watermarks
+table Watermarks
 	lineageTag: 0a6eb3a9-dfc1-4cb2-814c-3b67f979d2ae
 	sourceLineageTag: [ag].[_watermarks]
 
-	column source_table
+	column 'Source Table'
 		dataType: string
 		lineageTag: 1763d036-3789-473a-a984-1b81b3ab5a75
 		sourceLineageTag: source_table
 		summarizeBy: none
 		sourceColumn: source_table
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column last_processed_ts
+	column 'Last Processed Timestamp'
 		dataType: dateTime
 		formatString: General Date
 		lineageTag: 1a34ee4b-d4af-46d6-81af-41e493cb7bf8
@@ -19,9 +21,11 @@ table _watermarks
 		summarizeBy: none
 		sourceColumn: last_processed_ts
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column updated_at
+	column 'Updated At'
 		dataType: dateTime
 		formatString: General Date
 		lineageTag: 6776ab1d-f90b-4891-9af5-462126fd000c
@@ -29,9 +33,11 @@ table _watermarks
 		summarizeBy: none
 		sourceColumn: updated_at
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition _watermarks = entity
+	partition Watermarks = entity
 		mode: directLake
 		source
 			entityName: _watermarks

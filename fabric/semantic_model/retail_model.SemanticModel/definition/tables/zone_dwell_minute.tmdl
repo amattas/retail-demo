@@ -1,8 +1,8 @@
-table zone_dwell_minute
+table 'Zone Dwell by Minute'
 	lineageTag: 0bf09335-5a4f-471c-9b09-32b6f8261fa6
 	sourceLineageTag: [au].[zone_dwell_minute]
 
-	column store_id
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: cbd46151-4680-4fd3-9a7c-0e95183412ff
@@ -10,18 +10,22 @@ table zone_dwell_minute
 		summarizeBy: sum
 		sourceColumn: store_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column zone
+	column Zone
 		dataType: string
 		lineageTag: 120f9883-3652-4a83-846c-b4d438b1a3ba
 		sourceLineageTag: zone
 		summarizeBy: none
 		sourceColumn: zone
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column ts
+	column Timestamp
 		dataType: dateTime
 		formatString: General Date
 		lineageTag: c26e9f9a-56af-4116-96f6-089843545694
@@ -29,20 +33,24 @@ table zone_dwell_minute
 		summarizeBy: none
 		sourceColumn: ts
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column avg_dwell
+	column 'Average Dwell'
 		dataType: double
 		lineageTag: 3e664904-d5dc-47c4-9316-6313e996935b
 		sourceLineageTag: avg_dwell
 		summarizeBy: sum
 		sourceColumn: avg_dwell
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column customers
+	column Customers
 		dataType: int64
 		formatString: 0
 		lineageTag: 88c3825c-bbdd-4e69-8b8e-9c36eca2a746
@@ -50,9 +58,11 @@ table zone_dwell_minute
 		summarizeBy: sum
 		sourceColumn: customers
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition zone_dwell_minute = entity
+	partition 'Zone Dwell by Minute' = entity
 		mode: directLake
 		source
 			entityName: zone_dwell_minute

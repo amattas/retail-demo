@@ -1,8 +1,8 @@
-table dim_stores
+table Stores
 	lineageTag: 7a2501f0-2aab-403a-82e0-5f791cd939ef
 	sourceLineageTag: [ag].[dim_stores]
 
-	measure '# of Stores' = COUNTROWS(dim_stores)
+	measure '# of Stores' = COUNTROWS(Stores)
 		formatString: #,0
 		lineageTag: 01a1a1b2-0001-0001-0001-000000000001
 
@@ -16,12 +16,13 @@ table dim_stores
 
 		annotation SummarizationSetBy = Automatic
 
-	column StoreNumber
+	column 'Store Number'
 		dataType: string
 		lineageTag: 26e6a058-d596-4bfe-8e69-52e779a7adfa
 		sourceLineageTag: StoreNumber
 		summarizeBy: none
 		sourceColumn: StoreNumber
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -34,66 +35,72 @@ table dim_stores
 
 		annotation SummarizationSetBy = Automatic
 
-	column GeographyID
+	column 'Geography ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 34b29980-f042-438f-bedc-96916d57be64
 		sourceLineageTag: GeographyID
 		summarizeBy: none
 		sourceColumn: GeographyID
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column tax_rate
+	column 'Tax Rate'
 		dataType: double
 		lineageTag: 5d48e6a7-58d4-4ae4-a1fb-af34db5aa099
 		sourceLineageTag: tax_rate
 		summarizeBy: none
 		sourceColumn: tax_rate
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column volume_class
+	column 'Volume Class'
 		dataType: string
 		lineageTag: 0295d16e-cf12-4f89-a22b-e19fa4c8e6ca
 		sourceLineageTag: volume_class
 		summarizeBy: none
 		sourceColumn: volume_class
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column store_format
+	column 'Store Format'
 		dataType: string
 		lineageTag: 847e0428-24d0-4c22-adef-1d346945593c
 		sourceLineageTag: store_format
 		summarizeBy: none
 		sourceColumn: store_format
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column operating_hours
+	column 'Operating Hours'
 		dataType: string
 		lineageTag: 57c66eb7-47bd-47d8-a38e-14e7c857926b
 		sourceLineageTag: operating_hours
 		summarizeBy: none
 		sourceColumn: operating_hours
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
-	column daily_traffic_multiplier
+	column 'Daily Traffic Multiplier'
 		dataType: double
 		lineageTag: 718f6419-bcf5-4a30-9ff5-3719ccd5ec78
 		sourceLineageTag: daily_traffic_multiplier
 		summarizeBy: none
 		sourceColumn: daily_traffic_multiplier
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	partition dim_stores = entity
+	partition Stores = entity
 		mode: directLake
 		source
 			entityName: dim_stores

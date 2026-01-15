@@ -1,8 +1,8 @@
-table top_products_15m
+table 'Top Products 15 Min'
 	lineageTag: eda9ac0d-bc37-4363-96b4-298c279801bc
 	sourceLineageTag: [au].[top_products_15m]
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: f71dd371-de91-495f-ad76-db7f3c6fde8b
@@ -10,20 +10,24 @@ table top_products_15m
 		summarizeBy: sum
 		sourceColumn: product_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column revenue
+	column Revenue
 		dataType: double
 		lineageTag: 95625462-5b71-47fe-8186-915a9a4f1d6a
 		sourceLineageTag: revenue
 		summarizeBy: sum
 		sourceColumn: revenue
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column units
+	column Units
 		dataType: int64
 		formatString: 0
 		lineageTag: 11114f49-2e94-4a9e-9066-1d07443626fc
@@ -31,9 +35,11 @@ table top_products_15m
 		summarizeBy: sum
 		sourceColumn: units
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition top_products_15m = entity
+	partition 'Top Products 15 Min' = entity
 		mode: directLake
 		source
 			entityName: top_products_15m

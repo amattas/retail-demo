@@ -1,20 +1,20 @@
-table fact_online_order_headers
+table 'Online Orders'
 	lineageTag: 930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd
 	sourceLineageTag: [ag].[fact_online_order_headers]
 
-	measure 'Total Online Sales' = SUM(fact_online_order_headers[total_cents]) / 100
+	measure 'Total Online Sales' = SUM('Online Orders'[Total Cents]) / 100
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000001
 
-	measure 'Total Online Tax' = SUM(fact_online_order_headers[tax_cents]) / 100
+	measure 'Total Online Tax' = SUM('Online Orders'[Tax Cents]) / 100
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000002
 
-	measure 'Total Online Subtotal' = SUM(fact_online_order_headers[subtotal_cents]) / 100
+	measure 'Total Online Subtotal' = SUM('Online Orders'[Subtotal Cents]) / 100
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000003
 
-	measure 'Online Order Count' = COUNTROWS(fact_online_order_headers)
+	measure 'Online Order Count' = COUNTROWS('Online Orders')
 		formatString: #,0
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000004
 
@@ -22,7 +22,7 @@ table fact_online_order_headers
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000005
 
-	column customer_id
+	column 'Customer ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: c6cd591e-21eb-4a48-82fe-be8ca75c1e34
@@ -32,7 +32,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column subtotal_cents
+		changedProperty = Name
+
+	column 'Subtotal Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: 7c45861b-0559-41b0-8f45-d366dc2fc071
@@ -42,7 +44,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column order_id_ext
+		changedProperty = Name
+
+	column 'Order ID'
 		dataType: string
 		lineageTag: 549cb01f-8401-439b-94a1-03ce546d388c
 		sourceLineageTag: order_id_ext
@@ -51,7 +55,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column payment_method
+		changedProperty = Name
+
+	column 'Payment Method'
 		dataType: string
 		lineageTag: 2c6791b3-9bd0-4cb7-8e8d-172fdbb2bde6
 		sourceLineageTag: payment_method
@@ -60,7 +66,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column total_amount
+		changedProperty = Name
+
+	column 'Total Amount'
 		dataType: string
 		lineageTag: 41239a23-abc8-447a-ace2-d14d407e989c
 		sourceLineageTag: total_amount
@@ -69,7 +77,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column total_cents
+		changedProperty = Name
+
+	column 'Total Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: 2123d982-0ece-4589-a4cb-d2154af602cd
@@ -79,7 +89,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column tax_amount
+		changedProperty = Name
+
+	column 'Tax Amount'
 		dataType: string
 		lineageTag: 3d73f23c-7703-4673-a845-52220518b0e5
 		sourceLineageTag: tax_amount
@@ -88,7 +100,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column subtotal_amount
+		changedProperty = Name
+
+	column 'Subtotal Amount'
 		dataType: string
 		lineageTag: 18653173-4d8b-4cf3-b061-7399ace2daa0
 		sourceLineageTag: subtotal_amount
@@ -97,7 +111,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	column tax_cents
+		changedProperty = Name
+
+	column 'Tax Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: d5a18cad-980f-4839-8303-5bfde6a48bc8
@@ -107,7 +123,9 @@ table fact_online_order_headers
 
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_online_order_headers = entity
+		changedProperty = Name
+
+	partition 'Online Orders' = entity
 		mode: directLake
 		source
 			entityName: fact_online_order_headers

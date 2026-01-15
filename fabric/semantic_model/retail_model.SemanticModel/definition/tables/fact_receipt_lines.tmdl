@@ -1,12 +1,12 @@
-table fact_receipt_lines
+table 'Receipt Lines'
 	lineageTag: aab05dc7-35b4-4318-affd-bc107c21f8f7
 	sourceLineageTag: [ag].[fact_receipt_lines]
 
-	measure 'Total Units Sold' = SUM(fact_receipt_lines[quantity])
+	measure 'Total Units Sold' = SUM('Receipt Lines'[Quantity])
 		formatString: #,0
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000001
 
-	measure 'Line Revenue' = SUM(fact_receipt_lines[ext_cents]) / 100
+	measure 'Line Revenue' = SUM('Receipt Lines'[Extended Cents]) / 100
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000002
 
@@ -14,11 +14,11 @@ table fact_receipt_lines
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000003
 
-	measure 'Total Lines' = COUNTROWS(fact_receipt_lines)
+	measure 'Total Lines' = COUNTROWS('Receipt Lines')
 		formatString: #,0
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000004
 
-	column receipt_id_ext
+	column 'Receipt ID'
 		dataType: string
 		lineageTag: 9a782ca7-2110-4e68-994a-5c56e36c0200
 		sourceLineageTag: receipt_id_ext
@@ -27,7 +27,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+		changedProperty = Name
+
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 160f5195-0ef4-431a-9e58-e0dda60336f2
@@ -37,7 +39,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column line_num
+		changedProperty = Name
+
+	column 'Line Number'
 		dataType: int64
 		formatString: 0
 		lineageTag: bd65b0d0-4508-4f61-8a08-7bc9e337892e
@@ -47,7 +51,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column quantity
+		changedProperty = Name
+
+	column Quantity
 		dataType: int64
 		formatString: 0
 		lineageTag: de505fd4-366c-410b-9a65-544528a62890
@@ -57,7 +63,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column unit_price
+		changedProperty = Name
+
+	column 'Unit Price'
 		dataType: string
 		lineageTag: 9de741c8-fe8c-43bb-b1d1-3547e0e467e4
 		sourceLineageTag: unit_price
@@ -66,7 +74,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column ext_price
+		changedProperty = Name
+
+	column 'Extended Price'
 		dataType: string
 		lineageTag: a743303d-5bbe-46f7-844b-72b2a53cbd8f
 		sourceLineageTag: ext_price
@@ -75,7 +85,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column unit_cents
+		changedProperty = Name
+
+	column 'Unit Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: 5af8a932-d0bb-4d47-9699-705ddf5bbde0
@@ -85,7 +97,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column ext_cents
+		changedProperty = Name
+
+	column 'Extended Cents'
 		dataType: int64
 		formatString: 0
 		lineageTag: 669ff8f4-2ed2-4299-9cf5-9730c3bb22e1
@@ -95,7 +109,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	column promo_code
+		changedProperty = Name
+
+	column 'Promo Code'
 		dataType: string
 		lineageTag: 5848e85f-4f07-40c5-9166-5364b4b7c822
 		sourceLineageTag: promo_code
@@ -104,7 +120,9 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_receipt_lines = entity
+		changedProperty = Name
+
+	partition 'Receipt Lines' = entity
 		mode: directLake
 		source
 			entityName: fact_receipt_lines

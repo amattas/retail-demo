@@ -1,25 +1,27 @@
-table fact_store_inventory_txn
+table 'Store Inventory Transactions'
 	lineageTag: 069e006d-82a8-46ab-abf7-39d781c37887
 	sourceLineageTag: [ag].[fact_store_inventory_txn]
 
-	measure 'Total Inventory Transactions' = COUNTROWS(fact_store_inventory_txn)
+	measure 'Total Inventory Transactions' = COUNTROWS('Store Inventory Transactions')
 		formatString: #,0
 		lineageTag: 01a1a1a6-0001-0001-0001-000000000001
 
-	measure 'Total Quantity Delta' = SUM(fact_store_inventory_txn[quantity])
+	measure 'Total Quantity Delta' = SUM('Store Inventory Transactions'[Quantity])
 		formatString: #,0
 		lineageTag: 01a1a1a6-0001-0001-0001-000000000002
 
-	column txn_type
+	column 'Transaction Type'
 		dataType: string
 		lineageTag: fcdbfd4d-1ec4-422f-b7bd-a6a83e8b03c9
 		sourceLineageTag: txn_type
 		summarizeBy: none
 		sourceColumn: txn_type
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column quantity
+	column Quantity
 		dataType: int64
 		formatString: 0
 		lineageTag: b4460922-757f-4b4e-8fbc-5c30dd6b3740
@@ -27,9 +29,11 @@ table fact_store_inventory_txn
 		summarizeBy: sum
 		sourceColumn: quantity
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column balance
+	column Balance
 		dataType: int64
 		formatString: 0
 		lineageTag: 34eee0a6-d403-445d-83a6-163c9c0da520
@@ -37,9 +41,11 @@ table fact_store_inventory_txn
 		summarizeBy: sum
 		sourceColumn: balance
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column product_id
+	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 85ecab4a-5ef0-4c6a-bcbd-2db04af2a261
@@ -47,9 +53,11 @@ table fact_store_inventory_txn
 		summarizeBy: sum
 		sourceColumn: product_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column store_id
+	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: f9411773-fe61-4cc9-bd55-1a200d71cdf8
@@ -57,18 +65,22 @@ table fact_store_inventory_txn
 		summarizeBy: sum
 		sourceColumn: store_id
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	column source
+	column Source
 		dataType: string
 		lineageTag: 4f1e13af-0613-492f-9b82-4b2c53340348
 		sourceLineageTag: source
 		summarizeBy: none
 		sourceColumn: source
 
+		changedProperty = Name
+
 		annotation SummarizationSetBy = Automatic
 
-	partition fact_store_inventory_txn = entity
+	partition 'Store Inventory Transactions' = entity
 		mode: directLake
 		source
 			entityName: fact_store_inventory_txn
