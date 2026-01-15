@@ -40,6 +40,7 @@ table Geographies
 		sourceLineageTag: ZipCode
 		summarizeBy: none
 		sourceColumn: ZipCode
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

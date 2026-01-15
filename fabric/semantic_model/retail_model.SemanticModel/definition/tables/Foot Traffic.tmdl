@@ -2,8 +2,6 @@ table 'Foot Traffic'
 	lineageTag: c999b61a-43db-4db3-9783-626a4618f864
 	sourceLineageTag: [ag].[fact_foot_traffic]
 
-	changedProperty = Name
-
 	column Count
 		dataType: int64
 		formatString: 0
@@ -68,4 +66,6 @@ table 'Foot Traffic'
 			entityName: fact_foot_traffic
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

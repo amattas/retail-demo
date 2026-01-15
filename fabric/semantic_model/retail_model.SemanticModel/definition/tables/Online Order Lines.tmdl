@@ -21,9 +21,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: order_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Unit Cents'
 		dataType: int64
@@ -33,9 +33,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: unit_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Fulfillment Mode'
 		dataType: string
@@ -44,9 +44,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: fulfillment_mode
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Promo Code'
 		dataType: string
@@ -55,9 +55,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: promo_code
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Node Type'
 		dataType: string
@@ -66,9 +66,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: node_type
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Product ID'
 		dataType: int64
@@ -78,9 +78,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: product_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Extended Price'
 		dataType: string
@@ -89,9 +89,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: ext_price
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Extended Cents'
 		dataType: int64
@@ -101,9 +101,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: ext_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Line Number'
 		dataType: int64
@@ -113,9 +113,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: line_num
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Fulfillment Status'
 		dataType: string
@@ -124,9 +124,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: fulfillment_status
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Unit Price'
 		dataType: string
@@ -135,9 +135,9 @@ table 'Online Order Lines'
 		summarizeBy: none
 		sourceColumn: unit_price
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column Quantity
 		dataType: int64
@@ -147,9 +147,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: quantity
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Node ID'
 		dataType: int64
@@ -159,9 +159,9 @@ table 'Online Order Lines'
 		summarizeBy: sum
 		sourceColumn: node_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	partition 'Online Order Lines' = entity
 		mode: directLake

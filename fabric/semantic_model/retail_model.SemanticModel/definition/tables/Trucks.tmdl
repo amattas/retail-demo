@@ -22,6 +22,7 @@ table Trucks
 		sourceLineageTag: LicensePlate
 		summarizeBy: none
 		sourceColumn: LicensePlate
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -42,6 +43,7 @@ table Trucks
 		sourceLineageTag: DCID
 		summarizeBy: count
 		sourceColumn: DCID
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

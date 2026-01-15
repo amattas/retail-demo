@@ -25,9 +25,9 @@ table 'Receipt Lines'
 		summarizeBy: none
 		sourceColumn: receipt_id_ext
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Product ID'
 		dataType: int64
@@ -37,9 +37,9 @@ table 'Receipt Lines'
 		summarizeBy: sum
 		sourceColumn: product_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Line Number'
 		dataType: int64
@@ -49,9 +49,9 @@ table 'Receipt Lines'
 		summarizeBy: sum
 		sourceColumn: line_num
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column Quantity
 		dataType: int64
@@ -61,9 +61,9 @@ table 'Receipt Lines'
 		summarizeBy: sum
 		sourceColumn: quantity
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Unit Price'
 		dataType: string
@@ -72,9 +72,9 @@ table 'Receipt Lines'
 		summarizeBy: none
 		sourceColumn: unit_price
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Extended Price'
 		dataType: string
@@ -83,9 +83,9 @@ table 'Receipt Lines'
 		summarizeBy: none
 		sourceColumn: ext_price
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Unit Cents'
 		dataType: int64
@@ -95,9 +95,9 @@ table 'Receipt Lines'
 		summarizeBy: sum
 		sourceColumn: unit_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Extended Cents'
 		dataType: int64
@@ -107,9 +107,9 @@ table 'Receipt Lines'
 		summarizeBy: sum
 		sourceColumn: ext_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Promo Code'
 		dataType: string
@@ -118,9 +118,9 @@ table 'Receipt Lines'
 		summarizeBy: none
 		sourceColumn: promo_code
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	partition 'Receipt Lines' = entity
 		mode: directLake

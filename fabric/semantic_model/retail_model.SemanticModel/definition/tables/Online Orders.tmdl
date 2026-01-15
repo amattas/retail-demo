@@ -30,9 +30,9 @@ table 'Online Orders'
 		summarizeBy: sum
 		sourceColumn: customer_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Subtotal Cents'
 		dataType: int64
@@ -42,9 +42,9 @@ table 'Online Orders'
 		summarizeBy: sum
 		sourceColumn: subtotal_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Order ID'
 		dataType: string
@@ -53,9 +53,9 @@ table 'Online Orders'
 		summarizeBy: none
 		sourceColumn: order_id_ext
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Payment Method'
 		dataType: string
@@ -64,9 +64,9 @@ table 'Online Orders'
 		summarizeBy: none
 		sourceColumn: payment_method
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Total Amount'
 		dataType: string
@@ -75,9 +75,9 @@ table 'Online Orders'
 		summarizeBy: none
 		sourceColumn: total_amount
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Total Cents'
 		dataType: int64
@@ -87,9 +87,9 @@ table 'Online Orders'
 		summarizeBy: sum
 		sourceColumn: total_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Tax Amount'
 		dataType: string
@@ -98,9 +98,9 @@ table 'Online Orders'
 		summarizeBy: none
 		sourceColumn: tax_amount
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Subtotal Amount'
 		dataType: string
@@ -109,9 +109,9 @@ table 'Online Orders'
 		summarizeBy: none
 		sourceColumn: subtotal_amount
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Tax Cents'
 		dataType: int64
@@ -121,9 +121,9 @@ table 'Online Orders'
 		summarizeBy: sum
 		sourceColumn: tax_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	partition 'Online Orders' = entity
 		mode: directLake

@@ -12,38 +12,39 @@ annotation __PBI_TimeIntelligenceEnabled = 1
 
 annotation PBI_ProTooling = ["RemoteModeling","DirectLakeOnOneLakeCreatedInDesktop","DevMode"]
 
-ref table tender_mix_daily
-ref table online_sales_daily
-ref table top_products_15m
-ref table marketing_cost_daily
-ref table zone_dwell_minute
-ref table inventory_position_current
-ref table truck_dwell_daily
-ref table dim_date
-ref table _watermarks
-ref table sales_minute_store
-ref table dc_inventory_position_current
-ref table dim_customers
-ref table fact_marketing
-ref table fact_foot_traffic
-ref table fact_payments
-ref table fact_truck_moves
-ref table dim_stores
-ref table dim_distribution_centers
-ref table fact_receipt_lines
-ref table fact_reorders
-ref table fact_ble_pings
-ref table fact_receipts
-ref table fact_promo_lines
-ref table dim_products
-ref table fact_truck_inventory
-ref table fact_online_order_lines
-ref table dim_trucks
-ref table fact_online_order_headers
-ref table fact_promotions
-ref table fact_dc_inventory_txn
-ref table fact_store_inventory_txn
-ref table fact_store_ops
-ref table fact_stockouts
-ref table fact_customer_zone_changes
-ref table dim_geographies
+ref table 'Tender Mix Daily'
+ref table 'Online Sales Daily'
+ref table 'Top Products 15 Min'
+ref table 'Marketing Cost Daily'
+ref table 'Zone Dwell by Minute'
+ref table 'Store Inventory Position'
+ref table 'Truck Dwell Daily'
+ref table Watermarks
+ref table 'Store Sales by Minute'
+ref table 'DC Inventory Position'
+ref table Customers
+ref table Marketing
+ref table 'Foot Traffic'
+ref table Payments
+ref table 'Truck Moves'
+ref table Stores
+ref table 'Distribution Centers'
+ref table 'Receipt Lines'
+ref table Reorders
+ref table 'BLE Pings'
+ref table Receipts
+ref table 'Promotion Lines'
+ref table Products
+ref table 'Truck Inventory'
+ref table 'Online Order Lines'
+ref table Trucks
+ref table 'Online Orders'
+ref table Promotions
+ref table 'DC Inventory Transactions'
+ref table 'Store Inventory Transactions'
+ref table 'Store Operations'
+ref table Stockouts
+ref table 'Customer Zone Changes'
+ref table Geographies
+ref table Date
+

@@ -30,6 +30,7 @@ table Products
 		sourceLineageTag: ProductName
 		summarizeBy: none
 		sourceColumn: ProductName
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -107,6 +108,7 @@ table Products
 		sourceLineageTag: SalePrice
 		summarizeBy: sum
 		sourceColumn: SalePrice
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -120,6 +122,7 @@ table Products
 		sourceLineageTag: RequiresRefrigeration
 		summarizeBy: none
 		sourceColumn: RequiresRefrigeration
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -130,6 +133,7 @@ table Products
 		sourceLineageTag: taxability
 		summarizeBy: none
 		sourceColumn: taxability
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

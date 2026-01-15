@@ -2,8 +2,6 @@ table 'Truck Moves'
 	lineageTag: 486b3beb-5e42-4766-b0d7-1147520e5a37
 	sourceLineageTag: [ag].[fact_truck_moves]
 
-	changedProperty = Name
-
 	column Status
 		dataType: string
 		lineageTag: 05d465cc-c274-4016-80ec-bd258e36f80c
@@ -68,4 +66,6 @@ table 'Truck Moves'
 			entityName: fact_truck_moves
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

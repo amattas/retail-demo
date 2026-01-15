@@ -15,9 +15,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: receipt_id_ext
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Order ID'
 		dataType: string
@@ -26,9 +26,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: order_id_ext
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Payment Method'
 		dataType: string
@@ -37,9 +37,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: payment_method
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Amount Cents'
 		dataType: int64
@@ -49,9 +49,9 @@ table Payments
 		summarizeBy: sum
 		sourceColumn: amount_cents
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column Amount
 		dataType: string
@@ -60,9 +60,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: amount
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Transaction ID'
 		dataType: string
@@ -71,9 +71,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: transaction_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Processing Time MS'
 		dataType: int64
@@ -83,9 +83,9 @@ table Payments
 		summarizeBy: sum
 		sourceColumn: processing_time_ms
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column Status
 		dataType: string
@@ -94,9 +94,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: status
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Decline Reason'
 		dataType: string
@@ -105,9 +105,9 @@ table Payments
 		summarizeBy: none
 		sourceColumn: decline_reason
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Store ID'
 		dataType: int64
@@ -117,9 +117,9 @@ table Payments
 		summarizeBy: sum
 		sourceColumn: store_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	column 'Customer ID'
 		dataType: int64
@@ -129,9 +129,9 @@ table Payments
 		summarizeBy: sum
 		sourceColumn: customer_id
 
-		annotation SummarizationSetBy = Automatic
-
 		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
 
 	partition Payments = entity
 		mode: directLake

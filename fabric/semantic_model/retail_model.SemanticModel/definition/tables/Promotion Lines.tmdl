@@ -2,8 +2,6 @@ table 'Promotion Lines'
 	lineageTag: 6f0a86e5-8a4e-44c1-a568-13af0862f5ef
 	sourceLineageTag: [ag].[fact_promo_lines]
 
-	changedProperty = Name
-
 	column 'Receipt ID'
 		dataType: string
 		lineageTag: c6de1bfc-e7ba-4aef-834f-01871476eeb4
@@ -91,4 +89,6 @@ table 'Promotion Lines'
 			entityName: fact_promo_lines
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

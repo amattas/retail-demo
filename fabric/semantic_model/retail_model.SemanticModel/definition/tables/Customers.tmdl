@@ -22,6 +22,7 @@ table Customers
 		sourceLineageTag: FirstName
 		summarizeBy: none
 		sourceColumn: FirstName
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -32,6 +33,7 @@ table Customers
 		sourceLineageTag: LastName
 		summarizeBy: none
 		sourceColumn: LastName
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -52,6 +54,7 @@ table Customers
 		sourceLineageTag: GeographyID
 		summarizeBy: count
 		sourceColumn: GeographyID
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -62,6 +65,7 @@ table Customers
 		sourceLineageTag: LoyaltyCard
 		summarizeBy: none
 		sourceColumn: LoyaltyCard
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -81,6 +85,7 @@ table Customers
 		sourceLineageTag: BLEId
 		summarizeBy: none
 		sourceColumn: BLEId
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -91,6 +96,7 @@ table Customers
 		sourceLineageTag: AdId
 		summarizeBy: none
 		sourceColumn: AdId
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

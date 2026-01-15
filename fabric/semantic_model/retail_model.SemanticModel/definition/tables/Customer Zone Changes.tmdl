@@ -2,8 +2,6 @@ table 'Customer Zone Changes'
 	lineageTag: edc61f90-5ee8-4618-9d9d-e496d674f557
 	sourceLineageTag: [ag].[fact_customer_zone_changes]
 
-	changedProperty = Name
-
 	column 'Store ID'
 		dataType: int64
 		formatString: 0
@@ -55,4 +53,6 @@ table 'Customer Zone Changes'
 			entityName: fact_customer_zone_changes
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

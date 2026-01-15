@@ -1,26 +1,29 @@
 table Date
 	lineageTag: 8a9c5f7e-7d3b-4f0a-9b6d-2e4f8c9a1b3d
 	sourceLineageTag: [ag].[dim_date]
+	dataCategory: Time
 
 	column 'Date Key'
 		dataType: int64
-		isKey
 		formatString: 0
 		lineageTag: cb82fadf-1470-486d-8156-a89857b33a9c
 		sourceLineageTag: date_key
 		summarizeBy: none
 		sourceColumn: date_key
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
 	column Date
 		dataType: dateTime
+		isKey
 		formatString: Short Date
 		lineageTag: 663140d5-bad2-44f0-85c4-d838593e15ec
 		sourceLineageTag: date
 		summarizeBy: none
 		sourceColumn: date
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -34,6 +37,7 @@ table Date
 		sourceLineageTag: year
 		summarizeBy: none
 		sourceColumn: year
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -45,6 +49,7 @@ table Date
 		sourceLineageTag: quarter
 		summarizeBy: none
 		sourceColumn: quarter
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -56,6 +61,7 @@ table Date
 		sourceLineageTag: month
 		summarizeBy: none
 		sourceColumn: month
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -66,6 +72,7 @@ table Date
 		sourceLineageTag: month_name
 		summarizeBy: none
 		sourceColumn: month_name
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -77,6 +84,7 @@ table Date
 		sourceLineageTag: day
 		summarizeBy: none
 		sourceColumn: day
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -88,6 +96,7 @@ table Date
 		sourceLineageTag: day_of_week
 		summarizeBy: none
 		sourceColumn: day_of_week
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -98,6 +107,7 @@ table Date
 		sourceLineageTag: day_name
 		summarizeBy: none
 		sourceColumn: day_name
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -109,6 +119,7 @@ table Date
 		sourceLineageTag: week_of_year
 		summarizeBy: none
 		sourceColumn: week_of_year
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -120,6 +131,7 @@ table Date
 		sourceLineageTag: is_weekend
 		summarizeBy: none
 		sourceColumn: is_weekend
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -131,6 +143,7 @@ table Date
 		sourceLineageTag: fiscal_year
 		summarizeBy: none
 		sourceColumn: fiscal_year
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -142,6 +155,7 @@ table Date
 		sourceLineageTag: fiscal_quarter
 		summarizeBy: none
 		sourceColumn: fiscal_quarter
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

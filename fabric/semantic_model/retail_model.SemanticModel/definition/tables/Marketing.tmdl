@@ -2,8 +2,6 @@ table Marketing
 	lineageTag: 0de63cc1-c6da-4354-8a04-602a3c737aa8
 	sourceLineageTag: [ag].[fact_marketing]
 
-	changedProperty = Name
-
 	column 'Customer ID'
 		dataType: double
 		lineageTag: af26fadf-1aa7-4813-b8f2-4b18a7d05aa7
@@ -112,4 +110,6 @@ table Marketing
 			entityName: fact_marketing
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

@@ -22,6 +22,7 @@ table 'Distribution Centers'
 		sourceLineageTag: DCNumber
 		summarizeBy: none
 		sourceColumn: DCNumber
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -42,6 +43,7 @@ table 'Distribution Centers'
 		sourceLineageTag: GeographyID
 		summarizeBy: count
 		sourceColumn: GeographyID
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic

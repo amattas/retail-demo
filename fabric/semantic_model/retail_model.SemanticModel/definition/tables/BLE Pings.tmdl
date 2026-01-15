@@ -2,8 +2,6 @@ table 'BLE Pings'
 	lineageTag: 73ae8b40-2387-4123-859d-f4e85a159c5b
 	sourceLineageTag: [ag].[fact_ble_pings]
 
-	changedProperty = Name
-
 	column 'Customer ID'
 		dataType: double
 		lineageTag: 17cdf61c-5cf1-4033-980c-c519f645366f
@@ -80,4 +78,6 @@ table 'BLE Pings'
 			entityName: fact_ble_pings
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

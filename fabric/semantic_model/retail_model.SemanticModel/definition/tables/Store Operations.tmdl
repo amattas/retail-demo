@@ -2,8 +2,6 @@ table 'Store Operations'
 	lineageTag: 30e435c0-c71d-474c-b807-e2f634dbf383
 	sourceLineageTag: [ag].[fact_store_ops]
 
-	changedProperty = Name
-
 	column 'Trace ID'
 		dataType: string
 		lineageTag: 7c2cb6d2-a5ec-4d85-9e47-e23513bb14e2
@@ -44,4 +42,6 @@ table 'Store Operations'
 			entityName: fact_store_ops
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
 

@@ -22,6 +22,7 @@ table Stores
 		sourceLineageTag: StoreNumber
 		summarizeBy: none
 		sourceColumn: StoreNumber
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -42,6 +43,7 @@ table Stores
 		sourceLineageTag: GeographyID
 		summarizeBy: none
 		sourceColumn: GeographyID
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -52,6 +54,7 @@ table Stores
 		sourceLineageTag: tax_rate
 		summarizeBy: none
 		sourceColumn: tax_rate
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -64,6 +67,7 @@ table Stores
 		sourceLineageTag: volume_class
 		summarizeBy: none
 		sourceColumn: volume_class
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -74,6 +78,7 @@ table Stores
 		sourceLineageTag: store_format
 		summarizeBy: none
 		sourceColumn: store_format
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -84,6 +89,7 @@ table Stores
 		sourceLineageTag: operating_hours
 		summarizeBy: none
 		sourceColumn: operating_hours
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
@@ -94,6 +100,7 @@ table Stores
 		sourceLineageTag: daily_traffic_multiplier
 		summarizeBy: none
 		sourceColumn: daily_traffic_multiplier
+
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
