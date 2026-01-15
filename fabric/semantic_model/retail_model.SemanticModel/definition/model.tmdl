@@ -19,6 +19,7 @@ ref table marketing_cost_daily
 ref table zone_dwell_minute
 ref table inventory_position_current
 ref table truck_dwell_daily
+ref table dim_date
 ref table _watermarks
 ref table sales_minute_store
 ref table dc_inventory_position_current
@@ -46,4 +47,3 @@ ref table fact_store_ops
 ref table fact_stockouts
 ref table fact_customer_zone_changes
 ref table dim_geographies
-
