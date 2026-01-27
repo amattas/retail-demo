@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "bc13dbf03bd7588ebe1d",
   "position": {
-    "x": 1068,
+    "x": 980,
     "y": 0,
-    "z": 2,
+    "z": 4,
     "height": 72,
-    "width": 212
+    "width": 145
   },
   "visual": {
     "visualType": "slicer",
@@ -19,14 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Marketing Cost Daily"
+                      "Entity": "Geographies"
                     }
                   },
-                  "Property": "Campaign ID"
+                  "Property": "Region"
                 }
               },
-              "queryRef": "Marketing Cost Daily.Campaign ID",
-              "nativeQueryRef": "Campaign ID",
+              "queryRef": "Geographies.Region",
+              "nativeQueryRef": "Region",
               "active": true
             }
           ]
@@ -205,18 +205,19 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "bc13dbf03bd7588ebe1d",
+        "name": "48e417287aad12b7d4ad",
         "field": {
           "Column": {
             "Expression": {
               "SourceRef": {
-                "Entity": "Marketing Cost Daily"
+                "Entity": "Geographies"
               }
             },
-            "Property": "Campaign ID"
+            "Property": "Region"
           }
         },
-        "type": "Categorical"
+        "type": "Categorical",
+        "displayName": "Region"
       }
     ]
   },

@@ -28,6 +28,21 @@
               "queryRef": "Reorders.Priority",
               "nativeQueryRef": "Priority",
               "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Product Name"
+                }
+              },
+              "queryRef": "Products.Product Name",
+              "nativeQueryRef": "Product Name",
+              "active": false
             }
           ]
         },

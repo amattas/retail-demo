@@ -19,14 +19,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Property": "Total Sales"
+                  "Property": "Line Revenue"
                 }
               },
-              "queryRef": "Receipts.Total Sales",
-              "nativeQueryRef": "Total Sales"
+              "queryRef": "Receipt Lines.Line Revenue",
+              "nativeQueryRef": "Line Revenue"
             }
           ]
         }
@@ -38,10 +38,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Receipt Lines"
                   }
                 },
-                "Property": "Total Sales"
+                "Property": "Line Revenue"
               }
             },
             "direction": "Descending"
@@ -67,7 +67,7 @@
             }
           },
           "selector": {
-            "metadata": "Receipts.Total Sales"
+            "metadata": "Receipt Lines.Line Revenue"
           }
         }
       ],
@@ -130,10 +130,10 @@
           "Measure": {
             "Expression": {
               "SourceRef": {
-                "Entity": "Receipts"
+                "Entity": "Receipt Lines"
               }
             },
-            "Property": "Total Sales"
+            "Property": "Line Revenue"
           }
         },
         "type": "Advanced"

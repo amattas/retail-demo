@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "d05f59fb6452fc467b81",
   "position": {
-    "x": 836.6666666666667,
+    "x": 1135,
     "y": 0,
-    "z": 5,
-    "height": 71.66666666666667,
-    "width": 211.66666666666669
+    "z": 3,
+    "height": 72,
+    "width": 145
   },
   "visual": {
     "visualType": "slicer",
@@ -220,5 +220,24 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Default"
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "ddc7a1b061e5b1d373c0",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Date"
+              }
+            },
+            "Property": "Date"
+          }
+        },
+        "type": "Range",
+        "displayName": "Date"
+      }
+    ]
+  }
 }

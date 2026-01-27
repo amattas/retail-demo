@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "84f93d3168d449769ac6",
   "position": {
-    "x": 1068,
+    "x": 980,
     "y": 0,
-    "z": 2,
+    "z": 4,
     "height": 72,
-    "width": 212
+    "width": 145
   },
   "visual": {
     "visualType": "slicer",
@@ -205,7 +205,7 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "84f93d3168d449769ac6",
+        "name": "48e417287aad12b7d4ad",
         "field": {
           "Column": {
             "Expression": {
@@ -216,7 +216,8 @@
             "Property": "Region"
           }
         },
-        "type": "Categorical"
+        "type": "Categorical",
+        "displayName": "Region"
       }
     ]
   },

@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "8ec2581a907bf0d84b9d",
   "position": {
-    "x": 1068,
+    "x": 825,
     "y": 0,
-    "z": 2,
+    "z": 5,
     "height": 72,
-    "width": 212
+    "width": 145
   },
   "visual": {
     "visualType": "slicer",
@@ -19,14 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Truck Dwell Daily"
+                      "Entity": "Stores"
                     }
                   },
-                  "Property": "Site"
+                  "Property": "Store Number"
                 }
               },
-              "queryRef": "Truck Dwell Daily.Site",
-              "nativeQueryRef": "Site",
+              "queryRef": "Stores.Store Number",
+              "nativeQueryRef": "Store Number",
               "active": true
             }
           ]
@@ -205,18 +205,19 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "8ec2581a907bf0d84b9d",
+        "name": "3cac32a3d5803eda7d97",
         "field": {
           "Column": {
             "Expression": {
               "SourceRef": {
-                "Entity": "Truck Dwell Daily"
+                "Entity": "Stores"
               }
             },
-            "Property": "Site"
+            "Property": "Store Number"
           }
         },
-        "type": "Categorical"
+        "type": "Categorical",
+        "displayName": "Site"
       }
     ]
   },

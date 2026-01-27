@@ -1,18 +1,18 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "bda325846f0f50e1e960",
+  "name": "ab380d00ac63985c0c58",
   "position": {
-    "x": 645,
-    "y": 222,
-    "z": 1,
-    "height": 224,
-    "width": 595
+    "x": 1135,
+    "y": 0,
+    "z": 3,
+    "height": 72,
+    "width": 145
   },
   "visual": {
-    "visualType": "lineChart",
+    "visualType": "slicer",
     "query": {
       "queryState": {
-        "Category": {
+        "Values": {
           "projections": [
             {
               "field": {
@@ -28,29 +28,6 @@
               "queryRef": "Date.Date",
               "nativeQueryRef": "Date",
               "active": true
-            }
-          ]
-        },
-        "Y": {
-          "projections": [
-            {
-              "field": {
-                "Aggregation": {
-                  "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Truck Dwell Daily"
-                        }
-                      },
-                      "Property": "Average Dwell Minutes"
-                    }
-                  },
-                  "Function": 1
-                }
-              },
-              "queryRef": "Avg(Truck Dwell Daily.Average Dwell Minutes)",
-              "nativeQueryRef": "Average of Average Dwell Minutes"
             }
           ]
         }
@@ -75,23 +52,50 @@
       }
     },
     "objects": {
-      "categoryAxis": [
+      "data": [
         {
           "properties": {
-            "showAxisTitle": {
+            "mode": {
               "expr": {
                 "Literal": {
-                  "Value": "true"
+                  "Value": "'Between'"
                 }
               }
             }
           }
         }
       ],
-      "valueAxis": [
+      "header": [
         {
           "properties": {
-            "showAxisTitle": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "fontFamily": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Segoe UI'"
+                }
+              }
+            },
+            "textSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "9L"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "selection": [
+        {
+          "properties": {
+            "selectAllCheckboxEnabled": {
               "expr": {
                 "Literal": {
                   "Value": "true"
@@ -212,29 +216,28 @@
             }
           }
         }
-      ],
-      "title": [
-        {
-          "properties": {
-            "show": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            },
-            "text": {
-              "expr": {
-                "Literal": {
-                  "Value": "'Truck Dwell Minutes by Day'"
-                }
-              }
-            }
-          }
-        }
       ]
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Default"
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "ddc7a1b061e5b1d373c0",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Date"
+              }
+            },
+            "Property": "Date"
+          }
+        },
+        "type": "Range",
+        "displayName": "Date"
+      }
+    ]
+  }
 }

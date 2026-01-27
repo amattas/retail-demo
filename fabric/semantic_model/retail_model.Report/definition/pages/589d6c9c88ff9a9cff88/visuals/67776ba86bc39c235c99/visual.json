@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "67776ba86bc39c235c99",
   "position": {
-    "x": 836.6666666666667,
+    "x": 825,
     "y": 0,
     "z": 5,
-    "height": 71.66666666666667,
-    "width": 211.66666666666669
+    "height": 72,
+    "width": 145
   },
   "visual": {
     "visualType": "slicer",
@@ -223,7 +223,7 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "67776ba86bc39c235c99",
+        "name": "3cac32a3d5803eda7d97",
         "field": {
           "Column": {
             "Expression": {
@@ -234,7 +234,8 @@
             "Property": "Store Number"
           }
         },
-        "type": "Categorical"
+        "type": "Categorical",
+        "displayName": "Site"
       }
     ]
   },

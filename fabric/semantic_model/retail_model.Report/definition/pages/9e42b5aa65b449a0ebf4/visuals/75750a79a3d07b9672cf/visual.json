@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "0e37acb7c919d0306706",
+  "name": "75750a79a3d07b9672cf",
   "position": {
-    "x": 955,
+    "x": 645,
     "y": 100,
     "z": 1,
     "height": 112,
-    "width": 290
+    "width": 595
   },
   "visual": {
     "visualType": "cardVisual",
@@ -21,17 +21,17 @@
                     "Column": {
                       "Expression": {
                         "SourceRef": {
-                          "Entity": "Truck Dwell Daily"
+                          "Entity": "Online Sales Daily"
                         }
                       },
-                      "Property": "Average Dwell Minutes"
+                      "Property": "Total"
                     }
                   },
-                  "Function": 1
+                  "Function": 0
                 }
               },
-              "queryRef": "Avg(Truck Dwell Daily.Average Dwell Minutes)",
-              "nativeQueryRef": "Average of Average Dwell Minutes"
+              "queryRef": "Sum(Online Sales Daily.Total)",
+              "nativeQueryRef": "Sum of Total"
             }
           ]
         }
@@ -45,13 +45,13 @@
                   "Column": {
                     "Expression": {
                       "SourceRef": {
-                        "Entity": "Truck Dwell Daily"
+                        "Entity": "Online Sales Daily"
                       }
                     },
-                    "Property": "Average Dwell Minutes"
+                    "Property": "Total"
                   }
                 },
-                "Function": 1
+                "Function": 0
               }
             },
             "direction": "Descending"
@@ -77,7 +77,7 @@
             }
           },
           "selector": {
-            "metadata": "Avg(Truck Dwell Daily.Average Dwell Minutes)"
+            "metadata": "Sum(Online Sales Daily.Total)"
           }
         }
       ],
@@ -122,7 +122,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Avg Truck Dwell Minutes'"
+                  "Value": "'Online Sales (Selected Period)'"
                 }
               }
             }

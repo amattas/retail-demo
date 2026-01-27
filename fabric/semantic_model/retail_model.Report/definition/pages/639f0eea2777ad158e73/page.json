@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
   "name": "639f0eea2777ad158e73",
-  "displayName": "Supply Chain Control Tower",
+  "displayName": "Supply Chain Control Tower (Inventory & Replenishment)",
   "displayOption": "FitToPage",
   "height": 720,
   "width": 1280,
