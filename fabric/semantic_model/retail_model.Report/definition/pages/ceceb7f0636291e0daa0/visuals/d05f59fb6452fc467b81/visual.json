@@ -1,50 +1,33 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "d05f59fb6452fc467b81",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
-    "width": 595
+    "x": 836.6666666666667,
+    "y": 0,
+    "z": 5,
+    "height": 71.66666666666667,
+    "width": 211.66666666666669
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "slicer",
     "query": {
       "queryState": {
-        "Category": {
+        "Values": {
           "projections": [
             {
               "field": {
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Date"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "Date"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Date.Date",
+              "nativeQueryRef": "Date",
               "active": true
-            }
-          ]
-        },
-        "Y": {
-          "projections": [
-            {
-              "field": {
-                "Measure": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "Receipts"
-                    }
-                  },
-                  "Property": "Average Basket Size"
-                }
-              },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
             }
           ]
         }
@@ -53,39 +36,66 @@
         "sort": [
           {
             "field": {
-              "Measure": {
+              "Column": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Date"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Date"
               }
             },
-            "direction": "Descending"
+            "direction": "Ascending"
           }
         ],
         "isDefaultSort": true
       }
     },
     "objects": {
-      "categoryAxis": [
+      "data": [
         {
           "properties": {
-            "showAxisTitle": {
+            "mode": {
               "expr": {
                 "Literal": {
-                  "Value": "true"
+                  "Value": "'Between'"
                 }
               }
             }
           }
         }
       ],
-      "valueAxis": [
+      "header": [
         {
           "properties": {
-            "showAxisTitle": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "fontFamily": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Segoe UI'"
+                }
+              }
+            },
+            "textSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "9L"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "selection": [
+        {
+          "properties": {
+            "selectAllCheckboxEnabled": {
               "expr": {
                 "Literal": {
                   "Value": "true"
@@ -206,29 +216,9 @@
             }
           }
         }
-      ],
-      "title": [
-        {
-          "properties": {
-            "show": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            },
-            "text": {
-              "expr": {
-                "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
-                }
-              }
-            }
-          }
-        }
       ]
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

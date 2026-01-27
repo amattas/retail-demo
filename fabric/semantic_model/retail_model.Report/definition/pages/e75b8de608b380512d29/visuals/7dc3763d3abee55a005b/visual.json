@@ -206,7 +206,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Total Units Sold by Product Name and Store Number'"
+                  "Value": "'Units Sold by Category'"
                 }
               }
             }

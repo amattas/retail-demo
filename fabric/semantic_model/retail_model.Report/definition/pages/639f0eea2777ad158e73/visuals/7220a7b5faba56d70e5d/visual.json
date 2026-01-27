@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "7220a7b5faba56d70e5d",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "x": 40,
+    "y": 222,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
@@ -19,13 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Distribution Centers"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "DC Number"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Distribution Centers.DC Number",
+              "nativeQueryRef": "DC Number",
               "active": true
             }
           ]
@@ -34,17 +35,22 @@
           "projections": [
             {
               "field": {
-                "Measure": {
+                "Aggregation": {
                   "Expression": {
-                    "SourceRef": {
-                      "Entity": "Receipts"
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DC Inventory Position"
+                        }
+                      },
+                      "Property": "On Hand"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Function": 0
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Sum(DC Inventory Position.On Hand)",
+              "nativeQueryRef": "Sum of On Hand"
             }
           ]
         }
@@ -53,13 +59,18 @@
         "sort": [
           {
             "field": {
-              "Measure": {
+              "Aggregation": {
                 "Expression": {
-                  "SourceRef": {
-                    "Entity": "Receipts"
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "DC Inventory Position"
+                      }
+                    },
+                    "Property": "On Hand"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Function": 0
               }
             },
             "direction": "Descending"
@@ -220,7 +231,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'DC Inventory On Hand by DC'"
                 }
               }
             }
@@ -230,5 +241,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

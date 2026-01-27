@@ -1,15 +1,15 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "be917cc1ce2ab0110f19",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "x": 40,
+    "y": 222,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "lineChart",
     "query": {
       "queryState": {
         "Category": {
@@ -19,13 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Date"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "Date"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Date.Date",
+              "nativeQueryRef": "Date",
               "active": true
             }
           ]
@@ -34,17 +35,22 @@
           "projections": [
             {
               "field": {
-                "Measure": {
+                "Aggregation": {
                   "Expression": {
-                    "SourceRef": {
-                      "Entity": "Receipts"
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Online Sales Daily"
+                        }
+                      },
+                      "Property": "Total"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Function": 0
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Sum(Online Sales Daily.Total)",
+              "nativeQueryRef": "Sum of Total"
             }
           ]
         }
@@ -53,16 +59,16 @@
         "sort": [
           {
             "field": {
-              "Measure": {
+              "Column": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Date"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Date"
               }
             },
-            "direction": "Descending"
+            "direction": "Ascending"
           }
         ],
         "isDefaultSort": true
@@ -220,7 +226,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'Online Sales by Day'"
                 }
               }
             }
@@ -230,5 +236,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

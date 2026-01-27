@@ -1,50 +1,51 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "86d87ca3c57d17844db0",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "x": 40,
+    "y": 456,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "treemap",
     "query": {
       "queryState": {
-        "Category": {
+        "Group": {
           "projections": [
             {
               "field": {
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Products"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "Category"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Products.Category",
+              "nativeQueryRef": "Category",
               "active": true
             }
           ]
         },
-        "Y": {
+        "Values": {
           "projections": [
             {
               "field": {
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Store Inventory Position"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Total Units on Hand"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Store Inventory Position.Total Units on Hand",
+              "nativeQueryRef": "Total Units on Hand"
             }
           ]
         }
@@ -56,45 +57,16 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Store Inventory Position"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Total Units on Hand"
               }
             },
             "direction": "Descending"
           }
-        ],
-        "isDefaultSort": true
+        ]
       }
-    },
-    "objects": {
-      "categoryAxis": [
-        {
-          "properties": {
-            "showAxisTitle": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            }
-          }
-        }
-      ],
-      "valueAxis": [
-        {
-          "properties": {
-            "showAxisTitle": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            }
-          }
-        }
-      ]
     },
     "visualContainerObjects": {
       "dropShadow": [
@@ -220,7 +192,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'Units on Hand by Category'"
                 }
               }
             }
@@ -230,5 +202,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

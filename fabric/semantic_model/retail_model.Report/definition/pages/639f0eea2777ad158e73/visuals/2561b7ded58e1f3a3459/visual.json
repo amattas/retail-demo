@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "2561b7ded58e1f3a3459",
   "position": {
     "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "y": 456,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
@@ -26,6 +26,7 @@
                 }
               },
               "queryRef": "Stores.Store Number",
+              "nativeQueryRef": "Store Number",
               "active": true
             }
           ]
@@ -37,14 +38,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Store Inventory Position"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Total Inventory Retail Value"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Store Inventory Position.Total Inventory Retail Value",
+              "nativeQueryRef": "Total Inventory Retail Value"
             }
           ]
         }
@@ -56,16 +57,15 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Store Inventory Position"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Total Inventory Retail Value"
               }
             },
             "direction": "Descending"
           }
-        ],
-        "isDefaultSort": true
+        ]
       }
     },
     "objects": {
@@ -220,7 +220,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'Inventory Retail Value by Store'"
                 }
               }
             }
@@ -230,5 +230,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

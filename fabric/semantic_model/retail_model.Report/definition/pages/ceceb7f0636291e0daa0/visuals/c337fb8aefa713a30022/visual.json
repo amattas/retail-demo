@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "c337fb8aefa713a30022",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "x": 40,
+    "y": 222,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
@@ -19,13 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Truck Dwell Daily"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "Site"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Truck Dwell Daily.Site",
+              "nativeQueryRef": "Site",
               "active": true
             }
           ]
@@ -34,17 +35,22 @@
           "projections": [
             {
               "field": {
-                "Measure": {
+                "Aggregation": {
                   "Expression": {
-                    "SourceRef": {
-                      "Entity": "Receipts"
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Truck Dwell Daily"
+                        }
+                      },
+                      "Property": "Average Dwell Minutes"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Function": 1
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Avg(Truck Dwell Daily.Average Dwell Minutes)",
+              "nativeQueryRef": "Average of Average Dwell Minutes"
             }
           ]
         }
@@ -53,13 +59,18 @@
         "sort": [
           {
             "field": {
-              "Measure": {
+              "Aggregation": {
                 "Expression": {
-                  "SourceRef": {
-                    "Entity": "Receipts"
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "Truck Dwell Daily"
+                      }
+                    },
+                    "Property": "Average Dwell Minutes"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Function": 1
               }
             },
             "direction": "Descending"
@@ -220,7 +231,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'Avg Dwell Minutes by Site'"
                 }
               }
             }
@@ -230,5 +241,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }

@@ -1,50 +1,56 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "580b2505e0db989c2e59",
+  "name": "54932217451aad75881a",
   "position": {
-    "x": 645,
-    "y": 221.66666666666669,
-    "z": 3,
-    "height": 225,
+    "x": 40,
+    "y": 456,
+    "z": 1,
+    "height": 224,
     "width": 595
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "treemap",
     "query": {
       "queryState": {
-        "Category": {
+        "Group": {
           "projections": [
             {
               "field": {
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Stores"
+                      "Entity": "Tender Mix Daily"
                     }
                   },
-                  "Property": "Store Number"
+                  "Property": "Payment Method"
                 }
               },
-              "queryRef": "Stores.Store Number",
+              "queryRef": "Tender Mix Daily.Payment Method",
+              "nativeQueryRef": "Payment Method",
               "active": true
             }
           ]
         },
-        "Y": {
+        "Values": {
           "projections": [
             {
               "field": {
-                "Measure": {
+                "Aggregation": {
                   "Expression": {
-                    "SourceRef": {
-                      "Entity": "Receipts"
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Tender Mix Daily"
+                        }
+                      },
+                      "Property": "Total Amount"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Function": 0
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Sum(Tender Mix Daily.Total Amount)",
+              "nativeQueryRef": "Sum of Total Amount"
             }
           ]
         }
@@ -53,48 +59,24 @@
         "sort": [
           {
             "field": {
-              "Measure": {
+              "Aggregation": {
                 "Expression": {
-                  "SourceRef": {
-                    "Entity": "Receipts"
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "Tender Mix Daily"
+                      }
+                    },
+                    "Property": "Total Amount"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Function": 0
               }
             },
             "direction": "Descending"
           }
-        ],
-        "isDefaultSort": true
+        ]
       }
-    },
-    "objects": {
-      "categoryAxis": [
-        {
-          "properties": {
-            "showAxisTitle": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            }
-          }
-        }
-      ],
-      "valueAxis": [
-        {
-          "properties": {
-            "showAxisTitle": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            }
-          }
-        }
-      ]
     },
     "visualContainerObjects": {
       "dropShadow": [
@@ -220,7 +202,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Size by Store Number'"
+                  "Value": "'Tender Mix (Total Amount)'"
                 }
               }
             }
@@ -230,5 +212,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Copilot"
+  "howCreated": "Manual"
 }
