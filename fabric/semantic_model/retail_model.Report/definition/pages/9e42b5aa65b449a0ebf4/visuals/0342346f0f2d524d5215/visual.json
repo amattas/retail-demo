@@ -35,22 +35,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Marketing Cost Daily"
-                        }
-                      },
-                      "Property": "Cost"
+                    "SourceRef": {
+                      "Entity": "Marketing Cost Daily"
                     }
                   },
-                  "Function": 0
+                  "Property": "Marketing Spend (Channel)"
                 }
               },
-              "queryRef": "Sum(Marketing Cost Daily.Cost)",
-              "nativeQueryRef": "Sum of Cost"
+              "queryRef": "Marketing Cost Daily.Marketing Spend (Channel)",
+              "nativeQueryRef": "Marketing Spend (Channel)"
             }
           ]
         }
@@ -59,18 +54,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Marketing Cost Daily"
-                      }
-                    },
-                    "Property": "Cost"
+                  "SourceRef": {
+                    "Entity": "Marketing Cost Daily"
                   }
                 },
-                "Function": 0
+                "Property": "Marketing Spend (Channel)"
               }
             },
             "direction": "Descending"

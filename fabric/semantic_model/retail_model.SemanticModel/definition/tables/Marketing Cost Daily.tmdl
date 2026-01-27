@@ -2,6 +2,10 @@ table 'Marketing Cost Daily'
 	lineageTag: 4bb353d5-fa0d-4c32-911a-584a960f5482
 	sourceLineageTag: [au].[marketing_cost_daily]
 
+	measure 'Marketing Spend (Channel)' = CALCULATE(SUM('Marketing Cost Daily'[Cost]), TREATAS(VALUES(Marketing[Campaign ID]), 'Marketing Cost Daily'[Campaign ID]))
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 45de4a5d-09b4-4c1c-a32c-862c2cd20aa9
+
 	column 'Campaign ID'
 		dataType: string
 		lineageTag: b157fd89-f13a-41ea-91db-9be92915c7db
@@ -39,6 +43,7 @@ table 'Marketing Cost Daily'
 
 	column Cost
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 69e20067-0b0a-4503-b10c-80e75ca38f85
 		sourceLineageTag: cost
 		summarizeBy: sum
@@ -56,4 +61,3 @@ table 'Marketing Cost Daily'
 			entityName: marketing_cost_daily
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

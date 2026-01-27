@@ -39,6 +39,7 @@ table 'Tender Mix Daily'
 
 	column 'Total Amount'
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 6facbff4-fe61-4f8a-a4be-3dcdfb1d3e5e
 		sourceLineageTag: total_amount
 		summarizeBy: sum
@@ -56,4 +57,3 @@ table 'Tender Mix Daily'
 			entityName: tender_mix_daily
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

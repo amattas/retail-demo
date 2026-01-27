@@ -170,10 +170,6 @@ relationship 'Tender Mix Daily to Date'
 	fromColumn: 'Tender Mix Daily'.Day
 	toColumn: Date.Date
 
-relationship 'Marketing Cost Daily to Marketing'
-	fromColumn: 'Marketing Cost Daily'.'Campaign ID'
-	toColumn: Marketing.'Campaign ID'
-
 relationship 'Marketing Cost Daily to Date'
 	fromColumn: 'Marketing Cost Daily'.Day
 	toColumn: Date.Date

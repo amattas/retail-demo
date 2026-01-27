@@ -28,6 +28,7 @@ table 'Online Sales Daily'
 
 	column Subtotal
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: daa6013d-b5a8-43f0-be98-281031ed3583
 		sourceLineageTag: subtotal
 		summarizeBy: sum
@@ -41,6 +42,7 @@ table 'Online Sales Daily'
 
 	column Tax
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 9b698455-789b-499d-bbd1-62106620fb61
 		sourceLineageTag: tax
 		summarizeBy: sum
@@ -54,6 +56,7 @@ table 'Online Sales Daily'
 
 	column Total
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 3a046b1a-adfc-42b8-8da4-631614088a5f
 		sourceLineageTag: total
 		summarizeBy: sum
@@ -67,6 +70,7 @@ table 'Online Sales Daily'
 
 	column 'Average Order Value'
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 793db82f-f43e-4840-88d5-e9395c64a96a
 		sourceLineageTag: avg_order_value
 		summarizeBy: sum
@@ -84,4 +88,3 @@ table 'Online Sales Daily'
 			entityName: online_sales_daily
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

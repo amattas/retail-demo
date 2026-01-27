@@ -28,6 +28,7 @@ table 'Store Sales by Minute'
 
 	column 'Total Sales'
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 5fec6969-b148-481e-8c84-71314f701c96
 		sourceLineageTag: total_sales
 		summarizeBy: sum
@@ -53,6 +54,7 @@ table 'Store Sales by Minute'
 
 	column 'Average Basket'
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: c508e7f5-582e-463b-980f-2f0f662cc9b0
 		sourceLineageTag: avg_basket
 		summarizeBy: sum
@@ -70,4 +72,3 @@ table 'Store Sales by Minute'
 			entityName: sales_minute_store
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-
