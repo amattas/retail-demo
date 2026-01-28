@@ -84,3 +84,33 @@ class EventStreamer:
         return await self._batch_streaming_manager.start_batch_streaming_duckdb(
             self._duckdb_conn, self.streaming_config.azure_connection_string
         )
+
+    # Stub methods for API router compatibility
+    # These methods were removed during batch-only simplification but routers still reference them
+
+    def get_dlq_summary(self) -> dict:
+        """Get dead letter queue summary (stub - DLQ not supported in batch mode)."""
+        return {"message": "DLQ not supported in batch-only mode", "entries": []}
+
+    def retry_dlq_events(self, max_retries: int = 3) -> dict:
+        """Retry DLQ events (stub - DLQ not supported in batch mode)."""
+        return {"message": "DLQ not supported in batch-only mode", "retried": 0}
+
+    @property
+    def _dlq(self) -> list:
+        """DLQ entries (stub - returns empty list)."""
+        return []
+
+    def pause(self) -> bool:
+        """Pause streaming (stub - not supported in batch mode)."""
+        self.log.warning("pause() not supported in batch-only mode")
+        return False
+
+    def resume(self) -> bool:
+        """Resume streaming (stub - not supported in batch mode)."""
+        self.log.warning("resume() not supported in batch-only mode")
+        return False
+
+    def get_pause_statistics(self) -> dict:
+        """Get pause statistics (stub - not supported in batch mode)."""
+        return {"message": "Pause not supported in batch-only mode"}
