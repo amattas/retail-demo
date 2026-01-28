@@ -1,0 +1,68 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)",
+      "Bash(git checkout*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git stash*)",
+      "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(python -m pytest*)",
+      "Bash(pytest*)",
+      "Bash(ruff check*)",
+      "Bash(ruff format*)",
+      "Bash(mypy*)",
+      "Bash(pip install*)",
+      "Bash(pip list*)",
+      "Bash(cd /home/user/retail-demo*)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(wc*)",
+      "Bash(which*)",
+      "Bash(echo*)",
+      "Bash(mkdir*)",
+      "Bash(gh pr*)",
+      "Bash(gh issue*)",
+      "Bash(gh repo*)",
+      "Bash(gh api*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(chmod 777*)",
+      "Bash(curl*|*sh)",
+      "Bash(wget*|*sh)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tool": "Edit",
+          "file_pattern": "**/*.py"
+        },
+        "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+      },
+      {
+        "matcher": {
+          "tool": "Write",
+          "file_pattern": "**/*.py"
+        },
+        "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+      }
+    ]
+  }
+}

@@ -97,7 +97,10 @@ retail-demo/
 ├── STATUS.md           # Progress tracking
 ├── .claude/
 │   ├── agents/         # Subagent definitions
+│   ├── commands/       # Slash commands for common workflows
+│   ├── settings.json   # Permissions and hooks
 │   └── skills/         # Activity skills with templates
+├── .mcp.json           # MCP server configuration
 ├── context/            # Wave A outputs
 ├── templates/          # Document templates
 ├── datagen/            # Python data generator
@@ -152,3 +155,60 @@ See GitHub issues #7-#13 for missing fact tables in datagen:
 - #11: fact_store_ops
 - #12: fact_customer_zone_changes
 - #13: truck_departed events
+
+---
+
+## Lessons Learned
+
+### Common Mistakes to Avoid
+
+**Timestamps & Time Zones**
+- Always use UTC with timezone info: `datetime.now(timezone.utc)`
+- Event timestamps must be monotonically increasing within a batch
+- Use `pd.Timestamp.utcnow()` in pandas, not `pd.Timestamp.now()`
+
+**DuckDB**
+- Close connections explicitly; don't rely on garbage collection
+- Use `read_only=True` for concurrent read access
+- Batch inserts (1000+ rows) for performance
+
+**KQL**
+- Materialized view names must be unique across the entire database
+- Always wrap multi-statement scripts in `.execute database script <|`
+- Test KQL locally with sample data before deploying to Fabric
+
+**Pydantic**
+- Use `model_dump()` not deprecated `.dict()` (Pydantic v2)
+- Use `model_validate()` not deprecated `.parse_obj()`
+- Define `model_config` not inner `class Config`
+
+**Event Hubs / Streaming**
+- Events can arrive out of order; design consumers accordingly
+- Use partition keys for ordering guarantees within a partition
+- Set reasonable batch sizes (100-500 events) to balance latency vs throughput
+
+### Past Incidents
+
+_Document issues and their resolutions here as they occur:_
+
+<!--
+Template:
+- **YYYY-MM-DD**: Brief description of the problem
+  - Root cause: What went wrong
+  - Fix: How it was resolved
+  - Prevention: What was added to prevent recurrence
+-->
+
+## Slash Commands
+
+Quick reference for available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/commit` | Stage and commit with conventional format |
+| `/test` | Run pytest with coverage |
+| `/lint` | Run ruff and mypy checks |
+| `/pr` | Create pull request with context |
+| `/review` | Review recent changes for issues |
+| `/verify` | Full verification suite |
+| `/validate-kql` | Check KQL scripts for issues |
