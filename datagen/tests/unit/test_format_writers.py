@@ -167,7 +167,8 @@ class TestParquetWriterWrite:
         df_read = pd.read_parquet(output_path)
         assert df_read["IntCol"].dtype == "int64"
         assert df_read["FloatCol"].dtype == "float64"
-        assert df_read["StrCol"].dtype == "object"
+        # String columns may be 'object' or pandas StringDtype depending on version/engine
+        assert pd.api.types.is_string_dtype(df_read["StrCol"])
         assert pd.api.types.is_datetime64_any_dtype(df_read["DateCol"])
 
     def test_write_io_error(self, tmp_path):
