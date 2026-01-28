@@ -226,6 +226,7 @@ class EventFactory:
             None (event generation disabled)
         """
         import warnings
+
         warnings.warn(
             "EventFactory.generate_event is deprecated. "
             "Use batch_streaming module instead.",
@@ -255,6 +256,7 @@ class EventFactory:
             Empty list (event generation disabled)
         """
         import warnings
+
         warnings.warn(
             "EventFactory.generate_mixed_events is deprecated. "
             "Use batch_streaming module instead.",
