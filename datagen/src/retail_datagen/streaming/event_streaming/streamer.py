@@ -18,7 +18,6 @@ from ...shared.logging_utils import get_structured_logger
 from ...shared.metrics import metrics_collector
 from ...shared.models import Customer, DistributionCenter, ProductMaster, Store
 from ..azure_client import AzureEventHubClient
-from ..event_factory import EventFactory
 from .batch_streaming import BatchStreamingManager
 from .config import StreamingConfig, StreamingStatistics
 from .core import StreamingCore
@@ -28,13 +27,13 @@ from .monitoring import MonitoringManager
 
 class EventStreamer:
     """
-    Main real-time event streaming engine.
+    Main batch streaming engine.
 
-    Orchestrates the generation and streaming of retail events to Azure Event Hub
+    Orchestrates streaming of retail events from DuckDB to Azure Event Hub
     with comprehensive monitoring, error handling, and performance optimization.
 
     Features:
-    - Configurable event generation patterns
+    - Batch streaming from DuckDB fact tables
     - Robust Azure Event Hub integration
     - Real-time monitoring and statistics
     - Graceful shutdown handling
@@ -97,7 +96,6 @@ class EventStreamer:
 
         # Components
         self._azure_client: AzureEventHubClient | None = None
-        self._event_factory: EventFactory | None = None
 
         # State management
         self._is_streaming = False
@@ -259,48 +257,6 @@ class EventStreamer:
                     "Using pre-configured Azure client (test mode)",
                     session_id=self._session_id,
                 )
-
-            # Initialize event factory
-            self._event_factory = EventFactory(
-                stores=(
-                    list(self._stores.values())
-                    if isinstance(self._stores, dict)
-                    else self._stores
-                ),
-                customers=(
-                    list(self._customers.values())
-                    if isinstance(self._customers, dict)
-                    else self._customers
-                ),
-                products=(
-                    list(self._products.values())
-                    if isinstance(self._products, dict)
-                    else self._products
-                ),
-                distribution_centers=(
-                    list(self._distribution_centers.values())
-                    if isinstance(self._distribution_centers, dict)
-                    else self._distribution_centers
-                ),
-                seed=self.config.seed,
-            )
-
-            # Update streaming core with initialized components
-            self._streaming_core._event_factory = self._event_factory
-            self._streaming_core._azure_client = self._azure_client
-
-            # Compute daily targets for pacing after data load
-            stores_count = len(self._stores) if self._stores else 1
-            dcs_count = (
-                len(self._distribution_centers) if self._distribution_centers else 1
-            )
-            self._streaming_core.compute_daily_targets(
-                stores_count, dcs_count, self.config.volume
-            )
-            # Store config volume for daily resets
-            self._streaming_core._config_volume = self.config.volume
-            self._streaming_core._stores = self._stores
-            self._streaming_core._distribution_centers = self._distribution_centers
 
             # Update monitoring manager with azure client
             self._monitoring_manager._azure_client = self._azure_client
@@ -675,7 +631,7 @@ class EventStreamer:
         return await self._monitoring_manager.get_health_status(
             is_streaming=self._is_streaming,
             azure_client=self._azure_client,
-            event_factory=self._event_factory,
+            event_factory=None,  # EventFactory removed - batch streaming only
             master_data_loaded=master_data_loaded,
             buffer_size=buffer_size,
         )
