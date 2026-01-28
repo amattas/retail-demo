@@ -11,13 +11,13 @@ import signal
 import threading
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 
 from ...config.models import RetailConfig
 from ...shared.logging_utils import get_structured_logger
 from ...shared.metrics import metrics_collector
 from ...shared.models import Customer, DistributionCenter, ProductMaster, Store
 from ..azure_client import AzureEventHubClient
+from ..event_factory import EventFactory
 from .batch_streaming import BatchStreamingManager
 from .config import StreamingConfig, StreamingStatistics
 from .core import StreamingCore
@@ -27,13 +27,13 @@ from .monitoring import MonitoringManager
 
 class EventStreamer:
     """
-    Main batch streaming engine.
+    Main real-time event streaming engine.
 
-    Orchestrates streaming of retail events from DuckDB to Azure Event Hub
+    Orchestrates the generation and streaming of retail events to Azure Event Hub
     with comprehensive monitoring, error handling, and performance optimization.
 
     Features:
-    - Batch streaming from DuckDB fact tables
+    - Configurable event generation patterns
     - Robust Azure Event Hub integration
     - Real-time monitoring and statistics
     - Graceful shutdown handling
@@ -96,6 +96,7 @@ class EventStreamer:
 
         # Components
         self._azure_client: AzureEventHubClient | None = None
+        self._event_factory: EventFactory | None = None
 
         # State management
         self._is_streaming = False
@@ -258,6 +259,48 @@ class EventStreamer:
                     session_id=self._session_id,
                 )
 
+            # Initialize event factory
+            self._event_factory = EventFactory(
+                stores=(
+                    list(self._stores.values())
+                    if isinstance(self._stores, dict)
+                    else self._stores
+                ),
+                customers=(
+                    list(self._customers.values())
+                    if isinstance(self._customers, dict)
+                    else self._customers
+                ),
+                products=(
+                    list(self._products.values())
+                    if isinstance(self._products, dict)
+                    else self._products
+                ),
+                distribution_centers=(
+                    list(self._distribution_centers.values())
+                    if isinstance(self._distribution_centers, dict)
+                    else self._distribution_centers
+                ),
+                seed=self.config.seed,
+            )
+
+            # Update streaming core with initialized components
+            self._streaming_core._event_factory = self._event_factory
+            self._streaming_core._azure_client = self._azure_client
+
+            # Compute daily targets for pacing after data load
+            stores_count = len(self._stores) if self._stores else 1
+            dcs_count = (
+                len(self._distribution_centers) if self._distribution_centers else 1
+            )
+            self._streaming_core.compute_daily_targets(
+                stores_count, dcs_count, self.config.volume
+            )
+            # Store config volume for daily resets
+            self._streaming_core._config_volume = self.config.volume
+            self._streaming_core._stores = self._stores
+            self._streaming_core._distribution_centers = self._distribution_centers
+
             # Update monitoring manager with azure client
             self._monitoring_manager._azure_client = self._azure_client
 
@@ -302,92 +345,17 @@ class EventStreamer:
             if not self._distribution_centers:
                 self._distribution_centers = read_distribution_centers()
         except Exception as e:
-            # Fallback: synthesize minimal master data for simulation/tests
             self.log.error(
                 "Failed to load master data from DuckDB",
                 session_id=self._session_id,
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            self.log.warning(
-                "Falling back to minimal in-memory master data for streaming",
-                session_id=self._session_id,
-            )
-            self._load_fallback_master_data()
-
-    def _load_fallback_master_data(self):
-        """Load minimal fallback master data for testing."""
-        now = datetime.now(UTC)
-        if not self._stores:
-            self._stores = [
-                Store(ID=1, StoreNumber="ST001", Address="123 Main St", GeographyID=1),
-                Store(ID=2, StoreNumber="ST002", Address="456 Oak Ave", GeographyID=2),
-            ]
-        if not self._customers:
-            self._customers = [
-                Customer(
-                    ID=1,
-                    FirstName="Alex",
-                    LastName="Anderson",
-                    Address="789 Pine St",
-                    GeographyID=1,
-                    LoyaltyCard="LC000001",
-                    Phone="(555) 111-1111",
-                    BLEId="BLE001",
-                    AdId="AD001",
-                ),
-                Customer(
-                    ID=2,
-                    FirstName="Blake",
-                    LastName="Brightwell",
-                    Address="321 Elm St",
-                    GeographyID=2,
-                    LoyaltyCard="LC000002",
-                    Phone="(555) 222-2222",
-                    BLEId="BLE002",
-                    AdId="AD002",
-                ),
-            ]
-        if not self._products:
-            self._products = [
-                ProductMaster(
-                    ID=1,
-                    ProductName="Widget Pro",
-                    Brand="TestBrand",
-                    Company="TestCo",
-                    Department="Electronics",
-                    Category="Gadgets",
-                    Subcategory="Widgets",
-                    Cost=Decimal("10.00"),
-                    MSRP=Decimal("20.00"),
-                    SalePrice=Decimal("18.00"),
-                    RequiresRefrigeration=False,
-                    LaunchDate=now,
-                ),
-                ProductMaster(
-                    ID=2,
-                    ProductName="Gadget Plus",
-                    Brand="TestBrand",
-                    Company="TestCo",
-                    Department="Electronics",
-                    Category="Gadgets",
-                    Subcategory="Gadgets",
-                    Cost=Decimal("15.00"),
-                    MSRP=Decimal("25.00"),
-                    SalePrice=Decimal("22.00"),
-                    RequiresRefrigeration=False,
-                    LaunchDate=now,
-                ),
-            ]
-        if not self._distribution_centers:
-            self._distribution_centers = [
-                DistributionCenter(
-                    ID=1, DCNumber="DC001", Address="999 Industrial Blvd", GeographyID=1
-                ),
-                DistributionCenter(
-                    ID=2, DCNumber="DC002", Address="888 Warehouse Way", GeographyID=2
-                ),
-            ]
+            raise RuntimeError(
+                "Master data is required but could not be loaded from DuckDB. "
+                "Please generate master data first by running: "
+                "retail-datagen generate master-data"
+            ) from e
 
     async def start(self, duration: timedelta | None = None) -> bool:
         """
@@ -631,7 +599,7 @@ class EventStreamer:
         return await self._monitoring_manager.get_health_status(
             is_streaming=self._is_streaming,
             azure_client=self._azure_client,
-            event_factory=None,  # EventFactory removed - batch streaming only
+            event_factory=self._event_factory,
             master_data_loaded=master_data_loaded,
             buffer_size=buffer_size,
         )

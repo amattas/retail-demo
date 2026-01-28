@@ -73,30 +73,17 @@ class TestDictionaryLoading:
     """Test dictionary file loading."""
 
     @pytest.mark.integration
-    def test_dictionary_loader_caches_data(
-        self, temp_data_dirs, sample_geography_dict_data
-    ):
-        """Test that dictionary loader caches loaded data.
-
-        Note: With sourcedata module available, data is loaded from there first.
-        This test verifies caching behavior works regardless of data source.
-        """
+    def test_dictionary_loader_caches_data(self):
+        """Test that dictionary loader caches loaded data in memory."""
         from retail_datagen.shared.dictionary_loader import DictionaryLoader
 
-        # Create a test geography CSV (used as fallback if sourcedata unavailable)
-        dict_dir = Path(temp_data_dirs["dict"])
-        geo_file = dict_dir / "geographies.csv"
+        loader = DictionaryLoader()
 
-        df = pd.DataFrame(sample_geography_dict_data)
-        df.to_csv(geo_file, index=False)
-
-        loader = DictionaryLoader(str(dict_dir))
-
-        # First load (may come from sourcedata or CSV)
+        # First load from sourcedata
         result1 = loader.load_geographies()
         assert len(result1) > 0  # Has data
 
-        # Second load should use cache (same object reference)
+        # Second load should use in-memory cache (same object reference)
         result2 = loader.load_geographies()
         assert result1 is result2
 
@@ -122,31 +109,24 @@ class TestDictionaryLoading:
         assert any("sourcedata" in w.lower() for w in result.warnings)
 
     @pytest.mark.integration
-    def test_csv_fallback_when_sourcedata_unavailable(
-        self, temp_data_dirs, sample_geography_dict_data, monkeypatch
-    ):
-        """Test that CSV fallback works when sourcedata is disabled."""
+    def test_error_when_sourcedata_unavailable(self, monkeypatch):
+        """Test that clear error is raised when sourcedata is unavailable."""
         from retail_datagen.shared import dictionary_loader
+        from retail_datagen.shared.exceptions import DictionaryLoadError
 
         # Disable sourcedata
         monkeypatch.setattr(dictionary_loader, "SOURCEDATA_AVAILABLE", False)
         monkeypatch.setattr(dictionary_loader, "sourcedata_default", None)
 
-        # Create test CSV
-        dict_dir = Path(temp_data_dirs["dict"])
-        geo_file = dict_dir / "geographies.csv"
-        df = pd.DataFrame(sample_geography_dict_data)
-        df.to_csv(geo_file, index=False)
+        loader = dictionary_loader.DictionaryLoader()
 
-        loader = dictionary_loader.DictionaryLoader(str(dict_dir))
+        # Should raise clear error about sourcedata unavailability
+        with pytest.raises(DictionaryLoadError) as exc_info:
+            loader.load_geographies()
 
-        # Should load from CSV
-        result = loader.load_geographies()
-        assert len(result) == 3  # Test CSV has 3 rows
-
-        # Verify caching still works
-        result2 = loader.load_geographies()
-        assert result is result2
+        error_msg = str(exc_info.value).lower()
+        assert "sourcedata" in error_msg
+        assert "not available" in error_msg or "unavailable" in error_msg
 
 
 class TestPricingValidation:
@@ -318,6 +298,218 @@ class TestPayloadValidation:
         assert payload.store_id == 1
         assert payload.dc_id is None
         assert payload.quantity_delta == -5
+
+
+class TestCampaignAttribution:
+    """Test campaign attribution logic in event generation."""
+
+    @pytest.mark.integration
+    def test_campaign_id_populated_for_marketing_driven_purchase(self):
+        """Test that campaign_id is populated when customer was marketing-driven."""
+        from decimal import Decimal
+
+        # Create minimal test data
+        from retail_datagen.shared.models import (
+            Customer,
+            DistributionCenter,
+            ProductMaster,
+            Store,
+        )
+        from retail_datagen.streaming.event_factory import (
+            EventFactory,
+        )
+
+        store = Store(
+            ID=1,
+            StoreNumber="ST001",
+            Address="123 Test St",
+            GeographyID=1,
+            tax_rate=Decimal("0.08"),
+        )
+        customer = Customer(
+            ID=100,
+            FirstName="Test",
+            LastName="User",
+            Address="100 Test Ave",
+            GeographyID=1,
+            LoyaltyCard="LC001",
+            Phone="555-555-0100",
+            BLEId="BLE001",
+            AdId="AD001",
+        )
+        product = ProductMaster(
+            ID=1,
+            ProductName="Test Product",
+            Brand="TestBrand",
+            Company="TestCo",
+            Department="Test",
+            Category="Test",
+            Subcategory="Test",
+            Cost=Decimal("5.00"),
+            MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00"),
+            RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1),
+        )
+        dc = DistributionCenter(
+            ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1
+        )
+
+        factory = EventFactory(
+            stores=[store],
+            customers=[customer],
+            products=[product],
+            distribution_centers=[dc],
+            seed=42,
+        )
+
+        # Simulate a marketing conversion
+        factory.state.marketing_conversions["IMP001"] = {
+            "customer_id": 100,
+            "customer_ad_id": "AD001",
+            "campaign_id": "CAMP_TEST_001",
+            "channel": "SOCIAL",
+            "scheduled_visit_time": datetime.now(),
+            "converted": True,
+        }
+        # Set up O(1) lookup index (normally done when conversion is recorded)
+        factory.state.customer_to_campaign[100] = "CAMP_TEST_001"
+
+        # Create a customer session that is marketing-driven
+        factory.state.customer_sessions["100_1"] = {
+            "customer_id": 100,
+            "customer_ble_id": "BLE001",
+            "store_id": 1,
+            "entered_at": datetime.now() - timedelta(minutes=10),
+            "current_zone": "ELECTRONICS",
+            "has_made_purchase": False,
+            "expected_exit_time": datetime.now() + timedelta(minutes=20),
+            "marketing_driven": True,
+            "purchase_likelihood": 0.8,
+        }
+
+        # Generate a receipt - should include campaign_id
+        result = factory._generate_receipt_created(datetime.now())
+
+        if result is not None:
+            payload, correlation_id, partition_key = result
+            # Marketing-driven customer should have campaign_id
+            assert payload.campaign_id == "CAMP_TEST_001", (
+                f"Expected campaign_id 'CAMP_TEST_001', got '{payload.campaign_id}'"
+            )
+
+    @pytest.mark.integration
+    def test_campaign_id_null_for_non_marketing_purchase(self):
+        """Test that campaign_id is None when customer was not marketing-driven."""
+        from decimal import Decimal
+
+        from retail_datagen.shared.models import (
+            Customer,
+            DistributionCenter,
+            ProductMaster,
+            Store,
+        )
+        from retail_datagen.streaming.event_factory import EventFactory
+
+        store = Store(
+            ID=1,
+            StoreNumber="ST001",
+            Address="123 Test St",
+            GeographyID=1,
+            tax_rate=Decimal("0.08"),
+        )
+        customer = Customer(
+            ID=200,
+            FirstName="Regular",
+            LastName="Customer",
+            Address="200 Test Ave",
+            GeographyID=1,
+            LoyaltyCard="LC002",
+            Phone="555-555-0200",
+            BLEId="BLE002",
+            AdId="AD002",
+        )
+        product = ProductMaster(
+            ID=1,
+            ProductName="Test Product",
+            Brand="TestBrand",
+            Company="TestCo",
+            Department="Test",
+            Category="Test",
+            Subcategory="Test",
+            Cost=Decimal("5.00"),
+            MSRP=Decimal("12.00"),
+            SalePrice=Decimal("10.00"),
+            RequiresRefrigeration=False,
+            LaunchDate=datetime(2023, 1, 1),
+        )
+        dc = DistributionCenter(
+            ID=1, DCNumber="DC001", Address="456 DC St", GeographyID=1
+        )
+
+        factory = EventFactory(
+            stores=[store],
+            customers=[customer],
+            products=[product],
+            distribution_centers=[dc],
+            seed=42,
+        )
+
+        # Create a non-marketing-driven customer session
+        factory.state.customer_sessions["200_1"] = {
+            "customer_id": 200,
+            "customer_ble_id": "BLE002",
+            "store_id": 1,
+            "entered_at": datetime.now() - timedelta(minutes=10),
+            "current_zone": "GROCERY",
+            "has_made_purchase": False,
+            "expected_exit_time": datetime.now() + timedelta(minutes=20),
+            "marketing_driven": False,  # Not marketing-driven
+            "purchase_likelihood": 0.4,
+        }
+
+        # Generate a receipt - should NOT have campaign_id
+        result = factory._generate_receipt_created(datetime.now())
+
+        if result is not None:
+            payload, correlation_id, partition_key = result
+            # Non-marketing customer should have no campaign_id
+            assert payload.campaign_id is None, (
+                f"Expected campaign_id None, got '{payload.campaign_id}'"
+            )
+
+    @pytest.mark.integration
+    def test_backward_compatibility_with_null_campaign_id(self):
+        """Test that receipts without campaign_id are valid (backward compatibility)."""
+        from retail_datagen.streaming.schemas import (
+            EventEnvelope,
+            EventType,
+            ReceiptCreatedPayload,
+        )
+
+        # Create receipt without campaign_id (like old events)
+        payload = ReceiptCreatedPayload(
+            store_id=1,
+            customer_id=100,
+            receipt_id="RCP_OLD_001",
+            subtotal=50.0,
+            tax=4.0,
+            total=54.0,
+            tender_type="CASH",
+            item_count=3,
+            # campaign_id intentionally omitted
+        )
+
+        # Should be able to create envelope with this payload
+        envelope = EventEnvelope(
+            event_type=EventType.RECEIPT_CREATED,
+            payload=payload.model_dump(),
+            trace_id="TR_TEST_001",
+            ingest_timestamp=datetime.now(),
+        )
+
+        assert envelope.payload["campaign_id"] is None
+        assert envelope.event_type == EventType.RECEIPT_CREATED
 
 
 class TestTemporalPatterns:
