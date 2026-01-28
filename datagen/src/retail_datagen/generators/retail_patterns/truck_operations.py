@@ -7,7 +7,7 @@ and the complete truck lifecycle state machine.
 
 import logging
 import warnings
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from retail_datagen.shared.models import (
     InventoryReason,
@@ -17,6 +17,9 @@ from retail_datagen.shared.models import (
 from .base_types import InventoryFlowBase
 
 logger = logging.getLogger(__name__)
+
+# Minimum datetime with UTC timezone for comparisons
+DATETIME_MIN_UTC = datetime.min.replace(tzinfo=UTC)
 
 
 class TruckOperationsMixin(InventoryFlowBase):
@@ -82,7 +85,7 @@ class TruckOperationsMixin(InventoryFlowBase):
         available_dc_trucks = [
             truck_id
             for truck_id in dc_list
-            if self._truck_availability.get(truck_id, datetime.min) <= current_time
+            if self._truck_availability.get(truck_id, DATETIME_MIN_UTC) <= current_time
         ]
         if available_dc_trucks:
             idx = self._truck_rr_index.get(dc_id, 0) % len(available_dc_trucks)
@@ -94,7 +97,7 @@ class TruckOperationsMixin(InventoryFlowBase):
         available_pool_trucks = [
             truck_id
             for truck_id in pool_list
-            if self._truck_availability.get(truck_id, datetime.min) <= current_time
+            if self._truck_availability.get(truck_id, DATETIME_MIN_UTC) <= current_time
         ]
         if available_pool_trucks:
             return self._rng.choice(available_pool_trucks)
@@ -131,11 +134,11 @@ class TruckOperationsMixin(InventoryFlowBase):
             return None
 
         for truck_id in all_trucks:
-            if self._truck_availability.get(truck_id, datetime.min) <= current_time:
+            if self._truck_availability.get(truck_id, DATETIME_MIN_UTC) <= current_time:
                 return None
 
         return_times = [
-            self._truck_availability.get(truck_id, datetime.min)
+            self._truck_availability.get(truck_id, DATETIME_MIN_UTC)
             for truck_id in all_trucks
         ]
         return min(return_times)
@@ -383,6 +386,7 @@ class TruckOperationsMixin(InventoryFlowBase):
         Update shipment status based on current time.
 
         Implements complete truck lifecycle state machine with validation.
+        Advances through states progressively to avoid invalid transitions.
         """
         if shipment_id not in self._active_shipments:
             return None
@@ -409,7 +413,7 @@ class TruckOperationsMixin(InventoryFlowBase):
         unloading_start = arrived_time + timedelta(hours=1)
         completion_time = shipment["etd"]
 
-        # Determine target state
+        # Determine target state based on current time
         if current_time >= completion_time:
             target_status = TruckStatus.COMPLETED
         elif current_time >= unloading_start:
@@ -423,58 +427,54 @@ class TruckOperationsMixin(InventoryFlowBase):
         else:
             target_status = TruckStatus.SCHEDULED
 
+        # Advance state progressively to avoid invalid jumps
+        # Only advance ONE state per call to prevent skipping intermediate states
         if target_status != current_status:
-            is_valid = self._validate_state_transition(
-                shipment_id, current_status, target_status
-            )
-            if is_valid:
-                shipment["status"] = target_status
-                for key in list(shipment.keys()):
-                    if key.startswith("_state_entered_"):
-                        del shipment[key]
-                shipment[f"_state_entered_{target_status.value}"] = current_time
+            # Define the expected state progression order
+            state_order = [
+                TruckStatus.SCHEDULED,
+                TruckStatus.LOADING,
+                TruckStatus.IN_TRANSIT,
+                TruckStatus.ARRIVED,
+                TruckStatus.UNLOADING,
+                TruckStatus.COMPLETED,
+            ]
 
-                if target_status == TruckStatus.COMPLETED:
-                    del self._active_shipments[shipment_id]
-            else:
-                # Recovery by stepping through states
-                state_order = [
-                    TruckStatus.SCHEDULED,
-                    TruckStatus.LOADING,
-                    TruckStatus.IN_TRANSIT,
-                    TruckStatus.ARRIVED,
-                    TruckStatus.UNLOADING,
-                    TruckStatus.COMPLETED,
-                ]
-                stepping_status = current_status
-                steps_taken = 0
+            # Find current and target positions in the sequence
+            try:
+                current_index = state_order.index(current_status)
+                target_index = state_order.index(target_status)
+            except ValueError:
+                logger.error(
+                    f"Invalid state for shipment {shipment_id}: {current_status}"
+                )
+                return shipment
 
-                max_steps = self.MAX_RECOVERY_STEPS
-                while stepping_status != target_status and steps_taken < max_steps:
-                    next_valid_states = self.VALID_STATE_TRANSITIONS.get(
-                        stepping_status, set()
-                    )
-                    if not next_valid_states:
-                        break
-                    next_state = None
-                    for state in state_order:
-                        if state in next_valid_states:
-                            next_state = state
-                            break
-                    if next_state is None:
-                        break
-                    stepping_status = next_state
-                    steps_taken += 1
+            # Advance only ONE state at a time
+            if current_index < target_index:
+                next_index = current_index + 1
+                next_status = state_order[next_index]
 
-                if stepping_status != current_status:
-                    shipment["status"] = stepping_status
+                # Validate transition is allowed
+                is_valid = self._validate_state_transition(
+                    shipment_id, current_status, next_status
+                )
+                if is_valid:
+                    shipment["status"] = next_status
+                    # Clear old state entry timestamps
                     for key in list(shipment.keys()):
                         if key.startswith("_state_entered_"):
                             del shipment[key]
-                    shipment[f"_state_entered_{stepping_status.value}"] = current_time
+                    shipment[f"_state_entered_{next_status.value}"] = current_time
 
-                    if stepping_status == TruckStatus.COMPLETED:
+                    if next_status == TruckStatus.COMPLETED:
                         del self._active_shipments[shipment_id]
+                else:
+                    # Should not happen with proper state machine, but handle gracefully
+                    logger.error(
+                        f"Blocked transition for {shipment_id}: "
+                        f"{current_status.value} -> {next_status.value}"
+                    )
 
         return shipment
 
