@@ -226,7 +226,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Online Sales by Day'"
+                  "Value": "'Marketing Cost by Day'"
                 }
               }
             }

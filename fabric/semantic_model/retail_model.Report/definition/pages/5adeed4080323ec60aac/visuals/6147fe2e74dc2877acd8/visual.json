@@ -1,102 +1,83 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "c7fe10568952987a9ae0",
+  "name": "6147fe2e74dc2877acd8",
   "position": {
-    "x": 40,
-    "y": 456,
-    "z": 1,
-    "height": 224,
-    "width": 595
+    "x": 790,
+    "y": 0,
+    "z": 5,
+    "height": 72,
+    "width": 120
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "slicer",
     "query": {
       "queryState": {
-        "Category": {
+        "Values": {
           "projections": [
             {
               "field": {
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Truck Dwell Daily"
+                      "Entity": "Stores"
                     }
                   },
-                  "Property": "Site"
+                  "Property": "Store Number"
                 }
               },
-              "queryRef": "Truck Dwell Daily.Site",
-              "nativeQueryRef": "Site",
+              "queryRef": "Stores.Store Number",
+              "nativeQueryRef": "Store Number",
               "active": true
             }
           ]
-        },
-        "Y": {
-          "projections": [
-            {
-              "field": {
-                "Aggregation": {
-                  "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Truck Dwell Daily"
-                        }
-                      },
-                      "Property": "Trucks"
-                    }
-                  },
-                  "Function": 0
-                }
-              },
-              "queryRef": "Sum(Truck Dwell Daily.Trucks)",
-              "nativeQueryRef": "Sum of Trucks"
-            }
-          ]
         }
-      },
-      "sortDefinition": {
-        "sort": [
-          {
-            "field": {
-              "Aggregation": {
-                "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Truck Dwell Daily"
-                      }
-                    },
-                    "Property": "Trucks"
-                  }
-                },
-                "Function": 0
-              }
-            },
-            "direction": "Descending"
-          }
-        ],
-        "isDefaultSort": true
       }
     },
     "objects": {
-      "categoryAxis": [
+      "data": [
         {
           "properties": {
-            "showAxisTitle": {
+            "mode": {
               "expr": {
                 "Literal": {
-                  "Value": "true"
+                  "Value": "'Dropdown'"
                 }
               }
             }
           }
         }
       ],
-      "valueAxis": [
+      "header": [
         {
           "properties": {
-            "showAxisTitle": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "fontFamily": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Segoe UI'"
+                }
+              }
+            },
+            "textSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "9L"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "selection": [
+        {
+          "properties": {
+            "selectAllCheckboxEnabled": {
               "expr": {
                 "Literal": {
                   "Value": "true"
@@ -217,29 +198,28 @@
             }
           }
         }
-      ],
-      "title": [
-        {
-          "properties": {
-            "show": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            },
-            "text": {
-              "expr": {
-                "Literal": {
-                  "Value": "'Trucks Processed by Site'"
-                }
-              }
-            }
-          }
-        }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "3cac32a3d5803eda7d97",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Stores"
+              }
+            },
+            "Property": "Store Number"
+          }
+        },
+        "type": "Categorical",
+        "displayName": "Site"
+      }
+    ]
   },
   "howCreated": "Default"
 }

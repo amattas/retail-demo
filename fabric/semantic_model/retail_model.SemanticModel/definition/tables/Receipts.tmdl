@@ -30,6 +30,28 @@ table Receipts
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000007
 
+	column 'Event TS'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: dc87275f-4897-47be-83c3-965544bbe0d1
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Day = DATEVALUE(Receipts[Event TS])
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 36b7e57f-635c-4506-ba60-402549055724
+		summarizeBy: none
+
+		changedProperty = Name
+
+		annotation UnderlyingDateTimeDataType = Date
+
 	column 'Customer ID'
 		dataType: int64
 		formatString: 0
@@ -182,4 +204,3 @@ table Receipts
 			entityName: fact_receipts
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

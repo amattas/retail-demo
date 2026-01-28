@@ -234,7 +234,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Total Sales by Store Number'"
+                  "Value": "'In-Store Sales by Category'"
                 }
               }
             }

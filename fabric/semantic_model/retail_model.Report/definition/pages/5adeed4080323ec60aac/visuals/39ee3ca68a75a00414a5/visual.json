@@ -1,15 +1,16 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "c7fe10568952987a9ae0",
+  "name": "39ee3ca68a75a00414a5",
   "position": {
-    "x": 40,
+    "x": 645,
     "y": 456,
-    "z": 1,
+    "z": 4,
     "height": 224,
-    "width": 595
+    "width": 595,
+    "tabOrder": 1
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "lineChart",
     "query": {
       "queryState": {
         "Category": {
@@ -19,14 +20,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Truck Dwell Daily"
+                      "Entity": "Date"
                     }
                   },
-                  "Property": "Site"
+                  "Property": "Date"
                 }
               },
-              "queryRef": "Truck Dwell Daily.Site",
-              "nativeQueryRef": "Site",
+              "queryRef": "Date.Date",
+              "nativeQueryRef": "Date",
               "active": true
             }
           ]
@@ -35,22 +36,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Truck Dwell Daily"
-                        }
-                      },
-                      "Property": "Trucks"
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Function": 0
+                  "Property": "Total Units Sold"
                 }
               },
-              "queryRef": "Sum(Truck Dwell Daily.Trucks)",
-              "nativeQueryRef": "Sum of Trucks"
+              "queryRef": "Receipt Lines.Total Units Sold",
+              "nativeQueryRef": "Total Units Sold"
             }
           ]
         }
@@ -59,21 +55,16 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Column": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Truck Dwell Daily"
-                      }
-                    },
-                    "Property": "Trucks"
+                  "SourceRef": {
+                    "Entity": "Date"
                   }
                 },
-                "Function": 0
+                "Property": "Date"
               }
             },
-            "direction": "Descending"
+            "direction": "Ascending"
           }
         ],
         "isDefaultSort": true
@@ -231,7 +222,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Trucks Processed by Site'"
+                  "Value": "'In-Store Units by Day'"
                 }
               }
             }

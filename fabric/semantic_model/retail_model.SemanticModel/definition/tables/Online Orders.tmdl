@@ -22,6 +22,28 @@ table 'Online Orders'
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000005
 
+	column 'Event TS'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 2cf73f4d-98a3-431e-af08-d2dbdef55a63
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Day = DATEVALUE('Online Orders'[Event TS])
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 868c5a62-4853-44be-b323-191328ce2f3b
+		summarizeBy: none
+
+		changedProperty = Name
+
+		annotation UnderlyingDateTimeDataType = Date
+
 	column 'Customer ID'
 		dataType: int64
 		formatString: 0
@@ -131,4 +153,3 @@ table 'Online Orders'
 			entityName: fact_online_order_headers
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

@@ -16,22 +16,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Online Sales Daily"
-                        }
-                      },
-                      "Property": "Total"
+                    "SourceRef": {
+                      "Entity": "Online Order Lines"
                     }
                   },
-                  "Function": 0
+                  "Property": "Online Line Revenue"
                 }
               },
-              "queryRef": "Sum(Online Sales Daily.Total)",
-              "nativeQueryRef": "Sum of Total"
+              "queryRef": "Online Order Lines.Online Line Revenue",
+              "nativeQueryRef": "Online Line Revenue"
             }
           ]
         }
@@ -40,18 +35,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Online Sales Daily"
-                      }
-                    },
-                    "Property": "Total"
+                  "SourceRef": {
+                    "Entity": "Online Order Lines"
                   }
                 },
-                "Function": 0
+                "Property": "Online Line Revenue"
               }
             },
             "direction": "Descending"
@@ -77,7 +67,7 @@
             }
           },
           "selector": {
-            "metadata": "Sum(Online Sales Daily.Total)"
+            "metadata": "Online Order Lines.Online Line Revenue"
           }
         }
       ],

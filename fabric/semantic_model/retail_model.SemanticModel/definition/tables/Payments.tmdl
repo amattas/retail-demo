@@ -2,8 +2,8 @@ table Payments
 	lineageTag: a9ee5779-cb04-439d-8691-5ae9eb849b4e
 	sourceLineageTag: [ag].[fact_payments]
 
-	measure 'Total Amounts' = SUM(Payments[Amount])
-		formatString: 0
+	measure 'Total Amounts' = SUM(Payments[Amount Cents]) / 100
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 79b75b7a-6c45-4df5-a579-ead43dd9e267
 
 		changedProperty = Name
@@ -139,4 +139,3 @@ table Payments
 			entityName: fact_payments
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

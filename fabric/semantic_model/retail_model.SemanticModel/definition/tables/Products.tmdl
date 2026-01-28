@@ -82,6 +82,7 @@ table Products
 
 	column Cost
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 7513ae09-61e6-41d4-b2b5-28905fd2b2df
 		sourceLineageTag: Cost
 		summarizeBy: sum
@@ -93,6 +94,7 @@ table Products
 
 	column MSRP
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 2f861f86-9d75-4f97-b3fc-fe163069cdbc
 		sourceLineageTag: MSRP
 		summarizeBy: sum
@@ -104,6 +106,7 @@ table Products
 
 	column 'Sale Price'
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: c24767c6-4fea-47f9-9065-cfb0bff80eae
 		sourceLineageTag: SalePrice
 		summarizeBy: sum
@@ -153,4 +156,3 @@ table Products
 			entityName: dim_products
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

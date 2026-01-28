@@ -1,6 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "4a44e69a7e3ad7233320",
+  "name": "94f9b25c83e57278508d",
   "position": {
     "x": 645,
     "y": 100,
@@ -16,22 +16,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Marketing Cost Daily"
-                        }
-                      },
-                      "Property": "Cost"
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Function": 0
+                  "Property": "Total Units Sold"
                 }
               },
-              "queryRef": "Sum(Marketing Cost Daily.Cost)",
-              "nativeQueryRef": "Sum of Cost"
+              "queryRef": "Receipt Lines.Total Units Sold",
+              "nativeQueryRef": "Total Units Sold"
             }
           ]
         }
@@ -40,18 +35,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Marketing Cost Daily"
-                      }
-                    },
-                    "Property": "Cost"
+                  "SourceRef": {
+                    "Entity": "Receipt Lines"
                   }
                 },
-                "Function": 0
+                "Property": "Total Units Sold"
               }
             },
             "direction": "Descending"
@@ -77,7 +67,7 @@
             }
           },
           "selector": {
-            "metadata": "Sum(Marketing Cost Daily.Cost)"
+            "metadata": "Receipt Lines.Total Units Sold"
           }
         }
       ],
@@ -122,7 +112,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Marketing Cost (Selected Period)'"
+                  "Value": "'In-Store Units (Selected Period)'"
                 }
               }
             }

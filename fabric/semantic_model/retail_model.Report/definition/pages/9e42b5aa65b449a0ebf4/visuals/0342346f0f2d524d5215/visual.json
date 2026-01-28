@@ -221,7 +221,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Marketing Cost by Campaign'"
+                  "Value": "'Marketing Spend by Channel'"
                 }
               }
             }

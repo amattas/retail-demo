@@ -1,15 +1,16 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "9e4521413f3d4ea736a7",
+  "name": "72edab8cfa0a5a0a0dee",
   "position": {
-    "x": 645,
-    "y": 222,
-    "z": 1,
+    "x": 40,
+    "y": 456,
+    "z": 4,
     "height": 224,
-    "width": 595
+    "width": 595,
+    "tabOrder": 1
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "lineChart",
     "query": {
       "queryState": {
         "Category": {
@@ -19,14 +20,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Marketing Cost Daily"
+                      "Entity": "Date"
                     }
                   },
-                  "Property": "Campaign ID"
+                  "Property": "Date"
                 }
               },
-              "queryRef": "Marketing Cost Daily.Campaign ID",
-              "nativeQueryRef": "Campaign ID",
+              "queryRef": "Date.Date",
+              "nativeQueryRef": "Date",
               "active": true
             }
           ]
@@ -35,22 +36,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Marketing Cost Daily"
-                        }
-                      },
-                      "Property": "Cost"
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Function": 0
+                  "Property": "Line Revenue"
                 }
               },
-              "queryRef": "Sum(Marketing Cost Daily.Cost)",
-              "nativeQueryRef": "Sum of Cost"
+              "queryRef": "Receipt Lines.Line Revenue",
+              "nativeQueryRef": "Line Revenue"
             }
           ]
         }
@@ -59,21 +55,16 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Column": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Marketing Cost Daily"
-                      }
-                    },
-                    "Property": "Cost"
+                  "SourceRef": {
+                    "Entity": "Date"
                   }
                 },
-                "Function": 0
+                "Property": "Date"
               }
             },
-            "direction": "Descending"
+            "direction": "Ascending"
           }
         ],
         "isDefaultSort": true
@@ -231,7 +222,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Marketing Cost by Campaign'"
+                  "Value": "'In-Store Sales by Day'"
                 }
               }
             }

@@ -19,14 +19,14 @@
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Tender Mix Daily"
+                      "Entity": "Products"
                     }
                   },
-                  "Property": "Payment Method"
+                  "Property": "Category"
                 }
               },
-              "queryRef": "Tender Mix Daily.Payment Method",
-              "nativeQueryRef": "Payment Method",
+              "queryRef": "Products.Category",
+              "nativeQueryRef": "Category",
               "active": true
             }
           ]
@@ -35,22 +35,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Tender Mix Daily"
-                        }
-                      },
-                      "Property": "Total Amount"
+                    "SourceRef": {
+                      "Entity": "Online Order Lines"
                     }
                   },
-                  "Function": 0
+                  "Property": "Online Line Revenue"
                 }
               },
-              "queryRef": "Sum(Tender Mix Daily.Total Amount)",
-              "nativeQueryRef": "Sum of Total Amount"
+              "queryRef": "Online Order Lines.Online Line Revenue",
+              "nativeQueryRef": "Online Line Revenue"
             }
           ]
         }
@@ -59,18 +54,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Tender Mix Daily"
-                      }
-                    },
-                    "Property": "Total Amount"
+                  "SourceRef": {
+                    "Entity": "Online Order Lines"
                   }
                 },
-                "Function": 0
+                "Property": "Online Line Revenue"
               }
             },
             "direction": "Descending"
@@ -202,7 +192,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Tender Mix (Total Amount)'"
+                  "Value": "'Online Sales by Category'"
                 }
               }
             }

@@ -1,56 +1,33 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "c7fe10568952987a9ae0",
+  "name": "bc1296c2a65937e6157c",
   "position": {
-    "x": 40,
-    "y": 456,
-    "z": 1,
-    "height": 224,
-    "width": 595
+    "x": 1030,
+    "y": 0,
+    "z": 3,
+    "height": 72,
+    "width": 240
   },
   "visual": {
-    "visualType": "clusteredBarChart",
+    "visualType": "slicer",
     "query": {
       "queryState": {
-        "Category": {
+        "Values": {
           "projections": [
             {
               "field": {
                 "Column": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Truck Dwell Daily"
+                      "Entity": "Date"
                     }
                   },
-                  "Property": "Site"
+                  "Property": "Date"
                 }
               },
-              "queryRef": "Truck Dwell Daily.Site",
-              "nativeQueryRef": "Site",
+              "queryRef": "Date.Date",
+              "nativeQueryRef": "Date",
               "active": true
-            }
-          ]
-        },
-        "Y": {
-          "projections": [
-            {
-              "field": {
-                "Aggregation": {
-                  "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Truck Dwell Daily"
-                        }
-                      },
-                      "Property": "Trucks"
-                    }
-                  },
-                  "Function": 0
-                }
-              },
-              "queryRef": "Sum(Truck Dwell Daily.Trucks)",
-              "nativeQueryRef": "Sum of Trucks"
             }
           ]
         }
@@ -59,44 +36,66 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Column": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Truck Dwell Daily"
-                      }
-                    },
-                    "Property": "Trucks"
+                  "SourceRef": {
+                    "Entity": "Date"
                   }
                 },
-                "Function": 0
+                "Property": "Date"
               }
             },
-            "direction": "Descending"
+            "direction": "Ascending"
           }
         ],
         "isDefaultSort": true
       }
     },
     "objects": {
-      "categoryAxis": [
+      "data": [
         {
           "properties": {
-            "showAxisTitle": {
+            "mode": {
               "expr": {
                 "Literal": {
-                  "Value": "true"
+                  "Value": "'Between'"
                 }
               }
             }
           }
         }
       ],
-      "valueAxis": [
+      "header": [
         {
           "properties": {
-            "showAxisTitle": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "fontFamily": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Segoe UI'"
+                }
+              }
+            },
+            "textSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "9L"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "selection": [
+        {
+          "properties": {
+            "selectAllCheckboxEnabled": {
               "expr": {
                 "Literal": {
                   "Value": "true"
@@ -217,29 +216,28 @@
             }
           }
         }
-      ],
-      "title": [
-        {
-          "properties": {
-            "show": {
-              "expr": {
-                "Literal": {
-                  "Value": "true"
-                }
-              }
-            },
-            "text": {
-              "expr": {
-                "Literal": {
-                  "Value": "'Trucks Processed by Site'"
-                }
-              }
-            }
-          }
-        }
       ]
     },
     "drillFilterOtherVisuals": true
   },
-  "howCreated": "Default"
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "ddc7a1b061e5b1d373c0",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Date"
+              }
+            },
+            "Property": "Date"
+          }
+        },
+        "type": "Range",
+        "displayName": "Date"
+      }
+    ]
+  }
 }

@@ -16,6 +16,7 @@ table 'Top Products 15 Min'
 
 	column Revenue
 		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 95625462-5b71-47fe-8186-915a9a4f1d6a
 		sourceLineageTag: revenue
 		summarizeBy: sum
@@ -45,4 +46,3 @@ table 'Top Products 15 Min'
 			entityName: top_products_15m
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-
