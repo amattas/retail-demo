@@ -12,7 +12,7 @@ table Trucks
 		lineageTag: 35640ffe-7578-49d2-b2e2-ceb110b05924
 		sourceLineageTag: ID
 		summarizeBy: count
-		sourceColumn: ID
+		sourceColumn: id
 
 		annotation SummarizationSetBy = Automatic
 
@@ -21,7 +21,7 @@ table Trucks
 		lineageTag: fbf89ae1-c807-41f3-9079-a59a825406c2
 		sourceLineageTag: LicensePlate
 		summarizeBy: none
-		sourceColumn: LicensePlate
+		sourceColumn: license_plate
 
 		changedProperty = Name
 
@@ -33,7 +33,7 @@ table Trucks
 		lineageTag: e6bfcc12-5130-4d84-97ad-a1c554e4dbef
 		sourceLineageTag: Refrigeration
 		summarizeBy: none
-		sourceColumn: Refrigeration
+		sourceColumn: refrigeration
 
 		annotation SummarizationSetBy = Automatic
 
@@ -42,7 +42,7 @@ table Trucks
 		lineageTag: 52e87361-f6d2-4cde-944c-1164180439b0
 		sourceLineageTag: DCID
 		summarizeBy: count
-		sourceColumn: DCID
+		sourceColumn: dc_id
 
 		changedProperty = Name
 

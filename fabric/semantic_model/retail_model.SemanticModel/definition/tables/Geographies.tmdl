@@ -12,7 +12,7 @@ table Geographies
 		lineageTag: 86b814c1-1e15-456d-ad2b-cc3b0f83d7e8
 		sourceLineageTag: ID
 		summarizeBy: count
-		sourceColumn: ID
+		sourceColumn: id
 
 		annotation SummarizationSetBy = Automatic
 
@@ -21,7 +21,7 @@ table Geographies
 		lineageTag: 57de3111-834e-4204-9f1c-4bfee7fe30ae
 		sourceLineageTag: City
 		summarizeBy: none
-		sourceColumn: City
+		sourceColumn: city
 
 		annotation SummarizationSetBy = Automatic
 
@@ -30,7 +30,7 @@ table Geographies
 		lineageTag: c0f70822-4f36-49e2-9587-7f62e0176583
 		sourceLineageTag: State
 		summarizeBy: none
-		sourceColumn: State
+		sourceColumn: state
 
 		annotation SummarizationSetBy = Automatic
 
@@ -39,7 +39,7 @@ table Geographies
 		lineageTag: 00fa76f8-35be-45d4-85ab-485a221637c1
 		sourceLineageTag: ZipCode
 		summarizeBy: none
-		sourceColumn: ZipCode
+		sourceColumn: zip_code
 
 		changedProperty = Name
 
@@ -50,7 +50,7 @@ table Geographies
 		lineageTag: f70e4d1d-a9eb-4cad-a978-852cdebf824a
 		sourceLineageTag: District
 		summarizeBy: none
-		sourceColumn: District
+		sourceColumn: district
 
 		annotation SummarizationSetBy = Automatic
 
@@ -59,7 +59,7 @@ table Geographies
 		lineageTag: db8bcaef-9a73-41c4-9a9a-c979c125b87f
 		sourceLineageTag: Region
 		summarizeBy: none
-		sourceColumn: Region
+		sourceColumn: region
 
 		annotation SummarizationSetBy = Automatic
 

@@ -161,7 +161,7 @@ table Receipts
 		lineageTag: da77bc23-568e-4c61-ad68-49d35f133cd0
 		sourceLineageTag: Subtotal
 		summarizeBy: none
-		sourceColumn: Subtotal
+		sourceColumn: subtotal
 
 		annotation SummarizationSetBy = Automatic
 

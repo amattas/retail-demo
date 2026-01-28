@@ -66,7 +66,7 @@ table 'DC Inventory Transactions'
 		lineageTag: 9118102a-3857-4735-bf44-cae72b23b2b6
 		sourceLineageTag: Source
 		summarizeBy: none
-		sourceColumn: Source
+		sourceColumn: source
 
 		annotation SummarizationSetBy = Automatic
 

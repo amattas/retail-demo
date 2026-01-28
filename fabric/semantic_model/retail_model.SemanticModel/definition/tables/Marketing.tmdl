@@ -7,7 +7,7 @@ table Marketing
 		lineageTag: af26fadf-1aa7-4813-b8f2-4b18a7d05aa7
 		sourceLineageTag: CustomerId
 		summarizeBy: count
-		sourceColumn: CustomerId
+		sourceColumn: customer_id
 
 		changedProperty = Name
 
@@ -21,7 +21,7 @@ table Marketing
 		lineageTag: e29f4b2f-b696-4df5-be7d-227c34ea126b
 		sourceLineageTag: CostCents
 		summarizeBy: sum
-		sourceColumn: CostCents
+		sourceColumn: cost_cents
 
 		changedProperty = Name
 

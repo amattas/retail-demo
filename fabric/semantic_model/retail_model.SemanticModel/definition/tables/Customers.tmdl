@@ -12,7 +12,7 @@ table Customers
 		lineageTag: ad551aee-05c1-4bf7-ac53-2c998c804b5c
 		sourceLineageTag: ID
 		summarizeBy: count
-		sourceColumn: ID
+		sourceColumn: id
 
 		annotation SummarizationSetBy = Automatic
 
@@ -21,7 +21,7 @@ table Customers
 		lineageTag: 29fdf2eb-f734-4dca-a4d5-57494eb37a71
 		sourceLineageTag: FirstName
 		summarizeBy: none
-		sourceColumn: FirstName
+		sourceColumn: first_name
 
 		changedProperty = Name
 
@@ -32,7 +32,7 @@ table Customers
 		lineageTag: 485d56e0-0b8f-41da-bbcd-cb500561440c
 		sourceLineageTag: LastName
 		summarizeBy: none
-		sourceColumn: LastName
+		sourceColumn: last_name
 
 		changedProperty = Name
 
@@ -43,7 +43,7 @@ table Customers
 		lineageTag: 5e291f37-d33f-4a56-8471-a0e21934d4f8
 		sourceLineageTag: Address
 		summarizeBy: none
-		sourceColumn: Address
+		sourceColumn: address
 
 		annotation SummarizationSetBy = Automatic
 
@@ -53,7 +53,7 @@ table Customers
 		lineageTag: 1b0afb62-5a20-472d-9486-5f52b3dc74f6
 		sourceLineageTag: GeographyID
 		summarizeBy: count
-		sourceColumn: GeographyID
+		sourceColumn: geography_id
 
 		changedProperty = Name
 
@@ -64,7 +64,7 @@ table Customers
 		lineageTag: a9c05456-300a-4430-a34b-184f017b66ae
 		sourceLineageTag: LoyaltyCard
 		summarizeBy: none
-		sourceColumn: LoyaltyCard
+		sourceColumn: loyalty_card
 
 		changedProperty = Name
 
@@ -75,7 +75,7 @@ table Customers
 		lineageTag: bc662af4-3541-423b-895c-51e94578bfb7
 		sourceLineageTag: Phone
 		summarizeBy: none
-		sourceColumn: Phone
+		sourceColumn: phone
 
 		annotation SummarizationSetBy = Automatic
 
@@ -84,7 +84,7 @@ table Customers
 		lineageTag: be6bd21e-b728-46c6-b62b-5550e2abedba
 		sourceLineageTag: BLEId
 		summarizeBy: none
-		sourceColumn: BLEId
+		sourceColumn: ble_id
 
 		changedProperty = Name
 
@@ -95,7 +95,7 @@ table Customers
 		lineageTag: 0d74302f-4f4b-472c-9b9b-48b57d298e6b
 		sourceLineageTag: AdId
 		summarizeBy: none
-		sourceColumn: AdId
+		sourceColumn: ad_id
 
 		changedProperty = Name
 

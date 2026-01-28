@@ -7,7 +7,7 @@ table Promotions
 		lineageTag: 699c67ab-2aec-4718-9aa8-7205385c40ab
 		sourceLineageTag: ReceiptId
 		summarizeBy: none
-		sourceColumn: ReceiptId
+		sourceColumn: receipt_id
 
 		changedProperty = Name
 
@@ -18,7 +18,7 @@ table Promotions
 		lineageTag: b0238d92-2da9-40e5-8013-e322014a887a
 		sourceLineageTag: PromoCode
 		summarizeBy: none
-		sourceColumn: PromoCode
+		sourceColumn: promo_code
 
 		changedProperty = Name
 
@@ -29,7 +29,7 @@ table Promotions
 		lineageTag: 19c7f4b0-852c-471c-95af-c20eaa73d0c5
 		sourceLineageTag: DiscountAmount
 		summarizeBy: none
-		sourceColumn: DiscountAmount
+		sourceColumn: discount_amount
 
 		changedProperty = Name
 
@@ -41,7 +41,7 @@ table Promotions
 		lineageTag: 296dc317-642c-4a09-ba33-56b9c99d8c6d
 		sourceLineageTag: DiscountCents
 		summarizeBy: sum
-		sourceColumn: DiscountCents
+		sourceColumn: discount_cents
 
 		changedProperty = Name
 
@@ -52,7 +52,7 @@ table Promotions
 		lineageTag: 65790e25-52e4-4ea4-b186-e91c8b20359d
 		sourceLineageTag: DiscountType
 		summarizeBy: none
-		sourceColumn: DiscountType
+		sourceColumn: discount_type
 
 		changedProperty = Name
 
@@ -64,7 +64,7 @@ table Promotions
 		lineageTag: d9770793-f93b-410e-92bb-dbf5e4bd7b5f
 		sourceLineageTag: ProductCount
 		summarizeBy: sum
-		sourceColumn: ProductCount
+		sourceColumn: product_count
 
 		changedProperty = Name
 
@@ -75,7 +75,7 @@ table Promotions
 		lineageTag: 76d783a3-362d-4a96-b40f-22ef3efec531
 		sourceLineageTag: ProductIds
 		summarizeBy: none
-		sourceColumn: ProductIds
+		sourceColumn: product_ids
 
 		changedProperty = Name
 
@@ -87,7 +87,7 @@ table Promotions
 		lineageTag: 10e6f985-8df5-44d2-bfbf-95407d67e963
 		sourceLineageTag: StoreID
 		summarizeBy: count
-		sourceColumn: StoreID
+		sourceColumn: store_id
 
 		changedProperty = Name
 
@@ -99,7 +99,7 @@ table Promotions
 		lineageTag: 2fc2d368-9347-4b26-83b0-f9542c60d2df
 		sourceLineageTag: CustomerID
 		summarizeBy: count
-		sourceColumn: CustomerID
+		sourceColumn: customer_id
 
 		changedProperty = Name
 

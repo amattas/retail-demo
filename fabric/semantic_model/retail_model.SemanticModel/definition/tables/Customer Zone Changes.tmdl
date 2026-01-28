@@ -8,7 +8,7 @@ table 'Customer Zone Changes'
 		lineageTag: ca15bf52-0050-41fa-aa78-434135694b5d
 		sourceLineageTag: StoreID
 		summarizeBy: count
-		sourceColumn: StoreID
+		sourceColumn: store_id
 
 		changedProperty = Name
 
@@ -19,7 +19,7 @@ table 'Customer Zone Changes'
 		lineageTag: caa3482c-b4fa-4faa-bf95-459fdac0bbfa
 		sourceLineageTag: CustomerBLEId
 		summarizeBy: none
-		sourceColumn: CustomerBLEId
+		sourceColumn: customer_ble_id
 
 		changedProperty = Name
 
@@ -30,7 +30,7 @@ table 'Customer Zone Changes'
 		lineageTag: bda49b7c-f843-4f29-be11-46ede9eac12d
 		sourceLineageTag: FromZone
 		summarizeBy: none
-		sourceColumn: FromZone
+		sourceColumn: from_zone
 
 		changedProperty = Name
 
@@ -41,7 +41,7 @@ table 'Customer Zone Changes'
 		lineageTag: 73a8db4f-652e-4273-afc2-a6e50a2e1408
 		sourceLineageTag: ToZone
 		summarizeBy: none
-		sourceColumn: ToZone
+		sourceColumn: to_zone
 
 		changedProperty = Name
 

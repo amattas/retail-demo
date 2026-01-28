@@ -12,7 +12,7 @@ table Stores
 		lineageTag: 2d99adc6-f14d-456a-8a96-828c3d9cf143
 		sourceLineageTag: ID
 		summarizeBy: none
-		sourceColumn: ID
+		sourceColumn: id
 
 		annotation SummarizationSetBy = Automatic
 
@@ -21,7 +21,7 @@ table Stores
 		lineageTag: 26e6a058-d596-4bfe-8e69-52e779a7adfa
 		sourceLineageTag: StoreNumber
 		summarizeBy: none
-		sourceColumn: StoreNumber
+		sourceColumn: store_number
 
 		changedProperty = Name
 
@@ -32,7 +32,7 @@ table Stores
 		lineageTag: c89d4703-0419-4d06-8a5b-4ee55f0006e0
 		sourceLineageTag: Address
 		summarizeBy: none
-		sourceColumn: Address
+		sourceColumn: address
 
 		annotation SummarizationSetBy = Automatic
 
@@ -42,7 +42,7 @@ table Stores
 		lineageTag: 34b29980-f042-438f-bedc-96916d57be64
 		sourceLineageTag: GeographyID
 		summarizeBy: none
-		sourceColumn: GeographyID
+		sourceColumn: geography_id
 
 		changedProperty = Name
 
