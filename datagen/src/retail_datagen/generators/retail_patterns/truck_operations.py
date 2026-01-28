@@ -388,7 +388,8 @@ class TruckOperationsMixin(InventoryFlowBase):
             shipment = self.generate_truck_shipment(
                 dc_id, store_id, reorder_list, departure_time
             )
-            return [shipment]
+            # Return empty list if shipment was queued (None returned)
+            return [shipment] if shipment is not None else []
 
         # Split order across multiple trucks
         shipments = []
