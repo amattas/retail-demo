@@ -1,19 +1,19 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
-  "name": "825ffd037d9775388fe6",
-  "displayName": "Inventory Details",
+  "name": "34bcc5dad64c4502abfb",
+  "displayName": "Sales Details",
   "displayOption": "FitToPage",
   "height": 720,
   "width": 1280,
   "type": "Drillthrough",
   "visibility": "HiddenInViewMode",
   "pageBinding": {
-    "name": "itemDetails_drillthrough",
+    "name": "salesDetails_drillthrough",
     "type": "Drillthrough",
     "parameters": [
       {
-        "name": "itemDetails_category",
-        "boundFilter": "559549d2cb95bedc38b0",
+        "name": "salesDetails_category",
+        "boundFilter": "bc9a9ad8a8a842589c2b",
         "fieldExpr": {
           "Column": {
             "Expression": {
@@ -26,8 +26,8 @@
         }
       },
       {
-        "name": "itemDetails_site",
-        "boundFilter": "7f96cb8866b0856b41a9",
+        "name": "salesDetails_site",
+        "boundFilter": "6c8da8f2b0b742b9b0d4",
         "fieldExpr": {
           "Column": {
             "Expression": {
@@ -40,8 +40,8 @@
         }
       },
       {
-        "name": "itemDetails_region",
-        "boundFilter": "b47b3643b5e1dae0b971",
+        "name": "salesDetails_region",
+        "boundFilter": "dfdfddf588794b34aaf5",
         "fieldExpr": {
           "Column": {
             "Expression": {
@@ -54,22 +54,8 @@
         }
       },
       {
-        "name": "itemDetails_priority",
-        "boundFilter": "dd9913c6abaac1adf912",
-        "fieldExpr": {
-          "Column": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "Reorders"
-              }
-            },
-            "Property": "Priority"
-          }
-        }
-      },
-      {
-        "name": "itemDetails_product",
-        "boundFilter": "c04d3a778bc15fa0ea41",
+        "name": "salesDetails_product",
+        "boundFilter": "f9f8c81404d049939fea",
         "fieldExpr": {
           "Column": {
             "Expression": {
@@ -86,7 +72,7 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "559549d2cb95bedc38b0",
+        "name": "bc9a9ad8a8a842589c2b",
         "displayName": "Category",
         "field": {
           "Column": {
@@ -102,7 +88,7 @@
         "howCreated": "User"
       },
       {
-        "name": "7f96cb8866b0856b41a9",
+        "name": "6c8da8f2b0b742b9b0d4",
         "displayName": "Site",
         "field": {
           "Column": {
@@ -118,7 +104,7 @@
         "howCreated": "User"
       },
       {
-        "name": "b47b3643b5e1dae0b971",
+        "name": "dfdfddf588794b34aaf5",
         "displayName": "Region",
         "field": {
           "Column": {
@@ -134,23 +120,7 @@
         "howCreated": "User"
       },
       {
-        "name": "dd9913c6abaac1adf912",
-        "displayName": "Priority",
-        "field": {
-          "Column": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "Reorders"
-              }
-            },
-            "Property": "Priority"
-          }
-        },
-        "type": "Categorical",
-        "howCreated": "User"
-      },
-      {
-        "name": "c04d3a778bc15fa0ea41",
+        "name": "f9f8c81404d049939fea",
         "displayName": "Product",
         "field": {
           "Column": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "3471088250608e8b5968",
+  "name": "c84f5e98447c4abdb762",
   "position": {
     "x": 40,
     "y": 100,
@@ -61,56 +61,56 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Store Inventory Position"
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Property": "Total Units on Hand"
+                  "Property": "Line Revenue"
                 }
               },
-              "queryRef": "Store Inventory Position.Total Units on Hand",
-              "nativeQueryRef": "Units on Hand"
+              "queryRef": "Receipt Lines.Line Revenue",
+              "nativeQueryRef": "In-Store Sales"
             },
             {
               "field": {
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Store Inventory Position"
+                      "Entity": "Receipt Lines"
                     }
                   },
-                  "Property": "Total Inventory Retail Value"
+                  "Property": "Total Units Sold"
                 }
               },
-              "queryRef": "Store Inventory Position.Total Inventory Retail Value",
-              "nativeQueryRef": "Inventory Retail Value"
+              "queryRef": "Receipt Lines.Total Units Sold",
+              "nativeQueryRef": "In-Store Units"
             },
             {
               "field": {
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Store Inventory Position"
+                      "Entity": "Online Order Lines"
                     }
                   },
-                  "Property": "Total Inventory Value"
+                  "Property": "Online Line Revenue"
                 }
               },
-              "queryRef": "Store Inventory Position.Total Inventory Value",
-              "nativeQueryRef": "Inventory Value"
+              "queryRef": "Online Order Lines.Online Line Revenue",
+              "nativeQueryRef": "Online Sales"
             },
             {
               "field": {
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Reorders"
+                      "Entity": "Online Order Lines"
                     }
                   },
-                  "Property": "Total Reorder Quantity"
+                  "Property": "Total Online Units"
                 }
               },
-              "queryRef": "Reorders.Total Reorder Quantity",
-              "nativeQueryRef": "Reorder Qty"
+              "queryRef": "Online Order Lines.Total Online Units",
+              "nativeQueryRef": "Online Units"
             }
           ]
         }
@@ -122,10 +122,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Store Inventory Position"
+                    "Entity": "Receipt Lines"
                   }
                 },
-                "Property": "Total Inventory Retail Value"
+                "Property": "Line Revenue"
               }
             },
             "direction": "Descending"
@@ -148,7 +148,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Inventory Item Detail'"
+                  "Value": "'Sales Item Detail'"
                 }
               }
             }
