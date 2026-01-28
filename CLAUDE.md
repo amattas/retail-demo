@@ -121,6 +121,30 @@ retail-demo/
 
 ## Project-Specific Guidelines
 
+### Column Naming Convention
+
+**Standard:** Use `snake_case` for all column names throughout the data pipeline.
+
+**Rationale:**
+- Aligns with Python (PEP 8) naming conventions used in datagen
+- Consistent with KQL table names and event types
+- Avoids case-sensitivity issues across platforms
+- Improves readability in SQL and KQL queries
+
+**Scope:**
+- DuckDB dimension and fact tables (datagen output)
+- KQL event tables in Eventhouse (cusn schema)
+- Lakehouse Silver tables (ag schema)
+- Lakehouse Gold tables (au schema)
+
+**Examples:**
+- Correct: `event_ts`, `receipt_id_ext`, `customer_id`, `store_id`
+- Incorrect: `EventTs`, `ReceiptIdExt`, `customerId`, `storeId`
+
+**Exception:**
+- Semantic Model display names can use user-friendly formats (e.g., "Event Timestamp", "Receipt ID")
+- These are presentation layer only and do not affect underlying column names
+
 ### KQL Development
 - Use `.execute database script` for batch operations
 - Number scripts for execution order (01, 02, 03...)

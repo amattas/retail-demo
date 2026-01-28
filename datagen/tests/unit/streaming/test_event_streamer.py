@@ -348,21 +348,16 @@ class TestEventStreamerInitialization:
             mock_failing_client.connect.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_ensure_master_data_loaded_fallback(self, mock_config):
-        """Test fallback to minimal master data when CSVs not available."""
+    async def test_ensure_master_data_loaded_raises_on_failure(self, mock_config):
+        """Test that missing master data raises a clear error."""
         streamer = EventStreamer(mock_config)
 
-        await streamer._ensure_master_data_loaded()
-
-        # Should have fallback data
-        assert streamer._stores is not None
-        assert len(streamer._stores) > 0
-        assert streamer._customers is not None
-        assert len(streamer._customers) > 0
-        assert streamer._products is not None
-        assert len(streamer._products) > 0
-        assert streamer._distribution_centers is not None
-        assert len(streamer._distribution_centers) > 0
+        # Should raise RuntimeError with helpful message
+        with pytest.raises(
+            RuntimeError,
+            match="Master data is required but could not be loaded from DuckDB"
+        ):
+            await streamer._ensure_master_data_loaded()
 
 
 # ============================================================================
