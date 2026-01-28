@@ -85,8 +85,8 @@ class EventStreamer:
             self._duckdb_conn, self.streaming_config.azure_connection_string
         )
 
-    # Stub methods for API router compatibility
-    # These methods were removed during batch-only simplification but routers still reference them
+    # Stub methods for API router compatibility.
+    # Removed during batch-only simplification but routers still reference them.
 
     def get_dlq_summary(self) -> dict:
         """Get dead letter queue summary (stub - DLQ not supported in batch mode)."""
