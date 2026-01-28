@@ -181,15 +181,3 @@ relationship 'Truck Dwell Daily to Stores'
 relationship 'Truck Dwell Daily to Date'
 	fromColumn: 'Truck Dwell Daily'.Day
 	toColumn: Date.Date
-
-relationship 'Receipts to Date'
-	fromColumn: Receipts.Day
-	toColumn: Date.Date
-
-relationship 'Online Orders to Date'
-	fromColumn: 'Online Orders'.Day
-	toColumn: Date.Date
-
-relationship 'Reorders to Date'
-	fromColumn: Reorders.Day
-	toColumn: Date.Date

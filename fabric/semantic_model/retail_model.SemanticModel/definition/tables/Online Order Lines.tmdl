@@ -2,11 +2,11 @@ table 'Online Order Lines'
 	lineageTag: ead55580-9419-45ac-91ff-f5ac29096866
 	sourceLineageTag: [ag].[fact_online_order_lines]
 
-	measure 'Total Online Units' = SUM('Online Order Lines'[Quantity])
+	measure 'Total Online Units' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Online Order Lines'[Quantity]), 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: #,0
 		lineageTag: 01a1a1a4-0001-0001-0001-000000000001
 
-	measure 'Online Line Revenue' = SUM('Online Order Lines'[Extended Cents]) / 100
+	measure 'Online Line Revenue' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Online Order Lines'[Extended Cents]) / 100, 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a4-0001-0001-0001-000000000002
 
@@ -169,4 +169,3 @@ table 'Online Order Lines'
 			entityName: fact_online_order_lines
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

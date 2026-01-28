@@ -16,22 +16,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Store Sales by Minute"
-                        }
-                      },
-                      "Property": "Average Basket"
+                    "SourceRef": {
+                      "Entity": "Receipts"
                     }
                   },
-                  "Function": 1
+                  "Property": "Average Basket Size"
                 }
               },
-              "queryRef": "Avg(Store Sales by Minute.Average Basket)",
-              "nativeQueryRef": "Average of Average Basket"
+              "queryRef": "Receipts.Average Basket Size",
+              "nativeQueryRef": "Average Basket Size"
             }
           ]
         }
@@ -40,18 +35,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Store Sales by Minute"
-                      }
-                    },
-                    "Property": "Average Basket"
+                  "SourceRef": {
+                    "Entity": "Receipts"
                   }
                 },
-                "Function": 1
+                "Property": "Average Basket Size"
               }
             },
             "direction": "Descending"
@@ -74,13 +64,13 @@
                   }
                 }
               }
-            }
-          },
-          "selector": {
-            "metadata": "Avg(Store Sales by Minute.Average Basket)"
           }
+        },
+        "selector": {
+          "metadata": "Receipts.Average Basket Size"
         }
-      ],
+      }
+    ],
       "outline": [
         {
           "properties": {

@@ -2,11 +2,11 @@ table 'Receipt Lines'
 	lineageTag: aab05dc7-35b4-4318-affd-bc107c21f8f7
 	sourceLineageTag: [ag].[fact_receipt_lines]
 
-	measure 'Total Units Sold' = SUM('Receipt Lines'[Quantity])
+	measure 'Total Units Sold' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Receipt Lines'[Quantity]), Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: #,0
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000001
 
-	measure 'Line Revenue' = SUM('Receipt Lines'[Extended Cents]) / 100
+	measure 'Line Revenue' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Receipt Lines'[Extended Cents]) / 100, Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000002
 
@@ -14,7 +14,7 @@ table 'Receipt Lines'
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000003
 
-	measure 'Total Lines' = COUNTROWS('Receipt Lines')
+	measure 'Total Lines' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(COUNTROWS('Receipt Lines'), Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: #,0
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000004
 
@@ -128,4 +128,3 @@ table 'Receipt Lines'
 			entityName: fact_receipt_lines
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

@@ -50,22 +50,17 @@
           "projections": [
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Reorders"
-                        }
-                      },
-                      "Property": "Reorder Quantity"
+                    "SourceRef": {
+                      "Entity": "Reorders"
                     }
                   },
-                  "Function": 0
+                  "Property": "Total Reorder Quantity"
                 }
               },
-              "queryRef": "Sum(Reorders.Reorder Quantity)",
-              "nativeQueryRef": "Sum of Reorder Quantity"
+              "queryRef": "Reorders.Total Reorder Quantity",
+              "nativeQueryRef": "Total Reorder Quantity"
             }
           ]
         }
@@ -74,18 +69,13 @@
         "sort": [
           {
             "field": {
-              "Aggregation": {
+              "Measure": {
                 "Expression": {
-                  "Column": {
-                    "Expression": {
-                      "SourceRef": {
-                        "Entity": "Reorders"
-                      }
-                    },
-                    "Property": "Reorder Quantity"
+                  "SourceRef": {
+                    "Entity": "Reorders"
                   }
                 },
-                "Function": 0
+                "Property": "Total Reorder Quantity"
               }
             },
             "direction": "Descending"

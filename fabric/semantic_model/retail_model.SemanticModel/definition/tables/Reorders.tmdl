@@ -2,6 +2,10 @@ table Reorders
 	lineageTag: 5d56e188-c68e-4de1-a166-dba2aab94430
 	sourceLineageTag: [ag].[fact_reorders]
 
+	measure 'Total Reorder Quantity' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM(Reorders[Reorder Quantity]), Reorders[Event TS] >= MinDate, Reorders[Event TS] < MaxDate + 1)
+		formatString: #,0
+		lineageTag: 01a1a1a6-0001-0001-0001-000000000001
+
 	column 'Event TS'
 		dataType: dateTime
 		formatString: General Date
@@ -13,16 +17,6 @@ table Reorders
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
-
-	column Day = DATEVALUE(Reorders[Event TS])
-		dataType: dateTime
-		formatString: Short Date
-		lineageTag: ab69d197-36f0-4405-bf6f-e7577da2c1d3
-		summarizeBy: none
-
-		changedProperty = Name
-
-		annotation UnderlyingDateTimeDataType = Date
 
 	column 'Store ID'
 		dataType: int64

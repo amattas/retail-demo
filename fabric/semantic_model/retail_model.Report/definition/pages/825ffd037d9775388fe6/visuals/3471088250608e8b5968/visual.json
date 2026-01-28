@@ -114,21 +114,16 @@
             },
             {
               "field": {
-                "Aggregation": {
+                "Measure": {
                   "Expression": {
-                    "Column": {
-                      "Expression": {
-                        "SourceRef": {
-                          "Entity": "Reorders"
-                        }
-                      },
-                      "Property": "Reorder Quantity"
+                    "SourceRef": {
+                      "Entity": "Reorders"
                     }
                   },
-                  "Function": 0
+                  "Property": "Total Reorder Quantity"
                 }
               },
-              "queryRef": "Sum(Reorders.Reorder Quantity)",
+              "queryRef": "Reorders.Total Reorder Quantity",
               "nativeQueryRef": "Reorder Qty"
             },
             {

@@ -2,19 +2,19 @@ table Receipts
 	lineageTag: dbb3a597-d860-42d1-9585-a7da0fc2a2a4
 	sourceLineageTag: [ag].[fact_receipts]
 
-	measure 'Total Sales' = SUM(Receipts[Total Cents]) / 100
+	measure 'Total Sales' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM(Receipts[Total Cents]) / 100, Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000001
 
-	measure 'Total Tax' = SUM(Receipts[Tax Cents]) / 100
+	measure 'Total Tax' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM(Receipts[Tax Cents]) / 100, Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000002
 
-	measure 'Total Subtotal' = SUM(Receipts[Subtotal Cents]) / 100
+	measure 'Total Subtotal' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM(Receipts[Subtotal Cents]) / 100, Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000003
 
-	measure 'Receipt Count' = COUNTROWS(Receipts)
+	measure 'Receipt Count' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(COUNTROWS(Receipts), Receipts[Event TS] >= MinDate, Receipts[Event TS] < MaxDate + 1)
 		formatString: #,0
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000004
 
@@ -41,16 +41,6 @@ table Receipts
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
-
-	column Day = DATEVALUE(Receipts[Event TS])
-		dataType: dateTime
-		formatString: Short Date
-		lineageTag: 36b7e57f-635c-4506-ba60-402549055724
-		summarizeBy: none
-
-		changedProperty = Name
-
-		annotation UnderlyingDateTimeDataType = Date
 
 	column 'Customer ID'
 		dataType: int64

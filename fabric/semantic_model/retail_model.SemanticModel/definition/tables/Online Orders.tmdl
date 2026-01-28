@@ -2,19 +2,19 @@ table 'Online Orders'
 	lineageTag: 930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd
 	sourceLineageTag: [ag].[fact_online_order_headers]
 
-	measure 'Total Online Sales' = SUM('Online Orders'[Total Cents]) / 100
+	measure 'Total Online Sales' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Online Orders'[Total Cents]) / 100, 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000001
 
-	measure 'Total Online Tax' = SUM('Online Orders'[Tax Cents]) / 100
+	measure 'Total Online Tax' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Online Orders'[Tax Cents]) / 100, 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000002
 
-	measure 'Total Online Subtotal' = SUM('Online Orders'[Subtotal Cents]) / 100
+	measure 'Total Online Subtotal' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(SUM('Online Orders'[Subtotal Cents]) / 100, 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000003
 
-	measure 'Online Order Count' = COUNTROWS('Online Orders')
+	measure 'Online Order Count' = VAR MinDate = MIN('Date'[Date]) VAR MaxDate = MAX('Date'[Date]) RETURN CALCULATE(COUNTROWS('Online Orders'), 'Online Orders'[Event TS] >= MinDate, 'Online Orders'[Event TS] < MaxDate + 1)
 		formatString: #,0
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000004
 
@@ -33,16 +33,6 @@ table 'Online Orders'
 		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
-
-	column Day = DATEVALUE('Online Orders'[Event TS])
-		dataType: dateTime
-		formatString: Short Date
-		lineageTag: 868c5a62-4853-44be-b323-191328ce2f3b
-		summarizeBy: none
-
-		changedProperty = Name
-
-		annotation UnderlyingDateTimeDataType = Date
 
 	column 'Customer ID'
 		dataType: int64
