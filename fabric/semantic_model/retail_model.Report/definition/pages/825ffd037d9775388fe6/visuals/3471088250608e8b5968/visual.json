@@ -1,0 +1,162 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "3471088250608e8b5968",
+  "position": {
+    "x": 40,
+    "y": 100,
+    "z": 1,
+    "height": 580,
+    "width": 1200
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Product Name"
+                }
+              },
+              "queryRef": "Products.Product Name",
+              "nativeQueryRef": "Product Name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Brand"
+                }
+              },
+              "queryRef": "Products.Brand",
+              "nativeQueryRef": "Brand"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Category"
+                }
+              },
+              "queryRef": "Products.Category",
+              "nativeQueryRef": "Category"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Store Inventory Position"
+                    }
+                  },
+                  "Property": "Total Units on Hand"
+                }
+              },
+              "queryRef": "Store Inventory Position.Total Units on Hand",
+              "nativeQueryRef": "Units on Hand"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Store Inventory Position"
+                    }
+                  },
+                  "Property": "Total Inventory Retail Value"
+                }
+              },
+              "queryRef": "Store Inventory Position.Total Inventory Retail Value",
+              "nativeQueryRef": "Inventory Retail Value"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Store Inventory Position"
+                    }
+                  },
+                  "Property": "Total Inventory Value"
+                }
+              },
+              "queryRef": "Store Inventory Position.Total Inventory Value",
+              "nativeQueryRef": "Inventory Value"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Reorders"
+                    }
+                  },
+                  "Property": "Total Reorder Quantity"
+                }
+              },
+              "queryRef": "Reorders.Total Reorder Quantity",
+              "nativeQueryRef": "Reorder Qty"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Store Inventory Position"
+                  }
+                },
+                "Property": "Total Inventory Retail Value"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Inventory Item Detail'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Copilot"
+}

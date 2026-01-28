@@ -1,0 +1,90 @@
+table 'Online Sales Daily'
+	lineageTag: a2c1b744-09a3-4341-9934-282e0cd86ef7
+	sourceLineageTag: [au].[online_sales_daily]
+
+	column Day
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: cee9ed17-cbb5-4d0c-adcc-3409673e03cf
+		sourceLineageTag: day
+		summarizeBy: none
+		sourceColumn: day
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Orders
+		dataType: int64
+		formatString: 0
+		lineageTag: f4bcbe79-377f-4716-b883-62aa5f638594
+		sourceLineageTag: orders
+		summarizeBy: sum
+		sourceColumn: orders
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subtotal
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: daa6013d-b5a8-43f0-be98-281031ed3583
+		sourceLineageTag: subtotal
+		summarizeBy: sum
+		sourceColumn: subtotal
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Tax
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 9b698455-789b-499d-bbd1-62106620fb61
+		sourceLineageTag: tax
+		summarizeBy: sum
+		sourceColumn: tax
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Total
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 3a046b1a-adfc-42b8-8da4-631614088a5f
+		sourceLineageTag: total
+		summarizeBy: sum
+		sourceColumn: total
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Average Order Value'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 793db82f-f43e-4840-88d5-e9395c64a96a
+		sourceLineageTag: avg_order_value
+		summarizeBy: sum
+		sourceColumn: avg_order_value
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 'Online Sales Daily' = entity
+		mode: directLake
+		source
+			entityName: online_sales_daily
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

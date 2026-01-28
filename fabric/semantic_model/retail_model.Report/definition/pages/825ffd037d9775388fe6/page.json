@@ -1,0 +1,197 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
+  "name": "825ffd037d9775388fe6",
+  "displayName": "Inventory Details",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "type": "Drillthrough",
+  "visibility": "HiddenInViewMode",
+  "pageBinding": {
+    "name": "itemDetails_drillthrough",
+    "type": "Drillthrough",
+    "parameters": [
+      {
+        "name": "itemDetails_category",
+        "boundFilter": "559549d2cb95bedc38b0",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Products"
+              }
+            },
+            "Property": "Category"
+          }
+        }
+      },
+      {
+        "name": "itemDetails_site",
+        "boundFilter": "7f96cb8866b0856b41a9",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Stores"
+              }
+            },
+            "Property": "Store Number"
+          }
+        }
+      },
+      {
+        "name": "itemDetails_region",
+        "boundFilter": "b47b3643b5e1dae0b971",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Geographies"
+              }
+            },
+            "Property": "Region"
+          }
+        }
+      },
+      {
+        "name": "itemDetails_priority",
+        "boundFilter": "dd9913c6abaac1adf912",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Reorders"
+              }
+            },
+            "Property": "Priority"
+          }
+        }
+      },
+      {
+        "name": "itemDetails_product",
+        "boundFilter": "c04d3a778bc15fa0ea41",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Products"
+              }
+            },
+            "Property": "Product Name"
+          }
+        }
+      }
+    ]
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "559549d2cb95bedc38b0",
+        "displayName": "Category",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Products"
+              }
+            },
+            "Property": "Category"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      },
+      {
+        "name": "7f96cb8866b0856b41a9",
+        "displayName": "Site",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Stores"
+              }
+            },
+            "Property": "Store Number"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      },
+      {
+        "name": "b47b3643b5e1dae0b971",
+        "displayName": "Region",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Geographies"
+              }
+            },
+            "Property": "Region"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      },
+      {
+        "name": "dd9913c6abaac1adf912",
+        "displayName": "Priority",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Reorders"
+              }
+            },
+            "Property": "Priority"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      },
+      {
+        "name": "c04d3a778bc15fa0ea41",
+        "displayName": "Product",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Products"
+              }
+            },
+            "Property": "Product Name"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User"
+      }
+    ]
+  },
+  "objects": {
+    "background": [
+      {
+        "properties": {
+          "color": {
+            "solid": {
+              "color": {
+                "expr": {
+                  "Literal": {
+                    "Value": "'#FFFFFF'"
+                  }
+                }
+              }
+            }
+          },
+          "transparency": {
+            "expr": {
+              "Literal": {
+                "Value": "60L"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "howCreated": "Copilot"
+}

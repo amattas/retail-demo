@@ -1,0 +1,74 @@
+table 'Store Sales by Minute'
+	lineageTag: a8fa2a6d-f69b-426f-a314-e3a5843c3295
+	sourceLineageTag: [au].[sales_minute_store]
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 4523c24b-1eb5-4e76-a360-a309c8aa50aa
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Timestamp
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 83ce5f6d-852a-4ad3-83f4-b6f08f2c433b
+		sourceLineageTag: ts
+		summarizeBy: none
+		sourceColumn: ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Total Sales'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 5fec6969-b148-481e-8c84-71314f701c96
+		sourceLineageTag: total_sales
+		summarizeBy: sum
+		sourceColumn: total_sales
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Receipts
+		dataType: int64
+		formatString: 0
+		lineageTag: caf48a4f-d47e-41eb-ae5e-bf4d6bbd9376
+		sourceLineageTag: receipts
+		summarizeBy: sum
+		sourceColumn: receipts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Average Basket'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: c508e7f5-582e-463b-980f-2f0f662cc9b0
+		sourceLineageTag: avg_basket
+		summarizeBy: sum
+		sourceColumn: avg_basket
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 'Store Sales by Minute' = entity
+		mode: directLake
+		source
+			entityName: sales_minute_store
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

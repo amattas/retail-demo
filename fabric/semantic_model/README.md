@@ -54,3 +54,15 @@ Additional Gold tables planned for future releases:
 - Stockout and reorder analytics
 - Store operations metrics
 - Promotion performance tracking
+
+## Report (PBIP)
+
+This repo also includes a Power BI Project at `fabric/semantic_model/retail_model.pbip` with a starter report:
+
+- **Sales Dashboard**: Sales KPIs plus store/category breakdowns
+- **Supply Chain Control Tower**: Combined view of store/DC inventory, reorders, and truck dwell trends
+- **Online, Payments & Marketing**: Online sales by day, tender mix, and marketing cost by campaign
+- **Inventory & Replenishment**: On-hand units/value plus reorder quantity by priority
+- **Logistics Control Center**: Truck dwell/throughput plus DC inventory on hand
+
+Open it in **Power BI Desktop** via File → Open → `fabric/semantic_model/retail_model.pbip`.

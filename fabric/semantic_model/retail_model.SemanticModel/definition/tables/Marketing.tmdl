@@ -1,0 +1,115 @@
+table Marketing
+	lineageTag: 0de63cc1-c6da-4354-8a04-602a3c737aa8
+	sourceLineageTag: [ag].[fact_marketing]
+
+	column 'Customer ID'
+		dataType: double
+		lineageTag: af26fadf-1aa7-4813-b8f2-4b18a7d05aa7
+		sourceLineageTag: CustomerId
+		summarizeBy: count
+		sourceColumn: CustomerId
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Cost Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: e29f4b2f-b696-4df5-be7d-227c34ea126b
+		sourceLineageTag: CostCents
+		summarizeBy: sum
+		sourceColumn: CostCents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Device
+		dataType: string
+		lineageTag: b261ffc1-b0e5-4a33-ac71-797d936d6047
+		sourceLineageTag: device
+		summarizeBy: none
+		sourceColumn: device
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cost
+		dataType: string
+		lineageTag: 23c50c8e-33b2-47bd-aff8-9a84cad24506
+		sourceLineageTag: cost
+		summarizeBy: none
+		sourceColumn: cost
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Customer Ad ID'
+		dataType: string
+		lineageTag: a75aaf0c-3276-4cb6-b82b-5dd328e875de
+		sourceLineageTag: customer_ad_id
+		summarizeBy: none
+		sourceColumn: customer_ad_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Impression ID'
+		dataType: string
+		lineageTag: 89d38797-4885-4065-9195-4b0a2120f58e
+		sourceLineageTag: impression_id_ext
+		summarizeBy: none
+		sourceColumn: impression_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Campaign ID'
+		dataType: string
+		lineageTag: aeee4a8b-9e31-4c4a-9a0f-e6d15a3d2459
+		sourceLineageTag: campaign_id
+		summarizeBy: none
+		sourceColumn: campaign_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Creative ID'
+		dataType: string
+		lineageTag: b60cdc7a-5bde-4e67-a5be-f537896f9931
+		sourceLineageTag: creative_id
+		summarizeBy: none
+		sourceColumn: creative_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Channel
+		dataType: string
+		lineageTag: 8778e66d-7a6f-4276-bd3b-7abbc83893da
+		sourceLineageTag: channel
+		summarizeBy: none
+		sourceColumn: channel
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Marketing = entity
+		mode: directLake
+		source
+			entityName: fact_marketing
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+
+	changedProperty = Name
+

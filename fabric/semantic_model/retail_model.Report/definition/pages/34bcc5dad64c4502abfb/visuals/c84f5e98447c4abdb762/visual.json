@@ -1,0 +1,162 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "c84f5e98447c4abdb762",
+  "position": {
+    "x": 40,
+    "y": 100,
+    "z": 1,
+    "height": 580,
+    "width": 1200
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Product Name"
+                }
+              },
+              "queryRef": "Products.Product Name",
+              "nativeQueryRef": "Product Name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Brand"
+                }
+              },
+              "queryRef": "Products.Brand",
+              "nativeQueryRef": "Brand"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Category"
+                }
+              },
+              "queryRef": "Products.Category",
+              "nativeQueryRef": "Category"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
+                    }
+                  },
+                  "Property": "Line Revenue"
+                }
+              },
+              "queryRef": "Receipt Lines.Line Revenue",
+              "nativeQueryRef": "In-Store Sales"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
+                    }
+                  },
+                  "Property": "Total Units Sold"
+                }
+              },
+              "queryRef": "Receipt Lines.Total Units Sold",
+              "nativeQueryRef": "In-Store Units"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Online Order Lines"
+                    }
+                  },
+                  "Property": "Online Line Revenue"
+                }
+              },
+              "queryRef": "Online Order Lines.Online Line Revenue",
+              "nativeQueryRef": "Online Sales"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Online Order Lines"
+                    }
+                  },
+                  "Property": "Total Online Units"
+                }
+              },
+              "queryRef": "Online Order Lines.Total Online Units",
+              "nativeQueryRef": "Online Units"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Receipt Lines"
+                  }
+                },
+                "Property": "Line Revenue"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Sales Item Detail'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Copilot"
+}

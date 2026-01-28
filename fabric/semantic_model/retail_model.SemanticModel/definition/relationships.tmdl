@@ -174,7 +174,10 @@ relationship 'Marketing Cost Daily to Date'
 	fromColumn: 'Marketing Cost Daily'.Day
 	toColumn: Date.Date
 
+relationship 'Truck Dwell Daily to Stores'
+	fromColumn: 'Truck Dwell Daily'.Site
+	toColumn: Stores.'Store Number'
+
 relationship 'Truck Dwell Daily to Date'
 	fromColumn: 'Truck Dwell Daily'.Day
 	toColumn: Date.Date
-

@@ -1,0 +1,59 @@
+table Trucks
+	lineageTag: 7eb610bd-c508-404e-b04a-5cb53d07d17a
+	sourceLineageTag: [ag].[dim_trucks]
+
+	measure '# of Trucks' = COUNTROWS(Trucks)
+		formatString: #,0
+		lineageTag: 01a1a1b5-0001-0001-0001-000000000001
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: 35640ffe-7578-49d2-b2e2-ceb110b05924
+		sourceLineageTag: ID
+		summarizeBy: count
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'License Plate'
+		dataType: string
+		lineageTag: fbf89ae1-c807-41f3-9079-a59a825406c2
+		sourceLineageTag: LicensePlate
+		summarizeBy: none
+		sourceColumn: LicensePlate
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Refrigeration
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: e6bfcc12-5130-4d84-97ad-a1c554e4dbef
+		sourceLineageTag: Refrigeration
+		summarizeBy: none
+		sourceColumn: Refrigeration
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'DC ID'
+		dataType: double
+		lineageTag: 52e87361-f6d2-4cde-944c-1164180439b0
+		sourceLineageTag: DCID
+		summarizeBy: count
+		sourceColumn: DCID
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition Trucks = entity
+		mode: directLake
+		source
+			entityName: dim_trucks
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

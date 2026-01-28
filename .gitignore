@@ -110,3 +110,4 @@ site/
 /fabric/lakehouse/.stubs
 /fabric/lakehouse/5219ac70-71d4-4dfc-af32-5b8a6c29a471
 fabric/lakehouse/.work-folder-info
+fabric/semantic_model/retail_model.Report/.pbi/localSettings.json
