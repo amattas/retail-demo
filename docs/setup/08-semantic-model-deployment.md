@@ -7,128 +7,88 @@ Deploy the Power BI semantic model to enable analytics and dashboards.
 - ✅ Gold layer tables created (Phase 4 complete)
 - ✅ Fabric workspace with Lakehouse containing `au` and `ag` schemas
 - ✅ Contributor or Admin access to workspace
+- ✅ [Power BI Desktop](https://aka.ms/pbidesktop) installed
 
-## Deployment Methods
+## Deployment Process
 
-### Method 1: Fabric Portal (Recommended)
+With the TMDL-based Power BI Project format (.pbip), deployment is straightforward using Power BI Desktop.
 
-**Step 1: Get Your Lakehouse Resource ID**
+### Step 1: Open the Power BI Project
+
+1. Launch **Power BI Desktop**
+2. Go to **File** → **Open**
+3. Browse to `fabric/semantic_model/retail_model.pbip`
+4. Click **Open**
+
+Power BI Desktop will load the semantic model and report together.
+
+### Step 2: Configure Lakehouse Connection (First Time Only)
+
+If this is your first time opening the project, you may need to configure the data source:
+
+1. Power BI will prompt: "Unable to connect to data source"
+2. Click **Edit** or go to **Transform data** → **Data source settings**
+3. Select the Lakehouse connection
+4. Click **Edit Permissions**
+5. Set credentials:
+   - **Authentication method**: OAuth 2.0
+   - Sign in with your Fabric workspace account
+6. Click **OK**
+
+The model uses **DirectLake mode**, which connects directly to your Lakehouse Gold tables without importing data.
+
+### Step 3: Refresh the Data (Optional)
+
+To ensure you're seeing the latest data:
+
+1. Click **Refresh** in the Home ribbon
+2. Wait for refresh to complete (typically 10-30 seconds for DirectLake)
+
+### Step 4: Publish to Fabric Workspace
+
+1. Click **Publish** in the Home ribbon
+2. Select your target Fabric workspace from the list
+3. Click **Select**
+4. Wait for the upload to complete
+5. When prompted, click **Open in Fabric** to view in the browser
+
+### Step 5: Verify Deployment
+
+After publishing:
 
 1. Navigate to your Fabric workspace
-2. Open your Lakehouse (the one containing `au` and `ag` schemas)
-3. In the URL bar, copy the Lakehouse ID:
-   ```
-   https://app.fabric.microsoft.com/groups/{workspace-id}/lakehouses/{lakehouse-id}
-   ```
-4. Your resource ID format is:
-   ```
-   /subscriptions/{subscription}/resourceGroups/{rg}/providers/Microsoft.Fabric/workspaces/{workspace}/lakehouses/{lakehouse-id}
-   ```
+2. Verify two items were created:
+   - **Semantic model**: `retail_model`
+   - **Report**: `retail_model`
+3. Open the semantic model to verify:
+   - All 12 tables are present (9 Gold + 3 Dimension tables)
+   - Relationships are active
+   - Data refreshes successfully
 
-   **OR** simply use the short form:
-   ```
-   {lakehouse-id}
-   ```
-
-**Step 2: Update model.tmdl with Your Lakehouse ID**
-
-```bash
-cd fabric/semantic_model
-
-# Edit model.tmdl and replace the placeholder
-# Change this line:
-#   value: "<fabric-lakehouse-resource-id>"
-# To:
-#   value: "your-lakehouse-id-here"
-```
-
-**Step 3: Create Semantic Model in Fabric**
-
-1. Go to your Fabric workspace
-2. Click **+ New** → **Semantic model**
-3. Choose **Upload a .tmdl file**
-4. Select `fabric/semantic_model/model.tmdl`
-5. Name it: `RetailGold`
-
-**Step 4: Configure Data Sources (if needed)**
-
-If the Lakehouse connection doesn't auto-configure:
-
-1. Open the semantic model settings
-2. Go to **Data source credentials**
-3. Set credentials for the Lakehouse connection
-4. Click **Apply**
-
-**Step 5: Refresh the Model**
-
-1. In the semantic model view, click **Refresh now**
-2. Wait for refresh to complete (1-5 minutes)
-3. Check for any errors in the refresh history
-
-**Step 6: Verify Tables Loaded**
-
-1. Open the semantic model in **Power BI Desktop** or **Fabric**
-2. Check that all 11 tables appear:
-   - 9 Gold tables (au schema)
-   - 2 Dimension tables (ag schema)
-3. Verify relationships are active
-4. Test a simple measure: `Total Sales` from `gold_sales_minute_store`
-
-### Method 2: Power BI Desktop + Publish
-
-**Step 1: Open in Power BI Desktop**
-
-1. Install [Power BI Desktop](https://aka.ms/pbidesktop) if not already installed
-2. Open Power BI Desktop
-3. Go to **File** → **Import** → **Power BI Model**
-4. Browse to `fabric/semantic_model/model.tmdl`
-
-**Step 2: Configure Lakehouse Connection**
-
-1. Power BI will prompt for data source settings
-2. Select **DirectLake** mode
-3. Point to your Fabric Lakehouse:
-   - Server: `https://api.fabric.microsoft.com/v1`
-   - Database: Your Lakehouse name
-   - Schemas: `au`, `ag`
-
-**Step 3: Publish to Fabric**
-
-1. Click **Publish** in Power BI Desktop ribbon
-2. Select your Fabric workspace
-3. Wait for publish to complete
-4. Click **Open in Fabric** when done
-
-### Method 3: Fabric Git Integration (Advanced)
+### Alternative: Fabric Git Integration (Advanced)
 
 If your workspace is connected to Git:
 
 **Step 1: Commit Model to Git**
 
 ```bash
-# Already done - model.tmdl is in the repo
-git add fabric/semantic_model/model.tmdl
-git commit -m "Update semantic model with current Gold tables"
+git add fabric/semantic_model/
+git commit -m "Update Power BI semantic model"
 git push
 ```
 
 **Step 2: Sync in Fabric**
 
-1. In your Fabric workspace, go to **Git integration**
-2. Click **Update from Git**
-3. Select the semantic model changes
-4. Click **Update**
-
-**Step 3: Configure and Refresh**
-
-Follow steps 4-6 from Method 1
+1. In your Fabric workspace, go to **Source control**
+2. Click **Update all**
+3. The semantic model and report will sync from Git
 
 ## Verification Checklist
 
 After deployment, verify:
 
-- [ ] All 11 tables visible in model
-- [ ] 4 relationships active (check relationship view)
+- [ ] All 12 tables visible in model (9 Gold + 3 Dimension tables)
+- [ ] Relationships are active (check relationship view)
 - [ ] Measures calculate correctly:
   - `Total Sales` shows values
   - `Avg Basket` shows reasonable values ($20-$200)
@@ -139,8 +99,21 @@ After deployment, verify:
   - Logistics (2 tables)
   - Marketing (1 table)
 - [ ] Data refresh succeeds without errors
+- [ ] Report pages display correctly in workspace
 
 ## Common Issues
+
+### Issue: "Unable to connect to data source"
+
+**Cause**: First time opening the .pbip file or Lakehouse credentials not configured
+
+**Solution**:
+1. In Power BI Desktop, click **Transform data** → **Data source settings**
+2. Select the Lakehouse connection
+3. Click **Edit Permissions** → **Edit**
+4. Choose **OAuth 2.0** and sign in with your Fabric account
+5. Click **OK** and close the dialogs
+6. Click **Refresh** to reload data
 
 ### Issue: "Table not found" error
 
@@ -148,69 +121,83 @@ After deployment, verify:
 
 **Solution**:
 ```bash
-# Verify Gold tables exist
-# In Fabric Lakehouse, run:
-SHOW TABLES IN au;
+# Verify Gold tables exist in Fabric Lakehouse
+# Run this query in the Lakehouse SQL endpoint:
+SELECT table_schema, table_name
+FROM INFORMATION_SCHEMA.TABLES
+WHERE table_schema IN ('au', 'ag');
 
-# Should show 9 tables. If not, re-run:
+# Should show 12 tables. If not, re-run:
 # fabric/lakehouse/04-streaming-to-gold.ipynb
 ```
-
-### Issue: "Cannot connect to data source"
-
-**Cause**: Lakehouse credentials not configured
-
-**Solution**:
-1. Semantic model settings → Data source credentials
-2. Edit credentials for Lakehouse
-3. Use OAuth or Service Principal
-4. Click Apply and refresh
 
 ### Issue: Refresh fails with "Memory limit exceeded"
 
 **Cause**: Trying to Import mode instead of DirectLake
 
 **Solution**:
-1. Check partition mode in model.tmdl: `mode: DirectLake`
-2. Ensure Fabric capacity supports DirectLake
-3. If not, change to DirectQuery mode
+1. The model uses DirectLake mode by default (no import)
+2. Ensure your Fabric capacity supports DirectLake (F64 or higher recommended)
+3. Check capacity settings in Fabric admin portal
 
 ### Issue: Tables show but no data
 
-**Cause**: Gold tables are empty
+**Cause**: Gold tables are empty or not loaded
 
 **Solution**:
 ```bash
-# Check if Gold tables have data
-SELECT COUNT(*) FROM au.sales_minute_store;
+# Check if Gold tables have data via Lakehouse SQL endpoint:
+SELECT COUNT(*) FROM au.gold_sales_minute_store;
 
-# If 0, re-run historical load:
+# If 0, run the historical load notebook:
 # fabric/lakehouse/02-historical-data-load.ipynb
 ```
 
-## Performance Tuning
+### Issue: "Can't publish - semantic model already exists"
+
+**Cause**: A semantic model with the same name already exists in the workspace
+
+**Solution**:
+1. **Option A**: In Power BI Desktop, choose **Replace** when prompted
+2. **Option B**: Rename the model before publishing (File → Save As)
+3. **Option C**: Delete the old semantic model from the workspace first
+
+## Model Features
 
 ### DirectLake Mode Benefits
-- **Sub-second queries**: No import lag
-- **Always fresh**: Reflects latest Gold data
-- **Low memory**: No data duplication
+- **Sub-second queries**: No import lag, direct query to Lakehouse
+- **Always fresh**: Reflects latest Gold data in near-real-time
+- **Low memory**: No data duplication or caching needed
+- **Auto schema sync**: Table changes in Lakehouse reflect automatically
+
+### Pre-built Report Pages
+
+The `retail_model.pbip` includes five report pages ready to use:
+
+1. **Sales Dashboard**: Sales KPIs, store breakdowns, category performance
+2. **Supply Chain Control Tower**: Store/DC inventory, reorders, truck dwell trends
+3. **Online, Payments & Marketing**: Online sales, tender mix, marketing spend
+4. **Inventory & Replenishment**: On-hand units/value, reorder priorities
+5. **Logistics Control Center**: Truck dwell metrics, DC throughput
+
+You can customize these reports or build new ones using the semantic model.
 
 ### Optimization Tips
-1. **Aggregations**: Already pre-aggregated in Gold layer
-2. **Relationships**: Keep to essential joins only
-3. **Measures**: Use CALCULATE for time intelligence
-4. **Partitioning**: Not needed for DirectLake
+1. **Aggregations**: Pre-aggregated in Gold layer (no additional aggregation needed)
+2. **Relationships**: Defined between Gold tables and dimensions
+3. **Measures**: Built-in DAX measures for common KPIs
+4. **Perspectives**: Organized by business area (Operations, Merchandising, Logistics, Marketing)
 
 ## Next Steps
 
-After semantic model is deployed:
+After the semantic model is deployed:
 
-1. **Create Reports**: Use the semantic model as a data source
-2. **Build Dashboards**: Add tiles using the model measures
-3. **Schedule Refresh**: Set refresh schedule for Import mode tables (if any)
-4. **Set Up Alerts**: Configure data-driven alerts
+1. **Explore Reports**: Review the five pre-built report pages in the workspace
+2. **Customize Visuals**: Modify charts, filters, and layouts as needed
+3. **Share with Users**: Assign workspace roles or share the report
+4. **Pin to Dashboard**: Create a dashboard by pinning key visuals
 
-Proceed to [Phase 7: Dashboards](07-dashboards.md) to build visualizations.
+Proceed to [Phase 7: Dashboards](07-dashboards.md) for additional dashboard guidance.
 
 ## References
 
