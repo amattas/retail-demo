@@ -11,24 +11,20 @@ backward compatibility through mixin inheritance.
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from ..shared.models import (
     Customer,
     DistributionCenter,
-    InventoryReason,
     ProductMaster,
     Store,
 )
-# NOTE: event_generators removed in #214
-# EventFactory will be deprecated in #215 as part of the migration to batch-only streaming
+
+# NOTE: event_generators removed in #214. EventFactory deprecated in #215.
 from .schemas import (
     EventEnvelope,
     EventType,
-    InventoryUpdatedPayload,
-    OnlineOrderPickedPayload,
-    OnlineOrderShippedPayload,
 )
 
 
@@ -231,9 +227,10 @@ class EventFactory:
         """
         import warnings
         warnings.warn(
-            "EventFactory.generate_event is deprecated. Use batch_streaming module instead.",
+            "EventFactory.generate_event is deprecated. "
+            "Use batch_streaming module instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         return None
 
@@ -259,9 +256,10 @@ class EventFactory:
         """
         import warnings
         warnings.warn(
-            "EventFactory.generate_mixed_events is deprecated. Use batch_streaming module instead.",
+            "EventFactory.generate_mixed_events is deprecated. "
+            "Use batch_streaming module instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         return []
 
