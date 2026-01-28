@@ -34,6 +34,7 @@ class TruckOperationsMixin(InventoryFlowBase):
         - _truck_rr_index: dict[int | None, int]
         - _truck_availability: dict[int, datetime]
         - _active_shipments: dict[str, dict]
+        - _shipment_queue: list[dict]  # Queue for shipments waiting for trucks
         - _in_transit_inventory: dict[tuple[int, int], int]
         - _dc_inventory: dict[tuple[int, int], int]
         - _store_inventory: dict[tuple[int, int], int]
@@ -64,7 +65,7 @@ class TruckOperationsMixin(InventoryFlowBase):
 
     def _select_truck_for_shipment(
         self, dc_id: int, current_time: datetime
-    ) -> int | str | None:
+    ) -> int | None:
         """Select an available truck for a shipment.
 
         Prefers trucks assigned to the DC.
@@ -74,8 +75,10 @@ class TruckOperationsMixin(InventoryFlowBase):
             current_time: Current simulation time to check availability
 
         Returns:
-            Integer Truck ID if available, synthetic code if no real trucks exist,
-            or None if all trucks are currently in use.
+            Integer Truck ID if available, or None if all trucks are currently in use.
+
+        Raises:
+            ValueError: If no trucks are configured for the DC
         """
         # Prefer DC-assigned trucks - find first available
         dc_list = self._trucks_by_dc.get(dc_id) or []
@@ -99,19 +102,19 @@ class TruckOperationsMixin(InventoryFlowBase):
         if available_pool_trucks:
             return self._rng.choice(available_pool_trucks)
 
-        # If no real trucks exist at all, use synthetic
+        # If no real trucks exist at all, raise error - missing master data
         if not dc_list and not pool_list:
-            return f"TRK{self._rng.randint(1000, 9999)}"
+            raise ValueError(
+                f"No trucks configured for DC {dc_id}. "
+                "Ensure truck master data is generated before running logistics."
+            )
 
         # All real trucks are busy
         return None
 
-    def _mark_truck_unavailable(
-        self, truck_id: int | str, return_time: datetime
-    ) -> None:
+    def _mark_truck_unavailable(self, truck_id: int, return_time: datetime) -> None:
         """Mark a truck as unavailable until it returns to the DC."""
-        if isinstance(truck_id, int):
-            self._truck_availability[truck_id] = return_time
+        self._truck_availability[truck_id] = return_time
 
     def _calculate_round_trip_time(
         self, travel_hours: float, unload_hours: float
@@ -146,13 +149,137 @@ class TruckOperationsMixin(InventoryFlowBase):
         load_percentage = min(1.0, total_items / capacity)
         return 0.5 + (load_percentage * 1.5)
 
+    def _process_shipment_queue(self, current_time: datetime) -> list[dict]:
+        """
+        Process pending shipments when trucks become available.
+
+        Attempts to dispatch queued shipments in FIFO order by requested departure time.
+
+        Args:
+            current_time: Current simulation time
+
+        Returns:
+            List of shipment info dictionaries for successfully dispatched shipments
+        """
+        if not hasattr(self, "_shipment_queue"):
+            return []
+
+        dispatched = []
+        remaining = []
+
+        # Sort by requested departure time (FIFO for fairness)
+        sorted_pending = sorted(
+            self._shipment_queue, key=lambda s: s["requested_departure"]
+        )
+
+        for pending in sorted_pending:
+            dc_id = pending["dc_id"]
+            truck_id = self._select_truck_for_shipment(dc_id, current_time)
+
+            if truck_id is not None:
+                # Truck available - dispatch the pending shipment
+                store_id = pending["store_id"]
+                logger.info(
+                    f"Dispatching queued shipment for DC {dc_id} -> Store {store_id}"
+                )
+
+                # Create the shipment using the actual truck
+                shipment_info = self._create_shipment_with_truck(
+                    truck_id=truck_id,
+                    dc_id=dc_id,
+                    store_id=pending["store_id"],
+                    reorder_list=pending["reorder_list"],
+                    departure_time=current_time,  # Depart now
+                )
+                dispatched.append(shipment_info)
+            else:
+                # Still no trucks available - keep in queue
+                remaining.append(pending)
+
+        # Update pending queue
+        self._shipment_queue = remaining
+        return dispatched
+
+    def _create_shipment_with_truck(
+        self,
+        truck_id: int,
+        dc_id: int,
+        store_id: int,
+        reorder_list: list[tuple[int, int]],
+        departure_time: datetime,
+    ) -> dict:
+        """
+        Create a shipment with a specific truck ID.
+
+        Internal helper used by both immediate dispatch and pending queue processing.
+
+        Args:
+            truck_id: Integer truck ID
+            dc_id: Distribution center ID
+            store_id: Destination store ID
+            reorder_list: List of (product_id, quantity) tuples
+            departure_time: Actual departure time
+
+        Returns:
+            Shipment information dictionary
+        """
+        # Generate unique shipment ID
+        date_str = departure_time.strftime("%Y%m%d")
+        rand_suffix = self._rng.randint(100, 999)
+        shipment_id = f"SHIP{date_str}{dc_id:02d}{store_id:03d}{rand_suffix}"
+
+        # Check for active disruptions
+        capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, departure_time)
+
+        # Calculate travel time with disruption delays
+        base_travel_hours = self._rng.randint(2, 12)
+        delay_multiplier = 2.0 - capacity_multiplier
+        travel_hours = int(base_travel_hours * delay_multiplier)
+
+        eta = departure_time + timedelta(hours=travel_hours)
+        unload_hours = self._calculate_unload_duration(
+            sum(qty for _, qty in reorder_list)
+        )
+        etd = eta + timedelta(hours=unload_hours)
+
+        round_trip_hours = self._calculate_round_trip_time(travel_hours, unload_hours)
+        truck_return_time = departure_time + timedelta(hours=round_trip_hours)
+
+        self._mark_truck_unavailable(truck_id, truck_return_time)
+
+        shipment_info = {
+            "shipment_id": shipment_id,
+            "truck_id": truck_id,
+            "dc_id": dc_id,
+            "store_id": store_id,
+            "departure_time": departure_time,
+            "eta": eta,
+            "etd": etd,
+            "status": TruckStatus.SCHEDULED,
+            "products": reorder_list,
+            "total_items": sum(qty for _, qty in reorder_list),
+            "unload_duration_hours": unload_hours,
+            "truck_return_time": truck_return_time,
+        }
+
+        self._active_shipments[shipment_id] = shipment_info
+
+        # Track in-transit inventory
+        for product_id, quantity in reorder_list:
+            key = (store_id, product_id)
+            self._in_transit_inventory[key] = (
+                self._in_transit_inventory.get(key, 0) + quantity
+            )
+
+        return shipment_info
+
     def generate_truck_shipment(
         self,
         dc_id: int,
         store_id: int,
         reorder_list: list[tuple[int, int]],
         departure_time: datetime,
-    ) -> dict:
+    ) -> dict | None:
         """
         Generate truck shipment from DC to store.
 
@@ -166,7 +293,10 @@ class TruckOperationsMixin(InventoryFlowBase):
             departure_time: When truck departs
 
         Returns:
-            Shipment information dictionary
+            Shipment information dictionary, or None if shipment was queued
+
+        Raises:
+            ValueError: If no trucks are configured for the DC
         """
         # Validate quantities are non-negative
         for product_id, qty in reorder_list:
@@ -200,71 +330,35 @@ class TruckOperationsMixin(InventoryFlowBase):
                 remaining_capacity -= actual_qty
             reorder_list = truncated_list
 
-        # Generate unique shipment ID
-        date_str = departure_time.strftime("%Y%m%d")
-        rand_suffix = self._rng.randint(100, 999)
-        shipment_id = f"SHIP{date_str}{dc_id:02d}{store_id:03d}{rand_suffix}"
-
         # Choose a real truck when available
-        actual_departure_time = departure_time
         truck_id = self._select_truck_for_shipment(dc_id, departure_time)
 
         if truck_id is None:
-            next_available = self.get_next_available_truck_time(dc_id, departure_time)
-            if next_available is not None:
-                actual_departure_time = next_available
-                truck_id = self._select_truck_for_shipment(dc_id, actual_departure_time)
+            # No trucks available - queue the shipment
+            if not hasattr(self, "_shipment_queue"):
+                self._shipment_queue = []
 
-        if truck_id is None:
-            truck_id = f"TRK{self._rng.randint(1000, 9999)}"
-            logger.warning(f"No trucks available for DC {dc_id}, using synthetic")
-
-        # Check for active disruptions
-        capacity_multiplier = self.get_dc_capacity_multiplier(
-            dc_id, actual_departure_time
-        )
-
-        # Calculate travel time with disruption delays
-        base_travel_hours = self._rng.randint(2, 12)
-        delay_multiplier = 2.0 - capacity_multiplier
-        travel_hours = int(base_travel_hours * delay_multiplier)
-
-        eta = actual_departure_time + timedelta(hours=travel_hours)
-        unload_hours = self._calculate_unload_duration(
-            sum(qty for _, qty in reorder_list)
-        )
-        etd = eta + timedelta(hours=unload_hours)
-
-        round_trip_hours = self._calculate_round_trip_time(travel_hours, unload_hours)
-        truck_return_time = actual_departure_time + timedelta(hours=round_trip_hours)
-
-        self._mark_truck_unavailable(truck_id, truck_return_time)
-
-        shipment_info = {
-            "shipment_id": shipment_id,
-            "truck_id": truck_id,
-            "dc_id": dc_id,
-            "store_id": store_id,
-            "departure_time": actual_departure_time,
-            "eta": eta,
-            "etd": etd,
-            "status": TruckStatus.SCHEDULED,
-            "products": reorder_list,
-            "total_items": sum(qty for _, qty in reorder_list),
-            "unload_duration_hours": unload_hours,
-            "truck_return_time": truck_return_time,
-        }
-
-        self._active_shipments[shipment_id] = shipment_info
-
-        # Track in-transit inventory
-        for product_id, quantity in reorder_list:
-            key = (store_id, product_id)
-            self._in_transit_inventory[key] = (
-                self._in_transit_inventory.get(key, 0) + quantity
+            self._shipment_queue.append(
+                {
+                    "dc_id": dc_id,
+                    "store_id": store_id,
+                    "reorder_list": reorder_list,
+                    "requested_departure": departure_time,
+                }
             )
+            logger.info(
+                f"Queued shipment for DC {dc_id} -> Store {store_id}, waiting for truck"
+            )
+            return None  # Signal that shipment is queued, not dispatched
 
-        return shipment_info
+        # Truck available - create shipment
+        return self._create_shipment_with_truck(
+            truck_id=truck_id,
+            dc_id=dc_id,
+            store_id=store_id,
+            reorder_list=reorder_list,
+            departure_time=departure_time,
+        )
 
     def generate_truck_shipments(
         self,
