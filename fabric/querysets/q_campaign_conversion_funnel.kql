@@ -1,11 +1,4 @@
-// ============================================================================
-// ILLUSTRATIVE ONLY - This query demonstrates the desired conversion funnel
-// pattern but will NOT work as-is because receipt_created does not have a
-// campaign_id field. To implement this properly, you would need to:
-//   1. Add campaign_id to receipt events during streaming (via trace enrichment), OR
-//   2. Use customer_id matching with a time window for attribution, OR
-//   3. Implement a separate attribution table that links trace_ids to campaigns
-// ============================================================================
+// Campaign conversion funnel - impressions to purchases with attribution
 let window = 24h;
 ad_impression
 | where ingest_timestamp > ago(window)
@@ -13,9 +6,9 @@ ad_impression
 | join kind=leftouter (
     receipt_created
     | where ingest_timestamp > ago(window)
-    // NOTE: This join will produce nulls - receipt_created has no campaign_id field
+    | where isnotempty(campaign_id)
     | summarize conversions = count(), revenue = sum(total) by campaign_id
   ) on campaign_id
-| extend conversion_rate = toreal(conversions) / toreal(impressions)
+| extend conversion_rate = toreal(coalesce(conversions, 0)) / toreal(impressions)
+| extend revenue = coalesce(revenue, 0.0)
 | order by revenue desc
-

@@ -156,12 +156,16 @@ def mock_config():
 @pytest.fixture
 def event_streamer(mock_config):
     """Create an EventStreamer instance for testing."""
-    # EventStreamer simplified to batch-only mode, no DLQ support
-    streamer = EventStreamer(config=mock_config)
+    streamer = EventStreamer(
+        config=mock_config,
+        stores=[],
+        customers=[],
+        products=[],
+        distribution_centers=[],
+    )
     return streamer
 
 
-@pytest.mark.skip(reason="EventStreamer simplified to batch-only mode without DLQ")
 class TestEventStreamerDLQ:
     """Test EventStreamer DLQ functionality."""
 
