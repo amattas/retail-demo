@@ -74,16 +74,16 @@ class TestDictionaryLoading:
 
     @pytest.mark.integration
     def test_dictionary_loader_caches_data(self):
-        """Test that dictionary loader caches loaded data from sourcedata."""
+        """Test that dictionary loader caches loaded data in memory."""
         from retail_datagen.shared.dictionary_loader import DictionaryLoader
 
         loader = DictionaryLoader()
 
-        # First load (from sourcedata)
+        # First load from sourcedata
         result1 = loader.load_geographies()
         assert len(result1) > 0  # Has data
 
-        # Second load should use cache (same object reference)
+        # Second load should use in-memory cache (same object reference)
         result2 = loader.load_geographies()
         assert result1 is result2
 
@@ -108,6 +108,25 @@ class TestDictionaryLoading:
         result = loader.get_load_result("geographies")
         assert any("sourcedata" in w.lower() for w in result.warnings)
 
+    @pytest.mark.integration
+    def test_error_when_sourcedata_unavailable(self, monkeypatch):
+        """Test that clear error is raised when sourcedata is unavailable."""
+        from retail_datagen.shared import dictionary_loader
+        from retail_datagen.shared.exceptions import DictionaryLoadError
+
+        # Disable sourcedata
+        monkeypatch.setattr(dictionary_loader, "SOURCEDATA_AVAILABLE", False)
+        monkeypatch.setattr(dictionary_loader, "sourcedata_default", None)
+
+        loader = dictionary_loader.DictionaryLoader()
+
+        # Should raise clear error about sourcedata unavailability
+        with pytest.raises(DictionaryLoadError) as exc_info:
+            loader.load_geographies()
+
+        error_msg = str(exc_info.value).lower()
+        assert "sourcedata" in error_msg
+        assert "not available" in error_msg or "unavailable" in error_msg
 
 
 class TestPricingValidation:

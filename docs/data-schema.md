@@ -2,6 +2,23 @@
 
 Source-of-truth schemas derive from the data generator.
 
+## Column Naming Convention
+
+**Standard:** All column names use `snake_case` throughout the data pipeline.
+
+**Rationale:**
+- Aligns with Python (PEP 8) naming conventions used in datagen
+- Consistent with KQL table names and event types
+- Avoids case-sensitivity issues across platforms
+
+**Scope:** DuckDB, KQL tables, Lakehouse Silver/Gold tables
+
+**Examples:** `event_ts`, `receipt_id_ext`, `customer_id`, `store_id`
+
+**Exception:** Semantic Model display names can use user-friendly formats for presentation.
+
+---
+
 Event Envelope:
 - See `datagen/src/retail_datagen/streaming/schemas.py` for `EventEnvelope` and payloads.
 - Event types include: `receipt_created`, `receipt_line_added`, `payment_processed`, `inventory_updated`, `stockout_detected`, `reorder_triggered`, `customer_entered`, `customer_zone_changed`, `ble_ping_detected`, `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`, `ad_impression`, `promotion_applied`.

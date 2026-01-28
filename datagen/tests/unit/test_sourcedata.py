@@ -150,7 +150,7 @@ class TestSupercenterProfileData:
 class TestDictionaryLoaderSourcedataIntegration:
     """Test DictionaryLoader integration with sourcedata module."""
 
-    def test_loader_uses_sourcedata(self):
+    def test_loader_uses_sourcedata_by_default(self):
         """Test that DictionaryLoader uses sourcedata module."""
         from retail_datagen.shared.dictionary_loader import (
             SOURCEDATA_AVAILABLE,

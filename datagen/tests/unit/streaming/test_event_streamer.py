@@ -347,6 +347,17 @@ class TestEventStreamerInitialization:
             assert success is False
             mock_failing_client.connect.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_ensure_master_data_loaded_raises_on_failure(self, mock_config):
+        """Test that missing master data raises a clear error."""
+        streamer = EventStreamer(mock_config)
+
+        # Should raise RuntimeError with helpful message
+        with pytest.raises(
+            RuntimeError,
+            match="Master data is required but could not be loaded from DuckDB"
+        ):
+            await streamer._ensure_master_data_loaded()
 
 
 # ============================================================================
