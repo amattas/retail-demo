@@ -50,18 +50,22 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": {
-          "tool": "Edit",
-          "file_pattern": "**/*.py"
-        },
-        "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+        "matcher": "Edit(**/*.py)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+          }
+        ]
       },
       {
-        "matcher": {
-          "tool": "Write",
-          "file_pattern": "**/*.py"
-        },
-        "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+        "matcher": "Write(**/*.py)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruff check --fix $FILE 2>&1 | grep -v 'All checks passed' | head -10 || true"
+          }
+        ]
       }
     ]
   }
