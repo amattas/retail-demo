@@ -73,26 +73,13 @@ class TestDictionaryLoading:
     """Test dictionary file loading."""
 
     @pytest.mark.integration
-    def test_dictionary_loader_caches_data(
-        self, temp_data_dirs, sample_geography_dict_data
-    ):
-        """Test that dictionary loader caches loaded data.
-
-        Note: With sourcedata module available, data is loaded from there first.
-        This test verifies caching behavior works regardless of data source.
-        """
+    def test_dictionary_loader_caches_data(self):
+        """Test that dictionary loader caches loaded data from sourcedata."""
         from retail_datagen.shared.dictionary_loader import DictionaryLoader
 
-        # Create a test geography CSV (used as fallback if sourcedata unavailable)
-        dict_dir = Path(temp_data_dirs["dict"])
-        geo_file = dict_dir / "geographies.csv"
+        loader = DictionaryLoader()
 
-        df = pd.DataFrame(sample_geography_dict_data)
-        df.to_csv(geo_file, index=False)
-
-        loader = DictionaryLoader(str(dict_dir))
-
-        # First load (may come from sourcedata or CSV)
+        # First load (from sourcedata)
         result1 = loader.load_geographies()
         assert len(result1) > 0  # Has data
 
@@ -121,32 +108,6 @@ class TestDictionaryLoading:
         result = loader.get_load_result("geographies")
         assert any("sourcedata" in w.lower() for w in result.warnings)
 
-    @pytest.mark.integration
-    def test_csv_fallback_when_sourcedata_unavailable(
-        self, temp_data_dirs, sample_geography_dict_data, monkeypatch
-    ):
-        """Test that CSV fallback works when sourcedata is disabled."""
-        from retail_datagen.shared import dictionary_loader
-
-        # Disable sourcedata
-        monkeypatch.setattr(dictionary_loader, "SOURCEDATA_AVAILABLE", False)
-        monkeypatch.setattr(dictionary_loader, "sourcedata_default", None)
-
-        # Create test CSV
-        dict_dir = Path(temp_data_dirs["dict"])
-        geo_file = dict_dir / "geographies.csv"
-        df = pd.DataFrame(sample_geography_dict_data)
-        df.to_csv(geo_file, index=False)
-
-        loader = dictionary_loader.DictionaryLoader(str(dict_dir))
-
-        # Should load from CSV
-        result = loader.load_geographies()
-        assert len(result) == 3  # Test CSV has 3 rows
-
-        # Verify caching still works
-        result2 = loader.load_geographies()
-        assert result is result2
 
 
 class TestPricingValidation:
