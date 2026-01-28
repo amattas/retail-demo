@@ -324,6 +324,7 @@ class TestCampaignAttribution:
     """Test campaign attribution logic in event generation."""
 
     @pytest.mark.integration
+    @pytest.mark.skip(reason="EventFactory deprecated in #214, will be removed in #215")
     def test_campaign_id_populated_for_marketing_driven_purchase(self):
         """Test that campaign_id is populated when customer was marketing-driven."""
         from decimal import Decimal
@@ -419,6 +420,7 @@ class TestCampaignAttribution:
             )
 
     @pytest.mark.integration
+    @pytest.mark.skip(reason="EventFactory deprecated in #214, will be removed in #215")
     def test_campaign_id_null_for_non_marketing_purchase(self):
         """Test that campaign_id is None when customer was not marketing-driven."""
         from decimal import Decimal

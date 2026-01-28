@@ -1,10 +1,18 @@
 """
 Integration tests for the complete streaming system.
 
+DEPRECATED: EventFactory real-time event generation removed in #214.
+These tests are skipped pending full removal in #215.
+
 Tests the full streaming flow end-to-end including EventStreamer orchestrator,
 EventFactory generation, AzureEventHubClient (mocked), configuration system,
 state management, and API endpoints.
 """
+
+import pytest
+
+# Skip all tests in this module - EventFactory deprecated in #214
+pytestmark = pytest.mark.skip(reason="EventFactory deprecated in #214, will be removed in #215")
 
 import asyncio
 from datetime import UTC, datetime, timedelta
