@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
+from retail_datagen.shared.id_generator import EntityIdGenerator
 from retail_datagen.shared.models import (
     InventoryReason,
     ProductMaster,
@@ -208,9 +209,10 @@ class UtilsMixin(FactGeneratorBase):
             if not line_rows:
                 continue
 
-            return_id_ext = (
-                f"RET{date.strftime('%Y%m%d')}"
-                f"{int(store_id):03d}{self._rng.randint(1000, 9999)}"
+            return_timestamp = date.replace(hour=12, minute=0, second=0)
+            id_gen = EntityIdGenerator("RET", entity_id_width=3)
+            return_id_ext = id_gen.generate(
+                timestamp=return_timestamp, entity_id=int(store_id)
             )
             trace_id = self._generate_trace_id()
             store_tax_rate = store_rates.get(int(store_id), Decimal("0.07407"))
@@ -470,9 +472,10 @@ class UtilsMixin(FactGeneratorBase):
                 continue
 
             # Build return header
-            return_id_ext = (
-                f"RET{date.strftime('%Y%m%d')}"
-                f"{store_id:03d}{self._rng.randint(1000, 9999)}"
+            return_timestamp = date.replace(hour=12, minute=0, second=0)
+            id_gen = EntityIdGenerator("RET", entity_id_width=3)
+            return_id_ext = id_gen.generate(
+                timestamp=return_timestamp, entity_id=store_id
             )
             trace_id = self._generate_trace_id()
             store_tax_rate = store_rates.get(store_id, Decimal("0.07407"))
