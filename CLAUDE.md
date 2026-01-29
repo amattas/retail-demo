@@ -118,6 +118,7 @@ retail-demo/
 - Be truthful; avoid fabricating APIs, tools, or behavior
 - Respect the wave sequence
 - Follow priority order: Security > Correctness > Performance > Maintainability
+- **NEVER merge pull requests** — PR merges require human approval and must be performed by a team member, not Claude
 
 ## Project-Specific Guidelines
 
@@ -267,3 +268,4 @@ Quick reference for available commands:
 | `/review` | Review recent changes for issues |
 | `/verify` | Full verification suite |
 | `/validate-kql` | Check KQL scripts for issues |
+| `/work` | Fetch GitHub issues and work through them systematically (bugs first, then enhancements) |
