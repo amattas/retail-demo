@@ -190,10 +190,16 @@ class MarketingCampaignSimulator:
 
         # Convert date to timezone-aware datetime for ID generator
         if isinstance(start_date, datetime):
-            campaign_timestamp = start_date if start_date.tzinfo is not None else start_date.replace(tzinfo=UTC)
+            campaign_timestamp = (
+                start_date
+                if start_date.tzinfo is not None
+                else start_date.replace(tzinfo=UTC)
+            )
         else:
             # Convert date to datetime at midnight UTC
-            campaign_timestamp = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=UTC)
+            campaign_timestamp = datetime.combine(
+                start_date, datetime.min.time()
+            ).replace(tzinfo=UTC)
 
         campaign_id = self._campaign_id_gen.generate(timestamp=campaign_timestamp)
 
@@ -311,13 +317,19 @@ class MarketingCampaignSimulator:
 
                 # Convert date to timezone-aware datetime for ID generator
                 if isinstance(date, datetime):
-                    impression_time = date if date.tzinfo is not None else date.replace(tzinfo=UTC)
+                    impression_time = (
+                        date if date.tzinfo is not None else date.replace(tzinfo=UTC)
+                    )
                 else:
                     # Convert date to datetime at midnight UTC
-                    impression_time = datetime.combine(date, datetime.min.time()).replace(tzinfo=UTC)
+                    impression_time = datetime.combine(
+                        date, datetime.min.time()
+                    ).replace(tzinfo=UTC)
 
                 # Generate unique impression ID
-                impression_id = self._impression_id_gen.generate(timestamp=impression_time)
+                impression_id = self._impression_id_gen.generate(
+                    timestamp=impression_time
+                )
 
                 # Generate creative ID by deriving from impression ID
                 # Each impression has one creative, so reusing impression uniqueness
