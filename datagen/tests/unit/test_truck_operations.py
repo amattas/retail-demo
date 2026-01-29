@@ -23,8 +23,8 @@ class MockTruckOperations(TruckOperationsMixin):
         """Initialize mock with required attributes."""
         self._rng = random.Random(seed)
         self._truck_capacity = 1000
-        self._trucks = [1, 2, 3]
-        self._trucks_by_dc = {1: [1, 2], 2: [3], None: []}
+        self._trucks = [1, 2, 3, 4, 5]
+        self._trucks_by_dc = {1: [1, 2], 2: [3], None: [4, 5]}
         self._truck_rr_index = {1: 0, 2: 0}
         self._truck_availability = {}
         self._active_shipments = {}
@@ -345,9 +345,9 @@ class TestTruckSelectionAndAvailability:
 
     def test_select_truck_returns_none_when_all_busy(self, truck_ops, base_time):
         """Test that None is returned when all trucks are busy."""
-        # Mark all trucks as unavailable
+        # Mark all trucks as unavailable (DC trucks 1-3 and pool trucks 4-5)
         future_time = base_time + timedelta(hours=10)
-        for truck_id in [1, 2, 3]:
+        for truck_id in truck_ops._trucks:
             truck_ops._mark_truck_unavailable(truck_id, future_time)
 
         result = truck_ops._select_truck_for_shipment(1, base_time)

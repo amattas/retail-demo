@@ -417,7 +417,8 @@ class TruckOperationsMixin(InventoryFlowBase):
                     shipment = self.generate_truck_shipment(
                         dc_id, store_id, current_truck_items, truck_departure
                     )
-                    shipments.append(shipment)
+                    if shipment is not None:
+                        shipments.append(shipment)
                     truck_number += 1
                     current_truck_items = []
                     current_truck_total = 0
@@ -427,7 +428,8 @@ class TruckOperationsMixin(InventoryFlowBase):
             shipment = self.generate_truck_shipment(
                 dc_id, store_id, current_truck_items, truck_departure
             )
-            shipments.append(shipment)
+            if shipment is not None:
+                shipments.append(shipment)
 
         logger.info(
             f"Large order for store {store_id} split across {len(shipments)} trucks"
