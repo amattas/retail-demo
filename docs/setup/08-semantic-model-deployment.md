@@ -22,9 +22,56 @@ With the TMDL-based Power BI Project format (.pbip), deployment is straightforwa
 
 Power BI Desktop will load the semantic model and report together.
 
-### Step 2: Configure Lakehouse Connection (First Time Only)
+### Step 2: Update Lakehouse References (First Time Only)
 
-If this is your first time opening the project, you may need to configure the data source:
+The semantic model contains hardcoded workspace and lakehouse GUIDs that must be updated to match your Fabric environment.
+
+#### Option A: Automated Update (Recommended)
+
+Use the provided Python script to update all references automatically:
+
+```bash
+# Preview changes first with dry run
+python scripts/update_semantic_model.py \
+    --workspace-id "YOUR-WORKSPACE-GUID" \
+    --lakehouse-id "YOUR-LAKEHOUSE-GUID" \
+    --lakehouse-name "retail_lakehouse" \
+    --dry-run
+
+# Apply changes
+python scripts/update_semantic_model.py \
+    --workspace-id "YOUR-WORKSPACE-GUID" \
+    --lakehouse-id "YOUR-LAKEHOUSE-GUID" \
+    --lakehouse-name "retail_lakehouse"
+```
+
+To find your workspace and lakehouse GUIDs:
+1. Navigate to your Fabric workspace in the browser
+2. The workspace GUID is in the URL: `https://app.fabric.microsoft.com/groups/{workspace-guid}/...`
+3. Open your lakehouse and copy the GUID from the URL: `.../lakehouses/{lakehouse-guid}`
+
+The script updates:
+- `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl` (OneLake URL)
+- All 35 table files in `definition/tables/*.tmdl` (expression source references)
+
+#### Option B: Manual Update
+
+If you prefer to update manually:
+
+1. Open `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl`
+2. Replace the workspace and lakehouse GUIDs in the OneLake URL:
+   ```tmdl
+   expression 'DirectLake - retail_lakehouse' =
+       let
+           Source = AzureStorage.DataLake("https://onelake.dfs.fabric.microsoft.com/YOUR-WORKSPACE-GUID/YOUR-LAKEHOUSE-GUID", [HierarchicalNavigation=true])
+       in
+           Source
+   ```
+3. Save the file
+
+### Step 3: Configure Lakehouse Connection
+
+After updating the references, configure the data source in Power BI Desktop:
 
 1. Power BI will prompt: "Unable to connect to data source"
 2. Click **Edit** or go to **Transform data** → **Data source settings**
@@ -37,14 +84,14 @@ If this is your first time opening the project, you may need to configure the da
 
 The model uses **DirectLake mode**, which connects directly to your Lakehouse Gold tables without importing data.
 
-### Step 3: Refresh the Data (Optional)
+### Step 4: Refresh the Data (Optional)
 
 To ensure you're seeing the latest data:
 
 1. Click **Refresh** in the Home ribbon
 2. Wait for refresh to complete (typically 10-30 seconds for DirectLake)
 
-### Step 4: Publish to Fabric Workspace
+### Step 5: Publish to Fabric Workspace
 
 1. Click **Publish** in the Home ribbon
 2. Select your target Fabric workspace from the list
@@ -52,7 +99,7 @@ To ensure you're seeing the latest data:
 4. Wait for the upload to complete
 5. When prompted, click **Open in Fabric** to view in the browser
 
-### Step 5: Verify Deployment
+### Step 6: Verify Deployment
 
 After publishing:
 
