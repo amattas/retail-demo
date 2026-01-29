@@ -9,6 +9,7 @@ import logging
 import warnings
 from datetime import UTC, datetime, timedelta
 
+from retail_datagen.shared.id_generator import EntityIdGenerator
 from retail_datagen.shared.models import (
     InventoryReason,
     TruckStatus,
@@ -65,6 +66,10 @@ class TruckOperationsMixin(InventoryFlowBase):
         TruckStatus.ARRIVED: 4,
         TruckStatus.UNLOADING: 8,
     }
+
+    # ID generator for shipment IDs
+    # entity_id_width=5 to accommodate DC (2 digits) + Store (3 digits)
+    _shipment_id_generator = EntityIdGenerator("SHIP", entity_id_width=5)
 
     def _select_truck_for_shipment(
         self, dc_id: int, current_time: datetime
@@ -226,10 +231,17 @@ class TruckOperationsMixin(InventoryFlowBase):
         Returns:
             Shipment information dictionary
         """
-        # Generate unique shipment ID
-        date_str = departure_time.strftime("%Y%m%d")
-        rand_suffix = self._rng.randint(100, 999)
-        shipment_id = f"SHIP{date_str}{dc_id:02d}{store_id:03d}{rand_suffix}"
+        # Generate unique shipment ID using EntityIdGenerator
+        # Combine DC and Store IDs as a single entity_id: {dc:02d}{store:03d}
+        route_id = int(f"{dc_id:02d}{store_id:03d}")
+        # Ensure timestamp is timezone-aware (EntityIdGenerator requires it)
+        tz_aware_time = (
+            departure_time if departure_time.tzinfo is not None
+            else departure_time.replace(tzinfo=UTC)
+        )
+        shipment_id = self._shipment_id_generator.generate(
+            timestamp=tz_aware_time, entity_id=route_id
+        )
 
         # Check for active disruptions
         capacity_multiplier = self.get_dc_capacity_multiplier(dc_id, departure_time)
