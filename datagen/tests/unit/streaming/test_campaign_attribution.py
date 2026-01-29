@@ -1,12 +1,20 @@
 """
 Tests for campaign attribution cleanup scenarios (Issue #80).
 
+DEPRECATED: EventFactory real-time event generation removed in #214.
+These tests are skipped pending full removal in #215.
+
 Tests verify:
 1. Attribution cleanup after purchase (`customer_to_campaign` entry removed after pop())
 2. Second purchase by same customer has `campaign_id=None`
 3. Conversion expiry cleanup (72 hours cutoff)
 4. Edge cases for attribution handling
 """
+
+import pytest
+
+# Skip all tests in this module - EventFactory deprecated in #214
+pytestmark = pytest.mark.skip(reason="EventFactory deprecated in #214, will be removed in #215")
 
 from datetime import datetime, timedelta
 from decimal import Decimal

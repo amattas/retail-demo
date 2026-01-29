@@ -1,6 +1,11 @@
 """
 Comprehensive unit tests for EventFactory.
 
+DEPRECATED: EventFactory real-time event generation removed in #214.
+These tests are skipped pending full removal in #215.
+
+Use batch_streaming module for DuckDB-based event streaming instead.
+
 Tests all 16 event types, state management, event correlations,
 temporal patterns, and business rules.
 
@@ -13,6 +18,11 @@ Test Requirements:
 - Run with: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest \
     tests/unit/streaming/test_event_factory.py
 """
+
+import pytest
+
+# Skip all tests in this module - EventFactory deprecated in #214
+pytestmark = pytest.mark.skip(reason="EventFactory deprecated in #214, will be removed in #215")
 
 import random
 from datetime import datetime, timedelta

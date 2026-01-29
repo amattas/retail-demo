@@ -11,29 +11,20 @@ backward compatibility through mixin inheritance.
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ..generators.seasonal_patterns import CompositeTemporalPatterns
 from ..shared.models import (
     Customer,
     DistributionCenter,
-    InventoryReason,
     ProductMaster,
     Store,
 )
-from .event_generators import (
-    CustomerEventsMixin,
-    InventoryEventsMixin,
-    LogisticsEventsMixin,
-    MarketingEventsMixin,
-    ReceiptEventsMixin,
-)
+
+# NOTE: event_generators removed in #214. EventFactory deprecated in #215.
 from .schemas import (
     EventEnvelope,
     EventType,
-    InventoryUpdatedPayload,
-    OnlineOrderPickedPayload,
-    OnlineOrderShippedPayload,
 )
 
 
@@ -76,28 +67,15 @@ class EventGenerationState:
             self.customer_to_campaign = {}
 
 
-class EventFactory(
-    ReceiptEventsMixin,
-    CustomerEventsMixin,
-    InventoryEventsMixin,
-    LogisticsEventsMixin,
-    MarketingEventsMixin,
-):
+class EventFactory:
     """
     Factory for generating realistic retail events.
 
-    Creates events that follow realistic patterns:
-    - Time-based distributions (more activity during business hours)
-    - Store-based variations (different patterns by store size/location)
-    - Correlated events (receipt -> inventory -> reorder chains)
-    - Seasonal effects and promotional periods
+    DEPRECATED: This class is being deprecated as part of #184.
+    Real-time event generation is replaced by batch streaming from DuckDB.
+    This stub remains temporarily to avoid breaking imports until #215.
 
-    Inherits from:
-        ReceiptEventsMixin: Receipt, line item, and payment events
-        CustomerEventsMixin: Customer entry, zone change, BLE ping events
-        InventoryEventsMixin: Inventory, stockout, and reorder events
-        LogisticsEventsMixin: Truck arrival/departure, store open/close events
-        MarketingEventsMixin: Ad impression, promotion, online order events
+    The event generation logic has been removed. Use batch_streaming module instead.
     """
 
     def __init__(
@@ -237,112 +215,25 @@ class EventFactory(
         """
         Generate a specific type of event.
 
+        DEPRECATED: Event generation removed in #214.
+        Use batch_streaming module instead for DuckDB-based event streaming.
+
         Args:
             event_type: Type of event to generate
             timestamp: Event timestamp
 
         Returns:
-            EventEnvelope or None if event cannot be generated
+            None (event generation disabled)
         """
-        trace_id = self.generate_trace_id(timestamp)
+        import warnings
 
-        # Clean up expired customer sessions before generating events
-        self._cleanup_expired_sessions(timestamp)
-
-        try:
-            payload = None
-            correlation_id = None
-            partition_key = None
-
-            # Helper to safely unpack results that may be None
-            def _unpack_result(result):
-                if result is None:
-                    return None, None, None
-                return result
-
-            if event_type == EventType.RECEIPT_CREATED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_receipt_created(timestamp)
-                )
-            elif event_type == EventType.RECEIPT_LINE_ADDED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_receipt_line_added(timestamp)
-                )
-            elif event_type == EventType.PAYMENT_PROCESSED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_payment_processed(timestamp)
-                )
-            elif event_type == EventType.INVENTORY_UPDATED:
-                payload, correlation_id, partition_key = (
-                    self._generate_inventory_updated(timestamp)
-                )
-            elif event_type == EventType.STOCKOUT_DETECTED:
-                payload, correlation_id, partition_key = (
-                    self._generate_stockout_detected(timestamp)
-                )
-            elif event_type == EventType.REORDER_TRIGGERED:
-                payload, correlation_id, partition_key = (
-                    self._generate_reorder_triggered(timestamp)
-                )
-            elif event_type == EventType.CUSTOMER_ENTERED:
-                payload, correlation_id, partition_key = (
-                    self._generate_customer_entered(timestamp)
-                )
-            elif event_type == EventType.CUSTOMER_ZONE_CHANGED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_customer_zone_changed(timestamp)
-                )
-            elif event_type == EventType.BLE_PING_DETECTED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_ble_ping_detected(timestamp)
-                )
-            elif event_type == EventType.TRUCK_ARRIVED:
-                payload, correlation_id, partition_key = self._generate_truck_arrived(
-                    timestamp
-                )
-            elif event_type == EventType.TRUCK_DEPARTED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_truck_departed(timestamp)
-                )
-            elif event_type == EventType.STORE_OPENED:
-                payload, correlation_id, partition_key = self._generate_store_opened(
-                    timestamp
-                )
-            elif event_type == EventType.STORE_CLOSED:
-                payload, correlation_id, partition_key = self._generate_store_closed(
-                    timestamp
-                )
-            elif event_type == EventType.AD_IMPRESSION:
-                payload, correlation_id, partition_key = self._generate_ad_impression(
-                    timestamp
-                )
-            elif event_type == EventType.PROMOTION_APPLIED:
-                payload, correlation_id, partition_key = _unpack_result(
-                    self._generate_promotion_applied(timestamp)
-                )
-            elif event_type == EventType.ONLINE_ORDER_CREATED:
-                payload, correlation_id, partition_key = (
-                    self._generate_online_order_created(timestamp)
-                )
-
-            if payload is None:
-                return None
-
-            return EventEnvelope(
-                event_type=event_type,
-                payload=(
-                    payload.model_dump() if hasattr(payload, "model_dump") else payload
-                ),
-                trace_id=trace_id,
-                ingest_timestamp=timestamp,
-                correlation_id=correlation_id,
-                partition_key=partition_key,
-            )
-
-        except Exception as e:
-            # Log error but don't fail completely
-            print(f"Error generating {event_type} event: {e}")
-            return None
+        warnings.warn(
+            "EventFactory.generate_event is deprecated. "
+            "Use batch_streaming module instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return None
 
     def generate_mixed_events(
         self,
@@ -353,123 +244,31 @@ class EventFactory(
         """
         Generate a mix of different event types for realistic simulation.
 
+        DEPRECATED: Event generation removed in #214.
+        Use batch_streaming module instead for DuckDB-based event streaming.
+
         Args:
             count: Number of events to generate
             timestamp: Base timestamp for events
             event_weights: Optional weights for event type selection
 
         Returns:
-            List of generated events
+            Empty list (event generation disabled)
         """
-        if event_weights is None:
-            event_weights = {
-                EventType.RECEIPT_CREATED: 0.15,
-                EventType.RECEIPT_LINE_ADDED: 0.15,
-                EventType.CUSTOMER_ENTERED: 0.20,
-                EventType.BLE_PING_DETECTED: 0.15,
-                EventType.INVENTORY_UPDATED: 0.10,
-                EventType.AD_IMPRESSION: 0.15,
-                EventType.PAYMENT_PROCESSED: 0.05,
-                EventType.TRUCK_ARRIVED: 0.02,
-                EventType.STOCKOUT_DETECTED: 0.02,
-                EventType.REORDER_TRIGGERED: 0.01,
-                EventType.ONLINE_ORDER_CREATED: 0.08,
-            }
+        import warnings
 
-        events = []
-        event_types = list(event_weights.keys())
-        weights = list(event_weights.values())
+        warnings.warn(
+            "EventFactory.generate_mixed_events is deprecated. "
+            "Use batch_streaming module instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return []
 
-        for i in range(count):
-            # Add small time variation to each event
-            event_timestamp = timestamp + timedelta(
-                milliseconds=self.rng.randint(0, 1000)
-            )
+    def _cleanup_expired_sessions(self, timestamp: datetime) -> None:
+        """
+        Cleanup expired customer sessions and marketing conversions.
 
-            # Select event type based on weights
-            event_type = self.rng.choices(event_types, weights=weights)[0]
-
-            # Only generate if it makes sense for current time
-            if self.should_generate_event(event_type, event_timestamp):
-                event = self.generate_event(event_type, event_timestamp)
-                if event:
-                    events.append(event)
-                    # If online order created, also emit follow-up events
-                    if event.event_type == EventType.ONLINE_ORDER_CREATED:
-                        follow_ups = self._generate_online_order_followups(
-                            event, event_timestamp
-                        )
-                        events.extend(follow_ups)
-
-        return events
-
-    def _generate_online_order_followups(
-        self, order_event: EventEnvelope, timestamp: datetime
-    ) -> list[EventEnvelope]:
-        """Generate follow-up events for an online order."""
-        followup_events = []
-        try:
-            pl = order_event.payload
-            node_type = pl.get("node_type")
-            node_id = pl.get("node_id")
-            product_id = self.rng.choice(list(self.products.keys()))
-            qty_delta = -self.rng.randint(1, 3)
-            inv_payload = InventoryUpdatedPayload(
-                store_id=node_id if node_type == "STORE" else None,
-                dc_id=node_id if node_type == "DC" else None,
-                product_id=product_id,
-                quantity_delta=qty_delta,
-                reason=InventoryReason.SALE.value,
-                source="ONLINE",
-            )
-            inv_envelope = EventEnvelope(
-                event_type=EventType.INVENTORY_UPDATED,
-                payload=inv_payload.model_dump(),
-                trace_id=self.generate_trace_id(timestamp),
-                ingest_timestamp=timestamp,
-                partition_key=f"{node_type.lower()}_{node_id}",
-                correlation_id=order_event.trace_id,
-            )
-            followup_events.append(inv_envelope)
-
-            # Order picked event (slightly later)
-            picked_payload = OnlineOrderPickedPayload(
-                order_id=pl.get("order_id"),
-                node_type=node_type,
-                node_id=node_id,
-                fulfillment_mode=pl.get("fulfillment_mode"),
-                picked_time=timestamp + timedelta(seconds=self.rng.randint(60, 900)),
-            )
-            followup_events.append(
-                EventEnvelope(
-                    event_type=EventType.ONLINE_ORDER_PICKED,
-                    payload=picked_payload.model_dump(),
-                    trace_id=self.generate_trace_id(timestamp),
-                    ingest_timestamp=timestamp,
-                    partition_key=f"{node_type.lower()}_{node_id}",
-                    correlation_id=order_event.trace_id,
-                )
-            )
-
-            # Order shipped event (after pick)
-            shipped_payload = OnlineOrderShippedPayload(
-                order_id=pl.get("order_id"),
-                node_type=node_type,
-                node_id=node_id,
-                fulfillment_mode=pl.get("fulfillment_mode"),
-                shipped_time=timestamp + timedelta(seconds=self.rng.randint(900, 3600)),
-            )
-            followup_events.append(
-                EventEnvelope(
-                    event_type=EventType.ONLINE_ORDER_SHIPPED,
-                    payload=shipped_payload.model_dump(),
-                    trace_id=self.generate_trace_id(timestamp),
-                    ingest_timestamp=timestamp,
-                    partition_key=f"{node_type.lower()}_{node_id}",
-                    correlation_id=order_event.trace_id,
-                )
-            )
-        except Exception:
-            pass
-
-        return followup_events
+        DEPRECATED: Preserved for compatibility only.
+        """
+        pass
