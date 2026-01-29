@@ -118,6 +118,7 @@ retail-demo/
 - Be truthful; avoid fabricating APIs, tools, or behavior
 - Respect the wave sequence
 - Follow priority order: Security > Correctness > Performance > Maintainability
+- **NEVER merge pull requests** — PR merges require human approval and must be performed by a team member, not Claude
 
 ## Project-Specific Guidelines
 
