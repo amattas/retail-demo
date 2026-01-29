@@ -9,8 +9,6 @@ Tests verify the following implementations:
 - Issue #13: Truck departed events in fact_truck_moves
 """
 
-import os
-import tempfile
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -31,15 +29,60 @@ class TestTaxFallbackChain:
     def test_tax_rates(self):
         """Create test tax rates data."""
         return [
-            {"StateCode": "CA", "County": "Los Angeles", "City": "Los Angeles", "CombinedRate": "0.0950"},
-            {"StateCode": "CA", "County": "Los Angeles", "City": "Beverly Hills", "CombinedRate": "0.0925"},
-            {"StateCode": "CA", "County": "Los Angeles", "City": "Santa Monica", "CombinedRate": "0.0900"},
-            {"StateCode": "CA", "County": "Orange", "City": "Irvine", "CombinedRate": "0.0775"},
-            {"StateCode": "CA", "County": "Orange", "City": "Newport Beach", "CombinedRate": "0.0800"},
-            {"StateCode": "TX", "County": "Harris", "City": "Houston", "CombinedRate": "0.0825"},
-            {"StateCode": "TX", "County": "Harris", "City": "Pasadena", "CombinedRate": "0.0825"},
-            {"StateCode": "TX", "County": "Dallas", "City": "Dallas", "CombinedRate": "0.0825"},
-            {"StateCode": "NY", "County": "New York", "City": "New York", "CombinedRate": "0.0880"},
+            {
+                "StateCode": "CA",
+                "County": "Los Angeles",
+                "City": "Los Angeles",
+                "CombinedRate": "0.0950",
+            },
+            {
+                "StateCode": "CA",
+                "County": "Los Angeles",
+                "City": "Beverly Hills",
+                "CombinedRate": "0.0925",
+            },
+            {
+                "StateCode": "CA",
+                "County": "Los Angeles",
+                "City": "Santa Monica",
+                "CombinedRate": "0.0900",
+            },
+            {
+                "StateCode": "CA",
+                "County": "Orange",
+                "City": "Irvine",
+                "CombinedRate": "0.0775",
+            },
+            {
+                "StateCode": "CA",
+                "County": "Orange",
+                "City": "Newport Beach",
+                "CombinedRate": "0.0800",
+            },
+            {
+                "StateCode": "TX",
+                "County": "Harris",
+                "City": "Houston",
+                "CombinedRate": "0.0825",
+            },
+            {
+                "StateCode": "TX",
+                "County": "Harris",
+                "City": "Pasadena",
+                "CombinedRate": "0.0825",
+            },
+            {
+                "StateCode": "TX",
+                "County": "Dallas",
+                "City": "Dallas",
+                "CombinedRate": "0.0825",
+            },
+            {
+                "StateCode": "NY",
+                "County": "New York",
+                "City": "New York",
+                "CombinedRate": "0.0880",
+            },
         ]
 
     def test_city_level_lookup(self, test_tax_rates):
@@ -538,10 +581,24 @@ class TestEdgeCases:
         # Jump time far ahead - should require stepping through multiple states
         current_time = datetime(2024, 1, 15, 12, 0)  # Well past ETD
 
+        # After fix for issue #171, state machine advances ONE state per call
+        # to prevent invalid transitions like LOADING -> ARRIVED
+        # Need to call update multiple times to reach COMPLETED
         result = sim.update_shipment_status("TEST001", current_time)
+        assert result["status"] == TruckStatus.LOADING
 
-        # Should have stepped through to COMPLETED
+        result = sim.update_shipment_status("TEST001", current_time)
+        assert result["status"] == TruckStatus.IN_TRANSIT
+
+        result = sim.update_shipment_status("TEST001", current_time)
+        assert result["status"] == TruckStatus.ARRIVED
+
+        result = sim.update_shipment_status("TEST001", current_time)
+        assert result["status"] == TruckStatus.UNLOADING
+
+        result = sim.update_shipment_status("TEST001", current_time)
         assert result["status"] == TruckStatus.COMPLETED
+
         # Shipment should be removed from active
         assert "TEST001" not in sim._active_shipments
 
