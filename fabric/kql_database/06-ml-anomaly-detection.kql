@@ -1,0 +1,320 @@
+// 06 ML Anomaly Detection
+// Purpose: Real-time anomaly detection using KQL native capabilities
+// Run this entire script at once using .execute database script
+// ============================================================================
+//
+// ANOMALY DETECTION STRATEGY
+// ============================================================================
+// Uses KQL's native series_decompose_anomalies() function to detect unusual
+// patterns in key business metrics without requiring external ML models.
+//
+// METRICS MONITORED:
+// - Transaction velocity: Unusual spikes/drops in transaction counts
+// - Basket sizes: Abnormal purchase amounts
+// - Returns ratio: Suspicious return patterns
+// - Inventory movements: Unexpected stock changes
+//
+// DETECTION APPROACH:
+// - Time series binned into 1-hour windows for pattern detection
+// - series_decompose_anomalies() parameters:
+//   * threshold: Sensitivity (1.5 = moderate, lower = more sensitive)
+//   * seasonality: -1 = auto-detect seasonal patterns
+//   * trend: 'avg' = use moving average for trend line
+//
+// RETENTION:
+// - Anomaly alerts table: 30 days (compliance/audit)
+// - Allows investigation of historical anomalies
+// ============================================================================
+
+.execute database script with (ContinueOnErrors=true) <|
+
+// ============================================================================
+// ANOMALY ALERTS TABLE
+// ============================================================================
+// Stores detected anomalies for alerting and investigation
+
+.create-merge table anomaly_alerts (
+    alert_id:string,
+    detection_time:datetime,
+    metric_type:string,
+    entity_type:string,
+    entity_id:string,
+    time_window:datetime,
+    expected_value:real,
+    actual_value:real,
+    anomaly_score:real,
+    severity:string,
+    alert_details:dynamic,
+    ingest_timestamp:datetime
+)
+
+// ============================================================================
+// RETENTION & INGESTION POLICIES
+// ============================================================================
+
+.alter-merge table anomaly_alerts policy retention softdelete = 30d
+
+.alter table anomaly_alerts policy streamingingestion enable
+
+.alter table anomaly_alerts policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:05:00",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+// ============================================================================
+// ANOMALY DETECTION FUNCTIONS
+// ============================================================================
+
+// TRANSACTION VELOCITY ANOMALIES
+// Detects unusual spikes or drops in transaction counts by store
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_transaction_velocity_anomalies(lookback_hours:int = 168)
+{
+    // Prepare time series: 1-hour bins of transaction counts by store
+    let time_series = receipt_created
+        | where ingest_timestamp > ago(lookback_hours * 1h)
+        | summarize transaction_count = count() by store_id, ts = bin(ingest_timestamp, 1h)
+        | order by store_id asc, ts asc;
+    // Detect anomalies using series decomposition
+    time_series
+    | summarize ts_list = make_list(ts), count_list = make_list(transaction_count) by store_id
+    | extend (anomalies, anomaly_score, expected_count) = series_decompose_anomalies(count_list, 1.5, -1, 'avg')
+    | mv-expand ts_list to typeof(datetime), count_list to typeof(real), anomalies to typeof(long),
+                anomaly_score to typeof(real), expected_count to typeof(real)
+    | where anomalies != 0
+    | extend severity = case(
+        abs(anomaly_score) >= 3.0, "critical",
+        abs(anomaly_score) >= 2.0, "high",
+        abs(anomaly_score) >= 1.5, "medium",
+        "low"
+      )
+    | project detection_time = now(),
+              metric_type = "transaction_velocity",
+              entity_type = "store",
+              entity_id = tostring(store_id),
+              time_window = ts_list,
+              expected_value = expected_count,
+              actual_value = count_list,
+              anomaly_score = anomaly_score,
+              severity = severity,
+              alert_details = pack(
+                  "anomaly_direction", iif(count_list > expected_count, "spike", "drop"),
+                  "deviation_pct", round((count_list - expected_count) / expected_count * 100, 2)
+              )
+}
+
+// BASKET SIZE ANOMALIES
+// Detects unusual purchase amounts (potential fraud or pricing errors)
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_basket_size_anomalies(lookback_hours:int = 168)
+{
+    // Prepare time series: 1-hour bins of average basket sizes by store
+    let time_series = receipt_created
+        | where ingest_timestamp > ago(lookback_hours * 1h)
+        | where isnotnull(total) and total > 0
+        | summarize avg_basket = avg(total), max_basket = max(total) by store_id, ts = bin(ingest_timestamp, 1h)
+        | order by store_id asc, ts asc;
+    // Detect anomalies in average basket size
+    time_series
+    | summarize ts_list = make_list(ts), basket_list = make_list(avg_basket), max_basket_list = make_list(max_basket) by store_id
+    | extend (anomalies, anomaly_score, expected_basket) = series_decompose_anomalies(basket_list, 1.5, -1, 'avg')
+    | mv-expand ts_list to typeof(datetime), basket_list to typeof(real), max_basket_list to typeof(real),
+                anomalies to typeof(long), anomaly_score to typeof(real), expected_basket to typeof(real)
+    | where anomalies != 0
+    | extend severity = case(
+        abs(anomaly_score) >= 3.0, "critical",
+        abs(anomaly_score) >= 2.0, "high",
+        abs(anomaly_score) >= 1.5, "medium",
+        "low"
+      )
+    | project detection_time = now(),
+              metric_type = "basket_size",
+              entity_type = "store",
+              entity_id = tostring(store_id),
+              time_window = ts_list,
+              expected_value = expected_basket,
+              actual_value = basket_list,
+              anomaly_score = anomaly_score,
+              severity = severity,
+              alert_details = pack(
+                  "anomaly_direction", iif(basket_list > expected_basket, "unusually_high", "unusually_low"),
+                  "deviation_pct", round((basket_list - expected_basket) / expected_basket * 100, 2),
+                  "max_basket_in_window", max_basket_list
+              )
+}
+
+// INVENTORY MOVEMENT ANOMALIES
+// Detects unusual inventory changes (potential theft, data errors, or equipment issues)
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_inventory_movement_anomalies(lookback_hours:int = 168)
+{
+    // Prepare time series: 1-hour bins of inventory movements by store and product
+    let time_series = inventory_updated
+        | where ingest_timestamp > ago(lookback_hours * 1h)
+        | where isnotnull(quantity_delta)
+        | summarize total_delta = sum(quantity_delta), abs_delta = sum(abs(quantity_delta)) by store_id, product_id, ts = bin(ingest_timestamp, 1h)
+        | order by store_id asc, product_id asc, ts asc;
+    // Detect anomalies in absolute movement volume (catches both large gains and losses)
+    time_series
+    | summarize ts_list = make_list(ts), delta_list = make_list(abs_delta), net_delta_list = make_list(total_delta) by store_id, product_id
+    | extend (anomalies, anomaly_score, expected_delta) = series_decompose_anomalies(delta_list, 1.5, -1, 'avg')
+    | mv-expand ts_list to typeof(datetime), delta_list to typeof(real), net_delta_list to typeof(real),
+                anomalies to typeof(long), anomaly_score to typeof(real), expected_delta to typeof(real)
+    | where anomalies != 0
+    | extend severity = case(
+        abs(anomaly_score) >= 3.0, "critical",
+        abs(anomaly_score) >= 2.0, "high",
+        abs(anomaly_score) >= 1.5, "medium",
+        "low"
+      )
+    | project detection_time = now(),
+              metric_type = "inventory_movement",
+              entity_type = "store_product",
+              entity_id = strcat(store_id, ":", product_id),
+              time_window = ts_list,
+              expected_value = expected_delta,
+              actual_value = delta_list,
+              anomaly_score = anomaly_score,
+              severity = severity,
+              alert_details = pack(
+                  "store_id", store_id,
+                  "product_id", product_id,
+                  "net_delta", net_delta_list,
+                  "movement_type", iif(net_delta_list > 0, "gain", "loss"),
+                  "deviation_pct", round((delta_list - expected_delta) / expected_delta * 100, 2)
+              )
+}
+
+// PAYMENT PROCESSING ANOMALIES
+// Detects unusual patterns in payment methods or processing failures
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_payment_anomalies(lookback_hours:int = 168)
+{
+    // Prepare time series: 1-hour bins of payment failures by store
+    let time_series = payment_processed
+        | where ingest_timestamp > ago(lookback_hours * 1h)
+        | summarize total_payments = count(),
+                    failed_payments = countif(status == "declined"),
+                    failure_rate = todouble(countif(status == "declined")) / count() * 100
+              by store_id, ts = bin(ingest_timestamp, 1h)
+        | order by store_id asc, ts asc;
+    // Detect anomalies in failure rate
+    time_series
+    | summarize ts_list = make_list(ts), rate_list = make_list(failure_rate),
+                total_list = make_list(total_payments), failed_list = make_list(failed_payments) by store_id
+    | extend (anomalies, anomaly_score, expected_rate) = series_decompose_anomalies(rate_list, 1.5, -1, 'avg')
+    | mv-expand ts_list to typeof(datetime), rate_list to typeof(real), total_list to typeof(long),
+                failed_list to typeof(long), anomalies to typeof(long),
+                anomaly_score to typeof(real), expected_rate to typeof(real)
+    | where anomalies != 0
+    | extend severity = case(
+        abs(anomaly_score) >= 3.0, "critical",
+        abs(anomaly_score) >= 2.0, "high",
+        abs(anomaly_score) >= 1.5, "medium",
+        "low"
+      )
+    | project detection_time = now(),
+              metric_type = "payment_failure_rate",
+              entity_type = "store",
+              entity_id = tostring(store_id),
+              time_window = ts_list,
+              expected_value = expected_rate,
+              actual_value = rate_list,
+              anomaly_score = anomaly_score,
+              severity = severity,
+              alert_details = pack(
+                  "total_payments", total_list,
+                  "failed_payments", failed_list,
+                  "failure_rate_pct", round(rate_list, 2)
+              )
+}
+
+// CUSTOMER TRAFFIC ANOMALIES
+// Detects unusual foot traffic patterns (equipment failures, security incidents)
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_traffic_anomalies(lookback_hours:int = 168)
+{
+    // Prepare time series: 1-hour bins of customer entries by store
+    let time_series = customer_entered
+        | where ingest_timestamp > ago(lookback_hours * 1h)
+        | summarize total_customers = sum(customer_count) by store_id, ts = bin(ingest_timestamp, 1h)
+        | order by store_id asc, ts asc;
+    // Detect anomalies in customer traffic
+    time_series
+    | summarize ts_list = make_list(ts), traffic_list = make_list(total_customers) by store_id
+    | extend (anomalies, anomaly_score, expected_traffic) = series_decompose_anomalies(traffic_list, 1.5, -1, 'avg')
+    | mv-expand ts_list to typeof(datetime), traffic_list to typeof(real),
+                anomalies to typeof(long), anomaly_score to typeof(real), expected_traffic to typeof(real)
+    | where anomalies != 0
+    | extend severity = case(
+        abs(anomaly_score) >= 3.0, "critical",
+        abs(anomaly_score) >= 2.0, "high",
+        abs(anomaly_score) >= 1.5, "medium",
+        "low"
+      )
+    | project detection_time = now(),
+              metric_type = "customer_traffic",
+              entity_type = "store",
+              entity_id = tostring(store_id),
+              time_window = ts_list,
+              expected_value = expected_traffic,
+              actual_value = traffic_list,
+              anomaly_score = anomaly_score,
+              severity = severity,
+              alert_details = pack(
+                  "anomaly_direction", iif(traffic_list > expected_traffic, "spike", "drop"),
+                  "deviation_pct", round((traffic_list - expected_traffic) / expected_traffic * 100, 2)
+              )
+}
+
+// ============================================================================
+// UNIFIED ANOMALY DETECTION FUNCTION
+// ============================================================================
+// Combines all anomaly detection types into a single result set
+
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_all_anomalies(lookback_hours:int = 168)
+{
+    // Union all anomaly types
+    union
+        (fn_detect_transaction_velocity_anomalies(lookback_hours) | extend alert_id = strcat("txn_vel_", hash_sha256(strcat(entity_id, time_window)))),
+        (fn_detect_basket_size_anomalies(lookback_hours) | extend alert_id = strcat("basket_", hash_sha256(strcat(entity_id, time_window)))),
+        (fn_detect_inventory_movement_anomalies(lookback_hours) | extend alert_id = strcat("inv_mov_", hash_sha256(strcat(entity_id, time_window)))),
+        (fn_detect_payment_anomalies(lookback_hours) | extend alert_id = strcat("pay_fail_", hash_sha256(strcat(entity_id, time_window)))),
+        (fn_detect_traffic_anomalies(lookback_hours) | extend alert_id = strcat("traffic_", hash_sha256(strcat(entity_id, time_window))))
+    | project alert_id, detection_time, metric_type, entity_type, entity_id,
+              time_window, expected_value, actual_value, anomaly_score, severity, alert_details
+    | order by severity desc, abs(anomaly_score) desc, detection_time desc
+}
+
+// ============================================================================
+// USAGE EXAMPLES
+// ============================================================================
+// These queries demonstrate how to use the anomaly detection functions:
+//
+// -- Detect all anomalies in the last 7 days:
+// fn_detect_all_anomalies(168)
+//
+// -- Filter critical/high severity only:
+// fn_detect_all_anomalies(168)
+// | where severity in ("critical", "high")
+//
+// -- Focus on specific metric type:
+// fn_detect_all_anomalies(168)
+// | where metric_type == "transaction_velocity"
+//
+// -- Get anomalies for a specific store:
+// fn_detect_all_anomalies(168)
+// | where entity_id == "1001" or alert_details.store_id == 1001
+//
+// -- Persist anomalies to alerts table (run periodically):
+// fn_detect_all_anomalies(24)
+// | extend ingest_timestamp = now()
+// | project-away detection_time  // Will use ingest_timestamp
+// | extend detection_time = now()
+//
+// -- Dashboard query: Recent critical anomalies by type:
+// fn_detect_all_anomalies(24)
+// | where severity in ("critical", "high")
+// | summarize anomaly_count = count() by metric_type, severity
+// | order by anomaly_count desc
+//
+// ============================================================================
