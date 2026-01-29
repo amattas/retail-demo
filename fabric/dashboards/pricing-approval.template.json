@@ -1,0 +1,81 @@
+{
+  "$schema": "https://fabric.microsoft.com/schemas/dashboard/2024-01-01-preview",
+  "name": "Dynamic Pricing - Approval Workflow",
+  "description": "Human-in-the-loop dashboard for reviewing and approving ML-driven pricing recommendations",
+  "tiles": [
+    {
+      "title": "Pending Recommendations Summary",
+      "type": "kql",
+      "dataset": {
+        "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>"
+      },
+      "query": "let pending = pricing_recommendation_created | where status == 'PENDING'; pending | summarize recommendations=count(), total_impact_usd=sum(expected_revenue_impact), avg_confidence=avg(ml_confidence) by 1 | extend avg_confidence_pct=round(avg_confidence*100,1)"
+    },
+    {
+      "title": "Recommendations by Department (Pending)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_created | where status == 'PENDING' | summarize recommendations=count(), total_impact_usd=sum(expected_revenue_impact) by department | top 10 by recommendations desc"
+    },
+    {
+      "title": "Top Pending Recommendations by Revenue Impact",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_created | where status == 'PENDING' | project product_id, product_name, current_price, recommended_price, expected_revenue_impact, ml_confidence, constraint_status | top 20 by expected_revenue_impact desc"
+    },
+    {
+      "title": "Price Change Distribution (Pending)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_created | where status == 'PENDING' | extend change_pct = round((recommended_price - current_price) / current_price * 100, 1) | extend change_bucket = case(change_pct < -20, 'Large Markdown (>20%)', change_pct < -10, 'Moderate Markdown (10-20%)', change_pct < -5, 'Small Markdown (5-10%)', change_pct < 5, 'Minimal Change (<5%)', change_pct < 10, 'Small Increase (5-10%)', 'Large Increase (>10%)') | summarize count() by change_bucket | order by count_ desc"
+    },
+    {
+      "title": "Confidence Level Breakdown",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_created | where status == 'PENDING' | extend confidence_bucket = case(ml_confidence >= 0.9, 'Very High (>=90%)', ml_confidence >= 0.7, 'High (70-90%)', ml_confidence >= 0.5, 'Medium (50-70%)', 'Low (<50%)') | summarize recommendations=count(), avg_impact=avg(expected_revenue_impact) by confidence_bucket | order by recommendations desc"
+    },
+    {
+      "title": "Constraint Compliance Status",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_created | where status == 'PENDING' | extend has_violations = constraint_status != 'ALL_PASS' | summarize count() by has_violations | extend status_label = iif(has_violations, 'Has Constraint Warnings', 'All Constraints Pass')"
+    },
+    {
+      "title": "Recent Approvals (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_approved | where event_ts > ago(24h) | extend action='Approved' | union (pricing_recommendation_rejected | where event_ts > ago(24h) | extend action='Rejected') | summarize count() by action, bin(event_ts, 1h) | render timechart"
+    },
+    {
+      "title": "Approval Rate by Confidence Level (7d)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let approved = pricing_recommendation_approved | where event_ts > ago(7d) | extend outcome='Approved'; let rejected = pricing_recommendation_rejected | where event_ts > ago(7d) | extend outcome='Rejected'; let all_decisions = approved | union rejected; let created = pricing_recommendation_created | project recommendation_id, ml_confidence; all_decisions | join kind=inner created on recommendation_id | extend confidence_bucket = case(ml_confidence >= 0.9, 'Very High', ml_confidence >= 0.7, 'High', ml_confidence >= 0.5, 'Medium', 'Low') | summarize total=count(), approved=countif(outcome=='Approved') by confidence_bucket | extend approval_rate_pct=round(toreal(approved)/toreal(total)*100,1) | order by approval_rate_pct desc"
+    },
+    {
+      "title": "Realized Revenue Impact (7d) - Approved Only",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_approved | where event_ts > ago(7d) | join kind=inner (pricing_recommendation_created | project recommendation_id, expected_revenue_impact) on recommendation_id | summarize by bin(event_ts, 1d), expected_revenue_impact | summarize total_impact=sum(expected_revenue_impact) by event_ts | render timechart"
+    },
+    {
+      "title": "Approver Activity (7d)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let approved = pricing_recommendation_approved | where event_ts > ago(7d) | extend action='Approved'; let rejected = pricing_recommendation_rejected | where event_ts > ago(7d) | extend action='Rejected'; approved | union rejected | summarize decisions=count() by approver_id, action | order by decisions desc | top 10 by decisions"
+    },
+    {
+      "title": "Average Decision Time (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "let decisions = pricing_recommendation_approved | where event_ts > ago(24h) | extend action='Approved' | union (pricing_recommendation_rejected | where event_ts > ago(24h) | extend action='Rejected') | project recommendation_id, decision_ts=event_ts; let created = pricing_recommendation_created | project recommendation_id, created_ts=event_ts; decisions | join kind=inner created on recommendation_id | extend decision_time_min = datetime_diff('minute', decision_ts, created_ts) | summarize avg_decision_time_min=avg(decision_time_min), median_decision_time_min=percentile(decision_time_min, 50) by 1"
+    },
+    {
+      "title": "Top Rejected Recommendations by Reason",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "pricing_recommendation_rejected | where event_ts > ago(7d) | summarize rejections=count() by rejection_reason | top 10 by rejections desc"
+    }
+  ]
+}
