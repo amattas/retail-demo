@@ -156,6 +156,32 @@ retail-demo/
 - Use type hints for function signatures
 - Prefer Pydantic models for data structures
 
+### PySpark Transform Development
+**Critical:** When implementing transforms that map event data to fact/dimension tables:
+
+1. **Always reference source schemas first** before writing transform code
+   - Event schemas: `datagen/src/retail_datagen/streaming/schemas.py`
+   - Find the relevant Pydantic model (e.g., `ReorderTriggeredPayload`)
+   - Verify exact field names and types in the source schema
+
+2. **Validate field mappings** by cross-referencing:
+   - Source: Event payload schema in `schemas.py`
+   - Target: Destination table schema (KQL or Lakehouse)
+   - Ensure column names match exactly (case-sensitive)
+
+3. **Common mistake to avoid:**
+   - DO NOT guess or infer field names from context
+   - DO NOT assume similar field names across different event types
+   - DO NOT rely on outdated documentation or examples
+
+**Example workflow:**
+```
+1. Read event schema: datagen/src/retail_datagen/streaming/schemas.py
+2. Identify exact field names (e.g., reorder_quantity, not quantity_ordered)
+3. Write transform using F.col("reorder_quantity")
+4. Validate against both source schema and target table
+```
+
 ### Data Architecture
 - Event tables: Streaming-only (from Eventstream)
 - Dimension/Fact tables: Historical (via Lakehouse shortcuts)
@@ -214,6 +240,11 @@ See GitHub issues #7-#13 for missing fact tables in datagen:
 ### Past Incidents
 
 _Document issues and their resolutions here as they occur:_
+
+- **2026-01-28**: Schema field name mismatch in reorder transform (PR #224)
+  - Root cause: Transform referenced `quantity_ordered` instead of `reorder_quantity` from source schema
+  - Fix: Code review caught the error before production deployment
+  - Prevention: Added PySpark Transform Development section requiring schema validation before implementation
 
 <!--
 Template:
