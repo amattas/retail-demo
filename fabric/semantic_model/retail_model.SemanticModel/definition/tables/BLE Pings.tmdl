@@ -7,7 +7,7 @@ table 'BLE Pings'
 		lineageTag: 17cdf61c-5cf1-4033-980c-c519f645366f
 		sourceLineageTag: CustomerId
 		summarizeBy: count
-		sourceColumn: CustomerId
+		sourceColumn: customer_id
 
 		changedProperty = Name
 

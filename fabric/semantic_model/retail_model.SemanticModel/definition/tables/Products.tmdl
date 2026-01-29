@@ -20,7 +20,7 @@ table Products
 		lineageTag: 17774bf2-e801-4191-847e-316fbf614c6e
 		sourceLineageTag: ID
 		summarizeBy: count
-		sourceColumn: ID
+		sourceColumn: id
 
 		annotation SummarizationSetBy = Automatic
 
@@ -29,7 +29,7 @@ table Products
 		lineageTag: cb4130e7-5394-4782-acf3-ab5644c978e8
 		sourceLineageTag: ProductName
 		summarizeBy: none
-		sourceColumn: ProductName
+		sourceColumn: product_name
 
 		changedProperty = Name
 
@@ -40,7 +40,7 @@ table Products
 		lineageTag: 1645f5d1-5281-4c6a-9573-a2041c1791db
 		sourceLineageTag: Brand
 		summarizeBy: none
-		sourceColumn: Brand
+		sourceColumn: brand
 
 		annotation SummarizationSetBy = Automatic
 
@@ -49,7 +49,7 @@ table Products
 		lineageTag: df67fdcf-b472-46af-96a0-6593be141862
 		sourceLineageTag: Company
 		summarizeBy: none
-		sourceColumn: Company
+		sourceColumn: company
 
 		annotation SummarizationSetBy = Automatic
 
@@ -58,7 +58,7 @@ table Products
 		lineageTag: c148feb2-7c16-4b26-a049-ac70b86fc464
 		sourceLineageTag: Department
 		summarizeBy: none
-		sourceColumn: Department
+		sourceColumn: department
 
 		annotation SummarizationSetBy = Automatic
 
@@ -67,7 +67,7 @@ table Products
 		lineageTag: 479051c6-eb86-48bf-b815-6ea203276add
 		sourceLineageTag: Category
 		summarizeBy: none
-		sourceColumn: Category
+		sourceColumn: category
 
 		annotation SummarizationSetBy = Automatic
 
@@ -76,7 +76,7 @@ table Products
 		lineageTag: 228249f7-3e8e-4fb5-888d-5b7dce073f7e
 		sourceLineageTag: Subcategory
 		summarizeBy: none
-		sourceColumn: Subcategory
+		sourceColumn: subcategory
 
 		annotation SummarizationSetBy = Automatic
 
@@ -86,7 +86,7 @@ table Products
 		lineageTag: 7513ae09-61e6-41d4-b2b5-28905fd2b2df
 		sourceLineageTag: Cost
 		summarizeBy: sum
-		sourceColumn: Cost
+		sourceColumn: cost
 
 		annotation SummarizationSetBy = Automatic
 
@@ -98,7 +98,7 @@ table Products
 		lineageTag: 2f861f86-9d75-4f97-b3fc-fe163069cdbc
 		sourceLineageTag: MSRP
 		summarizeBy: sum
-		sourceColumn: MSRP
+		sourceColumn: msrp
 
 		annotation SummarizationSetBy = Automatic
 
@@ -110,7 +110,7 @@ table Products
 		lineageTag: c24767c6-4fea-47f9-9065-cfb0bff80eae
 		sourceLineageTag: SalePrice
 		summarizeBy: sum
-		sourceColumn: SalePrice
+		sourceColumn: sale_price
 
 		changedProperty = Name
 
@@ -124,7 +124,7 @@ table Products
 		lineageTag: dd0cf621-be7f-44c8-b63e-462cfadd4b68
 		sourceLineageTag: RequiresRefrigeration
 		summarizeBy: none
-		sourceColumn: RequiresRefrigeration
+		sourceColumn: requires_refrigeration
 
 		changedProperty = Name
 
@@ -146,7 +146,7 @@ table Products
 		lineageTag: 4e4723a9-99e8-4ec3-b68b-e56865aa98ec
 		sourceLineageTag: Tags
 		summarizeBy: none
-		sourceColumn: Tags
+		sourceColumn: tags
 
 		annotation SummarizationSetBy = Automatic
 

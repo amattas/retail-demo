@@ -7,7 +7,7 @@ table Stockouts
 		lineageTag: 60d4df49-5a17-4dd0-ba43-6c2c0cec2b4f
 		sourceLineageTag: StoreID
 		summarizeBy: count
-		sourceColumn: StoreID
+		sourceColumn: store_id
 
 		changedProperty = Name
 
@@ -20,7 +20,7 @@ table Stockouts
 		lineageTag: 1eaacd0f-91e7-4ac9-8c55-b080a302b99e
 		sourceLineageTag: DCID
 		summarizeBy: count
-		sourceColumn: DCID
+		sourceColumn: dc_id
 
 		changedProperty = Name
 
@@ -34,7 +34,7 @@ table Stockouts
 		lineageTag: 248dacbe-d44f-4a93-beca-0443b0245698
 		sourceLineageTag: ProductID
 		summarizeBy: count
-		sourceColumn: ProductID
+		sourceColumn: product_id
 
 		changedProperty = Name
 
@@ -46,7 +46,7 @@ table Stockouts
 		lineageTag: 6ae92787-58f4-4902-b05f-83d24d6194b8
 		sourceLineageTag: LastKnownQuantity
 		summarizeBy: sum
-		sourceColumn: LastKnownQuantity
+		sourceColumn: last_known_quantity
 
 		changedProperty = Name
 
