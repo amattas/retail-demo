@@ -33,13 +33,41 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 
 ## Deployment
 
+### Option 1: Automated Configuration (Recommended)
+
+1. **Configure Lakehouse Connection**:
+   ```bash
+   # From repository root
+   python scripts/configure_semantic_model.py \
+       --workspace-id <your-workspace-guid> \
+       --lakehouse-id <your-lakehouse-guid>
+   ```
+
+   Or use environment variables:
+   ```bash
+   export WORKSPACE_ID=<your-workspace-guid>
+   export LAKEHOUSE_ID=<your-lakehouse-guid>
+   python scripts/configure_semantic_model.py
+   ```
+
+2. **Import Model**:
+   - In Fabric workspace: New → Semantic model
+   - Import the configured model from `fabric/semantic_model/retail_model.SemanticModel`
+
+3. **Refresh Model**:
+   - The model is pre-configured to connect to your lakehouse
+   - Refresh to load data
+
+### Option 2: Manual Configuration
+
 1. **Import Model**:
    - In Fabric workspace: New → Semantic model
-   - Import `model.tmdl`
+   - Import `retail_model.SemanticModel`
 
 2. **Configure Lakehouse Connection**:
-   - Replace `<fabric-lakehouse-resource-id>` in model.tmdl with your Lakehouse resource ID
-   - Or configure after import in Fabric
+   - Update the connection URL in `definition/expressions.tmdl`
+   - Replace workspace and lakehouse GUIDs in the OneLake URL
+   - Or configure after import in Fabric UI
 
 3. **Refresh Model**:
    - Bind to Lakehouse
