@@ -7,6 +7,7 @@ Initial Dashboards:
 - Inventory Control: low stock, stockout map, reorder backlog, shrink suspects
 - Supply Chain: arrivals/departures, dwell, lane performance, ETA risk
 - Marketing: impressions → visits → purchases, promo lift, ROAS
+- Dynamic Pricing Approval: ML pricing recommendations, approval workflow, audit trail
 
 Data Sources:
 - KQL DB materialized views (hot path)
@@ -14,3 +15,4 @@ Data Sources:
 
 Templates
 - Minimal Real-Time dashboard template: `retail-ops.template.json` (replace KQL DB resource ID after import)
+- Dynamic Pricing Approval dashboard: `pricing-approval.template.json` (see `PRICING_APPROVAL_DASHBOARD.md` for setup)
