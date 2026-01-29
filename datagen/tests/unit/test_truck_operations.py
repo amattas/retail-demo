@@ -102,7 +102,13 @@ class TestTruckStateTransitions:
         assert shipment["status"] == TruckStatus.LOADING
 
         # Try to jump to ARRIVED (should go through IN_TRANSIT first)
+        # Use a time that's within the LOADING state timeout (8 hours)
+        # to avoid triggering timeout recovery
         arrived_time = shipment["eta"]
+        max_time_in_loading = timedelta(hours=7)  # Within 8-hour timeout
+        if arrived_time - loading_time > max_time_in_loading:
+            # Cap arrived_time to avoid timeout, test still validates state progression
+            arrived_time = loading_time + max_time_in_loading
         updated = truck_ops.update_shipment_status(shipment_id, arrived_time)
 
         # Should advance to IN_TRANSIT, not ARRIVED
