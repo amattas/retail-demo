@@ -20,6 +20,7 @@ from retail_datagen.shared.models import (
     InventoryReason,
     ProductMaster,
     Store,
+    Truck,
 )
 
 
@@ -99,12 +100,27 @@ class TestInventoryFlowSimulatorBalanceGetters:
         ]
 
     @pytest.fixture
-    def inventory_simulator(self, sample_dcs, sample_stores, sample_products):
+    def sample_trucks(self, sample_dcs):
+        """Create sample trucks for testing."""
+        return [
+            Truck(
+                ID=1,
+                LicensePlate="IL-12345",
+                Refrigeration=False,
+                DCID=sample_dcs[0].ID,
+            ),
+        ]
+
+    @pytest.fixture
+    def inventory_simulator(
+        self, sample_dcs, sample_stores, sample_products, sample_trucks
+    ):
         """Create InventoryFlowSimulator instance for testing."""
         return InventoryFlowSimulator(
             distribution_centers=sample_dcs,
             stores=sample_stores,
             products=sample_products,
+            trucks=sample_trucks,
             seed=42,
         )
 
@@ -443,12 +459,27 @@ class TestStoreInventoryTransactionBalanceField:
         ]
 
     @pytest.fixture
-    def inventory_simulator(self, sample_dcs, sample_stores, sample_products):
+    def sample_trucks(self, sample_dcs):
+        """Create sample trucks for testing."""
+        return [
+            Truck(
+                ID=1,
+                LicensePlate="IL-12345",
+                Refrigeration=False,
+                DCID=sample_dcs[0].ID,
+            ),
+        ]
+
+    @pytest.fixture
+    def inventory_simulator(
+        self, sample_dcs, sample_stores, sample_products, sample_trucks
+    ):
         """Create InventoryFlowSimulator instance for testing."""
         return InventoryFlowSimulator(
             distribution_centers=sample_dcs,
             stores=sample_stores,
             products=sample_products,
+            trucks=sample_trucks,
             seed=42,
         )
 
