@@ -7,10 +7,11 @@ impression generation with realistic costs and conversion patterns.
 
 import logging
 import random
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from retail_datagen.config.models import MarketingCostConfig
+from retail_datagen.shared.id_generator import EntityIdGenerator
 from retail_datagen.shared.models import Customer, DeviceType, MarketingChannel
 
 from .common import CAMPAIGN_START_PROBABILITY, DEFAULT_MIN_DAILY_IMPRESSIONS
@@ -42,8 +43,12 @@ class MarketingCampaignSimulator:
         """
         self.customers = customers
         self._rng = random.Random(seed)
-        self._impression_counter = 0  # Counter for unique impression IDs
         self.cost_config = cost_config or MarketingCostConfig()
+
+        # Initialize ID generators for collision-resistant IDs
+        self._campaign_id_gen = EntityIdGenerator("CAMP")
+        self._creative_id_gen = EntityIdGenerator("CREAT")
+        self._impression_id_gen = EntityIdGenerator("IMP")
 
         # Campaign types and their characteristics
         self._campaign_types = {
@@ -94,7 +99,6 @@ class MarketingCampaignSimulator:
 
         # Active campaigns tracking
         self._active_campaigns: dict[str, dict] = {}
-        self._campaign_counter = 1
 
     def calculate_impression_cost(
         self, channel: MarketingChannel, device: DeviceType
@@ -184,8 +188,20 @@ class MarketingCampaignSimulator:
         if campaign_type not in self._campaign_types:
             raise ValueError(f"Unknown campaign type: {campaign_type}")
 
-        campaign_id = f"CAMP{start_date.strftime('%Y%m%d')}{self._campaign_counter:04d}"
-        self._campaign_counter += 1
+        # Convert date to timezone-aware datetime for ID generator
+        if isinstance(start_date, datetime):
+            campaign_timestamp = (
+                start_date
+                if start_date.tzinfo is not None
+                else start_date.replace(tzinfo=UTC)
+            )
+        else:
+            # Convert date to datetime at midnight UTC
+            campaign_timestamp = datetime.combine(
+                start_date, datetime.min.time()
+            ).replace(tzinfo=UTC)
+
+        campaign_id = self._campaign_id_gen.generate(timestamp=campaign_timestamp)
 
         campaign_config = self._campaign_types[campaign_type].copy()
         campaign_info = {
@@ -299,17 +315,25 @@ class MarketingCampaignSimulator:
                 device_weights = list(self._device_distribution.values())
                 device = self._rng.choices(device_options, weights=device_weights)[0]
 
-                # Generate creative ID
-                campaign_suffix = campaign_id[-4:]
-                channel_prefix = channel.value[:3]
-                random_suffix = self._rng.randint(1, 99)
-                creative_id = (
-                    f"CREAT{campaign_suffix}{channel_prefix}{random_suffix:02d}"
+                # Convert date to timezone-aware datetime for ID generator
+                if isinstance(date, datetime):
+                    impression_time = (
+                        date if date.tzinfo is not None else date.replace(tzinfo=UTC)
+                    )
+                else:
+                    # Convert date to datetime at midnight UTC
+                    impression_time = datetime.combine(
+                        date, datetime.min.time()
+                    ).replace(tzinfo=UTC)
+
+                # Generate unique impression ID
+                impression_id = self._impression_id_gen.generate(
+                    timestamp=impression_time
                 )
 
-                # Generate unique impression ID using counter
-                self._impression_counter += 1
-                impression_id = f"IMP{self._impression_counter:010d}"
+                # Generate creative ID by deriving from impression ID
+                # Each impression has one creative, so reusing impression uniqueness
+                creative_id = f"CREAT{impression_id[3:]}"
 
                 # Calculate cost based on channel and device
                 impression_cost = self.calculate_impression_cost(channel, device)
