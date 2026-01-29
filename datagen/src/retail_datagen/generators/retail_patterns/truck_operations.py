@@ -236,7 +236,8 @@ class TruckOperationsMixin(InventoryFlowBase):
         route_id = int(f"{dc_id:02d}{store_id:03d}")
         # Ensure timestamp is timezone-aware (EntityIdGenerator requires it)
         tz_aware_time = (
-            departure_time if departure_time.tzinfo is not None
+            departure_time
+            if departure_time.tzinfo is not None
             else departure_time.replace(tzinfo=UTC)
         )
         shipment_id = self._shipment_id_generator.generate(
