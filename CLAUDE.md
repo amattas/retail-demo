@@ -268,3 +268,4 @@ Quick reference for available commands:
 | `/review` | Review recent changes for issues |
 | `/verify` | Full verification suite |
 | `/validate-kql` | Check KQL scripts for issues |
+| `/work` | Fetch GitHub issues and work through them systematically (bugs first, then enhancements) |

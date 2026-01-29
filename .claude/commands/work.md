@@ -80,7 +80,7 @@ Execute the following workflow to process GitHub issues systematically.
 
 ## Phase 7: Cleanup
 
-1. Return to main worktree: `cd /Users/amattas/GitHub/retail-demo`
+1. Return to main worktree: `cd $(git worktree list | head -1 | awk '{print $1}')`
 2. Optionally remove the worktree after PR is merged:
    ```
    git worktree remove ../retail-demo-issue-<number>
