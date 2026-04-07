@@ -21,6 +21,15 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 | `03-streaming-to-silver.ipynb` | Every 5 min | Eventhouse events → Silver (incremental) |
 | `04-streaming-to-gold.ipynb` | Every 15 min | Silver → Gold aggregations |
 | `05-maintain-delta-tables.ipynb` | Daily | OPTIMIZE and VACUUM routines |
+| `07-ml-demand-forecast.ipynb` | Daily 6 AM | Prophet demand forecasts → `au.gold_demand_forecast` |
+| `08-ml-market-basket.ipynb` | Weekly | FP-Growth product associations → `au.gold_product_associations` |
+| `09-ml-customer-segmentation.ipynb` | Weekly | RFM + K-means customer segments → `au.gold_customer_segments` |
+| `10-ml-churn-prediction.ipynb` | Weekly | LightGBM churn risk scores → `au.gold_churn_predictions` |
+| `11-ml-promotion-effectiveness.ipynb` | Weekly | Price elasticity & promotion lift → `au.gold_price_elasticity`, `au.gold_promotion_lift` |
+| `12-ml-journey-analysis.ipynb` | Daily | BLE beacon journey patterns → `au.gold_journey_patterns`, `au.gold_zone_transitions`, `au.gold_zone_dwell_stats` |
+| `13-ml-stockout-prediction.ipynb` | Daily | LightGBM stockout risk → `au.gold_stockout_risk` |
+| `14-ml-delivery-prediction.ipynb` | Daily | LightGBM truck dwell predictions → `au.gold_dwell_predictions` |
+| `15-ml-dynamic-pricing.ipynb` | Daily | Elasticity-based pricing → `au.gold_pricing_recommendations` |
 | `99-reset-lakehouse.ipynb` | Manual | Drop all Silver/Gold tables and databases |
 
 ## Execution Order
@@ -73,6 +82,23 @@ Pre-aggregated tables in `au` schema:
 - `au.marketing_cost_daily` - Marketing spend by campaign
 - `au.tender_mix_daily` - Payment method breakdown
 
+### ML Output Tables (Gold)
+
+| Table | Source Notebook | Model | Refresh |
+|-------|----------------|-------|---------|
+| `au.gold_demand_forecast` | `07` | Prophet | Daily |
+| `au.gold_product_associations` | `08` | FP-Growth | Weekly |
+| `au.gold_customer_segments` | `09` | K-means | Weekly |
+| `au.gold_churn_predictions` | `10` | LightGBM | Weekly |
+| `au.gold_price_elasticity` | `11` | Log-log regression | Weekly |
+| `au.gold_promotion_lift` | `11` | Baseline comparison | Weekly |
+| `au.gold_journey_patterns` | `12` | Path analysis | Daily |
+| `au.gold_zone_transitions` | `12` | Path analysis | Daily |
+| `au.gold_zone_dwell_stats` | `12` | Path analysis | Daily |
+| `au.gold_stockout_risk` | `13` | LightGBM | Daily |
+| `au.gold_dwell_predictions` | `14` | LightGBM | Daily |
+| `au.gold_pricing_recommendations` | `15` | Elasticity optimization | Daily |
+
 ## Pipelines
 
 | Pipeline | Schedule | Description |
@@ -82,7 +108,23 @@ Pre-aggregated tables in `au` schema:
 | `pl_streaming_gold` | Every 15 min | Runs `04-streaming-to-gold.ipynb` |
 | `pl_maintenance` | Daily | Runs `05-maintain-delta-tables.ipynb` |
 
-All pipelines: 3 retries, 30s intervals, 1-hour timeout.
+All core pipelines: 3 retries, 30s intervals, 1-hour timeout.
+
+### ML & Predictive Analytics Pipelines
+
+| Pipeline | Schedule | Notebook |
+|----------|----------|----------|
+| `pl_demand_forecast` | Daily 6 AM | `07-ml-demand-forecast.ipynb` |
+| `pl_market_basket` | Weekly Sun 1 AM | `08-ml-market-basket.ipynb` |
+| `pl_customer_segmentation` | Weekly Sun 2 AM | `09-ml-customer-segmentation.ipynb` |
+| `pl_churn_prediction` | Weekly Sun 3 AM | `10-ml-churn-prediction.ipynb` |
+| `pl_promotion_effectiveness` | Weekly Sun 4 AM | `11-ml-promotion-effectiveness.ipynb` |
+| `pl_journey_analysis` | Daily 4 AM | `12-ml-journey-analysis.ipynb` |
+| `pl_stockout_prediction` | Daily 5 AM | `13-ml-stockout-prediction.ipynb` |
+| `pl_delivery_prediction` | Daily 5:30 AM | `14-ml-delivery-prediction.ipynb` |
+| `pl_dynamic_pricing` | Daily 7 AM | `15-ml-dynamic-pricing.ipynb` |
+
+All ML pipelines: 3 retries, 30s intervals, 2-hour timeout. See [Phase 9: ML Notebooks](../setup/09-ml-notebooks.md) for setup instructions.
 
 ## Related Documentation
 

@@ -58,6 +58,7 @@ nav:
     - Phase 4 - Gold Layer: setup/04-gold-layer.md
     - Phase 5 - Pipelines: setup/05-pipelines.md
     - Phase 6 - Streaming: setup/06-streaming.md
+    - Phase 9 - ML Notebooks: setup/09-ml-notebooks.md
     - Phase 7 - Dashboards: setup/07-dashboards.md
     - Reference:
       - Validation: setup/validation.md

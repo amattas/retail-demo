@@ -109,6 +109,26 @@ This pipeline runs daily Delta table maintenance (OPTIMIZE, VACUUM).
 | `pl_streaming_gold` | Every 15 min | `04-streaming-to-gold` | Silver → Gold |
 | `pl_maintenance` | Daily 3 AM | `05-maintain-delta-tables` | Table optimization |
 
+## Step 5.5: Create ML Pipelines (After Phase 9)
+
+After deploying ML notebooks in [Phase 9](09-ml-notebooks.md), create pipelines for each:
+
+| Pipeline | Schedule | Notebook | Purpose |
+|----------|----------|----------|---------|
+| `pl_demand_forecast` | Daily 6 AM | `07-ml-demand-forecast` | Prophet demand forecasts |
+| `pl_market_basket` | Weekly Sun 1 AM | `08-ml-market-basket` | Product associations |
+| `pl_customer_segmentation` | Weekly Sun 2 AM | `09-ml-customer-segmentation` | Customer segments |
+| `pl_churn_prediction` | Weekly Sun 3 AM | `10-ml-churn-prediction` | Churn risk scores |
+| `pl_promotion_effectiveness` | Weekly Sun 4 AM | `11-ml-promotion-effectiveness` | Promotion lift |
+| `pl_journey_analysis` | Daily 4 AM | `12-ml-journey-analysis` | Journey patterns |
+| `pl_stockout_prediction` | Daily 5 AM | `13-ml-stockout-prediction` | Stockout risk |
+| `pl_delivery_prediction` | Daily 5:30 AM | `14-ml-delivery-prediction` | Dwell predictions |
+| `pl_dynamic_pricing` | Daily 7 AM | `15-ml-dynamic-pricing` | Pricing optimization |
+
+All ML pipelines use the same creation process as Steps 5.1-5.4 with parameters `SILVER_DB = "ag"` and `GOLD_DB = "au"`. Set timeout to 2 hours and retries to 3.
+
 ## Next Step
 
 Continue to [Phase 6: Streaming Setup](06-streaming.md)
+
+After completing Phases 6-8, proceed to [Phase 9: ML Notebooks](09-ml-notebooks.md) to deploy predictive analytics models.

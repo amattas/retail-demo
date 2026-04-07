@@ -14,6 +14,7 @@ This guide provides step-by-step instructions for deploying the Retail Demo solu
 - [ ] **Phase 6**: [Streaming](06-streaming.md) - Configure Eventstream for real-time data
 - [ ] **Phase 7**: [Semantic Model](08-semantic-model-deployment.md) - Deploy Power BI semantic model
 - [ ] **Phase 8**: [Dashboards](07-dashboards.md) - Create reports and dashboards
+- [ ] **Phase 9**: [ML Notebooks](09-ml-notebooks.md) - Deploy predictive analytics models
 
 ## Prerequisites
 
