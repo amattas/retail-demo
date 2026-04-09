@@ -15,15 +15,15 @@ Upload the following notebooks to your Lakehouse:
 | `03-streaming-to-silver.ipynb` | Process streaming events to Silver |
 | `04-streaming-to-gold.ipynb` | Aggregate Silver to Gold |
 | `05-maintain-delta-tables.ipynb` | OPTIMIZE and VACUUM routines |
-| `07-ml-demand-forecast.ipynb` | Prophet demand forecasts |
-| `08-ml-market-basket.ipynb` | FP-Growth product associations |
-| `09-ml-customer-segmentation.ipynb` | RFM + K-means customer segments |
-| `10-ml-churn-prediction.ipynb` | LightGBM churn risk scores |
-| `11-ml-promotion-effectiveness.ipynb` | Price elasticity & promotion lift |
-| `12-ml-journey-analysis.ipynb` | BLE beacon journey patterns |
-| `13-ml-stockout-prediction.ipynb` | LightGBM stockout risk |
-| `14-ml-delivery-prediction.ipynb` | LightGBM truck dwell predictions |
-| `15-ml-dynamic-pricing.ipynb` | Elasticity-based pricing |
+| `06-ml-demand-forecast.ipynb` | GBT demand forecasts |
+| `07-ml-market-basket.ipynb` | FP-Growth product associations |
+| `08-ml-customer-segmentation.ipynb` | RFM + K-means customer segments |
+| `09-ml-churn-prediction.ipynb` | LightGBM churn risk scores |
+| `10-ml-promotion-effectiveness.ipynb` | Price elasticity & promotion lift |
+| `11-ml-journey-analysis.ipynb` | BLE beacon journey patterns |
+| `12-ml-stockout-prediction.ipynb` | LightGBM stockout risk |
+| `13-ml-delivery-prediction.ipynb` | LightGBM truck dwell predictions |
+| `14-ml-dynamic-pricing.ipynb` | Elasticity-based pricing |
 | `99-reset-lakehouse.ipynb` | Reset all tables (optional, for testing) |
 
 ## Step 3.2: Run Historical Data Load

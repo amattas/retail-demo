@@ -112,15 +112,15 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 - [ ] Customer zone dwell alerts (potential service issues)
 
 ### AI & Machine Learning:
-- [x] Train demand forecasting models — `07-ml-demand-forecast.ipynb` (Prophet, 14-day horizon per SKU)
-- [x] Market basket analysis — `08-ml-market-basket.ipynb` (FP-Growth, cross-sell recommendations)
-- [x] Customer segmentation — `09-ml-customer-segmentation.ipynb` (RFM + K-means)
-- [x] Customer churn prediction — `10-ml-churn-prediction.ipynb` (LightGBM, AUC-ROC >0.75)
-- [x] Promotion effectiveness analysis — `11-ml-promotion-effectiveness.ipynb` (price elasticity, lift)
-- [x] In-store journey analysis — `12-ml-journey-analysis.ipynb` (BLE beacon path analysis)
-- [x] Stockout prediction — `13-ml-stockout-prediction.ipynb` (LightGBM, 3-day forecast)
-- [x] Delivery time prediction — `14-ml-delivery-prediction.ipynb` (LightGBM quantile regression)
-- [x] Dynamic pricing optimization — `15-ml-dynamic-pricing.ipynb` (elasticity-based pricing)
+- [x] Train demand forecasting models — `06-ml-demand-forecast.ipynb` (GBT, 14-day horizon per SKU)
+- [x] Market basket analysis — `07-ml-market-basket.ipynb` (FP-Growth, cross-sell recommendations)
+- [x] Customer segmentation — `08-ml-customer-segmentation.ipynb` (RFM + K-means)
+- [x] Customer churn prediction — `09-ml-churn-prediction.ipynb` (LightGBM, AUC-ROC >0.75)
+- [x] Promotion effectiveness analysis — `10-ml-promotion-effectiveness.ipynb` (price elasticity, lift)
+- [x] In-store journey analysis — `11-ml-journey-analysis.ipynb` (BLE beacon path analysis)
+- [x] Stockout prediction — `12-ml-stockout-prediction.ipynb` (LightGBM, 3-day forecast)
+- [x] Delivery time prediction — `13-ml-delivery-prediction.ipynb` (LightGBM quantile regression)
+- [x] Dynamic pricing optimization — `14-ml-dynamic-pricing.ipynb` (elasticity-based pricing)
 - [ ] Deploy anomaly detection models on sales and inventory streams
 - [ ] Integrate Azure OpenAI for auto-generated executive summaries
 - [ ] Build recommendation scoring pipeline (next-best-product)

@@ -16,32 +16,32 @@ Upload the following notebooks to your Lakehouse:
 
 | Notebook | Model | Schedule | Gold Output |
 |----------|-------|----------|-------------|
-| `07-ml-demand-forecast.ipynb` | Facebook Prophet | Daily 6 AM | `gold_demand_forecast` |
-| `08-ml-market-basket.ipynb` | FP-Growth | Weekly | `gold_product_associations` |
-| `09-ml-customer-segmentation.ipynb` | RFM + K-means | Weekly | `gold_customer_segments` |
-| `10-ml-churn-prediction.ipynb` | LightGBM | Weekly | `gold_churn_predictions` |
-| `11-ml-promotion-effectiveness.ipynb` | Log-log regression | Weekly | `gold_price_elasticity`, `gold_promotion_lift` |
-| `12-ml-journey-analysis.ipynb` | Path analysis | Daily | `gold_journey_patterns`, `gold_zone_transitions`, `gold_zone_dwell_stats` |
-| `13-ml-stockout-prediction.ipynb` | LightGBM | Daily | `gold_stockout_risk` |
-| `14-ml-delivery-prediction.ipynb` | LightGBM | Daily | `gold_dwell_predictions` |
-| `15-ml-dynamic-pricing.ipynb` | Elasticity optimization | Daily | `gold_pricing_recommendations` |
+| `06-ml-demand-forecast.ipynb` | GBT (Spark ML) | Daily 6 AM | `gold_demand_forecast` |
+| `07-ml-market-basket.ipynb` | FP-Growth | Weekly | `gold_product_associations` |
+| `08-ml-customer-segmentation.ipynb` | RFM + K-means | Weekly | `gold_customer_segments` |
+| `09-ml-churn-prediction.ipynb` | LightGBM | Weekly | `gold_churn_predictions` |
+| `10-ml-promotion-effectiveness.ipynb` | Log-log regression | Weekly | `gold_price_elasticity`, `gold_promotion_lift` |
+| `11-ml-journey-analysis.ipynb` | Path analysis | Daily | `gold_journey_patterns`, `gold_zone_transitions`, `gold_zone_dwell_stats` |
+| `12-ml-stockout-prediction.ipynb` | LightGBM | Daily | `gold_stockout_risk` |
+| `13-ml-delivery-prediction.ipynb` | LightGBM | Daily | `gold_dwell_predictions` |
+| `14-ml-dynamic-pricing.ipynb` | Elasticity optimization | Daily | `gold_pricing_recommendations` |
 
 ## Step 9.2: Run Initial Model Training
 
 Run each notebook manually in sequence to verify it completes successfully. Start with notebooks that have fewer dependencies:
 
-1. **Run `07-ml-demand-forecast`** — requires `ag.fact_receipts`, `ag.fact_receipt_lines`
-2. **Run `09-ml-customer-segmentation`** — requires `ag.fact_receipts`
-3. **Run `10-ml-churn-prediction`** — requires `ag.fact_receipts`, `ag.dim_customers`
-4. **Run `08-ml-market-basket`** — requires `ag.fact_receipt_lines`
-5. **Run `11-ml-promotion-effectiveness`** — requires `ag.fact_receipt_lines`, `ag.fact_promotions`
-6. **Run `13-ml-stockout-prediction`** — requires `ag.fact_store_inventory_txn`, `ag.fact_stockouts`
-7. **Run `14-ml-delivery-prediction`** — requires `ag.fact_truck_moves`
-8. **Run `12-ml-journey-analysis`** — requires `ag.fact_ble_pings`, `ag.fact_zone_changes`
-9. **Run `15-ml-dynamic-pricing`** — requires `au.gold_price_elasticity` (from notebook 11)
+1. **Run `06-ml-demand-forecast`** — requires `ag.fact_receipts`, `ag.fact_receipt_lines`
+2. **Run `08-ml-customer-segmentation`** — requires `ag.fact_receipts`
+3. **Run `09-ml-churn-prediction`** — requires `ag.fact_receipts`, `ag.dim_customers`
+4. **Run `07-ml-market-basket`** — requires `ag.fact_receipt_lines`
+5. **Run `10-ml-promotion-effectiveness`** — requires `ag.fact_receipt_lines`, `ag.fact_promotions`
+6. **Run `12-ml-stockout-prediction`** — requires `ag.fact_store_inventory_txn`, `ag.fact_stockouts`
+7. **Run `13-ml-delivery-prediction`** — requires `ag.fact_truck_moves`
+8. **Run `11-ml-journey-analysis`** — requires `ag.fact_ble_pings`, `ag.fact_zone_changes`
+9. **Run `14-ml-dynamic-pricing`** — requires `au.gold_price_elasticity` (from notebook 10)
 
 !!! note
-    Notebook 15 depends on notebook 11's output. Run 11 first.
+    Notebook 14 depends on notebook 10's output. Run 10 first.
 
 ## Step 9.3: Create ML Pipelines
 
@@ -51,20 +51,20 @@ Create a pipeline for each ML notebook following the same process as [Phase 5](0
 
 | Pipeline | Notebook | Schedule | Timeout |
 |----------|----------|----------|---------|
-| `pl_demand_forecast` | `07-ml-demand-forecast` | Daily 6 AM UTC | 2 hours |
-| `pl_journey_analysis` | `12-ml-journey-analysis` | Daily 4 AM UTC | 2 hours |
-| `pl_stockout_prediction` | `13-ml-stockout-prediction` | Daily 5 AM UTC | 2 hours |
-| `pl_delivery_prediction` | `14-ml-delivery-prediction` | Daily 5:30 AM UTC | 2 hours |
-| `pl_dynamic_pricing` | `15-ml-dynamic-pricing` | Daily 7 AM UTC | 2 hours |
+| `pl_demand_forecast` | `06-ml-demand-forecast` | Daily 6 AM UTC | 2 hours |
+| `pl_journey_analysis` | `11-ml-journey-analysis` | Daily 4 AM UTC | 2 hours |
+| `pl_stockout_prediction` | `12-ml-stockout-prediction` | Daily 5 AM UTC | 2 hours |
+| `pl_delivery_prediction` | `13-ml-delivery-prediction` | Daily 5:30 AM UTC | 2 hours |
+| `pl_dynamic_pricing` | `14-ml-dynamic-pricing` | Daily 7 AM UTC | 2 hours |
 
 ### Weekly Pipelines
 
 | Pipeline | Notebook | Schedule | Timeout |
 |----------|----------|----------|---------|
-| `pl_market_basket` | `08-ml-market-basket` | Sunday 1 AM UTC | 2 hours |
-| `pl_customer_segmentation` | `09-ml-customer-segmentation` | Sunday 2 AM UTC | 2 hours |
-| `pl_churn_prediction` | `10-ml-churn-prediction` | Sunday 3 AM UTC | 2 hours |
-| `pl_promotion_effectiveness` | `11-ml-promotion-effectiveness` | Sunday 4 AM UTC | 2 hours |
+| `pl_market_basket` | `07-ml-market-basket` | Sunday 1 AM UTC | 2 hours |
+| `pl_customer_segmentation` | `08-ml-customer-segmentation` | Sunday 2 AM UTC | 2 hours |
+| `pl_churn_prediction` | `09-ml-churn-prediction` | Sunday 3 AM UTC | 2 hours |
+| `pl_promotion_effectiveness` | `10-ml-promotion-effectiveness` | Sunday 4 AM UTC | 2 hours |
 
 ### Pipeline Parameters
 
@@ -153,9 +153,9 @@ FROM ag.fact_receipts;
 -- Recommend 90+ days for best results
 ```
 
-### Notebook 15 fails with "gold_price_elasticity not found"
+### Notebook 14 fails with "gold_price_elasticity not found"
 
-Run notebook 11 first — it produces the elasticity table that notebook 15 consumes.
+Run notebook 10 first — it produces the elasticity table that notebook 14 consumes.
 
 ## Next Steps
 
