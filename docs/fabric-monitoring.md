@@ -53,7 +53,7 @@ Workspace → Pipeline → Monitor → Select run → View details → Logs
 
 ## Pipeline Monitoring
 
-### Bronze → Silver Pipeline
+### pl_streaming_silver
 
 **Key Metrics to Track:**
 - Execution frequency: Every 5 minutes
@@ -63,7 +63,7 @@ Workspace → Pipeline → Monitor → Select run → View details → Logs
 
 **Monitor via Notebook Output:**
 ```python
-# In 02-onelake-to-silver.ipynb
+# In 03-streaming-to-silver.ipynb
 # Check final metrics cell for:
 print(f"Silver tables created: {len(silver_tables)}")
 print(f"Schema mismatches: {schema_mismatch_count}")
@@ -75,7 +75,7 @@ print(f"Total rows processed: {total_row_count}")
 - ⚠️ Execution time > 15 minutes → Check data volume or optimize queries
 - ⚠️ Row count drops > 20% → Potential data source issue
 
-### Silver → Gold Pipeline
+### pl_streaming_gold
 
 **Key Metrics to Track:**
 - Execution frequency: Every 15 minutes
@@ -85,7 +85,7 @@ print(f"Total rows processed: {total_row_count}")
 
 **Monitor via Notebook Output:**
 ```python
-# In 03-silver-to-gold.ipynb
+# In 04-streaming-to-gold.ipynb
 # Check summary cell for:
 print(f"Gold tables created: {gold_success}")
 print(f"Failed tables: {gold_failed}")
@@ -191,7 +191,7 @@ else:
 Create a Gold layer table for monitoring metrics:
 
 ```python
-# In 03-silver-to-gold.ipynb - add this aggregation
+# In 04-streaming-to-gold.ipynb - add this aggregation
 def create_monitoring_metrics():
     """Create monitoring metrics table."""
     df_receipts = read_silver("fact_receipts")
@@ -232,7 +232,7 @@ Track pipeline execution times to identify performance degradation:
 execution_time = (datetime.now() - start_time).total_seconds()
 
 log_df = spark.createDataFrame([{
-    "notebook_name": "02-onelake-to-silver",
+    "notebook_name": "03-streaming-to-silver",
     "execution_time_seconds": execution_time,
     "rows_processed": total_row_count,
     "success": True,

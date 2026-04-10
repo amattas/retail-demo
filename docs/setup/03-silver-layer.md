@@ -23,7 +23,8 @@ Upload the following notebooks to your Lakehouse:
 | `11-ml-journey-analysis.ipynb` | BLE beacon journey patterns |
 | `12-ml-stockout-prediction.ipynb` | Spark ML GBT stockout risk |
 | `13-ml-delivery-prediction.ipynb` | Spark ML GBT dwell predictions with empirical intervals |
-| `14-ml-dynamic-pricing.ipynb` | Elasticity-based pricing |
+| `14-ml-dynamic-pricing.ipynb` | Elasticity-aware pricing + constraints |
+| `30-create-ontology.ipynb` | Optional: create or refresh a Fabric ontology from core Silver tables |
 | `99-reset-lakehouse.ipynb` | Reset all tables (optional, for testing) |
 
 ## Step 3.2: Run Historical Data Load
@@ -34,6 +35,8 @@ Upload the following notebooks to your Lakehouse:
 2. ✅ Load 18 fact tables from Files/ parquet to Silver (ag)
 3. ✅ Create Gold aggregation tables in (au)
 4. ✅ Handle schema conflicts in parquet files automatically
+
+After the Silver tables exist, you can optionally run `30-create-ontology.ipynb` to create or refresh a Fabric ontology item over the core retail entities and relationships.
 
 ### Processing Logic
 

@@ -20,11 +20,11 @@ Upload the following notebooks to your Lakehouse:
 | `07-ml-market-basket.ipynb` | FP-Growth | Weekly | `gold_product_associations` |
 | `08-ml-customer-segmentation.ipynb` | RFM + K-means | Weekly | `gold_customer_segments` |
 | `09-ml-churn-prediction.ipynb` | Spark ML GBTClassifier | Weekly | `gold_churn_predictions` |
-| `10-ml-promotion-effectiveness.ipynb` | Log-log regression | Weekly | `gold_price_elasticity`, `gold_promotion_lift` |
+| `10-ml-promotion-effectiveness.ipynb` | Log-log regression + promo lift analysis | Weekly | `gold_price_elasticity`, `gold_promotion_lift` |
 | `11-ml-journey-analysis.ipynb` | Path analysis | Daily | `gold_journey_patterns`, `gold_zone_transitions`, `gold_zone_dwell_stats` |
 | `12-ml-stockout-prediction.ipynb` | Spark ML GBTClassifier | Daily | `gold_stockout_risk` |
 | `13-ml-delivery-prediction.ipynb` | Spark ML GBTRegressor + empirical intervals | Daily | `gold_dwell_predictions` |
-| `14-ml-dynamic-pricing.ipynb` | Elasticity optimization | Daily | `gold_pricing_recommendations` |
+| `14-ml-dynamic-pricing.ipynb` | Elasticity-aware pricing + business constraints | Daily | `pricing_constraints`, `gold_pricing_recommendations` |
 
 ## Step 9.2: Run Initial Model Training
 
@@ -38,10 +38,10 @@ Run each notebook manually in sequence to verify it completes successfully. Star
 6. **Run `12-ml-stockout-prediction`** — requires `ag.fact_store_inventory_txn`, `ag.fact_receipt_lines`, `ag.fact_receipts`, `ag.dim_products`
 7. **Run `13-ml-delivery-prediction`** — requires `ag.fact_truck_moves`, `ag.dim_trucks`, `ag.dim_stores`, `ag.dim_distribution_centers`
 8. **Run `11-ml-journey-analysis`** — requires `ag.fact_customer_zone_changes`; `ag.fact_receipts` is optional for conversion metrics
-9. **Run `14-ml-dynamic-pricing`** — requires `au.gold_price_elasticity` (from notebook 10)
+9. **Run `14-ml-dynamic-pricing`** — uses `au.gold_price_elasticity` from notebook 10 for elasticity optimization; without it, the notebook falls back to rule-based constrained pricing
 
 !!! note
-    Notebook 14 depends on notebook 10's output. Run 10 first.
+    For full elasticity-driven pricing, run notebook 10 before notebook 14. Notebook 14 can still complete without `au.gold_price_elasticity`, but it will skip the elasticity optimization phase and produce rule-based constrained recommendations only.
 
 ## Step 9.3: Create ML Pipelines
 
@@ -84,11 +84,15 @@ Some notebooks accept additional parameters with sensible defaults:
 | `07` | `MIN_SUPPORT` | `0.01` | FP-Growth minimum support |
 | `07` | `MIN_CONFIDENCE` | `0.3` | FP-Growth minimum confidence |
 | `09` | `CHURN_WINDOW_DAYS` | `90` | Days without purchase = churned |
+| `10` | `PROMO_EPISODE_GAP_DAYS` | `7` | Gap used to split reused promo codes into distinct promotion episodes |
+| `10` | `PROMO_LINES_TABLE` | `fact_promo_lines` | Preferred promo-to-product mapping table; receipt-line fallback is used if unavailable |
 | `11` | `ANALYSIS_DAYS` | `30` | BLE data lookback window |
+| `11` | `RECEIPT_MATCH_GRACE_WINDOW_MINUTES` | `5` | Minutes after a session ends that a receipt can still count as matched |
 | `12` | `FORECAST_HORIZON_DAYS` | `3` | Stockout prediction horizon |
 | `13` | `INTERVAL_COVERAGE` | `0.80` | Target coverage for empirical residual-based prediction intervals |
+| `14` | `SALES_WINDOW_DAYS` | `30` | Trailing demand window used for pricing features |
 
-Notebooks `09`, `12`, and `13` also accept source/output table parameters; the table names in this guide reflect the default examples used by the notebooks.
+Notebooks `09`-`14` also accept source/output table parameters; the table names in this guide reflect the default examples used by the notebooks. Notebook `14` additionally writes a supporting constraints table, `au.pricing_constraints`, alongside `au.gold_pricing_recommendations`.
 
 ### Pipeline Configuration
 
@@ -103,21 +107,30 @@ For each ML pipeline:
 
 ## Verification
 
-After running all notebooks, verify the Gold ML tables exist:
+After running all notebooks, verify the ML output tables exist:
 
 ```sql
 -- In Lakehouse SQL Analytics
 SHOW TABLES IN au LIKE 'gold_*';
+SHOW TABLES IN au LIKE 'pricing_constraints';
 
 -- Check row counts
 SELECT 'gold_demand_forecast' as tbl, COUNT(*) as rows FROM au.gold_demand_forecast
+UNION ALL SELECT 'gold_product_associations', COUNT(*) FROM au.gold_product_associations
 UNION ALL SELECT 'gold_customer_segments', COUNT(*) FROM au.gold_customer_segments
 UNION ALL SELECT 'gold_churn_predictions', COUNT(*) FROM au.gold_churn_predictions
+UNION ALL SELECT 'gold_price_elasticity', COUNT(*) FROM au.gold_price_elasticity
+UNION ALL SELECT 'gold_promotion_lift', COUNT(*) FROM au.gold_promotion_lift
+UNION ALL SELECT 'gold_journey_patterns', COUNT(*) FROM au.gold_journey_patterns
+UNION ALL SELECT 'gold_zone_transitions', COUNT(*) FROM au.gold_zone_transitions
+UNION ALL SELECT 'gold_zone_dwell_stats', COUNT(*) FROM au.gold_zone_dwell_stats
 UNION ALL SELECT 'gold_stockout_risk', COUNT(*) FROM au.gold_stockout_risk
+UNION ALL SELECT 'gold_dwell_predictions', COUNT(*) FROM au.gold_dwell_predictions
+UNION ALL SELECT 'pricing_constraints', COUNT(*) FROM au.pricing_constraints
 UNION ALL SELECT 'gold_pricing_recommendations', COUNT(*) FROM au.gold_pricing_recommendations;
 ```
 
-### Expected Gold ML Tables
+### Expected ML Output Tables
 
 | Table | Expected Rows | Key Columns |
 |-------|--------------|-------------|
@@ -125,14 +138,15 @@ UNION ALL SELECT 'gold_pricing_recommendations', COUNT(*) FROM au.gold_pricing_r
 | `gold_product_associations` | Up to 100 rules | `antecedent`, `consequent`, `confidence`, `lift` |
 | `gold_customer_segments` | 1 per customer | `customer_id`, `segment`, `rfm_score` |
 | `gold_churn_predictions` | 1 per customer | `customer_id`, `churn_probability`, `risk_category` |
-| `gold_price_elasticity` | 1 per product | `product_id`, `elasticity`, `optimal_price` |
-| `gold_promotion_lift` | 1 per promotion | `promo_code`, `lift_pct`, `roas` |
-| `gold_journey_patterns` | Top paths | `path`, `frequency`, `conversion_rate` |
-| `gold_zone_transitions` | Zone pairs | `from_zone`, `to_zone`, `transition_count` |
+| `gold_price_elasticity` | 1 per product | `product_id`, `elasticity_coefficient`, `elasticity_category`, `confidence_interval_lower` |
+| `gold_promotion_lift` | 1 per promo episode × product | `promo_code`, `product_id`, `incremental_lift_pct`, `net_lift_pct`, `roi_category` |
+| `gold_journey_patterns` | Top paths | `path_string`, `occurrence_count`, `conversion_rate` |
+| `gold_zone_transitions` | Zone pairs | `from_zone`, `to_zone`, `transition_count`, `transition_probability` |
 | `gold_zone_dwell_stats` | 1 per zone | `zone`, `avg_dwell_seconds`, `visit_count` |
 | `gold_stockout_risk` | store × product | `store_id`, `product_id`, `stockout_probability`, `risk_level` |
 | `gold_dwell_predictions` | 1 per shipment | `shipment_id`, `predicted_dwell_minutes`, `lower_bound_minutes`, `upper_bound_minutes` |
-| `gold_pricing_recommendations` | 1 per product | `product_id`, `current_price`, `recommended_price`, `expected_revenue_change` |
+| `pricing_constraints` | Configuration reference rows | `constraint_name`, `constraint_value`, `description` |
+| `gold_pricing_recommendations` | 1 per product | `product_id`, `current_price`, `recommended_price`, `projected_revenue_impact_30d`, `reason_codes` |
 
 ## Troubleshooting
 
@@ -158,7 +172,7 @@ FROM ag.fact_receipts;
 
 ### Notebook 14 fails with "gold_price_elasticity not found"
 
-Run notebook 10 first — it produces the elasticity table that notebook 14 consumes.
+Run notebook 10 first if you want elasticity-optimized pricing. Notebook 14 can still complete without `au.gold_price_elasticity`, but it will fall back to rule-based constrained pricing and skip the elasticity phase.
 
 ## Next Steps
 

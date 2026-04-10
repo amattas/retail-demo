@@ -116,11 +116,11 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 - [x] Market basket analysis — `07-ml-market-basket.ipynb` (FP-Growth, cross-sell recommendations)
 - [x] Customer segmentation — `08-ml-customer-segmentation.ipynb` (RFM + K-means)
 - [x] Customer churn prediction — `09-ml-churn-prediction.ipynb` (Spark ML GBTClassifier, AUC-ROC >0.75)
-- [x] Promotion effectiveness analysis — `10-ml-promotion-effectiveness.ipynb` (price elasticity, lift)
+- [x] Promotion effectiveness analysis — `10-ml-promotion-effectiveness.ipynb` (price elasticity, promo lift)
 - [x] In-store journey analysis — `11-ml-journey-analysis.ipynb` (BLE beacon path analysis)
 - [x] Stockout prediction — `12-ml-stockout-prediction.ipynb` (Spark ML GBTClassifier, 3-day forecast)
 - [x] Delivery time prediction — `13-ml-delivery-prediction.ipynb` (Spark ML GBTRegressor with empirical prediction intervals)
-- [x] Dynamic pricing optimization — `14-ml-dynamic-pricing.ipynb` (elasticity-based pricing)
+- [x] Dynamic pricing optimization — `14-ml-dynamic-pricing.ipynb` (elasticity-aware pricing recommendations)
 - [ ] Deploy anomaly detection models on sales and inventory streams
 - [ ] Integrate Azure OpenAI for auto-generated executive summaries
 - [ ] Build recommendation scoring pipeline (next-best-product)
@@ -128,7 +128,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 ### Advanced Use Cases:
 - [ ] CPG supplier collaboration portal (row-level security, embedded dashboards)
 - [ ] Retail media network tracking (ad revenue, impression-to-purchase)
-- [ ] Dynamic pricing optimization (markdown recommendations)
+- [ ] Closed-loop dynamic pricing deployment (automated price activation and feedback loops)
 - [ ] External data integration (weather API, social sentiment feeds)
 
 ### Copilot Enhancements:
