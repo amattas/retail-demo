@@ -24,11 +24,11 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 | `06-ml-demand-forecast.ipynb` | Daily 6 AM | GBT demand forecasts → `au.gold_demand_forecast` |
 | `07-ml-market-basket.ipynb` | Weekly | FP-Growth product associations → `au.gold_product_associations` |
 | `08-ml-customer-segmentation.ipynb` | Weekly | RFM + K-means customer segments → `au.gold_customer_segments` |
-| `09-ml-churn-prediction.ipynb` | Weekly | LightGBM churn risk scores → `au.gold_churn_predictions` |
+| `09-ml-churn-prediction.ipynb` | Weekly | Spark ML GBT churn risk scores → `au.gold_churn_predictions` |
 | `10-ml-promotion-effectiveness.ipynb` | Weekly | Price elasticity & promotion lift → `au.gold_price_elasticity`, `au.gold_promotion_lift` |
 | `11-ml-journey-analysis.ipynb` | Daily | BLE beacon journey patterns → `au.gold_journey_patterns`, `au.gold_zone_transitions`, `au.gold_zone_dwell_stats` |
-| `12-ml-stockout-prediction.ipynb` | Daily | LightGBM stockout risk → `au.gold_stockout_risk` |
-| `13-ml-delivery-prediction.ipynb` | Daily | LightGBM truck dwell predictions → `au.gold_dwell_predictions` |
+| `12-ml-stockout-prediction.ipynb` | Daily | Spark ML GBT stockout risk → `au.gold_stockout_risk` |
+| `13-ml-delivery-prediction.ipynb` | Daily | Spark ML GBT dwell predictions with empirical intervals → `au.gold_dwell_predictions` |
 | `14-ml-dynamic-pricing.ipynb` | Daily | Elasticity-based pricing → `au.gold_pricing_recommendations` |
 | `99-reset-lakehouse.ipynb` | Manual | Drop all Silver/Gold tables and databases |
 
@@ -89,14 +89,14 @@ Pre-aggregated tables in `au` schema:
 | `au.gold_demand_forecast` | `06` | GBT | Daily |
 | `au.gold_product_associations` | `07` | FP-Growth | Weekly |
 | `au.gold_customer_segments` | `08` | K-means | Weekly |
-| `au.gold_churn_predictions` | `09` | LightGBM | Weekly |
+| `au.gold_churn_predictions` | `09` | Spark ML GBTClassifier | Weekly |
 | `au.gold_price_elasticity` | `10` | Log-log regression | Weekly |
 | `au.gold_promotion_lift` | `10` | Baseline comparison | Weekly |
 | `au.gold_journey_patterns` | `11` | Path analysis | Daily |
 | `au.gold_zone_transitions` | `11` | Path analysis | Daily |
 | `au.gold_zone_dwell_stats` | `11` | Path analysis | Daily |
-| `au.gold_stockout_risk` | `12` | LightGBM | Daily |
-| `au.gold_dwell_predictions` | `13` | LightGBM | Daily |
+| `au.gold_stockout_risk` | `12` | Spark ML GBTClassifier | Daily |
+| `au.gold_dwell_predictions` | `13` | Spark ML GBTRegressor + empirical intervals | Daily |
 | `au.gold_pricing_recommendations` | `14` | Elasticity optimization | Daily |
 
 ## Pipelines

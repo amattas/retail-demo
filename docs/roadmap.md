@@ -115,11 +115,11 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 - [x] Train demand forecasting models — `06-ml-demand-forecast.ipynb` (GBT, 14-day horizon per SKU)
 - [x] Market basket analysis — `07-ml-market-basket.ipynb` (FP-Growth, cross-sell recommendations)
 - [x] Customer segmentation — `08-ml-customer-segmentation.ipynb` (RFM + K-means)
-- [x] Customer churn prediction — `09-ml-churn-prediction.ipynb` (LightGBM, AUC-ROC >0.75)
+- [x] Customer churn prediction — `09-ml-churn-prediction.ipynb` (Spark ML GBTClassifier, AUC-ROC >0.75)
 - [x] Promotion effectiveness analysis — `10-ml-promotion-effectiveness.ipynb` (price elasticity, lift)
 - [x] In-store journey analysis — `11-ml-journey-analysis.ipynb` (BLE beacon path analysis)
-- [x] Stockout prediction — `12-ml-stockout-prediction.ipynb` (LightGBM, 3-day forecast)
-- [x] Delivery time prediction — `13-ml-delivery-prediction.ipynb` (LightGBM quantile regression)
+- [x] Stockout prediction — `12-ml-stockout-prediction.ipynb` (Spark ML GBTClassifier, 3-day forecast)
+- [x] Delivery time prediction — `13-ml-delivery-prediction.ipynb` (Spark ML GBTRegressor with empirical prediction intervals)
 - [x] Dynamic pricing optimization — `14-ml-dynamic-pricing.ipynb` (elasticity-based pricing)
 - [ ] Deploy anomaly detection models on sales and inventory streams
 - [ ] Integrate Azure OpenAI for auto-generated executive summaries

@@ -147,11 +147,11 @@ Pipelines for ML notebooks created during [Phase 9: ML Notebooks](../setup/09-ml
 | `pl_demand_forecast` | Daily 6 AM UTC | `06-ml-demand-forecast` | GBT | `au.gold_demand_forecast` |
 | `pl_market_basket` | Weekly Sun 1 AM | `07-ml-market-basket` | FP-Growth | `au.gold_product_associations` |
 | `pl_customer_segmentation` | Weekly Sun 2 AM | `08-ml-customer-segmentation` | K-means | `au.gold_customer_segments` |
-| `pl_churn_prediction` | Weekly Sun 3 AM | `09-ml-churn-prediction` | LightGBM | `au.gold_churn_predictions` |
+| `pl_churn_prediction` | Weekly Sun 3 AM | `09-ml-churn-prediction` | Spark ML GBTClassifier | `au.gold_churn_predictions` |
 | `pl_promotion_effectiveness` | Weekly Sun 4 AM | `10-ml-promotion-effectiveness` | Regression | `au.gold_price_elasticity`, `au.gold_promotion_lift` |
 | `pl_journey_analysis` | Daily 4 AM | `11-ml-journey-analysis` | Path analysis | `au.gold_journey_patterns`, `au.gold_zone_transitions`, `au.gold_zone_dwell_stats` |
-| `pl_stockout_prediction` | Daily 5 AM | `12-ml-stockout-prediction` | LightGBM | `au.gold_stockout_risk` |
-| `pl_delivery_prediction` | Daily 5:30 AM | `13-ml-delivery-prediction` | LightGBM | `au.gold_dwell_predictions` |
+| `pl_stockout_prediction` | Daily 5 AM | `12-ml-stockout-prediction` | Spark ML GBTClassifier | `au.gold_stockout_risk` |
+| `pl_delivery_prediction` | Daily 5:30 AM | `13-ml-delivery-prediction` | Spark ML GBTRegressor | `au.gold_dwell_predictions` |
 | `pl_dynamic_pricing` | Daily 7 AM | `14-ml-dynamic-pricing` | Optimization | `au.gold_pricing_recommendations` |
 
 ### ML Pipeline Configuration
@@ -172,6 +172,6 @@ GOLD_DB = "au"
 
 ### Schedule Rationale
 
-- **Daily notebooks** (07, 12-15) run in sequence starting at 4 AM UTC to avoid overlap
-- **Weekly notebooks** (08-11) run Sunday mornings when pipeline load is lowest
+- **Daily notebooks** run between 4 AM and 7 AM UTC to avoid overlap
+- **Weekly notebooks** (`07`-`10`) run Sunday mornings when pipeline load is lowest
 - All ML pipelines run **after** `pl_maintenance` (3 AM) to operate on optimized tables

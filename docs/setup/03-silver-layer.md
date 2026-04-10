@@ -18,11 +18,11 @@ Upload the following notebooks to your Lakehouse:
 | `06-ml-demand-forecast.ipynb` | GBT demand forecasts |
 | `07-ml-market-basket.ipynb` | FP-Growth product associations |
 | `08-ml-customer-segmentation.ipynb` | RFM + K-means customer segments |
-| `09-ml-churn-prediction.ipynb` | LightGBM churn risk scores |
+| `09-ml-churn-prediction.ipynb` | Spark ML GBT churn risk scores |
 | `10-ml-promotion-effectiveness.ipynb` | Price elasticity & promotion lift |
 | `11-ml-journey-analysis.ipynb` | BLE beacon journey patterns |
-| `12-ml-stockout-prediction.ipynb` | LightGBM stockout risk |
-| `13-ml-delivery-prediction.ipynb` | LightGBM truck dwell predictions |
+| `12-ml-stockout-prediction.ipynb` | Spark ML GBT stockout risk |
+| `13-ml-delivery-prediction.ipynb` | Spark ML GBT dwell predictions with empirical intervals |
 | `14-ml-dynamic-pricing.ipynb` | Elasticity-based pricing |
 | `99-reset-lakehouse.ipynb` | Reset all tables (optional, for testing) |
 

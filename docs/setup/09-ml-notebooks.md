@@ -19,11 +19,11 @@ Upload the following notebooks to your Lakehouse:
 | `06-ml-demand-forecast.ipynb` | GBT (Spark ML) | Daily 6 AM | `gold_demand_forecast` |
 | `07-ml-market-basket.ipynb` | FP-Growth | Weekly | `gold_product_associations` |
 | `08-ml-customer-segmentation.ipynb` | RFM + K-means | Weekly | `gold_customer_segments` |
-| `09-ml-churn-prediction.ipynb` | LightGBM | Weekly | `gold_churn_predictions` |
+| `09-ml-churn-prediction.ipynb` | Spark ML GBTClassifier | Weekly | `gold_churn_predictions` |
 | `10-ml-promotion-effectiveness.ipynb` | Log-log regression | Weekly | `gold_price_elasticity`, `gold_promotion_lift` |
 | `11-ml-journey-analysis.ipynb` | Path analysis | Daily | `gold_journey_patterns`, `gold_zone_transitions`, `gold_zone_dwell_stats` |
-| `12-ml-stockout-prediction.ipynb` | LightGBM | Daily | `gold_stockout_risk` |
-| `13-ml-delivery-prediction.ipynb` | LightGBM | Daily | `gold_dwell_predictions` |
+| `12-ml-stockout-prediction.ipynb` | Spark ML GBTClassifier | Daily | `gold_stockout_risk` |
+| `13-ml-delivery-prediction.ipynb` | Spark ML GBTRegressor + empirical intervals | Daily | `gold_dwell_predictions` |
 | `14-ml-dynamic-pricing.ipynb` | Elasticity optimization | Daily | `gold_pricing_recommendations` |
 
 ## Step 9.2: Run Initial Model Training
@@ -34,10 +34,10 @@ Run each notebook manually in sequence to verify it completes successfully. Star
 2. **Run `08-ml-customer-segmentation`** — requires `ag.fact_receipts`
 3. **Run `09-ml-churn-prediction`** — requires `ag.fact_receipts`, `ag.dim_customers`
 4. **Run `07-ml-market-basket`** — requires `ag.fact_receipt_lines`
-5. **Run `10-ml-promotion-effectiveness`** — requires `ag.fact_receipt_lines`, `ag.fact_promotions`
-6. **Run `12-ml-stockout-prediction`** — requires `ag.fact_store_inventory_txn`, `ag.fact_stockouts`
-7. **Run `13-ml-delivery-prediction`** — requires `ag.fact_truck_moves`
-8. **Run `11-ml-journey-analysis`** — requires `ag.fact_ble_pings`, `ag.fact_zone_changes`
+5. **Run `10-ml-promotion-effectiveness`** — requires `ag.fact_receipt_lines`, `ag.fact_promotions`, `ag.dim_products`; `ag.fact_promo_lines` is preferred when available for promo-product mapping
+6. **Run `12-ml-stockout-prediction`** — requires `ag.fact_store_inventory_txn`, `ag.fact_receipt_lines`, `ag.fact_receipts`, `ag.dim_products`
+7. **Run `13-ml-delivery-prediction`** — requires `ag.fact_truck_moves`, `ag.dim_trucks`, `ag.dim_stores`, `ag.dim_distribution_centers`
+8. **Run `11-ml-journey-analysis`** — requires `ag.fact_customer_zone_changes`; `ag.fact_receipts` is optional for conversion metrics
 9. **Run `14-ml-dynamic-pricing`** — requires `au.gold_price_elasticity` (from notebook 10)
 
 !!! note
@@ -68,7 +68,7 @@ Create a pipeline for each ML notebook following the same process as [Phase 5](0
 
 ### Pipeline Parameters
 
-All ML notebooks use the same parameters:
+All ML notebooks use the same core parameters:
 
 ```json
 {
@@ -81,11 +81,14 @@ Some notebooks accept additional parameters with sensible defaults:
 
 | Notebook | Extra Parameter | Default | Description |
 |----------|----------------|---------|-------------|
-| `08` | `MIN_SUPPORT` | `0.01` | FP-Growth minimum support |
-| `08` | `MIN_CONFIDENCE` | `0.3` | FP-Growth minimum confidence |
-| `10` | `CHURN_WINDOW_DAYS` | `90` | Days without purchase = churned |
-| `12` | `ANALYSIS_DAYS` | `30` | BLE data lookback window |
-| `13` | `FORECAST_HORIZON_DAYS` | `3` | Stockout prediction horizon |
+| `07` | `MIN_SUPPORT` | `0.01` | FP-Growth minimum support |
+| `07` | `MIN_CONFIDENCE` | `0.3` | FP-Growth minimum confidence |
+| `09` | `CHURN_WINDOW_DAYS` | `90` | Days without purchase = churned |
+| `11` | `ANALYSIS_DAYS` | `30` | BLE data lookback window |
+| `12` | `FORECAST_HORIZON_DAYS` | `3` | Stockout prediction horizon |
+| `13` | `INTERVAL_COVERAGE` | `0.80` | Target coverage for empirical residual-based prediction intervals |
+
+Notebooks `09`, `12`, and `13` also accept source/output table parameters; the table names in this guide reflect the default examples used by the notebooks.
 
 ### Pipeline Configuration
 
@@ -121,14 +124,14 @@ UNION ALL SELECT 'gold_pricing_recommendations', COUNT(*) FROM au.gold_pricing_r
 | `gold_demand_forecast` | stores × products × 14 days | `store_id`, `product_id`, `forecast_date`, `predicted_quantity` |
 | `gold_product_associations` | Up to 100 rules | `antecedent`, `consequent`, `confidence`, `lift` |
 | `gold_customer_segments` | 1 per customer | `customer_id`, `segment`, `rfm_score` |
-| `gold_churn_predictions` | 1 per customer | `customer_id`, `churn_probability`, `risk_tier` |
+| `gold_churn_predictions` | 1 per customer | `customer_id`, `churn_probability`, `risk_category` |
 | `gold_price_elasticity` | 1 per product | `product_id`, `elasticity`, `optimal_price` |
 | `gold_promotion_lift` | 1 per promotion | `promo_code`, `lift_pct`, `roas` |
 | `gold_journey_patterns` | Top paths | `path`, `frequency`, `conversion_rate` |
 | `gold_zone_transitions` | Zone pairs | `from_zone`, `to_zone`, `transition_count` |
 | `gold_zone_dwell_stats` | 1 per zone | `zone`, `avg_dwell_seconds`, `visit_count` |
-| `gold_stockout_risk` | store × product | `store_id`, `product_id`, `risk_score`, `risk_tier` |
-| `gold_dwell_predictions` | 1 per route | `truck_id`, `predicted_dwell_minutes`, `confidence_lower`, `confidence_upper` |
+| `gold_stockout_risk` | store × product | `store_id`, `product_id`, `stockout_probability`, `risk_level` |
+| `gold_dwell_predictions` | 1 per shipment | `shipment_id`, `predicted_dwell_minutes`, `lower_bound_minutes`, `upper_bound_minutes` |
 | `gold_pricing_recommendations` | 1 per product | `product_id`, `current_price`, `recommended_price`, `expected_revenue_change` |
 
 ## Troubleshooting
