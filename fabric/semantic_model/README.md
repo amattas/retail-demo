@@ -7,7 +7,7 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - **Dimension Tables** (DirectLake): Master data from `ag` schema (dim_stores, dim_products)
 - **KQL views** (optional): Near-real-time tiles via DirectQuery
 
-## Current Tables (12)
+## Current Tables (25)
 
 ### Gold Aggregations (9 tables)
 - `gold_sales_minute_store` - Sales velocity per minute/store
@@ -24,6 +24,21 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - `dim_stores` - Store master data
 - `dim_products` - Product master data
 - `dim_date` - Date dimension with YYYYMMDD key, fiscal calendar attributes
+
+### ML & Predictive Analytics Tables (13 tables)
+- `gold_demand_forecast` - GBT demand predictions by store/product
+- `product_recommendations` - Market basket "bought together" pairs
+- `gold_customer_segments` - RFM + K-means customer segments
+- `gold_churn_predictions` - Spark ML GBT churn risk scores
+- `gold_price_elasticity` - Log-log price elasticity coefficients
+- `gold_promotion_lift` - Promo episode lift analysis
+- `gold_zone_dwell_stats` - BLE zone dwell time statistics
+- `gold_zone_transitions` - Zone-to-zone transition probabilities
+- `gold_journey_patterns` - Customer journey path analysis
+- `gold_stockout_risk` - Spark ML GBT stockout risk predictions
+- `gold_dwell_predictions` - Delivery dwell time predictions with intervals
+- `gold_pricing_recommendations` - Elasticity-aware pricing recommendations
+- `pricing_constraints` - Pricing business constraint reference
 
 ## Perspectives
 - **Operations**: Sales, inventory, dwell, tender mix
@@ -92,5 +107,12 @@ This repo also includes a Power BI Project at `fabric/semantic_model/retail_mode
 - **Online, Payments & Marketing**: Online sales by day, tender mix, and marketing cost by campaign
 - **Inventory & Replenishment**: On-hand units/value plus reorder quantity by priority
 - **Logistics Control Center**: Truck dwell/throughput plus DC inventory on hand
+
+### ML Report Pages (5 pages)
+- **Customer Segments & Churn** - Segment distribution, churn risk, RFM analysis
+- **Customer Journey** - Zone dwell heatmap, transition matrix, path analysis
+- **Demand & Stockout** - Forecast trends, stockout risk scatter, at-risk SKUs
+- **Pricing & Promotions** - Elasticity by category, pricing recommendations, promotion lift
+- **Logistics & Delivery Predictions** - Predicted vs actual dwell, outlier shipments
 
 Open it in **Power BI Desktop** via File → Open → `fabric/semantic_model/retail_model.pbip`.

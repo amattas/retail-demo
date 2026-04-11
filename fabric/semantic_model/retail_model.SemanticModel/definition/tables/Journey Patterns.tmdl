@@ -1,0 +1,179 @@
+table 'Journey Patterns'
+	lineageTag: b5000000-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_journey_patterns]
+
+	measure 'Avg Conversion Rate' = AVERAGE('Journey Patterns'[Conversion Rate])
+		formatString: 0.0%
+		lineageTag: b5000000-0000-0000-0001-000000000001
+
+	measure 'Avg Session Duration' = AVERAGE('Journey Patterns'[Avg Session Duration Minutes])
+		formatString: #,0.0
+		lineageTag: b5000000-0000-0000-0001-000000000002
+
+	measure 'Total Journey Sessions' = SUM('Journey Patterns'[Total Sessions])
+		formatString: #,0
+		lineageTag: b5000000-0000-0000-0001-000000000003
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000001
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Rank
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000002
+		sourceLineageTag: rank
+		summarizeBy: none
+		sourceColumn: rank
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Path String'
+		dataType: string
+		lineageTag: b5000000-0000-0000-0002-000000000003
+		sourceLineageTag: path_string
+		summarizeBy: none
+		sourceColumn: path_string
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Path Length'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000004
+		sourceLineageTag: path_length
+		summarizeBy: none
+		sourceColumn: path_length
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Occurrence Count'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000005
+		sourceLineageTag: occurrence_count
+		summarizeBy: sum
+		sourceColumn: occurrence_count
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Total Sessions'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000006
+		sourceLineageTag: total_sessions
+		summarizeBy: sum
+		sourceColumn: total_sessions
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Sessions With Purchase'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-000000000007
+		sourceLineageTag: sessions_with_purchase
+		summarizeBy: sum
+		sourceColumn: sessions_with_purchase
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Conversion Rate'
+		dataType: double
+		lineageTag: b5000000-0000-0000-0002-000000000008
+		sourceLineageTag: conversion_rate
+		summarizeBy: none
+		sourceColumn: conversion_rate
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Avg Session Duration Minutes'
+		dataType: double
+		lineageTag: b5000000-0000-0000-0002-000000000009
+		sourceLineageTag: avg_session_duration_minutes
+		summarizeBy: none
+		sourceColumn: avg_session_duration_minutes
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Avg Basket Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-00000000000a
+		sourceLineageTag: avg_basket_cents
+		summarizeBy: none
+		sourceColumn: avg_basket_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Total Revenue Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-00000000000b
+		sourceLineageTag: total_revenue_cents
+		summarizeBy: sum
+		sourceColumn: total_revenue_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Analysis Period Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: b5000000-0000-0000-0002-00000000000c
+		sourceLineageTag: analysis_period_days
+		summarizeBy: none
+		sourceColumn: analysis_period_days
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b5000000-0000-0000-0002-00000000000d
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Journey Patterns' = entity
+		mode: directLake
+		source
+			entityName: gold_journey_patterns
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

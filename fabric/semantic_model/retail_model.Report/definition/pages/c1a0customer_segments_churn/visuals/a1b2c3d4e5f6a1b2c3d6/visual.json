@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "34f4ed0049a0b7705abe",
+  "name": "a1b2c3d4e5f6a1b2c3d6",
   "position": {
-    "x": 645,
-    "y": 100,
+    "x": 440,
+    "y": 80,
     "z": 1,
     "height": 112,
-    "width": 595
+    "width": 380
   },
   "visual": {
     "visualType": "cardVisual",
@@ -19,14 +19,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Churn Predictions"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Avg Churn Probability"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Churn Predictions.Avg Churn Probability",
+              "nativeQueryRef": "Avg Churn Probability"
             }
           ]
         }
@@ -38,10 +38,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Churn Predictions"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Avg Churn Probability"
               }
             },
             "direction": "Descending"
@@ -59,18 +59,18 @@
                 "color": {
                   "expr": {
                     "Literal": {
-                      "Value": "'#118DFF'"
+                      "Value": "'#E3008C'"
                     }
                   }
                 }
               }
+            }
+          },
+          "selector": {
+            "metadata": "Churn Predictions.Avg Churn Probability"
           }
-        },
-        "selector": {
-          "metadata": "Receipts.Average Basket Size"
         }
-      }
-    ],
+      ],
       "outline": [
         {
           "properties": {
@@ -112,7 +112,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Value'"
+                  "Value": "'Avg Churn Probability'"
                 }
               }
             }
@@ -125,15 +125,15 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "7078143e002176617c7a",
+        "name": "f1b2c3d4e5f6a1b2c3d6",
         "field": {
           "Measure": {
             "Expression": {
               "SourceRef": {
-                "Entity": "Receipts"
+                "Entity": "Churn Predictions"
               }
             },
-            "Property": "Average Basket Size"
+            "Property": "Avg Churn Probability"
           }
         },
         "type": "Advanced"

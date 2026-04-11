@@ -1,0 +1,372 @@
+table 'Pricing Recommendations'
+	lineageTag: b6000000-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_pricing_recommendations]
+
+	measure 'Avg Recommended Change %' = AVERAGE('Pricing Recommendations'[Change Pct])
+		formatString: 0.0%
+		lineageTag: b6000000-0000-0000-0001-000000000001
+
+	measure 'Total Revenue Impact 30d' = SUM('Pricing Recommendations'[Projected Revenue Impact 30d])
+		formatString: \$#,0;(\$#,0);\$#,0
+		lineageTag: b6000000-0000-0000-0001-000000000002
+
+	measure 'Constraint Hit Count' = CALCULATE(COUNTROWS('Pricing Recommendations'), OR('Pricing Recommendations'[Hit Min Margin] = TRUE(), 'Pricing Recommendations'[Hit Max Price] = TRUE()))
+		formatString: #,0
+		lineageTag: b6000000-0000-0000-0001-000000000003
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b6000000-0000-0000-0002-000000000001
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product Name'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000002
+		sourceLineageTag: ProductName
+		summarizeBy: none
+		sourceColumn: ProductName
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Department
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000003
+		sourceLineageTag: Department
+		summarizeBy: none
+		sourceColumn: Department
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000004
+		sourceLineageTag: Category
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subcategory
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000005
+		sourceLineageTag: Subcategory
+		summarizeBy: none
+		sourceColumn: Subcategory
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cost
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b6000000-0000-0000-0002-000000000006
+		sourceLineageTag: cost
+		summarizeBy: sum
+		sourceColumn: cost
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column MSRP
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b6000000-0000-0000-0002-000000000007
+		sourceLineageTag: msrp
+		summarizeBy: sum
+		sourceColumn: msrp
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Current Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b6000000-0000-0000-0002-000000000008
+		sourceLineageTag: current_price
+		summarizeBy: sum
+		sourceColumn: current_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Recommended Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b6000000-0000-0000-0002-000000000009
+		sourceLineageTag: recommended_price
+		summarizeBy: sum
+		sourceColumn: recommended_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Change Pct'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-00000000000a
+		sourceLineageTag: change_pct
+		summarizeBy: none
+		sourceColumn: change_pct
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Reason Codes'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-00000000000b
+		sourceLineageTag: reason_codes
+		summarizeBy: none
+		sourceColumn: reason_codes
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Markdown Factor'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-00000000000c
+		sourceLineageTag: markdown_factor
+		summarizeBy: none
+		sourceColumn: markdown_factor
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Total Inventory'
+		dataType: int64
+		formatString: 0
+		lineageTag: b6000000-0000-0000-0002-00000000000d
+		sourceLineageTag: total_inventory
+		summarizeBy: sum
+		sourceColumn: total_inventory
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Days Since Last Receipt'
+		dataType: int64
+		formatString: 0
+		lineageTag: b6000000-0000-0000-0002-00000000000e
+		sourceLineageTag: days_since_last_receipt
+		summarizeBy: none
+		sourceColumn: days_since_last_receipt
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Avg Daily Sales'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-00000000000f
+		sourceLineageTag: avg_daily_sales
+		summarizeBy: none
+		sourceColumn: avg_daily_sales
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Days Of Inventory'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-000000000010
+		sourceLineageTag: days_of_inventory
+		summarizeBy: none
+		sourceColumn: days_of_inventory
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Hit Min Margin'
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: b6000000-0000-0000-0002-000000000011
+		sourceLineageTag: hit_min_margin
+		summarizeBy: none
+		sourceColumn: hit_min_margin
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Hit Max Price'
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: b6000000-0000-0000-0002-000000000012
+		sourceLineageTag: hit_max_price
+		summarizeBy: none
+		sourceColumn: hit_max_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Violates Max Change'
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: b6000000-0000-0000-0002-000000000013
+		sourceLineageTag: violates_max_change
+		summarizeBy: none
+		sourceColumn: violates_max_change
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Elasticity Coefficient'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-000000000014
+		sourceLineageTag: elasticity_coefficient
+		summarizeBy: none
+		sourceColumn: elasticity_coefficient
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Elasticity Category'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000015
+		sourceLineageTag: elasticity_category
+		summarizeBy: none
+		sourceColumn: elasticity_category
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Projected Revenue Impact 30d'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b6000000-0000-0000-0002-000000000016
+		sourceLineageTag: projected_revenue_impact_30d
+		summarizeBy: sum
+		sourceColumn: projected_revenue_impact_30d
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Confidence Level'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000017
+		sourceLineageTag: confidence_level
+		summarizeBy: none
+		sourceColumn: confidence_level
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Confidence Score'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-000000000018
+		sourceLineageTag: confidence_score
+		summarizeBy: none
+		sourceColumn: confidence_score
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Model Type'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-000000000019
+		sourceLineageTag: model_type
+		summarizeBy: none
+		sourceColumn: model_type
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'ML Confidence'
+		dataType: double
+		lineageTag: b6000000-0000-0000-0002-00000000001a
+		sourceLineageTag: ml_confidence
+		summarizeBy: none
+		sourceColumn: ml_confidence
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Recommendation Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b6000000-0000-0000-0002-00000000001b
+		sourceLineageTag: recommendation_date
+		summarizeBy: none
+		sourceColumn: recommendation_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Recommendation Ts'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b6000000-0000-0000-0002-00000000001c
+		sourceLineageTag: recommendation_ts
+		summarizeBy: none
+		sourceColumn: recommendation_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Schema Version'
+		dataType: string
+		lineageTag: b6000000-0000-0000-0002-00000000001d
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Pricing Recommendations' = entity
+		mode: directLake
+		source
+			entityName: gold_pricing_recommendations
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

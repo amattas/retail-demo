@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "34f4ed0049a0b7705abe",
+  "name": "b1c2d3e4f5a6b1c2d3e5",
   "position": {
-    "x": 645,
-    "y": 100,
+    "x": 40,
+    "y": 80,
     "z": 1,
     "height": 112,
-    "width": 595
+    "width": 380
   },
   "visual": {
     "visualType": "cardVisual",
@@ -19,14 +19,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Journey Patterns"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Avg Conversion Rate"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Journey Patterns.Avg Conversion Rate",
+              "nativeQueryRef": "Avg Conversion Rate"
             }
           ]
         }
@@ -38,10 +38,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Journey Patterns"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Avg Conversion Rate"
               }
             },
             "direction": "Descending"
@@ -64,13 +64,13 @@
                   }
                 }
               }
+            }
+          },
+          "selector": {
+            "metadata": "Journey Patterns.Avg Conversion Rate"
           }
-        },
-        "selector": {
-          "metadata": "Receipts.Average Basket Size"
         }
-      }
-    ],
+      ],
       "outline": [
         {
           "properties": {
@@ -112,7 +112,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Value'"
+                  "Value": "'Avg Conversion Rate'"
                 }
               }
             }
@@ -125,15 +125,15 @@
   "filterConfig": {
     "filters": [
       {
-        "name": "7078143e002176617c7a",
+        "name": "f2c2d3e4f5a6b1c2d3e5",
         "field": {
           "Measure": {
             "Expression": {
               "SourceRef": {
-                "Entity": "Receipts"
+                "Entity": "Journey Patterns"
               }
             },
-            "Property": "Average Basket Size"
+            "Property": "Avg Conversion Rate"
           }
         },
         "type": "Advanced"

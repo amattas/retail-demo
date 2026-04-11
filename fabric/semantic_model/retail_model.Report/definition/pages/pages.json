@@ -8,7 +8,12 @@
     "9e42b5aa65b449a0ebf4",
     "ceceb7f0636291e0daa0",
     "825ffd037d9775388fe6",
-    "34bcc5dad64c4502abfb"
+    "34bcc5dad64c4502abfb",
+    "589d6c9c88ff9a9cff88",
+    "s1a0demand_stockout",
+    "s2a0pricing_promotions",
+    "c1a0customer_segments_churn",
+    "c2a0customer_journey"
   ],
   "activePageName": "e75b8de608b380512d29"
 }

@@ -42,6 +42,7 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic retail data ge
 - [x] Test suite fixed and passing
 - [ ] Eventstream configuration (deployment step)
 - [ ] Real-time dashboards (deployment step)
+- [x] Report page: Logistics & Delivery Predictions (rpt-supply-chain-page) — `589d6c9c88ff9a9cff88`
 - [ ] Semantic model (deployment step)
 
 ---

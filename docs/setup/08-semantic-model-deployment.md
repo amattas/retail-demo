@@ -209,6 +209,29 @@ SELECT COUNT(*) FROM au.gold_sales_minute_store;
 2. **Option B**: Rename the model before publishing (File → Save As)
 3. **Option C**: Delete the old semantic model from the workspace first
 
+### Issue: Visuals show `Missing_References` or Desktop keeps saying metadata is out of sync
+
+**Cause**: Power BI Desktop can retain stale local PBIP state after semantic-model or report-definition changes.
+
+**Solution**:
+1. Close Power BI Desktop completely.
+2. From the repo root, run:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\reset_powerbi_desktop_local_state.ps1
+   ```
+3. Reopen `fabric/semantic_model/retail_model.pbip`.
+4. If prompted to refresh or rewrite local metadata, allow it.
+5. Refresh the semantic model.
+
+If the issue persists after the reset:
+1. Reconfirm that `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl` points to the correct OneLake workspace and lakehouse GUIDs for your environment.
+2. Re-run:
+   ```bash
+   python scripts/configure_semantic_model.py \
+       --workspace-id <your-workspace-guid> \
+       --lakehouse-id <your-lakehouse-guid>
+   ```
+
 ## Model Features
 
 ### DirectLake Mode Benefits

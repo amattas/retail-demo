@@ -1,0 +1,167 @@
+table 'Price Elasticity'
+	lineageTag: a4000004-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_price_elasticity]
+
+	measure 'Avg Elasticity' = AVERAGE('Price Elasticity'[Elasticity Coefficient])
+		formatString: #,0.00
+		lineageTag: a4000004-0001-0001-0001-000000000001
+
+	measure '# of Elastic Products' = CALCULATE(COUNTROWS('Price Elasticity'), 'Price Elasticity'[Elasticity Category] IN {"Elastic", "Highly Elastic"})
+		formatString: #,0
+		lineageTag: a4000004-0001-0001-0001-000000000002
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a4000004-0002-0002-0002-000000000001
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product Name'
+		dataType: string
+		lineageTag: a4000004-0002-0002-0002-000000000002
+		sourceLineageTag: product_name
+		summarizeBy: none
+		sourceColumn: product_name
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product Category'
+		dataType: string
+		lineageTag: a4000004-0002-0002-0002-000000000003
+		sourceLineageTag: product_category
+		summarizeBy: none
+		sourceColumn: product_category
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Elasticity Coefficient'
+		dataType: double
+		lineageTag: a4000004-0002-0002-0002-000000000004
+		sourceLineageTag: elasticity_coefficient
+		summarizeBy: none
+		sourceColumn: elasticity_coefficient
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Elasticity Category'
+		dataType: string
+		lineageTag: a4000004-0002-0002-0002-000000000005
+		sourceLineageTag: elasticity_category
+		summarizeBy: none
+		sourceColumn: elasticity_category
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Confidence Interval Lower'
+		dataType: double
+		lineageTag: a4000004-0002-0002-0002-000000000006
+		sourceLineageTag: confidence_interval_lower
+		summarizeBy: none
+		sourceColumn: confidence_interval_lower
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Confidence Interval Upper'
+		dataType: double
+		lineageTag: a4000004-0002-0002-0002-000000000007
+		sourceLineageTag: confidence_interval_upper
+		summarizeBy: none
+		sourceColumn: confidence_interval_upper
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'N Observations'
+		dataType: int64
+		formatString: 0
+		lineageTag: a4000004-0002-0002-0002-000000000008
+		sourceLineageTag: n_observations
+		summarizeBy: sum
+		sourceColumn: n_observations
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Avg Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a4000004-0002-0002-0002-000000000009
+		sourceLineageTag: avg_price
+		summarizeBy: none
+		sourceColumn: avg_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Regular Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a4000004-0002-0002-0002-00000000000a
+		sourceLineageTag: regular_price
+		summarizeBy: none
+		sourceColumn: regular_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Avg Daily Quantity'
+		dataType: double
+		lineageTag: a4000004-0002-0002-0002-00000000000b
+		sourceLineageTag: avg_daily_quantity
+		summarizeBy: none
+		sourceColumn: avg_daily_quantity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a4000004-0002-0002-0002-00000000000c
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Price Elasticity' = entity
+		mode: directLake
+		source
+			entityName: gold_price_elasticity
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

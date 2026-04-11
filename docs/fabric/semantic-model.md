@@ -7,10 +7,10 @@ Power BI semantic model for unified analytics using DirectLake over Lakehouse Go
 - **Dimension tables** (DirectLake): Master data from `ag` schema (dim_stores, dim_products, dim_date)
 
 ## Entities
-- Sales, Inventory, Logistics, Marketing, Customers, Products, Stores
+- Sales, Inventory, Logistics, Marketing, Customers, Products, Stores, ML Predictions, Pricing, Customer Intelligence
 
 ## Measures
-- Sales (min/hour/day), Units, Margin, DOS, Dwell, On-time %, ROAS
+- Sales (min/hour/day), Units, Margin, DOS, Dwell, On-time %, ROAS, Churn Probability, Stockout Risk, Forecast MAPE, Revenue Impact, Lift %, Elasticity, Predicted Dwell
 
 ## Artifacts
 - **Power BI Project**: `retail_model.pbip` (includes semantic model + report)
@@ -28,6 +28,36 @@ The repo also includes `fabric/lakehouse/30-create-ontology.ipynb`, an optional 
 - **Run timing**: Manual, after `02-historical-data-load.ipynb` has created the Silver tables
 
 This complements the semantic model: the semantic model remains the analytics layer, while the ontology captures business entities and relationships as a Fabric ontology item.
+
+## ML & Predictive Analytics
+
+Thirteen ML tables provide predictions and intelligence outputs from the Lakehouse notebooks:
+
+| Table | Description |
+|---|---|
+| `gold_demand_forecast` | GBT demand predictions by store/product |
+| `product_recommendations` | Market basket "bought together" pairs |
+| `gold_customer_segments` | RFM + K-means customer segments |
+| `gold_churn_predictions` | Spark ML GBT churn risk scores |
+| `gold_price_elasticity` | Log-log price elasticity coefficients |
+| `gold_promotion_lift` | Promo episode lift analysis |
+| `gold_zone_dwell_stats` | BLE zone dwell time statistics |
+| `gold_zone_transitions` | Zone-to-zone transition probabilities |
+| `gold_journey_patterns` | Customer journey path analysis |
+| `gold_stockout_risk` | Spark ML GBT stockout risk predictions |
+| `gold_dwell_predictions` | Delivery dwell time predictions with intervals |
+| `gold_pricing_recommendations` | Elasticity-aware pricing recommendations |
+| `pricing_constraints` | Pricing business constraint reference |
+
+Five dedicated report pages surface these ML outputs:
+
+| Page | Highlights |
+|---|---|
+| **Customer Segments & Churn** | Segment distribution, churn risk, RFM analysis |
+| **Customer Journey** | Zone dwell heatmap, transition matrix, path analysis |
+| **Demand & Stockout** | Forecast trends, stockout risk scatter, at-risk SKUs |
+| **Pricing & Promotions** | Elasticity by category, pricing recommendations, promotion lift |
+| **Logistics & Delivery Predictions** | Predicted vs actual dwell, outlier shipments |
 
 ## Deployment
 

@@ -1,0 +1,118 @@
+table 'Churn Predictions'
+	lineageTag: a3000003-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_churn_predictions]
+
+	measure 'Avg Churn Probability' = AVERAGE('Churn Predictions'[Churn Probability])
+		formatString: 0.0%
+		lineageTag: a3000003-0001-0001-0001-000000000001
+
+	measure 'High Risk Customer Count' = CALCULATE(COUNTROWS('Churn Predictions'), 'Churn Predictions'[Risk Category] = "High")
+		formatString: #,0
+		lineageTag: a3000003-0001-0001-0001-000000000002
+
+	measure 'Predicted Churn Rate' = DIVIDE(CALCULATE(COUNTROWS('Churn Predictions'), 'Churn Predictions'[Churn Prediction] = 1), COUNTROWS('Churn Predictions'))
+		formatString: 0.0%
+		lineageTag: a3000003-0001-0001-0001-000000000003
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a3000003-0002-0002-0002-000000000001
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Churn Probability'
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: a3000003-0002-0002-0002-000000000002
+		sourceLineageTag: churn_probability
+		summarizeBy: none
+		sourceColumn: churn_probability
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Churn Prediction'
+		dataType: int64
+		formatString: 0
+		lineageTag: a3000003-0002-0002-0002-000000000003
+		sourceLineageTag: churn_prediction
+		summarizeBy: none
+		sourceColumn: churn_prediction
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Category'
+		dataType: string
+		lineageTag: a3000003-0002-0002-0002-000000000004
+		sourceLineageTag: risk_category
+		summarizeBy: none
+		sourceColumn: risk_category
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Is Churned Actual'
+		dataType: int64
+		formatString: 0
+		lineageTag: a3000003-0002-0002-0002-000000000005
+		sourceLineageTag: is_churned_actual
+		summarizeBy: none
+		sourceColumn: is_churned_actual
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Prediction Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a3000003-0002-0002-0002-000000000006
+		sourceLineageTag: prediction_date
+		summarizeBy: none
+		sourceColumn: prediction_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Model Version'
+		dataType: string
+		lineageTag: a3000003-0002-0002-0002-000000000007
+		sourceLineageTag: model_version
+		summarizeBy: none
+		sourceColumn: model_version
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Churn Window Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: a3000003-0002-0002-0002-000000000008
+		sourceLineageTag: churn_window_days
+		summarizeBy: none
+		sourceColumn: churn_window_days
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Churn Predictions' = entity
+		mode: directLake
+		source
+			entityName: gold_churn_predictions
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

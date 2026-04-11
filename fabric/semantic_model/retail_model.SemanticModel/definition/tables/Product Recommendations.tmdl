@@ -1,0 +1,97 @@
+table 'Product Recommendations'
+	lineageTag: b1000000-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[product_recommendations]
+
+	measure '# of Recommendations' = COUNTROWS('Product Recommendations')
+		formatString: #,0
+		lineageTag: b1000000-0000-0000-0001-000000000001
+
+	measure 'Avg Confidence' = AVERAGE('Product Recommendations'[Confidence])
+		formatString: 0.0%
+		lineageTag: b1000000-0000-0000-0001-000000000002
+
+	measure 'Avg Lift' = AVERAGE('Product Recommendations'[Lift])
+		formatString: #,0.00
+		lineageTag: b1000000-0000-0000-0001-000000000003
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b1000000-0000-0000-0002-000000000001
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Recommended Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b1000000-0000-0000-0002-000000000002
+		sourceLineageTag: recommended_product_id
+		summarizeBy: none
+		sourceColumn: recommended_product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Support
+		dataType: double
+		lineageTag: b1000000-0000-0000-0002-000000000003
+		sourceLineageTag: support
+		summarizeBy: none
+		sourceColumn: support
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Confidence
+		dataType: double
+		lineageTag: b1000000-0000-0000-0002-000000000004
+		sourceLineageTag: confidence
+		summarizeBy: none
+		sourceColumn: confidence
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Lift
+		dataType: double
+		lineageTag: b1000000-0000-0000-0002-000000000005
+		sourceLineageTag: lift
+		summarizeBy: none
+		sourceColumn: lift
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b1000000-0000-0000-0002-000000000006
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Product Recommendations' = entity
+		mode: directLake
+		source
+			entityName: product_recommendations
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

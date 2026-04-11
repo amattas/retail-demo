@@ -1,0 +1,143 @@
+table 'Customer Segments'
+	lineageTag: a2000002-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_customer_segments]
+
+	measure '# of Segmented Customers' = COUNTROWS('Customer Segments')
+		formatString: #,0
+		lineageTag: a2000002-0001-0001-0001-000000000001
+
+	measure 'Avg Monetary Value' = AVERAGE('Customer Segments'[Monetary Value])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a2000002-0001-0001-0001-000000000002
+
+	measure 'Avg Order Value by Segment' = AVERAGE('Customer Segments'[Avg Order Value])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a2000002-0001-0001-0001-000000000003
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a2000002-0002-0002-0002-000000000001
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Cluster ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a2000002-0002-0002-0002-000000000002
+		sourceLineageTag: cluster_id
+		summarizeBy: none
+		sourceColumn: cluster_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Segment Label'
+		dataType: string
+		lineageTag: a2000002-0002-0002-0002-000000000003
+		sourceLineageTag: segment_label
+		summarizeBy: none
+		sourceColumn: segment_label
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Recency Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: a2000002-0002-0002-0002-000000000004
+		sourceLineageTag: recency_days
+		summarizeBy: none
+		sourceColumn: recency_days
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Frequency
+		dataType: int64
+		formatString: 0
+		lineageTag: a2000002-0002-0002-0002-000000000005
+		sourceLineageTag: frequency
+		summarizeBy: sum
+		sourceColumn: frequency
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Monetary Value'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a2000002-0002-0002-0002-000000000006
+		sourceLineageTag: monetary_value
+		summarizeBy: sum
+		sourceColumn: monetary_value
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Avg Order Value'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: a2000002-0002-0002-0002-000000000007
+		sourceLineageTag: avg_order_value
+		summarizeBy: none
+		sourceColumn: avg_order_value
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'First Purchase Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a2000002-0002-0002-0002-000000000008
+		sourceLineageTag: first_purchase_date
+		summarizeBy: none
+		sourceColumn: first_purchase_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Last Purchase Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a2000002-0002-0002-0002-000000000009
+		sourceLineageTag: last_purchase_date
+		summarizeBy: none
+		sourceColumn: last_purchase_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Segmented At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a2000002-0002-0002-0002-00000000000a
+		sourceLineageTag: segmented_at
+		summarizeBy: none
+		sourceColumn: segmented_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Customer Segments' = entity
+		mode: directLake
+		source
+			entityName: gold_customer_segments
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

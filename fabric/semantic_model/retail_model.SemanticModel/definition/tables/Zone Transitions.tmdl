@@ -1,0 +1,89 @@
+table 'Zone Transitions'
+	lineageTag: b4000000-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_zone_transitions]
+
+	measure 'Total Transitions' = SUM('Zone Transitions'[Transition Count])
+		formatString: #,0
+		lineageTag: b4000000-0000-0000-0001-000000000001
+
+	measure 'Avg Transition Probability' = AVERAGE('Zone Transitions'[Transition Probability])
+		formatString: 0.0%
+		lineageTag: b4000000-0000-0000-0001-000000000002
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b4000000-0000-0000-0002-000000000001
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'From Zone'
+		dataType: string
+		lineageTag: b4000000-0000-0000-0002-000000000002
+		sourceLineageTag: from_zone
+		summarizeBy: none
+		sourceColumn: from_zone
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'To Zone'
+		dataType: string
+		lineageTag: b4000000-0000-0000-0002-000000000003
+		sourceLineageTag: to_zone
+		summarizeBy: none
+		sourceColumn: to_zone
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Transition Count'
+		dataType: int64
+		formatString: 0
+		lineageTag: b4000000-0000-0000-0002-000000000004
+		sourceLineageTag: transition_count
+		summarizeBy: sum
+		sourceColumn: transition_count
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Transition Probability'
+		dataType: double
+		lineageTag: b4000000-0000-0000-0002-000000000005
+		sourceLineageTag: transition_probability
+		summarizeBy: none
+		sourceColumn: transition_probability
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b4000000-0000-0000-0002-000000000006
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Zone Transitions' = entity
+		mode: directLake
+		source
+			entityName: gold_zone_transitions
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

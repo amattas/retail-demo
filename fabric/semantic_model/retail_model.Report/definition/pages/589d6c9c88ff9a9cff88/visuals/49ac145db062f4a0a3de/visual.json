@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "34f4ed0049a0b7705abe",
+  "name": "49ac145db062f4a0a3de",
   "position": {
-    "x": 645,
+    "x": 850,
     "y": 100,
     "z": 1,
     "height": 112,
-    "width": 595
+    "width": 390
   },
   "visual": {
     "visualType": "cardVisual",
@@ -19,14 +19,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Dwell Predictions"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Shipments Outside Band"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Dwell Predictions.Shipments Outside Band",
+              "nativeQueryRef": "Shipments Outside Band"
             }
           ]
         }
@@ -38,10 +38,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Dwell Predictions"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Shipments Outside Band"
               }
             },
             "direction": "Descending"
@@ -64,13 +64,13 @@
                   }
                 }
               }
+            }
+          },
+          "selector": {
+            "metadata": "Dwell Predictions.Shipments Outside Band"
           }
-        },
-        "selector": {
-          "metadata": "Receipts.Average Basket Size"
         }
-      }
-    ],
+      ],
       "outline": [
         {
           "properties": {
@@ -112,7 +112,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Value'"
+                  "Value": "'Shipments Outside Band'"
                 }
               }
             }
@@ -122,23 +122,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "7078143e002176617c7a",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "Receipts"
-              }
-            },
-            "Property": "Average Basket Size"
-          }
-        },
-        "type": "Advanced"
-      }
-    ]
-  },
-  "howCreated": "Copilot"
+  "howCreated": "Default"
 }

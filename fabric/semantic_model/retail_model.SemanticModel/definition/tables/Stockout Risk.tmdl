@@ -1,0 +1,204 @@
+table 'Stockout Risk'
+	lineageTag: a5000005-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[gold_stockout_risk]
+
+	measure 'At-Risk SKU Count' = CALCULATE(COUNTROWS('Stockout Risk'), 'Stockout Risk'[Risk Level] IN {"High", "Critical"})
+		formatString: #,0
+		lineageTag: a5000005-0001-0001-0001-000000000001
+
+	measure 'Avg Stockout Probability' = AVERAGE('Stockout Risk'[Stockout Probability])
+		formatString: 0.0%
+		lineageTag: a5000005-0001-0001-0001-000000000002
+
+	measure 'Avg Days of Inventory' = AVERAGE('Stockout Risk'[Days of Inventory])
+		formatString: #,0.0
+		lineageTag: a5000005-0001-0001-0001-000000000003
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-000000000001
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-000000000002
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Current Inventory'
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-000000000003
+		sourceLineageTag: current_inventory
+		summarizeBy: sum
+		sourceColumn: current_inventory
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Demand Velocity Daily'
+		dataType: double
+		lineageTag: a5000005-0002-0002-0002-000000000004
+		sourceLineageTag: demand_velocity_daily
+		summarizeBy: none
+		sourceColumn: demand_velocity_daily
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Days of Inventory'
+		dataType: double
+		lineageTag: a5000005-0002-0002-0002-000000000005
+		sourceLineageTag: days_of_inventory
+		summarizeBy: none
+		sourceColumn: days_of_inventory
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Demand Trend'
+		dataType: double
+		lineageTag: a5000005-0002-0002-0002-000000000006
+		sourceLineageTag: demand_trend
+		summarizeBy: none
+		sourceColumn: demand_trend
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Stockout Probability'
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: a5000005-0002-0002-0002-000000000007
+		sourceLineageTag: stockout_probability
+		summarizeBy: none
+		sourceColumn: stockout_probability
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Stockout Predicted'
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-000000000008
+		sourceLineageTag: stockout_predicted
+		summarizeBy: none
+		sourceColumn: stockout_predicted
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Risk
+		dataType: string
+		lineageTag: a5000005-0002-0002-0002-000000000009
+		sourceLineageTag: risk
+		summarizeBy: none
+		sourceColumn: risk
+
+		annotation SummarizationSetBy = Automatic
+
+	column Ranking
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-00000000000a
+		sourceLineageTag: ranking
+		summarizeBy: none
+		sourceColumn: ranking
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Level'
+		dataType: string
+		lineageTag: a5000005-0002-0002-0002-00000000000b
+		sourceLineageTag: risk_level
+		summarizeBy: none
+		sourceColumn: risk_level
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Predicted At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a5000005-0002-0002-0002-00000000000c
+		sourceLineageTag: predicted_at
+		summarizeBy: none
+		sourceColumn: predicted_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Forecast Horizon Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: a5000005-0002-0002-0002-00000000000d
+		sourceLineageTag: forecast_horizon_days
+		summarizeBy: none
+		sourceColumn: forecast_horizon_days
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Department
+		dataType: string
+		lineageTag: a5000005-0002-0002-0002-00000000000e
+		sourceLineageTag: Department
+		summarizeBy: none
+		sourceColumn: Department
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		lineageTag: a5000005-0002-0002-0002-00000000000f
+		sourceLineageTag: Category
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subcategory
+		dataType: string
+		lineageTag: a5000005-0002-0002-0002-000000000010
+		sourceLineageTag: Subcategory
+		summarizeBy: none
+		sourceColumn: Subcategory
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Stockout Risk' = entity
+		mode: directLake
+		source
+			entityName: gold_stockout_risk
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

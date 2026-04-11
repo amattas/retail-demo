@@ -1,0 +1,43 @@
+table 'Pricing Constraints'
+	lineageTag: a7000007-0000-0000-0000-000000000000
+	sourceLineageTag: [au].[pricing_constraints]
+
+	column 'Constraint Name'
+		dataType: string
+		lineageTag: a7000007-0002-0002-0002-000000000001
+		sourceLineageTag: constraint_name
+		summarizeBy: none
+		sourceColumn: constraint_name
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Constraint Value'
+		dataType: double
+		lineageTag: a7000007-0002-0002-0002-000000000002
+		sourceLineageTag: constraint_value
+		summarizeBy: none
+		sourceColumn: constraint_value
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Description
+		dataType: string
+		lineageTag: a7000007-0002-0002-0002-000000000003
+		sourceLineageTag: description
+		summarizeBy: none
+		sourceColumn: description
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Pricing Constraints' = entity
+		mode: directLake
+		source
+			entityName: pricing_constraints
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

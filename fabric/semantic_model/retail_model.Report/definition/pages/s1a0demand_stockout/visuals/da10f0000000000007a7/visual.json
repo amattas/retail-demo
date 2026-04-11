@@ -1,0 +1,136 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "da10f0000000000007a7",
+  "position": {
+    "x": 40,
+    "y": 460,
+    "z": 3,
+    "height": 240,
+    "width": 1200
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Store ID"
+                }
+              },
+              "queryRef": "Stockout Risk.Store ID",
+              "nativeQueryRef": "Store ID"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Product ID"
+                }
+              },
+              "queryRef": "Stockout Risk.Product ID",
+              "nativeQueryRef": "Product ID"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Current Inventory"
+                }
+              },
+              "queryRef": "Stockout Risk.Current Inventory",
+              "nativeQueryRef": "Current Inventory"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Stockout Probability"
+                }
+              },
+              "queryRef": "Stockout Risk.Stockout Probability",
+              "nativeQueryRef": "Stockout Probability"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Risk Level"
+                }
+              },
+              "queryRef": "Stockout Risk.Risk Level",
+              "nativeQueryRef": "Risk Level"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stockout Risk"
+                    }
+                  },
+                  "Property": "Days of Inventory"
+                }
+              },
+              "queryRef": "Stockout Risk.Days of Inventory",
+              "nativeQueryRef": "Days of Inventory"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Stockout Risk"
+                  }
+                },
+                "Property": "Stockout Probability"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": { "expr": { "Literal": { "Value": "true" } } },
+            "text": { "expr": { "Literal": { "Value": "'Top Stockout Risk'" } } }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default"
+}

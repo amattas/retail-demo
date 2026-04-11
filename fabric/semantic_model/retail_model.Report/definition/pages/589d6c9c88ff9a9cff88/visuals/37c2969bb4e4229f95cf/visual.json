@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
-  "name": "34f4ed0049a0b7705abe",
+  "name": "37c2969bb4e4229f95cf",
   "position": {
-    "x": 645,
+    "x": 445,
     "y": 100,
     "z": 1,
     "height": 112,
-    "width": 595
+    "width": 390
   },
   "visual": {
     "visualType": "cardVisual",
@@ -19,14 +19,14 @@
                 "Measure": {
                   "Expression": {
                     "SourceRef": {
-                      "Entity": "Receipts"
+                      "Entity": "Dwell Predictions"
                     }
                   },
-                  "Property": "Average Basket Size"
+                  "Property": "Avg Prediction Error"
                 }
               },
-              "queryRef": "Receipts.Average Basket Size",
-              "nativeQueryRef": "Average Basket Size"
+              "queryRef": "Dwell Predictions.Avg Prediction Error",
+              "nativeQueryRef": "Avg Prediction Error"
             }
           ]
         }
@@ -38,10 +38,10 @@
               "Measure": {
                 "Expression": {
                   "SourceRef": {
-                    "Entity": "Receipts"
+                    "Entity": "Dwell Predictions"
                   }
                 },
-                "Property": "Average Basket Size"
+                "Property": "Avg Prediction Error"
               }
             },
             "direction": "Descending"
@@ -64,13 +64,13 @@
                   }
                 }
               }
+            }
+          },
+          "selector": {
+            "metadata": "Dwell Predictions.Avg Prediction Error"
           }
-        },
-        "selector": {
-          "metadata": "Receipts.Average Basket Size"
         }
-      }
-    ],
+      ],
       "outline": [
         {
           "properties": {
@@ -112,7 +112,7 @@
             "text": {
               "expr": {
                 "Literal": {
-                  "Value": "'Average Basket Value'"
+                  "Value": "'Avg Prediction Error'"
                 }
               }
             }
@@ -122,23 +122,5 @@
     },
     "drillFilterOtherVisuals": true
   },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "7078143e002176617c7a",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "Receipts"
-              }
-            },
-            "Property": "Average Basket Size"
-          }
-        },
-        "type": "Advanced"
-      }
-    ]
-  },
-  "howCreated": "Copilot"
+  "howCreated": "Default"
 }

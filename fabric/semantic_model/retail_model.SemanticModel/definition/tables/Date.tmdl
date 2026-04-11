@@ -160,7 +160,7 @@ table Date
 
 		annotation SummarizationSetBy = Automatic
 
-	partition Date = entity
+	partition 'Date Partition' = entity
 		mode: directLake
 		source
 			entityName: dim_date

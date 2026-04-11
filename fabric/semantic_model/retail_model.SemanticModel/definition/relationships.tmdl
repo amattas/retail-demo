@@ -181,3 +181,5 @@ relationship 'Truck Dwell Daily to Stores'
 relationship 'Truck Dwell Daily to Date'
 	fromColumn: 'Truck Dwell Daily'.Day
 	toColumn: Date.Date
+
+
