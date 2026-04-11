@@ -218,7 +218,7 @@ relationship 'Product Recommendations to Products'
 	fromColumn: 'Product Recommendations'.'Product ID'
 	toColumn: Products.ID
 
-relationship 'Product Recommendations to Products (Recommended)'
+relationship 'Recommended Products to Products'
 	isActive: false
 	fromColumn: 'Product Recommendations'.'Recommended Product ID'
 	toColumn: Products.ID
