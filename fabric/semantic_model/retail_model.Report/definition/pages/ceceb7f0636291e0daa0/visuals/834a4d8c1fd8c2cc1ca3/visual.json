@@ -1,0 +1,59 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "834a4d8c1fd8c2cc1ca3",
+  "position": {
+    "x": 645,
+    "y": 456,
+    "z": 4,
+    "height": 224,
+    "width": 595,
+    "tabOrder": 1
+  },
+  "visual": {
+    "visualType": "aiNarratives",
+    "objects": {
+      "userPrompt": [
+        {
+          "properties": {
+            "selectedVisualsJson": {
+              "expr": {
+                "Literal": {
+                  "Value": "'{\"isEntireReportSelected\":true}'"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Summarize logistics KPIs (truck dwell, throughput) and DC inventory. Highlight sites with high dwell times and any potential bottlenecks.'"
+                }
+              }
+            },
+            "useAllVisuals": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "narrativeSelection": [
+        {
+          "properties": {
+            "dismissSelectionScreen": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "SummarizeVisualContainer"
+}
