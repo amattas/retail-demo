@@ -1,6 +1,6 @@
 table 'Demand Forecast'
 	lineageTag: a1000001-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_demand_forecast]
+	sourceLineageTag: [au].[demand_forecast]
 
 	measure 'Avg Forecast Units' = AVERAGE('Demand Forecast'[Predicted Units])
 		formatString: #,0.0
@@ -127,6 +127,6 @@ table 'Demand Forecast'
 	partition 'Demand Forecast' = entity
 		mode: directLake
 		source
-			entityName: gold_demand_forecast
+			entityName: demand_forecast
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

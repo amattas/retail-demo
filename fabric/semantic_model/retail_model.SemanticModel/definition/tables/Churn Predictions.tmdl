@@ -1,6 +1,6 @@
 table 'Churn Predictions'
 	lineageTag: a3000003-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_churn_predictions]
+	sourceLineageTag: [au].[churn_predictions]
 
 	measure 'Avg Churn Probability' = AVERAGE('Churn Predictions'[Churn Probability])
 		formatString: 0.0%
@@ -113,6 +113,6 @@ table 'Churn Predictions'
 	partition 'Churn Predictions' = entity
 		mode: directLake
 		source
-			entityName: gold_churn_predictions
+			entityName: churn_predictions
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

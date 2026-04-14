@@ -1,6 +1,6 @@
 table 'Zone Transitions'
 	lineageTag: b4000000-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_zone_transitions]
+	sourceLineageTag: [au].[zone_transitions]
 
 	measure 'Total Transitions' = SUM('Zone Transitions'[Transition Count])
 		formatString: #,0
@@ -84,6 +84,6 @@ table 'Zone Transitions'
 	partition 'Zone Transitions' = entity
 		mode: directLake
 		source
-			entityName: gold_zone_transitions
+			entityName: zone_transitions
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

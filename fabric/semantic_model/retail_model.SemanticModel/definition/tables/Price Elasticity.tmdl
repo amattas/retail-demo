@@ -1,6 +1,6 @@
 table 'Price Elasticity'
 	lineageTag: a4000004-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_price_elasticity]
+	sourceLineageTag: [au].[price_elasticity]
 
 	measure 'Avg Elasticity' = AVERAGE('Price Elasticity'[Elasticity Coefficient])
 		formatString: #,0.00
@@ -162,6 +162,6 @@ table 'Price Elasticity'
 	partition 'Price Elasticity' = entity
 		mode: directLake
 		source
-			entityName: gold_price_elasticity
+			entityName: price_elasticity
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

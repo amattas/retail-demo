@@ -1,6 +1,6 @@
 table 'Promotion Lift'
 	lineageTag: b2000000-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_promotion_lift]
+	sourceLineageTag: [au].[promotion_lift]
 
 	measure 'Avg Incremental Lift %' = AVERAGE('Promotion Lift'[Incremental Lift Pct])
 		formatString: 0.0%
@@ -252,6 +252,6 @@ table 'Promotion Lift'
 	partition 'Promotion Lift' = entity
 		mode: directLake
 		source
-			entityName: gold_promotion_lift
+			entityName: promotion_lift
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

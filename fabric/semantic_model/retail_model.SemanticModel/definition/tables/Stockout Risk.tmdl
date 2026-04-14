@@ -1,6 +1,6 @@
 table 'Stockout Risk'
 	lineageTag: a5000005-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_stockout_risk]
+	sourceLineageTag: [au].[stockout_risk]
 
 	measure 'At-Risk SKU Count' = CALCULATE(COUNTROWS('Stockout Risk'), 'Stockout Risk'[Risk Level] IN {"High", "Critical"})
 		formatString: #,0
@@ -199,6 +199,6 @@ table 'Stockout Risk'
 	partition 'Stockout Risk' = entity
 		mode: directLake
 		source
-			entityName: gold_stockout_risk
+			entityName: stockout_risk
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

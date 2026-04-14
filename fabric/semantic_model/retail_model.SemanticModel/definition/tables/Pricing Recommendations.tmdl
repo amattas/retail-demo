@@ -1,6 +1,6 @@
 table 'Pricing Recommendations'
 	lineageTag: b6000000-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_pricing_recommendations]
+	sourceLineageTag: [au].[pricing_recommendations]
 
 	measure 'Avg Recommended Change %' = AVERAGE('Pricing Recommendations'[Change Pct])
 		formatString: 0.0%
@@ -367,6 +367,6 @@ table 'Pricing Recommendations'
 	partition 'Pricing Recommendations' = entity
 		mode: directLake
 		source
-			entityName: gold_pricing_recommendations
+			entityName: pricing_recommendations
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

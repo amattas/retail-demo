@@ -1,6 +1,6 @@
 table 'Zone Dwell Stats'
 	lineageTag: b3000000-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_zone_dwell_stats]
+	sourceLineageTag: [au].[zone_dwell_stats]
 
 	measure 'Avg Zone Dwell (seconds)' = AVERAGE('Zone Dwell Stats'[Avg Dwell Seconds])
 		formatString: #,0.0
@@ -112,6 +112,6 @@ table 'Zone Dwell Stats'
 	partition 'Zone Dwell Stats' = entity
 		mode: directLake
 		source
-			entityName: gold_zone_dwell_stats
+			entityName: zone_dwell_stats
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

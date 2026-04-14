@@ -1,6 +1,6 @@
 table 'Dwell Predictions'
 	lineageTag: a6000006-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_dwell_predictions]
+	sourceLineageTag: [au].[dwell_predictions]
 
 	measure 'Avg Predicted Dwell' = AVERAGE('Dwell Predictions'[Predicted Dwell Minutes])
 		formatString: #,0.0
@@ -164,6 +164,6 @@ table 'Dwell Predictions'
 	partition 'Dwell Predictions' = entity
 		mode: directLake
 		source
-			entityName: gold_dwell_predictions
+			entityName: dwell_predictions
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

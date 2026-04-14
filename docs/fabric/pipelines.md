@@ -145,17 +145,17 @@ Pipelines for ML notebooks created during [Phase 9: ML Notebooks](../setup/09-ml
 
 | Pipeline | Schedule | Notebook | Model | Output Table(s) |
 |----------|----------|----------|-------|-----------------|
-| `pl_demand_forecast` | Daily 6 AM UTC | `06-ml-demand-forecast` | GBT | `au.gold_demand_forecast` |
-| `pl_market_basket` | Weekly Sun 1 AM UTC | `07-ml-market-basket` | FP-Growth | `au.gold_product_associations` |
-| `pl_customer_segmentation` | Weekly Sun 2 AM UTC | `08-ml-customer-segmentation` | K-means | `au.gold_customer_segments` |
-| `pl_churn_prediction` | Weekly Sun 3 AM UTC | `09-ml-churn-prediction` | Spark ML GBTClassifier | `au.gold_churn_predictions` |
-| `pl_promotion_effectiveness` | Weekly Sun 4 AM UTC | `10-ml-promotion-effectiveness` | Log-log regression + promo lift | `au.gold_price_elasticity`, `au.gold_promotion_lift` |
-| `pl_journey_analysis` | Daily 4 AM UTC | `11-ml-journey-analysis` | Path analysis | `au.gold_journey_patterns`, `au.gold_zone_transitions`, `au.gold_zone_dwell_stats` |
-| `pl_stockout_prediction` | Daily 5 AM UTC | `12-ml-stockout-prediction` | Spark ML GBTClassifier | `au.gold_stockout_risk` |
-| `pl_delivery_prediction` | Daily 5:30 AM UTC | `13-ml-delivery-prediction` | Spark ML GBTRegressor + empirical intervals | `au.gold_dwell_predictions` |
-| `pl_dynamic_pricing` | Daily 7 AM UTC | `14-ml-dynamic-pricing` | Elasticity + rule-based optimization | `au.pricing_constraints`, `au.gold_pricing_recommendations` |
+| `pl_demand_forecast` | Daily 6 AM UTC | `06-ml-demand-forecast` | GBT | `au.demand_forecast` |
+| `pl_market_basket` | Weekly Sun 1 AM UTC | `07-ml-market-basket` | FP-Growth | `au.product_associations` |
+| `pl_customer_segmentation` | Weekly Sun 2 AM UTC | `08-ml-customer-segmentation` | K-means | `au.customer_segments` |
+| `pl_churn_prediction` | Weekly Sun 3 AM UTC | `09-ml-churn-prediction` | Spark ML GBTClassifier | `au.churn_predictions` |
+| `pl_promotion_effectiveness` | Weekly Sun 4 AM UTC | `10-ml-promotion-effectiveness` | Log-log regression + promo lift | `au.price_elasticity`, `au.promotion_lift` |
+| `pl_journey_analysis` | Daily 4 AM UTC | `11-ml-journey-analysis` | Path analysis | `au.journey_patterns`, `au.zone_transitions`, `au.zone_dwell_stats` |
+| `pl_stockout_prediction` | Daily 5 AM UTC | `12-ml-stockout-prediction` | Spark ML GBTClassifier | `au.stockout_risk` |
+| `pl_delivery_prediction` | Daily 5:30 AM UTC | `13-ml-delivery-prediction` | Spark ML GBTRegressor + empirical intervals | `au.dwell_predictions` |
+| `pl_dynamic_pricing` | Daily 7 AM UTC | `14-ml-dynamic-pricing` | Elasticity + rule-based optimization | `au.pricing_constraints`, `au.pricing_recommendations` |
 
-Run `pl_promotion_effectiveness` before `pl_dynamic_pricing` if you want notebook 14 to use fresh elasticity inputs. Without `au.gold_price_elasticity`, notebook 14 falls back to rule-based constrained pricing.
+Run `pl_promotion_effectiveness` before `pl_dynamic_pricing` if you want notebook 14 to use fresh elasticity inputs. Without `au.price_elasticity`, notebook 14 falls back to rule-based constrained pricing.
 
 ### ML Pipeline Configuration
 

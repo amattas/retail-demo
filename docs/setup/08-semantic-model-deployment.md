@@ -194,7 +194,7 @@ WHERE table_schema IN ('au', 'ag');
 **Solution**:
 ```bash
 # Check if Gold tables have data via Lakehouse SQL endpoint:
-SELECT COUNT(*) FROM au.gold_sales_minute_store;
+SELECT COUNT(*) FROM au.sales_minute_store;
 
 # If 0, run the historical load notebook:
 # fabric/lakehouse/02-historical-data-load.ipynb

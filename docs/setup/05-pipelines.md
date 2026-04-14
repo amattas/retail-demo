@@ -127,7 +127,7 @@ After deploying ML notebooks in [Phase 9](09-ml-notebooks.md), create pipelines 
 
 All ML pipelines use the same creation process as Steps 5.1-5.4 with parameters `SILVER_DB = "ag"` and `GOLD_DB = "au"`. Set timeout to 2 hours, retries to 3, and retry interval to 30 seconds.
 
-Schedule `pl_promotion_effectiveness` before `pl_dynamic_pricing` for full elasticity-driven pricing. Notebook 14 can fall back to rule-based constrained pricing if `au.gold_price_elasticity` is unavailable.
+Schedule `pl_promotion_effectiveness` before `pl_dynamic_pricing` for full elasticity-driven pricing. Notebook 14 can fall back to rule-based constrained pricing if `au.price_elasticity` is unavailable.
 
 ## Next Step
 

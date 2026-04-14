@@ -21,15 +21,15 @@ Fabric Lakehouse for batch processing and historical analytics using the medalli
 | `03-streaming-to-silver.ipynb` | Every 5 min | Eventhouse events → Silver (incremental) |
 | `04-streaming-to-gold.ipynb` | Every 15 min | Silver → Gold aggregations |
 | `05-maintain-delta-tables.ipynb` | Daily | OPTIMIZE and VACUUM routines |
-| `06-ml-demand-forecast.ipynb` | Daily 6 AM | GBT demand forecasts → `au.gold_demand_forecast` |
-| `07-ml-market-basket.ipynb` | Weekly | FP-Growth product associations → `au.gold_product_associations` |
-| `08-ml-customer-segmentation.ipynb` | Weekly | RFM + K-means customer segments → `au.gold_customer_segments` |
-| `09-ml-churn-prediction.ipynb` | Weekly | Spark ML GBT churn risk scores → `au.gold_churn_predictions` |
-| `10-ml-promotion-effectiveness.ipynb` | Weekly | Price elasticity & promotion lift → `au.gold_price_elasticity`, `au.gold_promotion_lift` |
-| `11-ml-journey-analysis.ipynb` | Daily | BLE beacon journey patterns → `au.gold_journey_patterns`, `au.gold_zone_transitions`, `au.gold_zone_dwell_stats` |
-| `12-ml-stockout-prediction.ipynb` | Daily | Spark ML GBT stockout risk → `au.gold_stockout_risk` |
-| `13-ml-delivery-prediction.ipynb` | Daily | Spark ML GBT dwell predictions with empirical intervals → `au.gold_dwell_predictions` |
-| `14-ml-dynamic-pricing.ipynb` | Daily | Elasticity-aware pricing + business constraints → `au.pricing_constraints`, `au.gold_pricing_recommendations` |
+| `06-ml-demand-forecast.ipynb` | Daily 6 AM | GBT demand forecasts → `au.demand_forecast` |
+| `07-ml-market-basket.ipynb` | Weekly | FP-Growth product associations → `au.product_associations` |
+| `08-ml-customer-segmentation.ipynb` | Weekly | RFM + K-means customer segments → `au.customer_segments` |
+| `09-ml-churn-prediction.ipynb` | Weekly | Spark ML GBT churn risk scores → `au.churn_predictions` |
+| `10-ml-promotion-effectiveness.ipynb` | Weekly | Price elasticity & promotion lift → `au.price_elasticity`, `au.promotion_lift` |
+| `11-ml-journey-analysis.ipynb` | Daily | BLE beacon journey patterns → `au.journey_patterns`, `au.zone_transitions`, `au.zone_dwell_stats` |
+| `12-ml-stockout-prediction.ipynb` | Daily | Spark ML GBT stockout risk → `au.stockout_risk` |
+| `13-ml-delivery-prediction.ipynb` | Daily | Spark ML GBT dwell predictions with empirical intervals → `au.dwell_predictions` |
+| `14-ml-dynamic-pricing.ipynb` | Daily | Elasticity-aware pricing + business constraints → `au.pricing_constraints`, `au.pricing_recommendations` |
 | `30-create-ontology.ipynb` | Manual | Create or replace a Fabric ontology from core Silver retail entities and relationships |
 | `99-reset-lakehouse.ipynb` | Manual | Drop all Silver/Gold tables and databases |
 
@@ -88,19 +88,19 @@ Pre-aggregated tables in `au` schema:
 
 | Table | Source Notebook | Model | Refresh |
 |-------|----------------|-------|---------|
-| `au.gold_demand_forecast` | `06` | GBT | Daily |
-| `au.gold_product_associations` | `07` | FP-Growth | Weekly |
-| `au.gold_customer_segments` | `08` | K-means | Weekly |
-| `au.gold_churn_predictions` | `09` | Spark ML GBTClassifier | Weekly |
-| `au.gold_price_elasticity` | `10` | Log-log regression | Weekly |
-| `au.gold_promotion_lift` | `10` | Promo episode lift analysis | Weekly |
-| `au.gold_journey_patterns` | `11` | Path analysis | Daily |
-| `au.gold_zone_transitions` | `11` | Path analysis | Daily |
-| `au.gold_zone_dwell_stats` | `11` | Path analysis | Daily |
-| `au.gold_stockout_risk` | `12` | Spark ML GBTClassifier | Daily |
-| `au.gold_dwell_predictions` | `13` | Spark ML GBTRegressor + empirical intervals | Daily |
+| `au.demand_forecast` | `06` | GBT | Daily |
+| `au.product_associations` | `07` | FP-Growth | Weekly |
+| `au.customer_segments` | `08` | K-means | Weekly |
+| `au.churn_predictions` | `09` | Spark ML GBTClassifier | Weekly |
+| `au.price_elasticity` | `10` | Log-log regression | Weekly |
+| `au.promotion_lift` | `10` | Promo episode lift analysis | Weekly |
+| `au.journey_patterns` | `11` | Path analysis | Daily |
+| `au.zone_transitions` | `11` | Path analysis | Daily |
+| `au.zone_dwell_stats` | `11` | Path analysis | Daily |
+| `au.stockout_risk` | `12` | Spark ML GBTClassifier | Daily |
+| `au.dwell_predictions` | `13` | Spark ML GBTRegressor + empirical intervals | Daily |
 | `au.pricing_constraints` | `14` | Constraint reference | Daily |
-| `au.gold_pricing_recommendations` | `14` | Elasticity + rule-based pricing | Daily |
+| `au.pricing_recommendations` | `14` | Elasticity + rule-based pricing | Daily |
 
 ## Pipelines
 
@@ -127,7 +127,7 @@ All core pipelines: 3 retries, 30s intervals, 1-hour timeout.
 | `pl_delivery_prediction` | Daily 5:30 AM UTC | `13-ml-delivery-prediction.ipynb` |
 | `pl_dynamic_pricing` | Daily 7 AM UTC | `14-ml-dynamic-pricing.ipynb` |
 
-Run `pl_promotion_effectiveness` before `pl_dynamic_pricing` for full elasticity-driven pricing. If `au.gold_price_elasticity` is unavailable, notebook 14 falls back to rule-based constrained pricing.
+Run `pl_promotion_effectiveness` before `pl_dynamic_pricing` for full elasticity-driven pricing. If `au.price_elasticity` is unavailable, notebook 14 falls back to rule-based constrained pricing.
 
 All ML pipelines: 3 retries, 30s intervals, 2-hour timeout. See [Phase 9: ML Notebooks](../setup/09-ml-notebooks.md) for setup instructions.
 

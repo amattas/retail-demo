@@ -79,16 +79,16 @@ Gold tables are pre-aggregated for dashboards.
 
 | Table | Columns |
 |-------|---------|
-| `gold_sales_minute_store` | store_id, ts (minute), total_sales, receipts, avg_basket |
-| `gold_top_products_15m` | product_id, revenue, units, computed_at |
-| `gold_inventory_position_current` | store_id, product_id, on_hand, as_of |
-| `gold_truck_dwell_daily` | site, day, avg_dwell_min, trucks |
-| `gold_campaign_revenue_daily` | campaign_id, day, impressions, conversions, revenue |
-| `gold_online_sales_daily` | day, orders, subtotal, tax, total, avg_order_value |
-| `gold_fulfillment_daily` | day, fulfillment_mode, fulfillment_status, orders, units |
-| `gold_zone_dwell_minute` | store_id, zone, ts (minute), avg_dwell, customers |
-| `gold_ble_presence_minute` | store_id, ts (minute), devices |
-| `gold_marketing_cost_daily` | campaign_id, day, impressions, cost |
+| `sales_minute_store` | store_id, ts (minute), total_sales, receipts, avg_basket |
+| `top_products_15m` | product_id, revenue, units, computed_at |
+| `inventory_position_current` | store_id, product_id, on_hand, as_of |
+| `truck_dwell_daily` | site, day, avg_dwell_min, trucks |
+| `campaign_revenue_daily` | campaign_id, day, impressions, conversions, revenue |
+| `online_sales_daily` | day, orders, subtotal, tax, total, avg_order_value |
+| `fulfillment_daily` | day, fulfillment_mode, fulfillment_status, orders, units |
+| `zone_dwell_minute` | store_id, zone, ts (minute), avg_dwell, customers |
+| `ble_presence_minute` | store_id, ts (minute), devices |
+| `marketing_cost_daily` | campaign_id, day, impressions, cost |
 
 ### Assets
 

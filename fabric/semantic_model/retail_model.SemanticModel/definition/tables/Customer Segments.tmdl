@@ -1,6 +1,6 @@
 table 'Customer Segments'
 	lineageTag: a2000002-0000-0000-0000-000000000000
-	sourceLineageTag: [au].[gold_customer_segments]
+	sourceLineageTag: [au].[customer_segments]
 
 	measure '# of Segmented Customers' = COUNTROWS('Customer Segments')
 		formatString: #,0
@@ -138,6 +138,6 @@ table 'Customer Segments'
 	partition 'Customer Segments' = entity
 		mode: directLake
 		source
-			entityName: gold_customer_segments
+			entityName: customer_segments
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'

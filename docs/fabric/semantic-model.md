@@ -35,18 +35,18 @@ Thirteen ML tables provide predictions and intelligence outputs from the Lakehou
 
 | Table | Description |
 |---|---|
-| `gold_demand_forecast` | GBT demand predictions by store/product |
+| `demand_forecast` | GBT demand predictions by store/product |
 | `product_recommendations` | Market basket "bought together" pairs |
-| `gold_customer_segments` | RFM + K-means customer segments |
-| `gold_churn_predictions` | Spark ML GBT churn risk scores |
-| `gold_price_elasticity` | Log-log price elasticity coefficients |
-| `gold_promotion_lift` | Promo episode lift analysis |
-| `gold_zone_dwell_stats` | BLE zone dwell time statistics |
-| `gold_zone_transitions` | Zone-to-zone transition probabilities |
-| `gold_journey_patterns` | Customer journey path analysis |
-| `gold_stockout_risk` | Spark ML GBT stockout risk predictions |
-| `gold_dwell_predictions` | Delivery dwell time predictions with intervals |
-| `gold_pricing_recommendations` | Elasticity-aware pricing recommendations |
+| `customer_segments` | RFM + K-means customer segments |
+| `churn_predictions` | Spark ML GBT churn risk scores |
+| `price_elasticity` | Log-log price elasticity coefficients |
+| `promotion_lift` | Promo episode lift analysis |
+| `zone_dwell_stats` | BLE zone dwell time statistics |
+| `zone_transitions` | Zone-to-zone transition probabilities |
+| `journey_patterns` | Customer journey path analysis |
+| `stockout_risk` | Spark ML GBT stockout risk predictions |
+| `dwell_predictions` | Delivery dwell time predictions with intervals |
+| `pricing_recommendations` | Elasticity-aware pricing recommendations |
 | `pricing_constraints` | Pricing business constraint reference |
 
 Five dedicated report pages surface these ML outputs:
