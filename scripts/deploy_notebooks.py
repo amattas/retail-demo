@@ -215,9 +215,14 @@ def ipynb_to_fabric_py(
     return "\n".join(lines)
 
 
-def build_platform_json(notebook_name: str) -> str:
-    """Build the .platform JSON (basic metadata, no lakehouse)."""
-    platform = {
+def build_platform_json(
+    notebook_name: str,
+    lakehouse_id: str | None = None,
+    lakehouse_name: str = "retail_lakehouse",
+    workspace_id: str | None = None,
+) -> str:
+    """Build the .platform JSON with lakehouse binding in config."""
+    platform: dict = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
         "metadata": {
             "type": "Notebook",
@@ -229,6 +234,16 @@ def build_platform_json(notebook_name: str) -> str:
             "logicalId": "00000000-0000-0000-0000-000000000000",
         },
     }
+
+    if lakehouse_id:
+        platform["config"]["lakehouse"] = {
+            "default_lakehouse": lakehouse_id,
+            "default_lakehouse_name": lakehouse_name,
+            "known_lakehouses": [{"id": lakehouse_id}],
+        }
+        if workspace_id:
+            platform["config"]["lakehouse"]["default_lakehouse_workspace_id"] = workspace_id
+
     return json.dumps(platform, indent=2)
 
 
@@ -254,8 +269,12 @@ def update_notebook(
     )
     content_b64 = base64.b64encode(py_content.encode("utf-8")).decode("ascii")
 
-    # .platform metadata (basic — no lakehouse here)
-    platform_json = build_platform_json(notebook_path.stem)
+    # .platform metadata with lakehouse binding
+    platform_json = build_platform_json(
+        notebook_path.stem,
+        lakehouse_id=lakehouse_id,
+        workspace_id=workspace_id,
+    )
     platform_b64 = base64.b64encode(platform_json.encode("utf-8")).decode("ascii")
 
     body = {
