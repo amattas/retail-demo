@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
   "name": "825ffd037d9775388fe6",
-  "displayName": "Inventory Details",
+  "displayName": "Inventory Detail",
   "displayOption": "FitToPage",
   "height": 720,
   "width": 1280,
