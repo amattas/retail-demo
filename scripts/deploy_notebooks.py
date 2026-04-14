@@ -137,114 +137,32 @@ def list_notebooks(token: str, workspace_id: str) -> dict[str, str]:
     return notebooks
 
 
-def ipynb_to_fabric_py(
+def inject_lakehouse_binding(
     ipynb_content: bytes,
+    lakehouse_id: str,
     lakehouse_name: str = "retail_lakehouse",
-    lakehouse_id: str | None = None,
     workspace_id: str | None = None,
-) -> str:
-    """Convert .ipynb to Fabric's native .py percent-script format.
+) -> bytes:
+    """Inject default lakehouse binding into .ipynb metadata.dependencies.
 
-    The lakehouse binding lives in the notebook-level META block under
-    ``dependencies.lakehouse`` — this is what Fabric reads at runtime to
-    set the default Spark SQL context.
+    Per Fabric docs, the binding lives at:
+        metadata.dependencies.lakehouse.default_lakehouse
     """
     nb = json.loads(ipynb_content)
-    lines: list[str] = ["# Fabric notebook source"]
 
-    # Notebook-level metadata
-    kernel = nb.get("metadata", {}).get("kernelspec", {})
-    nb_meta: dict = {
-        "kernel_info": {"name": kernel.get("name", "synapse_pyspark")},
-        "dependencies": {},
+    if "metadata" not in nb:
+        nb["metadata"] = {}
+    if "dependencies" not in nb["metadata"]:
+        nb["metadata"]["dependencies"] = {}
+
+    nb["metadata"]["dependencies"]["lakehouse"] = {
+        "default_lakehouse": lakehouse_id,
+        "default_lakehouse_name": lakehouse_name,
+        "default_lakehouse_workspace_id": workspace_id or "",
+        "known_lakehouses": [{"id": lakehouse_id}],
     }
 
-    # Attach default lakehouse in dependencies (the key location Fabric reads)
-    if lakehouse_id and workspace_id:
-        nb_meta["dependencies"] = {
-            "lakehouse": {
-                "default_lakehouse": lakehouse_id,
-                "default_lakehouse_name": lakehouse_name,
-                "default_lakehouse_workspace_id": workspace_id,
-                "known_lakehouses": [
-                    {"id": lakehouse_id}
-                ],
-            }
-        }
-
-    lines.append("")
-    lines.append("# METADATA ********************")
-    lines.append("")
-    for ml in json.dumps(nb_meta, indent=2).splitlines():
-        lines.append(f"# META {ml}")
-
-    # Cells
-    for cell in nb.get("cells", []):
-        cell_type = cell.get("cell_type", "code")
-        source_lines = cell.get("source", [])
-        source_text = "".join(source_lines)
-
-        if cell_type == "markdown":
-            lines.append("")
-            lines.append("# MARKDOWN ********************")
-            lines.append("")
-            for sl in source_text.splitlines():
-                lines.append(f"# {sl}" if sl else "#")
-        else:
-            lines.append("")
-            lines.append("# CELL ********************")
-            lines.append("")
-            for sl in source_text.splitlines():
-                lines.append(sl)
-
-        # Cell metadata
-        cell_meta: dict = {
-            "language": "python",
-            "language_group": "synapse_pyspark",
-        }
-        if cell_type == "markdown":
-            cell_meta = {}  # markdown cells had no explicit meta in the reference
-
-        lines.append("")
-        lines.append("# METADATA ********************")
-        lines.append("")
-        for ml in json.dumps(cell_meta, indent=2).splitlines():
-            lines.append(f"# META {ml}")
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def build_platform_json(
-    notebook_name: str,
-    lakehouse_id: str | None = None,
-    lakehouse_name: str = "retail_lakehouse",
-    workspace_id: str | None = None,
-) -> str:
-    """Build the .platform JSON with lakehouse binding in config."""
-    platform: dict = {
-        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
-        "metadata": {
-            "type": "Notebook",
-            "displayName": notebook_name,
-            "description": "New notebook",
-        },
-        "config": {
-            "version": "2.0",
-            "logicalId": "00000000-0000-0000-0000-000000000000",
-        },
-    }
-
-    if lakehouse_id:
-        platform["config"]["lakehouse"] = {
-            "default_lakehouse": lakehouse_id,
-            "default_lakehouse_name": lakehouse_name,
-            "known_lakehouses": [{"id": lakehouse_id}],
-        }
-        if workspace_id:
-            platform["config"]["lakehouse"]["default_lakehouse_workspace_id"] = workspace_id
-
-    return json.dumps(platform, indent=2)
+    return json.dumps(nb, indent=1, ensure_ascii=False).encode("utf-8")
 
 
 def update_notebook(
@@ -256,45 +174,41 @@ def update_notebook(
 ) -> None:
     """Update an existing notebook definition via the Fabric Items API.
 
-    Converts .ipynb to fabricGitSource (.py) format with the lakehouse binding
-    embedded in the notebook-level META dependencies block.
+    Uploads .ipynb directly with lakehouse binding in metadata.dependencies.
+    Per the Fabric notebook API docs:
+    - Use format: "ipynb" and path: "notebook-content.ipynb"
+    - Do NOT include updateMetadata flag without a .platform part
+    - Lakehouse binding goes in ipynb metadata.dependencies.lakehouse
     """
     import requests
 
-    # Convert .ipynb to Fabric's native .py format with lakehouse in META
-    py_content = ipynb_to_fabric_py(
-        notebook_path.read_bytes(),
-        lakehouse_id=lakehouse_id,
-        workspace_id=workspace_id,
-    )
-    content_b64 = base64.b64encode(py_content.encode("utf-8")).decode("ascii")
+    ipynb_bytes = notebook_path.read_bytes()
 
-    # .platform metadata with lakehouse binding
-    platform_json = build_platform_json(
-        notebook_path.stem,
-        lakehouse_id=lakehouse_id,
-        workspace_id=workspace_id,
-    )
-    platform_b64 = base64.b64encode(platform_json.encode("utf-8")).decode("ascii")
+    # Inject lakehouse binding into the .ipynb metadata
+    if lakehouse_id:
+        ipynb_bytes = inject_lakehouse_binding(
+            ipynb_bytes,
+            lakehouse_id=lakehouse_id,
+            lakehouse_name="retail_lakehouse",
+            workspace_id=workspace_id,
+        )
+
+    content_b64 = base64.b64encode(ipynb_bytes).decode("ascii")
 
     body = {
         "definition": {
+            "format": "ipynb",
             "parts": [
                 {
-                    "path": "notebook-content.py",
+                    "path": "notebook-content.ipynb",
                     "payload": content_b64,
-                    "payloadType": "InlineBase64",
-                },
-                {
-                    "path": ".platform",
-                    "payload": platform_b64,
                     "payloadType": "InlineBase64",
                 },
             ]
         }
     }
 
-    url = f"{FABRIC_API}/workspaces/{workspace_id}/items/{item_id}/updateDefinition?updateMetadata=true"
+    url = f"{FABRIC_API}/workspaces/{workspace_id}/notebooks/{item_id}/updateDefinition"
     resp = requests.post(url, headers=api_headers(token), json=body)
 
     if resp.status_code == 202:
