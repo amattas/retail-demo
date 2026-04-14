@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "bb16cc17dd18ee19ff20",
-  "position": { "x": 770, "y": 70, "z": 10, "height": 60, "width": 240 },
+  "position": {
+    "x": 770,
+    "y": 70,
+    "z": 10,
+    "height": 60,
+    "width": 240
+  },
   "visual": {
     "visualType": "slicer",
     "query": {
@@ -9,7 +15,16 @@
         "Values": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Stores" } }, "Property": "Store Number" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Stores"
+                    }
+                  },
+                  "Property": "Store Number"
+                }
+              },
               "queryRef": "Stores.Store Number",
               "nativeQueryRef": "Store Number",
               "active": true
@@ -19,5 +34,25 @@
       }
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "bb16cc17dd18ee19ff20f1",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Stores"
+              }
+            },
+            "Property": "Store Number"
+          }
+        },
+        "type": "Categorical",
+        "displayName": "Store Number"
+      }
+    ]
   }
 }

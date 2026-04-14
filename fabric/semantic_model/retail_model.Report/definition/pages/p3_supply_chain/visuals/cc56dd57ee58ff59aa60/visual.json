@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "cc56dd57ee58ff59aa60",
-  "position": { "x": 645, "y": 450, "z": 3, "height": 240, "width": 595 },
+  "position": {
+    "x": 645,
+    "y": 450,
+    "z": 3,
+    "height": 240,
+    "width": 595
+  },
   "visual": {
     "visualType": "lineChart",
     "query": {
@@ -9,7 +15,16 @@
         "Category": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Date" } }, "Property": "Date" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Date"
+                    }
+                  },
+                  "Property": "Date"
+                }
+              },
               "queryRef": "Date.Date",
               "active": true
             }
@@ -18,7 +33,16 @@
         "Y": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Truck Dwell Daily" } }, "Property": "Trucks" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Truck Dwell Daily"
+                    }
+                  },
+                  "Property": "Trucks"
+                }
+              },
               "queryRef": "Sum(Truck Dwell Daily.Trucks)",
               "nativeQueryRef": "Trucks"
             }
@@ -30,12 +54,43 @@
       "title": [
         {
           "properties": {
-            "show": { "expr": { "Literal": { "Value": "true" } } },
-            "text": { "expr": { "Literal": { "Value": "'Trucks by Day'" } } }
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Trucks by Day'"
+                }
+              }
+            }
           }
         }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "cc56dd57ee58ff59aa60f1",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Truck Dwell Daily"
+              }
+            },
+            "Property": "Trucks"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
   }
 }

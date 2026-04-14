@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "bb06cc07dd08ee09ff10",
-  "position": { "x": 770, "y": 5, "z": 10, "height": 60, "width": 240 },
+  "position": {
+    "x": 770,
+    "y": 5,
+    "z": 10,
+    "height": 60,
+    "width": 240
+  },
   "visual": {
     "visualType": "slicer",
     "query": {
@@ -9,7 +15,16 @@
         "Values": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Date" } }, "Property": "Date" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Date"
+                    }
+                  },
+                  "Property": "Date"
+                }
+              },
               "queryRef": "Date.Date",
               "nativeQueryRef": "Date",
               "active": true
@@ -22,11 +37,37 @@
       "data": [
         {
           "properties": {
-            "mode": { "expr": { "Literal": { "Value": "'Between'" } } }
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Between'"
+                }
+              }
+            }
           }
         }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "bb06cc07dd08ee09ff10f1",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Date"
+              }
+            },
+            "Property": "Date"
+          }
+        },
+        "type": "Range",
+        "displayName": "Date"
+      }
+    ]
   }
 }

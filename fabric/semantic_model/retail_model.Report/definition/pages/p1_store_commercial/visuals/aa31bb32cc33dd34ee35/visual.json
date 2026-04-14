@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "aa31bb32cc33dd34ee35",
-  "position": { "x": 280, "y": 100, "z": 1, "height": 90, "width": 230 },
+  "position": {
+    "x": 280,
+    "y": 100,
+    "z": 1,
+    "height": 90,
+    "width": 230
+  },
   "visual": {
     "visualType": "cardVisual",
     "query": {
@@ -9,7 +15,16 @@
         "Data": {
           "projections": [
             {
-              "field": { "Measure": { "Expression": { "SourceRef": { "Entity": "Receipts" } }, "Property": "Average Basket Size" } },
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Receipts"
+                    }
+                  },
+                  "Property": "Average Basket Size"
+                }
+              },
               "queryRef": "Receipts.Average Basket Size",
               "nativeQueryRef": "Average Basket Size"
             }
@@ -19,7 +34,16 @@
       "sortDefinition": {
         "sort": [
           {
-            "field": { "Measure": { "Expression": { "SourceRef": { "Entity": "Receipts" } }, "Property": "Average Basket Size" } },
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Receipts"
+                  }
+                },
+                "Property": "Average Basket Size"
+              }
+            },
             "direction": "Descending"
           }
         ],
@@ -30,12 +54,43 @@
       "title": [
         {
           "properties": {
-            "show": { "expr": { "Literal": { "Value": "true" } } },
-            "text": { "expr": { "Literal": { "Value": "'Avg Basket Size'" } } }
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Avg Basket Size'"
+                }
+              }
+            }
           }
         }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "aa31bb32cc33dd34ee35f1",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Receipts"
+              }
+            },
+            "Property": "Average Basket Size"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
   }
 }

@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "bb21cc22dd23ee24ff25",
-  "position": { "x": 1020, "y": 70, "z": 10, "height": 60, "width": 240 },
+  "position": {
+    "x": 1020,
+    "y": 70,
+    "z": 10,
+    "height": 60,
+    "width": 240
+  },
   "visual": {
     "visualType": "slicer",
     "query": {
@@ -9,7 +15,16 @@
         "Values": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Products" } }, "Property": "Category" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Products"
+                    }
+                  },
+                  "Property": "Category"
+                }
+              },
               "queryRef": "Products.Category",
               "nativeQueryRef": "Category",
               "active": true
@@ -19,5 +34,25 @@
       }
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "bb21cc22dd23ee24ff25f1",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Products"
+              }
+            },
+            "Property": "Category"
+          }
+        },
+        "type": "Categorical",
+        "displayName": "Category"
+      }
+    ]
   }
 }

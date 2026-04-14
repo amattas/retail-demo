@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "bb46cc47dd48ee49ff50",
-  "position": { "x": 645, "y": 200, "z": 3, "height": 240, "width": 595 },
+  "position": {
+    "x": 645,
+    "y": 200,
+    "z": 3,
+    "height": 240,
+    "width": 595
+  },
   "visual": {
     "visualType": "clusteredBarChart",
     "query": {
@@ -9,7 +15,16 @@
         "Category": {
           "projections": [
             {
-              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Receipts" } }, "Property": "Payment Method" } },
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Receipts"
+                    }
+                  },
+                  "Property": "Payment Method"
+                }
+              },
               "queryRef": "Receipts.Payment Method",
               "active": true
             }
@@ -18,7 +33,16 @@
         "Y": {
           "projections": [
             {
-              "field": { "Measure": { "Expression": { "SourceRef": { "Entity": "Receipt Lines" } }, "Property": "Line Revenue" } },
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Receipt Lines"
+                    }
+                  },
+                  "Property": "Line Revenue"
+                }
+              },
               "queryRef": "Receipt Lines.Line Revenue",
               "nativeQueryRef": "Line Revenue"
             }
@@ -30,12 +54,43 @@
       "title": [
         {
           "properties": {
-            "show": { "expr": { "Literal": { "Value": "true" } } },
-            "text": { "expr": { "Literal": { "Value": "'Sales by Payment Method'" } } }
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Sales by Payment Method'"
+                }
+              }
+            }
           }
         }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "bb46cc47dd48ee49ff50f1",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Receipt Lines"
+              }
+            },
+            "Property": "Line Revenue"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
   }
 }

@@ -1,7 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
   "name": "cc26dd27ee28ff29aa30",
-  "position": { "x": 40, "y": 100, "z": 1, "height": 90, "width": 230 },
+  "position": {
+    "x": 40,
+    "y": 100,
+    "z": 1,
+    "height": 90,
+    "width": 230
+  },
   "visual": {
     "visualType": "cardVisual",
     "query": {
@@ -9,7 +15,16 @@
         "Data": {
           "projections": [
             {
-              "field": { "Measure": { "Expression": { "SourceRef": { "Entity": "Store Inventory Position" } }, "Property": "Total Inventory Retail Value" } },
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Store Inventory Position"
+                    }
+                  },
+                  "Property": "Total Inventory Retail Value"
+                }
+              },
               "queryRef": "Store Inventory Position.Total Inventory Retail Value",
               "nativeQueryRef": "Total Inventory Retail Value"
             }
@@ -19,7 +34,16 @@
       "sortDefinition": {
         "sort": [
           {
-            "field": { "Measure": { "Expression": { "SourceRef": { "Entity": "Store Inventory Position" } }, "Property": "Total Inventory Retail Value" } },
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Store Inventory Position"
+                  }
+                },
+                "Property": "Total Inventory Retail Value"
+              }
+            },
             "direction": "Descending"
           }
         ],
@@ -30,12 +54,43 @@
       "title": [
         {
           "properties": {
-            "show": { "expr": { "Literal": { "Value": "true" } } },
-            "text": { "expr": { "Literal": { "Value": "'Store Inventory Value'" } } }
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Store Inventory Value'"
+                }
+              }
+            }
           }
         }
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "cc26dd27ee28ff29aa30f1",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Store Inventory Position"
+              }
+            },
+            "Property": "Total Inventory Retail Value"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
   }
 }
