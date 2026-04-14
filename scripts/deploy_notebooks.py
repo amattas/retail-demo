@@ -67,13 +67,24 @@ OLD_TABLES = [
 # ---------------------------------------------------------------------------
 
 def get_credential():
-    """Get an interactive browser credential for a separate login."""
+    """Get an interactive browser credential with persistent token cache."""
     try:
         from azure.identity import InteractiveBrowserCredential
     except ImportError:
         print("ERROR: azure-identity not installed. Run: pip install azure-identity")
         sys.exit(1)
-    return InteractiveBrowserCredential(additionally_allowed_tenants=["*"])
+
+    import tempfile
+    cache_path = Path(tempfile.gettempdir()) / "fabric_deploy_token_cache.bin"
+    from azure.identity import TokenCachePersistenceOptions
+
+    return InteractiveBrowserCredential(
+        additionally_allowed_tenants=["*"],
+        cache_persistence_options=TokenCachePersistenceOptions(
+            name="fabric_deploy_cache",
+            allow_unencrypted_storage=True,
+        ),
+    )
 
 
 def get_token(credential, scope: str) -> str:
@@ -126,36 +137,98 @@ def list_notebooks(token: str, workspace_id: str) -> dict[str, str]:
     return notebooks
 
 
-def build_platform_json(
-    notebook_name: str,
-    lakehouse_id: str,
+def ipynb_to_fabric_py(
+    ipynb_content: bytes,
     lakehouse_name: str = "retail_lakehouse",
+    lakehouse_id: str | None = None,
     workspace_id: str | None = None,
 ) -> str:
-    """Build the .platform JSON that attaches a default lakehouse to a notebook."""
+    """Convert .ipynb to Fabric's native .py percent-script format.
+
+    The lakehouse binding lives in the notebook-level META block under
+    ``dependencies.lakehouse`` — this is what Fabric reads at runtime to
+    set the default Spark SQL context.
+    """
+    nb = json.loads(ipynb_content)
+    lines: list[str] = ["# Fabric notebook source"]
+
+    # Notebook-level metadata
+    kernel = nb.get("metadata", {}).get("kernelspec", {})
+    nb_meta: dict = {
+        "kernel_info": {"name": kernel.get("name", "synapse_pyspark")},
+        "dependencies": {},
+    }
+
+    # Attach default lakehouse in dependencies (the key location Fabric reads)
+    if lakehouse_id and workspace_id:
+        nb_meta["dependencies"] = {
+            "lakehouse": {
+                "default_lakehouse": lakehouse_id,
+                "default_lakehouse_name": lakehouse_name,
+                "default_lakehouse_workspace_id": workspace_id,
+                "known_lakehouses": [
+                    {"id": lakehouse_id}
+                ],
+            }
+        }
+
+    lines.append("")
+    lines.append("# METADATA ********************")
+    lines.append("")
+    for ml in json.dumps(nb_meta, indent=2).splitlines():
+        lines.append(f"# META {ml}")
+
+    # Cells
+    for cell in nb.get("cells", []):
+        cell_type = cell.get("cell_type", "code")
+        source_lines = cell.get("source", [])
+        source_text = "".join(source_lines)
+
+        if cell_type == "markdown":
+            lines.append("")
+            lines.append("# MARKDOWN ********************")
+            lines.append("")
+            for sl in source_text.splitlines():
+                lines.append(f"# {sl}" if sl else "#")
+        else:
+            lines.append("")
+            lines.append("# CELL ********************")
+            lines.append("")
+            for sl in source_text.splitlines():
+                lines.append(sl)
+
+        # Cell metadata
+        cell_meta: dict = {
+            "language": "python",
+            "language_group": "synapse_pyspark",
+        }
+        if cell_type == "markdown":
+            cell_meta = {}  # markdown cells had no explicit meta in the reference
+
+        lines.append("")
+        lines.append("# METADATA ********************")
+        lines.append("")
+        for ml in json.dumps(cell_meta, indent=2).splitlines():
+            lines.append(f"# META {ml}")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_platform_json(notebook_name: str) -> str:
+    """Build the .platform JSON (basic metadata, no lakehouse)."""
     platform = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
         "metadata": {
             "type": "Notebook",
             "displayName": notebook_name,
+            "description": "New notebook",
         },
         "config": {
             "version": "2.0",
             "logicalId": "00000000-0000-0000-0000-000000000000",
         },
     }
-
-    # Lakehouse binding
-    if lakehouse_id:
-        lh_config: dict = {
-            "default_lakehouse": lakehouse_id,
-            "default_lakehouse_name": lakehouse_name,
-            "known_lakehouses": [{"id": lakehouse_id}],
-        }
-        if workspace_id:
-            lh_config["default_lakehouse_workspace_id"] = workspace_id
-        platform["config"]["lakehouse"] = lh_config
-
     return json.dumps(platform, indent=2)
 
 
@@ -168,28 +241,28 @@ def update_notebook(
 ) -> None:
     """Update an existing notebook definition via the Fabric Items API.
 
-    Uploads the .ipynb file directly using the ipynb format, plus a .platform
-    file that binds the notebook to the default lakehouse.
+    Converts .ipynb to fabricGitSource (.py) format with the lakehouse binding
+    embedded in the notebook-level META dependencies block.
     """
     import requests
 
-    # Notebook content — send .ipynb as-is
-    content_b64 = base64.b64encode(notebook_path.read_bytes()).decode("ascii")
-
-    # .platform metadata with lakehouse binding
-    platform_json = build_platform_json(
-        notebook_name=notebook_path.stem,
-        lakehouse_id=lakehouse_id or "",
+    # Convert .ipynb to Fabric's native .py format with lakehouse in META
+    py_content = ipynb_to_fabric_py(
+        notebook_path.read_bytes(),
+        lakehouse_id=lakehouse_id,
         workspace_id=workspace_id,
     )
+    content_b64 = base64.b64encode(py_content.encode("utf-8")).decode("ascii")
+
+    # .platform metadata (basic — no lakehouse here)
+    platform_json = build_platform_json(notebook_path.stem)
     platform_b64 = base64.b64encode(platform_json.encode("utf-8")).decode("ascii")
 
     body = {
         "definition": {
-            "format": "ipynb",
             "parts": [
                 {
-                    "path": "artifact.content.ipynb",
+                    "path": "notebook-content.py",
                     "payload": content_b64,
                     "payloadType": "InlineBase64",
                 },
