@@ -1,0 +1,23 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "cc16dd17ee18ff19aa20",
+  "position": { "x": 770, "y": 70, "z": 10, "height": 60, "width": 240 },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": { "Column": { "Expression": { "SourceRef": { "Entity": "Stores" } }, "Property": "Store Number" } },
+              "queryRef": "Stores.Store Number",
+              "nativeQueryRef": "Store Number",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
