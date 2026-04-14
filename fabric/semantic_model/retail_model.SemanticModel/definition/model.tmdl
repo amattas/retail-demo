@@ -47,17 +47,4 @@ ref table Stockouts
 ref table 'Customer Zone Changes'
 ref table Geographies
 ref table Date
-ref table 'Churn Predictions'
-ref table 'Customer Segments'
-ref table 'Demand Forecast'
-ref table 'Dwell Predictions'
-ref table 'Journey Patterns'
-ref table 'Price Elasticity'
-ref table 'Pricing Constraints'
-ref table 'Pricing Recommendations'
-ref table 'Product Recommendations'
-ref table 'Promotion Lift'
-ref table 'Stockout Risk'
-ref table 'Zone Dwell Stats'
-ref table 'Zone Transitions'
 

@@ -7,7 +7,7 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - **Dimension Tables** (DirectLake): Master data from `ag` schema (dim_stores, dim_products)
 - **KQL views** (optional): Near-real-time tiles via DirectQuery
 
-## Current Tables (25)
+## Current Tables (35 core)
 
 ### Gold Aggregations (9 tables)
 - `gold_sales_minute_store` - Sales velocity per minute/store
@@ -25,7 +25,14 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - `dim_products` - Product master data
 - `dim_date` - Date dimension with YYYYMMDD key, fiscal calendar attributes
 
-### ML & Predictive Analytics Tables (13 tables)
+### ML & Predictive Analytics Tables (13 tables — not loaded by default)
+
+> **Note:** These tables are defined in `definition/tables/` but not referenced in
+> `model.tmdl` until the ML notebooks (06-14) have been run and their Gold tables
+> exist in the lakehouse. To enable them, add the corresponding `ref table` lines
+> to `model.tmdl` and relationship entries to `relationships.tmdl` (see commented
+> examples at the bottom of each file), then refresh the model.
+
 - `gold_demand_forecast` - GBT demand predictions by store/product
 - `product_recommendations` - Market basket "bought together" pairs
 - `gold_customer_segments` - RFM + K-means customer segments
@@ -108,7 +115,14 @@ This repo also includes a Power BI Project at `fabric/semantic_model/retail_mode
 - **Inventory & Replenishment**: On-hand units/value plus reorder quantity by priority
 - **Logistics Control Center**: Truck dwell/throughput plus DC inventory on hand
 
-### ML Report Pages (5 pages)
+### ML Report Pages (5 pages — hidden until ML tables are enabled)
+
+> These pages are not included in the report page order by default. After running
+> ML notebooks 06-14, enable the ML tables in the semantic model (see above),
+> then add these page IDs back to `pages.json`:
+> `589d6c9c88ff9a9cff88`, `s1a0demand_stockout`, `s2a0pricing_promotions`,
+> `c1a0customer_segments_churn`, `c2a0customer_journey`
+
 - **Customer Segments & Churn** - Segment distribution, churn risk, RFM analysis
 - **Customer Journey** - Zone dwell heatmap, transition matrix, path analysis
 - **Demand & Stockout** - Forecast trends, stockout risk scatter, at-risk SKUs
