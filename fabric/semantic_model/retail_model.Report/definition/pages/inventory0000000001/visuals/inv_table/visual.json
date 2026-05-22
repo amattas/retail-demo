@@ -1,0 +1,119 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "inv_table",
+  "position": {
+    "x": 40,
+    "y": 450,
+    "z": 1,
+    "height": 230,
+    "width": 1170
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_products"
+                    }
+                  },
+                  "Property": "Product Name"
+                }
+              },
+              "queryRef": "dim_products.Product Name",
+              "nativeQueryRef": "Product Name",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "inventory_position_current"
+                    }
+                  },
+                  "Property": "Total Units on Hand"
+                }
+              },
+              "queryRef": "inventory_position_current.Total Units on Hand",
+              "nativeQueryRef": "Total Units on Hand",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "inventory_position_current"
+                    }
+                  },
+                  "Property": "Total Inventory Value"
+                }
+              },
+              "queryRef": "inventory_position_current.Total Inventory Value",
+              "nativeQueryRef": "Total Inventory Value",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_reorders"
+                    }
+                  },
+                  "Property": "Total Reorder Quantity"
+                }
+              },
+              "queryRef": "fact_reorders.Total Reorder Quantity",
+              "nativeQueryRef": "Total Reorder Quantity",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "grid": [
+        {
+          "properties": {
+            "gridVertical": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "gridHorizontal": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "columnHeaders": [
+        {
+          "properties": {
+            "bold": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default"
+}

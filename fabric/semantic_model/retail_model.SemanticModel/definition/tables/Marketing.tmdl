@@ -7,7 +7,7 @@ table Marketing
 		lineageTag: af26fadf-1aa7-4813-b8f2-4b18a7d05aa7
 		sourceLineageTag: CustomerId
 		summarizeBy: count
-		sourceColumn: customer_id
+		sourceColumn: CustomerId
 
 		changedProperty = Name
 
@@ -21,7 +21,7 @@ table Marketing
 		lineageTag: e29f4b2f-b696-4df5-be7d-227c34ea126b
 		sourceLineageTag: CostCents
 		summarizeBy: sum
-		sourceColumn: cost_cents
+		sourceColumn: CostCents
 
 		changedProperty = Name
 
@@ -104,12 +104,10 @@ table Marketing
 
 		annotation SummarizationSetBy = Automatic
 
+
 	partition Marketing = entity
 		mode: directLake
 		source
 			entityName: fact_marketing
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-
-	changedProperty = Name
-

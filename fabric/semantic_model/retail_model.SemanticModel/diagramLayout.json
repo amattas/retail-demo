@@ -4,474 +4,468 @@
     {
       "ordinal": 0,
       "scrollPosition": {
-        "x": 3919,
+        "x": 0,
         "y": 0
       },
       "nodes": [
         {
           "location": {
             "x": 0,
-            "y": 74
+            "y": 0.0
           },
-          "nodeIndex": "_watermarks",
-          "nodeLineageTag": "0a6eb3a9-dfc1-4cb2-814c-3b67f979d2ae",
+          "nodeIndex": "tender_mix_daily",
+          "nodeLineageTag": "52b36092-c97d-40fd-82fa-5031db035dc5",
           "size": {
-            "height": 152,
+            "height": 220,
             "width": 234
           },
           "zIndex": 1
         },
         {
           "location": {
-            "x": 284,
-            "y": 74
+            "x": 280,
+            "y": 0.0
           },
-          "nodeIndex": "dc_inventory_position_current",
-          "nodeLineageTag": "6e01fb51-1261-4586-97ec-01c0f7b73a13",
+          "nodeIndex": "online_sales_daily",
+          "nodeLineageTag": "a2c1b744-09a3-4341-9934-282e0cd86ef7",
           "size": {
-            "height": 152,
+            "height": 220,
             "width": 234
           },
           "zIndex": 2
         },
         {
           "location": {
-            "x": 568,
-            "y": 2
+            "x": 560,
+            "y": 0.0
           },
-          "nodeIndex": "dim_customers",
-          "nodeLineageTag": "5531b22c-bc78-4ae9-8d9f-64dcee879bad",
+          "nodeIndex": "top_products_15m",
+          "nodeLineageTag": "eda9ac0d-bc37-4363-96b4-298c279801bc",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 3
         },
         {
           "location": {
-            "x": 852,
-            "y": 62
+            "x": 840,
+            "y": 0.0
           },
-          "nodeIndex": "dim_distribution_centers",
-          "nodeLineageTag": "ae706b9b-d53f-48e5-8f09-4c969f0d6b4a",
+          "nodeIndex": "marketing_cost_daily",
+          "nodeLineageTag": "4bb353d5-fa0d-4c32-911a-584a960f5482",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 4
         },
         {
           "location": {
-            "x": 1136,
-            "y": 38
+            "x": 1120,
+            "y": 0.0
           },
-          "nodeIndex": "dim_geographies",
-          "nodeLineageTag": "0182aad6-4ad2-40ca-ad96-bccd64f82380",
+          "nodeIndex": "zone_dwell_minute",
+          "nodeLineageTag": "0bf09335-5a4f-471c-9b09-32b6f8261fa6",
           "size": {
-            "height": 224,
+            "height": 220,
             "width": 234
           },
           "zIndex": 5
         },
         {
           "location": {
-            "x": 1420,
-            "y": 0
+            "x": 1400,
+            "y": 0.0
           },
-          "nodeIndex": "dim_products",
-          "nodeLineageTag": "7a341aa1-e4de-4e62-8737-d78ecfeea40b",
+          "nodeIndex": "inventory_position_current",
+          "nodeLineageTag": "80253872-c9ec-4d0d-b638-c3c5163306c3",
           "size": {
-            "height": 300,
+            "height": 220,
             "width": 234
           },
           "zIndex": 6
         },
         {
           "location": {
-            "x": 1704,
-            "y": 2
+            "x": 1680,
+            "y": 0.0
           },
-          "nodeIndex": "dim_stores",
-          "nodeLineageTag": "7a2501f0-2aab-403a-82e0-5f791cd939ef",
+          "nodeIndex": "truck_dwell_daily",
+          "nodeLineageTag": "27b86d53-bcc1-4b0c-a6b6-bef459bc35ed",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 7
         },
         {
           "location": {
-            "x": 1988,
-            "y": 62
+            "x": 0,
+            "y": 260.0
           },
-          "nodeIndex": "dim_trucks",
-          "nodeLineageTag": "7eb610bd-c508-404e-b04a-5cb53d07d17a",
+          "nodeIndex": "_watermarks",
+          "nodeLineageTag": "0a6eb3a9-dfc1-4cb2-814c-3b67f979d2ae",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 8
         },
         {
           "location": {
-            "x": 2272,
-            "y": 38
+            "x": 280,
+            "y": 260.0
           },
-          "nodeIndex": "fact_ble_pings",
-          "nodeLineageTag": "73ae8b40-2387-4123-859d-f4e85a159c5b",
+          "nodeIndex": "sales_minute_store",
+          "nodeLineageTag": "a8fa2a6d-f69b-426f-a314-e3a5843c3295",
           "size": {
-            "height": 224,
+            "height": 220,
             "width": 234
           },
           "zIndex": 9
         },
         {
           "location": {
-            "x": 2556,
-            "y": 62
+            "x": 560,
+            "y": 260.0
           },
-          "nodeIndex": "fact_customer_zone_changes",
-          "nodeLineageTag": "edc61f90-5ee8-4618-9d9d-e496d674f557",
+          "nodeIndex": "dc_inventory_position_current",
+          "nodeLineageTag": "6e01fb51-1261-4586-97ec-01c0f7b73a13",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 10
         },
         {
           "location": {
-            "x": 2840,
-            "y": 38
+            "x": 840,
+            "y": 260.0
           },
-          "nodeIndex": "fact_dc_inventory_txn",
-          "nodeLineageTag": "1f83be55-41e6-4951-8d58-fc6f4a5cfa45",
+          "nodeIndex": "dim_customers",
+          "nodeLineageTag": "5531b22c-bc78-4ae9-8d9f-64dcee879bad",
           "size": {
-            "height": 224,
+            "height": 220,
             "width": 234
           },
           "zIndex": 11
         },
         {
           "location": {
-            "x": 3124,
-            "y": 50
+            "x": 1120,
+            "y": 260.0
           },
-          "nodeIndex": "fact_foot_traffic",
-          "nodeLineageTag": "c999b61a-43db-4db3-9783-626a4618f864",
+          "nodeIndex": "Marketing",
+          "nodeLineageTag": "0de63cc1-c6da-4354-8a04-602a3c737aa8",
           "size": {
-            "height": 200,
+            "height": 220,
             "width": 234
           },
           "zIndex": 12
         },
         {
           "location": {
-            "x": 3408,
-            "y": 2
+            "x": 1400,
+            "y": 260.0
           },
-          "nodeIndex": "fact_marketing",
-          "nodeLineageTag": "0de63cc1-c6da-4354-8a04-602a3c737aa8",
+          "nodeIndex": "Foot Traffic",
+          "nodeLineageTag": "c999b61a-43db-4db3-9783-626a4618f864",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 13
         },
         {
           "location": {
-            "x": 3692,
-            "y": 2
+            "x": 1680,
+            "y": 260.0
           },
-          "nodeIndex": "fact_online_order_headers",
-          "nodeLineageTag": "930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd",
+          "nodeIndex": "fact_payments",
+          "nodeLineageTag": "a9ee5779-cb04-439d-8691-5ae9eb849b4e",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 14
         },
         {
           "location": {
-            "x": 3976,
-            "y": 0
+            "x": 0,
+            "y": 520.0
           },
-          "nodeIndex": "fact_online_order_lines",
-          "nodeLineageTag": "ead55580-9419-45ac-91ff-f5ac29096866",
+          "nodeIndex": "Truck Moves",
+          "nodeLineageTag": "486b3beb-5e42-4766-b0d7-1147520e5a37",
           "size": {
-            "height": 300,
+            "height": 220,
             "width": 234
           },
           "zIndex": 15
         },
         {
           "location": {
-            "x": 4260,
-            "y": 0
+            "x": 280,
+            "y": 520.0
           },
-          "nodeIndex": "fact_payments",
-          "nodeLineageTag": "a9ee5779-cb04-439d-8691-5ae9eb849b4e",
+          "nodeIndex": "dim_stores",
+          "nodeLineageTag": "7a2501f0-2aab-403a-82e0-5f791cd939ef",
           "size": {
-            "height": 300,
-            "width": 234
-          },
-          "zIndex": 34
-        },
-        {
-          "location": {
-            "x": 4544,
-            "y": 26
-          },
-          "nodeIndex": "fact_promo_lines",
-          "nodeLineageTag": "6f0a86e5-8a4e-44c1-a568-13af0862f5ef",
-          "size": {
-            "height": 248,
+            "height": 220,
             "width": 234
           },
           "zIndex": 16
         },
         {
           "location": {
-            "x": 4828,
-            "y": 2
+            "x": 560,
+            "y": 520.0
           },
-          "nodeIndex": "fact_promotions",
-          "nodeLineageTag": "09104865-1d77-427a-bc33-b0148839d9a5",
+          "nodeIndex": "dim_distribution_centers",
+          "nodeLineageTag": "ae706b9b-d53f-48e5-8f09-4c969f0d6b4a",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 17
         },
         {
           "location": {
-            "x": 5112,
-            "y": 2
+            "x": 840,
+            "y": 520.0
           },
           "nodeIndex": "fact_receipt_lines",
           "nodeLineageTag": "aab05dc7-35b4-4318-affd-bc107c21f8f7",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
           "zIndex": 18
         },
         {
           "location": {
-            "x": 5396,
-            "y": 0
+            "x": 1120,
+            "y": 520.0
           },
-          "nodeIndex": "fact_receipts",
-          "nodeLineageTag": "dbb3a597-d860-42d1-9585-a7da0fc2a2a4",
+          "nodeIndex": "fact_reorders",
+          "nodeLineageTag": "5d56e188-c68e-4de1-a166-dba2aab94430",
           "size": {
-            "height": 300,
+            "height": 220,
             "width": 234
           },
           "zIndex": 19
         },
         {
           "location": {
-            "x": 5680,
-            "y": 26
+            "x": 1400,
+            "y": 520.0
           },
-          "nodeIndex": "fact_reorders",
-          "nodeLineageTag": "5d56e188-c68e-4de1-a166-dba2aab94430",
+          "nodeIndex": "BLE Pings",
+          "nodeLineageTag": "73ae8b40-2387-4123-859d-f4e85a159c5b",
           "size": {
-            "height": 248,
+            "height": 220,
             "width": 234
           },
           "zIndex": 20
         },
         {
           "location": {
-            "x": 5964,
-            "y": 62
+            "x": 1680,
+            "y": 520.0
           },
-          "nodeIndex": "fact_stockouts",
-          "nodeLineageTag": "620b34c9-377c-44fe-bad4-8159499fc668",
+          "nodeIndex": "fact_receipts",
+          "nodeLineageTag": "dbb3a597-d860-42d1-9585-a7da0fc2a2a4",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 21
         },
         {
           "location": {
-            "x": 6248,
-            "y": 38
+            "x": 0,
+            "y": 780.0
           },
-          "nodeIndex": "fact_store_inventory_txn",
-          "nodeLineageTag": "069e006d-82a8-46ab-abf7-39d781c37887",
+          "nodeIndex": "Promotion Lines",
+          "nodeLineageTag": "6f0a86e5-8a4e-44c1-a568-13af0862f5ef",
           "size": {
-            "height": 224,
+            "height": 220,
             "width": 234
           },
           "zIndex": 22
         },
         {
           "location": {
-            "x": 6532,
-            "y": 74
+            "x": 280,
+            "y": 780.0
           },
-          "nodeIndex": "fact_store_ops",
-          "nodeLineageTag": "30e435c0-c71d-474c-b807-e2f634dbf383",
+          "nodeIndex": "dim_products",
+          "nodeLineageTag": "7a341aa1-e4de-4e62-8737-d78ecfeea40b",
           "size": {
-            "height": 152,
+            "height": 220,
             "width": 234
           },
           "zIndex": 23
         },
         {
           "location": {
-            "x": 6816,
-            "y": 14
+            "x": 560,
+            "y": 780.0
           },
           "nodeIndex": "fact_truck_inventory",
           "nodeLineageTag": "d65dd252-405a-484b-9e2e-efc842442898",
           "size": {
-            "height": 272,
+            "height": 220,
             "width": 234
           },
           "zIndex": 24
         },
         {
           "location": {
-            "x": 7100,
-            "y": 50
+            "x": 840,
+            "y": 780.0
           },
-          "nodeIndex": "fact_truck_moves",
-          "nodeLineageTag": "486b3beb-5e42-4766-b0d7-1147520e5a37",
+          "nodeIndex": "fact_online_order_lines",
+          "nodeLineageTag": "ead55580-9419-45ac-91ff-f5ac29096866",
           "size": {
-            "height": 200,
+            "height": 220,
             "width": 234
           },
           "zIndex": 25
         },
         {
           "location": {
-            "x": 7384,
-            "y": 74
+            "x": 1120,
+            "y": 780.0
           },
-          "nodeIndex": "inventory_position_current",
-          "nodeLineageTag": "80253872-c9ec-4d0d-b638-c3c5163306c3",
+          "nodeIndex": "dim_trucks",
+          "nodeLineageTag": "7eb610bd-c508-404e-b04a-5cb53d07d17a",
           "size": {
-            "height": 152,
+            "height": 220,
             "width": 234
           },
           "zIndex": 26
         },
         {
           "location": {
-            "x": 7668,
-            "y": 62
+            "x": 1400,
+            "y": 780.0
           },
-          "nodeIndex": "marketing_cost_daily",
-          "nodeLineageTag": "4bb353d5-fa0d-4c32-911a-584a960f5482",
+          "nodeIndex": "fact_online_order_headers",
+          "nodeLineageTag": "930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 27
         },
         {
           "location": {
-            "x": 7952,
-            "y": 38
+            "x": 1680,
+            "y": 780.0
           },
-          "nodeIndex": "online_sales_daily",
-          "nodeLineageTag": "a2c1b744-09a3-4341-9934-282e0cd86ef7",
+          "nodeIndex": "Promotions",
+          "nodeLineageTag": "09104865-1d77-427a-bc33-b0148839d9a5",
           "size": {
-            "height": 224,
+            "height": 220,
             "width": 234
           },
           "zIndex": 28
         },
         {
           "location": {
-            "x": 8236,
-            "y": 50
+            "x": 0,
+            "y": 1040.0
           },
-          "nodeIndex": "sales_minute_store",
-          "nodeLineageTag": "a8fa2a6d-f69b-426f-a314-e3a5843c3295",
+          "nodeIndex": "fact_dc_inventory_txn",
+          "nodeLineageTag": "1f83be55-41e6-4951-8d58-fc6f4a5cfa45",
           "size": {
-            "height": 200,
+            "height": 220,
             "width": 234
           },
           "zIndex": 29
         },
         {
           "location": {
-            "x": 8520,
-            "y": 62
+            "x": 280,
+            "y": 1040.0
           },
-          "nodeIndex": "tender_mix_daily",
-          "nodeLineageTag": "52b36092-c97d-40fd-82fa-5031db035dc5",
+          "nodeIndex": "fact_store_inventory_txn",
+          "nodeLineageTag": "069e006d-82a8-46ab-abf7-39d781c37887",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 30
         },
         {
           "location": {
-            "x": 8804,
-            "y": 74
+            "x": 560,
+            "y": 1040.0
           },
-          "nodeIndex": "top_products_15m",
-          "nodeLineageTag": "eda9ac0d-bc37-4363-96b4-298c279801bc",
+          "nodeIndex": "Store Operations",
+          "nodeLineageTag": "30e435c0-c71d-474c-b807-e2f634dbf383",
           "size": {
-            "height": 152,
+            "height": 220,
             "width": 234
           },
           "zIndex": 31
         },
         {
           "location": {
-            "x": 9088,
-            "y": 62
+            "x": 840,
+            "y": 1040.0
           },
-          "nodeIndex": "truck_dwell_daily",
-          "nodeLineageTag": "27b86d53-bcc1-4b0c-a6b6-bef459bc35ed",
+          "nodeIndex": "fact_stockouts",
+          "nodeLineageTag": "620b34c9-377c-44fe-bad4-8159499fc668",
           "size": {
-            "height": 176,
+            "height": 220,
             "width": 234
           },
           "zIndex": 32
         },
         {
           "location": {
-            "x": 9372,
-            "y": 50
+            "x": 1120,
+            "y": 1040.0
           },
-          "nodeIndex": "zone_dwell_minute",
-          "nodeLineageTag": "0bf09335-5a4f-471c-9b09-32b6f8261fa6",
+          "nodeIndex": "Customer Zone Changes",
+          "nodeLineageTag": "edc61f90-5ee8-4618-9d9d-e496d674f557",
           "size": {
-            "height": 200,
+            "height": 220,
             "width": 234
           },
           "zIndex": 33
         },
         {
           "location": {
-            "x": 9656,
-            "y": 0
+            "x": 1400,
+            "y": 1040.0
+          },
+          "nodeIndex": "dim_geographies",
+          "nodeLineageTag": "0182aad6-4ad2-40ca-ad96-bccd64f82380",
+          "size": {
+            "height": 220,
+            "width": 234
+          },
+          "zIndex": 34
+        },
+        {
+          "location": {
+            "x": 1680,
+            "y": 1040.0
           },
           "nodeIndex": "dim_date",
           "nodeLineageTag": "8a9c5f7e-7d3b-4f0a-9b6d-2e4f8c9a1b3d",
           "size": {
-            "height": 296,
+            "height": 220,
             "width": 234
           },
-          "zIndex": 34
+          "zIndex": 35
         }
       ],
       "name": "All tables",
-      "zoomValue": 100,
-      "pinKeyFieldsToTop": false,
-      "showExtraHeaderInfo": false,
-      "hideKeyFieldsWhenCollapsed": false,
-      "tablesLocked": false
+      "zoomValue": 75
     }
-  ],
-  "selectedDiagram": "All tables",
-  "defaultDiagram": "All tables"
+  ]
 }

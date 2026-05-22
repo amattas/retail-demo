@@ -2,6 +2,18 @@ table 'Truck Moves'
 	lineageTag: 486b3beb-5e42-4766-b0d7-1147520e5a37
 	sourceLineageTag: [ag].[fact_truck_moves]
 
+	/// Count of truck movement events.
+	measure 'Truck Move Count' = COUNTROWS('Truck Moves')
+		formatString: #,0
+		displayFolder: Logistics\Truck Moves
+		lineageTag: a9f8319e-9d48-47b4-a120-000000000001
+
+	/// Average actual unload duration from truck move events.
+	measure 'Avg Unload Duration' = AVERAGE('Truck Moves'[actual_unload_duration])
+		formatString: #,0.0
+		displayFolder: Logistics\Truck Moves
+		lineageTag: a9f8319e-9d48-47b4-a120-000000000002
+
 	column Status
 		dataType: string
 		lineageTag: 05d465cc-c274-4016-80ec-bd258e36f80c
@@ -60,12 +72,21 @@ table 'Truck Moves'
 
 		annotation SummarizationSetBy = Automatic
 
+	column actual_unload_duration
+		dataType: double
+		lineageTag: 8f57805e-ee66-4e80-bb3f-832c006ec88c
+		sourceLineageTag: actual_unload_duration
+		summarizeBy: sum
+		sourceColumn: actual_unload_duration
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+
 	partition 'Truck Moves' = entity
 		mode: directLake
 		source
 			entityName: fact_truck_moves
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-
-	changedProperty = Name
-

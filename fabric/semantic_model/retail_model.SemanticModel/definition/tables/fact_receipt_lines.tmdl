@@ -1,0 +1,194 @@
+table fact_receipt_lines
+	lineageTag: aab05dc7-35b4-4318-affd-bc107c21f8f7
+	sourceLineageTag: [ag].[fact_receipt_lines]
+
+	/// Total item units sold in store receipt lines.
+	measure 'Total Units Sold' = SUM('fact_receipt_lines'[Quantity])
+		formatString: #,0
+		displayFolder: Core Metrics\Units
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000001
+
+	/// Store receipt-line revenue, stored in cents and reported in currency.
+	measure 'Line Revenue' =
+		DIVIDE(
+		    SUM('fact_receipt_lines'[Extended Cents]),
+		    100,
+		    0
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Core Metrics\Sales
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000002
+
+	/// Average unit sell price across store receipt lines.
+	measure 'Average Unit Price' =
+		DIVIDE(
+		    [Line Revenue],
+		    [Total Units Sold],
+		    0
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Core Metrics\Sales
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000003
+
+	/// Count of store receipt line items.
+	measure 'Total Lines' = COUNTROWS('fact_receipt_lines')
+		formatString: #,0
+		displayFolder: Core Metrics\Sales
+		lineageTag: 01a1a1a2-0001-0001-0001-000000000004
+
+	/// Estimated cost of goods sold for store receipt lines using product standard cost.
+	measure 'Line Cost' =
+		SUMX(
+		    'fact_receipt_lines',
+		    VAR ProductCost =
+		        LOOKUPVALUE(
+		            'dim_products'[Cost],
+		            'dim_products'[ID],
+		            'fact_receipt_lines'[Product ID]
+		        )
+		    RETURN
+		        'fact_receipt_lines'[Quantity] * COALESCE(ProductCost, 0)
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Profitability
+		lineageTag: c1020001-0000-0000-0000-000000000001
+
+	/// Estimated gross profit from store receipt-line revenue minus product cost.
+	measure 'Gross Profit' = [Line Revenue] - [Line Cost]
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Profitability
+		lineageTag: c1020001-0000-0000-0000-000000000002
+
+	/// Gross margin percentage for store receipt-line sales.
+	measure 'Gross Margin %' =
+		DIVIDE(
+		    [Gross Profit],
+		    [Line Revenue],
+		    0
+		)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Profitability
+		lineageTag: c1020001-0000-0000-0000-000000000003
+
+	/// Units per store receipt.
+	measure 'Units per Receipt' =
+		DIVIDE(
+		    [Total Units Sold],
+		    [Receipt Count],
+		    0
+		)
+		formatString: #,0.00
+		displayFolder: Core Metrics\Productivity
+		lineageTag: c1020001-0000-0000-0000-000000000004
+
+	column 'Receipt ID'
+		dataType: string
+		lineageTag: 9a782ca7-2110-4e68-994a-5c56e36c0200
+		sourceLineageTag: receipt_id_ext
+		summarizeBy: none
+		sourceColumn: receipt_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 160f5195-0ef4-431a-9e58-e0dda60336f2
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Line Number'
+		dataType: int64
+		formatString: 0
+		lineageTag: bd65b0d0-4508-4f61-8a08-7bc9e337892e
+		sourceLineageTag: line_num
+		summarizeBy: sum
+		sourceColumn: line_num
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Quantity
+		dataType: int64
+		formatString: 0
+		lineageTag: de505fd4-366c-410b-9a65-544528a62890
+		sourceLineageTag: quantity
+		summarizeBy: sum
+		sourceColumn: quantity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Unit Price'
+		dataType: string
+		lineageTag: 9de741c8-fe8c-43bb-b1d1-3547e0e467e4
+		sourceLineageTag: unit_price
+		summarizeBy: none
+		sourceColumn: unit_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Extended Price'
+		dataType: string
+		lineageTag: a743303d-5bbe-46f7-844b-72b2a53cbd8f
+		sourceLineageTag: ext_price
+		summarizeBy: none
+		sourceColumn: ext_price
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Unit Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 5af8a932-d0bb-4d47-9699-705ddf5bbde0
+		sourceLineageTag: unit_cents
+		summarizeBy: sum
+		sourceColumn: unit_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Extended Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 669ff8f4-2ed2-4299-9cf5-9730c3bb22e1
+		sourceLineageTag: ext_cents
+		summarizeBy: sum
+		sourceColumn: ext_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Promo Code'
+		dataType: string
+		lineageTag: 5848e85f-4f07-40c5-9166-5364b4b7c822
+		sourceLineageTag: promo_code
+		summarizeBy: none
+		sourceColumn: promo_code
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+
+	partition fact_receipt_lines = entity
+		mode: directLake
+		source
+			entityName: fact_receipt_lines
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'

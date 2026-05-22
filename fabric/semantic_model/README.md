@@ -7,7 +7,7 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - **Dimension Tables** (DirectLake): Master data from `ag` schema (dim_stores, dim_products)
 - **KQL views** (optional): Near-real-time tiles via DirectQuery
 
-## Current Tables (35 core)
+## Current Tables (35 model tables)
 
 ### Gold Aggregations (9 tables)
 - `sales_minute_store` - Sales velocity per minute/store
@@ -20,18 +20,36 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - `zone_dwell_minute` - Customer dwell times by zone
 - `marketing_cost_daily` - Marketing spend by campaign
 
-### Dimension Tables (3 tables)
+### Dimension Tables (7 tables)
 - `dim_stores` - Store master data
 - `dim_products` - Product master data
 - `dim_date` - Date dimension with YYYYMMDD key, fiscal calendar attributes
+- `dim_geographies` - Region, district, city, state, and ZIP slicing
+- `dim_distribution_centers` - DC master data for network and replenishment views
+- `dim_customers` - Customer master data for segmentation and churn analysis
+- `dim_trucks` - Truck fleet master data for logistics analysis
 
-### ML & Predictive Analytics Tables (13 tables — not loaded by default)
+### Operational Facts and Events (18 tables)
 
-> **Note:** These tables are defined in `definition/tables/` but not referenced in
-> `model.tmdl` until the ML notebooks (06-14) have been run and their Gold tables
-> exist in the lakehouse. To enable them, add the corresponding `ref table` lines
-> to `model.tmdl` and relationship entries to `relationships.tmdl` (see commented
-> examples at the bottom of each file), then refresh the model.
+The default model only references tables created by the historical and streaming
+Lakehouse notebooks so the PBIP opens cleanly in a freshly deployed demo.
+
+- Sales and tender facts: `fact_receipts`, `fact_receipt_lines`, `fact_payments`
+- Omnichannel facts: `fact_online_order_headers`, `fact_online_order_lines`
+- Inventory and replenishment facts: `fact_store_inventory_txn`,
+  `fact_dc_inventory_txn`, `fact_stockouts`, `fact_reorders`
+- Logistics facts: `fact_truck_moves`, `fact_truck_inventory`
+- Store/customer event facts: `Foot Traffic`, `BLE Pings`,
+  `Customer Zone Changes`, `Store Operations`
+- Marketing and promotion facts: `Marketing`, `Promotions`, `Promotion Lines`
+- Technical tracking: `_watermarks`
+
+### Optional ML & Predictive Analytics Tables
+
+These advanced tables are intentionally excluded from the active
+`definition/tables` folder because Power BI Desktop loads table definition files
+even when they are not referenced by `definition/model.tmdl`. Add them back only
+after the corresponding Gold/ML notebooks have generated the Lakehouse tables.
 
 - `demand_forecast` - GBT demand predictions by store/product
 - `product_recommendations` - Market basket "bought together" pairs
@@ -52,6 +70,13 @@ Power BI semantic model for unified analytics. Hybrid model over KQL (hot) and L
 - **Merchandising**: Products, inventory, online sales
 - **Logistics**: Truck dwell, DC inventory
 - **Marketing**: Marketing costs
+
+## Model Enhancements
+
+- Explicit measures are organized into business folders for sales, inventory, replenishment, fulfillment, traffic, promotion, and logistics.
+- `dim_date` includes calendar, fiscal, and week hierarchies and is related to store sales, online orders, reorders, and daily Gold aggregates for time intelligence.
+- Geography, product, store profile, and distribution center hierarchies support region, district, department, category, subcategory, format, volume class, and DC drill paths.
+- Implicit measures are discouraged so report visuals bind to curated DAX measures rather than accidental aggregations.
 
 ## Deployment
 
@@ -107,26 +132,21 @@ Additional Gold tables planned for future releases:
 
 ## Report (PBIP)
 
-This repo also includes a Power BI Project at `fabric/semantic_model/retail_model.pbip` with a starter report:
+This repo also includes a Power BI Project at `fabric/semantic_model/retail_model.pbip` with a rebuilt RTI retail demo report:
 
-- **Sales Dashboard**: Sales KPIs plus store/category breakdowns
-- **Supply Chain Control Tower**: Combined view of store/DC inventory, reorders, and truck dwell trends
-- **Online, Payments & Marketing**: Online sales by day, tender mix, and marketing cost by campaign
-- **Inventory & Replenishment**: On-hand units/value plus reorder quantity by priority
-- **Logistics Control Center**: Truck dwell/throughput plus DC inventory on hand
+- **SLT Dashboard**: Executive view across omnichannel revenue, margin, inventory health, replenishment, traffic, and logistics
+- **Supply Chain Control Tower**: Whitepaper-aligned inventory, stockout, replenishment, and DC command center
+- **Distribution Center Operations**: DC inventory, category mix, high-priority reorders, and dwell pressure
+- **Store Operations Command Center**: Real-time store sales velocity, basket, foot traffic, zone dwell, and store operations workload
+- **Regional & Department Performance**: Region, district, store, department, category, margin, and time-intelligence performance
+- **Omnichannel Fulfillment**: Store plus online commerce, order economics, fulfillment modes, tender mix, and channel share
+- **Customer, Marketing & Personalization**: Customer, traffic, BLE presence, retail media spend, and intervention queues
+- **Pricing & Promotion Optimization**: Margin, promotion discount, product mix, and pricing-action proxy views
+- **Logistics & Dwell Intelligence**: Truck dwell, shipment movement, and logistics exception monitoring
 
-### ML Report Pages (5 pages — hidden until ML tables are enabled)
+The optional ML tables can be re-enabled later for forecast, churn, elasticity,
+stockout-risk, and dwell-prediction visuals once those tables exist in the
+Lakehouse; keep optional definitions outside the active `definition/tables`
+folder until then.
 
-> These pages are not included in the report page order by default. After running
-> ML notebooks 06-14, enable the ML tables in the semantic model (see above),
-> then add these page IDs back to `pages.json`:
-> `589d6c9c88ff9a9cff88`, `s1a0demand_stockout`, `s2a0pricing_promotions`,
-> `c1a0customer_segments_churn`, `c2a0customer_journey`
-
-- **Customer Segments & Churn** - Segment distribution, churn risk, RFM analysis
-- **Customer Journey** - Zone dwell heatmap, transition matrix, path analysis
-- **Demand & Stockout** - Forecast trends, stockout risk scatter, at-risk SKUs
-- **Pricing & Promotions** - Elasticity by category, pricing recommendations, promotion lift
-- **Logistics & Delivery Predictions** - Predicted vs actual dwell, outlier shipments
-
-Open it in **Power BI Desktop** via File → Open → `fabric/semantic_model/retail_model.pbip`.
+Open it in **Power BI Desktop** via File -> Open -> `fabric/semantic_model/retail_model.pbip`.

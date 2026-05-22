@@ -2,6 +2,23 @@ table 'Store Operations'
 	lineageTag: 30e435c0-c71d-474c-b807-e2f634dbf383
 	sourceLineageTag: [ag].[fact_store_ops]
 
+	/// Count of store operation events.
+	measure 'Store Operation Events' = COUNTROWS('Store Operations')
+		formatString: #,0
+		displayFolder: Store Operations\Events
+		lineageTag: 01a1a1ca-0001-0001-0001-000000000001
+
+	/// Store operation events per active store.
+	measure 'Store Operation Events per Store' =
+		DIVIDE(
+		    [Store Operation Events],
+		    [# of Stores],
+		    0
+		)
+		formatString: #,0.0
+		displayFolder: Store Operations\Events
+		lineageTag: c1150001-0000-0000-0000-000000000001
+
 	column 'Trace ID'
 		dataType: string
 		lineageTag: 7c2cb6d2-a5ec-4d85-9e47-e23513bb14e2
@@ -10,7 +27,6 @@ table 'Store Operations'
 		sourceColumn: trace_id
 
 		changedProperty = Name
-
 		annotation SummarizationSetBy = Automatic
 
 	column 'Store ID'
@@ -36,12 +52,11 @@ table 'Store Operations'
 
 		annotation SummarizationSetBy = Automatic
 
+
 	partition 'Store Operations' = entity
 		mode: directLake
 		source
 			entityName: fact_store_ops
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-
-	changedProperty = Name
 

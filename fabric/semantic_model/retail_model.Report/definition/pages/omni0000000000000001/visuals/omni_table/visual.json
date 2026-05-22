@@ -1,0 +1,119 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "omni_table",
+  "position": {
+    "x": 40,
+    "y": 450,
+    "z": 1,
+    "height": 230,
+    "width": 1170
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_online_order_lines"
+                    }
+                  },
+                  "Property": "Fulfillment Mode"
+                }
+              },
+              "queryRef": "fact_online_order_lines.Fulfillment Mode",
+              "nativeQueryRef": "Fulfillment Mode",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_online_order_lines"
+                    }
+                  },
+                  "Property": "Fulfillment Status"
+                }
+              },
+              "queryRef": "fact_online_order_lines.Fulfillment Status",
+              "nativeQueryRef": "Fulfillment Status",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_online_order_lines"
+                    }
+                  },
+                  "Property": "Total Online Units"
+                }
+              },
+              "queryRef": "fact_online_order_lines.Total Online Units",
+              "nativeQueryRef": "Total Online Units",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_online_order_lines"
+                    }
+                  },
+                  "Property": "Online Line Revenue"
+                }
+              },
+              "queryRef": "fact_online_order_lines.Online Line Revenue",
+              "nativeQueryRef": "Online Line Revenue",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "grid": [
+        {
+          "properties": {
+            "gridVertical": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "gridHorizontal": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "columnHeaders": [
+        {
+          "properties": {
+            "bold": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "howCreated": "Default"
+}

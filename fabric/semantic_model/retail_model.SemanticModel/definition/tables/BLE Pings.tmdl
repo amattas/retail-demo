@@ -7,7 +7,7 @@ table 'BLE Pings'
 		lineageTag: 17cdf61c-5cf1-4033-980c-c519f645366f
 		sourceLineageTag: CustomerId
 		summarizeBy: count
-		sourceColumn: customer_id
+		sourceColumn: CustomerId
 
 		changedProperty = Name
 
@@ -72,12 +72,10 @@ table 'BLE Pings'
 
 		annotation SummarizationSetBy = Automatic
 
+
 	partition 'BLE Pings' = entity
 		mode: directLake
 		source
 			entityName: fact_ble_pings
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-
-	changedProperty = Name
-

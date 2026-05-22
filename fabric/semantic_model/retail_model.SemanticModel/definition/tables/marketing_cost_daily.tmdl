@@ -1,0 +1,107 @@
+table marketing_cost_daily
+	lineageTag: 4bb353d5-fa0d-4c32-911a-584a960f5482
+	sourceLineageTag: [au].[marketing_cost_daily]
+
+	/// Marketing spend filtered by the Marketing table channel context.
+	measure 'Marketing Spend (Channel)' =
+		CALCULATE(
+		    SUM('marketing_cost_daily'[Cost]),
+		    TREATAS(
+		        VALUES(Marketing[Campaign ID]),
+		        'marketing_cost_daily'[Campaign ID]
+		    )
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing\Spend
+		lineageTag: 45de4a5d-09b4-4c1c-a32c-862c2cd20aa9
+
+	/// Total marketing spend.
+	measure 'Total Marketing Cost' = SUM('marketing_cost_daily'[Cost])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing\Spend
+		lineageTag: 01a1a1c4-0001-0001-0001-000000000001
+
+	/// Total marketing impressions.
+	measure 'Total Marketing Impressions' = SUM('marketing_cost_daily'[Impressions])
+		formatString: #,0
+		displayFolder: Marketing\Reach
+		lineageTag: 01a1a1c4-0001-0001-0001-000000000002
+
+	/// Marketing cost per thousand impressions.
+	measure 'Marketing CPM' =
+		DIVIDE(
+		    [Total Marketing Cost] * 1000,
+		    [Total Marketing Impressions],
+		    0
+		)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing\Efficiency
+		lineageTag: 01a1a1c4-0001-0001-0001-000000000003
+
+	/// Marketing spend as a percentage of omnichannel revenue.
+	measure 'Marketing Spend % of Revenue' =
+		DIVIDE(
+		    [Total Marketing Cost],
+		    [Omnichannel Revenue],
+		    0
+		)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Marketing\Efficiency
+		lineageTag: c1160001-0000-0000-0000-000000000001
+
+	column 'Campaign ID'
+		dataType: string
+		lineageTag: b157fd89-f13a-41ea-91db-9be92915c7db
+		sourceLineageTag: campaign_id
+		summarizeBy: none
+		sourceColumn: campaign_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Day
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 601e19ab-304b-46d4-a357-76f8461372b8
+		sourceLineageTag: day
+		summarizeBy: none
+		sourceColumn: day
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Impressions
+		dataType: int64
+		formatString: 0
+		lineageTag: f567b3cc-29dc-4181-a70e-8d1bd45e464a
+		sourceLineageTag: impressions
+		summarizeBy: sum
+		sourceColumn: impressions
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Cost
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 69e20067-0b0a-4503-b10c-80e75ca38f85
+		sourceLineageTag: cost
+		summarizeBy: sum
+		sourceColumn: cost
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition marketing_cost_daily = entity
+		mode: directLake
+		source
+			entityName: marketing_cost_daily
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

@@ -2,6 +2,34 @@ table 'Foot Traffic'
 	lineageTag: c999b61a-43db-4db3-9783-626a4618f864
 	sourceLineageTag: [ag].[fact_foot_traffic]
 
+	/// Total observed in-store foot traffic count.
+	measure 'Foot Traffic Count' = SUM('Foot Traffic'[Count])
+		formatString: #,0
+		displayFolder: Store Operations\Traffic
+		lineageTag: 01a1a1cb-0001-0001-0001-000000000001
+
+	/// Average dwell minutes per observed in-store visitor.
+	measure 'Avg Foot Traffic Dwell Minutes' =
+		DIVIDE(
+		    SUM('Foot Traffic'[Dwell Seconds]),
+		    [Foot Traffic Count] * 60,
+		    0
+		)
+		formatString: #,0.0
+		displayFolder: Store Operations\Traffic
+		lineageTag: 01a1a1cb-0001-0001-0001-000000000002
+
+	/// Store receipt conversion proxy from receipts divided by observed traffic.
+	measure 'Traffic Conversion Proxy %' =
+		DIVIDE(
+		    [Receipt Count],
+		    [Foot Traffic Count],
+		    0
+		)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Store Operations\Traffic
+		lineageTag: c1140001-0000-0000-0000-000000000001
+
 	column Count
 		dataType: int64
 		formatString: 0
@@ -11,7 +39,6 @@ table 'Foot Traffic'
 		sourceColumn: count
 
 		changedProperty = Name
-
 		annotation SummarizationSetBy = Automatic
 
 	column Zone
@@ -60,12 +87,11 @@ table 'Foot Traffic'
 
 		annotation SummarizationSetBy = Automatic
 
+
 	partition 'Foot Traffic' = entity
 		mode: directLake
 		source
 			entityName: fact_foot_traffic
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-
-	changedProperty = Name
 

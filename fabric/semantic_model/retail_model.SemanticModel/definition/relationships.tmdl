@@ -1,185 +1,325 @@
 relationship 'Customers to Geographies'
 	isActive: false
-	fromColumn: Customers.'Geography ID'
-	toColumn: Geographies.ID
-
+	fromColumn: dim_customers.'Geography ID'
+	toColumn: dim_geographies.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Stores to Geographies'
-	fromColumn: Stores.'Geography ID'
-	toColumn: Geographies.ID
-
+	fromColumn: dim_stores.'Geography ID'
+	toColumn: dim_geographies.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Distribution Centers to Geographies'
-	fromColumn: 'Distribution Centers'.'Geography ID'
-	toColumn: Geographies.ID
-
+	fromColumn: dim_distribution_centers.'Geography ID'
+	toColumn: dim_geographies.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Receipts to Customers'
-	fromColumn: Receipts.'Customer ID'
-	toColumn: Customers.ID
-
+	fromColumn: fact_receipts.'Customer ID'
+	toColumn: dim_customers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Receipts to Stores'
-	fromColumn: Receipts.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: fact_receipts.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Receipt Lines to Receipts'
-	fromColumn: 'Receipt Lines'.'Receipt ID'
-	toColumn: Receipts.'Receipt ID'
-
+	fromColumn: fact_receipt_lines.'Receipt ID'
+	toColumn: fact_receipts.'Receipt ID'
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Receipt Lines to Products'
-	fromColumn: 'Receipt Lines'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_receipt_lines.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Payments to Receipts'
-	fromColumn: Payments.'Receipt ID'
-	toColumn: Receipts.'Receipt ID'
-
+	fromColumn: fact_payments.'Receipt ID'
+	toColumn: fact_receipts.'Receipt ID'
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Payments to Online Orders'
 	isActive: false
-	fromColumn: Payments.'Order ID'
-	toColumn: 'Online Orders'.'Order ID'
-
+	fromColumn: fact_payments.'Order ID'
+	toColumn: fact_online_order_headers.'Order ID'
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Payments to Stores'
 	isActive: false
-	fromColumn: Payments.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: fact_payments.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Payments to Customers'
 	isActive: false
-	fromColumn: Payments.'Customer ID'
-	toColumn: Customers.ID
-
+	fromColumn: fact_payments.'Customer ID'
+	toColumn: dim_customers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Online Orders to Customers'
-	fromColumn: 'Online Orders'.'Customer ID'
-	toColumn: Customers.ID
-
+	fromColumn: fact_online_order_headers.'Customer ID'
+	toColumn: dim_customers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Online Order Lines to Online Orders'
-	fromColumn: 'Online Order Lines'.'Order ID'
-	toColumn: 'Online Orders'.'Order ID'
-
+	fromColumn: fact_online_order_lines.'Order ID'
+	toColumn: fact_online_order_headers.'Order ID'
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Online Order Lines to Products'
-	fromColumn: 'Online Order Lines'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_online_order_lines.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Inventory Transactions to Stores'
-	fromColumn: 'Store Inventory Transactions'.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: fact_store_inventory_txn.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Inventory Transactions to Products'
-	fromColumn: 'Store Inventory Transactions'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_store_inventory_txn.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Inventory Position to Stores'
-	fromColumn: 'Store Inventory Position'.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: inventory_position_current.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Inventory Position to Products'
-	fromColumn: 'Store Inventory Position'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: inventory_position_current.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'DC Inventory Position to Distribution Centers'
-	fromColumn: 'DC Inventory Position'.'DC ID'
-	toColumn: 'Distribution Centers'.ID
-
+	fromColumn: dc_inventory_position_current.'DC ID'
+	toColumn: dim_distribution_centers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'DC Inventory Position to Products'
-	fromColumn: 'DC Inventory Position'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: dc_inventory_position_current.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'DC Inventory Transactions to Distribution Centers'
-	fromColumn: 'DC Inventory Transactions'.'DC ID'
-	toColumn: 'Distribution Centers'.ID
-
+	fromColumn: fact_dc_inventory_txn.'DC ID'
+	toColumn: dim_distribution_centers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'DC Inventory Transactions to Products'
-	fromColumn: 'DC Inventory Transactions'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_dc_inventory_txn.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Moves to Trucks'
 	fromColumn: 'Truck Moves'.'Truck ID'
-	toColumn: Trucks.ID
-
+	toColumn: dim_trucks.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Moves to Stores'
 	isActive: false
 	fromColumn: 'Truck Moves'.'Store ID'
-	toColumn: Stores.ID
-
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Moves to Distribution Centers'
 	fromColumn: 'Truck Moves'.'DC ID'
-	toColumn: 'Distribution Centers'.ID
-
+	toColumn: dim_distribution_centers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Inventory to Trucks'
-	fromColumn: 'Truck Inventory'.'Truck ID'
-	toColumn: Trucks.ID
-
+	fromColumn: fact_truck_inventory.'Truck ID'
+	toColumn: dim_trucks.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Inventory to Products'
-	fromColumn: 'Truck Inventory'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_truck_inventory.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Foot Traffic to Stores'
 	fromColumn: 'Foot Traffic'.'Store ID'
-	toColumn: Stores.ID
-
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Stockouts to Products'
-	fromColumn: Stockouts.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_stockouts.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Reorders to Stores'
-	fromColumn: Reorders.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: fact_reorders.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Reorders to Products'
-	fromColumn: Reorders.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: fact_reorders.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Reorders to Distribution Centers'
 	isActive: false
-	fromColumn: Reorders.'DC ID'
-	toColumn: 'Distribution Centers'.ID
-
+	fromColumn: fact_reorders.'DC ID'
+	toColumn: dim_distribution_centers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Operations to Stores'
 	fromColumn: 'Store Operations'.'Store ID'
-	toColumn: Stores.ID
-
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Promotions to Stores'
 	isActive: false
 	fromColumn: Promotions.'Store ID'
-	toColumn: Stores.ID
-
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Promotions to Customers'
 	isActive: false
 	fromColumn: Promotions.'Customer ID'
-	toColumn: Customers.ID
-
+	toColumn: dim_customers.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Promotions to Receipts'
 	fromColumn: Promotions.'Receipt ID'
-	toColumn: Receipts.'Receipt ID'
-
+	toColumn: fact_receipts.'Receipt ID'
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Store Sales by Minute to Stores'
-	fromColumn: 'Store Sales by Minute'.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: sales_minute_store.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Top Products 15 Min to Products'
-	fromColumn: 'Top Products 15 Min'.'Product ID'
-	toColumn: Products.ID
-
+	fromColumn: top_products_15m.'Product ID'
+	toColumn: dim_products.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Zone Dwell by Minute to Stores'
-	fromColumn: 'Zone Dwell by Minute'.'Store ID'
-	toColumn: Stores.ID
-
+	fromColumn: zone_dwell_minute.'Store ID'
+	toColumn: dim_stores.ID
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Online Sales Daily to Date'
-	fromColumn: 'Online Sales Daily'.Day
-	toColumn: Date.Date
-
+	fromColumn: online_sales_daily.Day
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Tender Mix Daily to Date'
-	fromColumn: 'Tender Mix Daily'.Day
-	toColumn: Date.Date
-
+	fromColumn: tender_mix_daily.Day
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Marketing Cost Daily to Date'
-	fromColumn: 'Marketing Cost Daily'.Day
-	toColumn: Date.Date
-
-relationship 'Truck Dwell Daily to Stores'
-	fromColumn: 'Truck Dwell Daily'.Site
-	toColumn: Stores.'Store Number'
-
+	fromColumn: marketing_cost_daily.Day
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
 relationship 'Truck Dwell Daily to Date'
-	fromColumn: 'Truck Dwell Daily'.Day
-	toColumn: Date.Date
-
-
+	fromColumn: truck_dwell_daily.Day
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
+relationship 'Store Sales by Minute to Date'
+	fromColumn: sales_minute_store.Timestamp
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
+	joinOnDateBehavior: datePartOnly
+relationship 'Zone Dwell by Minute to Date'
+	fromColumn: zone_dwell_minute.Timestamp
+	toColumn: dim_date.Date
+	fromCardinality: many
+	toCardinality: one
+	crossFilteringBehavior: oneDirection
+	securityFilteringBehavior: oneDirection
+	joinOnDateBehavior: datePartOnly
