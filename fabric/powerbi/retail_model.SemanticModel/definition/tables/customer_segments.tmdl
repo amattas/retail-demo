@@ -1,0 +1,140 @@
+table customer_segments
+	lineageTag: c5e6e000-0000-0000-0001-000000000000
+	sourceLineageTag: [au].[customer_segments]
+
+	/// Distinct customers represented in the ML segmentation output.
+	measure 'Segmented Customer Count' = DISTINCTCOUNT('customer_segments'[Customer ID])
+		formatString: #,0
+		displayFolder: ML\Customer Segmentation
+		lineageTag: c5e6e000-0000-0000-0001-000000000101
+
+	/// Average recency (days since last purchase) across segmented customers.
+	measure 'Avg Recency (Days)' = AVERAGE('customer_segments'[Recency Days])
+		formatString: #,0.0
+		displayFolder: ML\Customer Segmentation
+		lineageTag: c5e6e000-0000-0000-0001-000000000102
+
+	/// Average purchase frequency across segmented customers.
+	measure 'Avg Frequency' = AVERAGE('customer_segments'[Frequency])
+		formatString: #,0.00
+		displayFolder: ML\Customer Segmentation
+		lineageTag: c5e6e000-0000-0000-0001-000000000103
+
+	/// Total monetary value attributed to segmented customers.
+	measure 'Segmented Monetary Value' = SUM('customer_segments'[Monetary Value])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: ML\Customer Segmentation
+		lineageTag: c5e6e000-0000-0000-0001-000000000104
+
+	/// Average order value across segmented customers.
+	measure 'Segmented Avg Order Value' = AVERAGE('customer_segments'[Avg Order Value])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: ML\Customer Segmentation
+		lineageTag: c5e6e000-0000-0000-0001-000000000105
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0001-000000000001
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Cluster ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0001-000000000002
+		sourceLineageTag: cluster_id
+		summarizeBy: none
+		sourceColumn: cluster_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Segment Label'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0001-000000000003
+		sourceLineageTag: segment_label
+		summarizeBy: none
+		sourceColumn: segment_label
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Recency Days'
+		dataType: double
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0001-000000000004
+		sourceLineageTag: recency_days
+		summarizeBy: sum
+		sourceColumn: recency_days
+
+		annotation SummarizationSetBy = Automatic
+
+	column Frequency
+		dataType: double
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0001-000000000005
+		sourceLineageTag: frequency
+		summarizeBy: sum
+		sourceColumn: frequency
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Monetary Value'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: c5e6e000-0000-0000-0001-000000000006
+		sourceLineageTag: monetary_value
+		summarizeBy: sum
+		sourceColumn: monetary_value
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Avg Order Value'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: c5e6e000-0000-0000-0001-000000000007
+		sourceLineageTag: avg_order_value
+		summarizeBy: none
+		sourceColumn: avg_order_value
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'First Purchase Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0001-000000000008
+		sourceLineageTag: first_purchase_date
+		summarizeBy: none
+		sourceColumn: first_purchase_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Last Purchase Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0001-000000000009
+		sourceLineageTag: last_purchase_date
+		summarizeBy: none
+		sourceColumn: last_purchase_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Segmented At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0001-00000000000a
+		sourceLineageTag: segmented_at
+		summarizeBy: none
+		sourceColumn: segmented_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition customer_segments = entity
+		mode: directLake
+		source
+			entityName: customer_segments
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

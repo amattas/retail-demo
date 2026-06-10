@@ -154,125 +154,21 @@ class BatchStreamingManager:
         self, session, azure_connection_string: str | None
     ) -> bool:
         """
-        Legacy: Start batch streaming from SQLite database (deprecated).
-
-        Reads unpublished data from facts.db and streams to Azure Event Hub,
-        updating watermarks after successful publication.
+        Legacy SQLite batch streaming entry point.
 
         Args:
             session: SQLAlchemy session
             azure_connection_string: Azure Event Hub connection string
 
         Returns:
-            bool: True if streaming completed successfully, False otherwise
+            bool: Always False. Use start_batch_streaming_duckdb instead.
         """
-        if not session:
-            self.log.error(
-                "Cannot start batch streaming without database session",
-                session_id=self._session_id,
-            )
-            return False
-
-        self.log.info(
-            "Starting batch streaming from legacy SQLite (deprecated)",
+        self.log.error(
+            "Legacy SQLite batch streaming is no longer supported; "
+            "use DuckDB batch streaming instead.",
             session_id=self._session_id,
         )
-
-        try:
-            # Initialize Azure client
-            azure_client = await self._init_azure_client(azure_connection_string)
-            if azure_client is None:
-                return False
-
-            # Get streaming window from watermarks
-            try:
-                start_ts, end_ts = await self._get_streaming_window_from_watermarks(
-                    session
-                )
-                self.log.info(
-                    f"Streaming data from {start_ts} to {end_ts}",
-                    session_id=self._session_id,
-                )
-            except ValueError as e:
-                self.log.warning(str(e), session_id=self._session_id)
-                await azure_client.disconnect()
-                return True  # No data to stream is not an error
-
-            # Stream events from each table
-            total_published = 0
-            from retail_datagen.db.duck_watermarks import update_publication_watermark
-
-            for table_name in self._get_fact_tables():
-                fact_table_name = f"fact_{table_name}"
-                try:
-                    # Load unpublished events
-                    events = await self._load_unpublished_events_from_db(
-                        session, fact_table_name, start_ts, end_ts
-                    )
-
-                    if not events:
-                        self.log.debug(
-                            f"No unpublished events in {fact_table_name}",
-                            session_id=self._session_id,
-                        )
-                        continue
-
-                    self.log.info(
-                        f"Loaded {len(events)} events from {fact_table_name}",
-                        session_id=self._session_id,
-                    )
-
-                    # Convert to EventEnvelope format
-                    envelopes = self._convert_db_events_to_envelopes(events, table_name)
-
-                    # Publish events
-                    if envelopes:
-                        success = await azure_client.send_events(envelopes)
-
-                        if success:
-                            total_published += len(envelopes)
-
-                            # Update watermark after successful publication
-                            await update_publication_watermark(
-                                session, fact_table_name, end_ts
-                            )
-
-                            self.log.info(
-                                f"Published {len(envelopes)} events "
-                                f"from {fact_table_name}",
-                                session_id=self._session_id,
-                            )
-                        else:
-                            self.log.error(
-                                f"Failed to publish events from {fact_table_name}",
-                                session_id=self._session_id,
-                            )
-
-                except Exception as e:
-                    self.log.error(
-                        f"Error streaming {fact_table_name}: {e}",
-                        session_id=self._session_id,
-                        error_type=type(e).__name__,
-                    )
-                    # Continue with next table
-
-            self.log.info(
-                f"Batch streaming complete: {total_published} events published",
-                session_id=self._session_id,
-            )
-            return True
-
-        except Exception as e:
-            self.log.error(
-                "Batch streaming failed",
-                session_id=self._session_id,
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            return False
-        finally:
-            if azure_client:
-                await azure_client.disconnect()
+        return False
 
     async def _init_azure_client(
         self, azure_connection_string: str | None
@@ -383,105 +279,20 @@ class BatchStreamingManager:
         end_ts: datetime,
         batch_size: int = 1000,
     ) -> list[dict]:
-        """
-        Load unpublished events from legacy SQLite facts.db (deprecated).
-
-        Args:
-            session: SQLAlchemy session
-            table_name: Fact table name (e.g., "fact_receipts")
-            start_ts: Start timestamp (from watermark)
-            end_ts: End timestamp (current time or batch end)
-            batch_size: Maximum events to return
-
-        Returns:
-            List of event records as dicts
-        """
-        if not session:
-            raise ValueError(
-                "No database session provided - cannot read from legacy SQLite"
-            )
-
-        # Import here to avoid circular dependencies
-        from sqlalchemy import select
-
-        from retail_datagen.db.models.facts import (
-            BLEPing,
-            DCInventoryTransaction,
-            FootTraffic,
-            MarketingImpression,
-            OnlineOrder,
-            Receipt,
-            ReceiptLine,
-            StoreInventoryTransaction,
-            TruckMove,
+        """Reject legacy SQLite event loading after the DuckDB-only migration."""
+        raise RuntimeError(
+            "Legacy SQLite event loading is no longer supported; "
+            "use _load_unpublished_events_from_duck."
         )
-
-        # Map table name to model
-        model_map = {
-            "fact_receipts": Receipt,
-            "fact_receipt_lines": ReceiptLine,
-            "fact_dc_inventory_txn": DCInventoryTransaction,
-            "fact_store_inventory_txn": StoreInventoryTransaction,
-            "fact_truck_moves": TruckMove,
-            "fact_foot_traffic": FootTraffic,
-            "fact_ble_pings": BLEPing,
-            "fact_marketing": MarketingImpression,
-            "fact_online_orders": OnlineOrder,
-        }
-
-        model_class = model_map.get(table_name)
-        if not model_class:
-            raise ValueError(f"Unknown table: {table_name}")
-
-        # Query unpublished data
-        query = (
-            select(model_class)
-            .where(model_class.event_ts >= start_ts)
-            .where(model_class.event_ts < end_ts)
-            .order_by(model_class.event_ts)
-            .limit(batch_size)
-        )
-
-        result = await session.execute(query)
-        rows = result.scalars().all()
-
-        # Convert to dicts
-        events = []
-        for row in rows:
-            event_dict = {
-                column.name: getattr(row, column.name)
-                for column in row.__table__.columns
-            }
-            events.append(event_dict)
-
-        return events
 
     async def _get_streaming_window_from_watermarks(
         self, session
     ) -> tuple[datetime, datetime]:
-        """Get time window of unpublished data from watermarks."""
-        from retail_datagen.db.purge import get_unpublished_data_range
-
-        # Get earliest unpublished across all tables
-        earliest = None
-        latest = None
-
-        for table in self._get_fact_tables():
-            start, end = await get_unpublished_data_range(session, f"fact_{table}")
-            if start:
-                if not earliest or start < earliest:
-                    earliest = start
-            if end:
-                if not latest or end > latest:
-                    latest = end
-
-        if not earliest:
-            raise ValueError("No unpublished data found")
-
-        if not latest:
-            latest = datetime.now(UTC)
-
-        return earliest, latest
+        """Reject legacy SQLite watermark access after the DuckDB-only migration."""
+        raise RuntimeError(
+            "Legacy SQLite watermark access is no longer supported; "
+            "use retail_datagen.db.duck_watermarks."
+        )
 
     def _convert_db_events_to_envelopes(
         self, events: list[dict], table_name: str

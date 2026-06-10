@@ -1,0 +1,49 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
+  "name": "drillreceipt000001",
+  "displayName": "Receipt Detail",
+  "displayOption": "FitToPage",
+  "visibility": "HiddenInViewMode",
+  "height": 720,
+  "width": 1280,
+  "type": "Drillthrough",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "drill_filter_drillreceipt000001",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "fact_receipts"
+              }
+            },
+            "Property": "Receipt ID"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "Drillthrough"
+      }
+    ]
+  },
+  "pageBinding": {
+    "name": "drill_binding_drillreceipt000001",
+    "type": "Drillthrough",
+    "parameters": [
+      {
+        "name": "drill_param_drillreceipt000001",
+        "boundFilter": "drill_filter_drillreceipt000001",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "fact_receipts"
+              }
+            },
+            "Property": "Receipt ID"
+          }
+        }
+      }
+    ]
+  }
+}

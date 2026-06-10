@@ -41,7 +41,7 @@ def find_expressions_file(base_path: Path) -> Path:
     expressions_path = (
         base_path
         / "fabric"
-        / "semantic_model"
+        / "powerbi"
         / "retail_model.SemanticModel"
         / "definition"
         / "expressions.tmdl"

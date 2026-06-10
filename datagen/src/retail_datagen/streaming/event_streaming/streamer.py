@@ -457,10 +457,10 @@ class EventStreamer:
 
     async def start_batch_streaming(self) -> bool:
         """
-        Legacy: Start batch streaming from SQLite database (deprecated).
+        Legacy SQLite batch streaming entry point.
 
         Returns:
-            bool: True if streaming completed successfully, False otherwise
+            bool: Always False. Use start_batch_streaming_duckdb instead.
         """
         return await self._batch_streaming_manager.start_batch_streaming_sqlite(
             self._session, self.streaming_config.azure_connection_string

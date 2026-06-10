@@ -11,7 +11,7 @@ Subprojects:
 - `lakehouse/` – Bronze/Silver/Gold tables, Delta schemas, shortcuts, and medallion flows.
 - `pipelines/` – Data Pipelines to orchestrate ingest, transforms, and scheduled batch.
 - `notebooks/` – Fabric notebooks for feature engineering, ML, and batch enrichments.
-- `semantic_model/` – Power BI semantic model (hybrid over KQL and Lakehouse).
+- `powerbi/` – Power BI semantic model (hybrid over KQL and Lakehouse).
 
 Source-of-truth schema comes from `datagen/AGENTS.md` and `datagen/src/retail_datagen/streaming/schemas.py`.
 

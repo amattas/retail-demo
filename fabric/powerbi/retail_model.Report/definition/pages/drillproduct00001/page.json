@@ -1,0 +1,49 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.0.0/schema.json",
+  "name": "drillproduct00001",
+  "displayName": "Product Detail",
+  "displayOption": "FitToPage",
+  "visibility": "HiddenInViewMode",
+  "height": 720,
+  "width": 1280,
+  "type": "Drillthrough",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "drill_filter_drillproduct00001",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "dim_products"
+              }
+            },
+            "Property": "Product Name"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "Drillthrough"
+      }
+    ]
+  },
+  "pageBinding": {
+    "name": "drill_binding_drillproduct00001",
+    "type": "Drillthrough",
+    "parameters": [
+      {
+        "name": "drill_param_drillproduct00001",
+        "boundFilter": "drill_filter_drillproduct00001",
+        "fieldExpr": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "dim_products"
+              }
+            },
+            "Property": "Product Name"
+          }
+        }
+      }
+    ]
+  }
+}

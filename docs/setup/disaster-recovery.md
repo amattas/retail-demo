@@ -129,7 +129,7 @@ Use the reset notebook for complete cleanup:
 4. Confirm deletion
 
 **Recreate Semantic Model**:
-- Re-deploy using `fabric/semantic_model/model.tmdl`
+- Re-deploy using `fabric/powerbi/model.tmdl`
 
 ---
 

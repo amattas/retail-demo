@@ -61,7 +61,7 @@ Five dedicated report pages surface these ML outputs:
 
 ## Deployment
 
-1. Open `fabric/semantic_model/retail_model.pbip` in Power BI Desktop
+1. Open `fabric/powerbi/retail_model.pbip` in Power BI Desktop
 2. Configure Lakehouse connection credentials (OAuth 2.0)
 3. Click **Publish** and select your Fabric workspace
 

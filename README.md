@@ -142,7 +142,7 @@ retail-demo/
     ├── lakehouse/             # Medallion structures and transforms
     ├── pipelines/             # Orchestration and maintenance
     ├── notebooks/             # Transform and analysis notebooks
-    └── semantic_model/        # Power BI hybrid model
+    └── powerbi/               # Power BI hybrid model
 ```
 
 ## Development Status

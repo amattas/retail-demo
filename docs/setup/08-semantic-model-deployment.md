@@ -17,7 +17,7 @@ With the TMDL-based Power BI Project format (.pbip), deployment is straightforwa
 
 1. Launch **Power BI Desktop**
 2. Go to **File** → **Open**
-3. Browse to `fabric/semantic_model/retail_model.pbip`
+3. Browse to `fabric/powerbi/retail_model.pbip`
 4. Click **Open**
 
 Power BI Desktop will load the semantic model and report together.
@@ -51,14 +51,14 @@ To find your workspace and lakehouse GUIDs:
 3. Open your lakehouse and copy the GUID from the URL: `.../lakehouses/{lakehouse-guid}`
 
 The script updates:
-- `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl` (OneLake URL)
+- `fabric/powerbi/retail_model.SemanticModel/definition/expressions.tmdl` (OneLake URL)
 - All 35 table files in `definition/tables/*.tmdl` (expression source references)
 
 #### Option B: Manual Update
 
 If you prefer to update manually:
 
-1. Open `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl`
+1. Open `fabric/powerbi/retail_model.SemanticModel/definition/expressions.tmdl`
 2. Replace the workspace and lakehouse GUIDs in the OneLake URL:
    ```tmdl
    expression 'DirectLake - retail_lakehouse' =
@@ -119,7 +119,7 @@ If your workspace is connected to Git:
 **Step 1: Commit Model to Git**
 
 ```bash
-git add fabric/semantic_model/
+git add fabric/powerbi/
 git commit -m "Update Power BI semantic model"
 git push
 ```
@@ -219,12 +219,12 @@ SELECT COUNT(*) FROM au.sales_minute_store;
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\reset_powerbi_desktop_local_state.ps1
    ```
-3. Reopen `fabric/semantic_model/retail_model.pbip`.
+3. Reopen `fabric/powerbi/retail_model.pbip`.
 4. If prompted to refresh or rewrite local metadata, allow it.
 5. Refresh the semantic model.
 
 If the issue persists after the reset:
-1. Reconfirm that `fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl` points to the correct OneLake workspace and lakehouse GUIDs for your environment.
+1. Reconfirm that `fabric/powerbi/retail_model.SemanticModel/definition/expressions.tmdl` points to the correct OneLake workspace and lakehouse GUIDs for your environment.
 2. Re-run:
    ```bash
    python scripts/configure_semantic_model.py \

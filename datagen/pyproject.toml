@@ -124,10 +124,6 @@ module = [
     "cachetools.*",
     "sqlalchemy.*",
     "pandas.*",
-    # Internal modules without py.typed marker
-    "retail_datagen.db.models.*",
-    "retail_datagen.db.session",
-    "retail_datagen.db.purge",
 ]
 ignore_missing_imports = true
 

@@ -18,13 +18,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# SessionMaker import for SQLite fallback path (deprecated, DuckDB-only runtime)
-try:
-    from retail_datagen.db.session import retail_session_maker
-
-    SessionMaker = retail_session_maker()
-except ImportError:
-    SessionMaker = None  # type: ignore[assignment, misc]
+# SQLite fallback support was removed when the generator moved to DuckDB-only
+# runtime. Keep this sentinel so the non-DuckDB branch fails explicitly.
+SessionMaker = None
 
 import numpy as np
 
@@ -606,10 +602,10 @@ class FactDataGenerator(
             # No async DB session needed for DuckDB path
             await _run_with_session()
         elif self._session is None:
-            async with SessionMaker() as session:
-                self._session = session
-                await _run_with_session()
-                self._session = None
+            raise RuntimeError(
+                "DuckDB is required for fact generation; "
+                "the legacy SQLite session path has been removed."
+            )
         else:
             await _run_with_session()
 

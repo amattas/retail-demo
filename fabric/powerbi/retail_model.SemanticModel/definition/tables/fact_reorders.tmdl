@@ -1,0 +1,134 @@
+table fact_reorders
+	lineageTag: 5d56e188-c68e-4de1-a166-dba2aab94430
+	sourceLineageTag: [ag].[fact_reorders]
+
+	/// Total units requested by reorder events.
+	measure 'Total Reorder Quantity' = SUM('fact_reorders'[Reorder Quantity])
+		formatString: #,0
+		displayFolder: Replenishment
+		lineageTag: 01a1a1a6-0001-0001-0001-000000000001
+
+	/// Count of reorder events.
+	measure 'Reorder Events' = COUNTROWS('fact_reorders')
+		formatString: #,0
+		displayFolder: Replenishment
+		lineageTag: c1080001-0000-0000-0000-000000000001
+
+	/// Average units requested per reorder event.
+	measure 'Avg Reorder Quantity' = DIVIDE([Total Reorder Quantity], [Reorder Events], 0)
+		formatString: #,0.0
+		displayFolder: Replenishment
+		lineageTag: c1080001-0000-0000-0000-000000000002
+
+	/// High-priority reorder quantity for exception management.
+	measure 'High Priority Reorder Quantity' = CALCULATE([Total Reorder Quantity], 'fact_reorders'[Priority] IN {"High", "Critical"})
+		formatString: #,0
+		displayFolder: Replenishment\Exceptions
+		lineageTag: c1080001-0000-0000-0000-000000000003
+
+	/// Gap between reorder point and current quantity at reorder time.
+	measure 'Reorder Fill Gap' = SUMX('fact_reorders', 'fact_reorders'[Reorder Point] - 'fact_reorders'[Current Quantity])
+		formatString: #,0
+		displayFolder: Replenishment\Exceptions
+		lineageTag: c1080001-0000-0000-0000-000000000004
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 9ba003b4-5818-4fdf-a7cb-e746a618a80f
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'DC ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: e8cc3010-af1a-40d5-b05e-2ae21f44ae39
+		sourceLineageTag: dc_id
+		summarizeBy: sum
+		sourceColumn: dc_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: b38c131f-e4a2-4baa-b46c-144a36a860fa
+		sourceLineageTag: product_id
+		summarizeBy: sum
+		sourceColumn: product_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Current Quantity'
+		dataType: int64
+		formatString: 0
+		lineageTag: 58404047-477c-40a4-bbc3-092f7accd81f
+		sourceLineageTag: current_quantity
+		summarizeBy: sum
+		sourceColumn: current_quantity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Reorder Quantity'
+		dataType: int64
+		formatString: 0
+		lineageTag: 439f2374-5ee5-4420-af92-32a2f9b26007
+		sourceLineageTag: reorder_quantity
+		summarizeBy: sum
+		sourceColumn: reorder_quantity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Reorder Point'
+		dataType: int64
+		formatString: 0
+		lineageTag: 61113c82-1df7-4479-a735-2380f417e406
+		sourceLineageTag: reorder_point
+		summarizeBy: sum
+		sourceColumn: reorder_point
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Priority
+		dataType: string
+		lineageTag: dfd389e7-46b4-4e7a-907f-1bfa0fb71f79
+		sourceLineageTag: priority
+		summarizeBy: none
+		sourceColumn: priority
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column __index_level_0__
+		dataType: int64
+		formatString: 0
+		lineageTag: 2b449ce3-7b50-4e3e-9974-b39bb336b0b3
+		sourceLineageTag: __index_level_0__
+		summarizeBy: sum
+		sourceColumn: __index_level_0__
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_reorders = entity
+		mode: directLake
+		source
+			entityName: fact_reorders
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

@@ -60,7 +60,7 @@ python scripts/configure_semantic_model.py \
 
 # Output:
 # Lakehouse connection update:
-#   File: fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl
+#   File: fabric/powerbi/retail_model.SemanticModel/definition/expressions.tmdl
 #   Old URL: https://onelake.dfs.fabric.microsoft.com/[old-ids]
 #   New URL: https://onelake.dfs.fabric.microsoft.com/[new-ids]
 #
@@ -79,7 +79,7 @@ This script is typically used as part of the semantic model deployment process:
 2. Import the semantic model into your Fabric workspace
 3. Refresh the model to load data from your lakehouse
 
-See `fabric/semantic_model/README.md` for complete deployment instructions.
+See `fabric/powerbi/README.md` for complete deployment instructions.
 
 ### Error Handling
 
@@ -108,8 +108,8 @@ When Desktop caches stale local model bindings, removing repo-local `.pbi\localS
 
 ### What it removes
 
-- `fabric/semantic_model/retail_model.Report/.pbi/localSettings.json` (if recreated)
-- `fabric/semantic_model/retail_model.SemanticModel/.pbi/localSettings.json` (if recreated)
+- `fabric/powerbi/retail_model.Report/.pbi/localSettings.json` (if recreated)
+- `fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json` (if recreated)
 - Local Power BI Desktop cache contents under:
   - `AnalysisServicesWorkspaces`
   - `TempSaves/Backups`

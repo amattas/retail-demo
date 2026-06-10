@@ -1,12 +1,3 @@
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/user/retail-demo"
-      ]
-    }
-  }
+  "mcpServers": {}
 }

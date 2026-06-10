@@ -109,7 +109,7 @@ retail-demo/
 │   ├── notebooks/      # PySpark notebooks
 │   ├── eventstream/    # Event routing
 │   ├── dashboards/     # Real-time dashboards
-│   └── semantic_model/ # Power BI model
+│   └── powerbi/        # Power BI model
 └── docs/               # Documentation
 ```
 

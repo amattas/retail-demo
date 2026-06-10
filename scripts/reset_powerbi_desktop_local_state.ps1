@@ -14,8 +14,8 @@ if ($desktopProcesses) {
 }
 
 $repoTargets = @(
-    (Join-Path $RepoRoot 'fabric\semantic_model\retail_model.Report\.pbi\localSettings.json'),
-    (Join-Path $RepoRoot 'fabric\semantic_model\retail_model.SemanticModel\.pbi\localSettings.json')
+    (Join-Path $RepoRoot 'fabric\powerbi\retail_model.Report\.pbi\localSettings.json'),
+    (Join-Path $RepoRoot 'fabric\powerbi\retail_model.SemanticModel\.pbi\localSettings.json')
 )
 
 $appRoot = Join-Path $env:USERPROFILE 'Microsoft\Power BI Desktop Store App'

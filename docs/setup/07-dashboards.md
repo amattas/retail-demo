@@ -8,7 +8,7 @@ Create semantic model, dashboards, and reports for end users.
 
 1. **Import Semantic Model**:
    - New → Semantic model
-   - Import: `fabric/semantic_model/model.tmdl`
+   - Import: `fabric/powerbi/model.tmdl`
 
 2. **Configure Connections**:
 

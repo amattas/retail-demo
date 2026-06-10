@@ -1,0 +1,68 @@
+table fact_store_ops
+	lineageTag: 30e435c0-c71d-474c-b807-e2f634dbf383
+	sourceLineageTag: [ag].[fact_store_ops]
+
+	/// Count of store operation events.
+	measure 'Store Operation Events' = COUNTROWS('fact_store_ops')
+		formatString: #,0
+		displayFolder: Store Operations\Events
+		lineageTag: 01a1a1ca-0001-0001-0001-000000000001
+
+	/// Store operation events per active store.
+	measure 'Store Operation Events per Store' = DIVIDE([Store Operation Events], [# of Stores], 0)
+		formatString: #,0.0
+		displayFolder: Store Operations\Events
+		lineageTag: c1150001-0000-0000-0000-000000000001
+
+	column 'Trace ID'
+		dataType: string
+		lineageTag: 7c2cb6d2-a5ec-4d85-9e47-e23513bb14e2
+		sourceLineageTag: trace_id
+		summarizeBy: none
+		sourceColumn: trace_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 7e3719b4-06ee-4594-87db-11bf9f3ce04c
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Operation Type'
+		dataType: string
+		lineageTag: 2e9a1a12-9c75-4a39-b918-4a8048b725ef
+		sourceLineageTag: operation_type
+		summarizeBy: none
+		sourceColumn: operation_type
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Date portion of the store operation event timestamp. Used for the dim_date relationship (Direct Lake requires matching column types).
+	column 'Event Date'
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 2e9a1a12-9c75-4a39-b918-4a8048b725f0
+		sourceLineageTag: event_date
+		summarizeBy: none
+		sourceColumn: event_date
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_store_ops = entity
+		mode: directLake
+		source
+			entityName: fact_store_ops
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

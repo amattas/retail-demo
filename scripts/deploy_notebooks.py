@@ -103,7 +103,7 @@ def api_headers(token: str) -> dict:
 def read_ids_from_tmdl() -> tuple[str, str]:
     """Extract workspace and lakehouse GUIDs from expressions.tmdl."""
     expr_path = (
-        REPO_ROOT / "fabric" / "semantic_model"
+        REPO_ROOT / "fabric" / "powerbi"
         / "retail_model.SemanticModel" / "definition" / "expressions.tmdl"
     )
     content = expr_path.read_text(encoding="utf-8")
@@ -263,9 +263,9 @@ def deploy_notebooks(
         if not dry_run:
             try:
                 update_notebook(token, workspace_id, remote[name], nb_path, lakehouse_id)
-                print(f"    ✓ {name}")
+                print(f"    [OK] {name}")
             except Exception as e:
-                print(f"    ✗ {name}: {e}")
+                print(f"    [X] {name}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -327,9 +327,9 @@ def drop_tables_pyodbc(sql_endpoint: str, sql_token: str, dry_run: bool) -> bool
         if not dry_run:
             try:
                 cursor.execute(stmt)
-                print(f"    ✓ dropped {table}")
+                print(f"    [OK] dropped {table}")
             except Exception as e:
-                print(f"    ✗ {table}: {e}")
+                print(f"    [X] {table}: {e}")
     conn.commit()
     conn.close()
     return True
@@ -423,7 +423,7 @@ def main() -> int:
     print("\nOpening browser for authentication...")
     credential = get_credential()
     fabric_token = get_token(credential, FABRIC_SCOPE)
-    print("✓ Authenticated")
+    print("[OK] Authenticated")
 
     # Deploy notebooks
     if not args.skip_notebooks:

@@ -2,7 +2,7 @@
 
 ## Current State
 - **Wave**: E (Review & Packaging)
-- **Last Updated**: 2026-01-11
+- **Last Updated**: 2026-05-21
 
 ## Summary
 
@@ -41,8 +41,9 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic retail data ge
 - [x] Unused code removed
 - [x] Test suite fixed and passing
 - [ ] Eventstream configuration (deployment step)
-- [ ] Real-time dashboards (deployment step)
-- [x] Report page: Logistics & Delivery Predictions (rpt-supply-chain-page) — `589d6c9c88ff9a9cff88`
+- [x] Power BI report rebuilt from scratch with SLT, supply chain, DC, store, regional, omnichannel, customer/marketing, pricing/promotion, and logistics dashboards
+- [x] Semantic model enriched with curated DAX measures, time-intelligence relationships, date/product/geography/store/DC hierarchies, and core operational relationships
+- [x] PBIP references cleaned so the default report/model use only generated core tables; optional ML table definitions are excluded from the active model until their Lakehouse tables exist
 - [ ] Semantic model (deployment step)
 
 ---

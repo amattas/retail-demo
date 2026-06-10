@@ -1,0 +1,136 @@
+table fact_promotions
+	lineageTag: 09104865-1d77-427a-bc33-b0148839d9a5
+	sourceLineageTag: [ag].[fact_promotions]
+
+	/// Count of promotion header events.
+	measure 'Promotion Count' = COUNTROWS(fact_promotions)
+		formatString: #,0
+		displayFolder: Promotions\Core
+		lineageTag: a9f8319e-9d48-47b4-a118-000000000001
+
+	/// Promotion discount amount from header-level discount cents.
+	measure 'Promotion Discount Amount' = DIVIDE(SUM(fact_promotions[Discount Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Promotions\Core
+		lineageTag: a9f8319e-9d48-47b4-a118-000000000002
+
+	column 'Receipt ID'
+		dataType: string
+		lineageTag: 699c67ab-2aec-4718-9aa8-7205385c40ab
+		sourceLineageTag: receipt_id_ext
+		summarizeBy: none
+		sourceColumn: receipt_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Promo Code'
+		dataType: string
+		lineageTag: b0238d92-2da9-40e5-8013-e322014a887a
+		sourceLineageTag: promo_code
+		summarizeBy: none
+		sourceColumn: promo_code
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Discount Amount'
+		dataType: string
+		lineageTag: 19c7f4b0-852c-471c-95af-c20eaa73d0c5
+		sourceLineageTag: discount_amount
+		summarizeBy: none
+		sourceColumn: discount_amount
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Discount Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 296dc317-642c-4a09-ba33-56b9c99d8c6d
+		sourceLineageTag: discount_cents
+		summarizeBy: sum
+		sourceColumn: discount_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Discount Type'
+		dataType: string
+		lineageTag: 65790e25-52e4-4ea4-b186-e91c8b20359d
+		sourceLineageTag: discount_type
+		summarizeBy: none
+		sourceColumn: discount_type
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product Count'
+		dataType: int64
+		formatString: 0
+		lineageTag: d9770793-f93b-410e-92bb-dbf5e4bd7b5f
+		sourceLineageTag: product_count
+		summarizeBy: sum
+		sourceColumn: product_count
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product IDs'
+		dataType: string
+		lineageTag: 76d783a3-362d-4a96-b40f-22ef3efec531
+		sourceLineageTag: product_ids
+		summarizeBy: none
+		sourceColumn: product_ids
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 10e6f985-8df5-44d2-bfbf-95407d67e963
+		sourceLineageTag: store_id
+		summarizeBy: count
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 2fc2d368-9347-4b26-83b0-f9542c60d2df
+		sourceLineageTag: customer_id
+		summarizeBy: count
+		sourceColumn: customer_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column event_date
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: e5bdf9a5-d264-46a2-ad65-0f11dea87b29
+		sourceLineageTag: event_date
+		summarizeBy: none
+		sourceColumn: event_date
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_promotions = entity
+		mode: directLake
+		source
+			entityName: fact_promotions
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+
