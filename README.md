@@ -8,7 +8,7 @@ A comprehensive demonstration showcasing Microsoft Fabric's Real-Time Intelligen
 
 This demo **will illustrate** how Microsoft Fabric's Real-Time Intelligence features enable retailers to make data-driven decisions at the speed of business. By combining streaming data ingestion, real-time analytics, and AI-powered insights, retailers can optimize operations, enhance customer experiences, and drive competitive advantage.
 
-**Current Status**: The Python-based data generator is under active development. Fabric scaffolding is now in place under `fabric/` with specs for Eventstream, KQL DB, Querysets, Rules, Dashboards, Lakehouse, Pipelines, Notebooks, and a Semantic Model. See the Docs site under `docs/` (MkDocs) for architecture and plans.
+**Current Status**: The Python-based data generator is under active development. Fabric scaffolding is now in place under `fabric/` with specs for Eventstream, KQL DB, Querysets, Rules, Dashboards, Lakehouse, Pipelines, Notebooks, and a Semantic Model. See the Docs site under `website/` (Docusaurus) for architecture and plans.
 
 ## Key Scenarios (Planned)
 
@@ -97,9 +97,8 @@ pip install -e .
 cp .env.example .env
 # Edit .env with your Azure credentials (Event Hub connection string, etc.)
 
-# Optional: local docs preview (requires mkdocs)
-# pip install mkdocs mkdocs-material
-# mkdocs serve
+# Optional: local docs preview (requires Node.js 24+)
+# cd website && npm install && npm start
 ```
 
 ### Running the Data Generator
@@ -160,12 +159,12 @@ retail-demo/
 
 **Project Scaffolding**:
 - ✅ Fabric asset folders with build specs (`fabric/*`)
-- ✅ MkDocs documentation site
+- ✅ Docusaurus documentation site (`website/`)
 - ✅ Data contracts and schemas defined
 
 ### 📋 PHASE 2-5: PLANNED (Dec 2024 - Apr 2025)
 
-See [docs/roadmap.md](docs/roadmap.md) for detailed timeline.
+See [website/docs/roadmap.md](website/docs/roadmap.md) for detailed timeline.
 
 **Next Up** (Phase 2 - Target: Dec 2024):
 - Eventstream → KQL database + Lakehouse Bronze wiring
@@ -215,7 +214,7 @@ This is a demonstration project currently in active development. Contributions, 
 - [Real-Time Intelligence Overview](https://learn.microsoft.com/fabric/real-time-intelligence/)
 - [KQL Query Language Reference](https://learn.microsoft.com/azure/data-explorer/kusto/query/)
 - [Eventstreams Documentation](https://learn.microsoft.com/fabric/real-time-intelligence/event-streams/)
- - [MkDocs](https://www.mkdocs.org/)
+- [Docusaurus](https://docusaurus.io/)
 
 ## Contact
 

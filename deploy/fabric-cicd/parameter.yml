@@ -1,0 +1,26 @@
+find_replace:
+- find_value: (https://onelake\.dfs\.fabric\.microsoft\.com/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36})
+  replace_value:
+    dev: https://onelake.dfs.fabric.microsoft.com/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002
+  is_regex: 'true'
+  item_type: SemanticModel
+  file_path: definition/expressions.tmdl
+- find_value: DirectLake - retail_lakehouse
+  replace_value:
+    dev: DirectLake - retail_lakehouse
+  item_type: SemanticModel
+- find_value: FABRIC_KQL_DATABASE_RESOURCE_ID
+  replace_value:
+    dev: 00000000-0000-0000-0000-000000000003
+  item_type:
+  - KQLDashboard
+  - KQLQueryset
+key_value_replace:
+- find_key: $.properties.activities[*].typeProperties.workspaceId
+  replace_value:
+    dev: $workspace.$id
+  item_type: DataPipeline
+- find_key: $.properties.activities[*].typeProperties.notebookId
+  replace_value:
+    dev: $items.Notebook.02-historical-data-load.$id
+  item_type: DataPipeline

@@ -1,0 +1,3042 @@
+[
+ {
+  "Brand": "Pure Select",
+  "Category": "Food",
+  "Company": "Clean Eating Corp"
+ },
+ {
+  "Brand": "Wholesome Premium",
+  "Category": "Food",
+  "Company": "Farm-Fresh Products"
+ },
+ {
+  "Brand": "Green Best",
+  "Category": "Food",
+  "Company": "Fresh Corp"
+ },
+ {
+  "Brand": "Pure Market",
+  "Category": "Food",
+  "Company": "Fresh Farms LLC"
+ },
+ {
+  "Brand": "Field Choice",
+  "Category": "Food",
+  "Company": "Fresh Start Co."
+ },
+ {
+  "Brand": "Meadow Farms",
+  "Category": "Food",
+  "Company": "FreshMart Foods"
+ },
+ {
+  "Brand": "Natural Select",
+  "Category": "Food",
+  "Company": "Golden Grove Farms"
+ },
+ {
+  "Brand": "Organic Premium",
+  "Category": "Food",
+  "Company": "GreenChoice"
+ },
+ {
+  "Brand": "Green Valley",
+  "Category": "Food",
+  "Company": "Harvest Time Foods"
+ },
+ {
+  "Brand": "Country Select",
+  "Category": "Food",
+  "Company": "HealthPrime Foods"
+ },
+ {
+  "Brand": "Field Premium",
+  "Category": "Food",
+  "Company": "Healthy Choice Foods"
+ },
+ {
+  "Brand": "Field Farms",
+  "Category": "Food",
+  "Company": "HealthyLiving"
+ },
+ {
+  "Brand": "Green Grove",
+  "Category": "Food",
+  "Company": "Natura Best Foods"
+ },
+ {
+  "Brand": "Meadow Gold",
+  "Category": "Food",
+  "Company": "Natural Harvest Co"
+ },
+ {
+  "Brand": "Fresh Table",
+  "Category": "Food",
+  "Company": "NaturalWay"
+ },
+ {
+  "Brand": "Harvest Kitchen",
+  "Category": "Food",
+  "Company": "Organic Vitality Co"
+ },
+ {
+  "Brand": "Nature Harvest",
+  "Category": "Food",
+  "Company": "Prime Produce Inc"
+ },
+ {
+  "Brand": "Wholesome Best",
+  "Category": "Food",
+  "Company": "Pure Essence Ltd"
+ },
+ {
+  "Brand": "Farm Table",
+  "Category": "Food",
+  "Company": "Pure Taste Industries"
+ },
+ {
+  "Brand": "Prime Choice",
+  "Category": "Food",
+  "Company": "PureLife"
+ },
+ {
+  "Brand": "Organic Farms",
+  "Category": "Food",
+  "Company": "Quality Foods Ltd"
+ },
+ {
+  "Brand": "Pure Harvest",
+  "Category": "Food",
+  "Company": "Sunny Fields Corp"
+ },
+ {
+  "Brand": "Health Fields",
+  "Category": "Food",
+  "Company": "Vital Nutrition Co"
+ },
+ {
+  "Brand": "Wholesome Table",
+  "Category": "Food",
+  "Company": "Wholesome Goods Inc"
+ },
+ {
+  "Brand": "Natural Kitchen",
+  "Category": "Food",
+  "Company": "Clean Eating Corp"
+ },
+ {
+  "Brand": "Garden Valley",
+  "Category": "Food",
+  "Company": "Farm-Fresh Products"
+ },
+ {
+  "Brand": "Pure Goods",
+  "Category": "Food",
+  "Company": "Fresh Corp"
+ },
+ {
+  "Brand": "Vita Choice",
+  "Category": "Food",
+  "Company": "Fresh Farms LLC"
+ },
+ {
+  "Brand": "Field Gold",
+  "Category": "Food",
+  "Company": "Fresh Start Co."
+ },
+ {
+  "Brand": "Country Goods",
+  "Category": "Food",
+  "Company": "FreshMart Foods"
+ },
+ {
+  "Brand": "Farm Kitchen",
+  "Category": "Food",
+  "Company": "Golden Grove Farms"
+ },
+ {
+  "Brand": "Organic Select",
+  "Category": "Food",
+  "Company": "GreenChoice"
+ },
+ {
+  "Brand": "Green Table",
+  "Category": "Food",
+  "Company": "Harvest Time Foods"
+ },
+ {
+  "Brand": "Sunny Choice",
+  "Category": "Food",
+  "Company": "HealthPrime Foods"
+ },
+ {
+  "Brand": "Green Pantry",
+  "Category": "Food",
+  "Company": "Healthy Choice Foods"
+ },
+ {
+  "Brand": "Pure Farms",
+  "Category": "Food",
+  "Company": "HealthyLiving"
+ },
+ {
+  "Brand": "Wholesome Grove",
+  "Category": "Food",
+  "Company": "Natura Best Foods"
+ },
+ {
+  "Brand": "Health Best",
+  "Category": "Food",
+  "Company": "Natural Harvest Co"
+ },
+ {
+  "Brand": "Health Harvest",
+  "Category": "Food",
+  "Company": "NaturalWay"
+ },
+ {
+  "Brand": "Farm Market",
+  "Category": "Food",
+  "Company": "Organic Vitality Co"
+ },
+ {
+  "Brand": "Wholesome Kitchen",
+  "Category": "Food",
+  "Company": "Prime Produce Inc"
+ },
+ {
+  "Brand": "Organic Fields",
+  "Category": "Food",
+  "Company": "Pure Essence Ltd"
+ },
+ {
+  "Brand": "Harvest Valley",
+  "Category": "Food",
+  "Company": "Pure Taste Industries"
+ },
+ {
+  "Brand": "Garden Farms",
+  "Category": "Food",
+  "Company": "PureLife"
+ },
+ {
+  "Brand": "Wholesome Goods",
+  "Category": "Food",
+  "Company": "Quality Foods Ltd"
+ },
+ {
+  "Brand": "Prime Pantry",
+  "Category": "Food",
+  "Company": "Sunny Fields Corp"
+ },
+ {
+  "Brand": "Natural Premium",
+  "Category": "Food",
+  "Company": "Vital Nutrition Co"
+ },
+ {
+  "Brand": "Natural Table",
+  "Category": "Food",
+  "Company": "Wholesome Goods Inc"
+ },
+ {
+  "Brand": "Prime Farms",
+  "Category": "Food",
+  "Company": "Clean Eating Corp"
+ },
+ {
+  "Brand": "Wholesome Choice",
+  "Category": "Food",
+  "Company": "Farm-Fresh Products"
+ },
+ {
+  "Brand": "Farm Goods",
+  "Category": "Food",
+  "Company": "Fresh Corp"
+ },
+ {
+  "Brand": "Meadow Goods",
+  "Category": "Food",
+  "Company": "Fresh Farms LLC"
+ },
+ {
+  "Brand": "Prime Premium",
+  "Category": "Food",
+  "Company": "Fresh Start Co."
+ },
+ {
+  "Brand": "Valley Farms",
+  "Category": "Food",
+  "Company": "FreshMart Foods"
+ },
+ {
+  "Brand": "Garden Best",
+  "Category": "Food",
+  "Company": "Golden Grove Farms"
+ },
+ {
+  "Brand": "Green Kitchen",
+  "Category": "Food",
+  "Company": "GreenChoice"
+ },
+ {
+  "Brand": "Field Valley",
+  "Category": "Food",
+  "Company": "Harvest Time Foods"
+ },
+ {
+  "Brand": "Health Premium",
+  "Category": "Food",
+  "Company": "HealthPrime Foods"
+ },
+ {
+  "Brand": "Golden Valley",
+  "Category": "Food",
+  "Company": "Healthy Choice Foods"
+ },
+ {
+  "Brand": "Valley Choice",
+  "Category": "Food",
+  "Company": "HealthyLiving"
+ },
+ {
+  "Brand": "Natural Pantry",
+  "Category": "Food",
+  "Company": "Natura Best Foods"
+ },
+ {
+  "Brand": "Pure Best",
+  "Category": "Food",
+  "Company": "Natural Harvest Co"
+ },
+ {
+  "Brand": "Harvest Table",
+  "Category": "Food",
+  "Company": "NaturalWay"
+ },
+ {
+  "Brand": "Nature Fields",
+  "Category": "Food",
+  "Company": "Organic Vitality Co"
+ },
+ {
+  "Brand": "Vita Fields",
+  "Category": "Food",
+  "Company": "Prime Produce Inc"
+ },
+ {
+  "Brand": "Wholesome Valley",
+  "Category": "Food",
+  "Company": "Pure Essence Ltd"
+ },
+ {
+  "Brand": "Fresh Market",
+  "Category": "Food",
+  "Company": "Pure Taste Industries"
+ },
+ {
+  "Brand": "Field Table",
+  "Category": "Food",
+  "Company": "PureLife"
+ },
+ {
+  "Brand": "Sunny Farms",
+  "Category": "Food",
+  "Company": "Quality Foods Ltd"
+ },
+ {
+  "Brand": "Harvest Grove",
+  "Category": "Food",
+  "Company": "Sunny Fields Corp"
+ },
+ {
+  "Brand": "Fresh Kitchen",
+  "Category": "Food",
+  "Company": "Vital Nutrition Co"
+ },
+ {
+  "Brand": "Pure Pantry",
+  "Category": "Food",
+  "Company": "Wholesome Goods Inc"
+ },
+ {
+  "Brand": "Sunny Pantry",
+  "Category": "Food",
+  "Company": "Clean Eating Corp"
+ },
+ {
+  "Brand": "Grove Fields",
+  "Category": "Food",
+  "Company": "Farm-Fresh Products"
+ },
+ {
+  "Brand": "Farm Best",
+  "Category": "Food",
+  "Company": "Fresh Corp"
+ },
+ {
+  "Brand": "Health Table",
+  "Category": "Food",
+  "Company": "Fresh Farms LLC"
+ },
+ {
+  "Brand": "Grove Goods",
+  "Category": "Food",
+  "Company": "Fresh Start Co."
+ },
+ {
+  "Brand": "Fresh Fields",
+  "Category": "Food",
+  "Company": "FreshMart Foods"
+ },
+ {
+  "Brand": "Prime Grove",
+  "Category": "Food",
+  "Company": "Golden Grove Farms"
+ },
+ {
+  "Brand": "Fresh Choice",
+  "Category": "Food",
+  "Company": "GreenChoice"
+ },
+ {
+  "Brand": "Health Goods",
+  "Category": "Food",
+  "Company": "Harvest Time Foods"
+ },
+ {
+  "Brand": "Sunny Premium",
+  "Category": "Food",
+  "Company": "HealthPrime Foods"
+ },
+ {
+  "Brand": "Meadow Choice",
+  "Category": "Food",
+  "Company": "Healthy Choice Foods"
+ },
+ {
+  "Brand": "Organic Kitchen",
+  "Category": "Food",
+  "Company": "HealthyLiving"
+ },
+ {
+  "Brand": "Valley Pantry",
+  "Category": "Food",
+  "Company": "Natura Best Foods"
+ },
+ {
+  "Brand": "Organic Table",
+  "Category": "Food",
+  "Company": "Natural Harvest Co"
+ },
+ {
+  "Brand": "Golden Best",
+  "Category": "Food",
+  "Company": "NaturalWay"
+ },
+ {
+  "Brand": "Harvest Gold",
+  "Category": "Food",
+  "Company": "Organic Vitality Co"
+ },
+ {
+  "Brand": "Grove Pantry",
+  "Category": "Food",
+  "Company": "Prime Produce Inc"
+ },
+ {
+  "Brand": "Country Farms",
+  "Category": "Food",
+  "Company": "Pure Essence Ltd"
+ },
+ {
+  "Brand": "Health Grove",
+  "Category": "Food",
+  "Company": "Pure Taste Industries"
+ },
+ {
+  "Brand": "Pure Premium",
+  "Category": "Food",
+  "Company": "PureLife"
+ },
+ {
+  "Brand": "Green Choice",
+  "Category": "Food",
+  "Company": "Quality Foods Ltd"
+ },
+ {
+  "Brand": "Prime Select",
+  "Category": "Food",
+  "Company": "Sunny Fields Corp"
+ },
+ {
+  "Brand": "Meadow Valley",
+  "Category": "Food",
+  "Company": "Vital Nutrition Co"
+ },
+ {
+  "Brand": "Green Fields",
+  "Category": "Food",
+  "Company": "Wholesome Goods Inc"
+ },
+ {
+  "Brand": "Green Select",
+  "Category": "Food",
+  "Company": "Clean Eating Corp"
+ },
+ {
+  "Brand": "Organic Goods",
+  "Category": "Food",
+  "Company": "Farm-Fresh Products"
+ },
+ {
+  "Brand": "Grove Premium",
+  "Category": "Food",
+  "Company": "Fresh Corp"
+ },
+ {
+  "Brand": "Wholesome Market",
+  "Category": "Food",
+  "Company": "Fresh Farms LLC"
+ },
+ {
+  "Brand": "Valley Premium",
+  "Category": "Food",
+  "Company": "Fresh Start Co."
+ },
+ {
+  "Brand": "Field Best",
+  "Category": "Food",
+  "Company": "FreshMart Foods"
+ },
+ {
+  "Brand": "Meadow Fields",
+  "Category": "Food",
+  "Company": "Golden Grove Farms"
+ },
+ {
+  "Brand": "Valley Table",
+  "Category": "Food",
+  "Company": "GreenChoice"
+ },
+ {
+  "Brand": "Nature Premium",
+  "Category": "Food",
+  "Company": "Harvest Time Foods"
+ },
+ {
+  "Brand": "Pure Choice",
+  "Category": "Food",
+  "Company": "HealthPrime Foods"
+ },
+ {
+  "Brand": "Nature Farms",
+  "Category": "Food",
+  "Company": "Healthy Choice Foods"
+ },
+ {
+  "Brand": "Real Wear",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Core Label",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Prime Style",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Street Apparel",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Real Threads",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Sport Line",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Modern Line",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Chic Collection",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Denim Apparel",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Classic Co",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Fit Line",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Active Collection",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Chic Style",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Street Label",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Chic Outfitters",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Urban Style",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Pure Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Elite Fit",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Flex Collection",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Edge Line",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Metro Clothing",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Street Fit",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Metro Wear",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Metro Co",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Fit Co",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Flex Brand",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Real Fashion",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Chic Label",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "True Collection",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Denim Line",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Style Line",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Street Look",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Real Designs",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Street Brand",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Fashion Wear",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Edge Designs",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Bold Fit",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Street Designs",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Active Outfitters",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Classic Style",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Vogue Style",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Core Outfitters",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Elite Apparel",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Sport Clothing",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Runway Line",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Runway Look",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Active Apparel",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Core Look",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Runway Designs",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Fashion Clothing",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Trend Line",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Core Brand",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Fashion Line",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Trend Apparel",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Denim Label",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Prime Co",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Fit Threads",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Pure Clothing",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Active Wear",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Fit Look",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Runway Style",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Active Designs",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Modern Designs",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Trend Fit",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Casual Clothing",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Active Clothing",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Elite Threads",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Style Fit",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Chic Brand",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Style Look",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Prime Designs",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Urban Label",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Chic Co",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Core Style",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Denim Co",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Sport Brand",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Chic Fit",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Trend Co",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Vogue Line",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "True Threads",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Modern Label",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Prime Outfitters",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Trend Designs",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Edge Co",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Street Style",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Prime Apparel",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Trend Wear",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Urban Threads",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Pure Fit",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Classic Brand",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Fit Designs",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "True Apparel",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Chic Wear",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Sport Style",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "True Clothing",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Denim Designs",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Street Outfitters",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Casual Look",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Flex Fit",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Street Co",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Street Clothing",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Casual Line",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Core Line",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Casual Fashion",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Chic Clothing",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Flex Look",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Real Fit",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Elite Outfitters",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Classic Fashion",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Classic Clothing",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Flex Wear",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Flex Fashion",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Elite Co",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "True Style",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Metro Outfitters",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Modern Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Style Outfitters",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Elite Line",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Modern Apparel",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Fashion Co",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Active Fashion",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Trend Threads",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Metro Label",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Chic Threads",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Runway Co",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Vogue Apparel",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Casual Brand",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Fashion Apparel",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Vogue Designs",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Sport Apparel",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Urban Designs",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Real Brand",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Real Label",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Modern Threads",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Flex Style",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Core Clothing",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Fashion Look",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Fashion Label",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Style Designs",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Style Label",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Flex Threads",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Metro Brand",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Flex Label",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Real Clothing",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Classic Look",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Metro Designs",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Urban Co",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Prime Threads",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Fit Collection",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Fit Label",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Edge Fashion",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Vogue Threads",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Pure Line",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Elite Fashion",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Modern Fit",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Urban Wear",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Elite Collection",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Vogue Outfitters",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Pure Style",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Fit Apparel",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Prime Look",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Modern Brand",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Edge Apparel",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Prime Brand",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Urban Clothing",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Sport Fashion",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Flex Line",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "True Designs",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Fit Wear",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Chic Line",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Sport Collection",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Denim Fashion",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Bold Designs",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Bold Apparel",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Edge Collection",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Trend Fashion",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Pure Fashion",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Bold Collection",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Prime Line",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Trend Collection",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Active Brand",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Denim Fit",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "True Fit",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "True Line",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Flex Apparel",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Pure Look",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "True Wear",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Metro Collection",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Style Fashion",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Flex Designs",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Chic Fashion",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Vogue Clothing",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Urban Apparel",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Core Fashion",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Classic Outfitters",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Fit Clothing",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Denim Look",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Metro Look",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Runway Label",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Denim Outfitters",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Metro Threads",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Modern Collection",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Fashion Threads",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Flex Co",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Urban Brand",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Pure Label",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Street Fashion",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Urban Line",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Urban Look",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Denim Collection",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Fit Brand",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Casual Fit",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Vogue Look",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Sport Look",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Metro Apparel",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Active Look",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "True Outfitters",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Pure Co",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Runway Fashion",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Street Threads",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Chic Apparel",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Core Threads",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Urban Outfitters",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Flex Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Edge Style",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Prime Clothing",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Bold Label",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Trend Look",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Real Look",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Active Co",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Pure Collection",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Core Apparel",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Edge Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Fashion Fit",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Trend Clothing",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Vogue Brand",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Modern Style",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Elite Brand",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Edge Label",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Fit Fashion",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Casual Collection",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Chic Designs",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Casual Apparel",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Real Collection",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Trend Brand",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Bold Look",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Modern Co",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Style Brand",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Sport Outfitters",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Style Collection",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Core Wear",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Active Line",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Sport Designs",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Pure Apparel",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Pure Designs",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Runway Apparel",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Vogue Wear",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Classic Line",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Classic Designs",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Active Fit",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Vogue Collection",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Style Wear",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "True Co",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Fit Style",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Elite Label",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Denim Clothing",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Trend Outfitters",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Denim Style",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Real Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Runway Clothing",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Urban Fashion",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Prime Collection",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Edge Threads",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Classic Threads",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Street Collection",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Active Threads",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Bold Outfitters",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Pure Wear",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Sport Wear",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Sport Label",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Bold Brand",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Metro Line",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Bold Co",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Real Co",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Core Collection",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Casual Threads",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Fashion Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Elite Look",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Prime Fit",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Edge Wear",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Runway Threads",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Bold Clothing",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Real Style",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Style Clothing",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Elite Designs",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Classic Fit",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Edge Clothing",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Runway Fit",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Runway Outfitters",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Vogue Co",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Prime Label",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Style Threads",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Real Apparel",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Casual Designs",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Casual Label",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Sport Fit",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Street Wear",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Elite Clothing",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Runway Brand",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Edge Look",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Casual Style",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Modern Look",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Urban Fit",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Bold Style",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Pure Threads",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Bold Line",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Core Designs",
+  "Category": "Clothing",
+  "Company": "CasualWear LLC"
+ },
+ {
+  "Brand": "Prime Wear",
+  "Category": "Clothing",
+  "Company": "DenimCraft Co"
+ },
+ {
+  "Brand": "Edge Brand",
+  "Category": "Clothing",
+  "Company": "FastFashion Inc"
+ },
+ {
+  "Brand": "Vogue Fit",
+  "Category": "Clothing",
+  "Company": "Performance Inc"
+ },
+ {
+  "Brand": "Sport Threads",
+  "Category": "Clothing",
+  "Company": "SportSwear Inc"
+ },
+ {
+  "Brand": "Active Style",
+  "Category": "Clothing",
+  "Company": "StyleBrand Co"
+ },
+ {
+  "Brand": "Casual Outfitters",
+  "Category": "Clothing",
+  "Company": "TrendyClothes Inc"
+ },
+ {
+  "Brand": "Casual Co",
+  "Category": "Clothing",
+  "Company": "YouthFashion Outfitters"
+ },
+ {
+  "Brand": "Street Line",
+  "Category": "Clothing",
+  "Company": "ActiveWear AG"
+ },
+ {
+  "Brand": "Pixel Sync",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Digital Tech",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Ultra Elite",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Ultra Works",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Power Works",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Hyper Pro",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Tech Link",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Core Plus",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Power Hub",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Circuit Labs",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Pro Wave",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Circuit Digital",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Neo Pro",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Pixel Digital",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Digital Hub",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Smart Digital",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Hyper Sync",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Core Sync",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Pixel Labs",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Core Elite",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Cyber Hub",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Tech Zone",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Mega Works",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Vector Link",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Core Digital",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Cyber Max",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Pixel Wave",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Smart Hub",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Max Labs",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Hyper Max",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Hyper Works",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Mega Pro",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Byte Systems",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Cyber Wave",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Byte Max",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Neo Zone",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Power Max",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Cyber Plus",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Elite Max",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Mega Sync",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Smart Plus",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Data Link",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Logic Works",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Logic Link",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Logic Systems",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Vector Zone",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Hyper Plus",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Quantum Pro",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Max Works",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Elite Sync",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Digital Zone",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Byte Pro",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Max Link",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Quantum Tech",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Max Pro",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Smart Sync",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Vector Wave",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Pixel Link",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Logic Wave",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Digital Link",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Ultra Zone",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Byte Plus",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Cyber Works",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Hyper Labs",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Smart Wave",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Mega Tech",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Pro Labs",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Quantum Link",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Byte Wave",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Vector Plus",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Max Hub",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Core Works",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Hyper Systems",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Vector Tech",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Circuit Systems",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Pixel Elite",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Elite Labs",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Vector Digital",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Power Zone",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Power Solutions",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Neo Elite",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Pixel Plus",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Vector Labs",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Smart Elite",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Circuit Hub",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Hyper Digital",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Power Systems",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Core Wave",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Neo Tech",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Mega Max",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Data Max",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Pro Plus",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Power Pro",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Max Digital",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Byte Tech",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Hyper Solutions",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Vector Hub",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Power Plus",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Mega Digital",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Vector Works",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Mega Labs",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Core Zone",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Pro Link",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Vector Elite",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Quantum Max",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Circuit Max",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Data Solutions",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Quantum Works",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Byte Hub",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Elite Tech",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Data Digital",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Neo Wave",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Cyber Labs",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Byte Digital",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Cyber Elite",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Smart Works",
+  "Category": "Electronics",
+  "Company": "NotebookPro Group"
+ },
+ {
+  "Brand": "Mega Elite",
+  "Category": "Electronics",
+  "Company": "PrinterPro America"
+ },
+ {
+  "Brand": "Quantum Solutions",
+  "Category": "Electronics",
+  "Company": "TechSolutions Inc"
+ },
+ {
+  "Brand": "Core Pro",
+  "Category": "Electronics",
+  "Company": "TechWorld Electronics"
+ },
+ {
+  "Brand": "Pro Digital",
+  "Category": "Electronics",
+  "Company": "ComputerPlus Inc"
+ },
+ {
+  "Brand": "Neo Solutions",
+  "Category": "Electronics",
+  "Company": "DeviceWorks Inc"
+ },
+ {
+  "Brand": "Tech Hub",
+  "Category": "Electronics",
+  "Company": "HomeElectronics"
+ },
+ {
+  "Brand": "Care Aid",
+  "Category": "Health",
+  "Company": "HealthFirst Labs"
+ },
+ {
+  "Brand": "Bio Health",
+  "Category": "Health",
+  "Company": "PharmaCare Corporation"
+ },
+ {
+  "Brand": "Health Aid",
+  "Category": "Health",
+  "Company": "VitaLife Corp"
+ },
+ {
+  "Brand": "Well Health",
+  "Category": "Health",
+  "Company": "WellnessPlus Inc"
+ },
+ {
+  "Brand": "Health Care",
+  "Category": "Health",
+  "Company": "HealthFirst Labs"
+ },
+ {
+  "Brand": "Clean Plus",
+  "Category": "Health",
+  "Company": "PharmaCare Corporation"
+ },
+ {
+  "Brand": "Clean Pro",
+  "Category": "Health",
+  "Company": "VitaLife Corp"
+ },
+ {
+  "Brand": "Vita Care",
+  "Category": "Health",
+  "Company": "WellnessPlus Inc"
+ },
+ {
+  "Brand": "Cozy Solutions",
+  "Category": "Home",
+  "Company": "BuildMart Inc"
+ },
+ {
+  "Brand": "Comfort Solutions",
+  "Category": "Home",
+  "Company": "DomesticGoods LLC"
+ },
+ {
+  "Brand": "Haven Life",
+  "Category": "Home",
+  "Company": "HomeStyle Corp"
+ },
+ {
+  "Brand": "Home Comfort",
+  "Category": "Home",
+  "Company": "HouseCraft Co"
+ },
+ {
+  "Brand": "Office Supply",
+  "Category": "Office",
+  "Company": "BusinessSupply Inc"
+ },
+ {
+  "Brand": "Pro Works",
+  "Category": "Office",
+  "Company": "DeskPro Corp"
+ },
+ {
+  "Brand": "File Direct",
+  "Category": "Office",
+  "Company": "OfficeMart Corp"
+ },
+ {
+  "Brand": "File Max",
+  "Category": "Office",
+  "Company": "WorkSpace Solutions"
+ },
+ {
+  "Brand": "Work Supply",
+  "Category": "Office",
+  "Company": "BusinessSupply Inc"
+ },
+ {
+  "Brand": "Pro Supply",
+  "Category": "Office",
+  "Company": "DeskPro Corp"
+ },
+ {
+  "Brand": "Work Pro",
+  "Category": "Office",
+  "Company": "OfficeMart Corp"
+ },
+ {
+  "Brand": "Pro Max",
+  "Category": "Office",
+  "Company": "WorkSpace Solutions"
+ },
+ {
+  "Brand": "Copy Direct",
+  "Category": "Office",
+  "Company": "BusinessSupply Inc"
+ },
+ {
+  "Brand": "Note Plus",
+  "Category": "Office",
+  "Company": "DeskPro Corp"
+ },
+ {
+  "Brand": "Work Smart",
+  "Category": "Office",
+  "Company": "OfficeMart Corp"
+ },
+ {
+  "Brand": "Print First",
+  "Category": "Office",
+  "Company": "WorkSpace Solutions"
+ },
+ {
+  "Brand": "Office First",
+  "Category": "Office",
+  "Company": "BusinessSupply Inc"
+ },
+ {
+  "Brand": "Print Office",
+  "Category": "Office",
+  "Company": "DeskPro Corp"
+ },
+ {
+  "Brand": "Furry Care",
+  "Category": "Pet",
+  "Company": "AnimalCare Corp"
+ },
+ {
+  "Brand": "Top Paws",
+  "Category": "Pet",
+  "Company": "BluePaws Co"
+ },
+ {
+  "Brand": "Lucky Life",
+  "Category": "Pet",
+  "Company": "CatTreats Company"
+ },
+ {
+  "Brand": "Happy Love",
+  "Category": "Pet",
+  "Company": "DogFood Co"
+ },
+ {
+  "Brand": "Top Pal",
+  "Category": "Pet",
+  "Company": "PetFood Nutrition"
+ },
+ {
+  "Brand": "Paw Buddy",
+  "Category": "Pet",
+  "Company": "PetVitality Corp"
+ },
+ {
+  "Brand": "Best Pet",
+  "Category": "Pet",
+  "Company": "AnimalCare Corp"
+ },
+ {
+  "Brand": "Golden Buddy",
+  "Category": "Pet",
+  "Company": "BluePaws Co"
+ },
+ {
+  "Brand": "Golden Paws",
+  "Category": "Pet",
+  "Company": "CatTreats Company"
+ },
+ {
+  "Brand": "Top Chow",
+  "Category": "Pet",
+  "Company": "DogFood Co"
+ },
+ {
+  "Brand": "Motor Tech",
+  "Category": "Automotive",
+  "Company": "EngineLube Oil"
+ },
+ {
+  "Brand": "Motor Drive",
+  "Category": "Automotive",
+  "Company": "FluidCare Limited"
+ },
+ {
+  "Brand": "Auto Drive",
+  "Category": "Automotive",
+  "Company": "FuelOil Products"
+ },
+ {
+  "Brand": "Road Max",
+  "Category": "Automotive",
+  "Company": "MotorOil Inc"
+ },
+ {
+  "Brand": "Race Drive",
+  "Category": "Automotive",
+  "Company": "PetroProducts America"
+ },
+ {
+  "Brand": "Drive Pro",
+  "Category": "Automotive",
+  "Company": "EngineLube Oil"
+ },
+ {
+  "Brand": "Engine Zone",
+  "Category": "Automotive",
+  "Company": "FluidCare Limited"
+ },
+ {
+  "Brand": "Team Gear",
+  "Category": "Sports",
+  "Company": "Athletic Inc"
+ },
+ {
+  "Brand": "Elite Pro",
+  "Category": "Sports",
+  "Company": "BallSports Inc"
+ },
+ {
+  "Brand": "Star Athletic",
+  "Category": "Sports",
+  "Company": "GolfBalls Corp"
+ },
+ {
+  "Brand": "Sport Play",
+  "Category": "Sports",
+  "Company": "GolfClub Co"
+ },
+ {
+  "Brand": "Champion Sport",
+  "Category": "Sports",
+  "Company": "MaxCl Co"
+ },
+ {
+  "Brand": "Athletic Play",
+  "Category": "Sports",
+  "Company": "SwingCorp Company"
+ },
+ {
+  "Brand": "Win Team",
+  "Category": "Sports",
+  "Company": "Athletic Inc"
+ },
+ {
+  "Brand": "Win Athletic",
+  "Category": "Sports",
+  "Company": "BallSports Inc"
+ },
+ {
+  "Brand": "Victory Sport",
+  "Category": "Sports",
+  "Company": "GolfBalls Corp"
+ },
+ {
+  "Brand": "Team Zone",
+  "Category": "Sports",
+  "Company": "GolfClub Co"
+ },
+ {
+  "Brand": "Victory Game",
+  "Category": "Sports",
+  "Company": "MaxCl Co"
+ }
+]

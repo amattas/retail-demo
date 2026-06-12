@@ -1,0 +1,15 @@
+{
+  "store_type": "grocery",
+  "display_name": "Grocery",
+  "basket_lambda": 9.0,
+  "avg_ticket_target": 55.0,
+  "hourly_weights": [0.05, 0.02, 0.02, 0.02, 0.1, 0.4, 1.0, 1.8, 2.4, 2.8, 3.0, 3.4,
+                     3.2, 2.8, 2.6, 3.0, 3.8, 4.4, 4.0, 2.8, 1.8, 1.0, 0.4, 0.1],
+  "daily_weights": [1.0, 0.9, 0.95, 1.0, 1.15, 1.5, 1.35],
+  "monthly_weights": [0.95, 0.9, 1.0, 1.0, 1.05, 1.0, 1.05, 1.0, 1.0, 1.05, 1.25, 1.35],
+  "department_weights": {"Fresh": 0.45, "Grocery": 0.42, "Household & Personal Care": 0.13},
+  "promo_rate": 0.22,
+  "online_order_share": 0.15,
+  "zones": ["entrance", "produce", "bakery", "deli", "meat", "dairy", "frozen",
+            "aisles", "checkout", "exit"]
+}

@@ -1,0 +1,4055 @@
+[
+ {
+  "City": "Springfield",
+  "District": "Central Illinois",
+  "Region": "Midwest",
+  "State": "IL",
+  "Zip": "62701"
+ },
+ {
+  "City": "Franklin",
+  "District": "Middle Tennessee",
+  "Region": "Southeast",
+  "State": "TN",
+  "Zip": "37067"
+ },
+ {
+  "City": "Riverside",
+  "District": "Inland Empire",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "92501"
+ },
+ {
+  "City": "Arlington",
+  "District": "North Texas",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "76001"
+ },
+ {
+  "City": "Madison",
+  "District": "South Central Wisconsin",
+  "Region": "Midwest",
+  "State": "WI",
+  "Zip": "53701"
+ },
+ {
+  "City": "Fairfield",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06824"
+ },
+ {
+  "City": "Greenwood",
+  "District": "Upstate South Carolina",
+  "Region": "Southeast",
+  "State": "SC",
+  "Zip": "29646"
+ },
+ {
+  "City": "Lakewood",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80226"
+ },
+ {
+  "City": "Burlington",
+  "District": "Chittenden County",
+  "Region": "Northeast",
+  "State": "VT",
+  "Zip": "05401"
+ },
+ {
+  "City": "Westfield",
+  "District": "Pioneer Valley",
+  "Region": "Northeast",
+  "State": "MA",
+  "Zip": "01085"
+ },
+ {
+  "City": "Clearwater",
+  "District": "Pinellas County",
+  "Region": "Southeast",
+  "State": "FL",
+  "Zip": "33755"
+ },
+ {
+  "City": "Newton",
+  "District": "South Central Kansas",
+  "Region": "Midwest",
+  "State": "KS",
+  "Zip": "67114"
+ },
+ {
+  "City": "Ashland",
+  "District": "Rogue Valley",
+  "Region": "West",
+  "State": "OR",
+  "Zip": "97520"
+ },
+ {
+  "City": "Chester",
+  "District": "Delaware County",
+  "Region": "Northeast",
+  "State": "PA",
+  "Zip": "19013"
+ },
+ {
+  "City": "Richmond",
+  "District": "Richmond Metro",
+  "Region": "Southeast",
+  "State": "VA",
+  "Zip": "23219"
+ },
+ {
+  "City": "Bloomington",
+  "District": "South Central Indiana",
+  "Region": "Midwest",
+  "State": "IN",
+  "Zip": "47401"
+ },
+ {
+  "City": "Fairview",
+  "District": "Bergen County",
+  "Region": "Northeast",
+  "State": "NJ",
+  "Zip": "07022"
+ },
+ {
+  "City": "Hillsboro",
+  "District": "Washington County",
+  "Region": "West",
+  "State": "OR",
+  "Zip": "97123"
+ },
+ {
+  "City": "Georgetown",
+  "District": "Williamson County",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "78626"
+ },
+ {
+  "City": "Lancaster",
+  "District": "Lancaster County",
+  "Region": "Northeast",
+  "State": "PA",
+  "Zip": "17601"
+ },
+ {
+  "City": "Marietta",
+  "District": "Cobb County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30060"
+ },
+ {
+  "City": "Plymouth",
+  "District": "Hennepin County",
+  "Region": "Midwest",
+  "State": "MN",
+  "Zip": "55441"
+ },
+ {
+  "City": "Redwood City",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94061"
+ },
+ {
+  "City": "Thornton",
+  "District": "Adams County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80229"
+ },
+ {
+  "City": "Bridgeport",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06604"
+ },
+ {
+  "City": "Columbia",
+  "District": "Midlands South Carolina",
+  "Region": "Southeast",
+  "State": "SC",
+  "Zip": "29201"
+ },
+ {
+  "City": "Cedar Rapids",
+  "District": "Linn County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52401"
+ },
+ {
+  "City": "Fremont",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94536"
+ },
+ {
+  "City": "Aurora",
+  "District": "Kane County",
+  "Region": "Midwest",
+  "State": "IL",
+  "Zip": "60502"
+ },
+ {
+  "City": "Hampton",
+  "District": "Hampton Roads",
+  "Region": "Southeast",
+  "State": "VA",
+  "Zip": "23663"
+ },
+ {
+  "City": "Mansfield",
+  "District": "Tarrant County",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "76063"
+ },
+ {
+  "City": "Valdosta",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31601"
+ },
+ {
+  "City": "Watertown",
+  "District": "Jefferson County",
+  "Region": "Northeast",
+  "State": "NY",
+  "Zip": "13601"
+ },
+ {
+  "City": "Brookfield",
+  "District": "Waukesha County",
+  "Region": "Midwest",
+  "State": "WI",
+  "Zip": "53005"
+ },
+ {
+  "City": "Huntsville",
+  "District": "North Alabama",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "35801"
+ },
+ {
+  "City": "Glendale",
+  "District": "Maricopa County",
+  "Region": "Southwest",
+  "State": "AZ",
+  "Zip": "85301"
+ },
+ {
+  "City": "Milford",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06460"
+ },
+ {
+  "City": "Rockford",
+  "District": "Winnebago County",
+  "Region": "Midwest",
+  "State": "IL",
+  "Zip": "61101"
+ },
+ {
+  "City": "Salem",
+  "District": "Marion County",
+  "Region": "West",
+  "State": "OR",
+  "Zip": "97301"
+ },
+ {
+  "City": "Bristol",
+  "District": "Northeast Tennessee",
+  "Region": "Southeast",
+  "State": "TN",
+  "Zip": "37620"
+ },
+ {
+  "City": "Concord",
+  "District": "Merrimack County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03301"
+ },
+ {
+  "City": "Davenport",
+  "District": "Scott County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52801"
+ },
+ {
+  "City": "Pasadena",
+  "District": "Los Angeles County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "91101"
+ },
+ {
+  "City": "Longmont",
+  "District": "Boulder County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80501"
+ },
+ {
+  "City": "Norwalk",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06850"
+ },
+ {
+  "City": "Savannah",
+  "District": "Coastal Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31401"
+ },
+ {
+  "City": "Elkhart",
+  "District": "Elkhart County",
+  "Region": "Midwest",
+  "State": "IN",
+  "Zip": "46514"
+ },
+ {
+  "City": "Reno",
+  "District": "Washoe County",
+  "Region": "West",
+  "State": "NV",
+  "Zip": "89501"
+ },
+ {
+  "City": "Baytown",
+  "District": "Harris County",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "77520"
+ },
+ {
+  "City": "Danbury",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06810"
+ },
+ {
+  "City": "Spartanburg",
+  "District": "Upstate South Carolina",
+  "Region": "Southeast",
+  "State": "SC",
+  "Zip": "29301"
+ },
+ {
+  "City": "Kenosha",
+  "District": "Kenosha County",
+  "Region": "Midwest",
+  "State": "WI",
+  "Zip": "53140"
+ },
+ {
+  "City": "Chico",
+  "District": "Butte County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95926"
+ },
+ {
+  "City": "Pueblo",
+  "District": "Pueblo County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81001"
+ },
+ {
+  "City": "Middletown",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06457"
+ },
+ {
+  "City": "Macon",
+  "District": "Central Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31201"
+ },
+ {
+  "City": "Ames",
+  "District": "Story County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50010"
+ },
+ {
+  "City": "Stockton",
+  "District": "San Joaquin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95202"
+ },
+ {
+  "City": "Tyler",
+  "District": "East Texas",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "75701"
+ },
+ {
+  "City": "Nashua",
+  "District": "Hillsborough County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03060"
+ },
+ {
+  "City": "Augusta",
+  "District": "Central Savannah River",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30901"
+ },
+ {
+  "City": "Racine",
+  "District": "Racine County",
+  "Region": "Midwest",
+  "State": "WI",
+  "Zip": "53402"
+ },
+ {
+  "City": "Visalia",
+  "District": "Tulare County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "93291"
+ },
+ {
+  "City": "Fort Collins",
+  "District": "Larimer County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80521"
+ },
+ {
+  "City": "Stamford",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06901"
+ },
+ {
+  "City": "Columbus",
+  "District": "Muscogee County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31901"
+ },
+ {
+  "City": "Dubuque",
+  "District": "Dubuque County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52001"
+ },
+ {
+  "City": "Modesto",
+  "District": "Stanislaus County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95350"
+ },
+ {
+  "City": "Lubbock",
+  "District": "West Texas",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "79401"
+ },
+ {
+  "City": "Manchester",
+  "District": "Hillsborough County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03101"
+ },
+ {
+  "City": "Albany",
+  "District": "Southwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31701"
+ },
+ {
+  "City": "La Crosse",
+  "District": "La Crosse County",
+  "Region": "Midwest",
+  "State": "WI",
+  "Zip": "54601"
+ },
+ {
+  "City": "Salinas",
+  "District": "Monterey County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "93901"
+ },
+ {
+  "City": "Boulder",
+  "District": "Boulder County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80301"
+ },
+ {
+  "City": "Hartford",
+  "District": "Hartford County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06101"
+ },
+ {
+  "City": "Warner Robins",
+  "District": "Central Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31093"
+ },
+ {
+  "City": "Cedar Falls",
+  "District": "Black Hawk County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50613"
+ },
+ {
+  "City": "Fresno",
+  "District": "Fresno County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "93701"
+ },
+ {
+  "City": "Amarillo",
+  "District": "Texas Panhandle",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "79101"
+ },
+ {
+  "City": "Concord",
+  "District": "Merrimack County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03302"
+ },
+ {
+  "City": "Valdosta",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31602"
+ },
+ {
+  "City": "Waterloo",
+  "District": "Black Hawk County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50701"
+ },
+ {
+  "City": "Santa Rosa",
+  "District": "Sonoma County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95401"
+ },
+ {
+  "City": "Westminster",
+  "District": "Adams County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80030"
+ },
+ {
+  "City": "New Britain",
+  "District": "Hartford County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06050"
+ },
+ {
+  "City": "Rome",
+  "District": "Northwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30161"
+ },
+ {
+  "City": "Mason City",
+  "District": "Cerro Gordo County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50401"
+ },
+ {
+  "City": "Antioch",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94509"
+ },
+ {
+  "City": "Odessa",
+  "District": "West Texas",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "79761"
+ },
+ {
+  "City": "Dover",
+  "District": "Strafford County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03820"
+ },
+ {
+  "City": "Gainesville",
+  "District": "North Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30501"
+ },
+ {
+  "City": "Sioux City",
+  "District": "Woodbury County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51101"
+ },
+ {
+  "City": "Concord",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94519"
+ },
+ {
+  "City": "Grand Junction",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81501"
+ },
+ {
+  "City": "Waterbury",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06701"
+ },
+ {
+  "City": "Dalton",
+  "District": "Northwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30720"
+ },
+ {
+  "City": "Burlington",
+  "District": "Des Moines County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52601"
+ },
+ {
+  "City": "Richmond",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94801"
+ },
+ {
+  "City": "Midland",
+  "District": "West Texas",
+  "Region": "Southwest",
+  "State": "TX",
+  "Zip": "79701"
+ },
+ {
+  "City": "Keene",
+  "District": "Cheshire County",
+  "Region": "Northeast",
+  "State": "NH",
+  "Zip": "03431"
+ },
+ {
+  "City": "Hinesville",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31313"
+ },
+ {
+  "City": "Fort Dodge",
+  "District": "Webster County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50501"
+ },
+ {
+  "City": "Fairfield",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94533"
+ },
+ {
+  "City": "Lakewood",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80215"
+ },
+ {
+  "City": "Meriden",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06450"
+ },
+ {
+  "City": "LaGrange",
+  "District": "West Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30240"
+ },
+ {
+  "City": "Ottumwa",
+  "District": "Wapello County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52501"
+ },
+ {
+  "City": "Vallejo",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94590"
+ },
+ {
+  "City": "Thornton",
+  "District": "Adams County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80241"
+ },
+ {
+  "City": "New Haven",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06511"
+ },
+ {
+  "City": "Griffin",
+  "District": "Central Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30223"
+ },
+ {
+  "City": "Clinton",
+  "District": "Clinton County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52732"
+ },
+ {
+  "City": "Petaluma",
+  "District": "Sonoma County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94952"
+ },
+ {
+  "City": "Arvada",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80001"
+ },
+ {
+  "City": "Torrington",
+  "District": "Litchfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06790"
+ },
+ {
+  "City": "Carrollton",
+  "District": "West Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30117"
+ },
+ {
+  "City": "Marshalltown",
+  "District": "Marshall County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50158"
+ },
+ {
+  "City": "Napa",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94558"
+ },
+ {
+  "City": "Englewood",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80110"
+ },
+ {
+  "City": "Shelton",
+  "District": "Fairfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06484"
+ },
+ {
+  "City": "Douglas",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31533"
+ },
+ {
+  "City": "Newton",
+  "District": "Jasper County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50208"
+ },
+ {
+  "City": "San Rafael",
+  "District": "Marin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94901"
+ },
+ {
+  "City": "Wheat Ridge",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80033"
+ },
+ {
+  "City": "Ansonia",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06401"
+ },
+ {
+  "City": "Statesboro",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30458"
+ },
+ {
+  "City": "Indianola",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50125"
+ },
+ {
+  "City": "Hayward",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94541"
+ },
+ {
+  "City": "Broomfield",
+  "District": "Broomfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80020"
+ },
+ {
+  "City": "Winsted",
+  "District": "Litchfield County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06098"
+ },
+ {
+  "City": "Fitzgerald",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31750"
+ },
+ {
+  "City": "Spencer",
+  "District": "Clay County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51301"
+ },
+ {
+  "City": "Union City",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94587"
+ },
+ {
+  "City": "Louisville",
+  "District": "Boulder County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80027"
+ },
+ {
+  "City": "Willimantic",
+  "District": "Windham County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06226"
+ },
+ {
+  "City": "Tifton",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31794"
+ },
+ {
+  "City": "Storm Lake",
+  "District": "Buena Vista County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50588"
+ },
+ {
+  "City": "Fremont",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94538"
+ },
+ {
+  "City": "Lafayette",
+  "District": "Boulder County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80026"
+ },
+ {
+  "City": "Plainville",
+  "District": "Hartford County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06062"
+ },
+ {
+  "City": "Thomasville",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31792"
+ },
+ {
+  "City": "Cherokee",
+  "District": "Cherokee County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51012"
+ },
+ {
+  "City": "Newark",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94560"
+ },
+ {
+  "City": "Superior",
+  "District": "Boulder County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80027"
+ },
+ {
+  "City": "Seymour",
+  "District": "New Haven County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06483"
+ },
+ {
+  "City": "Moultrie",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31768"
+ },
+ {
+  "City": "Creston",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50801"
+ },
+ {
+  "City": "Milpitas",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95035"
+ },
+ {
+  "City": "Northglenn",
+  "District": "Adams County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80233"
+ },
+ {
+  "City": "Cromwell",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06416"
+ },
+ {
+  "City": "Cairo",
+  "District": "Southwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "39828"
+ },
+ {
+  "City": "Red Oak",
+  "District": "Montgomery County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51566"
+ },
+ {
+  "City": "Mountain View",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94041"
+ },
+ {
+  "City": "Federal Heights",
+  "District": "Adams County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80260"
+ },
+ {
+  "City": "Old Saybrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06475"
+ },
+ {
+  "City": "Bainbridge",
+  "District": "Southwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "39819"
+ },
+ {
+  "City": "Harlan",
+  "District": "Shelby County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51537"
+ },
+ {
+  "City": "Sunnyvale",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94086"
+ },
+ {
+  "City": "Sheridan",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80110"
+ },
+ {
+  "City": "Clinton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06413"
+ },
+ {
+  "City": "Americus",
+  "District": "Southwest Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31709"
+ },
+ {
+  "City": "Atlantic",
+  "District": "Cass County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50022"
+ },
+ {
+  "City": "Cupertino",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95014"
+ },
+ {
+  "City": "Edgewater",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80214"
+ },
+ {
+  "City": "Essex",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06426"
+ },
+ {
+  "City": "Cordele",
+  "District": "South Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31015"
+ },
+ {
+  "City": "Audubon",
+  "District": "Audubon County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50025"
+ },
+ {
+  "City": "Los Altos",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94022"
+ },
+ {
+  "City": "Golden",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80401"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06417"
+ },
+ {
+  "City": "Jesup",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31545"
+ },
+ {
+  "City": "Carroll",
+  "District": "Carroll County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51401"
+ },
+ {
+  "City": "Palo Alto",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94301"
+ },
+ {
+  "City": "Morrison",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80465"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06424"
+ },
+ {
+  "City": "Waycross",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31501"
+ },
+ {
+  "City": "Denison",
+  "District": "Crawford County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51442"
+ },
+ {
+  "City": "Redwood City",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94063"
+ },
+ {
+  "City": "Lakeside",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80212"
+ },
+ {
+  "City": "Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06438"
+ },
+ {
+  "City": "Blackshear",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31516"
+ },
+ {
+  "City": "Glenwood",
+  "District": "Mills County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51534"
+ },
+ {
+  "City": "San Carlos",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94070"
+ },
+ {
+  "City": "Deer Trail",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80105"
+ },
+ {
+  "City": "Killingworth",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06419"
+ },
+ {
+  "City": "Nahunta",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31553"
+ },
+ {
+  "City": "Clarinda",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51632"
+ },
+ {
+  "City": "Belmont",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94002"
+ },
+ {
+  "City": "Bennett",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80102"
+ },
+ {
+  "City": "East Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06423"
+ },
+ {
+  "City": "Folkston",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31537"
+ },
+ {
+  "City": "Shenandoah",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51601"
+ },
+ {
+  "City": "Foster City",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94404"
+ },
+ {
+  "City": "Bow Mar",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80123"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06498"
+ },
+ {
+  "City": "Homeland",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31537"
+ },
+ {
+  "City": "Sidney",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51652"
+ },
+ {
+  "City": "San Mateo",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94401"
+ },
+ {
+  "City": "Columbine",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80123"
+ },
+ {
+  "City": "Portland",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06480"
+ },
+ {
+  "City": "Kingsland",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31548"
+ },
+ {
+  "City": "Tabor",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51653"
+ },
+ {
+  "City": "Burlingame",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94010"
+ },
+ {
+  "City": "Ken Caryl",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80127"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06422"
+ },
+ {
+  "City": "St. Marys",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31558"
+ },
+ {
+  "City": "Randolph",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51649"
+ },
+ {
+  "City": "Millbrae",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94030"
+ },
+ {
+  "City": "Littleton",
+  "District": "Jefferson County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80120"
+ },
+ {
+  "City": "Chester",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06412"
+ },
+ {
+  "City": "Woodbine",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31569"
+ },
+ {
+  "City": "Hamburg",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51640"
+ },
+ {
+  "City": "Brisbane",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94005"
+ },
+ {
+  "City": "Centennial",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80112"
+ },
+ {
+  "City": "Ivoryton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06442"
+ },
+ {
+  "City": "Brunswick",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31520"
+ },
+ {
+  "City": "Farragut",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51639"
+ },
+ {
+  "City": "Daly City",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94014"
+ },
+ {
+  "City": "Highlands Ranch",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80129"
+ },
+ {
+  "City": "Moodus",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06469"
+ },
+ {
+  "City": "Jekyll Island",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31527"
+ },
+ {
+  "City": "Imogene",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51645"
+ },
+ {
+  "City": "South San Francisco",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94080"
+ },
+ {
+  "City": "Castle Pines",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80108"
+ },
+ {
+  "City": "Cobalt",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06414"
+ },
+ {
+  "City": "Sea Island",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31561"
+ },
+ {
+  "City": "Percival",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51648"
+ },
+ {
+  "City": "Pacifica",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94044"
+ },
+ {
+  "City": "Castle Rock",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80104"
+ },
+ {
+  "City": "East Berlin",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06023"
+ },
+ {
+  "City": "Little St. Simons",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31522"
+ },
+ {
+  "City": "Thurman",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51654"
+ },
+ {
+  "City": "Half Moon Bay",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94019"
+ },
+ {
+  "City": "Parker",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80134"
+ },
+ {
+  "City": "Middlefield",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06455"
+ },
+ {
+  "City": "St. Simons Island",
+  "District": "Southeast Georgia",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31522"
+ },
+ {
+  "City": "Riverton",
+  "District": "Fremont County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51650"
+ },
+ {
+  "City": "El Granada",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94018"
+ },
+ {
+  "City": "Lone Tree",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80124"
+ },
+ {
+  "City": "Rockfall",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06481"
+ },
+ {
+  "City": "Butler",
+  "District": "Taylor County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31006"
+ },
+ {
+  "City": "Essex",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51638"
+ },
+ {
+  "City": "Montara",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94037"
+ },
+ {
+  "City": "Roxborough",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80125"
+ },
+ {
+  "City": "Higganum",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06441"
+ },
+ {
+  "City": "Ideal",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31041"
+ },
+ {
+  "City": "Blanchard",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51630"
+ },
+ {
+  "City": "Moss Beach",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94038"
+ },
+ {
+  "City": "The Pinery",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80126"
+ },
+ {
+  "City": "Middletown",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06459"
+ },
+ {
+  "City": "Oglethorpe",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31068"
+ },
+ {
+  "City": "Coin",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51636"
+ },
+ {
+  "City": "Princeton",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94080"
+ },
+ {
+  "City": "Stonegate",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80121"
+ },
+ {
+  "City": "Centerbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06409"
+ },
+ {
+  "City": "Marshallville",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31057"
+ },
+ {
+  "City": "Yorktown",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51656"
+ },
+ {
+  "City": "Moss Beach",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94039"
+ },
+ {
+  "City": "Heritage Hills",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80124"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06499"
+ },
+ {
+  "City": "Montezuma",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31063"
+ },
+ {
+  "City": "College Springs",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51637"
+ },
+ {
+  "City": "Pescadero",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94060"
+ },
+ {
+  "City": "Inverness",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80112"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06425"
+ },
+ {
+  "City": "Reynolds",
+  "District": "Taylor County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31076"
+ },
+ {
+  "City": "Braddyville",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51631"
+ },
+ {
+  "City": "La Honda",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94020"
+ },
+ {
+  "City": "Greenwood Village",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80111"
+ },
+ {
+  "City": "Hadlyme",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06439"
+ },
+ {
+  "City": "Rupert",
+  "District": "Taylor County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31081"
+ },
+ {
+  "City": "Shambaugh",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51651"
+ },
+ {
+  "City": "Loma Mar",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94021"
+ },
+ {
+  "City": "Cherry Hills Village",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80113"
+ },
+ {
+  "City": "Lyme",
+  "District": "New London County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06371"
+ },
+ {
+  "City": "Mauk",
+  "District": "Taylor County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31058"
+ },
+ {
+  "City": "Northboro",
+  "District": "Page County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51647"
+ },
+ {
+  "City": "Woodside",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94062"
+ },
+ {
+  "City": "Glendale",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80246"
+ },
+ {
+  "City": "Hamburg",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06040"
+ },
+ {
+  "City": "Junction City",
+  "District": "Talbot County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31812"
+ },
+ {
+  "City": "Hopkins",
+  "District": "Nodaway County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51464"
+ },
+ {
+  "City": "Atherton",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94027"
+ },
+ {
+  "City": "Bow Mar",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80123"
+ },
+ {
+  "City": "Haddam Neck",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06424"
+ },
+ {
+  "City": "Talbotton",
+  "District": "Talbot County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31827"
+ },
+ {
+  "City": "Gravity",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50848"
+ },
+ {
+  "City": "Portola Valley",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94028"
+ },
+ {
+  "City": "Columbine Valley",
+  "District": "Arapahoe County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80123"
+ },
+ {
+  "City": "Chester",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06411"
+ },
+ {
+  "City": "Woodland",
+  "District": "Talbot County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31836"
+ },
+ {
+  "City": "Sharpsburg",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50862"
+ },
+ {
+  "City": "Menlo Park",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94025"
+ },
+ {
+  "City": "Deer Trail",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80105"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Geneva",
+  "District": "Talbot County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31810"
+ },
+ {
+  "City": "Clearfield",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50840"
+ },
+ {
+  "City": "East Palo Alto",
+  "District": "San Mateo County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94303"
+ },
+ {
+  "City": "Franktown",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80116"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Waverly Hall",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31831"
+ },
+ {
+  "City": "Lenox",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50851"
+ },
+ {
+  "City": "Stanford",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94305"
+ },
+ {
+  "City": "Sedalia",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80135"
+ },
+ {
+  "City": "Centerbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06404"
+ },
+ {
+  "City": "Pine Mountain",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31822"
+ },
+ {
+  "City": "New Market",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "51646"
+ },
+ {
+  "City": "Los Altos Hills",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94022"
+ },
+ {
+  "City": "Larkspur",
+  "District": "Douglas County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80118"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06424"
+ },
+ {
+  "City": "Hamilton",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31811"
+ },
+ {
+  "City": "Bedford",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50833"
+ },
+ {
+  "City": "Saratoga",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95070"
+ },
+ {
+  "City": "Palmer Lake",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80133"
+ },
+ {
+  "City": "Ivoryton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06443"
+ },
+ {
+  "City": "Ellerslie",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31807"
+ },
+ {
+  "City": "Blockton",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50836"
+ },
+ {
+  "City": "Monte Sereno",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95030"
+ },
+ {
+  "City": "Monument",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80132"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06498"
+ },
+ {
+  "City": "Cataula",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31804"
+ },
+ {
+  "City": "Conway",
+  "District": "Taylor County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50839"
+ },
+ {
+  "City": "Campbell",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95008"
+ },
+ {
+  "City": "Black Forest",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80908"
+ },
+ {
+  "City": "Portland",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06483"
+ },
+ {
+  "City": "Fortson",
+  "District": "Harris County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31808"
+ },
+ {
+  "City": "Diagonal",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50845"
+ },
+ {
+  "City": "Los Gatos",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95030"
+ },
+ {
+  "City": "Colorado Springs",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80901"
+ },
+ {
+  "City": "Chester",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06410"
+ },
+ {
+  "City": "Midland",
+  "District": "Muscogee County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31820"
+ },
+ {
+  "City": "Mount Ayr",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50854"
+ },
+ {
+  "City": "San Jose",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95101"
+ },
+ {
+  "City": "Fountain",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80817"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06419"
+ },
+ {
+  "City": "Manchester",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31816"
+ },
+ {
+  "City": "Tingley",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50863"
+ },
+ {
+  "City": "Santa Clara",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95050"
+ },
+ {
+  "City": "Security",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80911"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06418"
+ },
+ {
+  "City": "Greenville",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30222"
+ },
+ {
+  "City": "Kellerton",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50849"
+ },
+ {
+  "City": "Milpitas",
+  "District": "Santa Clara County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95036"
+ },
+ {
+  "City": "Widefield",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80911"
+ },
+ {
+  "City": "East Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Gay",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30218"
+ },
+ {
+  "City": "Redding",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50860"
+ },
+ {
+  "City": "Fremont",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94539"
+ },
+ {
+  "City": "Stratmoor Hills",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80906"
+ },
+ {
+  "City": "Essex",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06427"
+ },
+ {
+  "City": "Luthersville",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30251"
+ },
+ {
+  "City": "Ellston",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50846"
+ },
+ {
+  "City": "Newark",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94561"
+ },
+ {
+  "City": "Cimarron Hills",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80915"
+ },
+ {
+  "City": "Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06440"
+ },
+ {
+  "City": "Woodbury",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30293"
+ },
+ {
+  "City": "Maloy",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50853"
+ },
+ {
+  "City": "Union City",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94588"
+ },
+ {
+  "City": "Gleneagle",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80921"
+ },
+ {
+  "City": "Higganum",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06440"
+ },
+ {
+  "City": "Warm Springs",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31830"
+ },
+ {
+  "City": "Benton",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50835"
+ },
+ {
+  "City": "Hayward",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94542"
+ },
+ {
+  "City": "Air Force Academy",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80840"
+ },
+ {
+  "City": "Killingworth",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06420"
+ },
+ {
+  "City": "Lone Oak",
+  "District": "Meriwether County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31204"
+ },
+ {
+  "City": "Delphos",
+  "District": "Ringgold County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50847"
+ },
+ {
+  "City": "San Leandro",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94577"
+ },
+ {
+  "City": "Manitou Springs",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80829"
+ },
+ {
+  "City": "Lyme",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06371"
+ },
+ {
+  "City": "Hogansville",
+  "District": "Troup County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30230"
+ },
+ {
+  "City": "Arispe",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50831"
+ },
+ {
+  "City": "Castro Valley",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94546"
+ },
+ {
+  "City": "Cascade",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80809"
+ },
+ {
+  "City": "Old Lyme",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06371"
+ },
+ {
+  "City": "LaGrange",
+  "District": "Troup County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "30241"
+ },
+ {
+  "City": "Afton",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50830"
+ },
+ {
+  "City": "Dublin",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94568"
+ },
+ {
+  "City": "Chipita Park",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80809"
+ },
+ {
+  "City": "Old Saybrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06476"
+ },
+ {
+  "City": "West Point",
+  "District": "Troup County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31833"
+ },
+ {
+  "City": "Thayer",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50864"
+ },
+ {
+  "City": "Pleasanton",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94566"
+ },
+ {
+  "City": "Green Mountain Falls",
+  "District": "El Paso County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80819"
+ },
+ {
+  "City": "Portland",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06481"
+ },
+ {
+  "City": "Pine Mountain",
+  "District": "Troup County",
+  "Region": "Southeast",
+  "State": "GA",
+  "Zip": "31823"
+ },
+ {
+  "City": "Shannon City",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50861"
+ },
+ {
+  "City": "Livermore",
+  "District": "Alameda County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94550"
+ },
+ {
+  "City": "Woodland Park",
+  "District": "Teller County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80863"
+ },
+ {
+  "City": "Rockfall",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06481"
+ },
+ {
+  "City": "Lanett",
+  "District": "Chambers County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36863"
+ },
+ {
+  "City": "Lorimor",
+  "District": "Union County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50149"
+ },
+ {
+  "City": "Danville",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94526"
+ },
+ {
+  "City": "Victor",
+  "District": "Teller County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80860"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06497"
+ },
+ {
+  "City": "Valley",
+  "District": "Chambers County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36854"
+ },
+ {
+  "City": "Murray",
+  "District": "Clarke County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50174"
+ },
+ {
+  "City": "San Ramon",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94582"
+ },
+ {
+  "City": "Cripple Creek",
+  "District": "Teller County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80813"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06423"
+ },
+ {
+  "City": "Shawmut",
+  "District": "Chambers County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36876"
+ },
+ {
+  "City": "Osceola",
+  "District": "Clarke County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50213"
+ },
+ {
+  "City": "Walnut Creek",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94595"
+ },
+ {
+  "City": "Divide",
+  "District": "Teller County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80814"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06420"
+ },
+ {
+  "City": "LaFayette",
+  "District": "Chambers County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36862"
+ },
+ {
+  "City": "Woodburn",
+  "District": "Clarke County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50275"
+ },
+ {
+  "City": "Lafayette",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94549"
+ },
+ {
+  "City": "Florissant",
+  "District": "Teller County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80816"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06420"
+ },
+ {
+  "City": "Cusseta",
+  "District": "Chambers County",
+  "Region": "Midwest",
+  "State": "AL",
+  "Zip": "36852"
+ },
+ {
+  "City": "Truro",
+  "District": "Madison County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50257"
+ },
+ {
+  "City": "Orinda",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94563"
+ },
+ {
+  "City": "Lake George",
+  "District": "Park County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80827"
+ },
+ {
+  "City": "Centerbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06406"
+ },
+ {
+  "City": "Dadeville",
+  "District": "Tallapoosa County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36853"
+ },
+ {
+  "City": "Winterset",
+  "District": "Madison County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50273"
+ },
+ {
+  "City": "Moraga",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94556"
+ },
+ {
+  "City": "Fairplay",
+  "District": "Park County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80440"
+ },
+ {
+  "City": "Essex",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06428"
+ },
+ {
+  "City": "Alexander City",
+  "District": "Tallapoosa County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "35010"
+ },
+ {
+  "City": "Peru",
+  "District": "Madison County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50222"
+ },
+ {
+  "City": "Martinez",
+  "District": "Contra Costa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94553"
+ },
+ {
+  "City": "Alma",
+  "District": "Park County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80420"
+ },
+ {
+  "City": "Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06441"
+ },
+ {
+  "City": "Daviston",
+  "District": "Tallapoosa County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36256"
+ },
+ {
+  "City": "Macksburg",
+  "District": "Madison County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50155"
+ },
+ {
+  "City": "Benicia",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94510"
+ },
+ {
+  "City": "Breckenridge",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80424"
+ },
+ {
+  "City": "Higganum",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06441"
+ },
+ {
+  "City": "Equality",
+  "District": "Elmore County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36026"
+ },
+ {
+  "City": "Bevington",
+  "District": "Madison County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50033"
+ },
+ {
+  "City": "Vallejo",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94591"
+ },
+ {
+  "City": "Frisco",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80443"
+ },
+ {
+  "City": "Killingworth",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Wetumpka",
+  "District": "Elmore County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36092"
+ },
+ {
+  "City": "Cumming",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50061"
+ },
+ {
+  "City": "Fairfield",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94534"
+ },
+ {
+  "City": "Keystone",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80435"
+ },
+ {
+  "City": "Lyme",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06370"
+ },
+ {
+  "City": "Millbrook",
+  "District": "Elmore County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36054"
+ },
+ {
+  "City": "Hartford",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50118"
+ },
+ {
+  "City": "Suisun City",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94585"
+ },
+ {
+  "City": "Silverthorne",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80498"
+ },
+ {
+  "City": "Old Lyme",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06370"
+ },
+ {
+  "City": "Coosada",
+  "District": "Elmore County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36020"
+ },
+ {
+  "City": "Indianola",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50126"
+ },
+ {
+  "City": "Dixon",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95620"
+ },
+ {
+  "City": "Dillon",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80424"
+ },
+ {
+  "City": "Old Saybrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06477"
+ },
+ {
+  "City": "Deatsville",
+  "District": "Elmore County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36022"
+ },
+ {
+  "City": "Milo",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50166"
+ },
+ {
+  "City": "Rio Vista",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94571"
+ },
+ {
+  "City": "Copper Mountain",
+  "District": "Summit County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "80443"
+ },
+ {
+  "City": "Portland",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06482"
+ },
+ {
+  "City": "Marbury",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36051"
+ },
+ {
+  "City": "Sandyville",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50252"
+ },
+ {
+  "City": "Vacaville",
+  "District": "Solano County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95687"
+ },
+ {
+  "City": "Vail",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81657"
+ },
+ {
+  "City": "Rockfall",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06482"
+ },
+ {
+  "City": "Prattville",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36066"
+ },
+ {
+  "City": "Ackworth",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50001"
+ },
+ {
+  "City": "American Canyon",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94503"
+ },
+ {
+  "City": "Avon",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81620"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06496"
+ },
+ {
+  "City": "Autaugaville",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36003"
+ },
+ {
+  "City": "Carlisle",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50047"
+ },
+ {
+  "City": "Calistoga",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94515"
+ },
+ {
+  "City": "Beaver Creek",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81620"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06422"
+ },
+ {
+  "City": "Billingsley",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36006"
+ },
+ {
+  "City": "Norwalk",
+  "District": "Warren County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50211"
+ },
+ {
+  "City": "St. Helena",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94574"
+ },
+ {
+  "City": "Edwards",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81632"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Jones",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36749"
+ },
+ {
+  "City": "Swan",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50252"
+ },
+ {
+  "City": "Yountville",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94599"
+ },
+ {
+  "City": "Eagle",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81631"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Vida",
+  "District": "Autauga County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36083"
+ },
+ {
+  "City": "Knoxville",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50138"
+ },
+ {
+  "City": "Angwin",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94508"
+ },
+ {
+  "City": "Gypsum",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81637"
+ },
+ {
+  "City": "Centerbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06407"
+ },
+ {
+  "City": "Pine Level",
+  "District": "Montgomery County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36065"
+ },
+ {
+  "City": "Pleasantville",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50225"
+ },
+ {
+  "City": "Deer Park",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94576"
+ },
+ {
+  "City": "Minturn",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81645"
+ },
+ {
+  "City": "Essex",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06429"
+ },
+ {
+  "City": "Hope Hull",
+  "District": "Montgomery County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36043"
+ },
+ {
+  "City": "Pella",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50219"
+ },
+ {
+  "City": "Pope Valley",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94567"
+ },
+ {
+  "City": "Red Cliff",
+  "District": "Eagle County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81649"
+ },
+ {
+  "City": "Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06442"
+ },
+ {
+  "City": "Pike Road",
+  "District": "Montgomery County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36064"
+ },
+ {
+  "City": "Bussey",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50044"
+ },
+ {
+  "City": "Rutherford",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94573"
+ },
+ {
+  "City": "Glenwood Springs",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81601"
+ },
+ {
+  "City": "Higganum",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06442"
+ },
+ {
+  "City": "Mathews",
+  "District": "Montgomery County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36052"
+ },
+ {
+  "City": "Tracy",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50256"
+ },
+ {
+  "City": "Oakville",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94562"
+ },
+ {
+  "City": "Carbondale",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81623"
+ },
+ {
+  "City": "Killingworth",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06422"
+ },
+ {
+  "City": "Cecil",
+  "District": "Montgomery County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36013"
+ },
+ {
+  "City": "Columbia",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50057"
+ },
+ {
+  "City": "Napa",
+  "District": "Napa County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "94559"
+ },
+ {
+  "City": "New Castle",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81647"
+ },
+ {
+  "City": "Lyme",
+  "District": "New London County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06371"
+ },
+ {
+  "City": "Shorter",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36075"
+ },
+ {
+  "City": "Hamilton",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50116"
+ },
+ {
+  "City": "Browns Valley",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95918"
+ },
+ {
+  "City": "Silt",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81652"
+ },
+ {
+  "City": "Old Lyme",
+  "District": "New London County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06371"
+ },
+ {
+  "City": "Tuskegee",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36083"
+ },
+ {
+  "City": "Harvey",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50119"
+ },
+ {
+  "City": "Marysville",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95901"
+ },
+ {
+  "City": "Rifle",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81650"
+ },
+ {
+  "City": "Old Saybrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06478"
+ },
+ {
+  "City": "Tuskegee Institute",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36088"
+ },
+ {
+  "City": "Otley",
+  "District": "Marion County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50214"
+ },
+ {
+  "City": "Wheatland",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95692"
+ },
+ {
+  "City": "Parachute",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81635"
+ },
+ {
+  "City": "Portland",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06484"
+ },
+ {
+  "City": "Notasulga",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36866"
+ },
+ {
+  "City": "Swan",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50254"
+ },
+ {
+  "City": "Linda",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95901"
+ },
+ {
+  "City": "Battlement Mesa",
+  "District": "Garfield County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81635"
+ },
+ {
+  "City": "Rockfall",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06484"
+ },
+ {
+  "City": "Franklin",
+  "District": "Macon County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36444"
+ },
+ {
+  "City": "Leighton",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50143"
+ },
+ {
+  "City": "Olivehurst",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95961"
+ },
+ {
+  "City": "De Beque",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81630"
+ },
+ {
+  "City": "Westbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06495"
+ },
+ {
+  "City": "Auburn",
+  "District": "Lee County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36830"
+ },
+ {
+  "City": "Oskaloosa",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52577"
+ },
+ {
+  "City": "Smartsville",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95977"
+ },
+ {
+  "City": "Palisade",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81526"
+ },
+ {
+  "City": "East Hampton",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06421"
+ },
+ {
+  "City": "Opelika",
+  "District": "Lee County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36801"
+ },
+ {
+  "City": "Rose Hill",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52586"
+ },
+ {
+  "City": "Challenge",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95925"
+ },
+ {
+  "City": "Clifton",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81520"
+ },
+ {
+  "City": "Deep River",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06422"
+ },
+ {
+  "City": "Smiths Station",
+  "District": "Lee County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36877"
+ },
+ {
+  "City": "Fremont",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52561"
+ },
+ {
+  "City": "Camptonville",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95922"
+ },
+ {
+  "City": "Collbran",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81624"
+ },
+ {
+  "City": "Durham",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06422"
+ },
+ {
+  "City": "Salem",
+  "District": "Lee County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36874"
+ },
+ {
+  "City": "University Park",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52595"
+ },
+ {
+  "City": "Dobbins",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95935"
+ },
+ {
+  "City": "Mesa",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81643"
+ },
+ {
+  "City": "Centerbrook",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06408"
+ },
+ {
+  "City": "Phenix City",
+  "District": "Russell County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36867"
+ },
+ {
+  "City": "New Sharon",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50207"
+ },
+ {
+  "City": "Forbestown",
+  "District": "Yuba County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95941"
+ },
+ {
+  "City": "Molina",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81646"
+ },
+ {
+  "City": "Essex",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06430"
+ },
+ {
+  "City": "Ladonia",
+  "District": "Russell County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36854"
+ },
+ {
+  "City": "Barnes City",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50027"
+ },
+ {
+  "City": "French Camp",
+  "District": "San Joaquin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95231"
+ },
+ {
+  "City": "Gateway",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81522"
+ },
+ {
+  "City": "Haddam",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06443"
+ },
+ {
+  "City": "Seale",
+  "District": "Russell County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36875"
+ },
+ {
+  "City": "Eddyville",
+  "District": "Mahaska County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52553"
+ },
+ {
+  "City": "Lathrop",
+  "District": "San Joaquin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95330"
+ },
+ {
+  "City": "Loma",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81524"
+ },
+ {
+  "City": "Higganum",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06443"
+ },
+ {
+  "City": "Hurtsboro",
+  "District": "Russell County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36860"
+ },
+ {
+  "City": "What Cheer",
+  "District": "Keokuk County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "50268"
+ },
+ {
+  "City": "Manteca",
+  "District": "San Joaquin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95336"
+ },
+ {
+  "City": "Mack",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81525"
+ },
+ {
+  "City": "Killingworth",
+  "District": "Middlesex County",
+  "Region": "Northeast",
+  "State": "CT",
+  "Zip": "06423"
+ },
+ {
+  "City": "Cottonton",
+  "District": "Russell County",
+  "Region": "Southeast",
+  "State": "AL",
+  "Zip": "36851"
+ },
+ {
+  "City": "Sigourney",
+  "District": "Keokuk County",
+  "Region": "Midwest",
+  "State": "IA",
+  "Zip": "52591"
+ },
+ {
+  "City": "Tracy",
+  "District": "San Joaquin County",
+  "Region": "West",
+  "State": "CA",
+  "Zip": "95376"
+ },
+ {
+  "City": "Westwater",
+  "District": "Mesa County",
+  "Region": "West",
+  "State": "CO",
+  "Zip": "81527"
+ }
+]

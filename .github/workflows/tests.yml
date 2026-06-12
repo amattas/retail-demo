@@ -71,3 +71,24 @@ jobs:
         continue-on-error: true  # Pre-existing type issues, fix in separate PR
         run: |
           mypy src/ --ignore-missing-imports
+
+  utility-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install retail-setup
+        working-directory: utility
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        working-directory: utility
+        run: pytest -q

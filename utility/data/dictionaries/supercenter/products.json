@@ -1,0 +1,4692 @@
+[
+ {
+  "BasePrice": "3.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Organic Whole Wheat Bread",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Chicken Breast",
+  "Subcategory": "Chicken"
+ },
+ {
+  "BasePrice": "4.29",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Almond Milk Unsweetened",
+  "Subcategory": "Plant-Based Milk"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Greek Yogurt Vanilla",
+  "Subcategory": "Yogurt"
+ },
+ {
+  "BasePrice": "3.79",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Baby Spinach",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Premium Ground Coffee",
+  "Subcategory": "Coffee & Tea"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Artisan Pasta Sauce",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "15.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Wild Caught Salmon Fillet",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Bananas",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Extra Virgin Olive Oil",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Grass Fed Ground Beef",
+  "Subcategory": "Beef"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Quinoa Ancient Grain",
+  "Subcategory": "Grains & Rice"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Tomatoes",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "4.79",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Free Range Eggs Large",
+  "Subcategory": "Eggs"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Coconut Water Natural",
+  "Subcategory": "Water & Hydration"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Dark Chocolate Bar",
+  "Subcategory": "Chocolate"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Avocados",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Breakfast & Cereal",
+  "Department": "Grocery",
+  "ProductName": "Steel Cut Oats",
+  "Subcategory": "Hot Cereal"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Fresh Mozzarella Cheese",
+  "Subcategory": "Cheese"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Blueberries",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Peanut Butter Natural",
+  "Subcategory": "Nut Butters & Spreads"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Breakfast & Cereal",
+  "Department": "Grocery",
+  "ProductName": "Whole Grain Cereal",
+  "Subcategory": "Cold Cereal"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Strawberries",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Sea Salt Fine",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Raw Honey Wildflower",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Carrots",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Basmati Rice Premium",
+  "Subcategory": "Grains & Rice"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Fresh Atlantic Cod",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Bell Peppers",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Almond Butter Smooth",
+  "Subcategory": "Nut Butters & Spreads"
+ },
+ {
+  "BasePrice": "1.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Sparkling Water Lemon",
+  "Subcategory": "Water & Hydration"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Apples Gala",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Black Beans Organic",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Coconut Oil Virgin",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Broccoli Crowns",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Himalayan Pink Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Cucumbers",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Premium Tea Bags",
+  "Subcategory": "Coffee & Tea"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Turkey Breast",
+  "Subcategory": "Turkey"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Sweet Potatoes",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Cashew Milk Vanilla",
+  "Subcategory": "Plant-Based Milk"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Kale Leaves",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Artisan Crackers",
+  "Subcategory": "Crackers & Chips"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Wild Rice Blend",
+  "Subcategory": "Grains & Rice"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Zucchini",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Premium Vanilla Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Chicken Thighs",
+  "Subcategory": "Chicken"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Lemons",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chia Seeds Organic",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Asparagus Spears",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Mushrooms Mixed",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Coconut Flakes Unsweetened",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Premium Balsamic Vinegar",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Grape Tomatoes",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Grass Fed Butter",
+  "Subcategory": "Butter & Margarine"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Quinoa Flour Organic",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Green Beans",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Onions Yellow",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Maple Syrup Pure",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Duck Breast",
+  "Subcategory": "Duck"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Celery Stalks",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Almond Flour Blanched",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "1.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Sparkling Water Lime",
+  "Subcategory": "Water & Hydration"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Potatoes Russet",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Lentils Red Organic",
+  "Subcategory": "Beans & Legumes"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Coconut Milk Canned",
+  "Subcategory": "Plant-Based Milk"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Cauliflower Head",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Garlic Bulbs",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Premium Spice Blend",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Wild Mushrooms Fresh",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Beets Fresh",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Tahini Sesame Seed",
+  "Subcategory": "Nut Butters & Spreads"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Brussels Sprouts",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Romaine Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Coconut Sugar Raw",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Premium Truffle Oil",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Pork Tenderloin",
+  "Subcategory": "Pork"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Radishes",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Flax Seeds Ground",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Artichoke Hearts",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Cabbage Green",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Raw Cacao Powder",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Fish Sauce",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Parsley Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Hemp Seeds Hulled",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Corn Sweet",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Cilantro Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Miso Paste White",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Premium Saffron Threads",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Free Range Lamb Chops",
+  "Subcategory": "Lamb"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Mint Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Nutritional Yeast Flakes",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Pineapple Chunks",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Basil Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Kombucha Ginger",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Premium Aged Cheese",
+  "Subcategory": "Cheese"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Dill Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Apple Cider Vinegar Raw",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Mango Sliced",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Thyme Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Bone Broth Chicken",
+  "Subcategory": "Chicken"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Smoked Salmon",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Oregano Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Sprouted Grain Bread",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Papaya Chunks",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Rosemary Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Kelp Noodles Raw",
+  "Subcategory": "Pasta & Noodles"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Caviar",
+  "Subcategory": "Caviar & Roe"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Sage Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Fermented Vegetables",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Kiwi Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Tarragon Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Probiotic Yogurt",
+  "Subcategory": "Yogurt"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Premium Wagyu Beef",
+  "Subcategory": "Beef"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Chives Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Spirulina Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Dragon Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Bay Leaves",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Matcha Green Tea",
+  "Subcategory": "Coffee & Tea"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Lobster Tail",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Marjoram Fresh",
+  "Subcategory": "Fresh Herbs"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Goji Berries Dried",
+  "Subcategory": "Dried Fruit"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Star Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cumin Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chlorella Tablets",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Oysters Fresh",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Fennel Bulb",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Acai Berry Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Passion Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Coriander Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Wheatgrass Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Sea",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cardamom Pods",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Maca Root Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Lychee Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Turmeric Root",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ashwagandha Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Crab Legs",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Ginger Root",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Moringa Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Rambutan",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cinnamon Sticks",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Reishi Mushroom Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "59.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Uni Sea Urchin",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Nutmeg Whole",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "44.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cordyceps Mushroom",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Durian Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cloves Whole",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Lion's Mane Mushroom",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Tuna Sashimi",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Allspice Berries",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Turkey Tail Mushroom",
+  "Subcategory": "Turkey"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Jackfruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Mustard Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chaga Mushroom Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Hamachi",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Fenugreek Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Shiitake Mushroom Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Soursop",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "7.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Anise Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Maitake Mushroom Fresh",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "28.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Yellowtail",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Celery Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Oyster Mushroom Fresh",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Cherimoya",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "9.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Poppy Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Enoki Mushroom Fresh",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Salmon Roe",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Sesame Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "King Oyster Mushroom",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Custard Apple",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Sunflower Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Chanterelle Mushroom",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Monkfish",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pumpkin Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Morel Mushroom Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Longan Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pine Nuts",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Porcini Mushroom Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Sea Bass",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pecans Halves",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Black Truffle Fresh",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Persimmon Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Walnuts Halves",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "44.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "White Truffle Oil",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Snapper Red",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Brazil Nuts",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Truffle Salt Black",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Fresh Pomegranate Seeds",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Hazelnuts",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Truffle Honey Wild",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Grouper",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Macadamia Nuts",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Truffle Butter Fresh",
+  "Subcategory": "Specialty Butter"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Fig Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "17.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pistachios",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Foie Gras Duck",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Mahi Mahi",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Almonds Raw",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "299.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Caviar Beluga",
+  "Subcategory": "Caviar & Roe"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Date Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cashews Raw",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Caviar Ossetra",
+  "Subcategory": "Caviar & Roe"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Halibut",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Coconut Meat",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Caviar Sevruga",
+  "Subcategory": "Caviar & Roe"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Guava Fruit",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Tiger Nuts",
+  "Subcategory": "Seeds & Nuts"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Sturgeon Smoked",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Arctic Char",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cacao Nibs",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Eel Unagi Grilled",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Plantain Green",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Vanilla Beans",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Octopus Spanish",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Branzino",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Saffron Premium",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Squid Fresh Whole",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Fresh Breadfruit",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cardamom Green",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "59.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Abalone Canned",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "28.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Turbot",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Star Anise",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Sea Cucumber Dried",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Plantain Ripe",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Long Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Shark Fin Soup",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "25.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium John Dory",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Grains Paradise",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "299.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Bird's Nest Soup",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Yuca Root",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Sumac Berries",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Matsutake Mushroom",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "32.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Dover Sole",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Za'atar Blend",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cordyceps Sinensis",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Cassava Root",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Ras El Hanout",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ginseng Root Wild",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Langoustine",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "10.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Berbere Spice",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Sea Lettuce Dried",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Taro Root",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Dukkah Blend",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Wakame Seaweed",
+  "Subcategory": "Asian Ingredients"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Prawns Tiger",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Harissa Paste",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Nori Sheets Premium",
+  "Subcategory": "Asian Ingredients"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Sweet Potato",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Mole Paste",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Kombu Kelp Dried",
+  "Subcategory": "Asian Ingredients"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Shrimp Spot",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Curry Powder",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Dulse Flakes Red",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Jerusalem Artichoke",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Garam Masala",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Sea Grapes Fresh",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Langostino",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "10.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Chinese Five Spice",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Spirulina Tablets",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Water Chestnut",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "9.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Tandoori Masala",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chlorella Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Crayfish",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Jerk Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Blue Green Algae",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Lotus Root",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cajun Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Marine Collagen Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "32.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Mud Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "8.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Old Bay Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Fish Collagen Peptides",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Bamboo Shoots",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "7.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Creole Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Krill Oil Capsules",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium King Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Italian Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Cod Liver Oil",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Bean Sprouts",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Herbs Provence",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Salmon Oil Wild",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Snow Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Taco Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "44.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Astaxanthin Supplement",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Daikon Radish",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Ranch Seasoning",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Omega 3 Algae Oil",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "28.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Dungeness Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Organic Onion Powder",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "DHA Algae Supplement",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Bok Choy",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Garlic Powder",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "EPA Fish Oil",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Blue Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Paprika Smoked",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Vitamin D3 Liquid",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Napa Cabbage",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Chili Powder",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Vitamin B12 Spray",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Soft Shell Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "7.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cayenne Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Folate Methyl",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Chinese Broccoli",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Black Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Iron Bisglycinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Stone Crab",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic White Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Magnesium Glycinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Mustard Greens",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pink Peppercorns",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Zinc Picolinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Lobster Claws",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Green Peppercorns",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Selenium Methionine",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Collard Greens",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Sichuan Peppercorns",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Copper Bisglycinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Lobster Meat",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Tellicherry Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chromium Picolinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Turnip Greens",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Malabar Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Molybdenum Chelate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium King Prawns",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Long Pepper Whole",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Boron Citrate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Swiss Chard",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "27.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cubeb Pepper",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Vanadium Chelate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Tiger Prawns",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Pink Salt Coarse",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "8.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Manganese Bisglycinate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Arugula Wild",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Black Salt Kala",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Iodine Kelp Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Jumbo Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Red Salt Alaea",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Potassium Citrate",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Watercress",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Grey Salt Celtic",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Calcium Magnesium",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "32.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Colossal Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Fleur de Sel",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Vitamin K2 MK7",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Purslane",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Smoked Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "CoQ10 Ubiquinol",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Rock Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Truffle Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "PQQ Supplement",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Lamb's Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Saffron Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "59.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "NAD Precursor",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Brown Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Vanilla Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Resveratrol Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Mache Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Lavender Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Curcumin Complex",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium White Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Rosemary Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Green Tea Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Dandelion Greens",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Lemon Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Grape Seed Extract",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "23.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Pink Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Lime Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Pine Bark Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Chicory Leaves",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "10.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Orange Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Milk Thistle Extract",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "26.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Gulf Shrimp",
+  "Subcategory": "Fish"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Chili Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Saw Palmetto Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Endive Belgian",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Garlic Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ginkgo Biloba Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Bay Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Onion Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ginseng Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "7.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Radicchio Red",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Celery Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Rhodiola Rosea",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Sea Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "8.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Dill Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ashwagandha Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Frisee Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "9.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Herb Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Bacopa Monnieri",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Diver Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Mushroom Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Lion's Mane Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Escarole",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Seaweed Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cordyceps Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "69.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Dry Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Smoke Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Reishi Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Butter Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "15.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Wine Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chaga Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Wet Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Beer Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Turkey Tail Extract",
+  "Subcategory": "Turkey"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Red Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Coffee Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "21.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Maitake Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "44.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Weathervane Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Chocolate Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Shiitake Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Green Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Caramel Salt",
+  "Subcategory": "Spices & Seasonings"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Oyster Mushroom Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Calico Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Vanilla Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "15.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Enoki Mushroom Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Iceberg Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cinnamon Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "King Oyster Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Pink Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Coconut Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chanterelle Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Boston Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Palm Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "79.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Morel Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "54.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Maine Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Date Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Porcini Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Bibb Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Maple Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "99.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Black Truffle Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "64.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Nantucket Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Beet Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "White Truffle Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Romaine Hearts",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Cane Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Truffle Oil Extract",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "79.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Diver Scallops Wild",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Brown Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "22.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Shiitake Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Little Gem Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Raw Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "26.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Maitake Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium U10 Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "9.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Turbinado Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "32.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Reishi Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Red Oak Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Demerara Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "44.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cordyceps Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "69.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium U15 Scallops",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Muscovado Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Lion's Mane Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Green Oak Lettuce",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Jaggery Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Turkey Tail Powder",
+  "Subcategory": "Turkey"
+ },
+ {
+  "BasePrice": "99.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Sea Scallops Dry",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "10.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Piloncillo Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chaga Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Lolla Rossa",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Panela Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Oyster Mushroom Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "119.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Sashimi",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "13.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Sucanat Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "17.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Enoki Mushroom Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Mizuna Leaves",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "15.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Rapadura Sugar",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "King Oyster Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "129.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Crudo",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "18.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Coconut Nectar",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Chanterelle Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Tatsoi Greens",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Agave Nectar",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "119.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Morel Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "139.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Tartare",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Yacon Syrup",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Porcini Powder Dried",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "7.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Baby Arugula",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Monk Fruit",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "199.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Black Truffle Powder",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Carpaccio",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Stevia Extract",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "299.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "White Truffle Powder",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Baby Spinach",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Erythritol",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Truffle Powder Mixed",
+  "Subcategory": "Specialty Items"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Seafood",
+  "Department": "Grocery",
+  "ProductName": "Premium Scallops Ceviche",
+  "Subcategory": "Shellfish"
+ },
+ {
+  "BasePrice": "13.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Organic Xylitol",
+  "Subcategory": "Sweeteners"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Mushroom Blend Powder",
+  "Subcategory": "Health & Supplements"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Fresh Baby Kale",
+  "Subcategory": "Leafy Greens"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Bath",
+  "Department": "Home & Garden",
+  "ProductName": "Cotton Bath Towel Set",
+  "Subcategory": "Towels & Linens"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Lighting",
+  "Department": "Home & Garden",
+  "ProductName": "LED Light Bulb 60W",
+  "Subcategory": "Light Bulbs"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Bedding",
+  "Department": "Home & Garden",
+  "ProductName": "Memory Foam Pillow",
+  "Subcategory": "Pillows & Accessories"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Ceramic Dinner Plate Set",
+  "Subcategory": "Dinnerware"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Stainless Steel Kitchen Knife",
+  "Subcategory": "Cutlery & Tools"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Non-Stick Frying Pan 12in",
+  "Subcategory": "Cookware"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Glass Food Storage Container",
+  "Subcategory": "Storage & Organization"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Cleaning",
+  "Department": "Home & Garden",
+  "ProductName": "Microfiber Cleaning Cloth",
+  "Subcategory": "Cleaning Supplies"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Cleaning",
+  "Department": "Home & Garden",
+  "ProductName": "All-Purpose Cleaner Spray",
+  "Subcategory": "Cleaning Supplies"
+ },
+ {
+  "BasePrice": "79.99",
+  "Category": "Audio",
+  "Department": "Electronics",
+  "ProductName": "Wireless Bluetooth Headphones",
+  "Subcategory": "Headphones & Earbuds"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Accessories",
+  "Department": "Electronics",
+  "ProductName": "Smartphone Charging Cable",
+  "Subcategory": "Phone & Tablet Accessories"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Accessories",
+  "Department": "Electronics",
+  "ProductName": "Portable Phone Charger",
+  "Subcategory": "Phone & Tablet Accessories"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Home Electronics",
+  "Department": "Electronics",
+  "ProductName": "Digital Photo Frame",
+  "Subcategory": "Digital Cameras & Accessories"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Audio",
+  "Department": "Electronics",
+  "ProductName": "Bluetooth Speaker Portable",
+  "Subcategory": "Speakers"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Computer",
+  "Department": "Electronics",
+  "ProductName": "USB Flash Drive 32GB",
+  "Subcategory": "Storage & Memory"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Accessories",
+  "Department": "Electronics",
+  "ProductName": "HDMI Cable 6ft",
+  "Subcategory": "Cables & Adapters"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Wearables",
+  "Department": "Electronics",
+  "ProductName": "Smart Fitness Tracker",
+  "Subcategory": "Fitness Trackers"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Accessories",
+  "Department": "Electronics",
+  "ProductName": "Tablet Screen Protector",
+  "Subcategory": "Phone & Tablet Accessories"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Computer",
+  "Department": "Electronics",
+  "ProductName": "Wireless Computer Mouse",
+  "Subcategory": "Input Devices"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Men's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Men's Cotton T-Shirt",
+  "Subcategory": "Shirts & Tops"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Women's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Women's Yoga Pants",
+  "Subcategory": "Activewear"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Children's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Kids' Sneakers Size 10",
+  "Subcategory": "Shoes"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Accessories",
+  "Department": "Clothing",
+  "ProductName": "Baseball Cap Adjustable",
+  "Subcategory": "Hats & Caps"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Women's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Women's Denim Jeans",
+  "Subcategory": "Jeans & Pants"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Men's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Men's Athletic Shorts",
+  "Subcategory": "Shorts"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Children's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Children's Pajama Set",
+  "Subcategory": "Sleepwear"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Accessories",
+  "Department": "Clothing",
+  "ProductName": "Unisex Winter Gloves",
+  "Subcategory": "Gloves & Mittens"
+ },
+ {
+  "BasePrice": "79.99",
+  "Category": "Women's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Women's Running Shoes",
+  "Subcategory": "Athletic Shoes"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Men's Apparel",
+  "Department": "Clothing",
+  "ProductName": "Men's Dress Shirt",
+  "Subcategory": "Dress Shirts"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Vitamins & Supplements",
+  "Department": "Health & Beauty",
+  "ProductName": "Multivitamin Tablets 90ct",
+  "Subcategory": "Multivitamins"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Hair Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Shampoo & Conditioner Set",
+  "Subcategory": "Shampoo & Conditioner"
+ },
+ {
+  "BasePrice": "59.99",
+  "Category": "Oral Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Electric Toothbrush",
+  "Subcategory": "Toothbrushes"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Skin Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Face Moisturizer SPF 30",
+  "Subcategory": "Moisturizers"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Medicine",
+  "Department": "Health & Beauty",
+  "ProductName": "Pain Relief Tablets 100ct",
+  "Subcategory": "Pain Relief"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Personal Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Hand Sanitizer Gel 8oz",
+  "Subcategory": "Hand Care"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Personal Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Deodorant Antiperspirant",
+  "Subcategory": "Deodorants"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Skin Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Body Lotion Unscented",
+  "Subcategory": "Body Moisturizers"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Vision Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Contact Lens Solution",
+  "Subcategory": "Contact Lens Care"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Personal Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Lip Balm SPF 15",
+  "Subcategory": "Lip Care"
+ },
+ {
+  "BasePrice": "28.99",
+  "Category": "Baby Food",
+  "Department": "Baby & Kids",
+  "ProductName": "Baby Formula Powder",
+  "Subcategory": "Formula"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Diaper & Potty",
+  "Department": "Baby & Kids",
+  "ProductName": "Disposable Diapers Size 3",
+  "Subcategory": "Disposable Diapers"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Diaper & Potty",
+  "Department": "Baby & Kids",
+  "ProductName": "Baby Wipes Sensitive",
+  "Subcategory": "Baby Wipes"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Toys",
+  "Department": "Baby & Kids",
+  "ProductName": "Children's Toy Building Blocks",
+  "Subcategory": "Building & Construction"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Feeding",
+  "Department": "Baby & Kids",
+  "ProductName": "Baby Bottle 8oz",
+  "Subcategory": "Bottles & Cups"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Feeding",
+  "Department": "Baby & Kids",
+  "ProductName": "Pacifier 2-Pack",
+  "Subcategory": "Pacifiers & Teethers"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Bath & Body",
+  "Department": "Baby & Kids",
+  "ProductName": "Baby Shampoo Gentle",
+  "Subcategory": "Shampoo & Wash"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Safety",
+  "Department": "Baby & Kids",
+  "ProductName": "Car Seat Cover",
+  "Subcategory": "Car Seats & Travel"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Toys",
+  "Department": "Baby & Kids",
+  "ProductName": "Children's Picture Book",
+  "Subcategory": "Books & Learning"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Nursery",
+  "Department": "Baby & Kids",
+  "ProductName": "Baby Blanket Soft",
+  "Subcategory": "Blankets & Swaddles"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Laundry",
+  "Department": "Home & Garden",
+  "ProductName": "Laundry Detergent Pods 42ct",
+  "Subcategory": "Laundry Detergent"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Laundry",
+  "Department": "Home & Garden",
+  "ProductName": "Fabric Softener Liquid",
+  "Subcategory": "Fabric Softeners"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Toilet Paper 12 Roll Pack",
+  "Subcategory": "Toilet Paper"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Paper Towels 6 Roll Pack",
+  "Subcategory": "Paper Towels"
+ },
+ {
+  "BasePrice": "11.99",
+  "Category": "Cleaning",
+  "Department": "Home & Garden",
+  "ProductName": "Trash Bags 13 Gallon 40ct",
+  "Subcategory": "Trash Bags"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Cleaning",
+  "Department": "Home & Garden",
+  "ProductName": "Dish Soap Liquid",
+  "Subcategory": "Dishwashing"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Cleaning",
+  "Department": "Home & Garden",
+  "ProductName": "Sponges Kitchen 8-Pack",
+  "Subcategory": "Sponges & Scrubbers"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Aluminum Foil 75 sq ft",
+  "Subcategory": "Food Storage & Wraps"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Plastic Food Wrap",
+  "Subcategory": "Food Storage & Wraps"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Kitchen",
+  "Department": "Home & Garden",
+  "ProductName": "Oven Mitt Heat Resistant",
+  "Subcategory": "Oven Mitts & Pot Holders"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Dog",
+  "Department": "Pet Supplies",
+  "ProductName": "Dog Food Dry 15lb Bag",
+  "Subcategory": "Dog Food"
+ },
+ {
+  "BasePrice": "16.99",
+  "Category": "Cat",
+  "Department": "Pet Supplies",
+  "ProductName": "Cat Litter Clumping 20lb",
+  "Subcategory": "Cat Litter"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Dog",
+  "Department": "Pet Supplies",
+  "ProductName": "Dog Toy Rope",
+  "Subcategory": "Dog Toys"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Cat",
+  "Department": "Pet Supplies",
+  "ProductName": "Cat Treats Salmon Flavor",
+  "Subcategory": "Cat Treats"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Feeding",
+  "Department": "Pet Supplies",
+  "ProductName": "Pet Food Bowl Stainless Steel",
+  "Subcategory": "Food & Water Bowls"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Dog",
+  "Department": "Pet Supplies",
+  "ProductName": "Dog Leash 6ft",
+  "Subcategory": "Leashes & Collars"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Cat",
+  "Department": "Pet Supplies",
+  "ProductName": "Cat Scratching Post",
+  "Subcategory": "Scratching Posts & Pads"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Dog",
+  "Department": "Pet Supplies",
+  "ProductName": "Pet Waste Bags 200ct",
+  "Subcategory": "Waste Management"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Fish & Aquatic",
+  "Department": "Pet Supplies",
+  "ProductName": "Aquarium Fish Food Flakes",
+  "Subcategory": "Fish Food"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Bird",
+  "Department": "Pet Supplies",
+  "ProductName": "Bird Seed Wild Mix 10lb",
+  "Subcategory": "Bird Food"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Fluids & Chemicals",
+  "Department": "Automotive",
+  "ProductName": "Motor Oil 5W-30 5 Quart",
+  "Subcategory": "Motor Oil"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Interior",
+  "Department": "Automotive",
+  "ProductName": "Car Air Freshener",
+  "Subcategory": "Air Fresheners"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Fluids & Chemicals",
+  "Department": "Automotive",
+  "ProductName": "Windshield Washer Fluid",
+  "Subcategory": "Windshield Washer Fluid"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Electronics",
+  "Department": "Automotive",
+  "ProductName": "Car Phone Mount",
+  "Subcategory": "Phone Mounts & Holders"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Tools & Equipment",
+  "Department": "Automotive",
+  "ProductName": "Tire Pressure Gauge",
+  "Subcategory": "Tire Gauges & Inflators"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Tools & Equipment",
+  "Department": "Automotive",
+  "ProductName": "Jumper Cables 12ft",
+  "Subcategory": "Jump Starters & Cables"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Interior",
+  "Department": "Automotive",
+  "ProductName": "Car Seat Covers",
+  "Subcategory": "Seat Covers"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Safety",
+  "Department": "Automotive",
+  "ProductName": "Emergency Kit First Aid",
+  "Subcategory": "Emergency Kits"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Interior",
+  "Department": "Automotive",
+  "ProductName": "Car Floor Mats",
+  "Subcategory": "Floor Mats & Liners"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Exterior",
+  "Department": "Automotive",
+  "ProductName": "Window Tint Film",
+  "Subcategory": "Window Tinting"
+ },
+ {
+  "BasePrice": "149.99",
+  "Category": "Furniture",
+  "Department": "Office Supplies",
+  "ProductName": "Office Chair Ergonomic",
+  "Subcategory": "Chairs & Seating"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Paper",
+  "Department": "Office Supplies",
+  "ProductName": "Printer Paper 500 Sheets",
+  "Subcategory": "Copy & Printing Paper"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Printing",
+  "Department": "Office Supplies",
+  "ProductName": "Black Ink Cartridge",
+  "Subcategory": "Ink & Toner"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Paper",
+  "Department": "Office Supplies",
+  "ProductName": "Spiral Notebook 5-Pack",
+  "Subcategory": "Notebooks & Pads"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Writing",
+  "Department": "Office Supplies",
+  "ProductName": "Ballpoint Pens 12-Pack",
+  "Subcategory": "Pens & Pencils"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Office Tools",
+  "Department": "Office Supplies",
+  "ProductName": "Stapler Heavy Duty",
+  "Subcategory": "Staplers & Staple Removers"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Filing",
+  "Department": "Office Supplies",
+  "ProductName": "File Folders Letter Size",
+  "Subcategory": "Folders & Binders"
+ },
+ {
+  "BasePrice": "39.99",
+  "Category": "Furniture",
+  "Department": "Office Supplies",
+  "ProductName": "Desk Lamp LED",
+  "Subcategory": "Desk Accessories"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Computer",
+  "Department": "Office Supplies",
+  "ProductName": "Wireless Keyboard",
+  "Subcategory": "Keyboards & Mice"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Office Tools",
+  "Department": "Office Supplies",
+  "ProductName": "Paper Clips 500ct",
+  "Subcategory": "Paper Clips & Fasteners"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Wrapping & Party",
+  "Department": "Seasonal",
+  "ProductName": "Gift Wrap Paper Roll",
+  "Subcategory": "Gift Wrap & Bags"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Party Supplies",
+  "Department": "Seasonal",
+  "ProductName": "Birthday Candles 24ct",
+  "Subcategory": "Candles & Cake Decorating"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Party Supplies",
+  "Department": "Seasonal",
+  "ProductName": "Plastic Party Plates 20ct",
+  "Subcategory": "Tableware"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Halloween Decoration Set",
+  "Subcategory": "Halloween"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Christmas Tree Lights LED",
+  "Subcategory": "Christmas"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Cards & Stationery",
+  "Department": "Seasonal",
+  "ProductName": "Valentine's Day Cards 32ct",
+  "Subcategory": "Greeting Cards"
+ },
+ {
+  "BasePrice": "7.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Easter Egg Dye Kit",
+  "Subcategory": "Easter"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Fourth of July Flag",
+  "Subcategory": "Independence Day"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Thanksgiving Tablecloth",
+  "Subcategory": "Thanksgiving"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Party Supplies",
+  "Department": "Seasonal",
+  "ProductName": "New Year's Party Hats",
+  "Subcategory": "Party Favors"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Team Sports",
+  "Department": "Sports & Recreation",
+  "ProductName": "Sporting Goods Basketball",
+  "Subcategory": "Basketballs"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Fitness",
+  "Department": "Sports & Recreation",
+  "ProductName": "Yoga Mat Non-Slip",
+  "Subcategory": "Exercise Mats"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Fitness",
+  "Department": "Sports & Recreation",
+  "ProductName": "Resistance Bands Set",
+  "Subcategory": "Resistance Training"
+ },
+ {
+  "BasePrice": "89.99",
+  "Category": "Outdoor Recreation",
+  "Department": "Sports & Recreation",
+  "ProductName": "Camping Tent 2-Person",
+  "Subcategory": "Tents & Shelters"
+ },
+ {
+  "BasePrice": "49.99",
+  "Category": "Fishing",
+  "Department": "Sports & Recreation",
+  "ProductName": "Fishing Rod Spinning",
+  "Subcategory": "Fishing Rods"
+ },
+ {
+  "BasePrice": "34.99",
+  "Category": "Cycling",
+  "Department": "Sports & Recreation",
+  "ProductName": "Bicycle Helmet",
+  "Subcategory": "Helmets & Safety"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Team Sports",
+  "Department": "Sports & Recreation",
+  "ProductName": "Soccer Ball Official Size",
+  "Subcategory": "Soccer Balls"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Golf",
+  "Department": "Sports & Recreation",
+  "ProductName": "Golf Balls 12-Pack",
+  "Subcategory": "Golf Balls"
+ },
+ {
+  "BasePrice": "79.99",
+  "Category": "Racquet Sports",
+  "Department": "Sports & Recreation",
+  "ProductName": "Tennis Racket Lightweight",
+  "Subcategory": "Tennis Rackets"
+ },
+ {
+  "BasePrice": "99.99",
+  "Category": "Action Sports",
+  "Department": "Sports & Recreation",
+  "ProductName": "Skateboard Complete",
+  "Subcategory": "Skateboards"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Hot Dog Buns 8ct",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Hamburger Buns 8ct",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "All Beef Hot Dogs 10ct",
+  "Subcategory": "Sausage"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Bratwurst Sausage 5ct",
+  "Subcategory": "Sausage"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Italian Sausage Links 5ct",
+  "Subcategory": "Sausage"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Ketchup 38oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Yellow Mustard 20oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Sweet Pickle Relish 12oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "BBQ Sauce Original 18oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Potato Chips Family Size",
+  "Subcategory": "Crackers & Chips"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Tortilla Chips Family Size",
+  "Subcategory": "Crackers & Chips"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Salsa Medium 16oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Soda 12-Pack Cola",
+  "Subcategory": "Soft Drinks"
+ },
+ {
+  "BasePrice": "6.49",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Seltzer 12-Pack Lemon",
+  "Subcategory": "Water & Hydration"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Bagged Ice 10lb",
+  "Subcategory": "Water & Hydration"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Outdoor & Garden",
+  "Department": "Home & Garden",
+  "ProductName": "Charcoal Briquettes 16lb",
+  "Subcategory": "Charcoal"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cranberry Sauce Canned 14oz",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Pumpkin Pie 9in",
+  "Subcategory": "Pies & Desserts"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Pie Crusts 2-Pack Frozen",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Stuffing Mix Box 12oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "1.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cream of Mushroom Soup 10.5oz",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "French Fried Onions 6oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Dinner Rolls 12ct",
+  "Subcategory": "Bread & Rolls"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Whole Turkey Fresh",
+  "Subcategory": "Turkey"
+ },
+ {
+  "BasePrice": "29.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Spiral Sliced Ham",
+  "Subcategory": "Pork"
+ },
+ {
+  "BasePrice": "24.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Ham Roast Bone-In",
+  "Subcategory": "Pork"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Beef Burger Patties 6ct",
+  "Subcategory": "Beef"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Chicken Wings Family Pack",
+  "Subcategory": "Chicken"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Corn on the Cob 4ct",
+  "Subcategory": "Fresh Vegetables"
+ },
+ {
+  "BasePrice": "1.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cornbread Mix 8.5oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Paper Plates 100ct",
+  "Subcategory": "Plates & Bowls"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Plastic Cups 50ct",
+  "Subcategory": "Cups"
+ },
+ {
+  "BasePrice": "5.49",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Dinner Napkins 200ct",
+  "Subcategory": "Napkins"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Paper Products",
+  "Department": "Home & Garden",
+  "ProductName": "Picnic Cutlery Set 120ct",
+  "Subcategory": "Disposable Cutlery"
+ },
+ {
+  "BasePrice": "19.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Christmas Ornaments Set",
+  "Subcategory": "Christmas"
+ },
+ {
+  "BasePrice": "14.99",
+  "Category": "Holiday Decor",
+  "Department": "Seasonal",
+  "ProductName": "Christmas Garland 9ft",
+  "Subcategory": "Christmas"
+ },
+ {
+  "BasePrice": "1.29",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Turkey Gravy Mix 0.87oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "1.29",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Brown Gravy Mix 1oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Canned Yams 29oz",
+  "Subcategory": "Canned & Jarred"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Marshmallows 16oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Bakery",
+  "Department": "Grocery",
+  "ProductName": "Apple Pie 9in",
+  "Subcategory": "Pies & Desserts"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Eggnog Half Gallon",
+  "Subcategory": "Milk & Cream"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Hot Cocoa Mix 10ct",
+  "Subcategory": "Coffee & Tea"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Candy Canes 12ct",
+  "Subcategory": "Chocolate"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Cheddar Cheese Block 8oz",
+  "Subcategory": "Cheese"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Cottage Cheese 16oz",
+  "Subcategory": "Cheese"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Sour Cream 16oz",
+  "Subcategory": "Milk & Cream"
+ },
+ {
+  "BasePrice": "2.79",
+  "Category": "Dairy & Alternatives",
+  "Department": "Grocery",
+  "ProductName": "Cream Cheese 8oz",
+  "Subcategory": "Milk & Cream"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Orange Juice 52oz",
+  "Subcategory": "Juice"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Apple Juice 64oz",
+  "Subcategory": "Juice"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Sports Drink 8-Pack",
+  "Subcategory": "Sports Drinks"
+ },
+ {
+  "BasePrice": "9.99",
+  "Category": "Beverages",
+  "Department": "Grocery",
+  "ProductName": "Energy Drink 6-Pack",
+  "Subcategory": "Energy Drinks"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Bath",
+  "Department": "Home & Garden",
+  "ProductName": "Hand Soap 12oz",
+  "Subcategory": "Hand Soap"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Oral Care",
+  "Department": "Health & Beauty",
+  "ProductName": "Fluoride Toothpaste 6oz",
+  "Subcategory": "Toothpaste"
+ },
+ {
+  "BasePrice": "8.99",
+  "Category": "Cat",
+  "Department": "Pet Supplies",
+  "ProductName": "Cat Food Dry 3lb",
+  "Subcategory": "Food"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Frozen",
+  "Department": "Grocery",
+  "ProductName": "Ice Cream Vanilla 48oz",
+  "Subcategory": "Ice Cream"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Frozen",
+  "Department": "Grocery",
+  "ProductName": "Frozen Pizza Pepperoni",
+  "Subcategory": "Pizza"
+ },
+ {
+  "BasePrice": "2.49",
+  "Category": "Frozen",
+  "Department": "Grocery",
+  "ProductName": "Frozen Mixed Vegetables 16oz",
+  "Subcategory": "Vegetables"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Frozen",
+  "Department": "Grocery",
+  "ProductName": "Frozen Strawberries 16oz",
+  "Subcategory": "Fruit"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Breakfast & Cereal",
+  "Department": "Grocery",
+  "ProductName": "Pancake Mix 32oz",
+  "Subcategory": "Pancake & Waffle Mix"
+ },
+ {
+  "BasePrice": "2.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Grape Jelly 20oz",
+  "Subcategory": "Jam & Jelly"
+ },
+ {
+  "BasePrice": "3.49",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Cooking Spray 6oz",
+  "Subcategory": "Baking"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Vegetable Oil 48oz",
+  "Subcategory": "Oils & Vinegars"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Mayonnaise 30oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "3.99",
+  "Category": "Pantry",
+  "Department": "Grocery",
+  "ProductName": "Pickles Dill Spears 24oz",
+  "Subcategory": "Sauces & Condiments"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Granola Bars 12ct",
+  "Subcategory": "Bars"
+ },
+ {
+  "BasePrice": "4.49",
+  "Category": "Breakfast & Cereal",
+  "Department": "Grocery",
+  "ProductName": "Instant Oatmeal Packets 10ct",
+  "Subcategory": "Hot Cereal"
+ },
+ {
+  "BasePrice": "6.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Bacon 16oz",
+  "Subcategory": "Pork"
+ },
+ {
+  "BasePrice": "12.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Ribeye Steak 1lb",
+  "Subcategory": "Beef"
+ },
+ {
+  "BasePrice": "5.99",
+  "Category": "Meat & Poultry",
+  "Department": "Grocery",
+  "ProductName": "Pork Chops Bone-In 1lb",
+  "Subcategory": "Pork"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Produce",
+  "Department": "Grocery",
+  "ProductName": "Navel Oranges 3lb Bag",
+  "Subcategory": "Fresh Fruit"
+ },
+ {
+  "BasePrice": "4.99",
+  "Category": "Snacks & Candy",
+  "Department": "Grocery",
+  "ProductName": "Chocolate Chip Cookies Family Pack",
+  "Subcategory": "Cookies"
+ }
+]

@@ -1,0 +1,6 @@
+workspace:
+  name: retail-demo-prod
+
+deployment:
+  publish_skip: false
+  unpublish_skip: true
