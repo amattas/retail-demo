@@ -123,7 +123,7 @@ def generate_ble(
     # Rank zones by draw within each visit (rank 1 = first selected zone)
     w_visit = Window.partitionBy("receipt_id_ext").orderBy("zone_draw")
     visits_with_zones = visits_with_zones.withColumn(
-        "zone_rank", F.rank().over(w_visit).cast("int")
+        "zone_rank", F.row_number().over(w_visit).cast("int")
     )
 
     # Keep only the top n_zones ranked zones (zone_rank <= n_zones)
@@ -152,7 +152,7 @@ def generate_ble(
     # Global sequence for trace_id uniqueness: row number over (receipt, zone_rank, ping_seq)
     w_ping_order = Window.partitionBy("receipt_id_ext").orderBy("zone_rank", "ping_seq")
     pings = pings.withColumn(
-        "ping_global_seq", F.row_number().over(w_ping_order).cast("long")
+        "ping_visit_seq", F.row_number().over(w_ping_order).cast("long")
     )
 
     ping_key = [
@@ -184,7 +184,7 @@ def generate_ble(
             F.lit("TRC-BLE-"),
             F.col("receipt_id_ext"),
             F.lit("-"),
-            F.col("ping_global_seq").cast("string"),
+            F.col("ping_visit_seq").cast("string"),
         ),
     ).withColumn(
         "beacon_id",
