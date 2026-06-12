@@ -1,0 +1,16 @@
+{
+  "store_type": "luxury",
+  "display_name": "Luxury",
+  "basket_lambda": 1.6,
+  "avg_ticket_target": 1450.0,
+  "hourly_weights": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.8, 1.6,
+                     2.2, 2.6, 2.8, 2.8, 2.6, 2.2, 1.6, 0.8, 0.2, 0.0, 0.0, 0.0],
+  "daily_weights": [0.8, 0.8, 0.9, 1.0, 1.2, 1.6, 1.3],
+  "monthly_weights": [0.7, 0.8, 0.9, 0.95, 1.1, 1.0, 0.9, 0.9, 1.0, 1.05, 1.4, 2.0],
+  "department_weights": {"Apparel": 0.32, "Accessories": 0.3, "Jewelry & Watches": 0.2,
+                          "Footwear": 0.12, "Home & Fragrance": 0.06},
+  "promo_rate": 0.02,
+  "online_order_share": 0.25,
+  "zones": ["entrance", "salon", "apparel", "accessories", "jewelry", "fitting",
+            "private-suite", "checkout", "exit"]
+}
