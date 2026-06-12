@@ -27,8 +27,11 @@ def store_day_grid(
 ) -> DataFrame:
     """store_id x day cross grid with a precomputed per-partition seed column.
 
-    Seeds are computed driver-side (small grid: stores x days) so the engine
-    never depends on F.rand()'s partition-arrangement semantics for keys.
+    Seeds are computed driver-side so the engine never depends on F.rand()'s
+    partition-arrangement semantics for keys. Fine for realistic grids
+    (hundreds of stores x a year ~ 10^5 rows collected on the driver); if a
+    grid ever grows past ~10^6, switch the seed column to F.xxhash64 and keep
+    derive_seed as the reference with a parity test.
     """
     days = spark.sql(
         f"SELECT explode(sequence(to_date('{start.isoformat()}'), "

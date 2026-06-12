@@ -27,11 +27,6 @@ TYPE_COMPAT = {
     "decimal": {"double"},
 }
 
-# column lines look like:  column 'Store Number'  / column StoreNumber
-# with properties dataType: ... and sourceColumn: ... in the following lines
-COLUMN_RE = re.compile(r"^\tcolumn\s+(?:'([^']+)'|(\S+))\s*$", re.MULTILINE)
-
-
 def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
     """Return [(sourceColumn, dataType)] for every column block in a TMDL file.
 
@@ -45,6 +40,9 @@ def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
         sc = re.search(r"sourceColumn:\s*(\S+)", block)
         name = block.splitlines()[0].strip().strip("'")
         if dt is None:
+            continue
+        # DAX calculated columns have no physical sourceColumn — skip them
+        if sc is None and re.search(r"^\t\t(?:expression\s*=|\s*=)", block, re.MULTILINE):
             continue
         source = sc.group(1).strip("'\"") if sc else name
         out.append((source, dt.group(1)))
