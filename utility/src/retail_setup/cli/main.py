@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -254,6 +255,171 @@ def render(
     typer.echo("  - Import the rendered notebooks into your Fabric workspace manually")
     typer.echo("    (Workspace > Import > Notebook), or")
     typer.echo("  - Run `retail-setup deploy` to publish them automatically.")
+
+
+@dataclass
+class DeployStep:
+    """One subprocess step in the deploy plan.
+
+    `output_file` (repo-root-relative) captures the step's stdout to a file
+    (used for `terraform output -json`) without shell redirection.
+    """
+
+    cmd: list[str] = field(default_factory=list)
+    needs_confirmation: bool = False
+    description: str = ""
+    output_file: str | None = None
+
+
+def _deploy_plan(
+    env: str,
+    skip_terraform: bool,
+    lakehouse_name: str = "retail_lakehouse",
+) -> list[DeployStep]:
+    """Build the ordered deploy command plan (data only; nothing is executed)."""
+    py = sys.executable
+    tf_output = f"deploy/.generated/{env}/terraform-output.json"
+    steps = [
+        DeployStep(
+            cmd=[py, "-m", "deploy.scripts.generate_configs", "--environment", env],
+            description="Generate deployment configs",
+        )
+    ]
+    if not skip_terraform:
+        var_file = f"environments/{env}.tfvars"
+        steps += [
+            DeployStep(
+                cmd=["terraform", "-chdir=deploy/terraform", "init"],
+                description="Terraform init",
+            ),
+            DeployStep(
+                cmd=["terraform", "-chdir=deploy/terraform", "plan", f"-var-file={var_file}"],
+                description="Terraform plan",
+            ),
+            DeployStep(
+                cmd=["terraform", "-chdir=deploy/terraform", "apply", f"-var-file={var_file}"],
+                needs_confirmation=True,
+                description="Terraform apply (confirmation required)",
+            ),
+            DeployStep(
+                cmd=["terraform", "-chdir=deploy/terraform", "output", "-json"],
+                description="Capture Terraform outputs",
+                output_file=tf_output,
+            ),
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.generate_configs",
+                    "--environment",
+                    env,
+                    "--terraform-output",
+                    tf_output,
+                ],
+                description="Regenerate configs with Terraform outputs",
+            ),
+        ]
+    steps += [
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.build_artifacts",
+                "--notebook-groups",
+                "core",
+                "setup",
+                "--lakehouse-name",
+                lakehouse_name,
+            ],
+            description="Build deployment artifacts",
+        ),
+        DeployStep(
+            cmd=[py, "-m", "deploy.scripts.deploy_items", "--environment", env],
+            description="Deploy Fabric items",
+        ),
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.apply_kql",
+                "--output",
+                f"deploy/.generated/{env}/database.kql",
+            ],
+            description="Apply KQL database script",
+        ),
+        DeployStep(
+            cmd=[py, "-m", "deploy.scripts.validate_deployment", "--environment", env],
+            description="Validate deployment",
+        ),
+    ]
+    return steps
+
+
+def _echo_step(index: int, total: int, step: DeployStep) -> None:
+    gate = " [requires confirmation]" if step.needs_confirmation else ""
+    redirect = f" > {step.output_file}" if step.output_file else ""
+    typer.echo(f"[{index}/{total}] {step.description}{gate}")
+    typer.echo(f"    {' '.join(step.cmd)}{redirect}")
+
+
+@app.command()
+def deploy(
+    repo_root: Path = typer.Option(
+        _default_repo_root, "--repo-root", hidden=True, help="Repository root."
+    ),
+    env: str = typer.Option("dev", "--env", help="Deployment environment name."),
+    skip_terraform: bool = typer.Option(
+        False, "--skip-terraform", help="Skip the Terraform provisioning steps."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print the command plan without executing anything."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", help="Pre-confirm gated steps (Terraform apply)."
+    ),
+) -> None:
+    """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
+
+    Prerequisite: the `terraform` binary must be on PATH unless --skip-terraform
+    is given. Authentication is handled by the deploy framework scripts.
+    """
+    repo_root = repo_root.resolve()
+    plan = _deploy_plan(env, skip_terraform, lakehouse_name=_lakehouse_name(repo_root, env))
+    total = len(plan)
+
+    if dry_run:
+        typer.echo(f"Deploy plan for environment '{env}' (dry run; nothing executed):")
+        for i, step in enumerate(plan, start=1):
+            _echo_step(i, total, step)
+        return
+
+    for i, step in enumerate(plan, start=1):
+        _echo_step(i, total, step)
+        if step.needs_confirmation and not yes:
+            if not typer.confirm("Apply this Terraform plan?"):
+                typer.echo("Aborted by user.")
+                raise typer.Exit(code=1)
+        if step.output_file:
+            out_path = repo_root / step.output_file
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                step.cmd, cwd=repo_root, capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                out_path.write_text(result.stdout)
+            elif result.stderr:
+                typer.echo(result.stderr, err=True)
+        else:
+            result = subprocess.run(step.cmd, cwd=repo_root)
+        if result.returncode != 0:
+            typer.echo(
+                f"Deploy failed at step {i}/{total} "
+                f"(exit {result.returncode}): {' '.join(step.cmd)}",
+                err=True,
+            )
+            raise typer.Exit(code=result.returncode)
+
+    typer.echo(f"Deploy complete for environment '{env}'.")
 
 
 if __name__ == "__main__":
