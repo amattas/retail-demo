@@ -9,7 +9,7 @@
 # %%
 # PARAMETERS — rendered by `retail-setup render`; defaults work unrendered
 def _param(value: str, default: str) -> str:
-    return default if value.startswith("{{") else value
+    return default if len(value) > 1 and value[0] == value[1] == "{" else value
 
 LAKEHOUSE_NAME = _param("{{LAKEHOUSE_NAME}}", "retail_lakehouse")
 SILVER_DB = _param("{{SILVER_DB}}", "ag")

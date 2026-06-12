@@ -193,6 +193,16 @@ def render_notebook(template_path: Path, engine_source: str | None) -> dict:
                 "name": "python3",
             },
             "language_info": {"name": "python"},
+            "trident": {
+                "lakehouse": {
+                    "default_lakehouse_name": "{{LAKEHOUSE_NAME}}",
+                },
+            },
+            "retail_setup": {
+                "lakehouse_name": "{{LAKEHOUSE_NAME}}",
+                "store_type": "{{STORE_TYPE}}",
+                "rendered_ref": "{{DICTIONARY_REF}}",
+            },
         },
         "nbformat": 4,
         "nbformat_minor": 5,
