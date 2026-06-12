@@ -161,10 +161,12 @@ Run in order; each idempotent (overwrite-by-design, safe to re-run).
 | `setup-04-build-gold` | 9 `au.*` aggregates (port of `02-historical-data-load` Part 3) | < 5 min |
 
 Each notebook has a marked `# PARAMETERS` cell with `{{PLACEHOLDER}}` tokens
-(`{{WORKSPACE_NAME}}`, `{{LAKEHOUSE_NAME}}`, `{{SILVER_DB}}`, `{{GOLD_DB}}`,
+(`{{LAKEHOUSE_NAME}}`, `{{SILVER_DB}}`, `{{GOLD_DB}}`,
 `{{STORE_TYPE}}`, `{{START_DATE}}`, `{{END_DATE}}`, `{{STORE_COUNT}}`,
 `{{SEED}}`, `{{DICTIONARY_REF}}`) and working defaults, so an unrendered notebook still runs against
-default names.
+default names. (No `{{WORKSPACE_NAME}}` token: notebooks attach by lakehouse
+name; the workspace is a deploy-time concern handled by the `deploy/` config.)
+The CLI renders exactly the nine tokens above.
 
 ## CLI
 
