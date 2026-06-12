@@ -101,3 +101,10 @@ jobs:
       - name: Notebook drift check
         working-directory: utility
         run: python scripts/build_notebooks.py --check
+
+      - name: Deploy framework tests
+        run: |
+          pip install pyyaml
+          python -m pytest tests/deploy -q
+        env:
+          PYTHONPATH: .

@@ -1,7 +1,7 @@
 # Setup Utility (`utility/`) — Fabric-Native Historical Data Generator
 
 **Date:** 2026-06-12
-**Status:** Approved design, pending implementation plan
+**Status:** Implemented (Plans 1, 2a–2c, 3); deploy execution requires terraform + Fabric workspace access.
 
 ## Problem
 
