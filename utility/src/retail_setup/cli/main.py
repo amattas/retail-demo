@@ -2,19 +2,22 @@
 
 `configure` collects environment values (written to deploy/config/) and
 generation values (validated via GenerationConfig, written to utility/config.yaml).
+`render` injects configured values into the committed setup notebooks.
 """
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import typer
 import yaml
 from pydantic import ValidationError
 
-from retail_setup.config.generation import GenerationConfig
+from retail_setup.config.generation import GenerationConfig, load_generation_config
+from retail_setup.notebooks.inject import render_notebooks
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -152,6 +155,105 @@ def configure(
     typer.echo(f"Wrote {deploy_yml}")
     typer.echo(f"Wrote {env_yml}")
     typer.echo(f"Wrote {gen_path}")
+
+
+def _get_by_path(data: Any, dotted: str) -> Any:
+    """Get a nested value by dotted path; None if any segment is missing."""
+    node = data
+    for key in dotted.split("."):
+        if not isinstance(node, dict) or key not in node:
+            return None
+        node = node[key]
+    return node
+
+
+def _lakehouse_name(repo_root: Path, env: str) -> str:
+    """Resolve lakehouse.name from deploy config; the environment overlay wins."""
+    base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
+    env_path = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    overlay = yaml.safe_load(env_path.read_text()) or {} if env_path.is_file() else {}
+    name = _get_by_path(overlay, "lakehouse.name")
+    if name is None:
+        name = _get_by_path(base, "lakehouse.name")
+    if name is None:
+        typer.echo("lakehouse.name not found in deploy config; run `retail-setup configure` first")
+        raise typer.Exit(code=1)
+    return str(name)
+
+
+def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
+    """Pin the dictionary ref: explicit --ref, else HEAD SHA, else 'main' with a warning."""
+    if ref:
+        return ref
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        typer.echo(
+            "warning: could not resolve git HEAD; using dictionary ref 'main'",
+            err=True,
+        )
+        return "main"
+
+
+@app.command()
+def render(
+    repo_root: Path = typer.Option(
+        _default_repo_root, "--repo-root", hidden=True, help="Repository root."
+    ),
+    env: str = typer.Option("dev", "--env", help="Deployment environment name."),
+    ref: Optional[str] = typer.Option(
+        None, "--ref", help="Git ref to pin dictionaries to (default: current HEAD)."
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output-dir", help="Directory for rendered notebooks (default: utility/out)."
+    ),
+) -> None:
+    """Render the setup notebooks with configured values."""
+    repo_root = repo_root.resolve()
+
+    gen_path = repo_root / "utility" / "config.yaml"
+    if not gen_path.is_file():
+        typer.echo(f"{gen_path} not found; run `retail-setup configure` first")
+        raise typer.Exit(code=1)
+    try:
+        generation = load_generation_config(gen_path)
+    except (ValidationError, yaml.YAMLError) as exc:
+        typer.echo(f"Invalid {gen_path} (re-run `retail-setup configure`):\n{exc}")
+        raise typer.Exit(code=1)
+
+    values = {
+        "LAKEHOUSE_NAME": _lakehouse_name(repo_root, env),
+        "SILVER_DB": generation.silver_db,
+        "GOLD_DB": generation.gold_db,
+        "STORE_TYPE": generation.store_type,
+        "START_DATE": generation.start_date.isoformat(),
+        "END_DATE": generation.end_date.isoformat(),
+        "STORE_COUNT": str(generation.store_count),
+        "SEED": str(generation.seed),
+        "DICTIONARY_REF": _resolve_dictionary_ref(repo_root, ref),
+    }
+
+    written = render_notebooks(
+        values,
+        output_dir=output_dir if output_dir is not None else repo_root / "utility" / "out",
+        notebook_dir=repo_root / "utility" / "notebooks",
+    )
+
+    typer.echo("Rendered notebooks:")
+    for path in written:
+        typer.echo(f"  {path}")
+    typer.echo("")
+    typer.echo("Next steps:")
+    typer.echo("  - Import the rendered notebooks into your Fabric workspace manually")
+    typer.echo("    (Workspace > Import > Notebook), or")
+    typer.echo("  - Run `retail-setup deploy` to publish them automatically.")
 
 
 if __name__ == "__main__":
