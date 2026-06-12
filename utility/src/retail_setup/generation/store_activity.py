@@ -71,7 +71,9 @@ def generate_store_ops(
         cond = F.col("operating_hours") == literal
         open_hour = F.when(cond, o) if open_hour is None else open_hour.when(cond, o)
         close_hour = F.when(cond, c) if close_hour is None else close_hour.when(cond, c)
-    grid = grid.withColumn("open_hour", open_hour).withColumn("close_hour", close_hour)
+    # unknown formats fall back to standard hours instead of silent NULL event_ts
+    grid = grid.withColumn("open_hour", open_hour.otherwise(6)).withColumn(
+        "close_hour", close_hour.otherwise(22))
 
     day_ts = F.unix_timestamp(F.col("day").cast("timestamp"))
     open_ts = F.timestamp_seconds(day_ts + F.col("open_hour") * 3600)
