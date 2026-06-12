@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from deploy.scripts import build_artifacts
 
 
@@ -96,3 +98,35 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_lakehouse.Lakehouse" in result.staged_items
     assert "retail_eventhouse.Eventhouse" in result.staged_items
     assert "retail_kql.KQLDatabase" in result.staged_items
+
+
+def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    out_dir = tmp_path / "workspace"
+    rendered = repo / "utility" / "out"
+    rendered.mkdir(parents=True)
+    for name in [
+        "setup-01-seed-dictionaries",
+        "setup-02-generate-dimensions",
+        "setup-03-generate-facts",
+        "setup-04-build-gold",
+    ]:
+        _write_json(
+            rendered / f"{name}.ipynb",
+            {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
+        )
+
+    staged = build_artifacts.stage_setup_notebooks(
+        repo_root=repo, output_dir=out_dir, lakehouse_name="lh"
+    )
+    assert len(staged) == 4
+    item = out_dir / "setup-03-generate-facts.Notebook"
+    assert (item / ".platform").exists()
+    assert (item / "notebook-content.ipynb").exists()
+
+
+def test_setup_group_requires_rendered_notebooks(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="retail-setup render"):
+        build_artifacts.stage_setup_notebooks(
+            repo_root=tmp_path, output_dir=tmp_path / "ws", lakehouse_name="lh"
+        )

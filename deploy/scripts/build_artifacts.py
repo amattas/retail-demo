@@ -35,9 +35,17 @@ NOTEBOOK_GROUPS = {
         "14-ml-dynamic-pricing.ipynb",
     ],
     "ontology": ["30-create-ontology.ipynb"],
+    "setup": [],  # handled specially by stage_setup_notebooks — not fabric/lakehouse path
     "utility": ["90-augment-and-dedupe-receipts.ipynb"],
     "reset": ["99-reset-lakehouse.ipynb"],
 }
+
+SETUP_NOTEBOOKS = [
+    "setup-01-seed-dictionaries",
+    "setup-02-generate-dimensions",
+    "setup-03-generate-facts",
+    "setup-04-build-gold",
+]
 
 
 @dataclass(frozen=True)
@@ -105,6 +113,42 @@ def stage_powerbi_items(source_dir: Path, output_dir: Path) -> list[Path]:
     return staged
 
 
+def stage_setup_notebooks(
+    repo_root: Path,
+    output_dir: Path,
+    lakehouse_name: str = "retail_lakehouse",
+) -> list[Path]:
+    """Stage rendered setup notebooks from utility/out/ as Fabric .Notebook items.
+
+    The notebooks must already have been rendered by `retail-setup render` before
+    calling this function.  Raises FileNotFoundError if any expected notebook is
+    absent in utility/out/.
+    """
+
+    rendered_dir = repo_root / "utility" / "out"
+    missing = [
+        name
+        for name in SETUP_NOTEBOOKS
+        if not (rendered_dir / f"{name}.ipynb").exists()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            f"setup notebooks not rendered — run `retail-setup render` first "
+            f"(expected at utility/out/): {missing}"
+        )
+
+    staged: list[Path] = []
+    for name in SETUP_NOTEBOOKS:
+        staged.append(
+            stage_notebook(
+                rendered_dir / f"{name}.ipynb",
+                output_dir,
+                lakehouse_name=lakehouse_name,
+            )
+        )
+    return staged
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -134,6 +178,12 @@ def build_workspace(
             ).name
         )
 
+    if "setup" in notebook_groups:
+        staged_items.extend(
+            item.name
+            for item in stage_setup_notebooks(repo_root, output_dir)
+        )
+
     staged_items.extend(
         item.name
         for item in stage_powerbi_items(repo_root / "fabric" / "powerbi", output_dir)
@@ -149,6 +199,10 @@ def _selected_notebooks(groups: list[str]) -> list[str]:
                 f"Unknown notebook group {group!r}. "
                 f"Expected one of: {sorted(NOTEBOOK_GROUPS)}"
             )
+        # "setup" notebooks come from utility/out/ via stage_setup_notebooks, not
+        # fabric/lakehouse/, so they are handled separately in build_workspace.
+        if group == "setup":
+            continue
         selected.extend(NOTEBOOK_GROUPS[group])
     return selected
 
