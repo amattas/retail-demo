@@ -397,7 +397,7 @@ def deploy(
         # dry runs must not require live config; fall back to the default name
         try:
             lakehouse = _lakehouse_name(repo_root, env)
-        except typer.Exit:
+        except (typer.Exit, OSError, KeyError, yaml.YAMLError):
             lakehouse = "retail_lakehouse"
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
