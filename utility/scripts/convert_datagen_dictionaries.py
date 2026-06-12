@@ -34,7 +34,7 @@ from retail_datagen.sourcedata.supercenter.product_tags import PRODUCT_TAGS  # n
 from retail_datagen.sourcedata.supercenter.products import PRODUCTS  # noqa: E402
 from retail_datagen.sourcedata.supercenter.tax_rates import TAX_RATES  # noqa: E402
 
-from retail_setup.dictionaries.loader import _load_list  # noqa: E402
+from retail_setup.dictionaries.loader import load_list  # noqa: E402
 from retail_setup.dictionaries import models  # noqa: E402
 
 
@@ -79,7 +79,7 @@ def main() -> None:
         (sc / "tags.json", models.ProductTagEntry, len(PRODUCT_TAGS)),
     ]
     for path, model, expected in checks:
-        rows = _load_list(path, model)
+        rows = load_list(path, model)
         assert len(rows) == expected, f"{path.name}: {len(rows)} != {expected}"
     print("all conversions validated")
 

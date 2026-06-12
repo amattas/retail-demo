@@ -31,28 +31,55 @@ class DictionarySet:
 
 
 def default_dictionary_root() -> Path:
-    """utility/data/dictionaries, resolved relative to this package."""
-    return Path(__file__).resolve().parents[3] / "data" / "dictionaries"
+    """Return utility/data/dictionaries, resolved relative to this package.
+
+    Assumes the editable-install src layout where parents[3] == utility/.
+    This path resolution breaks under a wheel install (the package is buried
+    inside site-packages, not alongside data/).  If you encounter a
+    RuntimeError here, pass an explicit ``root`` to ``load_dictionaries``
+    instead of relying on this function.
+    """
+    root = Path(__file__).resolve().parents[3] / "data" / "dictionaries"
+    if not root.is_dir():
+        raise RuntimeError(
+            f"Default dictionary root {root} does not exist. "
+            "This function assumes an editable install (src layout) and does not "
+            "work under a wheel install. Pass an explicit root to load_dictionaries()."
+        )
+    return root
 
 
 def available_store_types(root: Path) -> list[str]:
+    if not root.is_dir():
+        return []
     return sorted(
         p.name for p in root.iterdir()
         if p.is_dir() and not p.name.startswith("_") and (p / "profile.json").exists()
     )
 
 
-def _load_list(path: Path, model: type[BaseModel]) -> list:
+def load_list(path: Path, model: type[BaseModel]) -> list:
+    """Load and validate a JSON array file, returning a list of model instances.
+
+    Raises ValueError with filename and row index on validation failure.
+    """
     try:
         raw = json.loads(path.read_text())
     except FileNotFoundError:
         raise ValueError(f"missing dictionary file: {path}") from None
     if not isinstance(raw, list):
         raise ValueError(f"{path.name}: expected a JSON array")
-    try:
-        return [model.model_validate(row) for row in raw]
-    except ValidationError as exc:
-        raise ValueError(f"{path.name}: {exc}") from exc
+    result = []
+    for i, row in enumerate(raw):
+        try:
+            result.append(model.model_validate(row))
+        except ValidationError as exc:
+            raise ValueError(f"{path.name}[{i}]: {exc}") from exc
+    return result
+
+
+# Keep the private alias for any callers that haven't migrated yet.
+_load_list = load_list
 
 
 def load_dictionaries(root: Path, store_type: str) -> DictionarySet:
@@ -63,7 +90,12 @@ def load_dictionaries(root: Path, store_type: str) -> DictionarySet:
         )
     shared = root / "_shared"
 
-    profile = StoreTypeProfile.model_validate(json.loads((type_dir / "profile.json").read_text()))
+    try:
+        profile = StoreTypeProfile.model_validate(
+            json.loads((type_dir / "profile.json").read_text())
+        )
+    except (json.JSONDecodeError, ValidationError) as exc:
+        raise ValueError(f"profile.json: {exc}") from exc
     if profile.store_type != store_type:
         raise ValueError(
             f"profile.json store_type {profile.store_type!r} does not match folder {store_type!r}"
@@ -73,11 +105,11 @@ def load_dictionaries(root: Path, store_type: str) -> DictionarySet:
     return DictionarySet(
         store_type=store_type,
         profile=profile,
-        first_names=_load_list(shared / "first_names.json", NameEntry),
-        last_names=_load_list(shared / "last_names.json", NameEntry),
-        geographies=_load_list(shared / "geographies.json", GeographyEntry),
-        tax_rates=_load_list(shared / "tax_rates.json", TaxJurisdictionEntry),
-        products=_load_list(type_dir / "products.json", ProductEntry),
-        brands=_load_list(type_dir / "brands.json", ProductBrandEntry),
-        tags=_load_list(tags_path, ProductTagEntry) if tags_path.exists() else [],
+        first_names=load_list(shared / "first_names.json", NameEntry),
+        last_names=load_list(shared / "last_names.json", NameEntry),
+        geographies=load_list(shared / "geographies.json", GeographyEntry),
+        tax_rates=load_list(shared / "tax_rates.json", TaxJurisdictionEntry),
+        products=load_list(type_dir / "products.json", ProductEntry),
+        brands=load_list(type_dir / "brands.json", ProductBrandEntry),
+        tags=load_list(tags_path, ProductTagEntry) if tags_path.exists() else [],
     )

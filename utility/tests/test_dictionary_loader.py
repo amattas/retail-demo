@@ -58,7 +58,7 @@ def test_load_merges_shared_and_type(dict_root: Path):
 
 
 def test_unknown_store_type_lists_options(dict_root: Path):
-    with pytest.raises(ValueError, match="toytown"):
+    with pytest.raises(ValueError, match=r"nonexistent.*toytown"):
         load_dictionaries(dict_root, "nonexistent")
 
 
@@ -79,3 +79,18 @@ def test_profile_store_type_must_match_folder(dict_root: Path):
 
 def test_available_store_types(dict_root: Path):
     assert available_store_types(dict_root) == ["toytown"]
+
+
+def test_missing_shared_file_raises_value_error(dict_root: Path):
+    (dict_root / "_shared" / "first_names.json").unlink()
+    with pytest.raises(ValueError, match="first_names.json"):
+        load_dictionaries(dict_root, "toytown")
+
+
+def test_bad_row_error_includes_row_index(dict_root: Path):
+    # Row 0 has an empty ProductName, which fails validation; error must contain index.
+    bad = dict_root / "toytown" / "products.json"
+    bad.write_text(json.dumps([{"ProductName": "", "BasePrice": "1.00",
+                                "Department": "D", "Category": "C", "Subcategory": "S"}]))
+    with pytest.raises(ValueError, match=r"products\.json\[0\]"):
+        load_dictionaries(dict_root, "toytown")
