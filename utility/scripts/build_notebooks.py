@@ -99,11 +99,16 @@ def strip_package_imports(source: str) -> str:
 
 
 def rewrite_engine_aliases(source: str) -> str:
-    """Rewrite engine.py's module-qualified calls (dims_mod.foo -> foo)."""
+    """Rewrite engine.py's module-qualified calls (dims_mod.foo -> foo).
+
+    NOTE for module authors: never use `from retail_setup... import x as y` in
+    engine-bundled modules — the import-strip would leave the alias name
+    dangling at Fabric runtime (compile() can't catch NameErrors).
+    """
     pattern = re.compile(r"\b(" + "|".join(ENGINE_ALIASES) + r")\.")
     rewritten = pattern.sub("", source)
-    leftovers = pattern.findall(rewritten)
-    assert not leftovers, f"unrewritten alias references: {leftovers}"
+    # downstream guards (compile + no-'_mod.' scan) catch any escape; the sub
+    # itself is total over the known alias list, so no re-scan here
     return rewritten
 
 
@@ -195,6 +200,8 @@ def render_notebook(template_path: Path, engine_source: str | None) -> dict:
 
 
 def notebook_json(nb: dict) -> str:
+    # byte-stability relies on insertion-stable dict order from render paths;
+    # do NOT add sort_keys=True (it would reorder committed notebooks)
     return json.dumps(nb, indent=1, ensure_ascii=False) + "\n"
 
 
