@@ -1,10 +1,5 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-
-from catalog_builder import build_catalog  # noqa: E402
-from catalogs.grocery import GROCERY_TREE  # noqa: E402
+from catalog_builder import build_catalog
+from catalogs.grocery import GROCERY_TREE
 
 from retail_setup.dictionaries.models import ProductBrandEntry, ProductEntry
 
