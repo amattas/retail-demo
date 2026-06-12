@@ -28,7 +28,10 @@ class TaxJurisdictionEntry(BaseModel):
     @field_validator("CombinedRate", mode="before")
     @classmethod
     def _rate_decimal(cls, v) -> Decimal:
-        return Decimal(str(v))
+        try:
+            return Decimal(str(v))
+        except Exception:
+            raise ValueError("CombinedRate must be a valid decimal number") from None
 
 
 class GeographyEntry(BaseModel):
@@ -54,7 +57,12 @@ class GeographyEntry(BaseModel):
 
 
 class NameEntry(BaseModel):
-    """One first or last name (shared across store types)."""
+    """One first or last name (shared across store types).
+
+    The ``Name`` field intentionally unifies the separate ``FirstNameDict`` and
+    ``LastNameDict`` models from datagen — both source models carry a single
+    name string, so one model suffices here.
+    """
 
     Name: str = Field(..., min_length=1)
 
@@ -76,7 +84,10 @@ class ProductEntry(BaseModel):
     @field_validator("BasePrice", mode="before")
     @classmethod
     def _price_decimal(cls, v) -> Decimal:
-        return Decimal(str(v))
+        try:
+            return Decimal(str(v))
+        except Exception:
+            raise ValueError("BasePrice must be a valid decimal number") from None
 
 
 class ProductTagEntry(BaseModel):
@@ -101,6 +112,13 @@ class StoreTypeProfile(BaseModel):
     promo_rate: float = Field(..., ge=0, le=1, description="Share of lines with a promotion")
     online_order_share: float = Field(..., ge=0, le=1)
     zones: list[str] = Field(..., min_length=1, description="Store footprint zones for BLE")
+
+    @field_validator("hourly_weights", "daily_weights", "monthly_weights")
+    @classmethod
+    def _weights_nonneg(cls, v: list[float]) -> list[float]:
+        if any(w < 0 for w in v):
+            raise ValueError("weight values must be non-negative")
+        return v
 
     @field_validator("hourly_weights")
     @classmethod

@@ -90,6 +90,35 @@ def test_store_type_profile_validates_weight_lengths():
         )
 
 
+def test_product_entry_rejects_nonnumeric_price():
+    with pytest.raises(ValidationError):
+        ProductEntry(
+            ProductName="X", BasePrice="abc", Department="D", Category="C", Subcategory="S"
+        )
+
+
+def test_tax_jurisdiction_rejects_nonnumeric_rate():
+    with pytest.raises(ValidationError):
+        TaxJurisdictionEntry(StateCode="OH", County="C", City="C", CombinedRate="abc")
+
+
+def test_store_type_profile_rejects_negative_weights():
+    with pytest.raises(ValidationError):
+        StoreTypeProfile(
+            store_type="grocery",
+            display_name="Grocery",
+            basket_lambda=8.0,
+            avg_ticket_target=55.0,
+            hourly_weights=[-1.0] + [1.0] * 23,
+            daily_weights=[1.0] * 7,
+            monthly_weights=[1.0] * 12,
+            department_weights={"Grocery": 1.0},
+            promo_rate=0.15,
+            online_order_share=0.10,
+            zones=["entrance"],
+        )
+
+
 def test_profile_rates_bounded():
     kwargs = dict(
         store_type="luxury",
