@@ -1334,3 +1334,22 @@ git commit -m "ci: java for utility Spark tests"
 - Remaining 15 fact tables (incl. returns, online orders, inventory window-balances, journey pandas-UDF island), invariant-runner + `setup_run_log`
 - Gold aggregates, notebooks + build script, GitHub dictionary fetch, local E2E harness
 - `GenerationConfig` injectable dictionary root for the Fabric runtime (carried note from Plan 1 final review)
+
+## Carry-notes from the Plan 2a final review (MUST address in 2b/2c plans)
+
+- **`fact_payments` has two producers**: receipts (in-store) + Plan 2b online
+  orders. `write_to_lakehouse` is overwrite — 2b must UNION the payment
+  streams before a single write (same for any shared table).
+- **Returns**: `receipt_type` is hardcoded SALE; 2b returns must union into
+  `fact_receipts`, not regenerate it.
+- Factor the seed-folding draw helpers (`u`/`gauss`/`h64` closures in
+  receipts.py) into `runtime.py` as `seeded_draws(cfg)` before writing more
+  fact generators, to avoid drift. Consider `F.pmod` over `F.abs` for the
+  2^-64 Long.MIN_VALUE edge.
+- **Notebooks (2c) must set `spark.sql.session.timeZone=UTC`** — naive
+  timestamps (LaunchDate, event_ts) rely on it; locally the test fixture
+  sets it.
+- Dims customer build is row-tuple driver-side — switch to column-wise
+  numpy/pandas before real volumes (500k customers) in 2c.
+- `writer.write_table`'s unused `table` param — drop or use when 2c touches
+  the writer.

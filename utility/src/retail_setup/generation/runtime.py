@@ -1,10 +1,9 @@
 """Deterministic seeding + partition grids for the generation engine."""
 
 import hashlib
-from datetime import date
+from datetime import date, timedelta
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
 
 
 def derive_seed(global_seed: int, section: str, key: int, day: date) -> int:
@@ -32,17 +31,16 @@ def store_day_grid(
     (hundreds of stores x a year ~ 10^5 rows collected on the driver); if a
     grid ever grows past ~10^6, switch the seed column to F.xxhash64 and keep
     derive_seed as the reference with a parity test.
+
+    partition_seed is consumed by pandas-UDF generators (Plan 2b's journey
+    island); fully Spark-native generators derive their own draws via xxhash64
+    and may ignore it.
     """
-    days = spark.sql(
-        f"SELECT explode(sequence(to_date('{start.isoformat()}'), "
-        f"to_date('{end.isoformat()}'), interval 1 day)) AS day"
-    )
-    stores = spark.createDataFrame([(s,) for s in store_ids], "store_id long")
-    grid = stores.crossJoin(days)
-    seed_udf_rows = [
+    day_list = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    rows = [
         (s, d, derive_seed(global_seed, section, s, d))
         for s in store_ids
-        for d in [r.day for r in days.collect()]
+        for d in day_list
     ]
-    seeds = spark.createDataFrame(seed_udf_rows, "store_id long, day date, partition_seed long")
-    return grid.join(seeds, ["store_id", "day"])
+    # the seeded rows ARE the full grid — no crossJoin/join round-trip needed
+    return spark.createDataFrame(rows, "store_id long, day date, partition_seed long")
