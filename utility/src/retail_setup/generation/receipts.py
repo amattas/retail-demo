@@ -157,6 +157,14 @@ def generate_receipts_group(
     products = dims["dim_products"].select(
         F.col("ID").alias("product_id"), F.col("SalePrice"), F.col("taxability"),
         F.col("Department").alias("department"))
+
+    product_departments = {r.department for r in products.select("department").distinct().collect()}
+    unknown = set(profile.department_weights) - product_departments
+    if unknown:
+        raise ValueError(
+            f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
+        )
+
     pw = Window.partitionBy("department").orderBy("product_id")
     products_ranked = products.withColumn("dept_rank", F.row_number().over(pw))
     dept_sizes = products.groupBy("department").agg(F.count("*").alias("dept_size"))

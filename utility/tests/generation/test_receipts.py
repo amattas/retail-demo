@@ -105,3 +105,32 @@ def test_determinism(spark, cfg, dicts):
     b = generate_receipts_group(spark, dims, dicts.profile, cfg)
     assert sorted(r.receipt_id_ext for r in a["fact_receipts"].collect()) == \
            sorted(r.receipt_id_ext for r in b["fact_receipts"].collect())
+
+
+def test_different_seeds_differ(spark, dicts):
+    def gen(seed):
+        cfg = GenerationConfig(
+            store_type="grocery", start_date=date(2025, 3, 3),
+            end_date=date(2025, 3, 4), store_count=2, dc_count=1,
+            customer_count=100, seed=seed, transactions_per_store_day=20,
+        )
+        dims = generate_dimensions(spark, dicts, cfg)
+        g = generate_receipts_group(spark, dims, dicts.profile, cfg)
+        return {r.receipt_id_ext for r in g["fact_receipts"].collect()}
+
+    assert gen(7) != gen(8)
+
+
+def test_unknown_department_raises(spark, cfg, dicts):
+    dims = generate_dimensions(spark, dicts, cfg)
+    bad_profile = dicts.profile.model_copy(
+        update={"department_weights": {**dicts.profile.department_weights, "Bogus": 0.1}}
+    )
+    with pytest.raises(ValueError, match="Bogus"):
+        generate_receipts_group(spark, dims, bad_profile, cfg)
+
+
+def test_subtotal_mirrors_subtotal_amount(group):
+    from pyspark.sql import functions as F
+    receipts = group["fact_receipts"]
+    assert receipts.filter(F.col("Subtotal") != F.col("subtotal_amount")).count() == 0
