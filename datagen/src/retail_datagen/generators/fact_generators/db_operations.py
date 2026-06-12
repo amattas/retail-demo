@@ -160,9 +160,9 @@ class DbOperationsMixin(FieldMappingMixin):
             await self._insert_via_duckdb(table_name, records, hour)
             return
 
-        # SQLite fallback path
-        await self._insert_via_sqlite(
-            session, table_name, records, hour, batch_size, commit_every_batches
+        raise RuntimeError(
+            "DuckDB is required for fact persistence; "
+            "the legacy SQLite insert path has been removed."
         )
 
     async def _insert_via_duckdb(
@@ -833,40 +833,9 @@ class DbOperationsMixin(FieldMappingMixin):
         if not self._session:
             return
 
-        from retail_datagen.db.purge import mark_data_unpublished
-
-        # Map generator table names to database table names
-        table_name_mapping = {
-            "dc_inventory_txn": "fact_dc_inventory_txn",
-            "truck_moves": "fact_truck_moves",
-            "store_inventory_txn": "fact_store_inventory_txn",
-            "receipts": "fact_receipts",
-            "receipt_lines": "fact_receipt_lines",
-            "foot_traffic": "fact_foot_traffic",
-            "ble_pings": "fact_ble_pings",
-            "marketing": "fact_marketing",
-            "online_orders": "fact_online_orders",
-            "fact_payments": "fact_payments",
-            "promotions": "fact_promotions",
-            "promo_lines": "fact_promo_lines",
-            "store_ops": "fact_store_ops",
-            "customer_zone_changes": "fact_customer_zone_changes",
-            "stockouts": "fact_stockouts",
-            "reorders": "fact_reorders",
-        }
-
-        for table_name in active_tables:
-            db_table_name = table_name_mapping.get(table_name)
-            if db_table_name:
-                try:
-                    await mark_data_unpublished(
-                        self._session, db_table_name, start_date, end_date
-                    )
-                    logger.debug(
-                        f"Marked {db_table_name} as unpublished: "
-                        f"{start_date} to {end_date}"
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to update watermark for {db_table_name}: {e}")
-                    # Don't fail generation if watermark update fails
-                    continue
+        logger.debug(
+            "Skipping legacy SQLite watermark update for %s through %s; "
+            "DuckDB watermarks are maintained by retail_datagen.db.duck_watermarks.",
+            start_date,
+            end_date,
+        )

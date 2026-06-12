@@ -1,0 +1,197 @@
+table stockout_risk
+	lineageTag: c5e6e000-0000-0000-0003-000000000000
+	sourceLineageTag: [au].[stockout_risk]
+
+	/// Distinct store/product combinations flagged by the stockout model.
+	measure 'Stockout Risk SKU Count' = DISTINCTCOUNT('stockout_risk'[Product ID])
+		formatString: #,0
+		displayFolder: ML\Stockout Risk
+		lineageTag: c5e6e000-0000-0000-0003-000000000101
+
+	/// Mean predicted stockout probability across the in-context positions.
+	measure 'Avg Stockout Probability' = AVERAGE('stockout_risk'[Stockout Probability])
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: ML\Stockout Risk
+		lineageTag: c5e6e000-0000-0000-0003-000000000102
+
+	/// Positions classified as high stockout risk by the model.
+	measure 'High Risk SKUs' = CALCULATE(DISTINCTCOUNT('stockout_risk'[Product ID]), 'stockout_risk'[Risk Level] = "High")
+		formatString: #,0
+		displayFolder: ML\Stockout Risk
+		lineageTag: c5e6e000-0000-0000-0003-000000000103
+
+	/// Average remaining days of inventory across in-context positions.
+	measure 'Avg Days of Inventory' = AVERAGE('stockout_risk'[Days of Inventory])
+		formatString: #,0.0
+		displayFolder: ML\Stockout Risk
+		lineageTag: c5e6e000-0000-0000-0003-000000000104
+
+	/// Average daily demand velocity across in-context positions.
+	measure 'Avg Daily Demand Velocity' = AVERAGE('stockout_risk'[Demand Velocity Daily])
+		formatString: #,0.00
+		displayFolder: ML\Stockout Risk
+		lineageTag: c5e6e000-0000-0000-0003-000000000105
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-000000000001
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-000000000002
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Current Inventory'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-000000000003
+		sourceLineageTag: current_inventory
+		summarizeBy: sum
+		sourceColumn: current_inventory
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Demand Velocity Daily'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0003-000000000004
+		sourceLineageTag: demand_velocity_daily
+		summarizeBy: none
+		sourceColumn: demand_velocity_daily
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Days of Inventory'
+		dataType: double
+		formatString: #,0.0
+		lineageTag: c5e6e000-0000-0000-0003-000000000005
+		sourceLineageTag: days_of_inventory
+		summarizeBy: none
+		sourceColumn: days_of_inventory
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Demand Trend'
+		dataType: double
+		lineageTag: c5e6e000-0000-0000-0003-000000000006
+		sourceLineageTag: demand_trend
+		summarizeBy: sum
+		sourceColumn: demand_trend
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Stockout Probability'
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: c5e6e000-0000-0000-0003-000000000007
+		sourceLineageTag: stockout_probability
+		summarizeBy: none
+		sourceColumn: stockout_probability
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Stockout Predicted'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-000000000008
+		sourceLineageTag: stockout_predicted
+		summarizeBy: none
+		sourceColumn: stockout_predicted
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Score'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0003-000000000009
+		sourceLineageTag: risk
+		summarizeBy: none
+		sourceColumn: risk
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Ranking'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-00000000000a
+		sourceLineageTag: ranking
+		summarizeBy: none
+		sourceColumn: ranking
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Level'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0003-00000000000b
+		sourceLineageTag: risk_level
+		summarizeBy: none
+		sourceColumn: risk_level
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Predicted At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0003-00000000000c
+		sourceLineageTag: predicted_at
+		summarizeBy: none
+		sourceColumn: predicted_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Forecast Horizon Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0003-00000000000d
+		sourceLineageTag: forecast_horizon_days
+		summarizeBy: none
+		sourceColumn: forecast_horizon_days
+
+		annotation SummarizationSetBy = Automatic
+
+	column Department
+		dataType: string
+		lineageTag: 78bec704-4105-4109-8e1f-ab3d72f62f5d
+		sourceLineageTag: Department
+		summarizeBy: none
+		sourceColumn: Department
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		lineageTag: 2bcf67df-5347-44fe-b258-575e1b30a299
+		sourceLineageTag: Category
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Subcategory
+		dataType: string
+		lineageTag: 344c1d2f-86d0-4e34-a261-e752e039ed85
+		sourceLineageTag: Subcategory
+		summarizeBy: none
+		sourceColumn: Subcategory
+
+		annotation SummarizationSetBy = Automatic
+
+	partition stockout_risk = entity
+		mode: directLake
+		source
+			entityName: stockout_risk
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

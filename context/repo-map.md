@@ -19,7 +19,7 @@ Microsoft Fabric item definitions and scripts
 - `notebooks/` - PySpark notebooks for Lakehouse transforms
 - `eventstream/` - Eventstream configuration
 - `dashboards/` - Real-time dashboard definitions
-- `semantic_model/` - Power BI semantic model
+- `powerbi/` - Power BI semantic model
 - `lakehouse/` - Lakehouse configuration
 - `querysets/` - KQL query samples
 - `pipelines/` - Data pipeline definitions

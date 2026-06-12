@@ -1,0 +1,190 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+  "name": "drprd_risk",
+  "position": {
+    "x": 660,
+    "y": 520,
+    "z": 1,
+    "height": 190,
+    "width": 580
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_stores"
+                    }
+                  },
+                  "Property": "Store Number"
+                }
+              },
+              "queryRef": "dim_stores.Store Number",
+              "nativeQueryRef": "Store Number",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "stockout_risk"
+                    }
+                  },
+                  "Property": "Avg Daily Demand Velocity"
+                }
+              },
+              "queryRef": "stockout_risk.Avg Daily Demand Velocity",
+              "nativeQueryRef": "Avg Daily Demand Velocity",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "stockout_risk"
+                    }
+                  },
+                  "Property": "Avg Days of Inventory"
+                }
+              },
+              "queryRef": "stockout_risk.Avg Days of Inventory",
+              "nativeQueryRef": "Avg Days of Inventory",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "stockout_risk"
+                    }
+                  },
+                  "Property": "Avg Stockout Probability"
+                }
+              },
+              "queryRef": "stockout_risk.Avg Stockout Probability",
+              "nativeQueryRef": "Avg Stockout Probability",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "stockout_risk"
+                    }
+                  },
+                  "Property": "High Risk SKUs"
+                }
+              },
+              "queryRef": "stockout_risk.High Risk SKUs",
+              "nativeQueryRef": "High Risk SKUs",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "grid": [
+        {
+          "properties": {
+            "gridVertical": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "gridHorizontal": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "columnHeaders": [
+        {
+          "properties": {
+            "bold": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "border": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#E0E4EC'"
+                    }
+                  }
+                }
+              }
+            },
+            "radius": {
+              "expr": {
+                "Literal": {
+                  "Value": "8D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#FFFFFF'"
+                    }
+                  }
+                }
+              }
+            },
+            "transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "0D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

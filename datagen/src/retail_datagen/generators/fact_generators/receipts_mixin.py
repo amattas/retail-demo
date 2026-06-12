@@ -187,9 +187,16 @@ class ReceiptsMixin(FactGeneratorBase):
                 f"at store {store.ID}. All receipts must have at least 1 line."
             )
 
-        receipt_id = (
-            f"RCP{transaction_time.strftime('%Y%m%d%H%M')}"
-            f"{store.ID:03d}{self._rng.randint(1000, 9999)}"
+        if not hasattr(self, "_receipt_id_gen"):
+            from retail_datagen.shared.id_generator import EntityIdGenerator
+            self._receipt_id_gen = EntityIdGenerator("RCP", entity_id_width=3)
+        if transaction_time.tzinfo is None:
+            from datetime import UTC
+            ts_aware = transaction_time.replace(tzinfo=UTC)
+        else:
+            ts_aware = transaction_time
+        receipt_id = self._receipt_id_gen.generate(
+            timestamp=ts_aware, entity_id=int(store.ID)
         )
         trace_id = self._generate_trace_id()
 

@@ -235,7 +235,7 @@ Examples:
     parser.add_argument(
         "--semantic-model-path",
         type=Path,
-        default=Path("fabric/semantic_model/retail_model.SemanticModel/definition"),
+        default=Path("fabric/powerbi/retail_model.SemanticModel/definition"),
         help="Path to semantic model definition directory",
     )
 
@@ -311,7 +311,7 @@ Examples:
             print()
             print("Next steps:")
             print(
-                "  1. Open fabric/semantic_model/retail_model.pbip in Power BI Desktop"
+                "  1. Open fabric/powerbi/retail_model.pbip in Power BI Desktop"
             )
             print("  2. Refresh the data source to test the connection")
             print("  3. Publish to your Fabric workspace")

@@ -1,0 +1,83 @@
+table fact_stockouts
+	lineageTag: 620b34c9-377c-44fe-bad4-8159499fc668
+	sourceLineageTag: [ag].[fact_stockouts]
+
+	/// Count of historical stockout events.
+	measure 'Stockout Events' = COUNTROWS('fact_stockouts')
+		formatString: #,0
+		displayFolder: Stockouts
+		lineageTag: 01a1a1c9-0001-0001-0001-000000000001
+
+	/// Average quantity last known before a stockout event.
+	measure 'Avg Last Known Stockout Qty' = AVERAGE('fact_stockouts'[Last Known Quantity])
+		formatString: #,0.0
+		displayFolder: Stockouts
+		lineageTag: c1090001-0000-0000-0000-000000000001
+
+	column 'Store ID'
+		dataType: double
+		lineageTag: 60d4df49-5a17-4dd0-ba43-6c2c0cec2b4f
+		sourceLineageTag: StoreID
+		summarizeBy: count
+		sourceColumn: StoreID
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'DC ID'
+		dataType: double
+		lineageTag: 1eaacd0f-91e7-4ac9-8c55-b080a302b99e
+		sourceLineageTag: DCID
+		summarizeBy: count
+		sourceColumn: DCID
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 248dacbe-d44f-4a93-beca-0443b0245698
+		sourceLineageTag: ProductID
+		summarizeBy: count
+		sourceColumn: ProductID
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Last Known Quantity'
+		dataType: int64
+		formatString: 0
+		lineageTag: 6ae92787-58f4-4902-b05f-83d24d6194b8
+		sourceLineageTag: LastKnownQuantity
+		summarizeBy: sum
+		sourceColumn: LastKnownQuantity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column __index_level_0__
+		dataType: int64
+		formatString: 0
+		lineageTag: 1cfbef48-7ab8-4c5d-8969-183c8eb05a7d
+		sourceLineageTag: __index_level_0__
+		summarizeBy: sum
+		sourceColumn: __index_level_0__
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_stockouts = entity
+		mode: directLake
+		source
+			entityName: fact_stockouts
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

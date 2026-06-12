@@ -60,7 +60,7 @@ python scripts/configure_semantic_model.py \
 
 # Output:
 # Lakehouse connection update:
-#   File: fabric/semantic_model/retail_model.SemanticModel/definition/expressions.tmdl
+#   File: fabric/powerbi/retail_model.SemanticModel/definition/expressions.tmdl
 #   Old URL: https://onelake.dfs.fabric.microsoft.com/[old-ids]
 #   New URL: https://onelake.dfs.fabric.microsoft.com/[new-ids]
 #
@@ -79,7 +79,7 @@ This script is typically used as part of the semantic model deployment process:
 2. Import the semantic model into your Fabric workspace
 3. Refresh the model to load data from your lakehouse
 
-See `fabric/semantic_model/README.md` for complete deployment instructions.
+See `fabric/powerbi/README.md` for complete deployment instructions.
 
 ### Error Handling
 
@@ -97,3 +97,43 @@ Run the test suite:
 ```bash
 pytest tests/scripts/test_configure_semantic_model.py -v
 ```
+
+## reset_powerbi_desktop_local_state.ps1
+
+Clears local Power BI Desktop state that can cause PBIP metadata drift or `Missing_References` errors after large semantic-model/report changes.
+
+### Purpose
+
+When Desktop caches stale local model bindings, removing repo-local `.pbi\localSettings.json` files is sometimes not enough. This script safely clears the user-local Power BI Desktop state that is regenerated on next open.
+
+### What it removes
+
+- `fabric/powerbi/retail_model.Report/.pbi/localSettings.json` (if recreated)
+- `fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json` (if recreated)
+- Local Power BI Desktop cache contents under:
+  - `AnalysisServicesWorkspaces`
+  - `TempSaves/Backups`
+  - `TempSaves/CloudUploads`
+  - `FoldedArtifactsCache`
+  - `LuciaCache`
+  - `Cache/Temp`
+
+### Usage
+
+Close Power BI Desktop first, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\reset_powerbi_desktop_local_state.ps1
+```
+
+Preview without deleting anything:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\reset_powerbi_desktop_local_state.ps1 -WhatIf
+```
+
+### Notes
+
+- The script stops if `PBIDesktop` is still running.
+- It only removes cache/state that Power BI Desktop can regenerate.
+- Use this when the PBIP opens but visuals show persistent `Missing_References`, or when Desktop repeatedly prompts that metadata is out of sync.

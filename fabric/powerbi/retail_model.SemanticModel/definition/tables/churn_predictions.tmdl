@@ -1,0 +1,113 @@
+table churn_predictions
+	lineageTag: c5e6e000-0000-0000-0002-000000000000
+	sourceLineageTag: [au].[churn_predictions]
+
+	/// Customers flagged as likely to churn by the model.
+	measure 'Customers At Risk' = CALCULATE(DISTINCTCOUNT('churn_predictions'[Customer ID]), 'churn_predictions'[Churn Prediction] = 1)
+		formatString: #,0
+		displayFolder: ML\Churn
+		lineageTag: c5e6e000-0000-0000-0002-000000000101
+
+	/// Mean predicted churn probability across customers in context.
+	measure 'Avg Churn Probability' = AVERAGE('churn_predictions'[Churn Probability])
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: ML\Churn
+		lineageTag: c5e6e000-0000-0000-0002-000000000102
+
+	/// Share of customers predicted to churn.
+	measure 'Predicted Churn Rate %' = DIVIDE(CALCULATE(DISTINCTCOUNT('churn_predictions'[Customer ID]), 'churn_predictions'[Churn Prediction] = 1), DISTINCTCOUNT('churn_predictions'[Customer ID]), 0)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: ML\Churn
+		lineageTag: c5e6e000-0000-0000-0002-000000000103
+
+	/// Customers classified as high churn risk by the model.
+	measure 'High Risk Customers' = CALCULATE(DISTINCTCOUNT('churn_predictions'[Customer ID]), 'churn_predictions'[Risk Category] = "High")
+		formatString: #,0
+		displayFolder: ML\Churn
+		lineageTag: c5e6e000-0000-0000-0002-000000000104
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0002-000000000001
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Churn Probability'
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: c5e6e000-0000-0000-0002-000000000002
+		sourceLineageTag: churn_probability
+		summarizeBy: none
+		sourceColumn: churn_probability
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Churn Prediction'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0002-000000000003
+		sourceLineageTag: churn_prediction
+		summarizeBy: none
+		sourceColumn: churn_prediction
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Risk Category'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0002-000000000004
+		sourceLineageTag: risk_category
+		summarizeBy: none
+		sourceColumn: risk_category
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Is Churned Actual'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0002-000000000005
+		sourceLineageTag: is_churned_actual
+		summarizeBy: none
+		sourceColumn: is_churned_actual
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Prediction Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0002-000000000006
+		sourceLineageTag: prediction_date
+		summarizeBy: none
+		sourceColumn: prediction_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Model Version'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0002-000000000007
+		sourceLineageTag: model_version
+		summarizeBy: none
+		sourceColumn: model_version
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Churn Window Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0002-000000000008
+		sourceLineageTag: churn_window_days
+		summarizeBy: none
+		sourceColumn: churn_window_days
+
+		annotation SummarizationSetBy = Automatic
+
+	partition churn_predictions = entity
+		mode: directLake
+		source
+			entityName: churn_predictions
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

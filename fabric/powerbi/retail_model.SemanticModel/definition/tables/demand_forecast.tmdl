@@ -1,0 +1,115 @@
+table demand_forecast
+	lineageTag: c5e6e000-0000-0000-0004-000000000000
+	sourceLineageTag: [au].[demand_forecast]
+
+	/// Total predicted units across the in-context store/product/horizon.
+	measure 'Forecasted Units' = SUM('demand_forecast'[Predicted Units])
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000101
+
+	/// Lower bound of the predicted units confidence interval.
+	measure 'Forecast Lower Bound' = SUM('demand_forecast'[Lower Bound])
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000102
+
+	/// Upper bound of the predicted units confidence interval.
+	measure 'Forecast Upper Bound' = SUM('demand_forecast'[Upper Bound])
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000103
+
+	/// Mean absolute percentage error reported with the forecast.
+	measure 'Forecast MAPE' = AVERAGE('demand_forecast'[Mape])
+		formatString: 0.00%;-0.00%;0.00%
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000104
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0004-000000000001
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0004-000000000002
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Forecast Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0004-000000000003
+		sourceLineageTag: forecast_date
+		summarizeBy: none
+		sourceColumn: forecast_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Predicted Units'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0004-000000000004
+		sourceLineageTag: predicted_units
+		summarizeBy: sum
+		sourceColumn: predicted_units
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Lower Bound'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0004-000000000005
+		sourceLineageTag: lower_bound
+		summarizeBy: sum
+		sourceColumn: lower_bound
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Upper Bound'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0004-000000000006
+		sourceLineageTag: upper_bound
+		summarizeBy: sum
+		sourceColumn: upper_bound
+
+		annotation SummarizationSetBy = Automatic
+
+	column Mape
+		dataType: double
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: c5e6e000-0000-0000-0004-000000000007
+		sourceLineageTag: mape
+		summarizeBy: none
+		sourceColumn: mape
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Generated At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0004-000000000008
+		sourceLineageTag: generated_at
+		summarizeBy: none
+		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition demand_forecast = entity
+		mode: directLake
+		source
+			entityName: demand_forecast
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'
+

@@ -118,7 +118,7 @@ def test_find_expressions_file(tmp_path):
     expressions_path = (
         tmp_path
         / "fabric"
-        / "semantic_model"
+        / "powerbi"
         / "retail_model.SemanticModel"
         / "definition"
         / "expressions.tmdl"
@@ -184,7 +184,7 @@ def test_main_dry_run(tmp_path, capsys):
     expressions_path = (
         tmp_path
         / "fabric"
-        / "semantic_model"
+        / "powerbi"
         / "retail_model.SemanticModel"
         / "definition"
         / "expressions.tmdl"

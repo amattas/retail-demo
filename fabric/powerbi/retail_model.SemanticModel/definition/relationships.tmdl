@@ -1,0 +1,235 @@
+relationship 'Customers to Geographies'
+	isActive: false
+	fromColumn: dim_customers.'Geography ID'
+	toColumn: dim_geographies.ID
+
+relationship 'Stores to Geographies'
+	fromColumn: dim_stores.'Geography ID'
+	toColumn: dim_geographies.ID
+
+relationship 'Distribution Centers to Geographies'
+	fromColumn: dim_distribution_centers.'Geography ID'
+	toColumn: dim_geographies.ID
+
+relationship 'Receipts to Customers'
+	fromColumn: fact_receipts.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Receipts to Stores'
+	fromColumn: fact_receipts.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Receipt Lines to Receipts'
+	fromColumn: fact_receipt_lines.'Receipt ID'
+	toColumn: fact_receipts.'Receipt ID'
+
+relationship 'Receipt Lines to Products'
+	fromColumn: fact_receipt_lines.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Payments to Receipts'
+	fromColumn: fact_payments.'Receipt ID'
+	toColumn: fact_receipts.'Receipt ID'
+
+relationship 'Payments to Online Orders'
+	isActive: false
+	fromColumn: fact_payments.'Order ID'
+	toColumn: fact_online_order_headers.'Order ID'
+
+relationship 'Payments to Stores'
+	isActive: false
+	fromColumn: fact_payments.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Payments to Customers'
+	isActive: false
+	fromColumn: fact_payments.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Online Orders to Customers'
+	fromColumn: fact_online_order_headers.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Online Order Lines to Online Orders'
+	fromColumn: fact_online_order_lines.'Order ID'
+	toColumn: fact_online_order_headers.'Order ID'
+
+relationship 'Online Order Lines to Products'
+	fromColumn: fact_online_order_lines.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Store Inventory Transactions to Stores'
+	fromColumn: fact_store_inventory_txn.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Store Inventory Transactions to Products'
+	fromColumn: fact_store_inventory_txn.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Store Inventory Position to Stores'
+	fromColumn: inventory_position_current.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Store Inventory Position to Products'
+	fromColumn: inventory_position_current.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'DC Inventory Position to Distribution Centers'
+	fromColumn: dc_inventory_position_current.'DC ID'
+	toColumn: dim_distribution_centers.ID
+
+relationship 'DC Inventory Position to Products'
+	fromColumn: dc_inventory_position_current.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'DC Inventory Transactions to Distribution Centers'
+	fromColumn: fact_dc_inventory_txn.'DC ID'
+	toColumn: dim_distribution_centers.ID
+
+relationship 'DC Inventory Transactions to Products'
+	fromColumn: fact_dc_inventory_txn.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Truck Moves to Trucks'
+	fromColumn: fact_truck_moves.'Truck ID'
+	toColumn: dim_trucks.ID
+
+relationship 'Truck Moves to Stores'
+	isActive: false
+	fromColumn: fact_truck_moves.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Truck Moves to Distribution Centers'
+	fromColumn: fact_truck_moves.'DC ID'
+	toColumn: dim_distribution_centers.ID
+
+relationship 'Truck Inventory to Trucks'
+	fromColumn: fact_truck_inventory.'Truck ID'
+	toColumn: dim_trucks.ID
+
+relationship 'Truck Inventory to Products'
+	fromColumn: fact_truck_inventory.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Foot Traffic to Stores'
+	fromColumn: fact_foot_traffic.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Reorders to Stores'
+	fromColumn: fact_reorders.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Reorders to Products'
+	fromColumn: fact_reorders.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Reorders to Distribution Centers'
+	isActive: false
+	fromColumn: fact_reorders.'DC ID'
+	toColumn: dim_distribution_centers.ID
+
+relationship 'Store Operations to Stores'
+	fromColumn: fact_store_ops.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Store Sales by Minute to Stores'
+	fromColumn: sales_minute_store.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Top Products 15 Min to Products'
+	fromColumn: top_products_15m.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Zone Dwell by Minute to Stores'
+	fromColumn: zone_dwell_minute.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Online Sales Daily to Date'
+	fromColumn: online_sales_daily.Day
+	toColumn: dim_date.Date
+
+relationship 'Tender Mix Daily to Date'
+	fromColumn: tender_mix_daily.Day
+	toColumn: dim_date.Date
+
+relationship 'Marketing Cost Daily to Date'
+	fromColumn: marketing_cost_daily.Day
+	toColumn: dim_date.Date
+
+relationship 'Truck Dwell Daily to Date'
+	fromColumn: truck_dwell_daily.Day
+	toColumn: dim_date.Date
+
+relationship 'Store Sales by Minute to Date'
+	joinOnDateBehavior: datePartOnly
+	fromColumn: sales_minute_store.Timestamp
+	toColumn: dim_date.Date
+
+relationship 'Zone Dwell by Minute to Date'
+	joinOnDateBehavior: datePartOnly
+	fromColumn: zone_dwell_minute.Timestamp
+	toColumn: dim_date.Date
+
+relationship 'Stockouts to Products'
+	fromColumn: fact_stockouts.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Promotions to Stores'
+	isActive: false
+	fromColumn: fact_promotions.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Promotions to Customers'
+	isActive: false
+	fromColumn: fact_promotions.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Promotions to Receipts'
+	fromColumn: fact_promotions.'Receipt ID'
+	toColumn: fact_receipts.'Receipt ID'
+
+relationship 'Customer Segments to Customers'
+	fromColumn: customer_segments.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Churn Predictions to Customers'
+	fromColumn: churn_predictions.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Stockout Risk to Stores'
+	fromColumn: stockout_risk.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Stockout Risk to Products'
+	fromColumn: stockout_risk.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Demand Forecast to Stores'
+	fromColumn: demand_forecast.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Demand Forecast to Products'
+	fromColumn: demand_forecast.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Demand Forecast to Date'
+	joinOnDateBehavior: datePartOnly
+	fromColumn: demand_forecast.'Forecast Date'
+	toColumn: dim_date.Date
+
+relationship 'Receipts to Date'
+	fromColumn: fact_receipts.'Event Date'
+	toColumn: dim_date.Date
+
+relationship 'Online Orders to Date'
+	fromColumn: fact_online_order_headers.'Event Date'
+	toColumn: dim_date.Date
+
+relationship 'Foot Traffic to Date'
+	fromColumn: fact_foot_traffic.'Event Date'
+	toColumn: dim_date.Date
+
+relationship 'Store Operations to Date'
+	fromColumn: fact_store_ops.'Event Date'
+	toColumn: dim_date.Date
+

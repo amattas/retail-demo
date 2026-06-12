@@ -9,14 +9,10 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from .base_types import FactGeneratorBase
-
-if TYPE_CHECKING:
-    from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
@@ -28,49 +24,12 @@ class FieldMappingMixin(FactGeneratorBase):
     and building outbox rows for streaming.
     """
 
-    def _get_model_for_table(self, table_name: str) -> type[DeclarativeBase]:
-        """
-        Map fact table name to SQLAlchemy model.
-
-        Args:
-            table_name: Name of fact table (e.g., "receipts", "dc_inventory_txn")
-
-        Returns:
-            SQLAlchemy model class for the table
-
-        Raises:
-            ValueError: If table name is unknown
-        """
-        from retail_datagen.db.models.facts import (
-            BLEPing,
-            DCInventoryTransaction,
-            FootTraffic,
-            MarketingImpression,
-            OnlineOrderHeader,
-            OnlineOrderLine,
-            Receipt,
-            ReceiptLine,
-            StoreInventoryTransaction,
-            TruckMove,
+    def _get_model_for_table(self, table_name: str) -> type[object]:
+        """Reject legacy SQLite ORM access after the DuckDB-only migration."""
+        raise RuntimeError(
+            f"Legacy SQLite ORM model lookup is not supported for {table_name!r}; "
+            "use the DuckDB persistence path."
         )
-
-        mapping = {
-            "dc_inventory_txn": DCInventoryTransaction,
-            "truck_moves": TruckMove,
-            "store_inventory_txn": StoreInventoryTransaction,
-            "receipts": Receipt,
-            "receipt_lines": ReceiptLine,
-            "foot_traffic": FootTraffic,
-            "ble_pings": BLEPing,
-            "marketing": MarketingImpression,
-            "online_orders": OnlineOrderHeader,
-            "online_order_lines": OnlineOrderLine,
-        }
-
-        if table_name not in mapping:
-            raise ValueError(f"Unknown table: {table_name}")
-
-        return mapping[table_name]
 
     def _transform_db_fields_to_kql_payload(self, table_name: str, rec: dict) -> dict:
         """Transform database field names to KQL-expected payload field names.
