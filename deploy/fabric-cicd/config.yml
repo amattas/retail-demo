@@ -1,0 +1,20 @@
+core:
+  workspace:
+    dev: retail-demo-dev
+  repository_directory: ../workspace
+  item_types_in_scope:
+  - Lakehouse
+  - Eventhouse
+  - KQLDatabase
+  - Notebook
+  - SemanticModel
+  - Report
+  parameter: parameter.yml
+publish:
+  skip:
+    dev: false
+unpublish:
+  skip:
+    dev: true
+  exclude_regex:
+    dev: ^DO_NOT_DELETE_.*

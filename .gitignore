@@ -114,6 +114,15 @@ fabric/powerbi/retail_model.Report/.pbi/localSettings.json
 fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /.github/skills
 
+# Deployment framework generated files and local Terraform state
+/deploy/.generated/
+/deploy/workspace/*
+!/deploy/workspace/.gitkeep
+/deploy/terraform/.terraform/
+/deploy/terraform/*.tfstate
+/deploy/terraform/*.tfstate.*
+/deploy/terraform/.terraform.lock.hcl
+
 # Docusaurus site (website/)
 website/node_modules/
 website/build/
