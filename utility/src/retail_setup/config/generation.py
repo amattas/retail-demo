@@ -18,6 +18,13 @@ class GenerationConfig(BaseModel):
     silver_db: str = "ag"
     gold_db: str = "au"
 
+    # scale knobs; None -> derived from store_count in the validator below
+    dc_count: int | None = Field(default=None, gt=0)
+    customer_count: int | None = Field(default=None, gt=0)
+    # base in-store transactions per store-day at multiplier 1.0; profiles'
+    # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it
+    transactions_per_store_day: int = Field(default=400, gt=0)
+
     @field_validator("store_type")
     @classmethod
     def _known_store_type(cls, v: str) -> str:
@@ -30,6 +37,14 @@ class GenerationConfig(BaseModel):
     def _date_order(self) -> "GenerationConfig":
         if self.end_date < self.start_date:
             raise ValueError("end_date must be on or after start_date")
+        return self
+
+    @model_validator(mode="after")
+    def _derive_scale_defaults(self) -> "GenerationConfig":
+        if self.dc_count is None:
+            self.dc_count = max(1, self.store_count // 10)
+        if self.customer_count is None:
+            self.customer_count = self.store_count * 1000
         return self
 
 

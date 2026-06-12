@@ -37,3 +37,18 @@ def test_yaml_round_trip(tmp_path: Path):
     cfg = load_generation_config(p)
     assert cfg.store_type == "grocery"
     assert cfg.store_count == 10
+
+
+def test_scale_defaults_derive_from_store_count():
+    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                           store_count=40)
+    assert cfg.dc_count == 4          # ~1 DC per 10 stores, min 1
+    assert cfg.customer_count == 40_000  # 1000 per store
+    assert cfg.transactions_per_store_day == 400
+
+
+def test_scale_overrides_respected():
+    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                           store_count=40, dc_count=2, customer_count=500,
+                           transactions_per_store_day=50)
+    assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 500, 50)
