@@ -110,7 +110,8 @@ def configure(
     """Configure deployment (deploy/config/) and generation (utility/config.yaml) settings."""
     repo_root = repo_root.resolve()
 
-    # Validate generation values FIRST so failures leave no files behind.
+    # Validate generation values before any file writes (deploy YAMLs are
+    # written next and restored if framework validation rejects them).
     try:
         generation = GenerationConfig(
             store_type=store_type,
@@ -125,6 +126,14 @@ def configure(
 
     deploy_yml = repo_root / "deploy" / "config" / "deploy.yml"
     env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    for path in (deploy_yml, env_yml):
+        if not path.is_file():
+            typer.echo(
+                f"Config file not found: {path}\n"
+                f"Unknown environment {env!r}? Available: "
+                f"{sorted(p.stem for p in env_yml.parent.glob('*.yml')) if env_yml.parent.is_dir() else '[]'}"
+            )
+            raise typer.Exit(code=1)
 
     original_deploy = _update_yaml_file(
         deploy_yml,
@@ -384,7 +393,16 @@ def deploy(
     is given. Authentication is handled by the deploy framework scripts.
     """
     repo_root = repo_root.resolve()
-    plan = _deploy_plan(env, skip_terraform, lakehouse_name=_lakehouse_name(repo_root, env))
+    if dry_run:
+        # dry runs must not require live config; fall back to the default name
+        try:
+            lakehouse = _lakehouse_name(repo_root, env)
+        except typer.Exit:
+            lakehouse = "retail_lakehouse"
+            typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
+    else:
+        lakehouse = _lakehouse_name(repo_root, env)
+    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse)
     total = len(plan)
 
     if dry_run:
