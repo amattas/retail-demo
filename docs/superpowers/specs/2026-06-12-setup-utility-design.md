@@ -25,16 +25,21 @@ workspace/lakehouse names across notebooks and scripts.
 3. Seedable dictionary sets for multiple retail store types: **supercenter,
    grocery, hardware, luxury** at launch.
 4. A light CLI that captures environment config (tenant, workspace, lakehouse,
-   schema names, generation settings) and injects the values into the committed
-   notebooks/scripts. Deployment via Fabric REST is scaffolded but backlogged
-   (separate workstream).
+   schema names, generation settings), injects the values into the committed
+   notebooks, and drives end-to-end deployment through the Fabric deployment
+   framework that now lives under `deploy/` (Terraform provisioning +
+   fabric-cicd item deployment). The deploy framework's design explicitly
+   anticipates this CLI as the front-end that maintains its canonical YAML
+   config.
 
 ## Non-Goals
 
 - **`datagen/` is untouched.** It keeps owning streaming and remains the
   legacy historical path.
 - No real-time/streaming generation in `utility/`.
-- No Fabric REST deployment in v1 (`retail-setup deploy` is a stub).
+- No new provisioning/deployment machinery — the CLI orchestrates the
+  existing `deploy/` framework (Terraform + fabric-cicd), it does not
+  reimplement it.
 - No new ML/Gold logic — Gold aggregates are a port of
   `02-historical-data-load` Part 3.
 
@@ -45,7 +50,7 @@ utility/
 ├── pyproject.toml              # package: retail_setup (conda env, py3.11+)
 ├── README.md
 ├── src/retail_setup/
-│   ├── cli/                    # `retail-setup` CLI (typer)
+│   ├── cli/                    # `retail-setup` CLI (typer): configure/render/deploy
 │   ├── config/                 # Pydantic models: FabricEnv + GenerationConfig
 │   ├── dictionaries/           # loaders + Pydantic validation
 │   ├── generation/             # Spark generation engine (see Engine)
@@ -70,9 +75,13 @@ Key structural decisions:
   (`scripts/build_notebooks.py`) inlines those modules into the notebooks'
   code cells. The CLI's render step only injects config values — it never
   assembles code. CI verifies committed notebooks match `src/` (rebuild+diff).
-- **One config file** `utility/config.yaml` (gitignored): fabric tenant,
-  workspace, lakehouse, `SILVER_DB`/`GOLD_DB`, store type, date range, store
-  count, seed.
+- **Environment config has one source of truth: `deploy/config/`.** Tenant,
+  workspace, lakehouse, eventhouse, capacity, and auth settings live in
+  `deploy/config/deploy.yml` + `deploy/config/environments/<env>.yml`
+  (the deployment framework's canonical schema). The CLI reads and updates
+  those files rather than duplicating environment values.
+  `utility/config.yaml` (gitignored) holds only generation settings: store
+  type, date range, store count, seed, `SILVER_DB`/`GOLD_DB` overrides.
 
 ## Dictionaries
 
@@ -155,16 +164,28 @@ default names.
 
 `retail-setup` (typer):
 
-- `configure` — interactive prompts → write/update `utility/config.yaml`.
-  Format validation only; no network calls.
+- `configure` — interactive prompts for environment values (tenant,
+  workspace, capacity, lakehouse/eventhouse names) → writes/updates
+  `deploy/config/deploy.yml` and `deploy/config/environments/<env>.yml`;
+  prompts for generation values (store type, date range, store count, seed)
+  → writes `utility/config.yaml`. Format validation only; no network calls.
 - `render` — inject config into copies of the four setup notebooks →
   `utility/out/`. The render target list is data-driven (a manifest in the
   package), so other placeholder-bearing files can be added later without CLI
-  changes. Originals never modified; idempotent; prints an import checklist.
-  Refuses to render on missing/invalid config (no half-filled placeholders).
-- `deploy` — scaffold only: defines the interface (reads config.yaml,
-  `--workspace`), exits with a "deployment tooling under separate
-  development" message pointing at `scripts/deploy_notebooks.py`. Backlog.
+  changes. Originals never modified; idempotent; prints an import checklist
+  for manual import (the non-deploy path). Refuses to render on
+  missing/invalid config (no half-filled placeholders).
+- `deploy` — thin orchestrator over the `deploy/` framework, mirroring its
+  documented local workflow: `generate_configs` → `terraform plan/apply`
+  (with confirmation gate) → re-run `generate_configs` with Terraform
+  outputs → `build_artifacts` → `deploy_items` → `apply_kql` →
+  `validate_deployment`. Rendered setup notebooks are staged into
+  `deploy/workspace/` as `.Notebook` item folders via a new `setup`
+  notebook group in `build_artifacts.py` (the framework already binds
+  default lakehouses for notebook groups). `--skip-terraform` and
+  `--dry-run` flags for partial runs. Auth comes from the framework's
+  existing modes (Azure CLI / env); the CLI adds no credential handling of
+  its own.
 
 ## Testing
 
@@ -180,6 +201,11 @@ default names.
   (local Spark) on a small config, writing to a temp dir — no Fabric needed.
 - **Notebook build check**: CI rebuilds notebooks from `src/` and diffs
   against committed ones (no drift).
+- **Configure/deploy round-trip**: `configure` edits to
+  `deploy/config/*.yml` are validated against the deploy framework's own
+  config loader (`deploy/scripts/deploy_config.py`); `deploy --dry-run`
+  exercised in tests with the framework scripts mocked (no Terraform or
+  Fabric calls in CI), extending the existing `tests/deploy/` suite.
 
 ## Error Handling
 
@@ -190,7 +216,9 @@ default names.
 
 ## Backlog (explicitly out of v1)
 
-- `retail-setup deploy` implementation (Fabric REST: import notebooks,
-  create lakehouse/schemas, optionally deploy semantic model).
 - Additional store types beyond the launch four.
 - Streaming/event generation from `utility/`.
+- Eventstream deployment (disabled in the deploy framework until
+  source-control item definitions exist) and pipeline/dashboard/queryset
+  item-folder deployment (framework treats them as source inputs for now).
+- CI-driven deployment (GitHub Actions wiring around `retail-setup deploy`).
