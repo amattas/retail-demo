@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "retail-setup"
+version = "0.1.0"
+description = "Fabric-native setup utility: historical data generation + environment configuration"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.4,<3.6", "pandas>=2.0", "numpy>=1.26"]
+spark = ["pyspark>=3.4,<3.6"]  # local testing; Fabric provides Spark at runtime
+
+[project.scripts]
+retail-setup = "retail_setup.cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retail_setup"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,17 @@
+{
+  "store_type": "hardware",
+  "display_name": "Hardware",
+  "basket_lambda": 4.5,
+  "avg_ticket_target": 95.0,
+  "hourly_weights": [0.02, 0.02, 0.02, 0.05, 0.3, 1.2, 2.6, 3.4, 3.2, 3.0, 3.0, 3.0,
+                     2.8, 2.6, 2.6, 2.8, 3.0, 2.8, 2.0, 1.2, 0.6, 0.2, 0.05, 0.02],
+  "daily_weights": [1.0, 0.9, 0.9, 0.95, 1.1, 1.7, 1.55],
+  "monthly_weights": [0.7, 0.75, 1.0, 1.25, 1.4, 1.35, 1.25, 1.15, 1.05, 1.0, 0.85, 0.8],
+  "department_weights": {"Tools": 0.3, "Building Materials": 0.2,
+                          "Electrical & Plumbing": 0.16, "Paint & Supplies": 0.12,
+                          "Lawn & Garden": 0.14, "Hardware & Safety": 0.08},
+  "promo_rate": 0.1,
+  "online_order_share": 0.2,
+  "zones": ["entrance", "tools", "lumber", "electrical", "plumbing", "paint",
+            "garden", "pro-desk", "checkout", "exit"]
+}

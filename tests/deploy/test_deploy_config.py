@@ -1,0 +1,120 @@
+"""Tests for deployment framework configuration helpers."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from deploy.scripts import deploy_config
+
+
+def test_load_environment_merges_defaults_and_environment() -> None:
+    config = deploy_config.load_environment("dev")
+
+    assert config.environment == "dev"
+    assert config.workspace.name == "retail-demo-dev"
+    assert config.lakehouse.name == "retail_lakehouse"
+    assert config.powerbi.semantic_model_name == "retail_model"
+    assert config.notebooks.include == ["core"]
+    assert config.deployment.item_types_in_scope == [
+        "Lakehouse",
+        "Eventhouse",
+        "KQLDatabase",
+        "Notebook",
+        "SemanticModel",
+        "Report",
+    ]
+
+
+def test_load_environment_rejects_unknown_environment() -> None:
+    with pytest.raises(FileNotFoundError, match="Environment config not found"):
+        deploy_config.load_environment("missing")
+
+
+def test_render_tfvars_omits_empty_optional_values() -> None:
+    config = deploy_config.load_environment("dev")
+    tfvars = deploy_config.render_tfvars(config)
+
+    assert 'workspace_name = "retail-demo-dev"' in tfvars
+    assert 'lakehouse_name = "retail_lakehouse"' in tfvars
+    assert "existing_workspace_id" not in tfvars
+    assert "role_assignments = []" in tfvars
+
+
+def test_render_fabric_cicd_config_uses_environment_workspace() -> None:
+    config = deploy_config.load_environment("dev")
+    rendered = deploy_config.render_fabric_cicd_config(config)
+
+    assert rendered["core"]["workspace"]["dev"] == "retail-demo-dev"
+    assert rendered["core"]["repository_directory"] == "../workspace"
+    assert rendered["publish"]["skip"]["dev"] is False
+    assert rendered["unpublish"]["skip"]["dev"] is True
+
+
+def test_render_parameter_file_uses_dynamic_item_references() -> None:
+    config = deploy_config.load_environment("dev")
+    terraform_outputs = {
+        "workspace_id": "11111111-1111-1111-1111-111111111111",
+        "lakehouse_id": "22222222-2222-2222-2222-222222222222",
+        "lakehouse_name": "retail_lakehouse",
+        "eventhouse_query_service_uri": "https://example.kusto.fabric.microsoft.com",
+        "kql_database_name": "retail_kql",
+    }
+
+    rendered = deploy_config.render_parameter_file(config, terraform_outputs)
+
+    find_values = [entry["find_value"] for entry in rendered["find_replace"]]
+    assert any("onelake\\.dfs\\.fabric\\.microsoft\\.com" in value for value in find_values)
+    assert rendered["find_replace"][0]["replace_value"]["dev"].endswith(
+        "/22222222-2222-2222-2222-222222222222"
+    )
+    assert {
+        "find_key": "$.properties.activities[*].typeProperties.workspaceId",
+        "replace_value": {"dev": "$workspace.$id"},
+        "item_type": "DataPipeline",
+    } in rendered["key_value_replace"]
+    assert {
+        "find_key": "$.properties.activities[*].typeProperties.notebookId",
+        "replace_value": {"dev": "$items.Notebook.02-historical-data-load.$id"},
+        "item_type": "DataPipeline",
+    } in rendered["key_value_replace"]
+
+
+def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
+    config = deploy_config.load_environment("dev")
+    terraform_outputs = {
+        "workspace_id": "11111111-1111-1111-1111-111111111111",
+        "lakehouse_id": "22222222-2222-2222-2222-222222222222",
+        "lakehouse_name": "retail_lakehouse",
+    }
+
+    paths = deploy_config.write_generated_configs(config, tmp_path, terraform_outputs)
+
+    assert paths.tfvars == tmp_path / "terraform" / "environments" / "dev.tfvars"
+    assert paths.fabric_config == tmp_path / "fabric-cicd" / "config.yml"
+    assert paths.parameter == tmp_path / "fabric-cicd" / "parameter.yml"
+    assert paths.tfvars.read_text(encoding="utf-8").startswith(
+        'environment = "dev"'
+    )
+    assert "core:" in paths.fabric_config.read_text(encoding="utf-8")
+    assert "find_replace:" in paths.parameter.read_text(encoding="utf-8")
+
+
+def test_load_terraform_outputs_accepts_terraform_json_shape(tmp_path: Path) -> None:
+    output_path = tmp_path / "terraform-output.json"
+    output_path.write_text(
+        json.dumps(
+            {
+                "workspace_id": {"value": "11111111-1111-1111-1111-111111111111"},
+                "lakehouse_name": {"value": "retail_lakehouse"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert deploy_config.load_terraform_outputs(output_path) == {
+        "workspace_id": "11111111-1111-1111-1111-111111111111",
+        "lakehouse_name": "retail_lakehouse",
+    }
