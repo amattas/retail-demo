@@ -113,3 +113,8 @@ fabric/lakehouse/.work-folder-info
 fabric/powerbi/retail_model.Report/.pbi/localSettings.json
 fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /.github/skills
+
+# Docusaurus site (website/)
+website/node_modules/
+website/build/
+website/.docusaurus/
