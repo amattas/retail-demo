@@ -97,3 +97,7 @@ jobs:
       - name: Run tests
         working-directory: utility
         run: pytest -q
+
+      - name: Notebook drift check
+        working-directory: utility
+        run: python scripts/build_notebooks.py --check
