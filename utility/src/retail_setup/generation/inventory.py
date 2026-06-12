@@ -359,8 +359,9 @@ def generate_inventory_chain(
         "fact_store_inventory_txn")
     fact_dc_txn = _with_index(
         dc_bal.withColumnRenamed("node_id", "dc_id")
-        # TMDL-bound PascalCase Source mirrors the snake_case source column.
-        .withColumn("Source", F.col("source")),
+        # Rename lowercase source -> Source (TMDL-bound PascalCase). Keeping
+        # both would be a case-insensitive duplicate that Delta rejects.
+        .withColumnRenamed("source", "Source"),
         "fact_dc_inventory_txn")
 
     stockouts = (_stockouts(store_bal, "ST", "StoreID")

@@ -69,6 +69,7 @@ def test_explicit_dictionary_root(tmp_path):
     cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
                            store_type="mini", dictionary_root=str(tmp_path))
     assert cfg.store_type == "mini"
+    assert cfg.resolved_dictionary_root == tmp_path
 
 
 def test_unknown_type_in_explicit_root_rejected(tmp_path):

@@ -58,8 +58,10 @@ Columns added vs plan (from TMDL audit 2026-06-12):
     - ("__index_level_0__", "long") — TMDL-bound.
 
   fact_dc_inventory_txn:
-    - ("Source", "string") — TMDL sourceColumn is PascalCase Source; plan's
-      source (lowercase) kept as extra.
+    - ("Source", "string") — TMDL sourceColumn is PascalCase Source. The
+      lowercase ``source`` that appears during construction is renamed to
+      ``Source`` in the final select (inventory.py); keeping both would cause
+      a case-insensitive collision that Delta on Fabric rejects.
     - ("__index_level_0__", "long") — TMDL-bound.
 
   fact_store_inventory_txn:
@@ -79,7 +81,8 @@ Columns in plan but NOT in TMDL (allowed — Direct Lake ignores extra columns):
     channel (extra beyond TMDL-bound channel — already in TMDL, fine)
   fact_promo_lines: receipt_id_ext, promo_code, line_number, product_id,
     quantity, discount_amount, discount_cents, event_ts, trace_id, event_date
-  fact_dc_inventory_txn: source (lowercase), trace_id, event_ts, event_date
+  fact_dc_inventory_txn: trace_id, event_ts, event_date
+    (lowercase source is renamed to Source in the final select; not an extra)
 """
 
 # table -> list of (column, spark_type)
@@ -317,9 +320,10 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("event_ts", "timestamp"), ("trace_id", "string"), ("dc_id", "long"),
         ("product_id", "long"), ("quantity", "long"), ("balance", "long"),
         ("txn_type", "string"),
-        # snake_case plan column (extra)
-        ("source", "string"),
-        # TMDL-bound PascalCase column (sourceColumn: Source)
+        # TMDL-bound PascalCase column (sourceColumn: Source). The lowercase
+        # ``source`` used during construction is renamed AS "Source" in
+        # inventory.py before the final select; keeping both would produce a
+        # case-insensitive duplicate that Delta on Fabric rejects.
         ("Source", "string"),
         ("event_date", "date"),
         ("__index_level_0__", "long"),

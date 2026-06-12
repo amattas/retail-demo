@@ -71,3 +71,19 @@ def test_spark_schema_builds(spark):
     for table in TABLES:
         schema = spark_schema(table)
         assert len(schema.fields) == len(TABLES[table])
+
+
+def test_no_case_insensitive_duplicate_columns():
+    """Every table must have case-insensitively unique column names.
+
+    Delta on Fabric rejects tables where two column names differ only in case
+    (e.g. 'source' and 'Source'). This test is the permanent guard against
+    re-introducing such pairs.
+    """
+    for table, cols in TABLES.items():
+        names = [c for c, _ in cols]
+        lower_names = [c.lower() for c in names]
+        assert len(set(lower_names)) == len(names), (
+            f"{table}: case-insensitive duplicate column names detected: "
+            f"{[n for n in names if lower_names.count(n.lower()) > 1]}"
+        )

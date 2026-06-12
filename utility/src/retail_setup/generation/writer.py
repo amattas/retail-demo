@@ -38,9 +38,6 @@ def write_all(
 
     The Spark session is derived from the first DataFrame in ``tables``
     (``df.sparkSession``) — no explicit session parameter is needed.
-    Writes run with ``spark.sql.caseSensitive=true`` (restored afterwards):
-    fact_dc_inventory_txn intentionally carries both ``source`` and ``Source``
-    (TMDL-bound), which the default case-insensitive analyzer rejects.
     """
     if (lakehouse is None) == (base_path is None):
         raise ValueError("Provide exactly one of lakehouse= or base_path=")
@@ -59,29 +56,24 @@ def write_all(
         else:
             df.write.format(fmt).mode("overwrite").save(f"{base_path}/{db}/{name}")
 
-    prev_case_sensitive = spark.conf.get("spark.sql.caseSensitive", "false")
-    spark.conf.set("spark.sql.caseSensitive", "true")
-    try:
-        written: list[tuple[str, int]] = []
-        for name, df in tables.items():
-            _write(df, cfg.silver_db, name)
-            written.append((name, df.count()))
-        for name, df in gold.items():
-            _write(df, cfg.gold_db, name)
-            written.append((name, df.count()))
+    written: list[tuple[str, int]] = []
+    for name, df in tables.items():
+        _write(df, cfg.silver_db, name)
+        written.append((name, df.count()))
+    for name, df in gold.items():
+        _write(df, cfg.gold_db, name)
+        written.append((name, df.count()))
 
-        log_rows = [
-            (run_id, cfg.store_type, cfg.seed, cfg.start_date, cfg.end_date,
-             name, count)
-            for name, count in written
-        ]
-        log_df = spark.createDataFrame(
-            log_rows,
-            "run_id string, store_type string, seed long, start_date date, "
-            "end_date date, table_name string, row_count long",
-        ).withColumn("generated_at", F.current_timestamp())
-        _write(log_df, cfg.silver_db, "setup_run_log")
-    finally:
-        spark.conf.set("spark.sql.caseSensitive", prev_case_sensitive)
+    log_rows = [
+        (run_id, cfg.store_type, cfg.seed, cfg.start_date, cfg.end_date,
+         name, count)
+        for name, count in written
+    ]
+    log_df = spark.createDataFrame(
+        log_rows,
+        "run_id string, store_type string, seed long, start_date date, "
+        "end_date date, table_name string, row_count long",
+    ).withColumn("generated_at", F.current_timestamp())
+    _write(log_df, cfg.silver_db, "setup_run_log")
 
     return [name for name, _ in written]
