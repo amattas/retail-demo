@@ -51,6 +51,8 @@ def _name_rows(raw: list) -> list[dict]:
         if isinstance(item, str):
             out.append({"Name": item})
         else:
+            # single-key dicts only; a second field would silently pick the wrong value
+            assert len(item) == 1, f"expected single-key name row, got {item!r}"
             out.append({"Name": next(iter(item.values()))})
     return out
 
