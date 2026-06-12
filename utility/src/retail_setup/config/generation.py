@@ -25,7 +25,11 @@ class GenerationConfig(BaseModel):
     # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it
     transactions_per_store_day: int = Field(default=400, gt=0)
     # fraction of SALE receipts returned per day (Dec 26 spikes 6x, capped 10%)
+    # nominal daily return share; Dec 26 applies a 6x spike capped at 0.10, so
+    # values near the ceiling flatten the spike - keep this small (~0.01)
     return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
+    # network-wide online orders per day at multiplier 1.0; None -> store_count * 8
+    online_orders_per_day: int | None = Field(default=None, gt=0)
 
     @field_validator("store_type")
     @classmethod
@@ -47,6 +51,8 @@ class GenerationConfig(BaseModel):
             self.dc_count = max(1, self.store_count // 10)
         if self.customer_count is None:
             self.customer_count = self.store_count * 1000
+        if self.online_orders_per_day is None:
+            self.online_orders_per_day = self.store_count * 8
         return self
 
 
