@@ -1264,6 +1264,24 @@ git commit -m "feat(utility): generation orchestrator, shared-table unions, inva
 - [ ] Every fact frame ends with `.select(*column_names(...))`
 - [ ] No file named with "credentials"/"secret"
 
+## Carry-notes from the Plan 2b final review (MUST address in the 2c plan)
+
+- **Single-partition `__index_level_0__` windows** (marketing, sensors,
+  online_orders, promotions, `inventory._with_index`): fine at test scale,
+  a full-volume write bottleneck — switch to a partitioned or hash-derived
+  index in 2c. Treat as must-address.
+- Column-wise customer build before real volumes (confirmed still pending).
+- Notebooks MUST pin `spark.sql.session.timeZone=UTC` — string-built
+  timestamps throughout the engine depend on it (locally the test fixture
+  sets it).
+- The engine's ±5y dim_date padding is load-bearing for the semantic model's
+  date relationships — the 2c writer must preserve it.
+- Minor cleanups for 2c: drop the now-unused `partition_seed` column +
+  stale docstring in `runtime.store_day_grid` (sensors went Spark-native);
+  remove the unused tuple element in `marketing.py`'s day grid; add a guard
+  comment on `online_orders`' 5-digit seq lpad (collides above 99,999
+  orders/day; config max ~16k).
+
 ## Deferred to Plan 2c
 
 - Gold aggregates (9 `au.*` tables), the four notebooks + build script,
