@@ -24,6 +24,8 @@ class GenerationConfig(BaseModel):
     # base in-store transactions per store-day at multiplier 1.0; profiles'
     # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it
     transactions_per_store_day: int = Field(default=400, gt=0)
+    # fraction of SALE receipts returned per day (Dec 26 spikes 6x, capped 10%)
+    return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
 
     @field_validator("store_type")
     @classmethod
