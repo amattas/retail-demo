@@ -2,7 +2,7 @@
 
 ## Current State
 - **Wave**: E (Review & Packaging)
-- **Last Updated**: 2026-05-21
+- **Last Updated**: 2026-06-12
 
 ## Summary
 
@@ -28,12 +28,15 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic retail data ge
   - Fact tables: receipts, receipt_lines, inventory, logistics, marketing, etc.
   - Modularized architecture: master_generators/, fact_generators/, retail_patterns/
 - [x] **KQL Database** - `fabric/kql_database/`
-  - Event tables (02-create-tables.kql)
-  - Functions (04-functions.kql)
-  - Materialized views (05, 06 .kql files)
+  - Event tables (01-create-tables.kql) + ingestion mappings (02)
+  - Functions (03-create-functions.kql)
+  - Materialized views (04-create-materialized-views.kql)
+  - ML anomaly detection (06) and pricing approval tables (07)
 - [x] **Lakehouse notebooks** - `fabric/lakehouse/`
-  - 02-onelake-to-silver.ipynb (Bronze → Silver)
-  - 03-silver-to-gold.ipynb (Silver → Gold aggregations)
+  - 01-create-bronze-shortcuts, 02-historical-data-load
+  - 03-streaming-to-silver.ipynb (Bronze → Silver)
+  - 04-streaming-to-gold.ipynb (Silver → Gold aggregations)
+  - 05-maintain-delta-tables, ML notebooks 06-14
 - [x] **Code quality** - mypy, ruff, tests passing
 
 ### Wave E: Review & Packaging
@@ -45,6 +48,7 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic retail data ge
 - [x] Semantic model enriched with curated DAX measures, time-intelligence relationships, date/product/geography/store/DC hierarchies, and core operational relationships
 - [x] PBIP references cleaned so the default report/model use only generated core tables; optional ML table definitions are excluded from the active model until their Lakehouse tables exist
 - [ ] Semantic model (deployment step)
+- [x] Docs migrated from MkDocs to Docusaurus (`website/`, 2026-06-12); all pages revised against the implemented code
 
 ---
 
