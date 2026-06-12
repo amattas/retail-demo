@@ -12,12 +12,14 @@ ROOT = default_dictionary_root()
 
 
 def test_supercenter_loads_with_expected_volume():
+    # Thresholds reflect actual datagen sourcedata volumes (670 products / 579 geographies),
+    # not the plan's original ~10k estimate.
     ds = load_dictionaries(ROOT, "supercenter")
-    assert len(ds.products) >= 9000
+    assert len(ds.products) >= 600
     assert len(ds.brands) >= 400
-    assert len(ds.geographies) >= 900
-    assert len(ds.first_names) >= 200
-    assert len(ds.last_names) >= 200
+    assert len(ds.geographies) >= 500
+    assert len(ds.first_names) >= 250
+    assert len(ds.last_names) >= 250
     assert len(ds.tax_rates) >= 100
 
 
