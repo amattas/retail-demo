@@ -345,6 +345,48 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("event_date", "date"),
         ("__index_level_0__", "long"),
     ],
+    # -----------------------------------------------------------------------
+    # Plan 2c: 9 Gold (au) aggregate tables
+    # TMDL audit 2026-06-12: bindings match exactly; `computed_at` and `as_of`
+    # are produced by the legacy transforms but unbound in TMDL (extras OK).
+    # TMDL `day`/`ts` are dateTime — TYPE_COMPAT accepts timestamp|date.
+    # -----------------------------------------------------------------------
+    "sales_minute_store": [
+        ("store_id", "long"), ("ts", "timestamp"), ("total_sales", "double"),
+        ("receipts", "long"), ("avg_basket", "double"),
+    ],
+    "top_products_15m": [
+        ("product_id", "long"), ("revenue", "double"), ("units", "long"),
+        ("computed_at", "timestamp"),  # produced by legacy code, unbound in TMDL
+    ],
+    "inventory_position_current": [
+        ("store_id", "long"), ("product_id", "long"), ("on_hand", "long"),
+        ("as_of", "timestamp"),
+    ],
+    "dc_inventory_position_current": [
+        ("dc_id", "long"), ("product_id", "long"), ("on_hand", "long"),
+        ("as_of", "timestamp"),
+    ],
+    "truck_dwell_daily": [
+        ("site", "string"), ("day", "date"), ("avg_dwell_min", "double"),
+        ("trucks", "long"),
+    ],
+    "online_sales_daily": [
+        ("day", "date"), ("orders", "long"), ("subtotal", "double"),
+        ("tax", "double"), ("total", "double"), ("avg_order_value", "double"),
+    ],
+    "zone_dwell_minute": [
+        ("store_id", "long"), ("zone", "string"), ("ts", "timestamp"),
+        ("avg_dwell", "double"), ("customers", "long"),
+    ],
+    "marketing_cost_daily": [
+        ("campaign_id", "string"), ("day", "date"), ("impressions", "long"),
+        ("cost", "double"),
+    ],
+    "tender_mix_daily": [
+        ("day", "date"), ("payment_method", "string"), ("transactions", "long"),
+        ("total_amount", "double"),
+    ],
 }
 
 
