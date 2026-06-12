@@ -8,6 +8,8 @@ line-length = 88
 # Exclude Fabric notebooks and other non-Python code
 exclude = [
     "fabric/**/*",
+    "deploy/.generated/**/*",
+    "deploy/workspace/**/*",
     "data/**/*",
     ".git",
     "__pycache__",
