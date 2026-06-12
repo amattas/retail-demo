@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from retail_setup.dictionaries.loader import available_store_types, default_dictionary_root
 
@@ -17,6 +17,10 @@ class GenerationConfig(BaseModel):
     seed: int = 42
     silver_db: str = "ag"
     gold_db: str = "au"
+    # Optional override for dictionary root; when None, default_dictionary_root() is used.
+    # Pass an absolute path string to point at a custom dictionary tree (e.g. a Fabric
+    # lakehouse Files mount) without mutating the package data directory.
+    dictionary_root: str | None = None
 
     # scale knobs; None -> derived from store_count in the validator below
     dc_count: int | None = Field(default=None, gt=0)
@@ -31,13 +35,18 @@ class GenerationConfig(BaseModel):
     # network-wide online orders per day at multiplier 1.0; None -> store_count * 8
     online_orders_per_day: int | None = Field(default=None, gt=0)
 
-    @field_validator("store_type")
-    @classmethod
-    def _known_store_type(cls, v: str) -> str:
-        known = available_store_types(default_dictionary_root())
-        if v not in known:
-            raise ValueError(f"store_type {v!r} not found; available: {known}")
-        return v
+    @model_validator(mode="after")
+    def _known_store_type(self) -> "GenerationConfig":
+        root = Path(self.dictionary_root) if self.dictionary_root else default_dictionary_root()
+        known = available_store_types(root)
+        if self.store_type not in known:
+            raise ValueError(f"store_type {self.store_type!r} not found; available: {known}")
+        return self
+
+    @property
+    def resolved_dictionary_root(self) -> Path:
+        """Resolved dictionary root path (explicit override or package default)."""
+        return Path(self.dictionary_root) if self.dictionary_root else default_dictionary_root()
 
     @model_validator(mode="after")
     def _date_order(self) -> "GenerationConfig":

@@ -52,3 +52,27 @@ def test_scale_overrides_respected():
                            store_count=40, dc_count=2, customer_count=500,
                            transactions_per_store_day=50)
     assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 500, 50)
+
+
+def test_explicit_dictionary_root(tmp_path):
+    # a fake root with one valid store type
+    import json, shutil
+    from retail_setup.dictionaries.loader import default_dictionary_root
+
+    src = default_dictionary_root()
+    shutil.copytree(src / "_shared", tmp_path / "_shared")
+    shutil.copytree(src / "grocery", tmp_path / "mini")
+    profile = json.loads((tmp_path / "mini" / "profile.json").read_text())
+    profile["store_type"] = "mini"
+    (tmp_path / "mini" / "profile.json").write_text(json.dumps(profile))
+
+    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                           store_type="mini", dictionary_root=str(tmp_path))
+    assert cfg.store_type == "mini"
+
+
+def test_unknown_type_in_explicit_root_rejected(tmp_path):
+    (tmp_path / "_shared").mkdir()
+    with pytest.raises(ValidationError, match="store_type"):
+        GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                         store_type="grocery", dictionary_root=str(tmp_path))
