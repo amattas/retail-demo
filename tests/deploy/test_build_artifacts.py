@@ -130,3 +130,47 @@ def test_setup_group_requires_rendered_notebooks(tmp_path: Path) -> None:
         build_artifacts.stage_setup_notebooks(
             repo_root=tmp_path, output_dir=tmp_path / "ws", lakehouse_name="lh"
         )
+
+
+def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
+    tmp_path: Path,
+) -> None:
+    """build_workspace must pass lakehouse_name through to staged setup notebook metadata."""
+    repo = tmp_path / "repo"
+    out_dir = tmp_path / "workspace"
+
+    # Minimal setup notebook fixtures in utility/out/
+    rendered = repo / "utility" / "out"
+    rendered.mkdir(parents=True)
+    for name in build_artifacts.SETUP_NOTEBOOKS:
+        _write_json(
+            rendered / f"{name}.ipynb",
+            {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
+        )
+
+    # Power BI stubs (build_workspace always calls stage_powerbi_items)
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+
+    result = build_artifacts.build_workspace(
+        repo_root=repo,
+        output_dir=out_dir,
+        notebook_groups=["setup"],
+        lakehouse_name="custom_lh",
+    )
+
+    # Every staged setup notebook must carry the custom lakehouse name in its metadata
+    for name in build_artifacts.SETUP_NOTEBOOKS:
+        notebook_path = out_dir / f"{name}.Notebook" / "notebook-content.ipynb"
+        assert notebook_path.exists(), f"Missing staged notebook: {notebook_path}"
+        notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+        lh_meta = notebook["metadata"]["dependencies"]["lakehouse"]
+        assert lh_meta["default_lakehouse_name"] == "custom_lh", (
+            f"{name}: expected 'custom_lh', got {lh_meta['default_lakehouse_name']!r}"
+        )

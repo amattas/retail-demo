@@ -153,6 +153,7 @@ def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     notebook_groups: list[str] | None = None,
+    lakehouse_name: str = "retail_lakehouse",
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -175,13 +176,14 @@ def build_workspace(
             stage_notebook(
                 repo_root / "fabric" / "lakehouse" / notebook_name,
                 output_dir,
+                lakehouse_name=lakehouse_name,
             ).name
         )
 
     if "setup" in notebook_groups:
         staged_items.extend(
             item.name
-            for item in stage_setup_notebooks(repo_root, output_dir)
+            for item in stage_setup_notebooks(repo_root, output_dir, lakehouse_name=lakehouse_name)
         )
 
     staged_items.extend(
@@ -248,9 +250,12 @@ def main() -> int:
         default=["core"],
         choices=sorted(NOTEBOOK_GROUPS),
     )
+    parser.add_argument("--lakehouse-name", default="retail_lakehouse")
     args = parser.parse_args()
 
-    result = build_workspace(args.repo_root, args.output_dir, args.notebook_groups)
+    result = build_workspace(
+        args.repo_root, args.output_dir, args.notebook_groups, args.lakehouse_name
+    )
     print(f"Staged {len(result.staged_items)} items in {result.output_dir}")
     for item in result.staged_items:
         print(f"  {item}")
