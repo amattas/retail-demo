@@ -1,0 +1,980 @@
+[
+ {
+  "City": "Birmingham",
+  "CombinedRate": "0.0900",
+  "County": "Jefferson",
+  "StateCode": "AL"
+ },
+ {
+  "City": "Mobile",
+  "CombinedRate": "0.1000",
+  "County": "Mobile",
+  "StateCode": "AL"
+ },
+ {
+  "City": "Montgomery",
+  "CombinedRate": "0.0950",
+  "County": "Montgomery",
+  "StateCode": "AL"
+ },
+ {
+  "City": "Anchorage",
+  "CombinedRate": "0.0000",
+  "County": "Anchorage",
+  "StateCode": "AK"
+ },
+ {
+  "City": "Fairbanks",
+  "CombinedRate": "0.0000",
+  "County": "Fairbanks",
+  "StateCode": "AK"
+ },
+ {
+  "City": "Juneau",
+  "CombinedRate": "0.0500",
+  "County": "Juneau",
+  "StateCode": "AK"
+ },
+ {
+  "City": "Phoenix",
+  "CombinedRate": "0.0830",
+  "County": "Maricopa",
+  "StateCode": "AZ"
+ },
+ {
+  "City": "Tucson",
+  "CombinedRate": "0.0870",
+  "County": "Pima",
+  "StateCode": "AZ"
+ },
+ {
+  "City": "Yuma",
+  "CombinedRate": "0.0780",
+  "County": "Yuma",
+  "StateCode": "AZ"
+ },
+ {
+  "City": "Little Rock",
+  "CombinedRate": "0.0925",
+  "County": "Pulaski",
+  "StateCode": "AR"
+ },
+ {
+  "City": "Fayetteville",
+  "CombinedRate": "0.0900",
+  "County": "Washington",
+  "StateCode": "AR"
+ },
+ {
+  "City": "Bentonville",
+  "CombinedRate": "0.0900",
+  "County": "Benton",
+  "StateCode": "AR"
+ },
+ {
+  "City": "Los Angeles",
+  "CombinedRate": "0.0950",
+  "County": "Los Angeles",
+  "StateCode": "CA"
+ },
+ {
+  "City": "San Francisco",
+  "CombinedRate": "0.0863",
+  "County": "San Francisco",
+  "StateCode": "CA"
+ },
+ {
+  "City": "San Diego",
+  "CombinedRate": "0.0775",
+  "County": "San Diego",
+  "StateCode": "CA"
+ },
+ {
+  "City": "Oakland",
+  "CombinedRate": "0.0975",
+  "County": "Alameda",
+  "StateCode": "CA"
+ },
+ {
+  "City": "Anaheim",
+  "CombinedRate": "0.0775",
+  "County": "Orange",
+  "StateCode": "CA"
+ },
+ {
+  "City": "Sacramento",
+  "CombinedRate": "0.0825",
+  "County": "Sacramento",
+  "StateCode": "CA"
+ },
+ {
+  "City": "San Jose",
+  "CombinedRate": "0.0913",
+  "County": "Santa Clara",
+  "StateCode": "CA"
+ },
+ {
+  "City": "Riverside",
+  "CombinedRate": "0.0775",
+  "County": "Riverside",
+  "StateCode": "CA"
+ },
+ {
+  "City": "Denver",
+  "CombinedRate": "0.0810",
+  "County": "Denver",
+  "StateCode": "CO"
+ },
+ {
+  "City": "Colorado Springs",
+  "CombinedRate": "0.0730",
+  "County": "El Paso",
+  "StateCode": "CO"
+ },
+ {
+  "City": "Boulder",
+  "CombinedRate": "0.0865",
+  "County": "Boulder",
+  "StateCode": "CO"
+ },
+ {
+  "City": "Hartford",
+  "CombinedRate": "0.0635",
+  "County": "Hartford",
+  "StateCode": "CT"
+ },
+ {
+  "City": "New Haven",
+  "CombinedRate": "0.0635",
+  "County": "New Haven",
+  "StateCode": "CT"
+ },
+ {
+  "City": "Bridgeport",
+  "CombinedRate": "0.0635",
+  "County": "Fairfield",
+  "StateCode": "CT"
+ },
+ {
+  "City": "Wilmington",
+  "CombinedRate": "0.0000",
+  "County": "New Castle",
+  "StateCode": "DE"
+ },
+ {
+  "City": "Dover",
+  "CombinedRate": "0.0000",
+  "County": "Kent",
+  "StateCode": "DE"
+ },
+ {
+  "City": "Georgetown",
+  "CombinedRate": "0.0000",
+  "County": "Sussex",
+  "StateCode": "DE"
+ },
+ {
+  "City": "Miami",
+  "CombinedRate": "0.0700",
+  "County": "Miami-Dade",
+  "StateCode": "FL"
+ },
+ {
+  "City": "Orlando",
+  "CombinedRate": "0.0650",
+  "County": "Orange",
+  "StateCode": "FL"
+ },
+ {
+  "City": "Tampa",
+  "CombinedRate": "0.0850",
+  "County": "Hillsborough",
+  "StateCode": "FL"
+ },
+ {
+  "City": "Jacksonville",
+  "CombinedRate": "0.0700",
+  "County": "Duval",
+  "StateCode": "FL"
+ },
+ {
+  "City": "West Palm Beach",
+  "CombinedRate": "0.0700",
+  "County": "Palm Beach",
+  "StateCode": "FL"
+ },
+ {
+  "City": "Fort Lauderdale",
+  "CombinedRate": "0.0700",
+  "County": "Broward",
+  "StateCode": "FL"
+ },
+ {
+  "City": "Atlanta",
+  "CombinedRate": "0.0890",
+  "County": "Fulton",
+  "StateCode": "GA"
+ },
+ {
+  "City": "Lawrenceville",
+  "CombinedRate": "0.0770",
+  "County": "Gwinnett",
+  "StateCode": "GA"
+ },
+ {
+  "City": "Marietta",
+  "CombinedRate": "0.0700",
+  "County": "Cobb",
+  "StateCode": "GA"
+ },
+ {
+  "City": "Honolulu",
+  "CombinedRate": "0.0450",
+  "County": "Honolulu",
+  "StateCode": "HI"
+ },
+ {
+  "City": "Kahului",
+  "CombinedRate": "0.0450",
+  "County": "Maui",
+  "StateCode": "HI"
+ },
+ {
+  "City": "Hilo",
+  "CombinedRate": "0.0450",
+  "County": "Hawaii",
+  "StateCode": "HI"
+ },
+ {
+  "City": "Boise",
+  "CombinedRate": "0.0600",
+  "County": "Ada",
+  "StateCode": "ID"
+ },
+ {
+  "City": "Nampa",
+  "CombinedRate": "0.0600",
+  "County": "Canyon",
+  "StateCode": "ID"
+ },
+ {
+  "City": "Coeur d'Alene",
+  "CombinedRate": "0.0610",
+  "County": "Kootenai",
+  "StateCode": "ID"
+ },
+ {
+  "City": "Chicago",
+  "CombinedRate": "0.1025",
+  "County": "Cook",
+  "StateCode": "IL"
+ },
+ {
+  "City": "Naperville",
+  "CombinedRate": "0.0750",
+  "County": "DuPage",
+  "StateCode": "IL"
+ },
+ {
+  "City": "Waukegan",
+  "CombinedRate": "0.0800",
+  "County": "Lake",
+  "StateCode": "IL"
+ },
+ {
+  "City": "Indianapolis",
+  "CombinedRate": "0.0700",
+  "County": "Marion",
+  "StateCode": "IN"
+ },
+ {
+  "City": "Hammond",
+  "CombinedRate": "0.0700",
+  "County": "Lake",
+  "StateCode": "IN"
+ },
+ {
+  "City": "Fort Wayne",
+  "CombinedRate": "0.0700",
+  "County": "Allen",
+  "StateCode": "IN"
+ },
+ {
+  "City": "Des Moines",
+  "CombinedRate": "0.0700",
+  "County": "Polk",
+  "StateCode": "IA"
+ },
+ {
+  "City": "Cedar Rapids",
+  "CombinedRate": "0.0700",
+  "County": "Linn",
+  "StateCode": "IA"
+ },
+ {
+  "City": "Davenport",
+  "CombinedRate": "0.0700",
+  "County": "Scott",
+  "StateCode": "IA"
+ },
+ {
+  "City": "Wichita",
+  "CombinedRate": "0.0765",
+  "County": "Sedgwick",
+  "StateCode": "KS"
+ },
+ {
+  "City": "Overland Park",
+  "CombinedRate": "0.0863",
+  "County": "Johnson",
+  "StateCode": "KS"
+ },
+ {
+  "City": "Kansas City",
+  "CombinedRate": "0.0963",
+  "County": "Wyandotte",
+  "StateCode": "KS"
+ },
+ {
+  "City": "Louisville",
+  "CombinedRate": "0.0600",
+  "County": "Jefferson",
+  "StateCode": "KY"
+ },
+ {
+  "City": "Lexington",
+  "CombinedRate": "0.0600",
+  "County": "Fayette",
+  "StateCode": "KY"
+ },
+ {
+  "City": "Covington",
+  "CombinedRate": "0.0600",
+  "County": "Kenton",
+  "StateCode": "KY"
+ },
+ {
+  "City": "New Orleans",
+  "CombinedRate": "0.0945",
+  "County": "Orleans",
+  "StateCode": "LA"
+ },
+ {
+  "City": "Baton Rouge",
+  "CombinedRate": "0.0945",
+  "County": "East Baton Rouge",
+  "StateCode": "LA"
+ },
+ {
+  "City": "Shreveport",
+  "CombinedRate": "0.0945",
+  "County": "Caddo",
+  "StateCode": "LA"
+ },
+ {
+  "City": "Portland",
+  "CombinedRate": "0.0550",
+  "County": "Cumberland",
+  "StateCode": "ME"
+ },
+ {
+  "City": "Bangor",
+  "CombinedRate": "0.0550",
+  "County": "Penobscot",
+  "StateCode": "ME"
+ },
+ {
+  "City": "Biddeford",
+  "CombinedRate": "0.0550",
+  "County": "York",
+  "StateCode": "ME"
+ },
+ {
+  "City": "Baltimore",
+  "CombinedRate": "0.0600",
+  "County": "Baltimore City",
+  "StateCode": "MD"
+ },
+ {
+  "City": "Rockville",
+  "CombinedRate": "0.0600",
+  "County": "Montgomery",
+  "StateCode": "MD"
+ },
+ {
+  "City": "Upper Marlboro",
+  "CombinedRate": "0.0600",
+  "County": "Prince George's",
+  "StateCode": "MD"
+ },
+ {
+  "City": "Boston",
+  "CombinedRate": "0.0625",
+  "County": "Suffolk",
+  "StateCode": "MA"
+ },
+ {
+  "City": "Cambridge",
+  "CombinedRate": "0.0625",
+  "County": "Middlesex",
+  "StateCode": "MA"
+ },
+ {
+  "City": "Worcester",
+  "CombinedRate": "0.0625",
+  "County": "Worcester",
+  "StateCode": "MA"
+ },
+ {
+  "City": "Detroit",
+  "CombinedRate": "0.0600",
+  "County": "Wayne",
+  "StateCode": "MI"
+ },
+ {
+  "City": "Pontiac",
+  "CombinedRate": "0.0600",
+  "County": "Oakland",
+  "StateCode": "MI"
+ },
+ {
+  "City": "Grand Rapids",
+  "CombinedRate": "0.0600",
+  "County": "Kent",
+  "StateCode": "MI"
+ },
+ {
+  "City": "Minneapolis",
+  "CombinedRate": "0.0788",
+  "County": "Hennepin",
+  "StateCode": "MN"
+ },
+ {
+  "City": "Saint Paul",
+  "CombinedRate": "0.0788",
+  "County": "Ramsey",
+  "StateCode": "MN"
+ },
+ {
+  "City": "Hastings",
+  "CombinedRate": "0.0788",
+  "County": "Dakota",
+  "StateCode": "MN"
+ },
+ {
+  "City": "Jackson",
+  "CombinedRate": "0.0700",
+  "County": "Hinds",
+  "StateCode": "MS"
+ },
+ {
+  "City": "Gulfport",
+  "CombinedRate": "0.0700",
+  "County": "Harrison",
+  "StateCode": "MS"
+ },
+ {
+  "City": "Hernando",
+  "CombinedRate": "0.0700",
+  "County": "DeSoto",
+  "StateCode": "MS"
+ },
+ {
+  "City": "Kansas City",
+  "CombinedRate": "0.0863",
+  "County": "Jackson",
+  "StateCode": "MO"
+ },
+ {
+  "City": "St. Louis",
+  "CombinedRate": "0.0863",
+  "County": "St. Louis City",
+  "StateCode": "MO"
+ },
+ {
+  "City": "Springfield",
+  "CombinedRate": "0.0613",
+  "County": "Greene",
+  "StateCode": "MO"
+ },
+ {
+  "City": "Billings",
+  "CombinedRate": "0.0000",
+  "County": "Yellowstone",
+  "StateCode": "MT"
+ },
+ {
+  "City": "Missoula",
+  "CombinedRate": "0.0000",
+  "County": "Missoula",
+  "StateCode": "MT"
+ },
+ {
+  "City": "Great Falls",
+  "CombinedRate": "0.0000",
+  "County": "Cascade",
+  "StateCode": "MT"
+ },
+ {
+  "City": "Omaha",
+  "CombinedRate": "0.0700",
+  "County": "Douglas",
+  "StateCode": "NE"
+ },
+ {
+  "City": "Lincoln",
+  "CombinedRate": "0.0725",
+  "County": "Lancaster",
+  "StateCode": "NE"
+ },
+ {
+  "City": "Papillion",
+  "CombinedRate": "0.0700",
+  "County": "Sarpy",
+  "StateCode": "NE"
+ },
+ {
+  "City": "Las Vegas",
+  "CombinedRate": "0.0825",
+  "County": "Clark",
+  "StateCode": "NV"
+ },
+ {
+  "City": "Reno",
+  "CombinedRate": "0.0825",
+  "County": "Washoe",
+  "StateCode": "NV"
+ },
+ {
+  "City": "Carson City",
+  "CombinedRate": "0.0765",
+  "County": "Carson City",
+  "StateCode": "NV"
+ },
+ {
+  "City": "Manchester",
+  "CombinedRate": "0.0000",
+  "County": "Hillsborough",
+  "StateCode": "NH"
+ },
+ {
+  "City": "Portsmouth",
+  "CombinedRate": "0.0000",
+  "County": "Rockingham",
+  "StateCode": "NH"
+ },
+ {
+  "City": "Concord",
+  "CombinedRate": "0.0000",
+  "County": "Merrimack",
+  "StateCode": "NH"
+ },
+ {
+  "City": "Newark",
+  "CombinedRate": "0.0663",
+  "County": "Essex",
+  "StateCode": "NJ"
+ },
+ {
+  "City": "Hackensack",
+  "CombinedRate": "0.0663",
+  "County": "Bergen",
+  "StateCode": "NJ"
+ },
+ {
+  "City": "New Brunswick",
+  "CombinedRate": "0.0663",
+  "County": "Middlesex",
+  "StateCode": "NJ"
+ },
+ {
+  "City": "Albuquerque",
+  "CombinedRate": "0.0738",
+  "County": "Bernalillo",
+  "StateCode": "NM"
+ },
+ {
+  "City": "Las Cruces",
+  "CombinedRate": "0.0713",
+  "County": "Dona Ana",
+  "StateCode": "NM"
+ },
+ {
+  "City": "Santa Fe",
+  "CombinedRate": "0.0838",
+  "County": "Santa Fe",
+  "StateCode": "NM"
+ },
+ {
+  "City": "New York City",
+  "CombinedRate": "0.0875",
+  "County": "New York",
+  "StateCode": "NY"
+ },
+ {
+  "City": "Buffalo",
+  "CombinedRate": "0.0850",
+  "County": "Erie",
+  "StateCode": "NY"
+ },
+ {
+  "City": "Rochester",
+  "CombinedRate": "0.0800",
+  "County": "Monroe",
+  "StateCode": "NY"
+ },
+ {
+  "City": "Brooklyn",
+  "CombinedRate": "0.0875",
+  "County": "Kings",
+  "StateCode": "NY"
+ },
+ {
+  "City": "Queens",
+  "CombinedRate": "0.0875",
+  "County": "Queens",
+  "StateCode": "NY"
+ },
+ {
+  "City": "Charlotte",
+  "CombinedRate": "0.0750",
+  "County": "Mecklenburg",
+  "StateCode": "NC"
+ },
+ {
+  "City": "Raleigh",
+  "CombinedRate": "0.0725",
+  "County": "Wake",
+  "StateCode": "NC"
+ },
+ {
+  "City": "Greensboro",
+  "CombinedRate": "0.0725",
+  "County": "Guilford",
+  "StateCode": "NC"
+ },
+ {
+  "City": "Fargo",
+  "CombinedRate": "0.0700",
+  "County": "Cass",
+  "StateCode": "ND"
+ },
+ {
+  "City": "Bismarck",
+  "CombinedRate": "0.0700",
+  "County": "Burleigh",
+  "StateCode": "ND"
+ },
+ {
+  "City": "Grand Forks",
+  "CombinedRate": "0.0700",
+  "County": "Grand Forks",
+  "StateCode": "ND"
+ },
+ {
+  "City": "Cleveland",
+  "CombinedRate": "0.0800",
+  "County": "Cuyahoga",
+  "StateCode": "OH"
+ },
+ {
+  "City": "Columbus",
+  "CombinedRate": "0.0775",
+  "County": "Franklin",
+  "StateCode": "OH"
+ },
+ {
+  "City": "Cincinnati",
+  "CombinedRate": "0.0725",
+  "County": "Hamilton",
+  "StateCode": "OH"
+ },
+ {
+  "City": "Oklahoma City",
+  "CombinedRate": "0.0890",
+  "County": "Oklahoma",
+  "StateCode": "OK"
+ },
+ {
+  "City": "Tulsa",
+  "CombinedRate": "0.0887",
+  "County": "Tulsa",
+  "StateCode": "OK"
+ },
+ {
+  "City": "Norman",
+  "CombinedRate": "0.0890",
+  "County": "Cleveland",
+  "StateCode": "OK"
+ },
+ {
+  "City": "Portland",
+  "CombinedRate": "0.0000",
+  "County": "Multnomah",
+  "StateCode": "OR"
+ },
+ {
+  "City": "Eugene",
+  "CombinedRate": "0.0000",
+  "County": "Lane",
+  "StateCode": "OR"
+ },
+ {
+  "City": "Salem",
+  "CombinedRate": "0.0000",
+  "County": "Marion",
+  "StateCode": "OR"
+ },
+ {
+  "City": "Philadelphia",
+  "CombinedRate": "0.0800",
+  "County": "Philadelphia",
+  "StateCode": "PA"
+ },
+ {
+  "City": "Pittsburgh",
+  "CombinedRate": "0.0700",
+  "County": "Allegheny",
+  "StateCode": "PA"
+ },
+ {
+  "City": "Norristown",
+  "CombinedRate": "0.0600",
+  "County": "Montgomery",
+  "StateCode": "PA"
+ },
+ {
+  "City": "Providence",
+  "CombinedRate": "0.0700",
+  "County": "Providence",
+  "StateCode": "RI"
+ },
+ {
+  "City": "Warwick",
+  "CombinedRate": "0.0700",
+  "County": "Kent",
+  "StateCode": "RI"
+ },
+ {
+  "City": "Wakefield",
+  "CombinedRate": "0.0700",
+  "County": "Washington",
+  "StateCode": "RI"
+ },
+ {
+  "City": "Columbia",
+  "CombinedRate": "0.0800",
+  "County": "Richland",
+  "StateCode": "SC"
+ },
+ {
+  "City": "Charleston",
+  "CombinedRate": "0.0800",
+  "County": "Charleston",
+  "StateCode": "SC"
+ },
+ {
+  "City": "Greenville",
+  "CombinedRate": "0.0700",
+  "County": "Greenville",
+  "StateCode": "SC"
+ },
+ {
+  "City": "Sioux Falls",
+  "CombinedRate": "0.0650",
+  "County": "Minnehaha",
+  "StateCode": "SD"
+ },
+ {
+  "City": "Rapid City",
+  "CombinedRate": "0.0650",
+  "County": "Pennington",
+  "StateCode": "SD"
+ },
+ {
+  "City": "Canton",
+  "CombinedRate": "0.0650",
+  "County": "Lincoln",
+  "StateCode": "SD"
+ },
+ {
+  "City": "Memphis",
+  "CombinedRate": "0.0925",
+  "County": "Shelby",
+  "StateCode": "TN"
+ },
+ {
+  "City": "Nashville",
+  "CombinedRate": "0.0925",
+  "County": "Davidson",
+  "StateCode": "TN"
+ },
+ {
+  "City": "Knoxville",
+  "CombinedRate": "0.0925",
+  "County": "Knox",
+  "StateCode": "TN"
+ },
+ {
+  "City": "Houston",
+  "CombinedRate": "0.0825",
+  "County": "Harris",
+  "StateCode": "TX"
+ },
+ {
+  "City": "Dallas",
+  "CombinedRate": "0.0825",
+  "County": "Dallas",
+  "StateCode": "TX"
+ },
+ {
+  "City": "San Antonio",
+  "CombinedRate": "0.0825",
+  "County": "Bexar",
+  "StateCode": "TX"
+ },
+ {
+  "City": "Austin",
+  "CombinedRate": "0.0825",
+  "County": "Travis",
+  "StateCode": "TX"
+ },
+ {
+  "City": "Fort Worth",
+  "CombinedRate": "0.0825",
+  "County": "Tarrant",
+  "StateCode": "TX"
+ },
+ {
+  "City": "McKinney",
+  "CombinedRate": "0.0825",
+  "County": "Collin",
+  "StateCode": "TX"
+ },
+ {
+  "City": "Salt Lake City",
+  "CombinedRate": "0.0685",
+  "County": "Salt Lake",
+  "StateCode": "UT"
+ },
+ {
+  "City": "Provo",
+  "CombinedRate": "0.0625",
+  "County": "Utah",
+  "StateCode": "UT"
+ },
+ {
+  "City": "Farmington",
+  "CombinedRate": "0.0635",
+  "County": "Davis",
+  "StateCode": "UT"
+ },
+ {
+  "City": "Burlington",
+  "CombinedRate": "0.0600",
+  "County": "Chittenden",
+  "StateCode": "VT"
+ },
+ {
+  "City": "Rutland",
+  "CombinedRate": "0.0600",
+  "County": "Rutland",
+  "StateCode": "VT"
+ },
+ {
+  "City": "Montpelier",
+  "CombinedRate": "0.0600",
+  "County": "Washington",
+  "StateCode": "VT"
+ },
+ {
+  "City": "Fairfax",
+  "CombinedRate": "0.0600",
+  "County": "Fairfax",
+  "StateCode": "VA"
+ },
+ {
+  "City": "Virginia Beach",
+  "CombinedRate": "0.0600",
+  "County": "Virginia Beach City",
+  "StateCode": "VA"
+ },
+ {
+  "City": "Arlington",
+  "CombinedRate": "0.0600",
+  "County": "Arlington",
+  "StateCode": "VA"
+ },
+ {
+  "City": "Seattle",
+  "CombinedRate": "0.1010",
+  "County": "King",
+  "StateCode": "WA"
+ },
+ {
+  "City": "Tacoma",
+  "CombinedRate": "0.0970",
+  "County": "Pierce",
+  "StateCode": "WA"
+ },
+ {
+  "City": "Spokane",
+  "CombinedRate": "0.0890",
+  "County": "Spokane",
+  "StateCode": "WA"
+ },
+ {
+  "City": "Charleston",
+  "CombinedRate": "0.0600",
+  "County": "Kanawha",
+  "StateCode": "WV"
+ },
+ {
+  "City": "Martinsburg",
+  "CombinedRate": "0.0600",
+  "County": "Berkeley",
+  "StateCode": "WV"
+ },
+ {
+  "City": "Huntington",
+  "CombinedRate": "0.0600",
+  "County": "Cabell",
+  "StateCode": "WV"
+ },
+ {
+  "City": "Milwaukee",
+  "CombinedRate": "0.0550",
+  "County": "Milwaukee",
+  "StateCode": "WI"
+ },
+ {
+  "City": "Madison",
+  "CombinedRate": "0.0550",
+  "County": "Dane",
+  "StateCode": "WI"
+ },
+ {
+  "City": "Waukesha",
+  "CombinedRate": "0.0550",
+  "County": "Waukesha",
+  "StateCode": "WI"
+ },
+ {
+  "City": "Cheyenne",
+  "CombinedRate": "0.0500",
+  "County": "Laramie",
+  "StateCode": "WY"
+ },
+ {
+  "City": "Casper",
+  "CombinedRate": "0.0500",
+  "County": "Natrona",
+  "StateCode": "WY"
+ },
+ {
+  "City": "Gillette",
+  "CombinedRate": "0.0500",
+  "County": "Campbell",
+  "StateCode": "WY"
+ }
+]
