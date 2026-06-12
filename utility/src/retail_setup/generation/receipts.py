@@ -1,10 +1,10 @@
 """Receipts fact group, Spark-native.
 
 Randomness: every stochastic decision derives a uniform double from
-xxhash64(key columns, salt) — partition-arrangement-independent, so output is
-deterministic for a (config, seed) pair regardless of cluster shape. The
-config seed is folded into every salt so different seeds produce different
-draws (deviation from the plan reference, which omitted the seed from salts).
+xxhash64(key columns, salt) via `runtime.seeded_draws` — partition-
+arrangement-independent, so output is deterministic for a (config, seed) pair
+regardless of cluster shape. The seed is folded into the salt delimiter inside
+`seeded_draws`, keeping generators decoupled from one another.
 
 Count distributions (store-day receipt counts, basket sizes) use a clamped
 normal approximation of Poisson — `max(1, round(N(lambda, sqrt(lambda))))` —
@@ -24,7 +24,7 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
-from retail_setup.generation.runtime import store_day_grid
+from retail_setup.generation.runtime import seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
 
 # (method, mix weight, decline multiplier, processing_ms lo, processing_ms hi)
@@ -40,36 +40,10 @@ DECLINE_REASONS = [
     "FRAUD_SUSPECTED", "CARD_BLOCKED", "LIMIT_EXCEEDED",
 ]
 
-_U_MOD = 10**12  # uniform resolution 1e-12 (precision requirement >= 1e-6)
-
-
-def _u(cols: list, salt: str) -> Column:
-    """Uniform [0,1) double from a stable hash of cols + salt."""
-    return (F.abs(F.xxhash64(*cols, F.lit(salt))) % F.lit(_U_MOD)) / F.lit(float(_U_MOD))
-
-
-def _gauss(cols: list, salt: str) -> Column:
-    """Approx standard normal via sum of 3 uniforms (Irwin-Hall), rescaled to sd ~1."""
-    s = _u(cols, salt + "1") + _u(cols, salt + "2") + _u(cols, salt + "3")
-    return (s - F.lit(1.5)) * F.lit(2.0)  # mean 0, sd ~1
-
 
 def _fmt(cents_col: Column) -> Column:
     """Integer cents -> 'XX.XX' string (no thousands separators)."""
     return F.format_string("%.2f", cents_col / F.lit(100.0))
-
-
-def _pick_by_weights(u: Column, items: list[tuple[str, float]]) -> Column:
-    """Inverse-CDF categorical pick: ascending cumulative bounds, last as otherwise."""
-    total = sum(w for _, w in items)
-    chain: Column | None = None
-    acc = 0.0
-    for name, w in items[:-1]:
-        acc += w / total
-        cond = u < F.lit(acc)
-        chain = F.when(cond, name) if chain is None else chain.when(cond, name)
-    last = F.lit(items[-1][0])
-    return last if chain is None else chain.otherwise(last)
 
 
 def _pick_hour(u: Column, hourly_weights: list[float]) -> Column:
@@ -92,14 +66,7 @@ def generate_receipts_group(
 ) -> dict[str, DataFrame]:
     """Generate fact_receipts, fact_receipt_lines, fact_payments (in-store only)."""
 
-    def u(cols: list, salt: str) -> Column:
-        return _u(cols, f"{salt}|{cfg.seed}")
-
-    def gauss(cols: list, salt: str) -> Column:
-        return _gauss(cols, f"{salt}|{cfg.seed}")
-
-    def h64(cols: list, salt: str) -> Column:
-        return F.abs(F.xxhash64(*cols, F.lit(f"{salt}|{cfg.seed}")))
+    d = seeded_draws(cfg.seed)
 
     stores = dims["dim_stores"].select(
         F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier")
@@ -122,16 +89,16 @@ def generate_receipts_group(
     lam = (F.lit(float(cfg.transactions_per_store_day)) * daily_w * monthly_w
            * F.col("daily_traffic_multiplier"))
     n_rcpt = F.greatest(
-        F.lit(1), F.round(lam + gauss(["store_id", "day"], "n") * F.sqrt(lam)))
+        F.lit(1), F.round(lam + d.gauss(["store_id", "day"], "n") * F.sqrt(lam)))
     grid = grid.withColumn("n_receipts", n_rcpt.cast("int"))
 
     # --- explode to receipts; hour from hourly weights (inverse CDF over 24 bins)
     receipts = (
         grid.withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_receipts"))))
         .withColumn("hour", _pick_hour(
-            u(["store_id", "day", "seq"], "hour"), profile.hourly_weights))
-        .withColumn("minute", (h64(["store_id", "day", "seq"], "min") % 60).cast("int"))
-        .withColumn("second", (h64(["store_id", "day", "seq"], "sec") % 60).cast("int"))
+            d.u(["store_id", "day", "seq"], "hour"), profile.hourly_weights))
+        .withColumn("minute", (d.h64(["store_id", "day", "seq"], "min") % 60).cast("int"))
+        .withColumn("second", (d.h64(["store_id", "day", "seq"], "sec") % 60).cast("int"))
         .withColumn("event_ts", F.make_timestamp(
             F.year("day"), F.month("day"), F.dayofmonth("day"),
             F.col("hour"), F.col("minute"), F.col("second")))
@@ -143,14 +110,14 @@ def generate_receipts_group(
             F.lpad(F.col("store_id").cast("string"), 4, "0"),
             F.lpad(F.col("seq").cast("string"), 6, "0")))
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
-        .withColumn("customer_id", (h64(["receipt_id_ext"], "cust")
+        .withColumn("customer_id", (d.h64(["receipt_id_ext"], "cust")
                                     % F.lit(cfg.customer_count) + 1).cast("long"))
         .withColumn("basket_n", F.greatest(F.lit(1), F.round(
             F.lit(profile.basket_lambda)
-            + gauss(["receipt_id_ext"], "basket") * F.sqrt(F.lit(profile.basket_lambda))
+            + d.gauss(["receipt_id_ext"], "basket") * F.sqrt(F.lit(profile.basket_lambda))
         )).cast("int"))
-        .withColumn("tender_type", _pick_by_weights(
-            u(["receipt_id_ext"], "tender"), [(n, w) for n, w, _, _, _ in TENDERS]))
+        .withColumn("tender_type", d.pick_by_weights(
+            ["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]))
     )
 
     # --- lines: explode baskets, weighted department -> uniform product within dept
@@ -169,8 +136,8 @@ def generate_receipts_group(
     products_ranked = products.withColumn("dept_rank", F.row_number().over(pw))
     dept_sizes = products.groupBy("department").agg(F.count("*").alias("dept_size"))
 
-    dept_expr = _pick_by_weights(
-        u(["receipt_id_ext", "line_num"], "dept"),
+    dept_expr = d.pick_by_weights(
+        ["receipt_id_ext", "line_num"], "dept",
         list(profile.department_weights.items()))
 
     lines = (
@@ -179,22 +146,22 @@ def generate_receipts_group(
         .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
         .withColumn("department", dept_expr)
         .join(dept_sizes, "department")
-        .withColumn("dept_rank", (h64(["receipt_id_ext", "line_num"], "prod")
+        .withColumn("dept_rank", (d.h64(["receipt_id_ext", "line_num"], "prod")
                                   % F.col("dept_size") + 1).cast("int"))
         .join(products_ranked, ["department", "dept_rank"])
         .withColumn("quantity", F.greatest(F.lit(1), F.least(F.lit(5), F.round(
-            u(["receipt_id_ext", "line_num"], "qty") * 3 + 0.7).cast("int"))))
+            d.u(["receipt_id_ext", "line_num"], "qty") * 3 + 0.7).cast("int"))))
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
-        .withColumn("has_promo", u(["receipt_id_ext", "line_num"], "promo")
+        .withColumn("has_promo", d.u(["receipt_id_ext", "line_num"], "promo")
                     < F.lit(profile.promo_rate))
         .withColumn("promo_code", F.when(F.col("has_promo"), F.concat(
             F.lit("PROMO"), F.lit(cfg.store_type[:3].upper()),
-            F.lpad(((h64(["receipt_id_ext", "line_num"], "pcode") % 5) + 1)
+            F.lpad(((d.h64(["receipt_id_ext", "line_num"], "pcode") % 5) + 1)
                    .cast("string"), 2, "0"))))
         .withColumn("discount_cents", F.when(F.col("has_promo"), F.round(
             F.col("ext_before")
-            * (u(["receipt_id_ext", "line_num"], "disc") * 0.2 + 0.1))
+            * (d.u(["receipt_id_ext", "line_num"], "disc") * 0.2 + 0.1))
             .cast("long")).otherwise(F.lit(0).cast("long")))
         .withColumn("ext_cents",
                     F.greatest(F.lit(0).cast("long"),
@@ -239,7 +206,7 @@ def generate_receipts_group(
     )
 
     # --- payments (one per receipt; in-store, so order_id_ext is NULL)
-    u_dec = u(["receipt_id_ext"], "decline")
+    u_dec = d.u(["receipt_id_ext"], "decline")
     decline_p: Column = F.lit(0.0)
     for name, _, mult, _, _ in TENDERS:
         decline_p = F.when(
@@ -250,14 +217,14 @@ def generate_receipts_group(
     for name, _, _, lo, hi in TENDERS[:-1]:
         proc_lo = F.when(F.col("payment_method") == name, F.lit(lo)).otherwise(proc_lo)
         proc_hi = F.when(F.col("payment_method") == name, F.lit(hi)).otherwise(proc_hi)
-    reason_idx = (h64(["receipt_id_ext"], "reason") % len(DECLINE_REASONS)).cast("int")
+    reason_idx = (d.h64(["receipt_id_ext"], "reason") % len(DECLINE_REASONS)).cast("int")
     fact_payments = (
         fact_receipts
         .withColumn("order_id_ext", F.lit(None).cast("string"))
         .withColumn("amount_cents", F.col("total_cents"))
         .withColumn("transaction_id", F.concat(
             F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            F.lpad((h64(["receipt_id_ext"], "txn") % 1_000_000).cast("string"), 6, "0")))
+            F.lpad((d.h64(["receipt_id_ext"], "txn") % 1_000_000).cast("string"), 6, "0")))
         .withColumn("status",
                     F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
         .withColumn("decline_reason", F.when(
@@ -265,7 +232,7 @@ def generate_receipts_group(
             F.element_at(F.array(*[F.lit(r) for r in DECLINE_REASONS]),
                          reason_idx + 1)))
         .withColumn("processing_time_ms",
-                    (proc_lo + u(["receipt_id_ext"], "proc")
+                    (proc_lo + d.u(["receipt_id_ext"], "proc")
                      * (proc_hi - proc_lo)).cast("long"))
         .withColumn("amount", _fmt(F.col("amount_cents")))
         .select(*column_names("fact_payments"))

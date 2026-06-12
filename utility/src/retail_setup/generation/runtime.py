@@ -6,6 +6,48 @@ from datetime import date, timedelta
 from pyspark.sql import DataFrame, SparkSession
 
 
+class seeded_draws:
+    """Deterministic draw expressions bound to a seed.
+
+    u(cols, salt)        -> uniform [0,1) double
+    gauss(cols, salt)    -> ~N(0,1) (Irwin-Hall of 3 uniforms, scaled)
+    h64(cols, salt)      -> non-negative long hash
+    pick_by_weights(cols, salt, [(value, weight), ...]) -> weighted categorical
+    """
+
+    _U_MOD = 10**12
+
+    def __init__(self, seed: int):
+        self.seed = seed
+
+    def h64(self, cols: list, salt: str):
+        from pyspark.sql import functions as F
+
+        return F.pmod(F.xxhash64(*cols, F.lit(f"{salt}|{self.seed}")), F.lit(2**62))
+
+    def u(self, cols: list, salt: str):
+        from pyspark.sql import functions as F
+
+        return (self.h64(cols, salt) % F.lit(self._U_MOD)) / F.lit(float(self._U_MOD))
+
+    def gauss(self, cols: list, salt: str):
+        from pyspark.sql import functions as F
+
+        s = self.u(cols, f"{salt}|g1") + self.u(cols, f"{salt}|g2") + self.u(cols, f"{salt}|g3")
+        return (s - F.lit(1.5)) * F.lit(2.0)
+
+    def pick_by_weights(self, cols: list, salt: str, weighted: list[tuple[str, float]]):
+        from pyspark.sql import functions as F
+
+        total = sum(w for _, w in weighted)
+        uu = self.u(cols, salt)
+        expr, acc = None, 0.0
+        for value, w in weighted[:-1]:
+            acc += w / total
+            expr = expr.when(uu < acc, value) if expr is not None else F.when(uu < acc, value)
+        return expr.otherwise(weighted[-1][0]) if expr is not None else F.lit(weighted[0][0])
+
+
 def derive_seed(global_seed: int, section: str, key: int, day: date) -> int:
     """Stable 31-bit seed from (global_seed, section, key, day).
 
