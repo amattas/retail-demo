@@ -49,7 +49,7 @@ from retail_setup.generation.inventory_balances import (
     stockouts as _stockouts,
     with_balances as _with_balances,
 )
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 
 _REORDER_TOP_N = 5
@@ -68,8 +68,7 @@ def _plus_hours(ts: Column, hours: Column) -> Column:
 
 def _with_index(df: DataFrame, table: str) -> DataFrame:
     """Add the TMDL-bound __index_level_0__ column and apply the contract order."""
-    idx = F.row_number().over(Window.orderBy("trace_id")) - F.lit(1)
-    return (df.withColumn("__index_level_0__", idx.cast("long"))
+    return (df.withColumn("__index_level_0__", legacy_index("trace_id"))
             .select(*column_names(table)))
 
 

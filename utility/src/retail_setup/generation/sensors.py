@@ -18,18 +18,18 @@ and avoids applyInPandas/F.rand() (see self-review checklist).
 
 Schema notes (TMDL arbiter results):
 - fact_ble_pings: BOTH customer_id (double, snake) AND CustomerId (double,
-  TMDL-bound) with mirrored values; __index_level_0__ (long) = row_number()-1
-  ordered by trace_id.
+  TMDL-bound) with mirrored values; __index_level_0__ (long) = hash-derived
+  via legacy_index(trace_id).
 - fact_customer_zone_changes: BOTH snake_case (store_id, customer_ble_id,
   from_zone, to_zone) AND PascalCase (StoreID, CustomerBLEId, FromZone, ToZone)
-  with mirrored values; __index_level_0__ ordered by trace_id.
+  with mirrored values; __index_level_0__ = legacy_index(trace_id).
 """
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 
 # BLE zone names (5 total); zone selection is without replacement
@@ -191,7 +191,7 @@ def generate_ble(
         F.format_string("BEACON_%03d_%s", F.col("store_id"), F.col("zone")),
     )
 
-    # __index_level_0__ = row_number() - 1 ordered by trace_id
+    # __index_level_0__ = hash-derived via legacy_index(trace_id)
     pings_out = pings.select(
         F.col("ping_ts").alias("event_ts"),
         "trace_id",
@@ -206,7 +206,7 @@ def generate_ble(
         F.to_date("ping_ts").alias("event_date"),
     ).withColumn(
         "__index_level_0__",
-        (F.row_number().over(Window.orderBy("trace_id")) - 1).cast("long"),
+        legacy_index("trace_id"),
     )
     pings_df = pings_out.select(*column_names("fact_ble_pings"))
 
@@ -249,7 +249,7 @@ def generate_ble(
         F.to_date("ping_ts").alias("event_date"),
     ).withColumn(
         "__index_level_0__",
-        (F.row_number().over(Window.orderBy("trace_id")) - 1).cast("long"),
+        legacy_index("trace_id"),
     )
     zc_df = zc_out.select(*column_names("fact_customer_zone_changes"))
 

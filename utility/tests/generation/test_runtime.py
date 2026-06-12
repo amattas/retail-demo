@@ -25,9 +25,8 @@ def test_store_day_grid(spark):
     rows = grid.collect()
     assert len(rows) == 6  # 2 stores x 3 days
     cols = set(grid.columns)
-    assert {"store_id", "day", "partition_seed"} <= cols
-    seeds = {(r.store_id, str(r.day)): r.partition_seed for r in rows}
-    assert len(set(seeds.values())) == 6  # all distinct
+    assert {"store_id", "day"} <= cols
+    assert "partition_seed" not in cols
 
 
 def test_seeded_draws_uniform_properties(spark):
@@ -66,3 +65,15 @@ def test_pick_by_weights(spark):
     counts = {r["pick"]: r["count"] for r in df.groupBy("pick").count().collect()}
     assert 0.6 < counts["A"] / 5000 < 0.8
     assert set(counts) == {"A", "B", "C"}
+
+
+def test_legacy_index_deterministic_and_distinct(spark):
+    from retail_setup.generation.runtime import legacy_index
+
+    df = spark.createDataFrame([(f"K{i}",) for i in range(500)], "k string")
+    out = df.withColumn("idx", legacy_index("k"))
+    rows = out.collect()
+    assert len({r.idx for r in rows}) == 500  # distinct for distinct keys
+    assert all(r.idx >= 0 for r in rows)
+    again = {r.k: r.idx for r in df.withColumn("idx", legacy_index("k")).collect()}
+    assert all(again[r.k] == r.idx for r in rows)  # stable

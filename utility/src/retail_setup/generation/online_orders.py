@@ -23,7 +23,7 @@ from pyspark.sql.window import Window
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.receipts import BASE_DECLINE, DECLINE_REASONS, _fmt
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 
 # Online tender mix per plan: 60% CC / 25% DC / 10% PAYPAL / 5% OTHER.
@@ -103,6 +103,7 @@ def generate_online_orders(
         .withColumn("event_date", F.col("day"))
         # ONL + yyyyMMdd + 5-digit seq + 3-digit draw; unique because (day, seq)
         # is a key within the grid.
+        # NOTE: lpad(seq, 5) collides above 99,999 orders/day; config max ~16k so safe.
         .withColumn("order_id_ext", F.concat(
             F.lit("ONL"), F.date_format("day", "yyyyMMdd"),
             F.lpad(F.col("seq").cast("string"), 5, "0"),
@@ -211,13 +212,11 @@ def generate_online_orders(
                         F.unix_timestamp("shipped_ts") + deliver_secs)))
     )
 
-    # TMDL-bound legacy pandas-index column: row_number()-1 over a
-    # deterministic (order_id, line_num) order.
-    idx_w = Window.orderBy("order_id_ext", "line_num")
+    # TMDL-bound legacy pandas-index column: hash-derived via legacy_index.
     fact_online_order_lines = (
         lines
         .withColumn("__index_level_0__",
-                    (F.row_number().over(idx_w) - 1).cast("long"))
+                    legacy_index("order_id_ext", "line_num"))
         .select(
             F.col("order_id_ext").alias("order_id"), "product_id",
             F.col("line_num").cast("long").alias("line_num"), "quantity",

@@ -17,14 +17,14 @@ All draws via `runtime.seeded_draws`, so output is deterministic for a
 Schema note: fact_marketing is TMDL-bound with DUAL columns — PascalCase
 `CustomerId`/`CostCents` (the TMDL sourceColumns) are exact mirrors of the
 snake_case plan columns `customer_id`/`cost_cents`, and `__index_level_0__`
-is the legacy pandas index (row_number() - 1 ordered by impression_id_ext).
+is the legacy pandas index (hash-derived via legacy_index).
 """
 
-from pyspark.sql import DataFrame, SparkSession, Window
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 
 # (archetype, channels, base impressions/day at the legacy 86-store fleet)
@@ -65,14 +65,14 @@ def generate_marketing(
 
     # --- day x archetype grid (driver-side; days x 4 rows)
     rows = [
-        (cfg.start_date, idx + 1, name, channels, base)
+        (idx + 1, name, channels, base)
         for idx, (name, channels, base) in enumerate(ARCHETYPES)
     ]
     grid = spark.createDataFrame(
         [
             (day_offset, idx, name, channels, base)
             for day_offset in range((cfg.end_date - cfg.start_date).days + 1)
-            for (_, idx, name, channels, base) in rows
+            for (idx, name, channels, base) in rows
         ],
         "day_offset int, archetype_idx int, archetype string, "
         "channels array<string>, base_impressions int",
@@ -190,6 +190,6 @@ def generate_marketing(
         F.col("day").alias("event_date"),
     ).withColumn(
         "__index_level_0__",
-        (F.row_number().over(Window.orderBy("impression_id_ext")) - 1).cast("long"),
+        legacy_index("impression_id_ext"),
     )
     return out.select(*column_names("fact_marketing"))

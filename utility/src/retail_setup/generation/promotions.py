@@ -17,18 +17,18 @@ Semantics (datagen promotions_mixin):
 TMDL contract note: ``fact_promo_lines`` carries dual columns — the
 snake_case plan names plus TMDL-bound PascalCase mirrors (ReceiptId,
 PromoCode, LineNumber, ProductID, Qty, DiscountAmount, DiscountCents) and the
-legacy pandas-index column ``__index_level_0__`` (row_number()-1 ordered by
-(receipt_id_ext, promo_code, line_number)). The PascalCase columns are exact
-copies of their snake_case twins.
+legacy pandas-index column ``__index_level_0__`` (hash-derived via
+legacy_index(receipt_id_ext, promo_code, line_number)). The PascalCase columns
+are exact copies of their snake_case twins.
 
 Pure joins/groupBys over the sales group — deterministic, no randomness.
 """
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.window import Window
 
 from retail_setup.generation.receipts import _fmt
+from retail_setup.generation.runtime import legacy_index
 from retail_setup.generation.schemas import column_names
 
 
@@ -67,7 +67,6 @@ def generate_promotions(
         )
     )
 
-    idx_w = Window.orderBy("receipt_id_ext", "promo_code", "line_number")
     promo_lines = (
         lines
         # TMDL-bound PascalCase mirrors of the snake_case columns
@@ -79,7 +78,8 @@ def generate_promotions(
         .withColumn("DiscountAmount", F.col("discount_amount"))
         .withColumn("DiscountCents", F.col("discount_cents"))
         # Legacy pandas-index column bound by the semantic model
-        .withColumn("__index_level_0__", (F.row_number().over(idx_w) - 1).cast("long"))
+        .withColumn("__index_level_0__",
+                    legacy_index("receipt_id_ext", "promo_code", "line_number"))
         .select(*column_names("fact_promo_lines"))
     )
 
