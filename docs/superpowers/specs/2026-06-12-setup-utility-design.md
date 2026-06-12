@@ -101,10 +101,16 @@ existing `DictionaryLoader` models so generated tables keep identical schemas).
   authored (~1.5–3K products each, distinct brand sets and profiles — e.g.
   luxury: low traffic/high ticket/near-zero promo; hardware: weekend-heavy,
   contractor bulk baskets).
-- Seeding: `setup-01` carries the dictionaries embedded as gzip+base64 cells
-  (added at build time) and unpacks the selected store type to
-  `Files/setup/dictionaries/` — fully self-contained, no network or upload
-  dependency.
+- Seeding: `setup-01` downloads the selected store type's dictionaries (plus
+  `_shared/`) directly from this public GitHub repo
+  (`raw.githubusercontent.com/.../<ref>/utility/data/dictionaries/...`) into
+  `Files/setup/dictionaries/`. The ref is a `{{DICTIONARY_REF}}` parameter:
+  the CLI render step injects the current commit SHA for reproducibility
+  (unrendered default: `main`). Local-first fallback: if the files already
+  exist under `Files/setup/dictionaries/` (manual upload or a prior run),
+  the notebook uses them and skips the download — covers tenants that block
+  outbound Spark traffic. Downstream notebooks always read from `Files/`,
+  never from the network.
 
 ## Generation Engine
 
@@ -157,7 +163,7 @@ Run in order; each idempotent (overwrite-by-design, safe to re-run).
 Each notebook has a marked `# PARAMETERS` cell with `{{PLACEHOLDER}}` tokens
 (`{{WORKSPACE_NAME}}`, `{{LAKEHOUSE_NAME}}`, `{{SILVER_DB}}`, `{{GOLD_DB}}`,
 `{{STORE_TYPE}}`, `{{START_DATE}}`, `{{END_DATE}}`, `{{STORE_COUNT}}`,
-`{{SEED}}`) and working defaults, so an unrendered notebook still runs against
+`{{SEED}}`, `{{DICTIONARY_REF}}`) and working defaults, so an unrendered notebook still runs against
 default names.
 
 ## CLI
