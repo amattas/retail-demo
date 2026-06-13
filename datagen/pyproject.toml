@@ -58,7 +58,9 @@ select = ["E", "F", "I", "N", "W", "UP"]
 # - E402: module-level import not at top (pytest.importorskip and conftest patterns)
 # - N806: variable in function should be lowercase (math convention: D, P, S, R)
 # - N818: exception name should end with Error suffix (existing base exception)
-ignore = ["E402", "N806", "N818"]
+# - UP042: replace `str, Enum` with `StrEnum` — the str/Enum idiom is deliberate
+#   (16 enums); StrEnum changes str() output, so the autofix is unsafe. Keep as-is.
+ignore = ["E402", "N806", "N818", "UP042"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["retail_datagen"]

@@ -189,9 +189,11 @@ class ReceiptsMixin(FactGeneratorBase):
 
         if not hasattr(self, "_receipt_id_gen"):
             from retail_datagen.shared.id_generator import EntityIdGenerator
+
             self._receipt_id_gen = EntityIdGenerator("RCP", entity_id_width=3)
         if transaction_time.tzinfo is None:
             from datetime import UTC
+
             ts_aware = transaction_time.replace(tzinfo=UTC)
         else:
             ts_aware = transaction_time
