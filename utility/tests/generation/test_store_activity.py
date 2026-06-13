@@ -52,3 +52,16 @@ def test_foot_traffic(spark, setup):
     j = rc.join(tt, ["store_id", "hr"])
     assert j.count() > 0
     assert j.filter(F.col("traffic") < F.col("count")).count() == 0
+
+
+def test_foot_traffic_covers_open_hours_without_receipts(spark, setup):
+    cfg, dims, sales = setup
+    ft = generate_foot_traffic(spark, sales["fact_receipts"], dims, cfg)
+    rc = sales["fact_receipts"].groupBy(
+        "store_id", F.date_trunc("hour", "event_ts").alias("hr")).count()
+    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")) \
+           .agg(F.sum("count").alias("traffic"))
+    # every receipt store-hour still has a foot-traffic row (coverage preserved)
+    assert rc.join(tt, ["store_id", "hr"], "left_anti").count() == 0
+    # and open store-hours with no receipts now emit browsing traffic
+    assert tt.join(rc, ["store_id", "hr"], "left_anti").count() > 0

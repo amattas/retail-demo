@@ -5,7 +5,7 @@ pricing rules); column names/types from schemas.TABLES, which the TMDL
 contract test guards.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import numpy as np
 from pyspark.sql import DataFrame, SparkSession
@@ -27,6 +27,28 @@ OPERATING_HOURS = ["6-22", "7-22", "7-23", "24h"]
 DEFAULT_TAX_RATE = 0.07407  # datagen receipts_mixin fallback
 REFRIGERATED_CATEGORIES = {"Produce", "Dairy & Eggs", "Dairy & Alternatives",
                            "Meat & Poultry", "Meat & Seafood", "Seafood", "Frozen"}
+
+
+def compute_pricing(base_price: float, rng: np.random.Generator) -> tuple[float, float, float]:
+    """Return ``(cost, msrp, sale_price)`` for a base price.
+
+    Ported from datagen ``PricingCalculator`` (shared/validators/pricing.py):
+
+    - MSRP = BasePrice +/-15%
+    - SalePrice = MSRP (60% of the time) OR MSRP discounted 5-35% (40%)
+    - Cost = 50-85% of SalePrice
+
+    Always guarantees ``Cost < SalePrice <= MSRP``.
+    """
+    msrp = max(0.01, round(base_price * (1.0 + rng.uniform(-0.15, 0.15)), 2))
+    if rng.random() < 0.60:
+        sale = msrp
+    else:
+        sale = max(0.01, round(msrp * (1.0 - rng.uniform(0.05, 0.35)), 2))
+    cost = sale * rng.uniform(0.50, 0.85)
+    cost = min(cost, sale - 0.01)
+    cost = max(0.01, round(cost, 2))
+    return float(cost), float(msrp), float(sale)
 
 
 def _addr(rng: np.random.Generator) -> str:
@@ -129,8 +151,8 @@ def generate_dimensions(
         ))
     out["dim_customers"] = spark.createDataFrame(cust_rows, spark_schema("dim_customers"))
 
-    # --- products from dictionary; pricing: SalePrice = BasePrice,
-    #     MSRP = SalePrice * U(1.0, 1.25), Cost = SalePrice * U(0.50, 0.85) (datagen rule)
+    # --- products from dictionary; pricing ported from datagen PricingCalculator
+    #     (MSRP = base +/-15%, SalePrice = MSRP or 5-35% off, Cost = 50-85% of SalePrice)
     brand_names = [b.Brand for b in dicts.brands]
     brand_company = {b.Brand: b.Company for b in dicts.brands}
     tags_by_product = {t.ProductName: t.Tags for t in dicts.tags}
@@ -138,7 +160,6 @@ def generate_dimensions(
     hist_start = datetime.combine(cfg.start_date, datetime.min.time())
     prod_rows = []
     for pid, p in enumerate(dicts.products, start=1):
-        sale = float(p.BasePrice)
         brand = str(rng.choice(brand_names))
         taxability = (
             "NON_TAXABLE" if p.Department in {"Fresh", "Grocery"} and "Candy" not in p.Category
@@ -152,8 +173,7 @@ def generate_dimensions(
             launch = hist_start + timedelta(days=int(rng.integers(0, 183)))
         else:
             launch = hist_start + timedelta(days=int(rng.integers(183, 366)))
-        cost = round(sale * float(rng.uniform(0.50, 0.85)), 2)
-        msrp = round(sale * float(rng.uniform(1.0, 1.25)), 2)
+        cost, msrp, sale = compute_pricing(float(p.BasePrice), rng)
         prod_rows.append((
             pid,
             p.ProductName,
