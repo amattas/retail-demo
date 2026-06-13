@@ -48,16 +48,17 @@ retail-setup render           # uses HEAD git SHA as DICTIONARY_REF
 retail-setup render --ref main  # pin a specific ref
 ```
 
-The four rendered notebooks are written to `utility/out/`:
+The rendered notebooks are written to `utility/out/`:
 
 - `setup-01-seed-dictionaries.ipynb`
 - `setup-02-generate-dimensions.ipynb`
 - `setup-03-generate-facts.ipynb`
 - `setup-04-build-gold.ipynb`
+- `setup-05-stream-events.ipynb` — optional live event generator (see step 5)
 
 ### 3a. Import notebooks manually (no deploy framework)
 
-Upload the four rendered notebooks from `utility/out/` to your Fabric workspace
+Upload the rendered notebooks from `utility/out/` to your Fabric workspace
 via the Fabric portal. Attach each to the target Lakehouse when prompted.
 
 ### 3b. Deploy via the framework (requires Terraform + Fabric workspace access)
@@ -91,6 +92,34 @@ In Fabric, open and run each notebook in sequence:
 2. `setup-02-generate-dimensions` — generates dimension tables into Lakehouse Delta
 3. `setup-03-generate-facts` — generates all 18 fact tables
 4. `setup-04-build-gold` — builds the 9 Gold aggregations
+
+### 5. (Optional) Stream live events
+
+`setup-05-stream-events` is a Spark Structured Streaming generator that emits the
+same 19 real-time event types datagen produced, as JSON `EventEnvelope`s, into a
+Fabric **Eventstream** — so the Eventstream → KQL `cusn.*` → Silver → Gold pipeline
+runs without the external datagen service, and **everything stays inside Fabric**
+(no standalone Azure Event Hubs namespace). It is **not** part of the ordered 1→4
+batch setup — run it after setup completes, as a long-running live driver.
+
+Key parameters (Fabric `parameters` cell, override per run):
+
+- `events_per_second` is now `source_rows_per_second` — rate-source rows/sec
+  (default 5). Each row emits one scenario bundle, so actual events/sec is higher.
+- `sink` — `"eventstream"` (default) or `"delta"` (a Lakehouse landing table for testing)
+- `run_seconds` — `0` runs forever; `>0` stops after N seconds (smoke test)
+- Eventstream: `eventstream_bootstrap`, `eventstream_name`, and
+  `eventstream_secret_keyvault` / `eventstream_secret_name`. Create a **Custom
+  Endpoint** source on the Eventstream; copy its Event-Hub/Kafka bootstrap server +
+  name from the protocol tab. The connection string is read at runtime from Key
+  Vault — never hardcoded.
+
+The Eventstream sink uses the Spark Kafka connector (`spark-sql-kafka-0-10`), which
+the Fabric Spark runtime provides by default.
+
+Design: `docs/superpowers/specs/2026-06-13-stream-generator-design.md`. The events
+carry valid foreign keys read from the dims that setup-02 wrote. Stop the streaming
+query to stop generating.
 
 ---
 

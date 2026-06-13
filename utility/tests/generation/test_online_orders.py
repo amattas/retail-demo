@@ -69,6 +69,20 @@ def test_lifecycle_ordering(setup):
     assert shipped.filter(F.col("delivered_ts") < F.col("shipped_ts")).count() == 0
 
 
+def test_backordered_lines_shipped_not_delivered(setup):
+    _, _, g = setup
+    lines_df = g["fact_online_order_lines"]
+    statuses = {r.fulfillment_status
+                for r in lines_df.select("fulfillment_status").distinct().collect()}
+    assert statuses <= {"DELIVERED", "SHIPPED", "CANCELLED"}
+    assert "SHIPPED" in statuses  # a fraction of non-BOPIS lines backorder
+    shipped = lines_df.filter(F.col("fulfillment_status") == "SHIPPED")
+    # SHIPPED = shipped but not yet delivered, and never BOPIS
+    assert shipped.filter(F.col("delivered_ts").isNotNull()).count() == 0
+    assert shipped.filter(F.col("shipped_ts").isNull()).count() == 0
+    assert shipped.filter(F.col("fulfillment_mode") == "BOPIS").count() == 0
+
+
 def test_cancellations_zeroed_no_payment(setup):
     _, _, g = setup
     h, pay = g["fact_online_order_headers"], g["payments"]

@@ -58,7 +58,7 @@ def render_notebooks(
 
     rendered: list[tuple[Path, str]] = []
     for name in NOTEBOOKS:
-        src = (src_dir / f"{name}.ipynb").read_text()
+        src = (src_dir / f"{name}.ipynb").read_text(encoding="utf-8")
         for token, value in values.items():
             src = src.replace("{{" + token + "}}", str(value))
         remaining = _TOKEN_RE.findall(src)
@@ -70,6 +70,6 @@ def render_notebooks(
     output_dir.mkdir(parents=True, exist_ok=True)
     out = []
     for path, src in rendered:  # write only after every notebook rendered clean
-        path.write_text(src)
+        path.write_text(src, encoding="utf-8")
         out.append(path)
     return out

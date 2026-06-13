@@ -73,7 +73,11 @@ TEMPLATE_FOR = {
     "setup-02-generate-dimensions": "driver-02-dimensions.py",
     "setup-03-generate-facts": "driver-03-facts.py",
     "setup-04-build-gold": "driver-04-gold.py",
+    "setup-05-stream-events": "driver-05-stream.py",
 }
+
+# Notebooks that do NOT embed the batch engine cell (self-contained logic).
+NO_ENGINE = {"setup-01-seed-dictionaries", "setup-05-stream-events"}
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 
@@ -117,7 +121,7 @@ def build_engine_source() -> str:
              "# Built by scripts/build_notebooks.py from utility/src/retail_setup/.",
              ""]
     for rel in ENGINE_MODULES:
-        source = (SRC / rel).read_text()
+        source = (SRC / rel).read_text(encoding="utf-8")
         source = strip_package_imports(source)
         if rel == "generation/engine.py":
             source = rewrite_engine_aliases(source)
@@ -149,6 +153,9 @@ def parse_template(text: str) -> list[tuple[str, str]]:
         elif stripped == "# %% [engine]":
             current = ("engine", [])
             cells.append(current)
+        elif stripped == "# %% [parameters]":
+            current = ("parameters", [])
+            cells.append(current)
         elif stripped == "# %%" or stripped.startswith("# %% "):
             current = ("code", [])
             cells.append(current)
@@ -173,12 +180,17 @@ def _source_lines(source: str) -> list[str]:
 
 def render_notebook(template_path: Path, engine_source: str | None) -> dict:
     cells = []
-    for index, (kind, body) in enumerate(parse_template(template_path.read_text())):
+    for index, (kind, body) in enumerate(parse_template(template_path.read_text(encoding="utf-8"))):
         if kind == "engine":
             if engine_source is None:
                 raise ValueError(f"{template_path.name} has an engine cell but no engine source")
             kind, body = "code", engine_source
-        cell = {"cell_type": kind, "id": f"cell-{index}", "metadata": {}}
+        metadata: dict = {}
+        if kind == "parameters":
+            # Fabric parameters cell: a code cell tagged so the pipeline can override it.
+            kind = "code"
+            metadata = {"tags": ["parameters"]}
+        cell = {"cell_type": kind, "id": f"cell-{index}", "metadata": metadata}
         if kind == "code":
             cell["execution_count"] = None
             cell["outputs"] = []
@@ -220,10 +232,10 @@ def build_all(output_dir: Path) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     built: dict[str, str] = {}
     for name, template in TEMPLATE_FOR.items():
-        needs_engine = name != "setup-01-seed-dictionaries"
+        needs_engine = name not in NO_ENGINE
         nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None)
         payload = notebook_json(nb)
-        (output_dir / f"{name}.ipynb").write_text(payload)
+        (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8")
         built[name] = payload
     return built
 
@@ -234,7 +246,7 @@ def check() -> int:
     drifted = []
     for name, payload in built.items():
         committed = NOTEBOOKS_DIR / f"{name}.ipynb"
-        if not committed.exists() or committed.read_text() != payload:
+        if not committed.exists() or committed.read_text(encoding="utf-8") != payload:
             drifted.append(committed)
     if drifted:
         print("notebook drift detected — re-run `python scripts/build_notebooks.py`:")

@@ -4,10 +4,15 @@ Mirrors `receipts.py`: all randomness flows through `runtime.seeded_draws`
 (xxhash64-based, partition-arrangement independent), money is integer cents,
 and daily volume is a clamped-normal approximation of Poisson.
 
-Documented simplifications (per plan 2b, Task 5):
-- Tax uses the MEAN store tax_rate (datagen falls back from customer geography
-  to a store rate; online orders have no store, so the network mean is used)
-  with the exact integer basis-point formula from receipts.
+Documented decisions (per plan 2b, Task 5):
+- Tax is destination-based: each order uses its customer's geography tax rate
+  (the mean store rate in that geography, with the network mean as fallback)
+  via the exact integer basis-point formula from receipts. datagen applies the
+  fulfilment store's rate to store-shipped lines and the customer-geography
+  rate to DC-shipped lines; we use the customer-geography rate for all lines.
+- Backorders: a small fraction of non-BOPIS lines ship but are not yet
+  delivered (fulfillment_status SHIPPED, delivered_ts NULL), mirroring
+  datagen's ``"DELIVERED" if not is_backordered else "SHIPPED"``.
 - Product pick is uniform over the full catalog — online ignores the profile's
   department weights.
 - CANCELLED orders get NO payment row (no pay-then-refund), which preserves
@@ -38,6 +43,10 @@ ONLINE_TENDERS = [
 ]
 
 CANCEL_RATE = 0.02
+# Fraction of shippable (non-BOPIS) lines that backorder: ship but not yet
+# delivered. Approximates datagen's inventory-driven backorder check, which
+# utility cannot evaluate here (the inventory chain is generated afterwards).
+BACKORDER_RATE = 0.08
 
 # basket-size buckets: 60% -> 1-3 lines, 30% -> 2-5, 10% -> 5-8
 BASKET_BUCKETS = [("S", 0.60, 1, 3), ("M", 0.30, 2, 5), ("L", 0.10, 5, 8)]
@@ -59,9 +68,22 @@ def generate_online_orders(
     """
     d = seeded_draws(cfg.seed)
 
-    # SIMPLIFICATION (documented in module docstring): mean store tax rate.
+    # Destination-based tax: per-customer-geography rate (mean store tax_rate in
+    # that geography), with the network mean as the fallback for geographies
+    # that have no store.
     mean_rate = dims["dim_stores"].agg(F.avg("tax_rate")).first()[0]
-    rate_bps = int(round(float(mean_rate) * 10000))
+    mean_bps = int(round(float(mean_rate) * 10000))
+    geo_rate = dims["dim_stores"].groupBy("GeographyID").agg(
+        F.avg("tax_rate").alias("geo_rate"))
+    cust_rate = (
+        dims["dim_customers"].select(F.col("ID").alias("customer_id"), "GeographyID")
+        .join(geo_rate, "GeographyID", "left")
+        .select(
+            "customer_id",
+            F.coalesce(F.round(F.col("geo_rate") * 10000), F.lit(mean_bps))
+            .cast("long").alias("rate_bps"),
+        )
+    )
 
     dc_ids = sorted(r.ID for r in dims["dim_distribution_centers"].select("ID").collect())
     store_ids = sorted(r.ID for r in dims["dim_stores"].select("ID").collect())
@@ -119,6 +141,9 @@ def generate_online_orders(
         .withColumn("promo_rate",
                     d.u(["order_id_ext"], "onl_prate") * F.lit(0.20) + F.lit(0.10))
         .withColumn("basket_n", basket_n)
+        # destination-based tax rate for this order's customer
+        .join(cust_rate, "customer_id", "left")
+        .withColumn("rate_bps", F.coalesce(F.col("rate_bps"), F.lit(mean_bps)))
     )
 
     # --- lines: uniform product over the full catalog (no department weights)
@@ -143,7 +168,7 @@ def generate_online_orders(
 
     lines = (
         orders.select("order_id_ext", "event_ts", "event_date", "is_cancelled",
-                      "promo_rate", "basket_n")
+                      "promo_rate", "basket_n", "rate_bps")
         .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
         .withColumn("cat_rank", (d.h64(["order_id_ext", "line_num"], "onl_prod")
                                  % F.lit(n_products) + 1).cast("int"))
@@ -163,16 +188,24 @@ def generate_online_orders(
             (F.col("ext_before") * F.col("promo_pct") + F.lit(50)) / F.lit(100))
             .cast("long"))
         .withColumn("ext_cents", F.col("ext_before") - F.col("discount_cents"))
-        # tax: mean store rate through the exact integer bps formula
+        # tax: per-customer-geography rate through the exact integer bps formula
         .withColumn("tax_mult", F.when(F.col("taxability") == "TAXABLE", 100)
                     .when(F.col("taxability") == "REDUCED_RATE", 50)
                     .otherwise(0).cast("long"))
         .withColumn("line_tax_cents", F.floor(
-            (F.col("ext_cents") * F.lit(rate_bps) * F.col("tax_mult")
+            (F.col("ext_cents") * F.col("rate_bps") * F.col("tax_mult")
              + F.lit(500_000)) / F.lit(1_000_000)).cast("long"))
         .withColumn("fulfillment_mode", mode)
+        # Backorder a small fraction of shippable (non-BOPIS, non-cancelled)
+        # lines: they ship but are not yet delivered (datagen SHIPPED state).
+        .withColumn("is_backordered",
+                    (F.col("fulfillment_mode") != "BOPIS") & ~F.col("is_cancelled")
+                    & (d.u(["order_id_ext", "line_num"], "onl_backorder")
+                       < F.lit(BACKORDER_RATE)))
         .withColumn("fulfillment_status",
-                    F.when(F.col("is_cancelled"), "CANCELLED").otherwise("DELIVERED"))
+                    F.when(F.col("is_cancelled"), "CANCELLED")
+                    .when(F.col("is_backordered"), "SHIPPED")
+                    .otherwise("DELIVERED"))
         .withColumn("node_type",
                     F.when(F.col("fulfillment_mode") == "SHIP_FROM_DC", "DC")
                     .otherwise("STORE"))
@@ -207,7 +240,9 @@ def generate_online_orders(
         .withColumn("shipped_ts", F.when(
             live & ~is_bopis,
             F.timestamp_seconds(F.unix_timestamp("picked_ts") + ship_secs)))
-        .withColumn("delivered_ts", F.when(live & is_bopis, F.col("picked_ts"))
+        .withColumn("delivered_ts",
+                    F.when(F.col("is_backordered"), F.lit(None).cast("timestamp"))
+                    .when(live & is_bopis, F.col("picked_ts"))
                     .when(live, F.timestamp_seconds(
                         F.unix_timestamp("shipped_ts") + deliver_secs)))
     )

@@ -82,4 +82,44 @@ def run_invariants(spark: SparkSession, t: dict[str, DataFrame]) -> InvariantRep
            .filter(F.col("line_discount").isNull()
                    | (F.col("promo_discount") != F.col("line_discount")))
            .count())
+
+    # --- dimension geography FK integrity (datagen foreign_key validator parity)
+    geo_ids = t["dim_geographies"].select(F.col("ID").alias("geo_id"))
+    for dim in ["dim_stores", "dim_distribution_centers", "dim_customers"]:
+        _check(r, f"{dim} -> dim_geographies FK",
+               t[dim].select(F.col("GeographyID").alias("geo_id"))
+               .join(geo_ids, "geo_id", "left_anti").count())
+
+    # --- DC coverage on facts that reference a distribution center
+    dc_ids = t["dim_distribution_centers"].select(F.col("ID").alias("dc_id"))
+    for tbl in ["fact_dc_inventory_txn", "fact_truck_moves", "fact_reorders"]:
+        _check(r, f"{tbl} -> dim_distribution_centers FK",
+               t[tbl].filter(F.col("dc_id").isNotNull()).select("dc_id")
+               .join(dc_ids, "dc_id", "left_anti").count())
+
+    # --- truck coverage on logistics facts
+    truck_ids = t["dim_trucks"].select(F.col("ID").alias("truck_id"))
+    for tbl in ["fact_truck_moves", "fact_truck_inventory"]:
+        _check(r, f"{tbl} -> dim_trucks FK",
+               t[tbl].filter(F.col("truck_id").isNotNull()).select("truck_id")
+               .join(truck_ids, "truck_id", "left_anti").count())
+
+    # --- customer coverage on facts that resolve a customer (nullable for some)
+    customer_ids = t["dim_customers"].select(F.col("ID").alias("customer_id"))
+    for tbl in ["fact_receipts", "fact_online_order_headers"]:
+        _check(r, f"{tbl} -> dim_customers FK",
+               t[tbl].filter(F.col("customer_id").isNotNull()).select("customer_id")
+               .join(customer_ids, "customer_id", "left_anti").count())
+    # fact_marketing.customer_id is a nullable double (low resolution rate); cast.
+    _check(r, "fact_marketing -> dim_customers FK",
+           t["fact_marketing"].filter(F.col("customer_id").isNotNull())
+           .select(F.col("customer_id").cast("long").alias("customer_id"))
+           .join(customer_ids, "customer_id", "left_anti").count())
+
+    # --- dim_products pricing constraints (datagen pricing validator parity)
+    prod = t["dim_products"]
+    _check(r, "dim_products pricing Cost<SalePrice<=MSRP",
+           prod.filter(~((F.col("Cost") > 0)
+                         & (F.col("Cost") < F.col("SalePrice"))
+                         & (F.col("SalePrice") <= F.col("MSRP")))).count())
     return r
