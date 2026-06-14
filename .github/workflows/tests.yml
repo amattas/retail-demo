@@ -96,7 +96,14 @@ jobs:
 
       - name: Run tests
         working-directory: utility
-        run: pytest -q
+        run: |
+          pytest -q tests --ignore=tests/generation --ignore=tests/test_e2e_local.py
+          pytest -q tests/generation/test_runtime.py tests/generation/test_spark_fixture.py tests/generation/test_schema_contract.py tests/generation/test_pricing.py tests/generation/test_writer.py
+          pytest -q tests/generation/test_dims.py tests/generation/test_receipts.py tests/generation/test_returns.py tests/generation/test_online_orders.py tests/generation/test_promotions.py
+          pytest -q tests/generation/test_inventory.py tests/generation/test_store_activity.py tests/generation/test_sensors.py tests/generation/test_marketing.py
+          pytest -q tests/generation/test_engine.py
+          pytest -q tests/generation/test_gold.py
+          pytest -q tests/test_e2e_local.py
 
       - name: Notebook drift check
         working-directory: utility
