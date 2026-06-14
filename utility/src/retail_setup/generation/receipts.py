@@ -40,6 +40,229 @@ DECLINE_REASONS = [
     "FRAUD_SUSPECTED", "CARD_BLOCKED", "LIMIT_EXCEEDED",
 ]
 
+# Share of in-store receipts whose customer lives in the store's geography
+# (datagen home-store locality). The rest draw a network-wide customer.
+GEO_AFFINITY = 0.70
+
+# Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
+# lowercase token matched as a substring of the department name so the one
+# table works across store types (datagen SeasonalPatterns category effects).
+SEASONAL_LIFT: dict[str, list[float]] = {
+    "electronics": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0, 1.0, 2.5, 2.0],
+    "seasonal":    [0.6, 0.7, 0.9, 1.0, 1.3, 1.5, 1.5, 1.2, 1.0, 1.4, 2.0, 2.5],
+    "garden":      [0.5, 0.6, 1.3, 1.8, 2.0, 1.8, 1.4, 1.0, 0.8, 0.6, 0.5, 0.5],
+    "home":        [0.8, 0.8, 1.2, 1.5, 1.6, 1.4, 1.2, 1.0, 0.9, 0.8, 1.0, 1.1],
+    "sport":       [0.9, 0.9, 1.1, 1.3, 1.5, 1.6, 1.6, 1.3, 1.1, 1.0, 1.1, 1.2],
+    "clothing":    [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
+    "apparel":     [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
+    "office":      [1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.6, 1.4, 1.0, 1.0, 1.1],
+    "toys":        [0.8, 0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.0, 1.0, 1.1, 2.0, 3.0],
+    "baby":        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2],
+    "grocery":     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.3, 1.4],
+    "fresh":       [1.0, 1.0, 1.0, 1.0, 1.05, 1.1, 1.1, 1.05, 1.0, 1.05, 1.3, 1.4],
+    "health":      [1.3, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.1],
+    "beauty":      [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
+    "automotive":  [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
+}
+
+# Named promo catalog (datagen promotion_utils parity): seasonal codes apply
+# only in their eligible months; evergreen SAVE/CLEARANCE codes fill in
+# otherwise. Some codes carry a minimum-purchase threshold; BOGO is a qty-based
+# buy-one-get-one. (code, discount_pct, eligible_months | None, min_cents, kind)
+PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
+    ("SAVE10", 10, None, 0, "PCT"),
+    ("SAVE15", 15, None, 2500, "PCT"),      # min $25
+    ("SAVE20", 20, None, 5000, "PCT"),      # min $50
+    ("SAVE25", 25, None, 7500, "PCT"),      # min $75
+    ("CLEARANCE30", 30, None, 0, "PCT"),
+    ("BOGO50", 50, None, 0, "BOGO"),        # buy one get one 50% off (qty >= 2)
+    ("NEWYEAR15", 15, [1, 2], 0, "PCT"),
+    ("SPRINGSALE20", 20, [3, 4, 5], 0, "PCT"),
+    ("SUMMER25", 25, [6, 7, 8], 0, "PCT"),
+    ("BACKTOSCHOOL20", 20, [8, 9], 0, "PCT"),
+    ("BFRIDAY30", 30, [11], 0, "PCT"),
+    ("BFRIDAY40", 40, [11], 10000, "PCT"),  # min $100
+    ("HOLIDAY20", 20, [12], 0, "PCT"),
+]
+# Evergreen fallback: always eligible, no minimum, percentage only.
+EVERGREEN: list[tuple[str, int]] = [
+    ("SAVE10", 10), ("CLEARANCE30", 30), ("DEAL15", 15),
+]
+
+# Per-customer shopping segments (datagen CustomerJourney segment distribution).
+SEGMENT_WEIGHTS: list[tuple[str, float]] = [
+    ("BUDGET", 0.35), ("CONVENIENCE", 0.25), ("QUALITY", 0.20), ("BRAND_LOYAL", 0.20),
+]
+
+
+def _segment_price_skew(u: Column, seg: Column) -> Column:
+    """Skew a uniform draw toward cheaper/pricier products by customer segment.
+
+    BUDGET biases to the low (cheap) end of a department's price-ranked
+    catalog, QUALITY/BRAND_LOYAL to the high end, CONVENIENCE is neutral.
+    """
+    return (F.when(seg == "BUDGET", u * u)
+            .when(seg == "QUALITY", F.lit(1.0) - (F.lit(1.0) - u) * (F.lit(1.0) - u))
+            .when(seg == "BRAND_LOYAL", F.pow(u, F.lit(0.85)))
+            .otherwise(u))
+
+
+# Weather simulation (datagen EventPatterns): a per-store-day weather state
+# scales foot traffic. Seasonal odds make winter snow/storm and summer sun more
+# likely. Only the traffic multiplier surfaces (there is no weather column).
+WEATHER_MULTS = [1.1, 1.0, 0.7, 0.6, 0.5]  # sunny, cloudy, rainy, snowy, stormy
+WEATHER_P_WINTER = [0.25, 0.30, 0.15, 0.20, 0.10]
+WEATHER_P_SUMMER = [0.55, 0.25, 0.15, 0.00, 0.05]
+WEATHER_P_SHOULDER = [0.40, 0.30, 0.20, 0.05, 0.05]
+
+# Shopping trip archetypes (datagen ShoppingBehaviorType): each trip is a quick
+# run / normal run / family shop / bulk stock-up, giving multi-modal basket
+# sizes. Multipliers scale the store-type basket_lambda; weighted mean ~1.0 so
+# overall item volume is preserved.
+TRIP_TYPES: list[tuple[str, float, float]] = [  # (name, weight, basket multiplier)
+    ("QUICK_TRIP", 0.30, 0.30),
+    ("GROCERY_RUN", 0.40, 0.90),
+    ("FAMILY_SHOPPING", 0.20, 1.60),
+    ("BULK_SHOPPING", 0.10, 2.50),
+]
+
+
+def _cdf_pick_lit(u: Column, probs: list[float], values: list[float]) -> Column:
+    """Inverse-CDF pick returning the chosen literal value."""
+    acc = 0.0
+    expr: Column | None = None
+    for p, v in list(zip(probs, values))[:-1]:
+        acc += p
+        cond = u < F.lit(acc)
+        expr = F.when(cond, F.lit(v)) if expr is None else expr.when(cond, F.lit(v))
+    return expr.otherwise(F.lit(values[-1])) if expr is not None else F.lit(values[0])
+
+
+def _weather_mult(u: Column, month: Column) -> Column:
+    """Per-store-day weather traffic multiplier with seasonal weather odds."""
+    return (F.when(month.isin(12, 1, 2),
+                   _cdf_pick_lit(u, WEATHER_P_WINTER, WEATHER_MULTS))
+            .when(month.isin(6, 7, 8),
+                  _cdf_pick_lit(u, WEATHER_P_SUMMER, WEATHER_MULTS))
+            .otherwise(_cdf_pick_lit(u, WEATHER_P_SHOULDER, WEATHER_MULTS)))
+
+
+def _trip_basket_mult(u: Column) -> Column:
+    """Pick a shopping-trip archetype's basket-size multiplier (inverse-CDF)."""
+    return _cdf_pick_lit(u, [w for _, w, _ in TRIP_TYPES],
+                         [m for _, _, m in TRIP_TYPES])
+
+
+def _seasonal_factor(dept_name: str, month_col: Column) -> Column:
+    """Monthly demand multiplier for a department (1.0 if no token matches)."""
+    key = dept_name.lower()
+    lifts = next((m for token, m in SEASONAL_LIFT.items() if token in key), None)
+    if lifts is None:
+        return F.lit(1.0)
+    expr: Column | None = None
+    for m in range(1, 13):
+        cond = month_col == F.lit(m)
+        expr = (F.when(cond, F.lit(lifts[m - 1])) if expr is None
+                else expr.when(cond, F.lit(lifts[m - 1])))
+    return expr.otherwise(F.lit(1.0))
+
+
+def _with_seasonal_department(df: DataFrame, u_col: Column,
+                              dept_weights: dict[str, float]) -> DataFrame:
+    """Pick a department per row via inverse-CDF over base weights scaled by the
+    seasonal lift for the row's month.
+
+    Intermediate per-department weight (``_w*``) and cumulative-CDF (``_c*``)
+    columns are materialized so Catalyst codegen stays small even for store
+    types with many departments (an inline single expression overflows the
+    64 KB JVM method limit and forces interpreted fallback). They are dropped
+    before returning.
+    """
+    depts = list(dept_weights)
+    month = F.month(F.col("event_date"))
+    out = df
+    for i, dn in enumerate(depts):
+        out = out.withColumn(
+            f"_w{i}", F.lit(float(dept_weights[dn])) * _seasonal_factor(dn, month))
+    wt = F.col("_w0")
+    for i in range(1, len(depts)):
+        wt = wt + F.col(f"_w{i}")
+    out = out.withColumn("_wt", wt)
+    prev: str | None = None
+    for i in range(len(depts) - 1):
+        term = F.col(f"_w{i}") / F.col("_wt")
+        out = out.withColumn(f"_c{i}", term if prev is None else F.col(prev) + term)
+        prev = f"_c{i}"
+    expr: Column | None = None
+    for i, dn in enumerate(depts[:-1]):
+        cond = u_col < F.col(f"_c{i}")
+        expr = F.when(cond, F.lit(dn)) if expr is None else expr.when(cond, F.lit(dn))
+    dept_col = expr.otherwise(F.lit(depts[-1])) if expr is not None else F.lit(depts[0])
+    out = out.withColumn("department", dept_col)
+    drop_cols = ([f"_w{i}" for i in range(len(depts))] + ["_wt"]
+                 + [f"_c{i}" for i in range(len(depts) - 1)])
+    return out.drop(*drop_cols)
+
+
+def _promo_eligible_expr(idx_col: Column, month_col: Column,
+                         ext_before: Column, qty: Column) -> Column:
+    """True when the catalog entry at idx_col is eligible: in-month, line value
+    meets any minimum, and BOGO needs qty >= 2."""
+    expr: Column | None = None
+    for i, (_, _, months, min_cents, kind) in enumerate(PROMO_CATALOG):
+        e = F.lit(True) if months is None else month_col.isin(*months)
+        if min_cents:
+            e = e & (ext_before >= F.lit(min_cents))
+        if kind == "BOGO":
+            e = e & (qty >= F.lit(2))
+        cond = idx_col == F.lit(i)
+        expr = F.when(cond, e) if expr is None else expr.when(cond, e)
+    return expr.otherwise(F.lit(False))
+
+
+def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
+                      d: seeded_draws, cfg: GenerationConfig) -> DataFrame:
+    """Resolve each receipt's customer_id with store-geography affinity.
+
+    With probability ``GEO_AFFINITY`` the customer is drawn from those living
+    in the store's geography (resolved by a deterministic within-geography
+    rank), otherwise a network-wide customer is used. Falls back to the
+    network-wide pick when the store's geography has no customers.
+    """
+    customers = dims["dim_customers"].select(
+        F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id"))
+    geo_sizes = customers.groupBy("cust_geo_id").agg(F.count("*").alias("geo_cust_count"))
+    rank_w = Window.partitionBy("cust_geo_id").orderBy("customer_id")
+    cust_ranked = customers.withColumn("local_rank", F.row_number().over(rank_w))
+
+    r = (
+        receipts
+        .join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
+        .drop("cust_geo_id")
+        .withColumn("geo_cust_count", F.coalesce(F.col("geo_cust_count"), F.lit(0)))
+        .withColumn("global_customer", (d.h64(["receipt_id_ext"], "cust")
+                                        % F.lit(cfg.customer_count) + 1).cast("long"))
+        .withColumn("want_local",
+                    (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
+                    & (F.col("geo_cust_count") > 0))
+        .withColumn("local_rank_target", F.when(
+            F.col("geo_cust_count") > 0,
+            (d.h64(["receipt_id_ext"], "localcust") % F.col("geo_cust_count") + 1))
+            .cast("long"))
+    )
+    local = cust_ranked.select(
+        F.col("cust_geo_id").alias("_lgeo"), F.col("local_rank").alias("_lrank"),
+        F.col("customer_id").alias("local_customer"))
+    return (
+        r.join(local, (F.col("store_geo_id") == F.col("_lgeo"))
+               & (F.col("local_rank_target") == F.col("_lrank")), "left")
+        .withColumn("customer_id", F.when(
+            F.col("want_local") & F.col("local_customer").isNotNull(),
+            F.col("local_customer")).otherwise(F.col("global_customer")))
+        .drop("_lgeo", "_lrank", "local_customer", "global_customer",
+              "want_local", "local_rank_target", "geo_cust_count")
+    )
+
 
 def _fmt(cents_col: Column) -> Column:
     """Integer cents -> 'XX.XX' string (no thousands separators)."""
@@ -69,7 +292,8 @@ def generate_receipts_group(
     d = seeded_draws(cfg.seed)
 
     stores = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier")
+        F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier",
+        F.col("GeographyID").alias("store_geo_id"))
     store_ids = [r.store_id for r in stores.select("store_id").collect()]
     grid = store_day_grid(
         spark, store_ids, cfg.start_date, cfg.end_date, cfg.seed, "receipts"
@@ -87,7 +311,8 @@ def generate_receipts_group(
     )
     monthly_w = F.element_at(F.array(*[F.lit(w / m_mean) for w in mw]), F.month("day"))
     lam = (F.lit(float(cfg.transactions_per_store_day)) * daily_w * monthly_w
-           * F.col("daily_traffic_multiplier"))
+           * F.col("daily_traffic_multiplier")
+           * _weather_mult(d.u(["store_id", "day"], "weather"), F.month("day")))
     n_rcpt = F.greatest(
         F.lit(1), F.round(lam + d.gauss(["store_id", "day"], "n") * F.sqrt(lam)))
     grid = grid.withColumn("n_receipts", n_rcpt.cast("int"))
@@ -110,12 +335,25 @@ def generate_receipts_group(
             F.lpad(F.col("store_id").cast("string"), 4, "0"),
             F.lpad(F.col("seq").cast("string"), 6, "0")))
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
-        .withColumn("customer_id", (d.h64(["receipt_id_ext"], "cust")
-                                    % F.lit(cfg.customer_count) + 1).cast("long"))
+    )
+
+    # geography affinity: resolve each receipt's customer (local vs network-wide)
+    receipts = _assign_customers(receipts, dims, d, cfg)
+
+    # per-customer shopping segment (datagen CustomerJourney): drives basket size
+    # and price-tier preference, so a customer behaves consistently across trips.
+    seg_basket = (F.when(F.col("_seg") == "CONVENIENCE", 0.7)
+                  .when(F.col("_seg") == "QUALITY", 1.15)
+                  .when(F.col("_seg") == "BRAND_LOYAL", 1.4)
+                  .otherwise(1.0))
+    # trip archetype gives multi-modal basket sizes (quick vs bulk stock-up)
+    lam_b = (F.lit(float(profile.basket_lambda)) * seg_basket
+             * _trip_basket_mult(d.u(["receipt_id_ext"], "trip")))
+    receipts = (
+        receipts
+        .withColumn("_seg", d.pick_by_weights(["customer_id"], "seg", SEGMENT_WEIGHTS))
         .withColumn("basket_n", F.greatest(F.lit(1), F.round(
-            F.lit(profile.basket_lambda)
-            + d.gauss(["receipt_id_ext"], "basket") * F.sqrt(F.lit(profile.basket_lambda))
-        )).cast("int"))
+            lam_b + d.gauss(["receipt_id_ext"], "basket") * F.sqrt(lam_b))).cast("int"))
         .withColumn("tender_type", d.pick_by_weights(
             ["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]))
     )
@@ -132,22 +370,28 @@ def generate_receipts_group(
             f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
         )
 
-    pw = Window.partitionBy("department").orderBy("product_id")
+    # rank products by price within department so the segment skew can target a
+    # cheap/pricey tier (datagen CustomerJourney price preference)
+    pw = Window.partitionBy("department").orderBy("SalePrice", "product_id")
     products_ranked = products.withColumn("dept_rank", F.row_number().over(pw))
     dept_sizes = products.groupBy("department").agg(F.count("*").alias("dept_size"))
 
-    dept_expr = d.pick_by_weights(
-        ["receipt_id_ext", "line_num"], "dept",
-        list(profile.department_weights.items()))
+    exploded = (
+        receipts.select("receipt_id_ext", "event_ts", "event_date", "store_id",
+                        "tax_rate", "basket_n", "_seg")
+        .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
+    )
+    exploded = _with_seasonal_department(
+        exploded, d.u(["receipt_id_ext", "line_num"], "dept"),
+        profile.department_weights)
 
     lines = (
-        receipts.select("receipt_id_ext", "event_ts", "event_date", "store_id",
-                        "tax_rate", "basket_n")
-        .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
-        .withColumn("department", dept_expr)
+        exploded
         .join(dept_sizes, "department")
-        .withColumn("dept_rank", (d.h64(["receipt_id_ext", "line_num"], "prod")
-                                  % F.col("dept_size") + 1).cast("int"))
+        .withColumn("_pskew", _segment_price_skew(
+            d.u(["receipt_id_ext", "line_num"], "prod"), F.col("_seg")))
+        .withColumn("dept_rank", F.least(F.col("dept_size"), F.greatest(F.lit(1),
+            (F.floor(F.col("_pskew") * F.col("dept_size")) + 1).cast("int"))))
         .join(products_ranked, ["department", "dept_rank"])
         .withColumn("quantity", F.greatest(F.lit(1), F.least(F.lit(5), F.round(
             d.u(["receipt_id_ext", "line_num"], "qty") * 3 + 0.7).cast("int"))))
@@ -155,14 +399,41 @@ def generate_receipts_group(
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
         .withColumn("has_promo", d.u(["receipt_id_ext", "line_num"], "promo")
                     < F.lit(profile.promo_rate))
-        .withColumn("promo_code", F.when(F.col("has_promo"), F.concat(
-            F.lit("PROMO"), F.lit(cfg.store_type[:3].upper()),
-            F.lpad(((d.h64(["receipt_id_ext", "line_num"], "pcode") % 5) + 1)
-                   .cast("string"), 2, "0"))))
-        .withColumn("discount_cents", F.when(F.col("has_promo"), F.round(
-            F.col("ext_before")
-            * (d.u(["receipt_id_ext", "line_num"], "disc") * 0.2 + 0.1))
-            .cast("long")).otherwise(F.lit(0).cast("long")))
+        # named promo code + matching discount (datagen promotion_utils parity):
+        # a seasonal/min-purchase/BOGO code if eligible, else an evergreen code.
+        .withColumn("_pidx", (d.h64(["receipt_id_ext", "line_num"], "pcode")
+                              % F.lit(len(PROMO_CATALOG))).cast("int"))
+        .withColumn("_pcode", F.element_at(
+            F.array(*[F.lit(t[0]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
+        .withColumn("_ppct", F.element_at(
+            F.array(*[F.lit(t[1]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
+        .withColumn("_pkind", F.element_at(
+            F.array(*[F.lit(t[4]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
+        .withColumn("_pelig", _promo_eligible_expr(
+            F.col("_pidx"), F.month(F.col("event_date")),
+            F.col("ext_before"), F.col("quantity")))
+        .withColumn("_evidx", (d.h64(["receipt_id_ext", "line_num"], "pcodeev")
+                               % F.lit(len(EVERGREEN))).cast("int"))
+        .withColumn("_evcode", F.element_at(
+            F.array(*[F.lit(c) for c, _ in EVERGREEN]), F.col("_evidx") + 1))
+        .withColumn("_evpct", F.element_at(
+            F.array(*[F.lit(p) for _, p in EVERGREEN]), F.col("_evidx") + 1))
+        .withColumn("promo_code", F.when(F.col("has_promo"), F.when(
+            F.col("_pelig"), F.col("_pcode")).otherwise(F.col("_evcode"))))
+        .withColumn("_disc_pct", F.when(
+            F.col("_pelig"), F.col("_ppct")).otherwise(F.col("_evpct")))
+        .withColumn("_disc_kind", F.when(
+            F.col("_pelig"), F.col("_pkind")).otherwise(F.lit("PCT")))
+        .withColumn("discount_cents", F.when(F.col("has_promo"),
+            F.when(F.col("_disc_kind") == "BOGO",
+                   # buy-one-get-one: every 2nd item discounted at _disc_pct
+                   F.floor(F.floor(F.col("quantity") / F.lit(2))
+                           * F.col("unit_cents") * F.col("_disc_pct")
+                           / F.lit(100.0) + F.lit(0.5)).cast("long"))
+            .otherwise(F.floor(
+                F.col("ext_before") * F.col("_disc_pct") / F.lit(100.0)
+                + F.lit(0.5)).cast("long")))
+            .otherwise(F.lit(0).cast("long")))
         .withColumn("ext_cents",
                     F.greatest(F.lit(0).cast("long"),
                                F.col("ext_before") - F.col("discount_cents")))

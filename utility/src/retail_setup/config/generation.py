@@ -34,6 +34,12 @@ class GenerationConfig(BaseModel):
     return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
     # network-wide online orders per day at multiplier 1.0; None -> store_count * 8
     online_orders_per_day: int | None = Field(default=None, gt=0)
+    # number of category-matched branded SKUs generated per base catalog product
+    # (datagen combinatorial SKUs); 1 = one SKU per dictionary row
+    brands_per_product: int = Field(default=3, ge=1, le=10)
+    # truck load capacity in units; a store-day shipment exceeding this is split
+    # across multiple truck legs (datagen multi-truck shipments)
+    truck_capacity: int = Field(default=15000, gt=0)
 
     @model_validator(mode="after")
     def _known_store_type(self) -> "GenerationConfig":

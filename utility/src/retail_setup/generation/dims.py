@@ -15,18 +15,54 @@ from retail_setup.dictionaries.loader import DictionarySet
 from retail_setup.generation.runtime import derive_seed
 from retail_setup.generation.schemas import spark_schema
 
-# datagen StoreProfiler equivalents (volume class -> traffic multiplier range)
+# datagen StoreProfiler equivalents (volume class -> traffic multiplier range).
+# Five tiers incl. KIOSK, matching datagen's StoreVolumeClass (the kiosk tier
+# was dropped in the first port; restored here for store-volume variety).
 VOLUME_CLASSES = [
     ("flagship", 0.05, (1.8, 2.5)),
-    ("high_volume", 0.20, (1.3, 1.8)),
+    ("high_volume", 0.15, (1.3, 1.8)),
     ("standard", 0.55, (0.8, 1.3)),
     ("low_volume", 0.20, (0.4, 0.8)),
+    ("kiosk", 0.05, (0.25, 0.35)),
 ]
-STORE_FORMATS = ["hypermarket", "superstore", "standard", "neighborhood"]
+# Five formats incl. EXPRESS (datagen's StoreFormat.EXPRESS). store_activity
+# carries a matching express zone-share row.
+STORE_FORMATS = ["hypermarket", "superstore", "standard", "neighborhood", "express"]
 OPERATING_HOURS = ["6-22", "7-22", "7-23", "24h"]
 DEFAULT_TAX_RATE = 0.07407  # datagen receipts_mixin fallback
 REFRIGERATED_CATEGORIES = {"Produce", "Dairy & Eggs", "Dairy & Alternatives",
                            "Meat & Poultry", "Meat & Seafood", "Seafood", "Frozen"}
+
+# Share of customers placed in a geography that has a store (the rest are
+# scattered anywhere). Restores datagen's "customers live near stores" locality
+# so receipts can draw a same-geography customer most of the time.
+CUSTOMER_HOME_AFFINITY = 0.70
+
+# Map a product department/category token to a brand-dictionary Category so a
+# product's brand fits its department (datagen product_generator parity: a
+# grocery item never carries a hardware brand). Tokens are matched lowercased;
+# substring matches (e.g. "home" in "home & garden") are tried before falling
+# back to the whole brand pool.
+_BRAND_CAT_SYNONYMS = {
+    "grocery": "food", "fresh": "food", "pantry": "food", "snacks": "food",
+    "beverages": "food", "health & beauty": "health", "home & garden": "home",
+    "office supplies": "office", "pet supplies": "pet",
+    "sports & recreation": "sports", "apparel": "clothing",
+}
+
+
+def _match_brand_category(key: str, brands_by_cat: dict[str, list]) -> list | None:
+    """Resolve a product department/category to a brand pool, or None."""
+    k = key.strip().lower()
+    if k in brands_by_cat:
+        return brands_by_cat[k]
+    syn = _BRAND_CAT_SYNONYMS.get(k)
+    if syn and syn in brands_by_cat:
+        return brands_by_cat[syn]
+    for cat, pool in brands_by_cat.items():
+        if cat and (cat in k or k in cat):
+            return pool
+    return None
 
 
 def compute_pricing(base_price: float, rng: np.random.Generator) -> tuple[float, float, float]:
@@ -75,15 +111,29 @@ def generate_dimensions(
     ]
     out["dim_geographies"] = spark.createDataFrame(geo_rows, spark_schema("dim_geographies"))
 
-    # tax lookup: (State, City) -> rate, else state mean, else default
-    by_city = {(t.StateCode, t.City): float(t.CombinedRate) for t in dicts.tax_rates}
+    # tax lookup hierarchy (datagen TaxCalculator parity):
+    #   exact (State, City) -> (State, County) average -> State average -> default.
+    # County is resolved from the tax dictionary; geographies carry no county of
+    # their own, so the county tier only applies to cities present in the dict.
+    city_acc: dict[tuple[str, str], list[float]] = {}
+    city_county: dict[tuple[str, str], str] = {}
+    county_acc: dict[tuple[str, str], list[float]] = {}
     state_rates: dict[str, list[float]] = {}
     for t in dicts.tax_rates:
-        state_rates.setdefault(t.StateCode, []).append(float(t.CombinedRate))
+        rate = float(t.CombinedRate)
+        city_acc.setdefault((t.StateCode, t.City), []).append(rate)
+        city_county[(t.StateCode, t.City)] = t.County
+        county_acc.setdefault((t.StateCode, t.County), []).append(rate)
+        state_rates.setdefault(t.StateCode, []).append(rate)
+    by_city = {k: float(np.mean(v)) for k, v in city_acc.items()}
+    by_county = {k: float(np.mean(v)) for k, v in county_acc.items()}
 
     def tax_for(state: str, city: str) -> float:
         if (state, city) in by_city:
             return by_city[(state, city)]
+        county = city_county.get((state, city))
+        if county is not None and (state, county) in by_county:
+            return by_county[(state, county)]
         if state in state_rates:
             return float(np.mean(state_rates[state]))
         return DEFAULT_TAX_RATE
@@ -102,8 +152,10 @@ def generate_dimensions(
     dc_states = {geos[int(g)].State for g in dc_geo_idx}
     eligible = [i for i, g in enumerate(geos) if g.State in dc_states] or list(range(n_geo))
     store_rows = []
+    store_geo_indices: list[int] = []
     for sid in range(1, cfg.store_count + 1):
         gi = int(rng.choice(eligible))
+        store_geo_indices.append(gi)
         g = geos[gi]
         classes, probs = zip(*[(c, p) for c, p, _ in VOLUME_CLASSES])
         vc = str(rng.choice(classes, p=probs))
@@ -132,12 +184,16 @@ def generate_dimensions(
         truck_rows.append((tid, plate, refrig, dcid))
     out["dim_trucks"] = spark.createDataFrame(truck_rows, spark_schema("dim_trucks"))
 
-    # --- customers
+    # --- customers; ~70% placed in a store's geography (datagen home-store
+    #     locality) so receipts can resolve a same-geography "local" shopper.
     first = [n.Name for n in dicts.first_names]
     last = [n.Name for n in dicts.last_names]
     cust_rows = []
     for cid in range(1, cfg.customer_count + 1):
-        gi = int(rng.integers(0, n_geo))
+        if store_geo_indices and rng.random() < CUSTOMER_HOME_AFFINITY:
+            gi = int(rng.choice(store_geo_indices))
+        else:
+            gi = int(rng.integers(0, n_geo))
         cust_rows.append((
             cid,
             str(rng.choice(first)),
@@ -151,45 +207,58 @@ def generate_dimensions(
         ))
     out["dim_customers"] = spark.createDataFrame(cust_rows, spark_schema("dim_customers"))
 
-    # --- products from dictionary; pricing ported from datagen PricingCalculator
-    #     (MSRP = base +/-15%, SalePrice = MSRP or 5-35% off, Cost = 50-85% of SalePrice)
-    brand_names = [b.Brand for b in dicts.brands]
-    brand_company = {b.Brand: b.Company for b in dicts.brands}
+    # --- products: each base product is offered by up to brands_per_product
+    #     category-matched brands (datagen combinatorial SKUs). Pricing/launch
+    #     are re-rolled per branded variant for realistic price spread.
+    brands_by_cat: dict[str, list] = {}
+    for b in dicts.brands:
+        brands_by_cat.setdefault(b.Category.strip().lower(), []).append(b)
+    all_brands = list(dicts.brands)
     tags_by_product = {t.ProductName: t.Tags for t in dicts.tags}
     # Use naive UTC datetimes — Spark session timezone is UTC (set in conftest fixture)
     hist_start = datetime.combine(cfg.start_date, datetime.min.time())
     prod_rows = []
-    for pid, p in enumerate(dicts.products, start=1):
-        brand = str(rng.choice(brand_names))
+    pid = 0
+    for p in dicts.products:
+        pool = (_match_brand_category(p.Department, brands_by_cat)
+                or _match_brand_category(p.Category, brands_by_cat)
+                or all_brands)
+        k = min(cfg.brands_per_product, len(pool))
+        brand_idx = rng.choice(len(pool), size=k, replace=False)
         taxability = (
             "NON_TAXABLE" if p.Department in {"Fresh", "Grocery"} and "Candy" not in p.Category
             else "REDUCED_RATE" if p.Department in {"Clothing", "Apparel"}
             else "TAXABLE"
         )
-        launch_r = float(rng.random())  # 60% before history, 30% first half, 10% later
-        if launch_r < 0.6:
-            launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))
-        elif launch_r < 0.9:
-            launch = hist_start + timedelta(days=int(rng.integers(0, 183)))
-        else:
-            launch = hist_start + timedelta(days=int(rng.integers(183, 366)))
-        cost, msrp, sale = compute_pricing(float(p.BasePrice), rng)
-        prod_rows.append((
-            pid,
-            p.ProductName,
-            brand,
-            brand_company[brand],
-            p.Department,
-            p.Category,
-            p.Subcategory,
-            cost,
-            msrp,
-            sale,
-            bool(p.Category in REFRIGERATED_CATEGORIES),
-            launch,
-            taxability,
-            p.Tags or tags_by_product.get(p.ProductName),
-        ))
+        refrigerated = bool(p.Category in REFRIGERATED_CATEGORIES)
+        tags = p.Tags or tags_by_product.get(p.ProductName)
+        for j in brand_idx:
+            pid += 1
+            chosen = pool[int(j)]
+            launch_r = float(rng.random())  # 60% before history, 30% first half, 10% later
+            if launch_r < 0.6:
+                launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))
+            elif launch_r < 0.9:
+                launch = hist_start + timedelta(days=int(rng.integers(0, 183)))
+            else:
+                launch = hist_start + timedelta(days=int(rng.integers(183, 366)))
+            cost, msrp, sale = compute_pricing(float(p.BasePrice), rng)
+            prod_rows.append((
+                pid,
+                p.ProductName,
+                chosen.Brand,
+                chosen.Company,
+                p.Department,
+                p.Category,
+                p.Subcategory,
+                cost,
+                msrp,
+                sale,
+                refrigerated,
+                launch,
+                taxability,
+                tags,
+            ))
     out["dim_products"] = spark.createDataFrame(prod_rows, spark_schema("dim_products"))
     return out
 

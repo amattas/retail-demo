@@ -5,11 +5,9 @@ Mirrors `receipts.py`: all randomness flows through `runtime.seeded_draws`
 and daily volume is a clamped-normal approximation of Poisson.
 
 Documented decisions (per plan 2b, Task 5):
-- Tax is destination-based: each order uses its customer's geography tax rate
-  (the mean store rate in that geography, with the network mean as fallback)
-  via the exact integer basis-point formula from receipts. datagen applies the
-  fulfilment store's rate to store-shipped lines and the customer-geography
-  rate to DC-shipped lines; we use the customer-geography rate for all lines.
+- Tax uses the exact integer basis-point formula from receipts. Store/BOPIS
+  lines use the fulfilment store's rate; DC-shipped lines use the customer's
+  geography rate, with the network mean as fallback.
 - Backorders: a small fraction of non-BOPIS lines ship but are not yet
   delivered (fulfillment_status SHIPPED, delivered_ts NULL), mirroring
   datagen's ``"DELIVERED" if not is_backordered else "SHIPPED"``.
@@ -166,6 +164,11 @@ def generate_online_orders(
         ["order_id_ext", "line_num"], "onl_mode",
         [("SHIP_FROM_DC", 0.60), ("SHIP_FROM_STORE", 0.30), ("BOPIS", 0.10)])
 
+    # store tax rate (bps) for destination-based tax on store-fulfilled lines
+    store_bps = dims["dim_stores"].select(
+        F.col("ID").alias("_snid"),
+        F.round(F.col("tax_rate") * 10000).cast("long").alias("_store_bps"))
+
     lines = (
         orders.select("order_id_ext", "event_ts", "event_date", "is_cancelled",
                       "promo_rate", "basket_n", "rate_bps")
@@ -188,24 +191,8 @@ def generate_online_orders(
             (F.col("ext_before") * F.col("promo_pct") + F.lit(50)) / F.lit(100))
             .cast("long"))
         .withColumn("ext_cents", F.col("ext_before") - F.col("discount_cents"))
-        # tax: per-customer-geography rate through the exact integer bps formula
-        .withColumn("tax_mult", F.when(F.col("taxability") == "TAXABLE", 100)
-                    .when(F.col("taxability") == "REDUCED_RATE", 50)
-                    .otherwise(0).cast("long"))
-        .withColumn("line_tax_cents", F.floor(
-            (F.col("ext_cents") * F.col("rate_bps") * F.col("tax_mult")
-             + F.lit(500_000)) / F.lit(1_000_000)).cast("long"))
+        # fulfillment + node resolved before tax so the destination rate is known
         .withColumn("fulfillment_mode", mode)
-        # Backorder a small fraction of shippable (non-BOPIS, non-cancelled)
-        # lines: they ship but are not yet delivered (datagen SHIPPED state).
-        .withColumn("is_backordered",
-                    (F.col("fulfillment_mode") != "BOPIS") & ~F.col("is_cancelled")
-                    & (d.u(["order_id_ext", "line_num"], "onl_backorder")
-                       < F.lit(BACKORDER_RATE)))
-        .withColumn("fulfillment_status",
-                    F.when(F.col("is_cancelled"), "CANCELLED")
-                    .when(F.col("is_backordered"), "SHIPPED")
-                    .otherwise("DELIVERED"))
         .withColumn("node_type",
                     F.when(F.col("fulfillment_mode") == "SHIP_FROM_DC", "DC")
                     .otherwise("STORE"))
@@ -216,6 +203,30 @@ def generate_online_orders(
             .otherwise(
             F.element_at(st_arr, (d.h64(["order_id_ext", "line_num"], "onl_node")
                                   % len(store_ids) + 1).cast("int"))))
+        # destination-based tax (datagen parity): STORE/BOPIS lines use the
+        # fulfilling store's rate; DC lines use the customer-geography rate.
+        .join(store_bps, F.col("node_id") == F.col("_snid"), "left")
+        .withColumn("line_rate_bps", F.when(
+            F.col("node_type") == "STORE",
+            F.coalesce(F.col("_store_bps"), F.col("rate_bps")))
+            .otherwise(F.col("rate_bps")))
+        .withColumn("tax_mult", F.when(F.col("taxability") == "TAXABLE", 100)
+                    .when(F.col("taxability") == "REDUCED_RATE", 50)
+                    .otherwise(0).cast("long"))
+        .withColumn("line_tax_cents", F.floor(
+            (F.col("ext_cents") * F.col("line_rate_bps") * F.col("tax_mult")
+             + F.lit(500_000)) / F.lit(1_000_000)).cast("long"))
+        # Backorder a small fraction of shippable (non-BOPIS, non-cancelled)
+        # lines: they ship but are not yet delivered (datagen SHIPPED state).
+        .withColumn("is_backordered",
+                    (F.col("fulfillment_mode") != "BOPIS") & ~F.col("is_cancelled")
+                    & (d.u(["order_id_ext", "line_num"], "onl_backorder")
+                       < F.lit(BACKORDER_RATE)))
+        .withColumn("fulfillment_status",
+                    F.when(F.col("is_cancelled"), "CANCELLED")
+                    .when(F.col("is_backordered"), "SHIPPED")
+                    .otherwise("DELIVERED"))
+        .drop("_snid", "_store_bps")
     )
 
     # --- lifecycle (non-cancelled lines only; cancelled lines keep NULL ts)

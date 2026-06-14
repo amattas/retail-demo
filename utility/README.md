@@ -96,7 +96,7 @@ In Fabric, open and run each notebook in sequence:
 ### 5. (Optional) Stream live events
 
 `setup-05-stream-events` is a Spark Structured Streaming generator that emits the
-same 19 real-time event types datagen produced, as JSON `EventEnvelope`s, into a
+same 18 real-time event types datagen produced, as JSON `EventEnvelope`s, into a
 Fabric **Eventstream** — so the Eventstream → KQL `cusn.*` → Silver → Gold pipeline
 runs without the external datagen service, and **everything stays inside Fabric**
 (no standalone Azure Event Hubs namespace). It is **not** part of the ordered 1→4

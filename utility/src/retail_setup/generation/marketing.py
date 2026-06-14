@@ -27,12 +27,13 @@ from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 
-# (archetype, channels, base impressions/day at the legacy 86-store fleet)
-ARCHETYPES: list[tuple[str, list[str], int]] = [
-    ("seasonal_sale", ["FACEBOOK", "GOOGLE", "EMAIL"], 1000),
-    ("product_launch", ["INSTAGRAM", "YOUTUBE", "DISPLAY"], 2000),
-    ("loyalty_program", ["EMAIL", "SOCIAL"], 500),
-    ("flash_sale", ["SOCIAL", "SEARCH"], 5000),  # runs ~1 day in 7
+# (archetype, channels, base impressions/day at the legacy 86-store fleet,
+#  campaign duration in days — datagen MarketingCampaignSimulator templates)
+ARCHETYPES: list[tuple[str, list[str], int, int]] = [
+    ("seasonal_sale", ["FACEBOOK", "GOOGLE", "EMAIL"], 1000, 7),
+    ("product_launch", ["INSTAGRAM", "YOUTUBE", "DISPLAY"], 2000, 14),
+    ("loyalty_program", ["EMAIL", "SOCIAL"], 500, 30),
+    ("flash_sale", ["SOCIAL", "SEARCH"], 5000, 1),  # runs ~1 day in 7
 ]
 
 # channel -> (lo, hi) cost-per-impression band in dollars (uniform draw)
@@ -65,19 +66,26 @@ def generate_marketing(
 
     # --- day x archetype grid (driver-side; days x 4 rows)
     rows = [
-        (idx + 1, name, channels, base)
-        for idx, (name, channels, base) in enumerate(ARCHETYPES)
+        (idx + 1, name, channels, base, dur)
+        for idx, (name, channels, base, dur) in enumerate(ARCHETYPES)
     ]
     grid = spark.createDataFrame(
         [
-            (day_offset, idx, name, channels, base)
+            (day_offset, idx, name, channels, base, dur)
             for day_offset in range((cfg.end_date - cfg.start_date).days + 1)
-            for (idx, name, channels, base) in rows
+            for (idx, name, channels, base, dur) in rows
         ],
         "day_offset int, archetype_idx int, archetype string, "
-        "channels array<string>, base_impressions int",
+        "channels array<string>, base_impressions int, duration int",
     ).withColumn(
         "day", F.date_add(F.lit(cfg.start_date), F.col("day_offset"))
+    ).withColumn(
+        # campaigns span their archetype duration: the day's impressions belong
+        # to the campaign window [start + k*duration, ...) it falls in.
+        "campaign_start",
+        F.date_add(F.lit(cfg.start_date),
+                   (F.col("day_offset") / F.col("duration")).cast("int")
+                   * F.col("duration")),
     )
 
     # flash_sale runs ~1 day in 7 (uniform gate per day)
@@ -99,21 +107,24 @@ def generate_marketing(
         grid
         .withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_impressions"))))
         .withColumn(
+            # campaign_id keyed on the campaign window so it spans multiple days
             "campaign_id",
             F.concat(
                 F.lit("CAMP"),
-                F.date_format("day", "yyyyMMdd"),
+                F.date_format("campaign_start", "yyyyMMdd"),
                 F.lpad(F.col("archetype_idx").cast("string"), 2, "0"),
             ),
         )
         .withColumn(
+            # impression id stays day-unique (campaign_id now repeats across days)
             "impression_id_ext",
             F.concat(
-                F.lit("IMP"), F.col("campaign_id"),
+                F.lit("IMP"), F.date_format("day", "yyyyMMdd"),
+                F.lpad(F.col("archetype_idx").cast("string"), 2, "0"),
                 F.lpad(F.col("seq").cast("string"), 7, "0"),
             ),
         )
-        # drops the 'IMP' prefix: CREAT + campaign_id + seq
+        # drops the 'IMP' prefix: CREAT + day + archetype + seq
         .withColumn(
             "creative_id",
             F.concat(F.lit("CREAT"), F.substring("impression_id_ext", 4, 30)),

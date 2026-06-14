@@ -18,10 +18,10 @@ them to **Azure Event Hubs**, where **Eventstream** routes them into the KQL Eve
 (dims + 18 fact tables + Gold) as Fabric-native PySpark notebooks. The **real-time
 generator** has no Fabric-native equivalent yet — it still lives only in datagen's
 `streaming/` subsystem (`event_factory.py`, `streamer.py`, `batch_streaming.py`,
-19 event types).
+18 event types).
 
 **Goal:** add a Fabric-native Spark Structured Streaming notebook that continuously
-emits the same 19 event types, in the same JSON envelope, to the same sink, so the
+emits the same 18 event types, in the same JSON envelope, to the same sink, so the
 existing Eventstream → KQL → Silver → Gold pipeline works unchanged — removing the
 last dependency on the external datagen service.
 
@@ -213,7 +213,7 @@ Both use `checkpointLocation`. `run_seconds==0` → default (continuous) trigger
 - **Pure-Python unit tests** (no Spark worker) for the envelope/payload *builders* if any
   helper logic is extracted, and for the scenario-weight table.
 - **Fabric runtime validation** (manual / pipeline smoke): run with `sink="delta"`,
-  `run_seconds=30`, assert the landing table receives all 19 event types with valid FKs
+  `run_seconds=30`, assert the landing table receives all 18 event types with valid FKs
   and well-formed envelopes; then `sink="eventstream"` end-to-end into `cusn.*`.
   (Local Structured-Streaming + Eventstream validation is not possible in this dev
   environment — corporate EDR blocks the Spark Python worker, and there is no Fabric
@@ -234,7 +234,7 @@ Both use `checkpointLocation`. `run_seconds==0` → default (continuous) trigger
 1. **Sink:** Fabric Eventstream (Custom Endpoint, Event-Hub/Kafka-compatible) primary +
    Delta debug toggle — keeps everything inside Fabric, no standalone Event Hubs.
    *(user-confirmed after the draft: "keep it contained in Fabric".)*
-2. **Scope:** all 19 event types via 6 scenario generators.
+2. **Scope:** all 18 event types via 6 scenario generators.
 3. **Runtime model:** `rate` source + pure-Catalyst transform (approach A), continuous
    with a bounded test mode.
 4. **Placement:** a `utility` template notebook (`setup-05-stream-events`) built via

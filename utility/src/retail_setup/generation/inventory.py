@@ -5,13 +5,12 @@ Eight internal stages produce six fact tables from the sales/returns groups:
 1. Store SALE txns mirror ``fact_receipt_lines`` 1:1 (negative quantity);
    RETURN add-backs mirror return lines (positive quantity).
 2. Reorders: per (store, day), the day's top-5 demanded products gated at
-   ``u < 0.4`` each emit one reorder. ``dc_id = store_id % dc_count + 1`` is
-   the deterministic store->DC assignment (documented simplification: a fixed
-   modulo map rather than geography-based routing).
-3. Shipments: one per (store, day) with reorders. The truck is chosen
+   ``u < 0.4`` each emit one reorder. Stores route to the nearest DC by
+   state/region and high-volume store-days split across truck-capacity legs.
+3. Shipments: one per (store, day, leg) with reorders. The truck is chosen
    round-robin by day number from that DC's assigned trucks in ``dim_trucks``
    (``DCID == dc``); a DC with no assigned trucks falls back to the shared
-   pool trucks (``DCID IS NULL``) — documented simplification. Six
+   pool trucks (``DCID IS NULL``). Six
    ``fact_truck_moves`` status rows per shipment: SCHEDULED day 23:30,
    LOADING next-day 04:00, IN_TRANSIT 06:00 (departure), ARRIVED 06:00+travel
    (= eta), UNLOADING eta+0.25h, COMPLETED eta+unload (= etd). eta/etd are
@@ -54,6 +53,10 @@ from retail_setup.generation.schemas import column_names
 
 _REORDER_TOP_N = 5
 _REORDER_GATE = 0.4
+# Fraction of returned units restocked to store on-hand; the rest are destroyed
+# or returned-to-vendor and never re-enter inventory (datagen returns
+# disposition: food destroyed, non-food ~40% restock).
+_RETURN_RESTOCK_RATE = 0.5
 
 
 def _at(day: Column, hhmmss: str) -> Column:
@@ -76,28 +79,34 @@ def _with_index(df: DataFrame, table: str) -> DataFrame:
 # Stage 1: store demand (SALE mirrors + RETURN add-backs)
 # ---------------------------------------------------------------------------
 
-def _sale_txns(sales: dict[str, DataFrame], rets: dict[str, DataFrame]) -> DataFrame:
+def _sale_txns(sales: dict[str, DataFrame], rets: dict[str, DataFrame],
+               d: seeded_draws) -> DataFrame:
     def _lines_to_txns(group: dict[str, DataFrame], txn_type: str,
-                       source: Column) -> DataFrame:
+                       source: Column, restock_gate: bool = False) -> DataFrame:
         hdr = group["fact_receipts"].select("receipt_id_ext", "store_id")
         # SALE lines carry positive qty -> negate; RETURN lines carry negative
         # qty -> negate back to a positive add-back. Both are just -quantity.
-        return (group["fact_receipt_lines"]
-                .join(hdr, "receipt_id_ext")
-                .select(
-                    F.col("store_id").alias("node_id"),
-                    "product_id",
-                    (-F.col("quantity")).cast("long").alias("quantity"),
-                    F.lit(txn_type).alias("txn_type"),
-                    source.alias("source"),
-                    "event_ts", "event_date",
-                    F.concat(F.lit("TRC-INV-"), F.col("receipt_id_ext"),
-                             F.lit("-"), F.col("line_num").cast("string"))
-                    .alias("trace_id"),
-                ))
+        base = group["fact_receipt_lines"].join(hdr, "receipt_id_ext")
+        if restock_gate:
+            # Only a fraction of returned units re-enter store on-hand; the rest
+            # are destroyed / returned-to-vendor (datagen returns disposition).
+            base = base.filter(
+                d.u([F.col("receipt_id_ext"), F.col("line_num").cast("string")],
+                    "restock") < F.lit(_RETURN_RESTOCK_RATE))
+        return base.select(
+            F.col("store_id").alias("node_id"),
+            "product_id",
+            (-F.col("quantity")).cast("long").alias("quantity"),
+            F.lit(txn_type).alias("txn_type"),
+            source.alias("source"),
+            "event_ts", "event_date",
+            F.concat(F.lit("TRC-INV-"), F.col("receipt_id_ext"),
+                     F.lit("-"), F.col("line_num").cast("string"))
+            .alias("trace_id"),
+        )
 
     sale = _lines_to_txns(sales, "SALE", F.lit("CUSTOMER_PURCHASE"))
-    ret = _lines_to_txns(rets, "RETURN", F.col("receipt_id_ext"))
+    ret = _lines_to_txns(rets, "RETURN", F.col("receipt_id_ext"), restock_gate=True)
     return sale.unionByName(ret).select(*_TXN_COLS)
 
 
@@ -105,7 +114,33 @@ def _sale_txns(sales: dict[str, DataFrame], rets: dict[str, DataFrame]) -> DataF
 # Stage 2: reorders
 # ---------------------------------------------------------------------------
 
-def _reorders(store_txns: DataFrame, d: seeded_draws,
+def _store_dc_map(dims: dict[str, DataFrame]) -> DataFrame:
+    """Route each store to its nearest DC by geography (same state > same region
+    > lowest dc_id), restoring datagen's geography-aware assignment in place of a
+    ``store_id % dc_count`` modulo. Returns one (store_id, dc_id) row per store."""
+    geo = dims["dim_geographies"].select(
+        F.col("ID").alias("geo_id"), "State", "Region")
+    stores = (dims["dim_stores"].select(F.col("ID").alias("store_id"), "GeographyID")
+              .join(geo, F.col("GeographyID") == F.col("geo_id"))
+              .select("store_id", F.col("State").alias("s_state"),
+                      F.col("Region").alias("s_region")))
+    dcs = (dims["dim_distribution_centers"]
+           .select(F.col("ID").alias("dc_id"), "GeographyID")
+           .join(geo, F.col("GeographyID") == F.col("geo_id"))
+           .select("dc_id", F.col("State").alias("d_state"),
+                   F.col("Region").alias("d_region")))
+    scored = stores.crossJoin(dcs).withColumn(
+        "_score",
+        F.when(F.col("s_state") == F.col("d_state"), 0)
+        .when(F.col("s_region") == F.col("d_region"), 1)
+        .otherwise(2))
+    nearest = Window.partitionBy("store_id").orderBy("_score", "dc_id")
+    return (scored.withColumn("_r", F.row_number().over(nearest))
+            .filter(F.col("_r") == 1)
+            .select("store_id", F.col("dc_id").cast("long").alias("dc_id")))
+
+
+def _reorders(store_txns: DataFrame, store_dc: DataFrame, d: seeded_draws,
               cfg: GenerationConfig) -> DataFrame:
     demand = (store_txns.filter(F.col("txn_type") == "SALE")
               .groupBy(F.col("node_id").alias("store_id"),
@@ -123,6 +158,14 @@ def _reorders(store_txns: DataFrame, d: seeded_draws,
                 F.lit(0).cast("long"),
                 F.col("reorder_point") - F.col("demand")))
             .withColumn("reorder_quantity", _draw_int(d.u(keys, "reorder-qty"), 50, 200))
+            # split a store-day's products across truck legs by capacity: each
+            # leg holds <= truck_capacity units (datagen multi-truck shipments).
+            .withColumn("_cum_qty", F.sum("reorder_quantity").over(
+                Window.partitionBy("store_id", "event_date").orderBy("product_id")
+                .rowsBetween(Window.unboundedPreceding, Window.currentRow)))
+            .withColumn("leg", F.floor(
+                (F.col("_cum_qty") - F.col("reorder_quantity"))
+                / F.lit(cfg.truck_capacity)).cast("long"))
             .withColumn("_deficit_pct",
                         (F.col("reorder_point") - F.col("current_quantity"))
                         / F.col("reorder_point") * F.lit(100.0))
@@ -131,14 +174,13 @@ def _reorders(store_txns: DataFrame, d: seeded_draws,
                         .when(F.col("_deficit_pct") >= 25, "HIGH")
                         .otherwise("NORMAL"))
             .withColumn("event_ts", _at(F.col("event_date"), "23:00:00"))
-            # Deterministic store->DC map (documented): store_id % dc_count + 1.
-            .withColumn("dc_id", (F.col("store_id") % F.lit(cfg.dc_count) + 1)
-                        .cast("long"))
+            # Geography-aware store->DC routing (nearest DC by state/region).
+            .join(store_dc, "store_id")
             .withColumn("trace_id", F.concat(
                 F.lit("TRC-RO-"), F.col("store_id").cast("string"), F.lit("-"),
                 F.col("event_date").cast("string"), F.lit("-"),
                 F.col("product_id").cast("string")))
-            .drop("_rank", "_deficit_pct", "demand"))
+            .drop("_rank", "_deficit_pct", "demand", "_cum_qty"))
 
 
 # ---------------------------------------------------------------------------
@@ -168,30 +210,40 @@ def _truck_lookup(spark: SparkSession, dims: dict[str, DataFrame],
 def _shipments(spark: SparkSession, reorders: DataFrame,
                dims: dict[str, DataFrame], d: seeded_draws,
                cfg: GenerationConfig) -> DataFrame:
-    """One row per shipment with truck assignment and the full timing model."""
+    """One row per shipment leg with truck assignment and the full timing model.
+
+    A store-day's reorders are split into legs of <= ``truck_capacity`` units;
+    each leg is its own shipment (own truck + 6-status lifecycle), staggered 30
+    min apart. At demo scale every store-day fits one leg, so this reduces to a
+    single shipment identical to the pre-split behaviour.
+    """
     keys = ["store_id", "event_date"]
-    base = (reorders.select("store_id", "event_date", "dc_id").distinct()
+    base = (reorders.select("store_id", "event_date", "dc_id", "leg").distinct()
             .withColumn("shipment_id", F.concat(
                 F.lit("SHIP"), F.date_format("event_date", "yyyyMMdd"),
                 F.lpad(F.col("dc_id").cast("string"), 2, "0"),
-                F.lpad(F.col("store_id").cast("string"), 3, "0")))
+                F.lpad(F.col("store_id").cast("string"), 3, "0"),
+                F.lpad(F.col("leg").cast("string"), 2, "0")))
             .withColumn("_day_num", F.datediff(
                 F.col("event_date"), F.lit(cfg.start_date))))
     lookup = _truck_lookup(spark, dims, cfg)
     sizes = lookup.select("dc_id", "n_trucks").distinct()
     timed = (base
              .join(sizes, "dc_id")
-             .withColumn("slot", F.pmod(F.col("_day_num"), F.col("n_trucks")))
+             .withColumn("slot", F.pmod(
+                 F.col("_day_num") + F.col("leg"), F.col("n_trucks")))
              .join(lookup, ["dc_id", "slot", "n_trucks"])
              .withColumn("_travel_h",
                          F.lit(2.0) + d.u(keys, "ship-travel") * F.lit(10.0))
              .withColumn("_unload_h",
                          F.lit(0.5) + d.u(keys, "ship-unload") * F.lit(1.5))
-             .withColumn("scheduled_ts", _at(F.col("event_date"), "23:30:00"))
-             .withColumn("loading_ts",
-                         _at(F.date_add("event_date", 1), "04:00:00"))
-             .withColumn("depart_ts",
-                         _at(F.date_add("event_date", 1), "06:00:00")))
+             # legs depart 30 min apart
+             .withColumn("scheduled_ts", _plus_hours(
+                 _at(F.col("event_date"), "23:30:00"), F.col("leg") * F.lit(0.5)))
+             .withColumn("loading_ts", _plus_hours(
+                 _at(F.date_add("event_date", 1), "04:00:00"), F.col("leg") * F.lit(0.5)))
+             .withColumn("depart_ts", _plus_hours(
+                 _at(F.date_add("event_date", 1), "06:00:00"), F.col("leg") * F.lit(0.5))))
     return (timed
             .withColumn("eta", _plus_hours(F.col("depart_ts"), F.col("_travel_h")))
             .withColumn("unloading_ts", _plus_hours(F.col("eta"), F.lit(0.25)))
@@ -233,7 +285,7 @@ def _truck_moves(shipments: DataFrame) -> DataFrame:
 
 
 def _truck_inventory(shipments: DataFrame, reorders: DataFrame) -> DataFrame:
-    products = reorders.select("store_id", "event_date", "product_id",
+    products = reorders.select("store_id", "event_date", "leg", "product_id",
                                "reorder_quantity")
     actions = F.array(
         F.struct(F.lit("LOAD").alias("action"),
@@ -245,7 +297,7 @@ def _truck_inventory(shipments: DataFrame, reorders: DataFrame) -> DataFrame:
                  F.col("store_id").alias("location_id"),
                  F.lit("STORE").alias("location_type")),
     )
-    return (shipments.join(products, ["store_id", "event_date"])
+    return (shipments.join(products, ["store_id", "event_date", "leg"])
             .withColumn("_a", F.explode(actions))
             .select(
                 F.col("_a.event_ts").alias("event_ts"),
@@ -341,8 +393,8 @@ def generate_inventory_chain(
     """Generate the six inventory/logistics fact tables (see module docstring)."""
     d = seeded_draws(cfg.seed)
 
-    demand_txns = _sale_txns(sales, rets)
-    reorders = _reorders(demand_txns, d, cfg)
+    demand_txns = _sale_txns(sales, rets, d)
+    reorders = _reorders(demand_txns, _store_dc_map(dims), d, cfg)
     shipments = _shipments(spark, reorders, dims, d, cfg)
     truck_moves = _truck_moves(shipments)
     truck_inv = _truck_inventory(shipments, reorders)

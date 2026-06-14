@@ -9,8 +9,8 @@ Semantics (datagen promotions_mixin):
   promo_code + '-' + line_num``.
 - ``fact_promotions``: one row per (receipt_id_ext, promo_code) aggregating
   those lines — discount sums, distinct ``product_count``, ``product_ids`` as
-  a comma-joined sorted id list. ``discount_type`` is always 'PERCENTAGE'
-  because our generated promo codes are percent-style discounts.
+  a comma-joined sorted id list. ``discount_type`` is 'BOGO' for BOGO codes and
+  'PERCENTAGE' for all other generated promo codes.
   Store/customer/event fields are joined from the receipt header;
   ``trace_id = 'TRC-PRM-' + receipt_id_ext + '-' + promo_code``.
 
@@ -97,8 +97,10 @@ def generate_promotions(
         agg
         .join(headers, "receipt_id_ext")
         .withColumn("discount_amount", _fmt(F.col("discount_cents")))
-        # Generated promo codes are percent-style discounts.
-        .withColumn("discount_type", F.lit("PERCENTAGE"))
+        # BOGO codes are buy-one-get-one; everything else is a percentage off.
+        .withColumn("discount_type",
+                    F.when(F.col("promo_code").startswith("BOGO"), F.lit("BOGO"))
+                    .otherwise(F.lit("PERCENTAGE")))
         .withColumn(
             "trace_id",
             F.concat(F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"),
