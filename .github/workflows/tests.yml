@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: datagen
+        working-directory: datagen-deprecated
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: datagen/requirements*.txt
+          cache-dependency-path: datagen-deprecated/requirements*.txt
 
       - name: Install dependencies
         run: |
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: datagen
+        working-directory: datagen-deprecated
 
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: datagen/requirements*.txt
+          cache-dependency-path: datagen-deprecated/requirements*.txt
 
       - name: Install dev dependencies
         run: |
