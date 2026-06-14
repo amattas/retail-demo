@@ -56,7 +56,10 @@ def test_stream_notebook_code_compiles():
 
 
 def test_stream_template_emits_legacy_event_type_set():
-    legacy_schema = UTILITY.parent / "datagen" / "src" / "retail_datagen" / "streaming" / "schemas.py"
+    legacy_root = UTILITY.parent / "datagen-deprecated"
+    if not legacy_root.exists():
+        legacy_root = UTILITY.parent / "datagen"
+    legacy_schema = legacy_root / "src" / "retail_datagen" / "streaming" / "schemas.py"
     tree = ast.parse(legacy_schema.read_text())
     event_type_class = next(
         node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EventType")
