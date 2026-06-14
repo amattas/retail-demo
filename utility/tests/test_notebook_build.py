@@ -1,3 +1,4 @@
+import ast
 import json
 import subprocess
 import sys
@@ -52,3 +53,39 @@ def test_stream_notebook_code_compiles():
     compile(code, "<setup-05>", "exec")
     # a Fabric parameters cell is tagged so the pipeline can override it
     assert any("parameters" in c["metadata"].get("tags", []) for c in nb["cells"])
+
+
+def test_stream_template_emits_legacy_event_type_set():
+    legacy_root = UTILITY.parent / "datagen-deprecated"
+    if not legacy_root.exists():
+        legacy_root = UTILITY.parent / "datagen"
+    legacy_schema = legacy_root / "src" / "retail_datagen" / "streaming" / "schemas.py"
+    tree = ast.parse(legacy_schema.read_text())
+    event_type_class = next(
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EventType")
+    legacy_events = {
+        stmt.value.value
+        for stmt in event_type_class.body
+        if isinstance(stmt, ast.Assign)
+        and isinstance(stmt.value, ast.Constant)
+        and isinstance(stmt.value.value, str)
+    }
+
+    template = (UTILITY / "notebooks" / "templates" / "driver-05-stream.py").read_text()
+    stream_tree = ast.parse(template)
+    stream_events = {
+        node.args[1].value
+        for node in ast.walk(stream_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "slot"
+        and len(node.args) > 1
+        and isinstance(node.args[1], ast.Constant)
+        and isinstance(node.args[1].value, str)
+    }
+    # Store operations use a Catalyst concat expression: "store_" + opened/closed.
+    assert 'F.concat(F.lit("store_"), op_type)' in template
+    stream_events.update({"store_opened", "store_closed"})
+
+    assert len(legacy_events) == 18
+    assert stream_events == legacy_events

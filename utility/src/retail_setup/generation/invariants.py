@@ -104,6 +104,12 @@ def run_invariants(spark: SparkSession, t: dict[str, DataFrame]) -> InvariantRep
                t[tbl].filter(F.col("truck_id").isNotNull()).select("truck_id")
                .join(truck_ids, "truck_id", "left_anti").count())
 
+    # --- truck timing: arrival (eta) must not be after completion (etd)
+    tm = t["fact_truck_moves"]
+    _check(r, "fact_truck_moves etd >= eta",
+           tm.filter(F.col("eta").isNotNull() & F.col("etd").isNotNull()
+                     & (F.col("etd") < F.col("eta"))).count())
+
     # --- customer coverage on facts that resolve a customer (nullable for some)
     customer_ids = t["dim_customers"].select(F.col("ID").alias("customer_id"))
     for tbl in ["fact_receipts", "fact_online_order_headers"]:

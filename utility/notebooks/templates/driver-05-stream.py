@@ -72,6 +72,34 @@ TRUCK_COUNT = _count("dim_trucks", 15)
 print(f"ranges: stores={STORE_COUNT} customers={CUSTOMER_COUNT} products={PRODUCT_COUNT} "
       f"dcs={DC_COUNT} trucks={TRUCK_COUNT}")
 
+# Dimension ATTRIBUTES (not just counts) as small broadcast frames for
+# stream-static joins, so the live feed's money matches the historical batch:
+# real product prices/taxability and the store's real tax rate. Synthetic
+# fallback when the dims are absent. Customer geography affinity is not applied
+# in the stream (the customer base is too large to broadcast and a fixed-rate
+# stream has no per-store demand signal) — a documented live-feed approximation.
+from pyspark.sql import functions as _F
+import random as _rnd
+
+try:
+    PROD_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products")
+                 .select(_F.col("ID").alias("ap_id"),
+                         _F.round(_F.col("SalePrice"), 2).alias("ap_price"),
+                         _F.col("taxability").alias("ap_taxa")))
+    STORE_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
+                  .select(_F.col("ID").alias("as_id"),
+                          _F.round(_F.col("tax_rate") * 10000).cast("long").alias("as_bps")))
+    print("attrs: using real dim_products / dim_stores prices+tax")
+except Exception as exc:  # noqa: BLE001 - attrs optional; synthetic fallback
+    print(f"  dim attrs unavailable ({exc}); using synthetic prices/tax")
+    _g = _rnd.Random(SEED)
+    PROD_ATTR = spark.createDataFrame(
+        [(i + 1, round(_g.uniform(1.0, 60.0), 2), "TAXABLE")
+         for i in range(min(PRODUCT_COUNT, 2000))],
+        "ap_id long, ap_price double, ap_taxa string")
+    STORE_ATTR = spark.createDataFrame(
+        [(i + 1, 800) for i in range(max(STORE_COUNT, 1))], "as_id long, as_bps long")
+
 # %%
 # ruff: noqa: F821, E402  (Fabric-injected globals; imports live in notebook cells)
 # Deterministic-draw helpers (same xxhash64 family as retail_setup.runtime) and
@@ -84,6 +112,39 @@ CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
 DEVICES = ["mobile", "desktop", "tablet"]
 PROMOS = ["SAVE10", "BFRIDAY30", "SUMMER25"]
 FULFILL = ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"]
+
+# Named promo catalog for the live feed (mirrors batch receipts.PROMO_CATALOG):
+# (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
+NAMED_PROMOS = [
+    ("SAVE10", 10, None, 0.0, "PCT"),
+    ("SAVE20", 20, None, 50.0, "PCT"),
+    ("CLEARANCE30", 30, None, 0.0, "PCT"),
+    ("BOGO50", 50, None, 0.0, "BOGO"),
+    ("NEWYEAR15", 15, [1, 2], 0.0, "PCT"),
+    ("SPRINGSALE20", 20, [3, 4, 5], 0.0, "PCT"),
+    ("SUMMER25", 25, [6, 7, 8], 0.0, "PCT"),
+    ("BACKTOSCHOOL20", 20, [8, 9], 0.0, "PCT"),
+    ("BFRIDAY30", 30, [11], 0.0, "PCT"),
+    ("HOLIDAY20", 20, [12], 0.0, "PCT"),
+]
+EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
+
+
+def _taxmult(taxa):
+    return (F.when(taxa == "TAXABLE", F.lit(1.0))
+            .when(taxa == "REDUCED_RATE", F.lit(0.5)).otherwise(F.lit(0.0)))
+
+
+def _promo_elig(idx, month, subtotal):
+    """True when the NAMED_PROMOS entry at idx is in-month and meets its min."""
+    expr = None
+    for i, (_c, _p, months, mn, _k) in enumerate(NAMED_PROMOS):
+        e = F.lit(True) if months is None else month.isin(*months)
+        if mn:
+            e = e & (subtotal >= F.lit(mn))
+        cond = idx == F.lit(i)
+        expr = F.when(cond, e) if expr is None else expr.when(cond, e)
+    return expr.otherwise(F.lit(False))
 
 
 def _u(key, salt):
@@ -148,22 +209,66 @@ scenario = (F.when(_u(F.col("v"), "scenario") < 0.55, "shopping")
             .when(_u(F.col("v"), "scenario") < 0.96, "marketing")
             .otherwise("store_ops"))
 
-b = (rate.select(ts.alias("ts"), v.alias("v"))
-     .withColumn("scenario", scenario)
-     # shared shopping-session fields
-     .withColumn("store_id", _id(F.col("v"), "store", STORE_COUNT))
-     .withColumn("customer_id", _id(F.col("v"), "cust", CUSTOMER_COUNT))
-     .withColumn("dc_id", _id(F.col("v"), "dc", DC_COUNT))
-     .withColumn("receipt_id", F.concat(F.lit("RCP-"), F.col("v").cast("string")))
-     .withColumn("order_id", F.concat(F.lit("ONL-"), F.col("v").cast("string")))
-     .withColumn("shipment_id", F.concat(F.lit("SHP-"), F.col("v").cast("string")))
-     .withColumn("session_id", F.concat(F.lit("SES-"), F.col("v").cast("string")))
-     .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
-     .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
-     .withColumn("tender", _pick(F.col("v"), "tender", TENDERS))
-     .withColumn("subtotal", F.round(_u(F.col("v"), "sub") * F.lit(90.0) + F.lit(5.0), 2))
-     .withColumn("tax", F.round(F.col("subtotal") * F.lit(0.08), 2))
+from pyspark.sql.functions import broadcast as _bcast  # noqa: E402
+
+b0 = (rate.select(ts.alias("ts"), v.alias("v"))
+      .withColumn("scenario", scenario)
+      .withColumn("store_id", _id(F.col("v"), "store", STORE_COUNT))
+      .withColumn("customer_id", _id(F.col("v"), "cust", CUSTOMER_COUNT))
+      .withColumn("dc_id", _id(F.col("v"), "dc", DC_COUNT))
+      .withColumn("receipt_id", F.concat(F.lit("RCP-"), F.col("v").cast("string")))
+      .withColumn("order_id", F.concat(F.lit("ONL-"), F.col("v").cast("string")))
+      .withColumn("shipment_id", F.concat(F.lit("SHP-"), F.col("v").cast("string")))
+      .withColumn("session_id", F.concat(F.lit("SES-"), F.col("v").cast("string")))
+      .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
+      .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
+      .withColumn("tender", _pick(F.col("v"), "tender", TENDERS))
+      # two real line products (joined to dim_products below for price+tax)
+      .withColumn("l1_pid", _id(F.concat(F.col("v"), F.lit("-1")), "pidx", PRODUCT_COUNT))
+      .withColumn("l2_pid", _id(F.concat(F.col("v"), F.lit("-2")), "pidx", PRODUCT_COUNT))
+      .withColumn("l1_qty", (_h(F.concat(F.col("v"), F.lit("-1")), "qty", 3) + F.lit(1)).cast("long"))
+      .withColumn("l2_qty", (_h(F.concat(F.col("v"), F.lit("-2")), "qty", 3) + F.lit(1)).cast("long")))
+
+# stream-static broadcast joins for real store tax + line prices/taxability
+_p1 = PROD_ATTR.select(F.col("ap_id").alias("p1id"),
+                       F.col("ap_price").alias("l1_unit"), F.col("ap_taxa").alias("l1_taxa"))
+_p2 = PROD_ATTR.select(F.col("ap_id").alias("p2id"),
+                       F.col("ap_price").alias("l2_unit"), F.col("ap_taxa").alias("l2_taxa"))
+
+b = (b0
+     .join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left")
+     .join(_bcast(_p1), F.col("l1_pid") == F.col("p1id"), "left")
+     .join(_bcast(_p2), F.col("l2_pid") == F.col("p2id"), "left")
+     .withColumn("store_bps", F.coalesce(F.col("as_bps"), F.lit(800)))
+     .withColumn("l1_unit", F.coalesce(F.col("l1_unit"), F.lit(9.99)))
+     .withColumn("l1_taxa", F.coalesce(F.col("l1_taxa"), F.lit("TAXABLE")))
+     .withColumn("l2_unit", F.coalesce(F.col("l2_unit"), F.lit(9.99)))
+     .withColumn("l2_taxa", F.coalesce(F.col("l2_taxa"), F.lit("TAXABLE")))
+     .withColumn("l1_ext", F.round(F.col("l1_unit") * F.col("l1_qty"), 2))
+     .withColumn("l2_ext", F.round(F.col("l2_unit") * F.col("l2_qty"), 2))
+     # real money: subtotal = sum of line exts; tax via the store's real rate
+     .withColumn("subtotal", F.round(F.col("l1_ext") + F.col("l2_ext"), 2))
+     .withColumn("tax", F.round(
+         (F.col("l1_ext") * _taxmult(F.col("l1_taxa"))
+          + F.col("l2_ext") * _taxmult(F.col("l2_taxa")))
+         * F.col("store_bps") / F.lit(10000.0), 2))
      .withColumn("total", F.round(F.col("subtotal") + F.col("tax"), 2))
+     # named promo (month-eligible + min-purchase + BOGO), evergreen fallback
+     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(NAMED_PROMOS)))
+     .withColumn("_pelig", _promo_elig(
+         F.col("_pidx"), F.month(F.col("ts")), F.col("subtotal")))
+     .withColumn("_evidx", _h(F.col("v"), "promoev", len(EVERGREEN_PROMOS)))
+     .withColumn("promo_code", F.when(F.col("_pelig"), F.element_at(
+         F.array(*[F.lit(t[0]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         .otherwise(F.element_at(
+             F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+     .withColumn("_ppct", F.when(F.col("_pelig"), F.element_at(
+         F.array(*[F.lit(t[1]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         .otherwise(F.element_at(
+             F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+     .withColumn("promo_disc", F.round(F.col("subtotal") * F.col("_ppct") / F.lit(100.0), 2))
+     .withColumn("promo_type", F.when(
+         F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(F.lit("PERCENTAGE")))
      .withColumn("pkey", F.concat(F.lit("store_"), F.col("store_id").cast("string"))))
 
 shop = F.col("scenario") == "shopping"
@@ -172,15 +277,13 @@ store_pkey = F.col("pkey")
 
 def _line(idx):
     lk = F.concat(F.col("v"), F.lit(f"-{idx}"))
-    qty = (_h(lk, "qty", 3) + F.lit(1)).cast("long")
-    unit = F.round(_u(lk, "price") * F.lit(20.0) + F.lit(1.0), 2)
     payload = F.struct(
         F.col("receipt_id"),
         F.lit(idx).cast("long").alias("line_number"),
-        _id(lk, "prod", PRODUCT_COUNT).alias("product_id"),
-        qty.alias("quantity"),
-        unit.alias("unit_price"),
-        F.round(unit * qty, 2).alias("extended_price"),
+        F.col(f"l{idx}_pid").alias("product_id"),
+        F.col(f"l{idx}_qty").alias("quantity"),
+        F.col(f"l{idx}_unit").alias("unit_price"),
+        F.col(f"l{idx}_ext").alias("extended_price"),
         F.lit(None).cast("string").alias("promo_code"),
     )
     return slot(shop, "receipt_line_added", payload, F.col("ts"), store_pkey, lk,
@@ -210,6 +313,16 @@ ops = F.col("scenario") == "store_ops"
 node_type = F.when(_pick(F.col("v"), "omode", FULFILL) == "SHIP_FROM_DC", "DC").otherwise("STORE")
 node_id = F.when(node_type == "DC", F.col("dc_id")).otherwise(F.col("store_id"))
 inv_qty = _h(F.col("v"), "iqty", 60).cast("long")  # 0..59
+# Supply-chain disruption: ~6% of inventory events are a disruption (sudden
+# stock crash -> guaranteed stockout + urgent reorder, tagged DISRUPTION /
+# DC_OUTAGE). Schema-safe — uses existing event types + free-text reason.
+disrupted = inv & (_u(F.col("v"), "disrupt") < F.lit(0.06))
+inv_qty_eff = F.when(disrupted, F.lit(0).cast("long")).otherwise(inv_qty)
+inv_delta = (F.when(disrupted, (-(inv_qty + F.lit(50))).cast("long"))
+             .when(_h(F.col("v"), "delta", 40) == 20, F.lit(-5).cast("long"))
+             .otherwise((_h(F.col("v"), "delta", 40) - F.lit(20)).cast("long")))
+inv_reason = F.when(disrupted, F.lit("DISRUPTION")).otherwise(F.lit("SALE"))
+inv_source = F.when(disrupted, F.lit("DC_OUTAGE")).otherwise(F.lit("STORE"))
 op_type = F.when(_u(F.col("v"), "op") < 0.5, "opened").otherwise("closed")
 truck_id = F.concat(F.lit("TRK"), F.lpad(_id(F.col("v"), "truck", TRUCK_COUNT).cast("string"), 4, "0"))
 
@@ -246,13 +359,11 @@ events_arr = F.array(
         F.col("store_id"), F.col("customer_id"),
     ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"), parent=F.col("receipt_id")),
     slot(shop & (_u(F.col("v"), "haspromo") < 0.3), "promotion_applied", F.struct(
-        F.col("receipt_id"), _pick(F.col("v"), "promo", PROMOS).alias("promo_code"),
-        F.round(_u(F.col("v"), "disc") * F.lit(5.0) + F.lit(1.0), 2).alias("discount_amount"),
-        # cents are the precise cents of discount_amount (same rounded value)
-        F.round(F.round(_u(F.col("v"), "disc") * F.lit(5.0) + F.lit(1.0), 2) * F.lit(100))
-        .cast("long").alias("discount_cents"),
-        F.lit("PERCENTAGE").alias("discount_type"), F.lit(1).cast("long").alias("product_count"),
-        F.array(_id(F.col("v"), "pprod", PRODUCT_COUNT)).alias("product_ids"),
+        F.col("receipt_id"), F.col("promo_code"),
+        F.col("promo_disc").alias("discount_amount"),
+        (F.round(F.col("promo_disc") * F.lit(100))).cast("long").alias("discount_cents"),
+        F.col("promo_type").alias("discount_type"), F.lit(1).cast("long").alias("product_count"),
+        F.array(F.col("l1_pid")).alias("product_ids"),
         F.col("store_id"), F.col("customer_id"),
     ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
 
@@ -260,22 +371,21 @@ events_arr = F.array(
     slot(inv, "inventory_updated", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
-        F.when(_h(F.col("v"), "delta", 40) == 20, F.lit(-5))
-        .otherwise(_h(F.col("v"), "delta", 40) - F.lit(20)).cast("long").alias("quantity_delta"),
-        F.lit("SALE").alias("reason"), F.lit("STORE").alias("source"),
+        inv_delta.alias("quantity_delta"),
+        inv_reason.alias("reason"), inv_source.alias("source"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & (inv_qty < F.lit(5)), "stockout_detected", F.struct(
+    slot(inv & ((inv_qty < F.lit(5)) | disrupted), "stockout_detected", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
-        inv_qty.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
+        inv_qty_eff.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & (inv_qty < F.lit(10)), "reorder_triggered", F.struct(
+    slot(inv & ((inv_qty < F.lit(10)) | disrupted), "reorder_triggered", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
-        inv_qty.alias("current_quantity"),
+        inv_qty_eff.alias("current_quantity"),
         (_h(F.col("v"), "roq", 200) + F.lit(50)).cast("long").alias("reorder_quantity"),
         F.lit(10).cast("long").alias("reorder_point"),
-        F.when(inv_qty < F.lit(3), "URGENT").otherwise("HIGH").alias("priority"),
+        F.when(disrupted | (inv_qty < F.lit(3)), "URGENT").otherwise("HIGH").alias("priority"),
     ), F.col("ts"), store_pkey, F.col("v")),
 
     # --- store ops ---

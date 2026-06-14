@@ -48,7 +48,7 @@ def test_balances_are_running(setup):
     key = txn.groupBy("store_id", "product_id").count().orderBy(F.desc("count")).first()
     seq = (txn.filter((F.col("store_id") == key.store_id)
                       & (F.col("product_id") == key.product_id))
-           .orderBy("event_ts").collect())
+           .orderBy("event_ts", "trace_id").collect())
     running = 0
     for r in seq:
         running += r.quantity

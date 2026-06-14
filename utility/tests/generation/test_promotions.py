@@ -52,4 +52,7 @@ def test_promotions_aggregate(setup):
 def test_promotions_link_to_receipts(setup):
     sales, promos, _ = setup
     assert promos.join(sales["fact_receipts"], "receipt_id_ext", "left_anti").count() == 0
-    assert promos.filter(F.col("discount_type") != "PERCENTAGE").count() == 0
+    assert promos.filter(~F.col("discount_type").isin("PERCENTAGE", "BOGO")).count() == 0
+    assert promos.filter(
+        F.col("promo_code").startswith("BOGO") & (F.col("discount_type") != "BOGO")
+    ).count() == 0

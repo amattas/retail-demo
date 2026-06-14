@@ -37,7 +37,9 @@ def test_row_counts(dims, small_cfg, dicts):
     assert dims["dim_stores"].count() == small_cfg.store_count
     assert dims["dim_distribution_centers"].count() == small_cfg.dc_count
     assert dims["dim_customers"].count() == small_cfg.customer_count
-    assert dims["dim_products"].count() == len(dicts.products)
+    # each base product yields up to brands_per_product category-matched SKUs
+    n_prod = dims["dim_products"].count()
+    assert len(dicts.products) <= n_prod <= len(dicts.products) * small_cfg.brands_per_product
 
 
 def test_fk_integrity(dims):
