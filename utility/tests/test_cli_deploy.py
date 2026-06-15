@@ -1,3 +1,5 @@
+import subprocess
+
 from typer.testing import CliRunner
 
 from retail_setup.cli.main import app, _deploy_plan
@@ -33,3 +35,17 @@ def test_plan_orders_steps_and_gates_apply():
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
     assert apply_idx < build_idx < deploy_idx
+
+
+def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):
+    def fake_run(cmd, *args, **kwargs):
+        if cmd and cmd[0] == "terraform":
+            raise FileNotFoundError("terraform")
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--yes"])
+    assert result.exit_code == 127, result.output
+    assert "Required executable not found: terraform" in result.output
+    assert "--skip-terraform" in result.output
+    assert "Traceback" not in result.output
