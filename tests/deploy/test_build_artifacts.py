@@ -198,6 +198,76 @@ def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:
     assert definition["queryset"]["dataSources"][0]["databaseItemName"] == "custom_kql"
 
 
+def _write_pipeline(repo_root: Path, name: str, notebooks: list[str]) -> None:
+    item = repo_root / "fabric" / "pipelines" / f"{name}.DataPipeline"
+    _write_json(item / ".platform", {"metadata": {"type": "DataPipeline"}})
+    _write_json(
+        item / "pipeline-content.json",
+        {
+            "properties": {
+                "activities": [
+                    {
+                        "name": nb,
+                        "type": "TridentNotebook",
+                        "typeProperties": {"notebookId": f"id-{nb}"},
+                    }
+                    for nb in notebooks
+                ]
+            }
+        },
+    )
+
+
+def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver", "04-streaming-to-gold"])
+    _write_pipeline(repo, "machine-learning", ["06-ml-demand-forecast"])
+
+    output = tmp_path / "workspace"
+    output.mkdir()
+    deployed = {"03-streaming-to-silver", "04-streaming-to-gold", "05-maintain-delta-tables"}
+    staged = build_artifacts.stage_pipelines(repo, output, deployed)
+
+    # streaming pipeline's notebooks are deployed; ML pipeline's are not.
+    assert [p.name for p in staged] == ["streaming-data-load.DataPipeline"]
+    assert (output / "streaming-data-load.DataPipeline" / "pipeline-content.json").exists()
+    assert not (output / "machine-learning.DataPipeline").exists()
+
+
+def test_stage_pipelines_returns_empty_when_no_sources(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    output = tmp_path / "workspace"
+    output.mkdir()
+    assert build_artifacts.stage_pipelines(repo, output, {"02-historical-data-load"}) == []
+
+
+def test_build_workspace_stages_compatible_pipelines_in_folder(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:
+        _write_json(
+            repo / "fabric" / "lakehouse" / notebook_name,
+            {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5},
+        )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+    _write_pipeline(repo, "daily-maintenance", ["05-maintain-delta-tables"])  # core -> staged
+    _write_pipeline(repo, "machine-learning", ["06-ml-demand-forecast"])  # ml -> skipped
+
+    output = tmp_path / "workspace"
+    result = build_artifacts.build_workspace(repo, output, ["core"])
+
+    assert "daily-maintenance.DataPipeline" in result.staged_items
+    assert "machine-learning.DataPipeline" not in result.staged_items
+    assert (output / "Pipelines" / "daily-maintenance.DataPipeline").is_dir()
+    assert not (output / "Pipelines" / "machine-learning.DataPipeline").exists()
+
+
 def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     out_dir = tmp_path / "workspace"
