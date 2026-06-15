@@ -1,0 +1,22 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "02-historical-data-load",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "90009e22-24ab-4750-b2f6-b72cf6db2741",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      }
+    ]
+  }
+}
