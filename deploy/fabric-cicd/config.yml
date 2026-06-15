@@ -8,6 +8,7 @@ core:
   - SemanticModel
   - Report
   - KQLQueryset
+  - DataPipeline
   parameter: parameter.yml
 publish:
   skip:

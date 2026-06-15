@@ -32,21 +32,27 @@ fab auth login
 fab export "Retail Demo.Workspace/daily-maintenance.DataPipeline" -o fabric/pipelines -f
 ```
 
-## Deployment status
+## Deployment
 
-These pipelines are **not yet** published by `retail-setup deploy`. Each
-activity references a notebook by `notebookId` and `workspaceId` that point at
-the **source** workspace (`Retail Demo`). Before deploying to another workspace
-(for example `retail-demo-dev`), those references must be remapped to the target:
+`retail-setup deploy` publishes these pipelines into a **Pipelines** workspace
+folder. A pipeline is staged **only when every notebook it orchestrates is part
+of the deploy** — so with the default `core setup` groups the
+`historical-data-load`, `streaming-data-load`, and `daily-maintenance` pipelines
+publish, while `machine-learning` publishes only when the `ml` notebook group is
+included. This keeps every `$items.Notebook.<name>.$id` reference resolvable.
 
-- `workspaceId` → `$workspace.$id`
-- `notebookId` → `$items.Notebook.<activity-name>.$id`
+Each activity references its notebook by the **source** workspace's
+`notebookId`/`workspaceId`. `deploy/fabric-cicd/parameter.yml` remaps them to the
+target at publish time (generated from these files by
+`deploy.scripts.generate_configs`):
 
-The activity `name` matches the notebook display name, which makes the remap
-mechanical. `deploy/fabric-cicd/parameter.yml` already carries example
-`key_value_replace` rules for `DataPipeline`; wiring the full set (and adding
-`DataPipeline` to `build_artifacts` staging and `item_types_in_scope`) is the
-remaining step to publish them automatically.
+- `workspaceId` → `$workspace.$id` (one `key_value_replace`)
+- each `notebookId` GUID → `$items.Notebook.<activity-name>.$id` (one
+  `find_replace` per notebook; the activity `name` is the notebook display name)
+
+fabric-cicd publishes Notebooks before Data Pipelines, so the notebook
+references resolve. Add or refresh a pipeline by re-exporting (above) and
+redeploying — the parameter rules regenerate automatically.
 
 ## Recommended setup sequence
 

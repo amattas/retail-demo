@@ -25,6 +25,7 @@ PLATFORM_SCHEMA = (
 NOTEBOOKS_FOLDER = "Notebooks"
 SETUP_FOLDER = "Setup"
 POWERBI_FOLDER = "Power BI"
+PIPELINES_FOLDER = "Pipelines"
 NOTEBOOK_GROUPS = {
     "core": [
         "01-create-bronze-shortcuts.ipynb",
@@ -231,6 +232,61 @@ def stage_querysets(
     return [item_dir]
 
 
+def stage_pipelines(
+    repo_root: Path,
+    output_dir: Path,
+    deployed_notebooks: set[str],
+) -> list[Path]:
+    """Stage ``fabric/pipelines/*.DataPipeline`` items into the workspace output.
+
+    A pipeline is staged only when every notebook it orchestrates is present in
+    ``deployed_notebooks`` (the notebooks selected for this deploy). Pipelines
+    that reference notebooks outside the selected groups are skipped so their
+    ``$items.Notebook.<name>.$id`` references always resolve at publish time.
+    Returns an empty list when no pipeline sources exist.
+    """
+
+    source_dir = repo_root / "fabric" / "pipelines"
+    if not source_dir.is_dir():
+        return []
+    staged: list[Path] = []
+    for item_dir in sorted(source_dir.glob("*.DataPipeline"), key=lambda path: path.name):
+        content_path = item_dir / "pipeline-content.json"
+        if not content_path.is_file():
+            continue
+        refs = _pipeline_notebook_refs(
+            json.loads(content_path.read_text(encoding="utf-8"))
+        )
+        if not refs.issubset(deployed_notebooks):
+            continue
+        destination = output_dir / item_dir.name
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(item_dir, destination)
+        staged.append(destination)
+    return staged
+
+
+def _pipeline_notebook_refs(pipeline_content: dict) -> set[str]:
+    """Notebook display names a pipeline orchestrates (``TridentNotebook`` activities)."""
+
+    refs: set[str] = set()
+    activities = pipeline_content.get("properties", {}).get("activities", [])
+    for activity in activities:
+        if activity.get("type") == "TridentNotebook" and activity.get("name"):
+            refs.add(str(activity["name"]))
+    return refs
+
+
+def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
+    """Display names (file stems) of notebooks staged for the given groups."""
+
+    names = {Path(name).stem for name in _selected_notebooks(notebook_groups)}
+    if "setup" in notebook_groups:
+        names.update(SETUP_NOTEBOOKS)
+    return names
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -289,6 +345,17 @@ def build_workspace(
         item.name
         for item in stage_querysets(
             repo_root, output_dir, kql_database_name=kql_database_name
+        )
+    )
+    # Data Pipelines publish into a "Pipelines" workspace folder, but only when
+    # every notebook they orchestrate is part of this deploy (so the pipeline's
+    # $items.Notebook.<name>.$id references resolve).
+    staged_items.extend(
+        item.name
+        for item in stage_pipelines(
+            repo_root,
+            output_dir / PIPELINES_FOLDER,
+            _deployed_notebook_names(notebook_groups),
         )
     )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))

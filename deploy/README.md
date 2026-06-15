@@ -89,9 +89,9 @@ After the Eventhouse and KQL database exist:
 ## Configuration notes
 
 - Published items are organized into Fabric workspace folders: demo/pipeline
-  notebooks under **Notebooks**, one-time setup notebooks under **Setup**, and
-  the semantic model and report under **Power BI**. The Lakehouse and queryset
-  stay at the workspace root.
+  notebooks under **Notebooks**, one-time setup notebooks under **Setup**, the
+  semantic model and report under **Power BI**, and Data Pipelines under
+  **Pipelines**. The Lakehouse and queryset stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
 - Eventstream deployment is disabled by default because Fabric source-control
   item definitions for Eventstream are not yet part of this framework.

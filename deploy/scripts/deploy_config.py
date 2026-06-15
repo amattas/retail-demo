@@ -335,11 +335,35 @@ def render_fabric_cicd_config(config: DeployConfig) -> dict[str, Any]:
     return rendered
 
 
+def collect_pipeline_notebook_refs(repo_root: Path = REPO_ROOT) -> dict[str, str]:
+    """Map each pipeline ``notebookId`` GUID to its notebook display name.
+
+    Scans ``fabric/pipelines/*.DataPipeline/pipeline-content.json``. The activity
+    ``name`` is the notebook display name, which is used to build
+    ``$items.Notebook.<name>.$id`` references that fabric-cicd resolves to the
+    deployed notebook's GUID at publish time.
+    """
+
+    pipelines_dir = repo_root / "fabric" / "pipelines"
+    refs: dict[str, str] = {}
+    if not pipelines_dir.is_dir():
+        return refs
+    for content_path in sorted(pipelines_dir.glob("*.DataPipeline/pipeline-content.json")):
+        content = json.loads(content_path.read_text(encoding="utf-8"))
+        for activity in content.get("properties", {}).get("activities", []):
+            if activity.get("type") != "TridentNotebook":
+                continue
+            notebook_id = activity.get("typeProperties", {}).get("notebookId")
+            name = activity.get("name")
+            if notebook_id and name:
+                refs[str(notebook_id)] = str(name)
+    return refs
+
+
 def render_parameter_file(
     config: DeployConfig, terraform_outputs: dict[str, Any]
 ) -> dict[str, Any]:
     """Render fabric-cicd parameter.yml content."""
-
     workspace_id = _require_output(terraform_outputs, "workspace_id")
     lakehouse_id = _require_output(terraform_outputs, "lakehouse_id")
     lakehouse_name = str(
@@ -381,15 +405,23 @@ def render_parameter_file(
                 "replace_value": {config.environment: "$workspace.$id"},
                 "item_type": "DataPipeline",
             },
-            {
-                "find_key": "$.properties.activities[*].typeProperties.notebookId",
-                "replace_value": {
-                    config.environment: "$items.Notebook.02-historical-data-load.$id"
-                },
-                "item_type": "DataPipeline",
-            },
         ],
     }
+
+    # Each pipeline activity references its notebook by the source workspace's
+    # notebookId GUID. Map every GUID to $items.Notebook.<name>.$id (resolved by
+    # fabric-cicd to the deployed notebook) via a string find_replace, since a
+    # single key_value_replace cannot map each activity to a different value.
+    for notebook_id, notebook_name in collect_pipeline_notebook_refs().items():
+        parameters["find_replace"].append(
+            {
+                "find_value": notebook_id,
+                "replace_value": {
+                    config.environment: f"$items.Notebook.{notebook_name}.$id"
+                },
+                "item_type": "DataPipeline",
+            }
+        )
 
     kql_database_id = terraform_outputs.get("kql_database_id")
     if kql_database_id:

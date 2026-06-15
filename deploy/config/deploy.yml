@@ -55,6 +55,7 @@ deployment:
     - SemanticModel
     - Report
     - KQLQueryset
+    - DataPipeline
   publish_skip: false
   unpublish_skip: true
   orphan_exclude_regex: "^DO_NOT_DELETE_.*"
