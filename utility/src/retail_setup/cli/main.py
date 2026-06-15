@@ -503,6 +503,17 @@ def _echo_step(index: int, total: int, step: DeployStep) -> None:
     typer.echo(f"    {' '.join(step.cmd)}{redirect}")
 
 
+def _missing_executable_message(executable: str) -> str:
+    if executable.lower() == "terraform":
+        return (
+            "Required executable not found: terraform\n"
+            "Install Terraform and ensure it is on PATH, or rerun with "
+            "`retail-setup deploy --skip-terraform` if the Fabric resources "
+            "already exist."
+        )
+    return f"Required executable not found: {executable}\nInstall it and ensure it is on PATH."
+
+
 @app.command()
 def deploy(
     repo_root: Path = typer.Option(
@@ -549,18 +560,27 @@ def deploy(
             if not typer.confirm("Apply this Terraform plan?"):
                 typer.echo("Aborted by user.")
                 raise typer.Exit(code=1)
-        if step.output_file:
-            out_path = repo_root / step.output_file
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                step.cmd, cwd=repo_root, capture_output=True, text=True
+        try:
+            if step.output_file:
+                out_path = repo_root / step.output_file
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                result = subprocess.run(
+                    step.cmd, cwd=repo_root, capture_output=True, text=True
+                )
+                if result.returncode == 0:
+                    out_path.write_text(result.stdout)
+                elif result.stderr:
+                    typer.echo(result.stderr, err=True)
+            else:
+                result = subprocess.run(step.cmd, cwd=repo_root)
+        except FileNotFoundError:
+            executable = step.cmd[0] if step.cmd else "<unknown>"
+            typer.echo(
+                f"Deploy failed at step {i}/{total}: {step.description}",
+                err=True,
             )
-            if result.returncode == 0:
-                out_path.write_text(result.stdout)
-            elif result.stderr:
-                typer.echo(result.stderr, err=True)
-        else:
-            result = subprocess.run(step.cmd, cwd=repo_root)
+            typer.echo(_missing_executable_message(executable), err=True)
+            raise typer.Exit(code=127) from None
         if result.returncode != 0:
             typer.echo(
                 f"Deploy failed at step {i}/{total} "
