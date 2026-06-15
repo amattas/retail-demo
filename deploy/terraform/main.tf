@@ -3,11 +3,34 @@ data "fabric_workspace" "existing" {
   id    = var.existing_workspace_id
 }
 
+# Resolve the Fabric capacity by display name when an explicit capacity_id is
+# not provided. A workspace without an assigned Fabric capacity cannot create
+# Lakehouse/Eventhouse items (the API returns FeatureNotAvailable).
+data "fabric_capacity" "main" {
+  count        = var.existing_workspace_id == null && var.capacity_id == null && var.capacity_name != null ? 1 : 0
+  display_name = var.capacity_name
+
+  lifecycle {
+    postcondition {
+      condition     = self.state == "Active"
+      error_message = "Fabric capacity '${var.capacity_name}' is not Active. Assign an active Fabric (F) SKU capacity before deploying."
+    }
+  }
+}
+
+locals {
+  resolved_capacity_id = (
+    var.capacity_id != null
+    ? var.capacity_id
+    : try(data.fabric_capacity.main[0].id, null)
+  )
+}
+
 resource "fabric_workspace" "main" {
   count                          = var.existing_workspace_id == null ? 1 : 0
   display_name                   = var.workspace_name
   description                    = var.workspace_description
-  capacity_id                    = var.capacity_id
+  capacity_id                    = local.resolved_capacity_id
   skip_capacity_state_validation = var.skip_capacity_state_validation
 }
 
