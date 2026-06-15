@@ -88,6 +88,10 @@ After the Eventhouse and KQL database exist:
 
 ## Configuration notes
 
+- Published items are organized into Fabric workspace folders: demo/pipeline
+  notebooks under **Notebooks**, one-time setup notebooks under **Setup**, and
+  the semantic model and report under **Power BI**. The Lakehouse and queryset
+  stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
 - Eventstream deployment is disabled by default because Fabric source-control
   item definitions for Eventstream are not yet part of this framework.
@@ -108,5 +112,5 @@ After the Eventhouse and KQL database exist:
 | `setup notebooks not rendered` | Run `retail-setup render --env <env>` before building/deploying the `setup` notebook group. |
 | `terraform` command not found | Install Terraform or use `--skip-terraform` when resources already exist. |
 | `fabric_cicd` import error | Install `fabric-cicd` in the active Python environment. |
-| Authentication failure | Run `az login --tenant <tenant-id>` for `azure_cli`, or `Connect-AzAccount -Tenant <tenant-id>` for `azure_powershell`. |
+| Authentication failure | Run `az account show --query "{tenantId:tenantId,user:user.name,name:name}" -o table` and confirm it matches deploy config. Run `az login --tenant <tenant-id>` for `azure_cli`, or `Connect-AzAccount -Tenant <tenant-id>` for `azure_powershell`. |
 | KQL tables missing | Run the generated `database.kql` script manually in the target KQL database. |
