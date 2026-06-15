@@ -73,6 +73,10 @@ Interactive:
 retail-setup configure
 ```
 
+Interactive prompts show the current config/default value in brackets. The
+store type prompt also lists the available dictionary profiles:
+`grocery`, `hardware`, `luxury`, and `supercenter`.
+
 Non-interactive example:
 
 ```powershell
