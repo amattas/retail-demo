@@ -63,7 +63,7 @@ terraform -chdir=deploy\terraform apply -var-file=environments\dev.tfvars
 terraform -chdir=deploy\terraform output -json > deploy\.generated\dev\terraform-output.json
 python -m deploy.scripts.generate_configs --environment dev --terraform-output deploy\.generated\dev\terraform-output.json
 retail-setup render --env dev
-python -m deploy.scripts.build_artifacts --notebook-groups core setup --lakehouse-name retail_lakehouse
+python -m deploy.scripts.build_artifacts --notebook-groups core setup ml --lakehouse-name retail_lakehouse
 python -m deploy.scripts.deploy_items --environment dev
 python -m deploy.scripts.apply_kql --output deploy\.generated\dev\database.kql
 python -m deploy.scripts.validate_deployment --environment dev
