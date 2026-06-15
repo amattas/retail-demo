@@ -73,6 +73,72 @@ def test_recreate_warns_and_aborts_on_decline(monkeypatch):
     assert "Aborted by user" in result.output
 
 
+def test_deploy_offers_reset_when_workspace_exists(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    monkeypatch.setattr("retail_setup.cli.main._workspace_exists", lambda *_: True)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0))
+    # Accept the reset prompt ("y"), then decline the destroy gate ("n") to stop.
+    result = runner.invoke(app, ["deploy", "--env", "dev"], input="y\nn\n")
+    assert "already exists" in result.output
+    assert "destroy" in result.output  # confirming reset took the recreate path
+    assert "Aborted by user" in result.output
+
+
+def test_deploy_skips_reset_prompt_when_workspace_absent(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    monkeypatch.setattr("retail_setup.cli.main._workspace_exists", lambda *_: False)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0))
+    result = runner.invoke(app, ["deploy", "--env", "dev"], input="n\n")
+    assert "already exists" not in result.output
+
+
+def test_deploy_yes_skips_reset_prompt(monkeypatch):
+    seen = {"checked": False}
+
+    def fake_exists(*_):
+        seen["checked"] = True
+        return True
+
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    monkeypatch.setattr("retail_setup.cli.main._workspace_exists", fake_exists)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0))
+    runner.invoke(app, ["deploy", "--env", "dev", "--yes"])
+    assert seen["checked"] is False  # --yes never prompts for reset
+
+
+def test_workspace_exists_matches_display_name(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main.shutil.which", lambda _c: "C:/az.cmd")
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **k: subprocess.CompletedProcess(
+            a, 0, stdout='{"value": [{"displayName": "retail-demo-dev"}]}'
+        ),
+    )
+    from retail_setup.cli.main import _workspace_exists
+
+    assert _workspace_exists(Path("."), "retail-demo-dev") is True
+    assert _workspace_exists(Path("."), "missing") is False
+
+
+def test_workspace_exists_false_when_az_unavailable(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main.shutil.which", lambda _c: None)
+    from retail_setup.cli.main import _workspace_exists
+
+    assert _workspace_exists(Path("."), "retail-demo-dev") is False
+
+
+def test_workspace_name_prefers_environment_overlay(tmp_path):
+    cfg = tmp_path / "deploy" / "config"
+    (cfg / "environments").mkdir(parents=True)
+    (cfg / "deploy.yml").write_text("workspace:\n  name: retail-demo\n", encoding="utf-8")
+    (cfg / "environments" / "dev.yml").write_text(
+        "workspace:\n  name: retail-demo-dev\n", encoding="utf-8"
+    )
+    from retail_setup.cli.main import _workspace_name
+
+    assert _workspace_name(tmp_path, "dev") == "retail-demo-dev"
+
+
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):
     def fake_run(cmd, *args, **kwargs):
         if cmd and cmd[0] == "terraform":
