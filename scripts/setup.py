@@ -178,6 +178,10 @@ def run_command(command: list[str], *, cwd: Path = REPO_ROOT, dry_run: bool = Fa
         raise SystemExit(
             f"Required executable not found: {command[0]}. Install it and ensure it is on PATH."
         ) from None
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            f"Command failed with exit code {exc.returncode}: {rendered}"
+        ) from None
 
 
 def install_prerequisites(

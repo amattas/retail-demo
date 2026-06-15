@@ -131,6 +131,68 @@ def _available_store_types() -> list[str]:
         return []
 
 
+def _load_deploy_environment(repo_root: Path, env: str):
+    root = str(repo_root)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from deploy.scripts.deploy_config import load_environment
+
+    return load_environment(
+        env,
+        config_path=repo_root / "deploy" / "config" / "deploy.yml",
+        environments_root=repo_root / "deploy" / "config" / "environments",
+    )
+
+
+def _active_azure_cli_tenant() -> str:
+    try:
+        result = subprocess.run(
+            ["az", "account", "show", "--query", "tenantId", "-o", "tsv"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        raise typer.Exit(code=127) from None
+    if result.returncode != 0:
+        raise typer.Exit(code=1)
+    return result.stdout.strip()
+
+
+def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
+    try:
+        config = _load_deploy_environment(repo_root, env)
+    except ImportError:
+        return
+
+    if config.auth_mode != "azure_cli" or not config.tenant_id:
+        return
+
+    try:
+        active_tenant = _active_azure_cli_tenant()
+    except typer.Exit as exc:
+        if exc.exit_code == 127:
+            typer.echo(
+                "Azure CLI is required for auth.mode=azure_cli but `az` was not found on PATH.",
+                err=True,
+            )
+            typer.echo("Install Azure CLI or set deploy config auth.mode to azure_powershell.", err=True)
+        else:
+            typer.echo("Azure CLI is not logged in.", err=True)
+            typer.echo(f"Run: az login --tenant {config.tenant_id}", err=True)
+        raise
+
+    if active_tenant.lower() != config.tenant_id.lower():
+        typer.echo(
+            "Azure CLI tenant does not match deploy config tenant_id.",
+            err=True,
+        )
+        typer.echo(f"  Active tenant:   {active_tenant}", err=True)
+        typer.echo(f"  Expected tenant: {config.tenant_id}", err=True)
+        typer.echo(f"Run: az login --tenant {config.tenant_id}", err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def configure(
     repo_root: Path = typer.Option(
@@ -545,6 +607,7 @@ def deploy(
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
         lakehouse = _lakehouse_name(repo_root, env)
+        _validate_azure_cli_tenant(repo_root, env)
     plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse)
     total = len(plan)
 

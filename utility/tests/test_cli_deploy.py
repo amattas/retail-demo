@@ -1,8 +1,10 @@
 import subprocess
+from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from retail_setup.cli.main import app, _deploy_plan
+from retail_setup.cli.main import app, _deploy_plan, _validate_azure_cli_tenant
 
 runner = CliRunner()
 
@@ -44,8 +46,36 @@ def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
     result = runner.invoke(app, ["deploy", "--env", "dev", "--yes"])
     assert result.exit_code == 127, result.output
     assert "Required executable not found: terraform" in result.output
     assert "--skip-terraform" in result.output
     assert "Traceback" not in result.output
+
+
+def test_azure_cli_tenant_preflight_accepts_matching_tenant(monkeypatch):
+    monkeypatch.setattr(
+        "retail_setup.cli.main._load_deploy_environment",
+        lambda *_: SimpleNamespace(auth_mode="azure_cli", tenant_id="TENANT"),
+    )
+    monkeypatch.setattr("retail_setup.cli.main._active_azure_cli_tenant", lambda: "tenant")
+
+    _validate_azure_cli_tenant(Path("."), "dev")
+
+
+def test_azure_cli_tenant_preflight_rejects_mismatched_tenant(monkeypatch):
+    monkeypatch.setattr(
+        "retail_setup.cli.main._load_deploy_environment",
+        lambda *_: SimpleNamespace(auth_mode="azure_cli", tenant_id="expected-tenant"),
+    )
+    monkeypatch.setattr(
+        "retail_setup.cli.main._active_azure_cli_tenant",
+        lambda: "active-tenant",
+    )
+
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--yes"])
+    assert result.exit_code == 1, result.output
+    assert "Azure CLI tenant does not match deploy config tenant_id" in result.output
+    assert "az login --tenant expected-tenant" in result.output
+    assert "terraform" not in result.output

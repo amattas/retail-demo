@@ -41,6 +41,31 @@ the workspace and resources already exist:
 retail-setup deploy --env dev --skip-terraform
 ```
 
+## Fabric `FeatureNotAvailable` during Terraform apply
+
+**Symptom**: Terraform creates the workspace, then fails creating the Lakehouse
+or Eventhouse with:
+
+```text
+Error Code: FeatureNotAvailable
+Could not create resource: The feature is not available
+```
+
+This means the target Fabric tenant/capacity/workspace does not currently expose
+that Fabric item type through the API/provider in the selected region or
+capacity.
+
+Fix:
+
+1. Confirm the selected capacity supports Lakehouse and Real-Time Intelligence.
+2. Confirm the workspace is assigned to the expected Fabric capacity.
+3. Try creating a Lakehouse and Eventhouse manually in the Fabric portal in the
+   same workspace. If the portal blocks creation, fix the tenant/capacity/region
+   first.
+4. If the workspace was created but item creation failed, either delete the
+   partial workspace and rerun deploy, or set `workspace.existing_id` in
+   `deploy/config/environments/<env>.yml` after the workspace is usable.
+
 ## `fabric_cicd` or `azure.identity` import error
 
 Install deployment dependencies:
@@ -56,6 +81,18 @@ For `auth.mode: azure_cli`:
 ```powershell
 az login --tenant <tenant-id>
 ```
+
+Before deploying, confirm the active Azure CLI tenant matches
+`deploy/config/deploy.yml` or `deploy/config/environments/<env>.yml`:
+
+```powershell
+az account show --query "{tenantId:tenantId,user:user.name,name:name}" -o table
+```
+
+If it does not match, rerun `az login --tenant <tenant-id>`. Terraform and
+fabric-cicd use the active Azure CLI identity; the `tenant_id` value in config is
+used for validation and generated files, but it does not switch the logged-in
+Azure account for you.
 
 For `auth.mode: azure_powershell`:
 

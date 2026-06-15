@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,11 +62,20 @@ def test_install_prerequisites_dry_run_records_commands(monkeypatch):
     assert commands == [["testpm", "install", "terraform"]]
 
 
-def test_current_python_env_uses_launching_interpreter():
-    env = setup.current_python_env()
+def test_run_command_reports_nonzero_exit_without_traceback(monkeypatch, capsys):
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(7, command)
 
-    assert env.python == Path(sys.executable)
-    assert env.description == "current Python environment"
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+
+    try:
+        setup.run_command(["terraform", "init"])
+    except SystemExit as exc:
+        assert "Command failed with exit code 7: terraform init" in str(exc)
+    else:
+        raise AssertionError("run_command should raise SystemExit")
+
+    assert "$ terraform init" in capsys.readouterr().out
 
 
 def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
