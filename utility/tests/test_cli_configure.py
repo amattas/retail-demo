@@ -1,4 +1,3 @@
-from datetime import date
 from pathlib import Path
 
 import yaml
@@ -13,12 +12,22 @@ def _seed_deploy_config(root: Path):
     base = root / "deploy" / "config"
     (base / "environments").mkdir(parents=True)
     (base / "deploy.yml").write_text(yaml.safe_dump({
-        "tenant_id": None,
+        "tenant_id": "11111111-1111-1111-1111-111111111111",
         "auth": {"mode": "azure_cli"},
-        "workspace": {"name": "retail-demo", "description": "d"},
+        "workspace": {
+            "name": "retail-demo",
+            "description": "d",
+            "capacity_name": "F64",
+        },
         "lakehouse": {"name": "retail_lakehouse", "enable_schemas": True},
         "eventhouse": {"name": "retail_eventhouse", "kql_database_name": "retail_kql"},
         "notebooks": {"include": ["core"]},
+        "powerbi": {"semantic_model_name": "retail_model", "report_name": "retail_model"},
+        "deployment": {
+            "item_types_in_scope": ["Lakehouse", "Notebook"],
+            "publish_skip": False,
+            "unpublish_skip": True,
+        },
     }, sort_keys=False))
     (base / "environments" / "dev.yml").write_text(
         yaml.safe_dump({"workspace": {"name": "retail-demo-dev"}}))
@@ -45,6 +54,34 @@ def test_configure_writes_both_configs(tmp_path):
     gen = yaml.safe_load((tmp_path / "utility/config.yaml").read_text())
     assert gen["store_type"] == "grocery"
     assert gen["store_count"] == 10
+
+
+def test_configure_prompts_show_defaults_and_store_types(tmp_path):
+    _seed_deploy_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["configure", "--repo-root", str(tmp_path), "--env", "dev"],
+        input="\n" * 11,
+    )
+    assert result.exit_code == 0, result.output
+    assert (
+        "Store type (available: grocery, hardware, luxury, supercenter)"
+        in result.output
+    )
+    assert "[supercenter]" in result.output
+    assert "Start date (YYYY-MM-DD) [2025-01-01]" in result.output
+    assert "End date (YYYY-MM-DD) [2025-03-31]" in result.output
+    assert "Store count [50]" in result.output
+    assert "Random seed [42]" in result.output
+
+    gen = yaml.safe_load((tmp_path / "utility/config.yaml").read_text())
+    assert gen == {
+        "store_type": "supercenter",
+        "start_date": "2025-01-01",
+        "end_date": "2025-03-31",
+        "store_count": 50,
+        "seed": 42,
+    }
 
 
 def test_configure_rejects_bad_generation_values(tmp_path):

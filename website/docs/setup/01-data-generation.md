@@ -32,6 +32,9 @@ Interactive:
 retail-setup configure
 ```
 
+The interactive prompts show current config/default values in brackets and list
+available store types.
+
 Non-interactive example:
 
 ```powershell

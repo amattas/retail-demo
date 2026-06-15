@@ -10,6 +10,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
@@ -18,6 +19,10 @@ import yaml
 from pydantic import ValidationError
 
 from retail_setup.config.generation import GenerationConfig, load_generation_config
+from retail_setup.dictionaries.loader import (
+    available_store_types,
+    default_dictionary_root,
+)
 from retail_setup.notebooks.inject import render_notebooks
 
 app = typer.Typer(no_args_is_help=True)
@@ -30,6 +35,8 @@ def _main() -> None:
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
 _GENERATION_KEYS = ("store_type", "start_date", "end_date", "store_count", "seed")
+_DEFAULT_START_DATE = date(2025, 1, 1)
+_DEFAULT_END_DATE = date(2025, 3, 31)
 
 
 def _default_repo_root() -> Path:
@@ -89,26 +96,163 @@ def _validate_deploy_config(repo_root: Path, env: str) -> None:
     )
 
 
+def _load_yaml_mapping(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file must contain a YAML mapping: {path}")
+    return data
+
+
+def _config_default(base: dict[str, Any], overlay: dict[str, Any], dotted: str) -> Any:
+    value = _get_by_path(overlay, dotted)
+    if value is not None:
+        return value
+    return _get_by_path(base, dotted)
+
+
+def _prompt_str(name: str, value: str | None, *, default: Any = None) -> str:
+    if value is not None:
+        return value
+    if default is None:
+        return typer.prompt(name)
+    return typer.prompt(name, default=str(default), show_default=True)
+
+
+def _prompt_int(name: str, value: int | None, *, default: int) -> int:
+    if value is not None:
+        return value
+    return typer.prompt(name, default=default, show_default=True, type=int)
+
+
+def _available_store_types() -> list[str]:
+    try:
+        return available_store_types(default_dictionary_root())
+    except RuntimeError:
+        return []
+
+
 @app.command()
 def configure(
     repo_root: Path = typer.Option(
         _default_repo_root, "--repo-root", hidden=True, help="Repository root."
     ),
     env: str = typer.Option("dev", "--env", help="Deployment environment name."),
-    tenant_id: str = typer.Option(..., "--tenant-id", prompt="Entra tenant ID"),
-    workspace_name: str = typer.Option(..., "--workspace-name", prompt="Fabric workspace name"),
-    capacity_name: str = typer.Option(..., "--capacity-name", prompt="Fabric capacity name"),
-    lakehouse_name: str = typer.Option(..., "--lakehouse-name", prompt="Lakehouse name"),
-    eventhouse_name: str = typer.Option(..., "--eventhouse-name", prompt="Eventhouse name"),
-    kql_database_name: str = typer.Option(..., "--kql-database-name", prompt="KQL database name"),
-    store_type: str = typer.Option(..., "--store-type", prompt="Store type"),
-    start_date: str = typer.Option(..., "--start-date", prompt="Start date (YYYY-MM-DD)"),
-    end_date: str = typer.Option(..., "--end-date", prompt="End date (YYYY-MM-DD)"),
-    store_count: int = typer.Option(..., "--store-count", prompt="Store count"),
-    seed: int = typer.Option(..., "--seed", prompt="Random seed"),
+    tenant_id: Optional[str] = typer.Option(None, "--tenant-id", help="Entra tenant ID."),
+    workspace_name: Optional[str] = typer.Option(
+        None, "--workspace-name", help="Fabric workspace name."
+    ),
+    capacity_name: Optional[str] = typer.Option(
+        None, "--capacity-name", help="Fabric capacity name."
+    ),
+    lakehouse_name: Optional[str] = typer.Option(
+        None, "--lakehouse-name", help="Lakehouse name."
+    ),
+    eventhouse_name: Optional[str] = typer.Option(
+        None, "--eventhouse-name", help="Eventhouse name."
+    ),
+    kql_database_name: Optional[str] = typer.Option(
+        None, "--kql-database-name", help="KQL database name."
+    ),
+    store_type: Optional[str] = typer.Option(
+        None, "--store-type", help="Store type. Available values are shown interactively."
+    ),
+    start_date: Optional[str] = typer.Option(
+        None, "--start-date", help="Start date (YYYY-MM-DD)."
+    ),
+    end_date: Optional[str] = typer.Option(None, "--end-date", help="End date (YYYY-MM-DD)."),
+    store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
 ) -> None:
     """Configure deployment (deploy/config/) and generation (utility/config.yaml) settings."""
     repo_root = repo_root.resolve()
+    deploy_yml = repo_root / "deploy" / "config" / "deploy.yml"
+    env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    for path in (deploy_yml, env_yml):
+        if not path.is_file():
+            typer.echo(
+                f"Config file not found: {path}\n"
+                f"Unknown environment {env!r}? Available: "
+                f"{sorted(p.stem for p in env_yml.parent.glob('*.yml')) if env_yml.parent.is_dir() else '[]'}"
+            )
+            raise typer.Exit(code=1)
+
+    base_config = _load_yaml_mapping(deploy_yml)
+    env_config = _load_yaml_mapping(env_yml)
+    gen_path = repo_root / "utility" / "config.yaml"
+    existing_generation: dict[str, Any] = {}
+    if gen_path.is_file():
+        existing_generation = _load_yaml_mapping(gen_path)
+
+    store_types = _available_store_types()
+    store_type_prompt = (
+        f"Store type (available: {', '.join(store_types)})"
+        if store_types
+        else "Store type"
+    )
+
+    tenant_id = _prompt_str(
+        "Entra tenant ID",
+        tenant_id,
+        default=_config_default(base_config, env_config, "tenant_id"),
+    )
+    workspace_name = _prompt_str(
+        "Fabric workspace name",
+        workspace_name,
+        default=_config_default(base_config, env_config, "workspace.name"),
+    )
+    capacity_name = _prompt_str(
+        "Fabric capacity name",
+        capacity_name,
+        default=_config_default(base_config, env_config, "workspace.capacity_name"),
+    )
+    lakehouse_name = _prompt_str(
+        "Lakehouse name",
+        lakehouse_name,
+        default=_config_default(base_config, env_config, "lakehouse.name"),
+    )
+    eventhouse_name = _prompt_str(
+        "Eventhouse name",
+        eventhouse_name,
+        default=_config_default(base_config, env_config, "eventhouse.name"),
+    )
+    kql_database_name = _prompt_str(
+        "KQL database name",
+        kql_database_name,
+        default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
+    )
+    store_type = _prompt_str(
+        store_type_prompt,
+        store_type,
+        default=existing_generation.get(
+            "store_type", GenerationConfig.model_fields["store_type"].default
+        ),
+    )
+    start_date = _prompt_str(
+        "Start date (YYYY-MM-DD)",
+        start_date,
+        default=existing_generation.get("start_date", _DEFAULT_START_DATE.isoformat()),
+    )
+    end_date = _prompt_str(
+        "End date (YYYY-MM-DD)",
+        end_date,
+        default=existing_generation.get("end_date", _DEFAULT_END_DATE.isoformat()),
+    )
+    store_count = _prompt_int(
+        "Store count",
+        store_count,
+        default=int(
+            existing_generation.get(
+                "store_count", GenerationConfig.model_fields["store_count"].default
+            )
+        ),
+    )
+    seed = _prompt_int(
+        "Random seed",
+        seed,
+        default=int(
+            existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
+        ),
+    )
 
     # Validate generation values before any file writes (deploy YAMLs are
     # written next and restored if framework validation rejects them).
@@ -123,17 +267,6 @@ def configure(
     except ValidationError as exc:
         typer.echo(f"Invalid generation settings:\n{exc}")
         raise typer.Exit(code=1)
-
-    deploy_yml = repo_root / "deploy" / "config" / "deploy.yml"
-    env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
-    for path in (deploy_yml, env_yml):
-        if not path.is_file():
-            typer.echo(
-                f"Config file not found: {path}\n"
-                f"Unknown environment {env!r}? Available: "
-                f"{sorted(p.stem for p in env_yml.parent.glob('*.yml')) if env_yml.parent.is_dir() else '[]'}"
-            )
-            raise typer.Exit(code=1)
 
     original_deploy = _update_yaml_file(
         deploy_yml,
@@ -156,7 +289,6 @@ def configure(
         raise typer.Exit(code=1)
 
     dumped = generation.model_dump(mode="json")
-    gen_path = repo_root / "utility" / "config.yaml"
     gen_path.parent.mkdir(parents=True, exist_ok=True)
     gen_path.write_text(
         yaml.safe_dump({key: dumped[key] for key in _GENERATION_KEYS}, sort_keys=False)
