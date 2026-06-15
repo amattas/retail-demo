@@ -9,7 +9,7 @@ items** (`.platform`, `pipeline-content.json`, and an optional `.schedules`) tha
 
 | Pipeline | Recommended Schedule | Activities |
 |----------|---------------------|------------|
-| `setup-pipeline` | On demand | `00-apply-kql` → `setup-01` → `setup-02` → `setup-03` → `setup-04` |
+| `setup-pipeline` | On demand | `setup-00-apply-kql` → `setup-01` → `setup-02` → `setup-03` → `setup-04` |
 | `historical-data-load` | Once (manual) | `02-historical-data-load` |
 | `streaming-data-load` | Cron (every 5 minutes) | `03-streaming-to-silver` → `04-streaming-to-gold` (sequential) |
 | `daily-maintenance` | Daily 00:00 | `05-maintain-delta-tables` |
@@ -23,8 +23,10 @@ triggers in the Fabric portal.
 
 `retail-setup deploy` stages each pipeline whose notebooks are part of the
 deploy into a **Pipelines** workspace folder, and adds `DataPipeline` to the
-fabric-cicd scope so they publish automatically. With the default
-`core setup ml` groups, all five pipelines deploy.
+fabric-cicd scope so they publish automatically. `setup-pipeline` is the
+exception — it publishes into the **Setup** folder alongside the setup notebooks
+it orchestrates. With the default `core setup ml` groups, all five pipelines
+deploy.
 
 Each activity references its notebook by the **source** workspace's
 `notebookId`/`workspaceId`. `deploy/fabric-cicd/parameter.yml` remaps them to the
@@ -39,8 +41,8 @@ After a successful deploy, `retail-setup deploy` offers to **run `setup-pipeline
 now** (via the Fabric Job Scheduler API) to apply the KQL setup and generate the
 dimensions, facts, and Gold tables.
 
-`setup-pipeline` is authored in this repo; its first step `00-apply-kql` is a
-notebook **generated** from `fabric/kql_database/*.kql` that applies the
+`setup-pipeline` is authored in this repo; its first step `setup-00-apply-kql` is
+a notebook **generated** from `fabric/kql_database/*.kql` that applies the
 Eventhouse KQL setup with Kqlmagic. The other four pipelines were exported from a
 live workspace with `deploy.scripts.export_pipelines`.
 
@@ -58,7 +60,7 @@ python -m deploy.scripts.export_pipelines --workspace-name "Retail Demo" --outpu
 ### setup-pipeline
 
 One-shot environment bootstrap: applies the Eventhouse KQL schema
-(`00-apply-kql`), then runs the rendered setup notebooks in order to seed
+(`setup-00-apply-kql`), then runs the rendered setup notebooks in order to seed
 dictionaries, generate dimensions and facts, and build the Gold tables.
 
 ### historical-data-load

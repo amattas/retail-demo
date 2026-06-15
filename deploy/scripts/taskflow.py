@@ -61,10 +61,20 @@ ARTIFACT_TO_ITEM_TYPE = {
 }
 
 
-def _token(scope: str, credential: AzureCliCredential | None = None) -> str:
+def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
+    """Azure CLI credential with a generous process timeout.
+
+    On Windows ``az.cmd`` is slow to start, so azure-identity's 10s default
+    frequently times out when fetching the Power BI and Fabric tokens back to
+    back. Allow more time, and reuse one credential for both token requests.
+    """
+
     from azure.identity import AzureCliCredential
 
-    credential = credential or AzureCliCredential()
+    return credential or AzureCliCredential(process_timeout=60)
+
+
+def _token(scope: str, credential: AzureCliCredential) -> str:
     return credential.get_token(scope).token
 
 
@@ -234,6 +244,7 @@ def export_taskflow(
 ) -> Path:
     """Export a workspace task flow to a portable JSON file (artifacts by name)."""
 
+    credential = _credential(credential)
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
     workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(
@@ -260,6 +271,7 @@ def deploy_taskflow(
     """Deploy a portable task flow to a workspace. Returns unresolved references."""
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
+    credential = _credential(credential)
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
     workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(

@@ -76,6 +76,11 @@ SETUP_NOTEBOOKS = [
     "setup-04-build-gold",
 ]
 
+# The one Data Pipeline that orchestrates the setup notebooks. It publishes into
+# the "Setup" workspace folder (alongside those notebooks) rather than the
+# general "Pipelines" folder.
+SETUP_PIPELINE = "setup-pipeline"
+
 
 @dataclass(frozen=True)
 class BuildResult:
@@ -178,7 +183,7 @@ def stage_setup_notebooks(
     return staged
 
 
-KQL_APPLY_NOTEBOOK = "00-apply-kql"
+KQL_APPLY_NOTEBOOK = "setup-00-apply-kql"
 
 
 def stage_kql_apply_notebook(
@@ -377,7 +382,10 @@ def stage_pipelines(
     ``deployed_notebooks`` (the notebooks selected for this deploy). Pipelines
     that reference notebooks outside the selected groups are skipped so their
     ``$items.Notebook.<name>.$id`` references always resolve at publish time.
-    Returns an empty list when no pipeline sources exist.
+
+    Each pipeline publishes into the "Pipelines" workspace folder, except
+    ``setup-pipeline`` which joins the setup notebooks under "Setup". Returns an
+    empty list when no pipeline sources exist.
     """
 
     source_dir = repo_root / "fabric" / "pipelines"
@@ -393,9 +401,11 @@ def stage_pipelines(
         )
         if not refs.issubset(deployed_notebooks):
             continue
-        destination = output_dir / item_dir.name
+        folder = SETUP_FOLDER if item_dir.stem == SETUP_PIPELINE else PIPELINES_FOLDER
+        destination = output_dir / folder / item_dir.name
         if destination.exists():
             shutil.rmtree(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
         staged.append(destination)
     return staged
@@ -470,8 +480,8 @@ def build_workspace(
         )
 
     # One-time setup notebooks publish into a separate "Setup" workspace folder,
-    # along with a generated 00-apply-kql notebook that applies the Eventhouse
-    # KQL setup scripts.
+    # along with a generated setup-00-apply-kql notebook that applies the
+    # Eventhouse KQL setup scripts.
     if "setup" in notebook_groups:
         setup_dir = output_dir / SETUP_FOLDER
         staged_items.extend(
@@ -486,7 +496,7 @@ def build_workspace(
             ).name
         )
 
-    # Power BI items publish into a "Power BI" workspace folder.
+    # Power BI items publish into the "Reporting" workspace folder.
     staged_items.extend(
         item.name
         for item in stage_powerbi_items(
@@ -502,14 +512,15 @@ def build_workspace(
             repo_root, output_dir, kql_database_name=kql_database_name
         )
     )
-    # Data Pipelines publish into a "Pipelines" workspace folder, but only when
-    # every notebook they orchestrate is part of this deploy (so the pipeline's
-    # $items.Notebook.<name>.$id references resolve).
+    # Data Pipelines publish into a "Pipelines" workspace folder (except
+    # setup-pipeline, which joins the setup notebooks under "Setup"), but only
+    # when every notebook they orchestrate is part of this deploy (so the
+    # pipeline's $items.Notebook.<name>.$id references resolve).
     staged_items.extend(
         item.name
         for item in stage_pipelines(
             repo_root,
-            output_dir / PIPELINES_FOLDER,
+            output_dir,
             _deployed_notebook_names(notebook_groups),
         )
     )

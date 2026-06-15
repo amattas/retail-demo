@@ -68,14 +68,14 @@ python -m deploy.scripts.taskflow deploy --workspace "retail-demo-dev" --path fa
 one (reusing its `resourceId`/`id`/`etag`). Items that don't resolve to a
 target-workspace item are dropped and reported.
 
-`retail-setup deploy` offers to run this automatically at the end (interactive
-only) — "Wire up the workspace task flow now?".
+`retail-setup deploy` runs this **automatically** at the end (in both interactive
+and `--yes` modes), once the referenced items have been published.
 
 ## Caveats
 
 - **Live write.** `deploy` writes directly to the metadata cluster (there is no
-  fabric-cicd publisher for task flows). Run it after the referenced items have
-  been published so they resolve.
+  fabric-cicd publisher for task flows). `retail-setup deploy` runs it
+  automatically once the referenced items have been published, so they resolve.
 - **Undocumented API.** The `taskflow202602` (read) / `taskflow202512`
   (create/update) paths are internal and may change.
 - **Stale / legacy references are skipped.** Items whose GUID is no longer in the

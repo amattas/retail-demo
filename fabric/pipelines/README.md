@@ -9,20 +9,22 @@ workspace and use the Git-integration format that fabric-cicd publishes.
 
 | Pipeline | Orchestrates | Schedule |
 | --- | --- | --- |
-| `setup-pipeline` | `00-apply-kql` → `setup-01`…`setup-04` (KQL setup, then dimensions/facts/gold) | On demand |
+| `setup-pipeline` | `setup-00-apply-kql` → `setup-01`…`setup-04` (KQL setup, then dimensions/facts/gold) | On demand |
 | `historical-data-load` | `02-historical-data-load` | On demand |
 | `streaming-data-load` | `03-streaming-to-silver`, `04-streaming-to-gold` | Cron |
 | `daily-maintenance` | `05-maintain-delta-tables` | Daily 00:00 |
 | `machine-learning` | `06`–`14` ML notebooks | On demand |
 
 `setup-pipeline` is authored in this repo (not exported). Its first step,
-`00-apply-kql`, is a notebook **generated** by `build_artifacts` from
+`setup-00-apply-kql`, is a notebook **generated** by `build_artifacts` from
 `fabric/kql_database/*.kql` that applies the Eventhouse KQL setup with Kqlmagic;
-the remaining steps run the rendered setup notebooks in order. After
-`retail-setup deploy` completes, it offers to run `setup-pipeline` on demand
-(via `deploy.scripts.run_pipeline`). The `00-apply-kql` notebook can only be
-validated by running it in Fabric — verify its first run and adjust the Kqlmagic
-auth if a headless pipeline run can't authenticate.
+the remaining steps run the rendered setup notebooks in order. It publishes into
+the **Setup** workspace folder alongside those notebooks (not the general
+**Pipelines** folder). After `retail-setup deploy` completes, it offers to run
+`setup-pipeline` on demand (via `deploy.scripts.run_pipeline`). The
+`setup-00-apply-kql` notebook can only be validated by running it in Fabric —
+verify its first run and adjust the Kqlmagic auth if a headless pipeline run
+can't authenticate.
 
 ## Re-exporting from Fabric
 
@@ -48,11 +50,13 @@ fab export "Retail Demo.Workspace/daily-maintenance.DataPipeline" -o fabric/pipe
 ## Deployment
 
 `retail-setup deploy` publishes these pipelines into a **Pipelines** workspace
-folder. A pipeline is staged **only when every notebook it orchestrates is part
-of the deploy** — so with the default `core setup` groups the
-`historical-data-load`, `streaming-data-load`, and `daily-maintenance` pipelines
-publish, while `machine-learning` publishes only when the `ml` notebook group is
-included. This keeps every `$items.Notebook.<name>.$id` reference resolvable.
+folder — except `setup-pipeline`, which publishes into the **Setup** folder with
+the setup notebooks it orchestrates. A pipeline is staged **only when every
+notebook it orchestrates is part of the deploy** — so with the default
+`core setup` groups the `historical-data-load`, `streaming-data-load`, and
+`daily-maintenance` pipelines publish, while `machine-learning` publishes only
+when the `ml` notebook group is included. This keeps every
+`$items.Notebook.<name>.$id` reference resolvable.
 
 Each activity references its notebook by the **source** workspace's
 `notebookId`/`workspaceId`. `deploy/fabric-cicd/parameter.yml` remaps them to the
