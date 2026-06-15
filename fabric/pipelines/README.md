@@ -24,6 +24,9 @@ required:
 python -m deploy.scripts.export_pipelines --workspace-name "Retail Demo" --output-dir fabric/pipelines
 ```
 
+`export_pipelines` is a thin wrapper over the generic `deploy.scripts.export_items`
+(`--item-type DataPipeline`), which exports any Fabric item type.
+
 The official Microsoft Fabric CLI (`fab`) does the same export, but maintains
 its **own** login separate from `az` (run `fab auth login` first):
 
