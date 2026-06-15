@@ -15,6 +15,16 @@ PLATFORM_SCHEMA = (
     "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/"
     "platformProperties/2.0.0/schema.json"
 )
+
+# Workspace folder names used to organize published items. fabric-cicd maps the
+# staged directory structure to Fabric workspace folders, so staging an item
+# under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
+# Demo/pipeline notebooks go under "Notebooks"; one-time setup notebooks (and
+# other setup artifacts) go under "Setup". The Lakehouse shell and KQLQueryset
+# stay at the workspace root.
+NOTEBOOKS_FOLDER = "Notebooks"
+SETUP_FOLDER = "Setup"
+POWERBI_FOLDER = "Power BI"
 NOTEBOOK_GROUPS = {
     "core": [
         "01-create-bronze-shortcuts.ipynb",
@@ -245,24 +255,32 @@ def build_workspace(
     # Terraform already owns them.
     staged_items.append(stage_shell_item(output_dir, "retail_lakehouse", "Lakehouse").name)
 
+    # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
+    notebooks_dir = output_dir / NOTEBOOKS_FOLDER
     for notebook_name in _selected_notebooks(notebook_groups):
         staged_items.append(
             stage_notebook(
                 repo_root / "fabric" / "lakehouse" / notebook_name,
-                output_dir,
+                notebooks_dir,
                 lakehouse_name=lakehouse_name,
             ).name
         )
 
+    # One-time setup notebooks publish into a separate "Setup" workspace folder.
     if "setup" in notebook_groups:
         staged_items.extend(
             item.name
-            for item in stage_setup_notebooks(repo_root, output_dir, lakehouse_name=lakehouse_name)
+            for item in stage_setup_notebooks(
+                repo_root, output_dir / SETUP_FOLDER, lakehouse_name=lakehouse_name
+            )
         )
 
+    # Power BI items publish into a "Power BI" workspace folder.
     staged_items.extend(
         item.name
-        for item in stage_powerbi_items(repo_root / "fabric" / "powerbi", output_dir)
+        for item in stage_powerbi_items(
+            repo_root / "fabric" / "powerbi", output_dir / POWERBI_FOLDER
+        )
     )
     # Curated KQL queries (fabric/querysets/*.kql) ship as a single
     # .KQLQueryset item bound to the Eventhouse KQL database. Skipped silently

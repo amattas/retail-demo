@@ -101,6 +101,14 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_eventhouse.Eventhouse" not in result.staged_items
     assert "retail_kql.KQLDatabase" not in result.staged_items
 
+    # Notebooks publish under a "Notebooks" workspace folder; Power BI items
+    # under a "Power BI" folder; the Lakehouse shell stays at the root.
+    assert (output / "Notebooks" / "01-create-bronze-shortcuts.Notebook").is_dir()
+    assert (output / "Power BI" / "retail_model.SemanticModel").is_dir()
+    assert (output / "Power BI" / "retail_model.Report").is_dir()
+    assert (output / "retail_lakehouse.Lakehouse").is_dir()
+    assert not (output / "01-create-bronze-shortcuts.Notebook").exists()
+
 
 def test_stage_querysets_builds_kqlqueryset_with_tab_per_file(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
@@ -257,7 +265,9 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
 
     # Every staged setup notebook must carry the custom lakehouse name in its metadata
     for name in build_artifacts.SETUP_NOTEBOOKS:
-        notebook_path = out_dir / f"{name}.Notebook" / "notebook-content.ipynb"
+        notebook_path = (
+            out_dir / "Setup" / f"{name}.Notebook" / "notebook-content.ipynb"
+        )
         assert notebook_path.exists(), f"Missing staged notebook: {notebook_path}"
         notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
         lh_meta = notebook["metadata"]["dependencies"]["lakehouse"]
