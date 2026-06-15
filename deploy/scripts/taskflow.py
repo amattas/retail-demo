@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -107,34 +108,74 @@ def list_workspace_items(
 
 def get_taskflow(
     pbi_session: requests.Session, cluster: str, workspace_id: str
-) -> dict[str, Any]:
-    """Read the raw task flow record (``{etag, resourceId, taskFlow}``)."""
+) -> dict[str, Any] | None:
+    """Read the raw task flow record (``{etag, resourceId, taskFlow}``) or ``None``.
+
+    A workspace that has never had a task flow returns an empty list; this
+    returns ``None`` in that case so callers can create one.
+    """
 
     url = f"{cluster}/metadata/workspaces/{workspace_id}/taskflow202602"
     response = pbi_session.get(url)
     response.raise_for_status()
     records = response.json()
-    if not records:
-        raise ValueError(f"No task flow found in workspace {workspace_id}")
-    return records[0]
+    return records[0] if records else None
 
 
 def put_taskflow(
     pbi_session: requests.Session,
     cluster: str,
     workspace_id: str,
-    resource_id: str,
+    record: dict[str, Any],
     task_flow: dict[str, Any],
-    etag: str | None = None,
 ) -> int:
-    """Write a task flow (``{tasks, edges}``) back to the workspace."""
+    """Update an existing task flow in the workspace.
 
+    The body must carry the existing task-flow identity (``id``/``name``/
+    ``description``) — the server rejects an empty ``taskflow.Id`` — plus the new
+    ``tasks`` and ``edges``.
+    """
+
+    resource_id = record["resourceId"]
+    existing = record.get("taskFlow", {})
     url = f"{cluster}/metadata/workspaces/{workspace_id}/taskflow202512/{resource_id}"
     headers = {"Content-Type": "application/json"}
-    if etag:
-        headers["If-Match"] = etag
-    body = {"tasks": task_flow.get("tasks", []), "edges": task_flow.get("edges", [])}
+    if record.get("etag"):
+        headers["If-Match"] = record["etag"]
+    body = {
+        "id": existing.get("id") or resource_id,
+        "name": existing.get("name") or "Retail Demo",
+        "description": existing.get("description", ""),
+        "tasks": task_flow.get("tasks", []),
+        "edges": task_flow.get("edges", []),
+    }
     response = pbi_session.put(url, json=body, headers=headers)
+    response.raise_for_status()
+    return response.status_code
+
+
+def create_taskflow(
+    pbi_session: requests.Session,
+    cluster: str,
+    workspace_id: str,
+    task_flow: dict[str, Any],
+    name: str = "Retail Demo",
+) -> int:
+    """Create a workspace's first task flow via POST to the collection.
+
+    The body is the full task-flow object (``id``, ``name``, ``description``,
+    ``tasks``, ``edges``); the server rejects an empty ``id``.
+    """
+
+    url = f"{cluster}/metadata/workspaces/{workspace_id}/taskflow202512"
+    body = {
+        "id": task_flow.get("id") or str(uuid.uuid4()),
+        "name": task_flow.get("name") or name,
+        "description": task_flow.get("description", ""),
+        "tasks": task_flow.get("tasks", []),
+        "edges": task_flow.get("edges", []),
+    }
+    response = pbi_session.post(url, json=body, headers={"Content-Type": "application/json"})
     response.raise_for_status()
     return response.status_code
 
@@ -159,11 +200,17 @@ def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict
 def to_workspace(
     portable: dict[str, Any], name_type_to_guid: dict[tuple[str, str], str]
 ) -> tuple[dict[str, Any], list[str]]:
-    """Resolve portable item names to target GUIDs. Returns (task_flow, unresolved)."""
+    """Resolve portable item names to target GUIDs. Returns (task_flow, unresolved).
+
+    Items that can't be resolved to a target-workspace GUID are dropped from
+    their task (the server rejects references to non-existent artifacts) and
+    reported in the returned ``unresolved`` list.
+    """
 
     resolved = json.loads(json.dumps(portable))
     unresolved: list[str] = []
     for task in resolved.get("tasks", []):
+        kept_items: list[dict[str, Any]] = []
         for item in task.get("items", []):
             artifact_type = str(item.get("artifactType", ""))
             name = item.get("artifactName")
@@ -172,9 +219,11 @@ def to_workspace(
             if guid:
                 item["artifactUniqueId"] = f"{artifact_type}:{guid}"
                 item["artifactObjectId"] = guid
+                item.pop("artifactName", None)
+                kept_items.append(item)
             else:
                 unresolved.append(f"{artifact_type}:{name}")
-            item.pop("artifactName", None)
+        task["items"] = kept_items
     return resolved, unresolved
 
 
@@ -192,6 +241,8 @@ def export_taskflow(
     )
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
+    if record is None:
+        raise ValueError(f"No task flow found in workspace {workspace}")
     guid_to_name = _guid_name_map(list_workspace_items(fabric, workspace_id))
     portable = to_portable(record["taskFlow"], guid_to_name)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,7 +272,11 @@ def deploy_taskflow(
     task_flow, unresolved = to_workspace(portable, name_type_to_guid)
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
-    put_taskflow(pbi, cluster, workspace_id, record["resourceId"], task_flow, record["etag"])
+    if record is None:
+        # Fresh workspace with no task flow yet — create one.
+        create_taskflow(pbi, cluster, workspace_id, {**portable, **task_flow})
+    else:
+        put_taskflow(pbi, cluster, workspace_id, record, task_flow)
     return unresolved
 
 

@@ -18,8 +18,9 @@ network traffic:
 | Operation | Call |
 | --- | --- |
 | Resolve cluster | `PUT https://api.powerbi.com/spglobalservice/GetOrInsertClusterUrisByTenantLocation` → `{"FixedClusterUri": "https://wabi-<region>.analysis.windows.net/"}` |
-| Read | `GET {cluster}/metadata/workspaces/{workspaceId}/taskflow202602` → `[{etag, resourceId, taskFlow}]` |
-| Save | `PUT {cluster}/metadata/workspaces/{workspaceId}/taskflow202512/{resourceId}` — body `{tasks, edges}` |
+| Read | `GET {cluster}/metadata/workspaces/{workspaceId}/taskflow202602` → `[{etag, resourceId, taskFlow}]` (empty `[]` when none exists) |
+| Create | `POST {cluster}/metadata/workspaces/{workspaceId}/taskflow202512` — body is the full task flow (`{id, name, description, tasks, edges}`; `id` must be a non-empty GUID) → `201` |
+| Update | `PUT {cluster}/metadata/workspaces/{workspaceId}/taskflow202512/{resourceId}` — body must include `id`/`name`/`description` plus `tasks`/`edges` |
 
 ### Data model
 
@@ -62,19 +63,24 @@ python -m deploy.scripts.taskflow export --workspace "Retail Demo" --path fabric
 python -m deploy.scripts.taskflow deploy --workspace "retail-demo-dev" --path fabric/taskflow/taskflow.json
 ```
 
-`deploy` reads the target's existing task flow to reuse its `resourceId`/`etag`,
-remaps every item name to the target workspace's GUID, and writes the flow.
-Unresolved references are reported and left unbound.
+`deploy` resolves every item name to the target workspace's GUID, then either
+**creates** the task flow (fresh workspace with none) or **updates** the existing
+one (reusing its `resourceId`/`id`/`etag`). Items that don't resolve to a
+target-workspace item are dropped and reported.
+
+`retail-setup deploy` offers to run this automatically at the end (interactive
+only) — "Wire up the workspace task flow now?".
 
 ## Caveats
 
 - **Live write.** `deploy` writes directly to the metadata cluster (there is no
-  fabric-cicd publisher for task flows). It is **not** wired into
-  `retail-setup deploy`; run it as an explicit post-deploy step once the
-  referenced items exist in the target workspace.
-- **Undocumented API.** The `taskflow202602` (read) / `taskflow202512` (write)
-  paths are internal and may change.
-- **Stale / legacy references.** Items whose GUID is no longer in the source
-  workspace export with `artifactName: null` (e.g. notebooks recreated after the
-  flow was authored). Semantic models use a legacy `dataset` id (`"3:NNNN"`)
-  rather than a GUID and also export unresolved. These are skipped on deploy.
+  fabric-cicd publisher for task flows). Run it after the referenced items have
+  been published so they resolve.
+- **Undocumented API.** The `taskflow202602` (read) / `taskflow202512`
+  (create/update) paths are internal and may change.
+- **Stale / legacy references are skipped.** Items whose GUID is no longer in the
+  source workspace export with `artifactName: null` (e.g. notebooks recreated
+  after the flow was authored); semantic models use a legacy `dataset` id
+  (`"3:NNNN"`). Items the target workspace doesn't have (e.g. data agents,
+  ontology, or the reset notebook when not deployed) are also dropped. The
+  resolvable core of the flow is still wired.
