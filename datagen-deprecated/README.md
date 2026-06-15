@@ -1,5 +1,10 @@
 # Retail Big Data Generator
 
+> **Deprecated for new workspace setup.** This legacy FastAPI/DuckDB/Event Hub
+> generator is retained for reference and compatibility investigations. For a
+> clean Microsoft Fabric workspace, use the Fabric-native `retail-setup` utility
+> documented in `..\README.md` and `..\utility\README.md`.
+
 A comprehensive synthetic retail data generator that produces **realistic but entirely synthetic** retail data for analytics POCs, supporting Parquet exports and real-time Azure Event Hub streaming.
 
 ## Purpose

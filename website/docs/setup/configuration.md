@@ -1,101 +1,99 @@
 # Configuration Reference
 
-Complete reference for environment variables and pipeline settings.
+The current setup path stores configuration in two places:
 
-## Environment Variables
+- `deploy/config/` for workspace/deployment settings.
+- `utility/config.yaml` for synthetic data generation settings.
 
-### Data Generator
+Run `retail-setup configure` to update both.
 
-Non-secret settings live in `datagen/config.json` (copy from `config.example.json`); the Event Hub name is `stream.hub` (default `retail-events`). Secrets are supplied via environment variables:
+## Deployment settings
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AZURE_EVENTHUB_CONNECTION_STRING` | For streaming | Event Hubs connection string |
-| `AZURE_STORAGE_ACCOUNT_URI` (or `AZURE_STORAGE_ACCOUNT_URL`) | For upload | Storage account URI, may include container/prefix (e.g., `https://stdretail.blob.core.windows.net/supermarket`) |
-| `AZURE_STORAGE_ACCOUNT_KEY` | For upload | Storage account key |
+`retail-setup configure` updates:
 
-See the [Datagen Configuration Reference](../datagen/configuration.md) for the full `config.json` schema.
+- `deploy/config/deploy.yml`
+- `deploy/config/environments/<env>.yml`
 
-### Bronze Layer (01-create-bronze-shortcuts.ipynb)
+Important values:
 
-Settings are constants in the notebook's configuration cell (edit before running):
+| Setting | Description |
+| --- | --- |
+| `tenant_id` | Entra tenant ID. |
+| `workspace.name` | Fabric workspace name for the selected environment. |
+| `workspace.capacity_name` | Fabric capacity name. |
+| `lakehouse.name` | Target Lakehouse name. |
+| `eventhouse.name` | Target Eventhouse name. |
+| `eventhouse.kql_database_name` | Target KQL database name. |
+| `auth.mode` | `azure_cli` or `azure_powershell`. |
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `LAKEHOUSE_NAME` | `retail_lakehouse` | Lakehouse name (also settable via env var) |
-| `BRONZE_SCHEMA` | `cusn` | Bronze schema for Eventhouse shortcuts |
-| `ADLS_ACCOUNT` | `stdretail` | Storage account name |
-| `ADLS_CONTAINER` | `supermarket` | Container name |
-| `EVENTHOUSE_DATABASE` | `retail_eventhouse` | KQL database name |
+## Generation settings
 
-### Silver Layer (03-streaming-to-silver.ipynb)
+`utility/config.yaml` is ignored by Git and contains local generation choices:
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `LAKEHOUSE_NAME` | No | `retail_lakehouse` | Lakehouse name |
-| `SILVER_DB` | No | `ag` | Silver database/schema name |
-| `BRONZE_SCHEMA` | No | `cusn` | Source Bronze schema |
+| Setting | Description |
+| --- | --- |
+| `store_type` | One of `grocery`, `hardware`, `luxury`, or `supercenter`. |
+| `start_date` / `end_date` | Inclusive historical generation date range. |
+| `store_count` | Number of stores to generate. |
+| `seed` | Deterministic random seed. |
 
-### Gold Layer (04-streaming-to-gold.ipynb)
+The engine also has derived defaults:
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `LAKEHOUSE_NAME` | No | `retail_lakehouse` | Lakehouse name |
-| `SILVER_DB` | No | `ag` | Source Silver schema |
-| `GOLD_DB` | No | `au` | Gold database/schema name |
+| Derived setting | Default |
+| --- | --- |
+| `silver_db` | `ag` |
+| `gold_db` | `au` |
+| `dc_count` | `max(1, store_count // 10)` |
+| `customer_count` | `store_count * 1000` |
+| `online_orders_per_day` | `store_count * 8` |
 
-## Pipeline Settings
+## Notebook parameters
 
-### Schedule Recommendations
+Rendered setup notebooks receive these tokens:
 
-| Pipeline | Frequency | Rationale |
-|----------|-----------|-----------|
-| `pl_historical_load` | Once (manual) | Initial data load only |
-| `pl_streaming_silver` | 5 minutes | Balance freshness vs compute cost |
-| `pl_streaming_gold` | 15 minutes | Gold is for analytics, less time-sensitive |
-| `pl_maintenance` | Daily (3 AM) | Optimize Delta tables during low usage |
+| Token | Source |
+| --- | --- |
+| `{{LAKEHOUSE_NAME}}` | Deployment config |
+| `{{SILVER_DB}}` | Generation config |
+| `{{GOLD_DB}}` | Generation config |
+| `{{STORE_TYPE}}` | Generation config |
+| `{{START_DATE}}` | Generation config |
+| `{{END_DATE}}` | Generation config |
+| `{{STORE_COUNT}}` | Generation config |
+| `{{SEED}}` | Generation config |
+| `{{DICTIONARY_REF}}` | Git SHA or `retail-setup render --ref` |
 
-### Retry Configuration
+## Optional live stream parameters
 
-| Setting | Value |
-|---------|-------|
-| **Retries** | 3 |
-| **Retry Interval** | 30 seconds |
-| **Timeout** | 1 hour (30 min for Gold) |
+`setup-05-stream-events.ipynb` is imported manually and configured in Fabric:
 
-## Schema Naming Convention
+| Parameter | Description |
+| --- | --- |
+| `source_rows_per_second` | Spark rate-source rows per second. |
+| `sink` | `eventstream` or `delta`. |
+| `run_seconds` | `0` for continuous streaming, or a positive test duration. |
+| `eventstream_bootstrap` | Eventstream Custom Endpoint bootstrap server. |
+| `eventstream_name` | Eventstream Custom Endpoint topic/Event Hub name. |
+| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret that stores the connection string. |
 
-| Schema | Layer | Purpose |
-|--------|-------|---------|
-| `cusn` | Bronze | Eventhouse event table shortcuts |
-| `ag` | Silver | Cleaned, deduplicated Delta tables |
-| `au` | Gold | Pre-aggregated KPIs |
+Do not store secrets in committed configuration files or notebooks.
 
-## Notebook Parameters
+## Pipeline settings
 
-### 02-historical-data-load.ipynb
+Pipelines are optional and manual. If you create them, use these typical
+settings:
 
-```python
-SILVER_DB = "ag"     # Target Silver schema
-GOLD_DB = "au"       # Target Gold schema
-```
+| Pipeline | Frequency |
+| --- | --- |
+| Historical setup | Manual |
+| Streaming to Silver | 5 minutes |
+| Streaming to Gold | 15 minutes |
+| Maintenance | Daily |
 
-### 03-streaming-to-silver.ipynb
+## Schema names
 
-```python
-SILVER_DB = "ag"           # Target Silver schema
-BRONZE_SCHEMA = "cusn"     # Source Bronze schema
-```
-
-### 04-streaming-to-gold.ipynb
-
-```python
-SILVER_DB = "ag"     # Source Silver schema
-GOLD_DB = "au"       # Target Gold schema
-```
-
-### 05-maintain-delta-tables.ipynb
-
-```python
-LAKEHOUSE_NAME = "retail_lakehouse"  # Lakehouse containing ag/au schemas
-```
+| Schema | Purpose |
+| --- | --- |
+| `cusn` | Optional Eventhouse shortcuts/live Bronze tables |
+| `ag` | Silver Delta tables |
+| `au` | Gold aggregate tables |

@@ -1,80 +1,78 @@
-# Phase 6: Streaming Setup
+# Phase 6: Optional Live Streaming
 
-Configure Eventstream for real-time event ingestion from Event Hubs.
+Live streaming is optional. The historical setup notebooks 01-04 are enough to
+populate the Lakehouse for a new workspace walkthrough.
 
-## Step 6.1: Create Eventstream
+The current Fabric-native live driver is:
 
-**Create Eventstream for real-time ingestion**:
-
-1. New → Eventstream
-   - Name: `retail_events_stream`
-
-2. **Add Source**: Azure Event Hubs
-   - Connection: Your Event Hubs namespace
-   - Hub: `retail-events`
-   - Consumer Group: `$Default`
-
-3. **Add Destinations** (2 destinations):
-
-### Destination 1: KQL Database
-
-| Setting | Value |
-|---------|-------|
-| Target | `retail_eventhouse` (from Step 2.1) |
-| Input data format | JSON |
-| Routing | Route by `event_type` field; unrecognized types land in `unknown_event` |
-| Ingestion mapping | Use the `EventMapping` mappings from Step 2.2 |
-
-:::note
-A Lakehouse destination is **not** required. The Lakehouse Bronze layer reads streaming data through OneLake shortcuts to the Eventhouse tables (`Tables/cusn/`, created in Phase 2), not through a separate Eventstream sink.
-:::
-
-4. **Start Eventstream**
-
-## Step 6.2: Start Data Generator Streaming
-
-**Send test events via data generator**:
-
-```bash
-curl -X POST http://localhost:8000/api/stream/start \
-  -H "Content-Type: application/json" \
-  -d '{"duration_minutes": 5, "burst_override": 100}'
-
-# Monitor and stop
-curl http://localhost:8000/api/stream/status
-curl -X POST http://localhost:8000/api/stream/stop
+```text
+utility/notebooks/setup-05-stream-events.ipynb
 ```
 
-Omit `duration_minutes` to stream indefinitely. Streaming requires that historical fact data has been generated first (Phase 1) and `AZURE_EVENTHUB_CONNECTION_STRING` is set.
+This notebook is committed in the repository, but it is not currently rendered
+to `utility/out/` or staged by `retail-setup deploy`. Import it manually when you
+want live synthetic events.
+
+## Step 6.1: Prepare Eventhouse/KQL
+
+1. Run the generated `deploy/.generated/<env>/database.kql` script in the target
+   KQL database.
+2. Enable OneLake availability on the KQL database.
+3. Create Lakehouse shortcuts from Eventhouse event tables into schema `cusn` if
+   you want to run `03-streaming-to-silver.ipynb`.
+
+## Step 6.2: Create Eventstream Custom Endpoint
+
+In Fabric Eventstream:
+
+1. Create or open the Eventstream.
+2. Add a Custom Endpoint source.
+3. Copy the endpoint bootstrap server and Event Hub/Kafka topic name.
+4. Store the endpoint connection string in Key Vault.
+
+Do not hardcode connection strings in notebooks.
+
+## Step 6.3: Run setup-05
+
+Import `utility/notebooks/setup-05-stream-events.ipynb`, attach it to the
+Lakehouse, and set parameters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `source_rows_per_second` | Spark rate-source rows per second. |
+| `sink` | `eventstream` or `delta`. |
+| `run_seconds` | `0` runs forever; positive values stop after N seconds. |
+| `eventstream_bootstrap` | Custom Endpoint bootstrap server. |
+| `eventstream_name` | Custom Endpoint topic/Event Hub name. |
+| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret location for the connection string. |
+
+Use `sink = "delta"` for a quick smoke test without Eventstream.
+
+## Step 6.4: Process live events into Silver/Gold
+
+After events land in KQL/Eventhouse and shortcuts exist:
+
+1. Run `03-streaming-to-silver.ipynb`.
+2. Run `04-streaming-to-gold.ipynb`.
+
+For scheduled processing, create the optional pipelines described in
+[Phase 5](05-pipelines.md).
 
 ## Verification
 
-### Check KQL Database
+KQL:
 
 ```kql
 receipt_created | take 10
 ```
 
-### Check Pipeline Execution
+Lakehouse SQL:
 
-- Verify `pl_streaming_silver` runs successfully after 5 minutes
-- Verify `pl_streaming_gold` runs successfully after 15 minutes
-
-## Eventstream Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌───────────────┐
-│   Datagen   │────▶│  Event Hubs  │────▶│ Eventstream  │────▶│ KQL Database  │
-└─────────────┘     └──────────────┘     └──────────────┘     │ (Eventhouse)  │
-                                                              └───────┬───────┘
-                                                                      │ OneLake shortcuts
-                                                                      ▼
-                                                              ┌───────────────┐
-                                                              │  Lakehouse    │
-                                                              │ Tables/cusn/  │
-                                                              └───────────────┘
+```sql
+SELECT COUNT(*) FROM ag.fact_receipts;
+SELECT MAX(ts) FROM au.sales_minute_store;
 ```
 
-## Next Step
+## Next step
 
-Continue to [Phase 7: Dashboards](07-dashboards.md)
+Continue to [Phase 7: Dashboards](07-dashboards.md).

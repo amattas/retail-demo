@@ -1,225 +1,192 @@
-# Microsoft Fabric Real-Time Intelligence - Retail Demo
+# Microsoft Fabric Real-Time Intelligence Retail Demo
 
-> **⚠️ PROJECT STATUS**: This project is currently in early development. Both the data generator and Microsoft Fabric artifacts are works in progress. See [Development Status](#development-status) for details.
+This repository contains a Microsoft Fabric retail demo that generates synthetic
+retail data, deploys Fabric assets, and builds Lakehouse Silver/Gold tables plus
+a Power BI semantic model.
 
-A comprehensive demonstration showcasing Microsoft Fabric's Real-Time Intelligence capabilities for the retail and consumer products goods industry. This project combines a sophisticated data generator with Fabric artifacts to deliver actionable, real-time insights across critical retail operations.
+The current supported setup path is the Fabric-native `retail-setup` utility in
+`utility\`. The older FastAPI/DuckDB generator is kept under `datagen-deprecated\`
+for reference and compatibility investigations, but it is not the recommended
+path for a new workspace.
 
-## Overview
+## What you get
 
-This demo **will illustrate** how Microsoft Fabric's Real-Time Intelligence features enable retailers to make data-driven decisions at the speed of business. By combining streaming data ingestion, real-time analytics, and AI-powered insights, retailers can optimize operations, enhance customer experiences, and drive competitive advantage.
+- A Fabric workspace with a Lakehouse, Eventhouse, KQL database, notebooks,
+  semantic model, and report artifacts.
+- Setup notebooks that generate deterministic synthetic retail data directly in
+  Fabric Spark.
+- Lakehouse Silver tables in schema `ag`: dimensions, `dim_date`, 18 fact
+  tables, and `setup_run_log`.
+- Lakehouse Gold tables in schema `au`: 9 aggregate tables for reporting.
+- Optional live event generation through `setup-05-stream-events.ipynb`.
 
-**Current Status**: The Python-based data generator is under active development. Fabric scaffolding is now in place under `fabric/` with specs for Eventstream, KQL DB, Querysets, Rules, Dashboards, Lakehouse, Pipelines, Notebooks, and a Semantic Model. See the Docs site under `website/` (Docusaurus) for architecture and plans.
+## Prerequisites
 
-## Key Scenarios (Planned)
+Required for notebook render/manual import:
 
-The completed demo will showcase four critical retail scenarios powered by Microsoft Fabric Real-Time Intelligence:
+- Python 3.11 or later.
+- Git.
+- A Microsoft Fabric tenant, capacity, and workspace permissions.
 
-### 1. Supply Chain Control Center
-Monitor and optimize your supply chain in real-time:
-- Live inventory tracking across warehouses and distribution centers
-- Predictive stock-out alerts and automated replenishment triggers
-- Real-time supplier performance monitoring
-- Logistics optimization with live shipment tracking
+Required for automated deployment:
 
-### 2. Omni-Channel Fulfillment Visibility
-Gain complete transparency across all fulfillment channels:
-- Real-time order status across online, in-store, and mobile channels
-- Dynamic inventory allocation and routing
-- Live BOPIS (Buy Online, Pick-up In Store) performance metrics
-- Same-day delivery tracking and optimization
+- Terraform on `PATH`.
+- Azure CLI or Azure PowerShell authenticated to the target tenant.
+- Python packages `azure-identity` and `fabric-cicd`.
+- Permission to create or update the target Fabric workspace, Lakehouse,
+  Eventhouse, KQL database, semantic model, and report.
 
-### 3. Personalized Customer Engagement
-Deliver hyper-personalized experiences powered by real-time data:
-- Live customer behavior tracking and segmentation
-- Real-time product recommendations
-- Dynamic pricing and personalized promotions
-- Instant customer sentiment analysis
+Fabric provides the Spark runtime used by the setup notebooks. Local PySpark is
+only needed for utility development/tests.
 
-### 4. AI-Driven Insights and Assistance
-Leverage AI for intelligent decision-making:
-- Anomaly detection in sales patterns and inventory levels
-- Predictive analytics for demand forecasting
-- Natural language queries against real-time data
-- Automated alert generation and intelligent recommendations
+## New workspace walkthrough
 
-## Architecture
+Run these commands from PowerShell unless noted otherwise.
 
-### Data Generator
-*[In Development]*
+### 1. Clone and install the setup utility
 
-A Python-based data generator designed to produce realistic retail events including:
-- **Transactional Data**: Point-of-sale transactions, online orders, returns
-- **Inventory Events**: Stock movements, transfers, adjustments
-- **Customer Interactions**: Browsing behavior, cart events, loyalty activities
-- **Supply Chain Events**: Shipments, deliveries, supplier updates
-- **Marketing Events**: Campaign interactions, promotional responses
-
-Planned features:
-- Realistic seasonal patterns and trends
-- Multi-brand support with brand-specific behaviors
-- Configurable data volumes and streaming rates
-- RESTful API for on-demand generation
-- Real-time streaming to Azure Event Hubs
-
-### Microsoft Fabric Components
-Scaffolded in `fabric/` with build specs:
-- **Eventstream**: Ingest and route real-time retail events from Azure Event Hubs → KQL DB + Lakehouse Bronze
-- **KQL Database**: Hot-path tables, ingestion mappings, materialized views
-- **Querysets**: Curated KQL queries for dashboards and investigations
-- **Real-Time Rules**: Alerts/actions for stockouts, reorders, dwell breaches
-- **Dashboards**: Real-time operational views over KQL + historical overlays
-- **Lakehouse**: Bronze/Silver/Gold medallion layers and transforms
-- **Pipelines**: Orchestration for medallion and maintenance
-- **Notebooks**: Transformations, ML, and exploratory analysis
-- **Semantic Model**: Power BI model (hybrid KQL + Lakehouse)
-
-## Getting Started
-
-### Current Prerequisites
-- Python 3.9+
-- Azure subscription (for Event Hubs integration - optional)
-
-### Future Prerequisites
-- Microsoft Fabric workspace (required once Fabric artifacts are complete)
-
-### Installation
-
-```bash
-# Clone the repository
+```powershell
 git clone https://github.com/amattas/retail-demo.git
-cd retail-demo
+Set-Location retail-demo
 
-# Set up the data generator
-cd datagen
-pip install -e .
-
-# Configure your environment (from datagen directory)
-cp .env.example .env
-# Edit .env with your Azure credentials (Event Hub connection string, etc.)
-
-# Optional: local docs preview (requires Node.js 24+)
-# cd website && npm install && npm start
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .\utility
 ```
 
-### Running the Data Generator
+For automated deployment, also install the deployment helpers:
 
-**Note**: The data generator is still in development. The examples below show the planned API usage.
-
-```bash
-# Start the FastAPI server (when available)
-uvicorn retail_datagen.main:app --reload
-
-# Generate sample data via API
-curl -X POST http://localhost:8000/api/generate/transactions \
-  -H "Content-Type: application/json" \
-  -d '{"count": 1000, "brand": "TechStyle"}'
-
-# Start real-time streaming
-curl -X POST http://localhost:8000/api/streaming/start \
-  -H "Content-Type: application/json" \
-  -d '{"stream_type": "transactions", "rate": 100}'
+```powershell
+python -m pip install azure-identity fabric-cicd
 ```
 
-## Project Structure
+### 2. Configure the target workspace and data generation
 
-```
-retail-demo/
-├── datagen/                    # Data generation engine
-│   ├── src/retail_datagen/
-│   │   ├── api/               # FastAPI endpoints
-│   │   ├── generators/        # Data generation logic
-│   │   ├── streaming/         # Event Hub integration
-│   │   ├── config/            # Configuration management
-│   │   └── shared/            # Shared utilities
-│   └── tests/                 # Comprehensive test suite
-└── fabric/                    # Fabric artifacts and specs
-    ├── eventstream/           # Eventstream definitions and mappings
-    ├── kql_database/          # KQL DB tables, policies, views
-    ├── querysets/             # Curated KQL queries
-    ├── rules/                 # Real-time alerts/actions
-    ├── dashboards/            # Real-time dashboards
-    ├── lakehouse/             # Medallion structures and transforms
-    ├── pipelines/             # Orchestration and maintenance
-    ├── notebooks/             # Transform and analysis notebooks
-    └── powerbi/               # Power BI hybrid model
+Interactive:
+
+```powershell
+retail-setup configure
 ```
 
-## Development Status
+Non-interactive example:
 
-### ✅ PHASE 1: COMPLETE (Oct 2024)
+```powershell
+retail-setup configure `
+  --env dev `
+  --tenant-id 00000000-0000-0000-0000-000000000000 `
+  --workspace-name retail-demo-dev `
+  --capacity-name F64 `
+  --lakehouse-name retail_lakehouse `
+  --eventhouse-name retail_eventhouse `
+  --kql-database-name retail_kql `
+  --store-type supercenter `
+  --start-date 2025-01-01 `
+  --end-date 2025-03-31 `
+  --store-count 50 `
+  --seed 42
+```
 
-**Data Generator** (datagen/):
-- ✅ Master data generation (stores, customers, products, DCs, trucks)
-- ✅ Historical fact generation (9 fact tables with temporal patterns)
-- ✅ Real-time streaming to Azure Event Hubs (15+ event types)
-- ✅ Online orders integration (historical + streaming lifecycle)
-- ✅ FastAPI web interface with progress tracking
-- ✅ Marketing attribution and customer session orchestration
-- ✅ Supply chain simulation (DC → Truck → Store flows)
+This updates:
 
-**Project Scaffolding**:
-- ✅ Fabric asset folders with build specs (`fabric/*`)
-- ✅ Docusaurus documentation site (`website/`)
-- ✅ Data contracts and schemas defined
+- `deploy\config\deploy.yml`
+- `deploy\config\environments\dev.yml`
+- `utility\config.yaml`
 
-### 📋 PHASE 2-5: PLANNED (Dec 2024 - Apr 2025)
+`utility\config.yaml` is intentionally ignored by Git because it contains local
+environment choices.
 
-See [website/docs/roadmap.md](website/docs/roadmap.md) for detailed timeline.
+### 3. Render the setup notebooks
 
-**Next Up** (Phase 2 - Target: Dec 2024):
-- Eventstream → KQL database + Lakehouse Bronze wiring
-- KQL table definitions and ingestion mappings
-- End-to-end data flow validation
+```powershell
+retail-setup render --env dev
+```
 
-**Future Phases**:
-- Phase 3 (Jan 2025): Real-Time Dashboards, Querysets, Materialized Views
-- Phase 4 (Feb 2025): Lakehouse Silver/Gold medallion, Semantic Model, Copilot enablement
-- Phase 5 (Mar-Apr 2025): Real-time alerts/actions, AI models, CPG supplier portal
+This writes rendered setup notebooks to `utility\out\`:
 
-## Use Cases by Industry Segment (Planned)
+- `setup-01-seed-dictionaries.ipynb`
+- `setup-02-generate-dimensions.ipynb`
+- `setup-03-generate-facts.ipynb`
+- `setup-04-build-gold.ipynb`
 
-Once complete, the demo will support industry-specific scenarios:
+### 4. Deploy or import the artifacts
 
-### Fashion & Apparel
-- Real-time trend detection from social media and sales data
-- Dynamic markdown optimization based on inventory velocity
-- Size and style recommendation engines
+Manual path:
 
-### Grocery & Food Retail
-- Fresh product lifecycle management
-- Real-time demand sensing for perishables
-- Dynamic delivery route optimization
+1. Create or open the Fabric workspace.
+2. Create the target Lakehouse using the same name passed to
+   `--lakehouse-name`.
+3. Import the rendered notebooks from `utility\out\`.
+4. Attach each notebook to the target Lakehouse.
 
-### Electronics & Technology
-- Product launch monitoring and inventory allocation
-- Warranty and support trend analysis
-- Competitive pricing intelligence
+Automated path:
 
-### Omni-Channel Retail
-- Unified commerce analytics across all touchpoints
-- Real-time cart abandonment intervention
-- Cross-channel attribution and customer journey mapping
+```powershell
+retail-setup deploy --env dev --dry-run
+retail-setup deploy --env dev --yes
+```
 
-## Contributing
+`retail-setup deploy` renders the deployment plan, runs Terraform unless
+`--skip-terraform` is used, stages Fabric item folders, deploys supported items
+with `fabric-cicd`, and writes a combined KQL database script to
+`deploy\.generated\dev\database.kql`.
 
-This is a demonstration project currently in active development. Contributions, suggestions, and feedback are welcome!
+The KQL script is not executed automatically. Open the generated script and run
+it in the target Fabric KQL database after the Eventhouse/KQL database exists.
 
-## License
+### 5. Run the setup notebooks in Fabric
 
-[Specify your license here]
+Run these notebooks in order:
 
-## Resources
+1. `setup-01-seed-dictionaries` seeds dictionary JSON under
+   `Files/setup/dictionaries`.
+2. `setup-02-generate-dimensions` writes dimension tables and `dim_date`.
+3. `setup-03-generate-facts` writes the full Silver data contract and
+   `setup_run_log`.
+4. `setup-04-build-gold` builds the 9 Gold aggregate tables from persisted
+   Silver facts.
 
-- [Microsoft Fabric Documentation](https://learn.microsoft.com/fabric/)
-- [Real-Time Intelligence Overview](https://learn.microsoft.com/fabric/real-time-intelligence/)
-- [KQL Query Language Reference](https://learn.microsoft.com/azure/data-explorer/kusto/query/)
-- [Eventstreams Documentation](https://learn.microsoft.com/fabric/real-time-intelligence/event-streams/)
-- [Docusaurus](https://docusaurus.io/)
+Expected Lakehouse output:
 
-## Contact
+- Silver schema `ag`: `dim_geographies`, `dim_stores`,
+  `dim_distribution_centers`, `dim_trucks`, `dim_customers`, `dim_products`,
+  `dim_date`, 18 `fact_*` tables, and `setup_run_log`.
+- Gold schema `au`: `sales_minute_store`, `top_products_15m`,
+  `inventory_position_current`, `dc_inventory_position_current`,
+  `truck_dwell_daily`, `online_sales_daily`, `zone_dwell_minute`,
+  `marketing_cost_daily`, and `tender_mix_daily`.
 
-For questions or feedback about this demo, please [open an issue](../../issues) or contact the project maintainer.
+### 6. Optional live event generation
 
----
+`setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it is
+not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
+Import it manually if you want a live stream driver.
 
-**Note**: This project is in early development. Both the data generator and Microsoft Fabric Real-Time Intelligence artifacts are actively being built. This demonstration project is designed to showcase Microsoft Fabric Real-Time Intelligence capabilities. All generated data is synthetic and for illustrative purposes only.
+The notebook can write to:
+
+- a Fabric Eventstream Custom Endpoint (`sink = "eventstream"`), or
+- a Delta landing table (`sink = "delta"`) for smoke testing.
+
+Set its parameters in Fabric before running: `source_rows_per_second`, `sink`,
+`run_seconds`, and Eventstream connection settings.
+
+## Project structure
+
+```text
+retail-demo\
+├── utility\              # Current Fabric-native setup utility and notebooks
+├── deploy\               # Terraform/fabric-cicd deployment framework
+├── fabric\               # Fabric source assets, KQL, Lakehouse, Power BI
+├── datagen-deprecated\   # Legacy FastAPI/DuckDB/Event Hub generator
+└── scripts\              # Supporting scripts for semantic model/local state
+```
+
+## More documentation
+
+- `utility\README.md` — detailed setup utility usage.
+- `deploy\README.md` — deployment framework details.
+- `fabric\lakehouse\README.md` — Lakehouse notebook groups and outputs.
+- `fabric\kql_database\README.md` — KQL database scripts and expected event
+  tables.
+
+All generated data is synthetic and for demo purposes only.

@@ -1,16 +1,29 @@
 # Pipelines
 
-Data Pipelines orchestrating medallion flows and scheduled processing.
+This folder documents Fabric pipeline orchestration for the retail demo.
 
-See [Pipeline Documentation](../../docs/fabric/pipelines.md) for complete configuration details.
+Pipelines are not currently created automatically by `retail-setup deploy`.
+Create them manually in Fabric if you want scheduled notebook execution.
 
-## Quick Reference
+## Recommended setup sequence
 
-| Pipeline | Schedule | Notebook |
-|----------|----------|----------|
-| `pl_historical_load` | Once (manual) | `02-historical-data-load` |
-| `pl_streaming_silver` | Every 5 min | `03-streaming-to-silver` |
-| `pl_streaming_gold` | Every 15 min | `04-streaming-to-gold` |
-| `pl_maintenance` | Daily 3 AM UTC | `05-maintain-delta-tables` |
+For a clean workspace, run the rendered setup notebooks manually first:
 
-Pipelines must be created manually in Microsoft Fabric - see documentation for step-by-step instructions.
+| Order | Notebook | Purpose |
+| --- | --- | --- |
+| 1 | `setup-01-seed-dictionaries` | Seed dictionary JSON under `Files/setup/dictionaries`. |
+| 2 | `setup-02-generate-dimensions` | Generate dimension tables and `dim_date`. |
+| 3 | `setup-03-generate-facts` | Generate the Silver fact tables and `setup_run_log`. |
+| 4 | `setup-04-build-gold` | Build the Gold aggregate tables. |
+
+## Optional pipeline ideas
+
+| Pipeline | Suggested trigger | Notebook |
+| --- | --- | --- |
+| Historical setup | Manual/on demand | Setup notebooks 01-04 in order |
+| Streaming to Silver | Every 5 minutes | `03-streaming-to-silver` |
+| Streaming to Gold | Every 15 minutes | `04-streaming-to-gold` |
+| Maintenance | Daily | `05-maintain-delta-tables` |
+
+Use Fabric pipeline parameters to pass the same Lakehouse/schema values used by
+`retail-setup configure`.
