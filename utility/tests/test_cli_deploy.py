@@ -17,7 +17,7 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert calls == []
     out = result.output
     assert "generate_configs" in out and "terraform" in out
-    assert "build_artifacts" in out and "core setup" in out.replace("'", "")
+    assert "build_artifacts" in out and "core setup ml" in out.replace("'", "")
     assert "deploy_items" in out and "apply_kql" in out and "validate_deployment" in out
 
 
