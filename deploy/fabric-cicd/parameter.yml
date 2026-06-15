@@ -4,11 +4,62 @@ find_replace:
     dev: https://onelake.dfs.fabric.microsoft.com/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002
   is_regex: 'true'
   item_type: SemanticModel
-  file_path: definition/expressions.tmdl
 - find_value: DirectLake - retail_lakehouse
   replace_value:
     dev: DirectLake - retail_lakehouse
   item_type: SemanticModel
+- find_value: 16aa0e09-f7c3-436b-8bb2-4250fabc65d0
+  replace_value:
+    dev: $items.Notebook.05-maintain-delta-tables.$id
+  item_type: DataPipeline
+- find_value: 90009e22-24ab-4750-b2f6-b72cf6db2741
+  replace_value:
+    dev: $items.Notebook.02-historical-data-load.$id
+  item_type: DataPipeline
+- find_value: 875f69ea-f370-4702-b5f0-efc73e0a2ae0
+  replace_value:
+    dev: $items.Notebook.09-ml-churn-prediction.$id
+  item_type: DataPipeline
+- find_value: 13c32a9a-70f8-4638-97a2-54f4ddf49d05
+  replace_value:
+    dev: $items.Notebook.06-ml-demand-forecast.$id
+  item_type: DataPipeline
+- find_value: e1aaa8df-b835-4f32-8240-f75d0d1889db
+  replace_value:
+    dev: $items.Notebook.07-ml-market-basket.$id
+  item_type: DataPipeline
+- find_value: 22cf947e-4e21-4f59-b653-fc2b316d4b27
+  replace_value:
+    dev: $items.Notebook.08-ml-customer-segmentation.$id
+  item_type: DataPipeline
+- find_value: 20a387e3-668a-4ff0-a072-b33ab29a0b79
+  replace_value:
+    dev: $items.Notebook.10-ml-promotion-effectiveness.$id
+  item_type: DataPipeline
+- find_value: 09fc05bb-ef5f-45d3-85bf-de3b096c425b
+  replace_value:
+    dev: $items.Notebook.11-ml-journey-analysis.$id
+  item_type: DataPipeline
+- find_value: 72ac6599-7069-4679-8670-c0d74cb3ec6d
+  replace_value:
+    dev: $items.Notebook.13-ml-delivery-prediction.$id
+  item_type: DataPipeline
+- find_value: e5f45d40-53c2-4a12-a9b5-c303f8c7347d
+  replace_value:
+    dev: $items.Notebook.12-ml-stockout-prediction.$id
+  item_type: DataPipeline
+- find_value: fdef9c48-5c00-4edc-a9ca-fcf26f8b5be4
+  replace_value:
+    dev: $items.Notebook.14-ml-dynamic-pricing.$id
+  item_type: DataPipeline
+- find_value: 42c685c9-6bea-45f5-872b-7cc1353961e3
+  replace_value:
+    dev: $items.Notebook.03-streaming-to-silver.$id
+  item_type: DataPipeline
+- find_value: 8b187f3d-b32f-4d15-ae0a-f20c518e29ec
+  replace_value:
+    dev: $items.Notebook.04-streaming-to-gold.$id
+  item_type: DataPipeline
 - find_value: FABRIC_KQL_DATABASE_RESOURCE_ID
   replace_value:
     dev: 00000000-0000-0000-0000-000000000003
@@ -19,8 +70,4 @@ key_value_replace:
 - find_key: $.properties.activities[*].typeProperties.workspaceId
   replace_value:
     dev: $workspace.$id
-  item_type: DataPipeline
-- find_key: $.properties.activities[*].typeProperties.notebookId
-  replace_value:
-    dev: $items.Notebook.02-historical-data-load.$id
   item_type: DataPipeline

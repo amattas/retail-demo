@@ -1,0 +1,68 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
+  "artifactId": "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd",
+  "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471",
+  "dataSourceInstructions": null,
+  "displayName": "retail_ontology",
+  "type": "ontology",
+  "userDescription": null,
+  "metadata": {},
+  "elements": [
+    {
+      "id": "Geography",
+      "is_selected": true,
+      "display_name": "Geography",
+      "type": "ontology.entity",
+      "description": "id,city,state,zip_code,district,region",
+      "children": []
+    },
+    {
+      "id": "Store",
+      "is_selected": true,
+      "display_name": "Store",
+      "type": "ontology.entity",
+      "description": "id,store_number,address,geography_id,tax_rate,volume_class,store_format,operating_hours,daily_traffic_multiplier",
+      "children": []
+    },
+    {
+      "id": "DistributionCenter",
+      "is_selected": true,
+      "display_name": "DistributionCenter",
+      "type": "ontology.entity",
+      "description": "id,dc_number,address,geography_id",
+      "children": []
+    },
+    {
+      "id": "Truck",
+      "is_selected": true,
+      "display_name": "Truck",
+      "type": "ontology.entity",
+      "description": "id,license_plate,refrigeration,dcid",
+      "children": []
+    },
+    {
+      "id": "Customer",
+      "is_selected": true,
+      "display_name": "Customer",
+      "type": "ontology.entity",
+      "description": "id,first_name,last_name,address,geography_id,loyalty_card,phone,ble_id,ad_id",
+      "children": []
+    },
+    {
+      "id": "Product",
+      "is_selected": true,
+      "display_name": "Product",
+      "type": "ontology.entity",
+      "description": "id,product_name,brand,company,department,category,subcategory,cost,msrp,sale_price,requires_refrigeration,taxability,tags",
+      "children": []
+    },
+    {
+      "id": "Receipt",
+      "is_selected": true,
+      "display_name": "Receipt",
+      "type": "ontology.entity",
+      "description": "customer_id,store_id,tax_cents,total_cents,payment_method,subtotal_cents,receipt_id_ext,total_amount,tax_amount,receipt_type,discount_amount,subtotal",
+      "children": []
+    }
+  ]
+}

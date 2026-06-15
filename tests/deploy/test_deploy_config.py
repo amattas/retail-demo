@@ -23,6 +23,8 @@ def test_load_environment_merges_defaults_and_environment() -> None:
         "Notebook",
         "SemanticModel",
         "Report",
+        "KQLQueryset",
+        "DataPipeline",
     ]
 
 
@@ -73,11 +75,53 @@ def test_render_parameter_file_uses_dynamic_item_references() -> None:
         "replace_value": {"dev": "$workspace.$id"},
         "item_type": "DataPipeline",
     } in rendered["key_value_replace"]
-    assert {
-        "find_key": "$.properties.activities[*].typeProperties.notebookId",
-        "replace_value": {"dev": "$items.Notebook.02-historical-data-load.$id"},
-        "item_type": "DataPipeline",
-    } in rendered["key_value_replace"]
+    # The single hardcoded notebookId key_value_replace was replaced by one
+    # find_replace per pipeline notebook, generated from fabric/pipelines.
+    assert not any(
+        "notebookId" in entry.get("find_key", "")
+        for entry in rendered["key_value_replace"]
+    )
+    notebook_replacements = {
+        entry["replace_value"]["dev"]
+        for entry in rendered["find_replace"]
+        if isinstance(entry["replace_value"].get("dev"), str)
+        and entry["replace_value"]["dev"].startswith("$items.Notebook.")
+    }
+    assert "$items.Notebook.02-historical-data-load.$id" in notebook_replacements
+
+
+def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> None:
+    item = tmp_path / "fabric" / "pipelines" / "streaming-data-load.DataPipeline"
+    item.mkdir(parents=True)
+    (item / "pipeline-content.json").write_text(
+        json.dumps(
+            {
+                "properties": {
+                    "activities": [
+                        {
+                            "name": "03-streaming-to-silver",
+                            "type": "TridentNotebook",
+                            "typeProperties": {"notebookId": "guid-silver"},
+                        },
+                        {
+                            "name": "04-streaming-to-gold",
+                            "type": "TridentNotebook",
+                            "typeProperties": {"notebookId": "guid-gold"},
+                        },
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    refs = deploy_config.collect_pipeline_notebook_refs(tmp_path)
+
+    assert refs == {
+        "guid-silver": "03-streaming-to-silver",
+        "guid-gold": "04-streaming-to-gold",
+    }
+
 
 
 def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:

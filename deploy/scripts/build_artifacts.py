@@ -15,6 +15,17 @@ PLATFORM_SCHEMA = (
     "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/"
     "platformProperties/2.0.0/schema.json"
 )
+
+# Workspace folder names used to organize published items. fabric-cicd maps the
+# staged directory structure to Fabric workspace folders, so staging an item
+# under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
+# Demo/pipeline notebooks go under "Notebooks"; one-time setup notebooks (and
+# other setup artifacts) go under "Setup". The Lakehouse shell and KQLQueryset
+# stay at the workspace root.
+NOTEBOOKS_FOLDER = "Notebooks"
+SETUP_FOLDER = "Setup"
+POWERBI_FOLDER = "Power BI"
+PIPELINES_FOLDER = "Pipelines"
 NOTEBOOK_GROUPS = {
     "core": [
         "01-create-bronze-shortcuts.ipynb",
@@ -149,11 +160,139 @@ def stage_setup_notebooks(
     return staged
 
 
+def stage_querysets(
+    repo_root: Path,
+    output_dir: Path,
+    kql_database_name: str = "retail_kql",
+    display_name: str = "retail_querysets",
+) -> list[Path]:
+    """Stage `fabric/querysets/*.kql` as one Fabric `.KQLQueryset` item.
+
+    Every `.kql` file becomes a tab in a single queryset bound to the Eventhouse
+    KQL database. The data source `clusterUri` is left empty so fabric-cicd fills
+    it from the deployed KQL database (matched by `databaseItemName`), while
+    `databaseItemId` carries the `FABRIC_KQL_DATABASE_RESOURCE_ID` placeholder
+    that `parameter.yml` replaces with the Terraform-provisioned KQL database id.
+
+    Returns an empty list when no queryset sources exist so the deploy degrades
+    gracefully.
+    """
+
+    source_dir = repo_root / "fabric" / "querysets"
+    if not source_dir.is_dir():
+        return []
+    kql_files = sorted(source_dir.glob("*.kql"), key=lambda path: path.name)
+    if not kql_files:
+        return []
+
+    item_dir = output_dir / f"{display_name}.KQLQueryset"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    _write_platform(item_dir, "KQLQueryset", display_name)
+
+    data_source_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"retail-demo:KQLQueryset:{display_name}:datasource",
+        )
+    )
+    tabs = [
+        {
+            "id": str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    f"retail-demo:KQLQueryset:{display_name}:tab:{kql_file.stem}",
+                )
+            ),
+            "content": kql_file.read_text(encoding="utf-8"),
+            "title": kql_file.stem,
+            "dataSourceId": data_source_id,
+        }
+        for kql_file in kql_files
+    ]
+
+    queryset = {
+        "queryset": {
+            "version": "1.0.0",
+            "dataSources": [
+                {
+                    "id": data_source_id,
+                    "clusterUri": "",
+                    "type": "Fabric",
+                    "databaseItemId": "FABRIC_KQL_DATABASE_RESOURCE_ID",
+                    "databaseItemName": kql_database_name,
+                }
+            ],
+            "tabs": tabs,
+        }
+    }
+    (item_dir / "RealTimeQueryset.json").write_text(
+        json.dumps(queryset, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return [item_dir]
+
+
+def stage_pipelines(
+    repo_root: Path,
+    output_dir: Path,
+    deployed_notebooks: set[str],
+) -> list[Path]:
+    """Stage ``fabric/pipelines/*.DataPipeline`` items into the workspace output.
+
+    A pipeline is staged only when every notebook it orchestrates is present in
+    ``deployed_notebooks`` (the notebooks selected for this deploy). Pipelines
+    that reference notebooks outside the selected groups are skipped so their
+    ``$items.Notebook.<name>.$id`` references always resolve at publish time.
+    Returns an empty list when no pipeline sources exist.
+    """
+
+    source_dir = repo_root / "fabric" / "pipelines"
+    if not source_dir.is_dir():
+        return []
+    staged: list[Path] = []
+    for item_dir in sorted(source_dir.glob("*.DataPipeline"), key=lambda path: path.name):
+        content_path = item_dir / "pipeline-content.json"
+        if not content_path.is_file():
+            continue
+        refs = _pipeline_notebook_refs(
+            json.loads(content_path.read_text(encoding="utf-8"))
+        )
+        if not refs.issubset(deployed_notebooks):
+            continue
+        destination = output_dir / item_dir.name
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(item_dir, destination)
+        staged.append(destination)
+    return staged
+
+
+def _pipeline_notebook_refs(pipeline_content: dict) -> set[str]:
+    """Notebook display names a pipeline orchestrates (``TridentNotebook`` activities)."""
+
+    refs: set[str] = set()
+    activities = pipeline_content.get("properties", {}).get("activities", [])
+    for activity in activities:
+        if activity.get("type") == "TridentNotebook" and activity.get("name"):
+            refs.add(str(activity["name"]))
+    return refs
+
+
+def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
+    """Display names (file stems) of notebooks staged for the given groups."""
+
+    names = {Path(name).stem for name in _selected_notebooks(notebook_groups)}
+    if "setup" in notebook_groups:
+        names.update(SETUP_NOTEBOOKS)
+    return names
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     notebook_groups: list[str] | None = None,
     lakehouse_name: str = "retail_lakehouse",
+    kql_database_name: str = "retail_kql",
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -172,24 +311,52 @@ def build_workspace(
     # Terraform already owns them.
     staged_items.append(stage_shell_item(output_dir, "retail_lakehouse", "Lakehouse").name)
 
+    # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
+    notebooks_dir = output_dir / NOTEBOOKS_FOLDER
     for notebook_name in _selected_notebooks(notebook_groups):
         staged_items.append(
             stage_notebook(
                 repo_root / "fabric" / "lakehouse" / notebook_name,
-                output_dir,
+                notebooks_dir,
                 lakehouse_name=lakehouse_name,
             ).name
         )
 
+    # One-time setup notebooks publish into a separate "Setup" workspace folder.
     if "setup" in notebook_groups:
         staged_items.extend(
             item.name
-            for item in stage_setup_notebooks(repo_root, output_dir, lakehouse_name=lakehouse_name)
+            for item in stage_setup_notebooks(
+                repo_root, output_dir / SETUP_FOLDER, lakehouse_name=lakehouse_name
+            )
         )
 
+    # Power BI items publish into a "Power BI" workspace folder.
     staged_items.extend(
         item.name
-        for item in stage_powerbi_items(repo_root / "fabric" / "powerbi", output_dir)
+        for item in stage_powerbi_items(
+            repo_root / "fabric" / "powerbi", output_dir / POWERBI_FOLDER
+        )
+    )
+    # Curated KQL queries (fabric/querysets/*.kql) ship as a single
+    # .KQLQueryset item bound to the Eventhouse KQL database. Skipped silently
+    # when no queryset sources exist.
+    staged_items.extend(
+        item.name
+        for item in stage_querysets(
+            repo_root, output_dir, kql_database_name=kql_database_name
+        )
+    )
+    # Data Pipelines publish into a "Pipelines" workspace folder, but only when
+    # every notebook they orchestrate is part of this deploy (so the pipeline's
+    # $items.Notebook.<name>.$id references resolve).
+    staged_items.extend(
+        item.name
+        for item in stage_pipelines(
+            repo_root,
+            output_dir / PIPELINES_FOLDER,
+            _deployed_notebook_names(notebook_groups),
+        )
     )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
@@ -252,10 +419,15 @@ def main() -> int:
         choices=sorted(NOTEBOOK_GROUPS),
     )
     parser.add_argument("--lakehouse-name", default="retail_lakehouse")
+    parser.add_argument("--kql-database-name", default="retail_kql")
     args = parser.parse_args()
 
     result = build_workspace(
-        args.repo_root, args.output_dir, args.notebook_groups, args.lakehouse_name
+        args.repo_root,
+        args.output_dir,
+        args.notebook_groups,
+        args.lakehouse_name,
+        args.kql_database_name,
     )
     print(f"Staged {len(result.staged_items)} items in {result.output_dir}")
     for item in result.staged_items:

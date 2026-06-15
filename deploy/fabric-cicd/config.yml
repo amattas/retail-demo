@@ -4,11 +4,11 @@ core:
   repository_directory: ../workspace
   item_types_in_scope:
   - Lakehouse
-  - Eventhouse
-  - KQLDatabase
   - Notebook
   - SemanticModel
   - Report
+  - KQLQueryset
+  - DataPipeline
   parameter: parameter.yml
 publish:
   skip:

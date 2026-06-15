@@ -88,11 +88,19 @@ After the Eventhouse and KQL database exist:
 
 ## Configuration notes
 
+- Published items are organized into Fabric workspace folders: demo/pipeline
+  notebooks under **Notebooks**, one-time setup notebooks under **Setup**, the
+  semantic model and report under **Power BI**, and Data Pipelines under
+  **Pipelines**. The Lakehouse and queryset stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
 - Eventstream deployment is disabled by default because Fabric source-control
   item definitions for Eventstream are not yet part of this framework.
-- Pipeline, dashboard, and queryset assets remain source inputs until their
-  Fabric source-control item formats are validated.
+- Curated KQL queries in `fabric\querysets\*.kql` deploy as a single
+  `retail_querysets.KQLQueryset` item (one tab per `.kql` file) bound to the
+  Eventhouse KQL database. `clusterUri` is resolved by fabric-cicd at publish
+  time and `databaseItemId` is rewritten from the Terraform KQL database id.
+- Pipeline and dashboard assets remain source inputs until their Fabric
+  source-control item formats are validated.
 - Secrets must come from Azure login, GitHub Actions secrets, environment
   variables, Key Vault, or ignored local files. Do not commit secrets to YAML,
   Terraform files, notebooks, or generated artifacts.
