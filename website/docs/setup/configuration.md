@@ -7,6 +7,11 @@ The current setup path stores configuration in two places:
 
 Run `retail-setup configure` to update both.
 
+The `--env` flag names the deployment environment. For example, `--env dev`
+uses `deploy/config/environments/dev.yml` and writes generated deployment
+artifacts under `deploy/.generated/dev/`. Use separate environment names for
+separate workspace targets.
+
 ## Deployment settings
 
 `retail-setup configure` updates:

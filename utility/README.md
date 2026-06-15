@@ -9,7 +9,7 @@ legacy reference only.
 
 ## Supported workflow
 
-1. Install the utility.
+1. Run the guided setup script, or install the utility manually.
 2. Run `retail-setup configure` to write deployment and generation settings.
 3. Run `retail-setup render` to produce workspace-specific setup notebooks.
 4. Import notebooks manually, or run `retail-setup deploy`.
@@ -33,7 +33,38 @@ Required only for `retail-setup deploy`:
 Fabric provides Spark for the notebooks. Local PySpark is only needed for
 development tests.
 
-## Install
+## Guided setup
+
+From the repository root:
+
+```powershell
+python .\scripts\setup.py
+```
+
+The guided setup script:
+
+1. Detects Windows, macOS, or Linux.
+2. Offers to install missing CLI prerequisites with the OS package manager
+   (`winget`/Chocolatey, Homebrew, `apt-get`, `dnf`, or `yum`).
+3. Uses conda when available and accepted; otherwise creates `.venv`.
+4. Installs Python dependencies.
+5. Runs `retail-setup configure`.
+6. Runs `retail-setup render`.
+7. Asks whether to run `retail-setup deploy`.
+
+Examples:
+
+```powershell
+python .\scripts\setup.py --env dev
+python .\scripts\setup.py --env dev --deploy
+python .\scripts\setup.py --env dev --dry-run
+```
+
+`--env` selects `deploy\config\environments\<env>.yml` and generated outputs
+under `deploy\.generated\<env>\`. Use separate environment names for separate
+workspace targets, such as `dev`, `test`, or `prod`.
+
+## Manual install
 
 From the repository root:
 

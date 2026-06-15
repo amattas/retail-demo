@@ -4,14 +4,34 @@ The current data-generation path runs inside Fabric Spark through rendered setup
 notebooks. You do not need to run the deprecated local FastAPI data generator for
 a new workspace.
 
-## Step 1.1: Install `retail-setup`
+## Step 1.1: Run guided setup
 
 From PowerShell:
 
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
+python .\scripts\setup.py
+```
 
+The guided setup detects your OS, offers to install missing prerequisites,
+sets up Python with conda or venv, installs dependencies, runs configure,
+renders notebooks, and asks whether to deploy.
+
+`--env` selects `deploy/config/environments/<env>.yml` and writes generated
+deployment files under `deploy/.generated/<env>/`.
+
+```powershell
+python .\scripts\setup.py --env dev
+python .\scripts\setup.py --env dev --deploy
+python .\scripts\setup.py --env dev --dry-run
+```
+
+## Step 1.2: Manual install path
+
+Use this path if you prefer to run each command yourself.
+
+```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -24,7 +44,7 @@ For automated deployment, also install:
 python -m pip install azure-identity fabric-cicd
 ```
 
-## Step 1.2: Configure workspace and generation settings
+## Step 1.3: Configure workspace and generation settings
 
 Interactive:
 
@@ -61,7 +81,7 @@ This writes:
 
 `utility/config.yaml` is ignored by Git.
 
-## Step 1.3: Render notebooks
+## Step 1.4: Render notebooks
 
 ```powershell
 retail-setup render --env dev
@@ -74,7 +94,7 @@ Rendered notebooks are written to `utility/out/`:
 - `setup-03-generate-facts.ipynb`
 - `setup-04-build-gold.ipynb`
 
-## Step 1.4: Choose deployment path
+## Step 1.5: Choose deployment path
 
 Manual import:
 

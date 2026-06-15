@@ -2,6 +2,28 @@
 
 Utility scripts for configuring and deploying the retail demo components.
 
+## setup.py
+
+Guided cross-platform setup for a new Fabric workspace.
+
+### Purpose
+
+`setup.py` is the single entry point for local setup. It detects the operating
+system, offers to install missing CLI prerequisites with the OS package manager,
+sets up Python with conda or venv, installs Python dependencies, runs
+`retail-setup configure`, renders notebooks, and asks whether to deploy.
+
+### Usage
+
+```powershell
+python scripts\setup.py
+python scripts\setup.py --env dev --dry-run
+python scripts\setup.py --env dev --deploy
+```
+
+`--env` selects `deploy\config\environments\<env>.yml` and scopes generated
+deployment output under `deploy\.generated\<env>\`.
+
 ## configure_semantic_model.py
 
 Configures the Power BI semantic model to connect to your Fabric lakehouse.

@@ -43,14 +43,38 @@ only needed for utility development/tests.
 
 Run these commands from PowerShell unless noted otherwise.
 
-### 1. Clone and install the setup utility
+### 1. Clone and run the guided setup
 
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
+python .\scripts\setup.py
+```
 
+The guided setup detects Windows, macOS, or Linux; offers to install missing
+CLI prerequisites with the OS package manager; asks whether to use conda when it
+is available; falls back to `.venv`; installs Python dependencies; runs
+`retail-setup configure`; renders notebooks; and finally asks whether to deploy.
+
+Use `--env` to select the deployment environment file under
+`deploy\config\environments\`. For example, `--env dev` uses
+`deploy\config\environments\dev.yml` and writes generated deployment files under
+`deploy\.generated\dev\`.
+
+```powershell
+python .\scripts\setup.py --env dev
+python .\scripts\setup.py --env dev --deploy
+python .\scripts\setup.py --env dev --dry-run
+```
+
+### 2. Manual install path
+
+Use this path if you prefer to run each step yourself.
+
+```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
 python -m pip install --upgrade pip
 python -m pip install -e .\utility
 ```
@@ -61,7 +85,7 @@ For automated deployment, also install the deployment helpers:
 python -m pip install azure-identity fabric-cicd
 ```
 
-### 2. Configure the target workspace and data generation
+### 3. Configure the target workspace and data generation
 
 Interactive:
 
@@ -99,7 +123,7 @@ This updates:
 `utility\config.yaml` is intentionally ignored by Git because it contains local
 environment choices.
 
-### 3. Render the setup notebooks
+### 4. Render the setup notebooks
 
 ```powershell
 retail-setup render --env dev
@@ -112,7 +136,7 @@ This writes rendered setup notebooks to `utility\out\`:
 - `setup-03-generate-facts.ipynb`
 - `setup-04-build-gold.ipynb`
 
-### 4. Deploy or import the artifacts
+### 5. Deploy or import the artifacts
 
 Manual path:
 
@@ -137,7 +161,7 @@ with `fabric-cicd`, and writes a combined KQL database script to
 The KQL script is not executed automatically. Open the generated script and run
 it in the target Fabric KQL database after the Eventhouse/KQL database exists.
 
-### 5. Run the setup notebooks in Fabric
+### 6. Run the setup notebooks in Fabric
 
 Run these notebooks in order:
 
@@ -159,7 +183,7 @@ Expected Lakehouse output:
   `truck_dwell_daily`, `online_sales_daily`, `zone_dwell_minute`,
   `marketing_cost_daily`, and `tender_mix_daily`.
 
-### 6. Optional live event generation
+### 7. Optional live event generation
 
 `setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it is
 not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
