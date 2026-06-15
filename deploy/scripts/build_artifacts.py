@@ -253,7 +253,7 @@ def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict
             {
                 "cell_type": "markdown",
                 "metadata": {},
-                "source": (
+                "source": _source_lines(
                     "# Apply KQL setup scripts\n\n"
                     "Applies the Eventhouse KQL setup (tables, ingestion mappings, "
                     "functions, materialized views) with Kqlmagic. Generated from "
@@ -274,13 +274,23 @@ def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict
     }
 
 
+def _source_lines(source: str) -> list[str]:
+    """Split notebook cell source into a list of lines.
+
+    Fabric's notebook service requires ``cell.source`` to be a list of strings
+    (not a single string), even though both are valid per the ipynb schema.
+    """
+
+    return source.splitlines(keepends=True) or [""]
+
+
 def _code_cell(source: str) -> dict:
     return {
         "cell_type": "code",
         "execution_count": None,
         "metadata": {},
         "outputs": [],
-        "source": source,
+        "source": _source_lines(source),
     }
 
 
