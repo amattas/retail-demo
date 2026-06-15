@@ -7,6 +7,7 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 
 from __future__ import annotations
 
+import json
 import subprocess
 import shutil
 import sys
@@ -399,6 +400,54 @@ def _lakehouse_name(repo_root: Path, env: str) -> str:
     return str(name)
 
 
+def _workspace_name(repo_root: Path, env: str) -> str:
+    """Resolve the target workspace.name from deploy config (overlay wins)."""
+    base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
+    env_path = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    overlay = yaml.safe_load(env_path.read_text()) or {} if env_path.is_file() else {}
+    name = _get_by_path(overlay, "workspace.name")
+    if name is None:
+        name = _get_by_path(base, "workspace.name")
+    return str(name) if name is not None else f"retail-demo-{env}"
+
+
+def _workspace_exists(repo_root: Path, workspace_name: str) -> bool:
+    """Return True if a Fabric workspace with this display name already exists.
+
+    Best-effort: queries the Fabric REST API via the Azure CLI. Returns False if
+    the CLI is unavailable or the query fails, so detection never blocks a deploy.
+    """
+    az = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if not az:
+        return False
+    try:
+        result = subprocess.run(
+            [
+                az, "rest",
+                "--resource", "https://api.fabric.microsoft.com",
+                "--url", "https://api.fabric.microsoft.com/v1/workspaces",
+                "-o", "json",
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if result.returncode != 0:
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return False
+    return any(
+        str(item.get("displayName", "")) == workspace_name
+        for item in data.get("value", [])
+    )
+
+
 def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
     """Pin the dictionary ref: explicit --ref, else HEAD SHA, else 'main' with a warning."""
     if ref:
@@ -638,7 +687,9 @@ def deploy(
 
     With --recreate, the deployment destroys the existing workspace (and every
     item in it) and recreates it from scratch. This is destructive; use it only
-    for a clean-slate redeploy.
+    for a clean-slate redeploy. If you omit --recreate, an interactive deploy
+    detects an existing workspace and offers to reset it, so the flag is
+    optional.
     """
     repo_root = repo_root.resolve()
     if recreate and skip_terraform:
@@ -660,6 +711,21 @@ def deploy(
     else:
         lakehouse = _lakehouse_name(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
+        # Auto-detect a prior deployment so the user doesn't need to remember
+        # --recreate. If the workspace exists, offer a clean-slate reset.
+        if not recreate and not skip_terraform and not yes:
+            ws_name = _workspace_name(repo_root, env)
+            if _workspace_exists(repo_root, ws_name):
+                typer.echo("")
+                typer.echo(f"Workspace '{ws_name}' already exists from a previous deploy.")
+                if typer.confirm(
+                    "Reset it? This DESTROYS the workspace and ALL items in it, "
+                    "then redeploys from scratch",
+                    default=False,
+                ):
+                    recreate = True
+                else:
+                    typer.echo("Keeping it — updating the existing workspace in place.")
     plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse, recreate=recreate)
     total = len(plan)
 
