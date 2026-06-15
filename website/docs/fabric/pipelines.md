@@ -1,85 +1,90 @@
 # Pipelines
 
-Data Pipelines orchestrating the medallion notebooks and scheduled processing. `fabric/pipelines/` contains **four exported pipeline definitions** (ARM-template JSON plus manifest) that can be re-created in any Fabric workspace.
+Data Pipelines orchestrating the medallion notebooks, setup, and scheduled
+processing. `fabric/pipelines/` contains **Git-integration `.DataPipeline`
+items** (`.platform`, `pipeline-content.json`, and an optional `.schedules`) that
+`retail-setup deploy` publishes directly into the workspace.
 
 ## Pipeline Summary
 
 | Pipeline | Recommended Schedule | Activities |
 |----------|---------------------|------------|
+| `setup-pipeline` | On demand | `00-apply-kql` → `setup-01` → `setup-02` → `setup-03` → `setup-04` |
 | `historical-data-load` | Once (manual) | `02-historical-data-load` |
-| `streaming-data-load` | Every 5 minutes | `03-streaming-to-silver` → `04-streaming-to-gold` (sequential) |
-| `daily-maintenance` | Daily 3 AM UTC | `05-maintain-delta-tables` |
-| `machine-learning` | Daily/weekly (after maintenance) | ML notebooks `06`–`13` in parallel; `14` after `10` |
+| `streaming-data-load` | Cron (every 5 minutes) | `03-streaming-to-silver` → `04-streaming-to-gold` (sequential) |
+| `daily-maintenance` | Daily 00:00 | `05-maintain-delta-tables` |
+| `machine-learning` | Daily/weekly (after maintenance) | ML notebooks `06`–`14` |
 
-All notebook activities are exported with a 12-hour timeout and no retries. Schedules are configured as **triggers in the Fabric portal** — they are not part of the exported JSON.
+Notebook activities use a 12-hour timeout and no retries. Schedules present in
+`.schedules` (cron/daily) deploy with the pipeline; others are configured as
+triggers in the Fabric portal.
 
-## Folder Layout
+## Deployment
 
+`retail-setup deploy` stages each pipeline whose notebooks are part of the
+deploy into a **Pipelines** workspace folder, and adds `DataPipeline` to the
+fabric-cicd scope so they publish automatically. With the default
+`core setup ml` groups, all five pipelines deploy.
+
+Each activity references its notebook by the **source** workspace's
+`notebookId`/`workspaceId`. `deploy/fabric-cicd/parameter.yml` remaps them to the
+target at publish time (generated from the pipeline sources):
+
+- `workspaceId` → `$workspace.$id`
+- each `notebookId` GUID → `$items.Notebook.<activity-name>.$id`
+
+fabric-cicd publishes Notebooks before Data Pipelines, so the references resolve.
+
+After a successful deploy, `retail-setup deploy` offers to **run `setup-pipeline`
+now** (via the Fabric Job Scheduler API) to apply the KQL setup and generate the
+dimensions, facts, and Gold tables.
+
+`setup-pipeline` is authored in this repo; its first step `00-apply-kql` is a
+notebook **generated** from `fabric/kql_database/*.kql` that applies the
+Eventhouse KQL setup with Kqlmagic. The other four pipelines were exported from a
+live workspace with `deploy.scripts.export_pipelines`.
+
+## Re-exporting
+
+Refresh the exported pipelines from a live workspace (reuses your Azure CLI
+login):
+
+```powershell
+python -m deploy.scripts.export_pipelines --workspace-name "Retail Demo" --output-dir fabric/pipelines
 ```
-fabric/pipelines/
-├── historical-data-load/historical-data-load/
-│   ├── historical-data-load.json
-│   └── manifest.json
-├── streaming-data-load/streaming-data-load/
-│   ├── streaming-data-load.json
-│   └── manifest.json
-├── daily-maintenance/daily-maintenance/
-│   ├── daily-maintenance.json
-│   └── manifest.json
-└── machine-learning/machine-learning/
-    ├── machine-learning.json
-    └── manifest.json
-```
-
-The exported JSON references notebook and workspace IDs from the original workspace; update these when importing into a different workspace.
 
 ## Pipeline Details
 
+### setup-pipeline
+
+One-shot environment bootstrap: applies the Eventhouse KQL schema
+(`00-apply-kql`), then runs the rendered setup notebooks in order to seed
+dictionaries, generate dimensions and facts, and build the Gold tables.
+
 ### historical-data-load
 
-One-time load of historical batch data from `Files/` parquet shortcuts through Silver (`ag`) and Gold (`au`). Runs `02-historical-data-load.ipynb`. Execute manually after the Bronze shortcuts exist.
+One-time load of historical batch data from `Files/` parquet shortcuts through
+Silver (`ag`) and Gold (`au`). Runs `02-historical-data-load.ipynb`.
 
 ### streaming-data-load
 
-The streaming refresh loop. Runs `03-streaming-to-silver.ipynb` (watermark-based incremental load from Eventhouse `cusn` shortcuts), then `04-streaming-to-gold.ipynb` (Gold aggregation rebuild) on success. Schedule every 5 minutes.
+The streaming refresh loop: `03-streaming-to-silver.ipynb` (watermark-based
+incremental load from Eventhouse `cusn` shortcuts), then
+`04-streaming-to-gold.ipynb` (Gold aggregation rebuild). Cron schedule.
 
 ### daily-maintenance
 
-Runs `05-maintain-delta-tables.ipynb`: Delta `OPTIMIZE` (with ZORDER), and `VACUUM` (7-day default retention) across Silver and Gold tables. Schedule daily at 3 AM UTC, before the ML pipeline.
+Runs `05-maintain-delta-tables.ipynb`: Delta `OPTIMIZE` (with ZORDER) and
+`VACUUM` across Silver and Gold. Daily.
 
 ### machine-learning
 
-Runs the ML notebooks as parallel activities:
-
-- Parallel: `06-ml-demand-forecast`, `07-ml-market-basket`, `08-ml-customer-segmentation`, `09-ml-churn-prediction`, `10-ml-promotion-effectiveness`, `11-ml-journey-analysis`, `12-ml-stockout-prediction`, `13-ml-delivery-prediction`
-- Dependent: `14-ml-dynamic-pricing` runs only after `10-ml-promotion-effectiveness` succeeds, since it consumes `au.price_elasticity`. If elasticity data is unavailable, notebook 14 falls back to rule-based constrained pricing.
-
-See [Phase 9: ML Notebooks](../setup/09-ml-notebooks.md) for notebook details and outputs.
-
-## Creating Pipelines in Fabric
-
-For each pipeline:
-
-1. **Navigate to Data Factory**: in your Fabric workspace → New → Data pipeline
-2. **Add Notebook activities**: one per notebook listed above, with dependency conditions where noted
-3. **Configure policy**: timeout and retry settings per your environment
-4. **Add trigger**: Schedule trigger with the recommended recurrence
-5. **Save and activate**: toggle the trigger to "Started"
-
-Alternatively, import the exported JSON definitions and rebind the notebook/workspace IDs.
+Runs the ML notebooks `06`–`14`. `14-ml-dynamic-pricing` depends on
+`10-ml-promotion-effectiveness` (it consumes `au.price_elasticity`); if
+elasticity data is unavailable, notebook 14 falls back to rule-based constrained
+pricing. See [Phase 9: ML Notebooks](../setup/09-ml-notebooks.md).
 
 ## Monitoring
 
 - **Fabric Portal** → Data Factory → Pipelines → View runs
 - Check execution status, duration, and error logs
-- Set up alerts for pipeline failures
-
-## Schedule Rationale
-
-- `streaming-data-load` runs frequently (5 min) to keep Silver/Gold near-real-time; 03 and 04 are sequenced in one pipeline so Gold never reads a partially updated Silver layer
-- `daily-maintenance` runs at 3 AM UTC during low load
-- `machine-learning` should run after maintenance so models train against optimized tables; heavy notebooks (market basket, segmentation, churn, promotion effectiveness) can be moved to a weekly cadence if capacity is constrained
-
-## Legacy Names
-
-Earlier documentation referred to per-notebook pipelines (`pl_historical_load`, `pl_streaming_silver`, `pl_streaming_gold`, `pl_maintenance`, `pl_demand_forecast`, etc.). These were consolidated into the four pipelines above; `pl_streaming_silver`/`pl_streaming_gold` are now the two sequential activities of `streaming-data-load`, and all ML pipelines were merged into `machine-learning`.

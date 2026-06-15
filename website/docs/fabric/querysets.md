@@ -28,3 +28,13 @@ Curated KQL queries in `fabric/querysets/` for operations, investigations, and R
 - **Marketing**: campaign cost and conversion funnel attribution
 
 Several of these queries back the tiles in the [retail-ops dashboard template](./dashboards.md).
+
+## Deployment
+
+`retail-setup deploy` bundles every `.kql` file in `fabric/querysets/` into a
+single `retail_querysets.KQLQueryset` item (one tab per file) bound to the
+Eventhouse KQL database, and publishes it at the workspace root. Add a query by
+dropping a new `.kql` file in `fabric/querysets/` and redeploying — no other
+configuration is required. The data source `clusterUri` is resolved by
+fabric-cicd at publish time and `databaseItemId` is rewritten from the Terraform
+KQL database id.
