@@ -64,6 +64,22 @@ def test_azure_cli_tenant_preflight_accepts_matching_tenant(monkeypatch):
     _validate_azure_cli_tenant(Path("."), "dev")
 
 
+def test_active_azure_cli_tenant_uses_resolved_az_path(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="tenant-id\n")
+
+    monkeypatch.setattr("retail_setup.cli.main.shutil.which", lambda command: "C:/az.cmd")
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    from retail_setup.cli.main import _active_azure_cli_tenant
+
+    assert _active_azure_cli_tenant() == "tenant-id"
+    assert calls[0][0] == "C:/az.cmd"
+
+
 def test_azure_cli_tenant_preflight_rejects_mismatched_tenant(monkeypatch):
     monkeypatch.setattr(
         "retail_setup.cli.main._load_deploy_environment",

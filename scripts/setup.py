@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -245,6 +246,97 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     )
 
 
+def _resolve_az() -> str | None:
+    """Resolve the Azure CLI executable, including the Windows az.cmd shim."""
+
+    return shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+
+
+def _extract_tenant_id(text: str) -> str | None:
+    match = re.search(r"^tenant_id:\s*(.+)$", text, re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).strip().strip('"').strip("'")
+    if value in ("", "null", "~"):
+        return None
+    return value
+
+
+def _extract_auth_mode(text: str) -> str | None:
+    match = re.search(
+        r"^auth:\s*\n(?:[ \t]+.*\n)*?[ \t]+mode:\s*(.+)$", text, re.MULTILINE
+    )
+    if not match:
+        return None
+    return match.group(1).strip().strip('"').strip("'")
+
+
+def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
+    """Return (auth_mode, tenant_id) from the merged deploy config.
+
+    The environment overlay wins over the shared deploy.yml. Parsed with the
+    standard library so it works before project dependencies are installed.
+    """
+
+    base = REPO_ROOT / "deploy" / "config" / "deploy.yml"
+    overlay = REPO_ROOT / "deploy" / "config" / "environments" / f"{deploy_env}.yml"
+    base_text = base.read_text() if base.is_file() else ""
+    overlay_text = overlay.read_text() if overlay.is_file() else ""
+
+    tenant_id = _extract_tenant_id(overlay_text) or _extract_tenant_id(base_text)
+    auth_mode = (
+        _extract_auth_mode(overlay_text)
+        or _extract_auth_mode(base_text)
+        or "azure_cli"
+    )
+    return auth_mode, tenant_id
+
+
+def _active_az_tenant(az: str) -> str | None:
+    result = subprocess.run(
+        [az, "account", "show", "--query", "tenantId", "-o", "tsv"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
+    """Sign in to the configured Azure tenant before deploy when needed.
+
+    Only acts for `auth.mode: azure_cli`. Skips login when the active Azure CLI
+    tenant already matches the configured tenant_id.
+    """
+
+    auth_mode, tenant_id = read_deploy_auth(deploy_env)
+    if auth_mode != "azure_cli" or not tenant_id:
+        return
+
+    az = _resolve_az()
+    if az is None:
+        raise SystemExit(
+            "Azure CLI (az) is required for deploy but was not found on PATH. "
+            "Install Azure CLI, or set deploy config auth.mode to azure_powershell."
+        )
+
+    active_tenant = None if dry_run else _active_az_tenant(az)
+    if active_tenant and active_tenant.lower() == tenant_id.lower():
+        print(f"Azure CLI already signed in to tenant {tenant_id}.")
+        return
+
+    if active_tenant:
+        print(
+            f"Active Azure CLI tenant {active_tenant} does not match "
+            f"configured tenant {tenant_id}; signing in."
+        )
+    else:
+        print(f"Signing in to Azure tenant {tenant_id}.")
+    run_command([az, "login", "--tenant", tenant_id], dry_run=dry_run)
+
+
 def run_retail_setup(
     env: PythonEnv,
     *,
@@ -265,6 +357,7 @@ def run_retail_setup(
     if not assume_yes and not deploy:
         deploy = prompt_yes_no("Run `retail-setup deploy` now?", default=False)
     if deploy:
+        ensure_azure_login(deploy_env, dry_run=dry_run)
         deploy_command = [
             str(env.python),
             "-m",

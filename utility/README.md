@@ -50,7 +50,10 @@ The guided setup script:
 4. Installs Python dependencies into that environment.
 5. Runs `retail-setup configure`.
 6. Runs `retail-setup render`.
-7. Asks whether to run `retail-setup deploy`.
+7. Asks whether to run `retail-setup deploy`. Before deploying, it signs in to
+   the configured Azure tenant with `az login --tenant <tenant_id>` (skipped
+   when the active Azure CLI tenant already matches, or when
+   `auth.mode: azure_powershell`).
 
 Examples:
 

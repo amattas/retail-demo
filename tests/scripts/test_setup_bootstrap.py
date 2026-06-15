@@ -102,6 +102,7 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
     monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
 
     setup.run_retail_setup(
         env,
@@ -120,3 +121,49 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
         "qa",
         "--yes",
     ]
+
+
+def test_extract_tenant_id_and_auth_mode():
+    text = "tenant_id: 11111111-1111-1111-1111-111111111111\nauth:\n  mode: azure_cli\n"
+
+    assert setup._extract_tenant_id(text) == "11111111-1111-1111-1111-111111111111"
+    assert setup._extract_auth_mode(text) == "azure_cli"
+
+
+def test_extract_tenant_id_treats_null_as_missing():
+    assert setup._extract_tenant_id("tenant_id: null\n") is None
+    assert setup._extract_tenant_id("subscription_id: x\n") is None
+
+
+def test_ensure_azure_login_skips_when_tenant_matches(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+    monkeypatch.setattr(setup, "_active_az_tenant", lambda _: "tenant")
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == []
+
+
+def test_ensure_azure_login_runs_login_on_mismatch(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "expected"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "C:/az.cmd")
+    monkeypatch.setattr(setup, "_active_az_tenant", lambda _: "active")
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == [["C:/az.cmd", "login", "--tenant", "expected"]]
+
+
+def test_ensure_azure_login_noop_for_non_azure_cli(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_powershell", "TENANT"))
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == []

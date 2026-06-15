@@ -16,7 +16,9 @@ python .\scripts\setup.py
 
 The guided setup detects your OS, offers to install missing prerequisites, uses
 the Python environment that launched the script, installs dependencies, runs
-configure, renders notebooks, and asks whether to deploy.
+configure, renders notebooks, and asks whether to deploy. Before deploying, it
+signs in to the configured Azure tenant with `az login --tenant <tenant_id>`
+(skipped when the active Azure CLI tenant already matches).
 
 `--env` selects `deploy/config/environments/<env>.yml` and writes generated
 deployment files under `deploy/.generated/<env>/`.

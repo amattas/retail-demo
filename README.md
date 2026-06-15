@@ -54,7 +54,9 @@ python .\scripts\setup.py
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into
 the environment that launched the script; runs `retail-setup configure`; renders
-notebooks; and finally asks whether to deploy.
+notebooks; and finally asks whether to deploy. When you deploy, it signs in to
+the configured Azure tenant with `az login --tenant <tenant_id>` first (unless
+the active Azure CLI tenant already matches).
 
 Use `--env` to select the deployment environment file under
 `deploy\config\environments\`. For example, `--env dev` uses

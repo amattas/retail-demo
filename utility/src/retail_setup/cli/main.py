@@ -8,6 +8,7 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 from __future__ import annotations
 
 import subprocess
+import shutil
 import sys
 from dataclasses import dataclass, field
 from datetime import date
@@ -145,9 +146,12 @@ def _load_deploy_environment(repo_root: Path, env: str):
 
 
 def _active_azure_cli_tenant() -> str:
+    az = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if not az:
+        raise typer.Exit(code=127)
     try:
         result = subprocess.run(
-            ["az", "account", "show", "--query", "tenantId", "-o", "tsv"],
+            [az, "account", "show", "--query", "tenantId", "-o", "tsv"],
             capture_output=True,
             text=True,
             check=False,
