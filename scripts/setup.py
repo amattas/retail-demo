@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -167,11 +168,6 @@ def prompt_yes_no(message: str, *, default: bool) -> bool:
     return answer in {"y", "yes"}
 
 
-def prompt_text(message: str, *, default: str) -> str:
-    answer = input(f"{message} [{default}]: ").strip()
-    return answer or default
-
-
 def run_command(command: list[str], *, cwd: Path = REPO_ROOT, dry_run: bool = False) -> None:
     rendered = " ".join(command)
     print(f"$ {rendered}")
@@ -182,6 +178,10 @@ def run_command(command: list[str], *, cwd: Path = REPO_ROOT, dry_run: bool = Fa
     except FileNotFoundError:
         raise SystemExit(
             f"Required executable not found: {command[0]}. Install it and ensure it is on PATH."
+        ) from None
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            f"Command failed with exit code {exc.returncode}: {rendered}"
         ) from None
 
 
@@ -219,95 +219,15 @@ def install_prerequisites(
             run_command(install_command, dry_run=dry_run)
 
 
-def _conda_env_exists(name: str) -> bool:
-    result = subprocess.run(
-        ["conda", "env", "list"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return False
-    return any(line.split() and line.split()[0] == name for line in result.stdout.splitlines())
-
-
-def _conda_python(env_name: str) -> Path:
-    result = subprocess.run(
-        [
-            "conda",
-            "run",
-            "-n",
-            env_name,
-            "python",
-            "-c",
-            "import sys; print(sys.executable)",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return Path(result.stdout.strip())
-
-
-def ensure_python_env(*, dry_run: bool, assume_yes: bool) -> PythonEnv:
-    """Create or select the Python environment for setup commands."""
-
-    conda_available = _command_exists("conda")
-    use_conda = False
-    if conda_available:
-        use_conda = assume_yes or prompt_yes_no(
-            "Use conda for the Python environment?", default=True
-        )
-
-    if use_conda:
-        env_name = (
-            "retail"
-            if assume_yes
-            else prompt_text("Conda environment name", default="retail")
-        )
-        if not dry_run and not _conda_env_exists(env_name):
-            run_command(
-                [
-                    "conda",
-                    "create",
-                    "-n",
-                    env_name,
-                    f"python={MIN_PYTHON[0]}.{MIN_PYTHON[1]}",
-                    "-y",
-                ]
-            )
-        elif dry_run:
-            run_command(
-                [
-                    "conda",
-                    "create",
-                    "-n",
-                    env_name,
-                    f"python={MIN_PYTHON[0]}.{MIN_PYTHON[1]}",
-                    "-y",
-                ],
-                dry_run=True,
-            )
-        python = (
-            _conda_python(env_name)
-            if not dry_run
-            else Path("conda") / "envs" / env_name / "python"
-        )
-        return PythonEnv(python=python, description=f"conda environment {env_name!r}")
+def current_python_env() -> PythonEnv:
+    """Use the Python interpreter that launched this setup script."""
 
     if sys.version_info < MIN_PYTHON:
         raise SystemExit(
-            "Python 3.11 or later is required for venv setup. "
-            "Install Python 3.11+ or rerun with conda available."
+            "Python 3.11 or later is required. Activate a Python 3.11+ conda "
+            "environment or virtual environment, then rerun this script."
         )
-
-    venv_dir = REPO_ROOT / ".venv"
-    if not venv_dir.exists() or dry_run:
-        run_command([sys.executable, "-m", "venv", str(venv_dir)], dry_run=dry_run)
-    python = venv_dir / (
-        "Scripts/python.exe" if platform.system().lower() == "windows" else "bin/python"
-    )
-    return PythonEnv(python=python, description=f"virtual environment at {venv_dir}")
+    return PythonEnv(python=Path(sys.executable), description="current Python environment")
 
 
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
@@ -326,6 +246,92 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     )
 
 
+def _resolve_az() -> str | None:
+    """Resolve the Azure CLI executable, including the Windows az.cmd shim."""
+
+    return shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+
+
+def _extract_tenant_id(text: str) -> str | None:
+    match = re.search(r"^tenant_id:\s*(.+)$", text, re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).strip().strip('"').strip("'")
+    if value in ("", "null", "~"):
+        return None
+    return value
+
+
+def _extract_auth_mode(text: str) -> str | None:
+    match = re.search(
+        r"^auth:\s*\n(?:[ \t]+.*\n)*?[ \t]+mode:\s*(.+)$", text, re.MULTILINE
+    )
+    if not match:
+        return None
+    return match.group(1).strip().strip('"').strip("'")
+
+
+def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
+    """Return (auth_mode, tenant_id) from the merged deploy config.
+
+    The environment overlay wins over the shared deploy.yml. Parsed with the
+    standard library so it works before project dependencies are installed.
+    """
+
+    base = REPO_ROOT / "deploy" / "config" / "deploy.yml"
+    overlay = REPO_ROOT / "deploy" / "config" / "environments" / f"{deploy_env}.yml"
+    base_text = base.read_text() if base.is_file() else ""
+    overlay_text = overlay.read_text() if overlay.is_file() else ""
+
+    tenant_id = _extract_tenant_id(overlay_text) or _extract_tenant_id(base_text)
+    auth_mode = (
+        _extract_auth_mode(overlay_text)
+        or _extract_auth_mode(base_text)
+        or "azure_cli"
+    )
+    return auth_mode, tenant_id
+
+
+def _powershell_login_command(tenant_id: str) -> list[str] | None:
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if pwsh is None:
+        return None
+    return [pwsh, "-NoProfile", "-Command", f"Connect-AzAccount -Tenant {tenant_id}"]
+
+
+def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
+    """Sign in to the configured Azure tenant before deploy.
+
+    Always runs the login command so deploy never proceeds under the wrong
+    account or tenant. Supports `auth.mode: azure_cli` (`az login`) and
+    `auth.mode: azure_powershell` (`Connect-AzAccount`).
+    """
+
+    auth_mode, tenant_id = read_deploy_auth(deploy_env)
+    if not tenant_id:
+        return
+
+    if auth_mode == "azure_powershell":
+        login = _powershell_login_command(tenant_id)
+        if login is None:
+            raise SystemExit(
+                "PowerShell is required for auth.mode=azure_powershell but was "
+                "not found on PATH."
+            )
+        print(f"Signing in to Azure tenant {tenant_id} with Azure PowerShell.")
+        run_command(login, dry_run=dry_run)
+        return
+
+    az = _resolve_az()
+    if az is None:
+        raise SystemExit(
+            "Azure CLI (az) is required for deploy but was not found on PATH. "
+            "Install Azure CLI, or set deploy config auth.mode to azure_powershell."
+        )
+    print(f"Signing in to Azure tenant {tenant_id}.")
+    run_command([az, "login", "--tenant", tenant_id], dry_run=dry_run)
+
+
 def run_retail_setup(
     env: PythonEnv,
     *,
@@ -333,6 +339,7 @@ def run_retail_setup(
     dry_run: bool,
     assume_yes: bool,
     deploy_requested: bool,
+    recreate: bool = False,
 ) -> None:
     run_command(
         [str(env.python), "-m", "retail_setup.cli.main", "configure", "--env", deploy_env],
@@ -346,6 +353,7 @@ def run_retail_setup(
     if not assume_yes and not deploy:
         deploy = prompt_yes_no("Run `retail-setup deploy` now?", default=False)
     if deploy:
+        ensure_azure_login(deploy_env, dry_run=dry_run)
         deploy_command = [
             str(env.python),
             "-m",
@@ -354,6 +362,8 @@ def run_retail_setup(
             "--env",
             deploy_env,
         ]
+        if recreate:
+            deploy_command.append("--recreate")
         if assume_yes:
             deploy_command.append("--yes")
         run_command(deploy_command, dry_run=dry_run)
@@ -376,6 +386,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Print commands without running them.")
     parser.add_argument("--yes", action="store_true", help="Accept setup prompts with defaults.")
     parser.add_argument("--deploy", action="store_true", help="Run deploy after configure/render.")
+    parser.add_argument(
+        "--recreate",
+        action="store_true",
+        help="Destroy and recreate the workspace during deploy (clean slate).",
+    )
     parser.add_argument(
         "--skip-prereqs",
         action="store_true",
@@ -401,14 +416,15 @@ def main() -> int:
             assume_yes=args.yes,
         )
 
-    env = ensure_python_env(dry_run=args.dry_run, assume_yes=args.yes)
+    env = current_python_env()
     install_python_dependencies(env, dry_run=args.dry_run)
     run_retail_setup(
         env,
         deploy_env=args.env,
         dry_run=args.dry_run,
         assume_yes=args.yes,
-        deploy_requested=args.deploy,
+        deploy_requested=args.deploy or args.recreate,
+        recreate=args.recreate,
     )
     return 0
 

@@ -8,6 +8,7 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 from __future__ import annotations
 
 import subprocess
+import shutil
 import sys
 from dataclasses import dataclass, field
 from datetime import date
@@ -131,6 +132,71 @@ def _available_store_types() -> list[str]:
         return []
 
 
+def _load_deploy_environment(repo_root: Path, env: str):
+    root = str(repo_root)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from deploy.scripts.deploy_config import load_environment
+
+    return load_environment(
+        env,
+        config_path=repo_root / "deploy" / "config" / "deploy.yml",
+        environments_root=repo_root / "deploy" / "config" / "environments",
+    )
+
+
+def _active_azure_cli_tenant() -> str:
+    az = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if not az:
+        raise typer.Exit(code=127)
+    try:
+        result = subprocess.run(
+            [az, "account", "show", "--query", "tenantId", "-o", "tsv"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        raise typer.Exit(code=127) from None
+    if result.returncode != 0:
+        raise typer.Exit(code=1)
+    return result.stdout.strip()
+
+
+def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
+    try:
+        config = _load_deploy_environment(repo_root, env)
+    except ImportError:
+        return
+
+    if config.auth_mode != "azure_cli" or not config.tenant_id:
+        return
+
+    try:
+        active_tenant = _active_azure_cli_tenant()
+    except typer.Exit as exc:
+        if exc.exit_code == 127:
+            typer.echo(
+                "Azure CLI is required for auth.mode=azure_cli but `az` was not found on PATH.",
+                err=True,
+            )
+            typer.echo("Install Azure CLI or set deploy config auth.mode to azure_powershell.", err=True)
+        else:
+            typer.echo("Azure CLI is not logged in.", err=True)
+            typer.echo(f"Run: az login --tenant {config.tenant_id}", err=True)
+        raise
+
+    if active_tenant.lower() != config.tenant_id.lower():
+        typer.echo(
+            "Azure CLI tenant does not match deploy config tenant_id.",
+            err=True,
+        )
+        typer.echo(f"  Active tenant:   {active_tenant}", err=True)
+        typer.echo(f"  Expected tenant: {config.tenant_id}", err=True)
+        typer.echo(f"Run: az login --tenant {config.tenant_id}", err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def configure(
     repo_root: Path = typer.Option(
@@ -189,6 +255,16 @@ def configure(
         if store_types
         else "Store type"
     )
+
+    _prompted_values = (
+        tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
+        kql_database_name, store_type, start_date, end_date, store_count, seed,
+    )
+    if any(value is None for value in _prompted_values) and sys.stdin.isatty():
+        typer.echo("")
+        typer.echo("=" * 70)
+        typer.echo("  INPUT REQUIRED — review each value and press Enter to accept [default]")
+        typer.echo("=" * 70)
 
     tenant_id = _prompt_str(
         "Entra tenant ID",
@@ -416,6 +492,7 @@ def _deploy_plan(
     env: str,
     skip_terraform: bool,
     lakehouse_name: str = "retail_lakehouse",
+    recreate: bool = False,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     py = sys.executable
@@ -433,6 +510,25 @@ def _deploy_plan(
                 cmd=["terraform", "-chdir=deploy/terraform", "init"],
                 description="Terraform init",
             ),
+        ]
+        if recreate:
+            steps += [
+                DeployStep(
+                    cmd=[
+                        "terraform",
+                        "-chdir=deploy/terraform",
+                        "destroy",
+                        f"-var-file={var_file}",
+                    ],
+                    needs_confirmation=True,
+                    description="Terraform destroy (recreate - DESTROYS the workspace and all items)",
+                ),
+                DeployStep(
+                    cmd=[py, "-c", "import time; time.sleep(30)"],
+                    description="Wait 30s for Fabric to finalize workspace deletion",
+                ),
+            ]
+        steps += [
             DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "plan", f"-var-file={var_file}"],
                 description="Terraform plan",
@@ -529,13 +625,31 @@ def deploy(
     yes: bool = typer.Option(
         False, "--yes", help="Pre-confirm gated steps (Terraform apply)."
     ),
+    recreate: bool = typer.Option(
+        False,
+        "--recreate",
+        help="Destroy the existing workspace and recreate it (clean slate).",
+    ),
 ) -> None:
     """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
 
     Prerequisite: the `terraform` binary must be on PATH unless --skip-terraform
     is given. Authentication is handled by the deploy framework scripts.
+
+    With --recreate, the deployment destroys the existing workspace (and every
+    item in it) and recreates it from scratch. This is destructive; use it only
+    for a clean-slate redeploy.
     """
     repo_root = repo_root.resolve()
+    if recreate and skip_terraform:
+        typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
+        raise typer.Exit(code=1)
+    if recreate and not dry_run:
+        typer.echo("")
+        typer.echo("!" * 70)
+        typer.echo("  WARNING: --recreate will DESTROY the existing workspace and ALL items")
+        typer.echo("  in it, wait 30 seconds, then recreate everything from scratch.")
+        typer.echo("!" * 70)
     if dry_run:
         # dry runs must not require live config; fall back to the default name
         try:
@@ -545,7 +659,8 @@ def deploy(
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
         lakehouse = _lakehouse_name(repo_root, env)
-    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse)
+        _validate_azure_cli_tenant(repo_root, env)
+    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse, recreate=recreate)
     total = len(plan)
 
     if dry_run:
@@ -557,7 +672,7 @@ def deploy(
     for i, step in enumerate(plan, start=1):
         _echo_step(i, total, step)
         if step.needs_confirmation and not yes:
-            if not typer.confirm("Apply this Terraform plan?"):
+            if not typer.confirm(f"Proceed with: {step.description}?"):
                 typer.echo("Aborted by user.")
                 raise typer.Exit(code=1)
         try:

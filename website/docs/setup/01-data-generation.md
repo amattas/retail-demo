@@ -11,25 +11,33 @@ From PowerShell:
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
-python .\scripts\setup.py
+.\scripts\setup.ps1
 ```
 
-The guided setup detects your OS, offers to install missing prerequisites,
-sets up Python with conda or venv, installs dependencies, runs configure,
-renders notebooks, and asks whether to deploy.
+`setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
+otherwise installs Miniforge with winget and creates a conda environment, then
+runs the guided setup. On macOS and Linux, activate a Python 3.11+ environment
+and run `python ./scripts/setup.py` instead.
+
+The guided setup detects your OS, offers to install missing prerequisites, uses
+the Python environment that launched the script, installs dependencies, runs
+configure, renders notebooks, and asks whether to deploy. Before deploying, it
+always signs in to the configured Azure tenant (`az login --tenant <tenant_id>`
+for `auth.mode: azure_cli`) so deployment never runs under the wrong account.
 
 `--env` selects `deploy/config/environments/<env>.yml` and writes generated
 deployment files under `deploy/.generated/<env>/`.
 
 ```powershell
-python .\scripts\setup.py --env dev
-python .\scripts\setup.py --env dev --deploy
-python .\scripts\setup.py --env dev --dry-run
+.\scripts\setup.ps1 --env dev
+.\scripts\setup.ps1 --env dev --deploy
+.\scripts\setup.ps1 --env dev --dry-run
 ```
 
 ## Step 1.2: Manual install path
 
-Use this path if you prefer to run each command yourself.
+Use this path if you prefer to create or activate an environment yourself before
+running each command. For conda, activate the conda environment first.
 
 ```powershell
 py -3.11 -m venv .venv

@@ -2,16 +2,33 @@
 
 Utility scripts for configuring and deploying the retail demo components.
 
+## setup.ps1 (Windows entry point)
+
+Guided Windows bootstrap. It ensures a Python 3.11+ environment exists —
+using Python on PATH if suitable, otherwise installing Miniforge with winget and
+creating a conda environment — then delegates to `setup.py`. All arguments are
+forwarded.
+
+```powershell
+.\scripts\setup.ps1
+.\scripts\setup.ps1 --env dev --dry-run
+.\scripts\setup.ps1 --env dev --deploy
+```
+
+On macOS and Linux, activate a Python 3.11+ environment and run `setup.py`
+directly.
+
 ## setup.py
 
-Guided cross-platform setup for a new Fabric workspace.
+Guided cross-platform setup engine for a new Fabric workspace.
 
 ### Purpose
 
-`setup.py` is the single entry point for local setup. It detects the operating
-system, offers to install missing CLI prerequisites with the OS package manager,
-sets up Python with conda or venv, installs Python dependencies, runs
-`retail-setup configure`, renders notebooks, and asks whether to deploy.
+`setup.py` is the single entry point for local setup logic. It detects the
+operating system, offers to install missing CLI prerequisites with the OS
+package manager, uses the Python environment that launched the script, installs
+Python dependencies, runs `retail-setup configure`, renders notebooks, signs in
+to the configured Azure tenant, and asks whether to deploy.
 
 ### Usage
 

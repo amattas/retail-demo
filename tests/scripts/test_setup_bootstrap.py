@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,6 +62,22 @@ def test_install_prerequisites_dry_run_records_commands(monkeypatch):
     assert commands == [["testpm", "install", "terraform"]]
 
 
+def test_run_command_reports_nonzero_exit_without_traceback(monkeypatch, capsys):
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(7, command)
+
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+
+    try:
+        setup.run_command(["terraform", "init"])
+    except SystemExit as exc:
+        assert "Command failed with exit code 7: terraform init" in str(exc)
+    else:
+        raise AssertionError("run_command should raise SystemExit")
+
+    assert "$ terraform init" in capsys.readouterr().out
+
+
 def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
@@ -85,6 +102,7 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
     monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
 
     setup.run_retail_setup(
         env,
@@ -103,3 +121,65 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
         "qa",
         "--yes",
     ]
+
+
+def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
+    commands = []
+    env = setup.PythonEnv(Path("python"), "test")
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
+
+    setup.run_retail_setup(
+        env,
+        deploy_env="qa",
+        dry_run=True,
+        assume_yes=True,
+        deploy_requested=True,
+        recreate=True,
+    )
+
+    deploy_cmd = commands[-1]
+    assert "--recreate" in deploy_cmd
+    assert deploy_cmd.index("--recreate") < deploy_cmd.index("--yes")
+
+    text = "tenant_id: 11111111-1111-1111-1111-111111111111\nauth:\n  mode: azure_cli\n"
+
+    assert setup._extract_tenant_id(text) == "11111111-1111-1111-1111-111111111111"
+    assert setup._extract_auth_mode(text) == "azure_cli"
+
+
+def test_extract_tenant_id_treats_null_as_missing():
+    assert setup._extract_tenant_id("tenant_id: null\n") is None
+    assert setup._extract_tenant_id("subscription_id: x\n") is None
+
+
+def test_ensure_azure_login_always_runs_az_login(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "C:/az.cmd")
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == [["C:/az.cmd", "login", "--tenant", "TENANT"]]
+
+
+def test_ensure_azure_login_uses_powershell_for_az_powershell(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_powershell", "TENANT"))
+    monkeypatch.setattr(setup.shutil, "which", lambda command: "pwsh" if command == "pwsh" else None)
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == [["pwsh", "-NoProfile", "-Command", "Connect-AzAccount -Tenant TENANT"]]
+
+
+def test_ensure_azure_login_noop_when_no_tenant(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", None))
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == []

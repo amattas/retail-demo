@@ -35,29 +35,38 @@ development tests.
 
 ## Guided setup
 
-From the repository root:
+On Windows, from the repository root:
 
 ```powershell
-python .\scripts\setup.py
+.\scripts\setup.ps1
 ```
 
-The guided setup script:
+`setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
+otherwise installs Miniforge with winget and creates a conda environment, then
+delegates to `scripts\setup.py`. On macOS and Linux, activate a Python 3.11+
+environment and run `python ./scripts/setup.py` directly.
+
+The guided setup:
 
 1. Detects Windows, macOS, or Linux.
 2. Offers to install missing CLI prerequisites with the OS package manager
    (`winget`/Chocolatey, Homebrew, `apt-get`, `dnf`, or `yum`).
-3. Uses conda when available and accepted; otherwise creates `.venv`.
-4. Installs Python dependencies.
+3. Uses the Python environment that launched the script.
+4. Installs Python dependencies into that environment.
 5. Runs `retail-setup configure`.
 6. Runs `retail-setup render`.
-7. Asks whether to run `retail-setup deploy`.
+7. Asks whether to run `retail-setup deploy`. Before deploying, it always signs
+   in to the configured Azure tenant — `az login --tenant <tenant_id>` for
+   `auth.mode: azure_cli`, or `Connect-AzAccount -Tenant <tenant_id>` for
+   `auth.mode: azure_powershell` — so deployment never runs under the wrong
+   account.
 
 Examples:
 
 ```powershell
-python .\scripts\setup.py --env dev
-python .\scripts\setup.py --env dev --deploy
-python .\scripts\setup.py --env dev --dry-run
+.\scripts\setup.ps1 --env dev
+.\scripts\setup.ps1 --env dev --deploy
+.\scripts\setup.ps1 --env dev --dry-run
 ```
 
 `--env` selects `deploy\config\environments\<env>.yml` and generated outputs
@@ -74,6 +83,9 @@ py -3.11 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e .\utility
 ```
+
+If you prefer conda, activate your conda environment before running
+`python .\scripts\setup.py` or before installing the package manually.
 
 For automated deployment:
 
@@ -217,6 +229,14 @@ stage/deploy supported Fabric items:
 
 ```powershell
 retail-setup deploy --env dev --skip-terraform
+```
+
+For a clean slate, `--recreate` destroys the existing workspace (and every item
+in it), waits 30 seconds, then recreates everything. This is destructive and is
+gated by a confirmation prompt:
+
+```powershell
+retail-setup deploy --env dev --recreate
 ```
 
 The deploy command runs these steps in order:
