@@ -54,6 +54,7 @@ deployment:
     - Notebook
     - SemanticModel
     - Report
+    - KQLQueryset
   publish_skip: false
   unpublish_skip: true
   orphan_exclude_regex: "^DO_NOT_DELETE_.*"

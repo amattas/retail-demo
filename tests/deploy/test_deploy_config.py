@@ -23,6 +23,7 @@ def test_load_environment_merges_defaults_and_environment() -> None:
         "Notebook",
         "SemanticModel",
         "Report",
+        "KQLQueryset",
     ]
 
 
