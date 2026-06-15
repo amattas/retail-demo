@@ -52,6 +52,26 @@ find_replace:
   replace_value:
     dev: $items.Notebook.14-ml-dynamic-pricing.$id
   item_type: DataPipeline
+- find_value: ada58402-29c1-5543-9bdf-4d7bac88b449
+  replace_value:
+    dev: $items.Notebook.00-apply-kql.$id
+  item_type: DataPipeline
+- find_value: f670ec39-fd56-5b27-b8b1-17cb523cb15c
+  replace_value:
+    dev: $items.Notebook.setup-01-seed-dictionaries.$id
+  item_type: DataPipeline
+- find_value: ecaa838e-f4f0-582d-a901-77d21cdbed25
+  replace_value:
+    dev: $items.Notebook.setup-02-generate-dimensions.$id
+  item_type: DataPipeline
+- find_value: a34eceb5-c8c3-5ad6-8798-a5c0d08edd16
+  replace_value:
+    dev: $items.Notebook.setup-03-generate-facts.$id
+  item_type: DataPipeline
+- find_value: 76ba8c81-cdcf-5f8b-99aa-22eb85079516
+  replace_value:
+    dev: $items.Notebook.setup-04-build-gold.$id
+  item_type: DataPipeline
 - find_value: 42c685c9-6bea-45f5-872b-7cc1353961e3
   replace_value:
     dev: $items.Notebook.03-streaming-to-silver.$id

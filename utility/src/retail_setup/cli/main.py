@@ -707,6 +707,41 @@ def deploy(
 
     typer.echo(f"Deploy complete for environment '{env}'.")
 
+    if not yes:
+        if typer.confirm(
+            "Run the setup pipeline now (apply KQL setup, then generate "
+            "dimensions, facts, and gold)?",
+            default=False,
+        ):
+            _run_setup_pipeline(repo_root, env)
+        else:
+            typer.echo(
+                "Skipping. Run later with: "
+                "retail-setup deploy --env " + env + " (or trigger 'setup-pipeline' in Fabric)."
+            )
+
+
+def _run_setup_pipeline(repo_root: Path, env: str) -> None:
+    """Start an on-demand run of the deployed setup pipeline."""
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "deploy.scripts.run_pipeline",
+        "--environment",
+        env,
+        "--pipeline",
+        "setup-pipeline",
+    ]
+    typer.echo("    " + " ".join(cmd))
+    result = subprocess.run(cmd, cwd=repo_root)
+    if result.returncode != 0:
+        typer.echo(
+            "Could not start the setup pipeline automatically. Open the workspace "
+            "in Fabric and run 'setup-pipeline' manually.",
+            err=True,
+        )
+
 
 if __name__ == "__main__":
     app()

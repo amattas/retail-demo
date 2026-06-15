@@ -1,0 +1,106 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "00-apply-kql",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "ada58402-29c1-5543-9bdf-4d7bac88b449",
+          "workspaceId": "9c315f26-dcc7-5e85-b972-4f3af5aaf3a0"
+        }
+      },
+      {
+        "name": "setup-01-seed-dictionaries",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "00-apply-kql",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "f670ec39-fd56-5b27-b8b1-17cb523cb15c",
+          "workspaceId": "9c315f26-dcc7-5e85-b972-4f3af5aaf3a0"
+        }
+      },
+      {
+        "name": "setup-02-generate-dimensions",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-01-seed-dictionaries",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "ecaa838e-f4f0-582d-a901-77d21cdbed25",
+          "workspaceId": "9c315f26-dcc7-5e85-b972-4f3af5aaf3a0"
+        }
+      },
+      {
+        "name": "setup-03-generate-facts",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-02-generate-dimensions",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "a34eceb5-c8c3-5ad6-8798-a5c0d08edd16",
+          "workspaceId": "9c315f26-dcc7-5e85-b972-4f3af5aaf3a0"
+        }
+      },
+      {
+        "name": "setup-04-build-gold",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-facts",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "76ba8c81-cdcf-5f8b-99aa-22eb85079516",
+          "workspaceId": "9c315f26-dcc7-5e85-b972-4f3af5aaf3a0"
+        }
+      }
+    ]
+  }
+}
