@@ -774,6 +774,13 @@ def deploy(
     typer.echo(f"Deploy complete for environment '{env}'.")
 
     if not yes:
+        taskflow_path = repo_root / "fabric" / "taskflow" / "taskflow.json"
+        if taskflow_path.is_file() and typer.confirm(
+            "Wire up the workspace task flow now (the visual item graph)?",
+            default=False,
+        ):
+            _deploy_taskflow(repo_root, env)
+
         if typer.confirm(
             "Run the setup pipeline now (apply KQL setup, then generate "
             "dimensions, facts, and gold)?",
@@ -785,6 +792,28 @@ def deploy(
                 "Skipping. Run later with: "
                 "retail-setup deploy --env " + env + " (or trigger 'setup-pipeline' in Fabric)."
             )
+
+
+def _deploy_taskflow(repo_root: Path, env: str) -> None:
+    """Deploy the workspace task flow to the target workspace."""
+
+    workspace = _workspace_name(repo_root, env)
+    cmd = [
+        sys.executable,
+        "-m",
+        "deploy.scripts.taskflow",
+        "deploy",
+        "--workspace",
+        workspace,
+    ]
+    typer.echo("    " + " ".join(cmd))
+    result = subprocess.run(cmd, cwd=repo_root)
+    if result.returncode != 0:
+        typer.echo(
+            "Could not deploy the task flow automatically. Run later with: "
+            f"python -m deploy.scripts.taskflow deploy --workspace {workspace!r}.",
+            err=True,
+        )
 
 
 def _run_setup_pipeline(repo_root: Path, env: str) -> None:

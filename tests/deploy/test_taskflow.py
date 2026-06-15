@@ -57,11 +57,87 @@ def test_to_workspace_resolves_names_to_target_guids_and_reports_unresolved() ->
 
     resolved, unresolved = taskflow.to_workspace(portable, name_type_to_guid)
 
-    item0 = resolved["tasks"][0]["items"][0]
-    assert item0["artifactUniqueId"] == "SynapseNotebook:new-nb-guid"
-    assert item0["artifactObjectId"] == "new-nb-guid"
-    assert "artifactName" not in item0  # name stripped after resolution
+    items = resolved["tasks"][0]["items"]
+    # Unresolved items are dropped; only the resolved one remains.
+    assert len(items) == 1
+    assert items[0]["artifactUniqueId"] == "SynapseNotebook:new-nb-guid"
+    assert items[0]["artifactObjectId"] == "new-nb-guid"
+    assert "artifactName" not in items[0]  # name stripped after resolution
     assert unresolved == ["Pipeline:missing-pipeline"]
+
+
+def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) -> None:
+    import json as _json
+
+    path = tmp_path / "taskflow.json"
+    path.write_text(
+        _json.dumps(
+            {
+                "id": "tf-id",
+                "name": "Retail Demo",
+                "tasks": [
+                    {
+                        "id": "t1",
+                        "items": [
+                            {"artifactType": "Pipeline", "artifactName": "setup-pipeline"}
+                        ],
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = {"create": 0, "put": 0}
+
+    monkeypatch.setattr(taskflow, "_session", lambda *_a, **_k: object())
+    monkeypatch.setattr(taskflow, "_token", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
+    monkeypatch.setattr(
+        taskflow,
+        "list_workspace_items",
+        lambda *_a: [{"type": "DataPipeline", "displayName": "setup-pipeline", "id": "pl"}],
+    )
+    monkeypatch.setattr(taskflow, "resolve_cluster", lambda *_a: "https://c")
+    monkeypatch.setattr(taskflow, "get_taskflow", lambda *_a: None)  # no existing flow
+
+    def fake_create(_s, _c, _w, tf, **_k):
+        calls["create"] += 1
+        assert tf["tasks"][0]["items"][0]["artifactObjectId"] == "pl"
+        return 201
+
+    monkeypatch.setattr(taskflow, "create_taskflow", fake_create)
+    monkeypatch.setattr(taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1))
+
+    unresolved = taskflow.deploy_taskflow("retail-demo-dev", path)
+
+    assert calls["create"] == 1 and calls["put"] == 0
+    assert unresolved == []
+
+
+def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -> None:
+    import json as _json
+
+    path = tmp_path / "taskflow.json"
+    path.write_text(_json.dumps({"id": "x", "tasks": [], "edges": []}), encoding="utf-8")
+    calls = {"create": 0, "put": 0}
+
+    monkeypatch.setattr(taskflow, "_session", lambda *_a, **_k: object())
+    monkeypatch.setattr(taskflow, "_token", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
+    monkeypatch.setattr(taskflow, "list_workspace_items", lambda *_a: [])
+    monkeypatch.setattr(taskflow, "resolve_cluster", lambda *_a: "https://c")
+    monkeypatch.setattr(
+        taskflow,
+        "get_taskflow",
+        lambda *_a: {"resourceId": "r", "etag": "e", "taskFlow": {"id": "i"}},
+    )
+    monkeypatch.setattr(taskflow, "create_taskflow", lambda *a, **k: calls.update(create=calls["create"] + 1))
+    monkeypatch.setattr(taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1))
+
+    taskflow.deploy_taskflow("retail-demo-dev", path)
+
+    assert calls["put"] == 1 and calls["create"] == 0
 
 
 def test_artifact_type_mapping_covers_key_fabric_types() -> None:
