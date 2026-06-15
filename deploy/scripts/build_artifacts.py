@@ -149,11 +149,84 @@ def stage_setup_notebooks(
     return staged
 
 
+def stage_querysets(
+    repo_root: Path,
+    output_dir: Path,
+    kql_database_name: str = "retail_kql",
+    display_name: str = "retail_querysets",
+) -> list[Path]:
+    """Stage `fabric/querysets/*.kql` as one Fabric `.KQLQueryset` item.
+
+    Every `.kql` file becomes a tab in a single queryset bound to the Eventhouse
+    KQL database. The data source `clusterUri` is left empty so fabric-cicd fills
+    it from the deployed KQL database (matched by `databaseItemName`), while
+    `databaseItemId` carries the `FABRIC_KQL_DATABASE_RESOURCE_ID` placeholder
+    that `parameter.yml` replaces with the Terraform-provisioned KQL database id.
+
+    Returns an empty list when no queryset sources exist so the deploy degrades
+    gracefully.
+    """
+
+    source_dir = repo_root / "fabric" / "querysets"
+    if not source_dir.is_dir():
+        return []
+    kql_files = sorted(source_dir.glob("*.kql"), key=lambda path: path.name)
+    if not kql_files:
+        return []
+
+    item_dir = output_dir / f"{display_name}.KQLQueryset"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    _write_platform(item_dir, "KQLQueryset", display_name)
+
+    data_source_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"retail-demo:KQLQueryset:{display_name}:datasource",
+        )
+    )
+    tabs = [
+        {
+            "id": str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    f"retail-demo:KQLQueryset:{display_name}:tab:{kql_file.stem}",
+                )
+            ),
+            "content": kql_file.read_text(encoding="utf-8"),
+            "title": kql_file.stem,
+            "dataSourceId": data_source_id,
+        }
+        for kql_file in kql_files
+    ]
+
+    queryset = {
+        "queryset": {
+            "version": "1.0.0",
+            "dataSources": [
+                {
+                    "id": data_source_id,
+                    "clusterUri": "",
+                    "type": "Fabric",
+                    "databaseItemId": "FABRIC_KQL_DATABASE_RESOURCE_ID",
+                    "databaseItemName": kql_database_name,
+                }
+            ],
+            "tabs": tabs,
+        }
+    }
+    (item_dir / "RealTimeQueryset.json").write_text(
+        json.dumps(queryset, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return [item_dir]
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     notebook_groups: list[str] | None = None,
     lakehouse_name: str = "retail_lakehouse",
+    kql_database_name: str = "retail_kql",
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -190,6 +263,15 @@ def build_workspace(
     staged_items.extend(
         item.name
         for item in stage_powerbi_items(repo_root / "fabric" / "powerbi", output_dir)
+    )
+    # Curated KQL queries (fabric/querysets/*.kql) ship as a single
+    # .KQLQueryset item bound to the Eventhouse KQL database. Skipped silently
+    # when no queryset sources exist.
+    staged_items.extend(
+        item.name
+        for item in stage_querysets(
+            repo_root, output_dir, kql_database_name=kql_database_name
+        )
     )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
@@ -252,10 +334,15 @@ def main() -> int:
         choices=sorted(NOTEBOOK_GROUPS),
     )
     parser.add_argument("--lakehouse-name", default="retail_lakehouse")
+    parser.add_argument("--kql-database-name", default="retail_kql")
     args = parser.parse_args()
 
     result = build_workspace(
-        args.repo_root, args.output_dir, args.notebook_groups, args.lakehouse_name
+        args.repo_root,
+        args.output_dir,
+        args.notebook_groups,
+        args.lakehouse_name,
+        args.kql_database_name,
     )
     print(f"Staged {len(result.staged_items)} items in {result.output_dir}")
     for item in result.staged_items:

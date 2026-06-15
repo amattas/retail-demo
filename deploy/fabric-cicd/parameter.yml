@@ -4,7 +4,6 @@ find_replace:
     dev: https://onelake.dfs.fabric.microsoft.com/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002
   is_regex: 'true'
   item_type: SemanticModel
-  file_path: definition/expressions.tmdl
 - find_value: DirectLake - retail_lakehouse
   replace_value:
     dev: DirectLake - retail_lakehouse

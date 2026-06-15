@@ -102,6 +102,94 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_kql.KQLDatabase" not in result.staged_items
 
 
+def test_stage_querysets_builds_kqlqueryset_with_tab_per_file(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    querysets = repo / "fabric" / "querysets"
+    querysets.mkdir(parents=True)
+    (querysets / "q_tender_mix.kql").write_text(
+        "payment_processed | summarize sum(amount) by payment_method",
+        encoding="utf-8",
+    )
+    (querysets / "q_receipts.kql").write_text(
+        "mv_store_sales_minute | take 100", encoding="utf-8"
+    )
+
+    output = tmp_path / "workspace"
+    output.mkdir()
+    staged = build_artifacts.stage_querysets(
+        repo, output, kql_database_name="retail_kql"
+    )
+
+    assert staged == [output / "retail_querysets.KQLQueryset"]
+    item = staged[0]
+
+    platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
+    assert platform["metadata"]["type"] == "KQLQueryset"
+    assert platform["metadata"]["displayName"] == "retail_querysets"
+
+    definition = json.loads((item / "RealTimeQueryset.json").read_text(encoding="utf-8"))
+    queryset = definition["queryset"]
+    data_source = queryset["dataSources"][0]
+    # clusterUri is left empty for fabric-cicd to resolve from the live KQL DB.
+    assert data_source["clusterUri"] == ""
+    assert data_source["databaseItemName"] == "retail_kql"
+    # databaseItemId carries the placeholder that parameter.yml rewrites.
+    assert data_source["databaseItemId"] == "FABRIC_KQL_DATABASE_RESOURCE_ID"
+
+    # One tab per source file, sorted by file name, each bound to the data source.
+    assert [tab["title"] for tab in queryset["tabs"]] == ["q_receipts", "q_tender_mix"]
+    assert all(tab["dataSourceId"] == data_source["id"] for tab in queryset["tabs"])
+    assert queryset["tabs"][0]["content"] == "mv_store_sales_minute | take 100"
+
+
+def test_stage_querysets_returns_empty_when_no_sources(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    output = tmp_path / "workspace"
+    output.mkdir()
+
+    # No fabric/querysets directory at all.
+    assert build_artifacts.stage_querysets(repo, output) == []
+
+    # Directory present but empty.
+    (repo / "fabric" / "querysets").mkdir(parents=True)
+    assert build_artifacts.stage_querysets(repo, output) == []
+    assert not (output / "retail_querysets.KQLQueryset").exists()
+
+
+def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:
+    source_root = tmp_path / "repo"
+    for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:
+        _write_json(
+            source_root / "fabric" / "lakehouse" / notebook_name,
+            {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5},
+        )
+    _write_json(
+        source_root / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        source_root / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+    (source_root / "fabric" / "querysets").mkdir(parents=True)
+    (source_root / "fabric" / "querysets" / "q_tender_mix.kql").write_text(
+        "payment_processed | count", encoding="utf-8"
+    )
+
+    output = tmp_path / "workspace"
+    result = build_artifacts.build_workspace(
+        source_root, output, ["core"], kql_database_name="custom_kql"
+    )
+
+    assert "retail_querysets.KQLQueryset" in result.staged_items
+    definition = json.loads(
+        (output / "retail_querysets.KQLQueryset" / "RealTimeQueryset.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert definition["queryset"]["dataSources"][0]["databaseItemName"] == "custom_kql"
+
+
 def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     out_dir = tmp_path / "workspace"
