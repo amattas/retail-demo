@@ -1,0 +1,469 @@
+{
+  "tasks": [
+    {
+      "id": "d7ce0e1e-fc0d-4749-a3a8-aec7c850017d",
+      "type": "get data",
+      "name": "Load Historical Data",
+      "description": "Ingest batch and real-time data into a single location within your Fabric workspace.",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:8a58519f-4156-40ba-a466-7d31d5e26fcd",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": "8a58519f-4156-40ba-a466-7d31d5e26fcd",
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:90009e22-24ab-4750-b2f6-b72cf6db2741",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "02-historical-data-load"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:adb9c982-0630-4585-9b9e-1c5f0a149bd0",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "01-create-bronze-shortcuts"
+        }
+      ],
+      "loc": "-220 -80"
+    },
+    {
+      "id": "32712835-c4fe-4073-aed8-195eceb57619",
+      "type": "store data",
+      "name": "Lakehouse",
+      "description": "",
+      "items": [
+        {
+          "artifactUniqueId": "Lakehouse:fc9ed7b6-6723-4116-8bf1-278135865270",
+          "artifactType": "Lakehouse",
+          "artifactObjectId": "fc9ed7b6-6723-4116-8bf1-278135865270",
+          "artifactName": "retail_lakehouse"
+        },
+        {
+          "artifactUniqueId": "SqlAnalyticsEndpoint:63f6eba8-57a6-42ec-a29d-3ee823d40969",
+          "artifactType": "SqlAnalyticsEndpoint",
+          "artifactObjectId": "63f6eba8-57a6-42ec-a29d-3ee823d40969",
+          "artifactName": "retail_lakehouse"
+        }
+      ],
+      "loc": "460 20"
+    },
+    {
+      "id": "17a0dbf9-0c1d-4be1-bcda-d7664e21336a",
+      "type": "get data",
+      "name": "Get Real-Time Data",
+      "description": "",
+      "items": [
+        {
+          "artifactUniqueId": "KustoEventHouse:c35327d5-3ac8-4922-8d69-493391c05984",
+          "artifactType": "KustoEventHouse",
+          "artifactObjectId": "c35327d5-3ac8-4922-8d69-493391c05984",
+          "artifactName": "retail_eventhouse"
+        },
+        {
+          "artifactUniqueId": "KustoDatabase:bc856a99-066c-4865-993a-7d188fbca851",
+          "artifactType": "KustoDatabase",
+          "artifactObjectId": "bc856a99-066c-4865-993a-7d188fbca851",
+          "artifactName": "retail_eventhouse"
+        }
+      ],
+      "loc": "-220 120"
+    },
+    {
+      "id": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
+      "type": "prepare data",
+      "name": "Transform Historical Data",
+      "description": "",
+      "items": [
+        {
+          "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
+          "artifactType": "Pipeline",
+          "artifactObjectId": "abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
+          "artifactName": "historical-data-load"
+        }
+      ],
+      "loc": "120 -80"
+    },
+    {
+      "id": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
+      "type": "prepare data",
+      "name": "Transform Real-Time Data",
+      "description": "Clean, transform, extract, and load your data for analysis and modeling tasks.",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:18e17653-c8fb-456e-a4fa-44743c948866",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": "18e17653-c8fb-456e-a4fa-44743c948866",
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:543e9201-1cbe-4da2-b8f8-0a634fa8bcdc",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": "543e9201-1cbe-4da2-b8f8-0a634fa8bcdc",
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "Pipeline:3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
+          "artifactType": "Pipeline",
+          "artifactObjectId": "3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
+          "artifactName": "streaming-data-load"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:8b187f3d-b32f-4d15-ae0a-f20c518e29ec",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "04-streaming-to-gold"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:42c685c9-6bea-45f5-872b-7cc1353961e3",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "03-streaming-to-silver"
+        }
+      ],
+      "loc": "120 120"
+    },
+    {
+      "id": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
+      "type": "general",
+      "name": "General",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:c3d99c89-ceb3-482d-b0e7-62625929f45e",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": "c3d99c89-ceb3-482d-b0e7-62625929f45e",
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "Pipeline:1ec9af37-769b-49e8-adb8-0ee36d961b7d",
+          "artifactType": "Pipeline",
+          "artifactObjectId": "1ec9af37-769b-49e8-adb8-0ee36d961b7d",
+          "artifactName": "daily-maintenance"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:16aa0e09-f7c3-436b-8bb2-4250fabc65d0",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "05-maintain-delta-tables"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:4c58cdde-5ead-4292-999f-2f33696fff5d",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "99-reset-lakehouse"
+        }
+      ],
+      "loc": "460 -280"
+    },
+    {
+      "id": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "type": "store data",
+      "name": "Semantic Model",
+      "description": "",
+      "items": [
+        {
+          "artifactUniqueId": "3:4416500",
+          "artifactType": "dataset",
+          "artifactObjectId": null,
+          "artifactName": null
+        }
+      ],
+      "loc": "800 120"
+    },
+    {
+      "id": "2b579fce-56a9-4b47-8602-22a334c8f273",
+      "type": "distribute data",
+      "name": "Data Agents",
+      "description": "Propose hypotheses, train models, and explore your data to make decisions and predictions.",
+      "items": [
+        {
+          "artifactUniqueId": "LLMPlugin:b791fcbd-1b88-4126-9f46-d95eac202634",
+          "artifactType": "LLMPlugin",
+          "artifactObjectId": "b791fcbd-1b88-4126-9f46-d95eac202634",
+          "artifactName": "retail-semantic-model-agent"
+        },
+        {
+          "artifactUniqueId": "LLMPlugin:c1d73913-84df-4aa3-a3cb-bf16ca343553",
+          "artifactType": "LLMPlugin",
+          "artifactObjectId": null,
+          "artifactName": "retail-ontology-agent"
+        }
+      ],
+      "loc": "1140 40"
+    },
+    {
+      "id": "333311ac-9b2e-4cfc-898c-cb63347b6988",
+      "type": "analyze and train data",
+      "name": "Analyze and train Models",
+      "description": "Propose hypotheses, train models, and explore your data to make decisions and predictions.",
+      "items": [
+        {
+          "artifactUniqueId": "MLExperiment:a4ad20b8-552e-4b80-9c98-e1ce47fa278c",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "demand_forecast"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:cffb7610-e761-485e-8f75-7f2c8a7730d2",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:07998890-6802-419e-84c6-66d1f7d741d2",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:22cf947e-4e21-4f59-b653-fc2b316d4b27",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "08-ml-customer-segmentation"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:13c32a9a-70f8-4638-97a2-54f4ddf49d05",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "06-ml-demand-forecast"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:e1aaa8df-b835-4f32-8240-f75d0d1889db",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "07-ml-market-basket"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:875f69ea-f370-4702-b5f0-efc73e0a2ae0",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "09-ml-churn-prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:7ee8db66-05bb-4bb3-aca8-bbc355b80443",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "churn_prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:fc745b56-e5eb-4f39-9956-47072085f7aa",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "customer_segmentation"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:33805d04-7b88-4d31-ab18-3c690778a4de",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "market_basket"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:c68213a1-407e-4580-8a91-8b17f3014e9a",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "promotion_effectiveness"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:20a387e3-668a-4ff0-a072-b33ab29a0b79",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "10-ml-promotion-effectiveness"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:09fc05bb-ef5f-45d3-85bf-de3b096c425b",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "11-ml-journey-analysis"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:e5f45d40-53c2-4a12-a9b5-c303f8c7347d",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "12-ml-stockout-prediction"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:72ac6599-7069-4679-8670-c0d74cb3ec6d",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "13-ml-delivery-prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:34688f82-93d4-4e31-9108-e829ef29a451",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "delivery_prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:fe322005-2266-4cf1-bac3-37f2c15b0e10",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "journey_analysis"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:fdef9c48-5c00-4edc-a9ca-fcf26f8b5be4",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "14-ml-dynamic-pricing"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:864058c9-4a96-4476-9f9b-534a2e72ae30",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "stockout_prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:ca01314e-0157-4758-adea-9aed779c3aa8",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "dynamic_pricing"
+        },
+        {
+          "artifactUniqueId": "Pipeline:28d204d9-0bb5-4756-b52e-0da700fe8bc8",
+          "artifactType": "Pipeline",
+          "artifactObjectId": "28d204d9-0bb5-4756-b52e-0da700fe8bc8",
+          "artifactName": "machine-learning"
+        }
+      ],
+      "loc": "460 320"
+    },
+    {
+      "id": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
+      "type": "distribute data",
+      "name": "Serve Ontologies",
+      "description": "Package your items for distribution as customized, easy-to-use apps.",
+      "items": [
+        {
+          "artifactUniqueId": "Ontology:573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd",
+          "artifactType": "Ontology",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "GraphIndex:2a5ecefc-1e17-47b7-8ead-26d4be95c41e",
+          "artifactType": "GraphIndex",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "Lakehouse:1003054e-bb57-4c1b-8a2b-eae6e4fe67c7",
+          "artifactType": "Lakehouse",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "SqlAnalyticsEndpoint:a2ccc340-587d-4b58-8506-b5a6ef9852b1",
+          "artifactType": "SqlAnalyticsEndpoint",
+          "artifactObjectId": null,
+          "artifactName": null
+        },
+        {
+          "artifactUniqueId": "Ontology:ab4766aa-2ebf-4b76-86b6-7efe733d918d",
+          "artifactType": "Ontology",
+          "artifactObjectId": null,
+          "artifactName": "Retail Ontology"
+        },
+        {
+          "artifactUniqueId": "GraphIndex:778d7f93-af99-41f2-8442-6330dc789bcf",
+          "artifactType": "GraphIndex",
+          "artifactObjectId": null,
+          "artifactName": "RetailOntology_AutoGen_graph_ab4766aa2ebf4b7686b67efe733d918d"
+        },
+        {
+          "artifactUniqueId": "Lakehouse:d292daaf-0c5c-455a-b401-cad1143075a7",
+          "artifactType": "Lakehouse",
+          "artifactObjectId": null,
+          "artifactName": "RetailOntology_AutoGen_lh_ab4766aa2ebf4b7686b67efe733d918d"
+        },
+        {
+          "artifactUniqueId": "SqlAnalyticsEndpoint:5e48187f-572a-4325-82d0-64c7aa0d41c9",
+          "artifactType": "SqlAnalyticsEndpoint",
+          "artifactObjectId": null,
+          "artifactName": "RetailOntology_AutoGen_lh_ab4766aa2ebf4b7686b67efe733d918d"
+        }
+      ],
+      "loc": "800 -60"
+    }
+  ],
+  "edges": [
+    {
+      "id": "-1",
+      "source": "d7ce0e1e-fc0d-4749-a3a8-aec7c850017d",
+      "target": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-2",
+      "source": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
+      "target": "32712835-c4fe-4073-aed8-195eceb57619",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-3",
+      "source": "17a0dbf9-0c1d-4be1-bcda-d7664e21336a",
+      "target": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-4",
+      "source": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
+      "target": "32712835-c4fe-4073-aed8-195eceb57619",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-5",
+      "source": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
+      "target": "32712835-c4fe-4073-aed8-195eceb57619",
+      "fromPort": "bottom",
+      "toPort": "top"
+    },
+    {
+      "id": "-6",
+      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-8",
+      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "333311ac-9b2e-4cfc-898c-cb63347b6988",
+      "fromPort": "bottom",
+      "toPort": "top"
+    },
+    {
+      "id": "-9",
+      "source": "333311ac-9b2e-4cfc-898c-cb63347b6988",
+      "target": "32712835-c4fe-4073-aed8-195eceb57619",
+      "fromPort": "top",
+      "toPort": "bottom"
+    },
+    {
+      "id": "-10",
+      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-11",
+      "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "target": "2b579fce-56a9-4b47-8602-22a334c8f273",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-12",
+      "source": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
+      "target": "2b579fce-56a9-4b47-8602-22a334c8f273",
+      "fromPort": "right",
+      "toPort": "left"
+    }
+  ],
+  "id": "adf6a8f1-8129-4a69-a7f7-80c21c32edf6",
+  "name": "Retail Demo",
+  "description": ""
+}
