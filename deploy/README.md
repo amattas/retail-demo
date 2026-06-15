@@ -100,8 +100,12 @@ After the Eventhouse and KQL database exist:
   `retail_querysets.KQLQueryset` item (one tab per `.kql` file) bound to the
   Eventhouse KQL database. `clusterUri` is resolved by fabric-cicd at publish
   time and `databaseItemId` is rewritten from the Terraform KQL database id.
-- Pipeline and dashboard assets remain source inputs until their Fabric
-  source-control item formats are validated.
+- Data Pipelines in `fabric\pipelines\*.DataPipeline` deploy into a **Pipelines**
+  folder; each pipeline is staged only when its notebooks are part of the deploy,
+  and notebook references are remapped via generated `parameter.yml` rules.
+- Dashboard assets remain source inputs until their Fabric source-control item
+  formats are validated. Task flows are deployed separately by
+  `deploy.scripts.taskflow` (offered as a prompt at the end of deploy).
 - Secrets must come from Azure login, GitHub Actions secrets, environment
   variables, Key Vault, or ignored local files. Do not commit secrets to YAML,
   Terraform files, notebooks, or generated artifacts.
