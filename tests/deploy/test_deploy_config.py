@@ -25,6 +25,7 @@ def test_load_environment_merges_defaults_and_environment() -> None:
         "Report",
         "KQLQueryset",
         "DataPipeline",
+        "MLExperiment",
     ]
 
 

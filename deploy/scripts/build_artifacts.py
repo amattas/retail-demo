@@ -20,12 +20,30 @@ PLATFORM_SCHEMA = (
 # staged directory structure to Fabric workspace folders, so staging an item
 # under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
 # Demo/pipeline notebooks go under "Notebooks"; one-time setup notebooks (and
-# other setup artifacts) go under "Setup". The Lakehouse shell and KQLQueryset
-# stay at the workspace root.
+# other setup artifacts) go under "Setup"; the semantic model and report go under
+# "Reporting"; MLflow experiments go under "ML". The Lakehouse shell and
+# KQLQueryset stay at the workspace root.
 NOTEBOOKS_FOLDER = "Notebooks"
 SETUP_FOLDER = "Setup"
-POWERBI_FOLDER = "Power BI"
+POWERBI_FOLDER = "Reporting"
 PIPELINES_FOLDER = "Pipelines"
+ML_FOLDER = "ML"
+
+# MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
+# them as MLExperiment shell items so they exist (and are organized under the "ML"
+# folder) before the notebooks run. Names match each notebook's default
+# MLFLOW_EXPERIMENT value.
+ML_EXPERIMENTS = [
+    "demand_forecast",
+    "market_basket",
+    "customer_segmentation",
+    "churn_prediction",
+    "promotion_effectiveness",
+    "journey_analysis",
+    "stockout_prediction",
+    "delivery_prediction",
+    "dynamic_pricing",
+]
 NOTEBOOK_GROUPS = {
     "core": [
         "01-create-bronze-shortcuts.ipynb",
@@ -287,6 +305,18 @@ def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
     return names
 
 
+def stage_ml_experiments(output_dir: Path) -> list[Path]:
+    """Stage MLflow experiments as MLExperiment shell items.
+
+    fabric-cicd publishes MLExperiment shell-only (no definition), so each name
+    becomes a `<name>.MLExperiment` shell. Pre-creating them lets the ML
+    notebooks reuse the experiments rather than creating them on first run, and
+    groups them under the "ML" workspace folder.
+    """
+
+    return [stage_shell_item(output_dir, name, "MLExperiment") for name in ML_EXPERIMENTS]
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -358,6 +388,11 @@ def build_workspace(
             _deployed_notebook_names(notebook_groups),
         )
     )
+    # MLflow experiments bootstrap alongside the ML notebooks, under "ML".
+    if "ml" in notebook_groups:
+        staged_items.extend(
+            item.name for item in stage_ml_experiments(output_dir / ML_FOLDER)
+        )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
 
