@@ -102,10 +102,10 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_kql.KQLDatabase" not in result.staged_items
 
     # Notebooks publish under a "Notebooks" workspace folder; Power BI items
-    # under a "Power BI" folder; the Lakehouse shell stays at the root.
+    # under a "Reporting" folder; the Lakehouse shell stays at the root.
     assert (output / "Notebooks" / "01-create-bronze-shortcuts.Notebook").is_dir()
-    assert (output / "Power BI" / "retail_model.SemanticModel").is_dir()
-    assert (output / "Power BI" / "retail_model.Report").is_dir()
+    assert (output / "Reporting" / "retail_model.SemanticModel").is_dir()
+    assert (output / "Reporting" / "retail_model.Report").is_dir()
     assert (output / "retail_lakehouse.Lakehouse").is_dir()
     assert not (output / "01-create-bronze-shortcuts.Notebook").exists()
 
@@ -190,6 +190,42 @@ def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) ->
     assert "Kqlmagic" in text
     assert "create table receipts" in text  # embedded KQL
     assert "retail_kql" in text  # target database name
+
+
+def test_stage_ml_experiments_creates_shell_items(tmp_path: Path) -> None:
+    staged = build_artifacts.stage_ml_experiments(tmp_path)
+
+    assert len(staged) == len(build_artifacts.ML_EXPERIMENTS)
+    item = tmp_path / "demand_forecast.MLExperiment"
+    assert item.is_dir()
+    platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
+    assert platform["metadata"]["type"] == "MLExperiment"
+    assert platform["metadata"]["displayName"] == "demand_forecast"
+
+
+def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"] + build_artifacts.NOTEBOOK_GROUPS["ml"]:
+        _write_json(
+            repo / "fabric" / "lakehouse" / notebook_name,
+            {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5},
+        )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+
+    without_ml = build_artifacts.build_workspace(repo, tmp_path / "ws1", ["core"])
+    assert not (tmp_path / "ws1" / "ML").exists()
+    assert "demand_forecast.MLExperiment" not in without_ml.staged_items
+
+    with_ml = build_artifacts.build_workspace(repo, tmp_path / "ws2", ["core", "ml"])
+    assert (tmp_path / "ws2" / "ML" / "demand_forecast.MLExperiment").is_dir()
+    assert "demand_forecast.MLExperiment" in with_ml.staged_items
 
 
 def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:

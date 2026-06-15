@@ -9,6 +9,7 @@ core:
   - Report
   - KQLQueryset
   - DataPipeline
+  - MLExperiment
   parameter: parameter.yml
 publish:
   skip:

@@ -63,7 +63,7 @@ terraform -chdir=deploy\terraform apply -var-file=environments\dev.tfvars
 terraform -chdir=deploy\terraform output -json > deploy\.generated\dev\terraform-output.json
 python -m deploy.scripts.generate_configs --environment dev --terraform-output deploy\.generated\dev\terraform-output.json
 retail-setup render --env dev
-python -m deploy.scripts.build_artifacts --notebook-groups core setup --lakehouse-name retail_lakehouse
+python -m deploy.scripts.build_artifacts --notebook-groups core setup ml --lakehouse-name retail_lakehouse
 python -m deploy.scripts.deploy_items --environment dev
 python -m deploy.scripts.apply_kql --output deploy\.generated\dev\database.kql
 python -m deploy.scripts.validate_deployment --environment dev
@@ -90,8 +90,9 @@ After the Eventhouse and KQL database exist:
 
 - Published items are organized into Fabric workspace folders: demo/pipeline
   notebooks under **Notebooks**, one-time setup notebooks under **Setup**, the
-  semantic model and report under **Power BI**, and Data Pipelines under
-  **Pipelines**. The Lakehouse and queryset stay at the workspace root.
+  semantic model and report under **Reporting**, Data Pipelines under
+  **Pipelines**, and bootstrapped MLflow experiments under **ML** (with the `ml`
+  notebook group). The Lakehouse and queryset stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
 - Eventstream deployment is disabled by default because Fabric source-control
   item definitions for Eventstream are not yet part of this framework.

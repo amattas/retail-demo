@@ -565,6 +565,7 @@ def _deploy_plan(
                 "--notebook-groups",
                 "core",
                 "setup",
+                "ml",
                 "--lakehouse-name",
                 lakehouse_name,
             ],
