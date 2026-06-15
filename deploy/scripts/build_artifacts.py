@@ -160,6 +160,112 @@ def stage_setup_notebooks(
     return staged
 
 
+KQL_APPLY_NOTEBOOK = "00-apply-kql"
+
+
+def stage_kql_apply_notebook(
+    repo_root: Path,
+    output_dir: Path,
+    kql_database_name: str = "retail_kql",
+) -> Path:
+    """Generate and stage a notebook that applies the Eventhouse KQL setup scripts.
+
+    The notebook resolves the workspace's KQL database at runtime and runs the
+    combined ``.execute database script`` (built from ``fabric/kql_database/*.kql``)
+    with Kqlmagic. It is chained first in the setup pipeline so the Eventhouse
+    schema exists before the data-generation notebooks run.
+
+    Note: notebook execution can't be validated outside Fabric — verify the first
+    run and adjust the Kqlmagic auth if a headless pipeline run can't sign in.
+    """
+
+    from deploy.scripts import apply_kql
+
+    scripts = apply_kql.collect_kql_scripts(repo_root / "fabric" / "kql_database")
+    kql_script = apply_kql.build_database_script(scripts)
+    notebook = _kql_apply_notebook_content(kql_script, kql_database_name)
+
+    item_dir = output_dir / f"{KQL_APPLY_NOTEBOOK}.Notebook"
+    item_dir.mkdir(parents=True, exist_ok=True)
+    _write_platform(item_dir, "Notebook", KQL_APPLY_NOTEBOOK)
+    (item_dir / "notebook-content.ipynb").write_text(
+        json.dumps(notebook, indent=1, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return item_dir
+
+
+def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict:
+    """Build the ipynb JSON for the KQL-apply notebook (Kqlmagic + embedded KQL)."""
+
+    resolve = (
+        "import requests, notebookutils\n"
+        "ws_id = notebookutils.runtime.context['currentWorkspaceId']\n"
+        "tok = notebookutils.credentials.getToken('pbi')\n"
+        "resp = requests.get(\n"
+        "    f'https://api.fabric.microsoft.com/v1/workspaces/{ws_id}/kqlDatabases',\n"
+        "    headers={'Authorization': f'Bearer {tok}'},\n"
+        ")\n"
+        "resp.raise_for_status()\n"
+        "dbs = resp.json()['value']\n"
+        f"db = next((d for d in dbs if d['displayName'] == {kql_database_name!r}), dbs[0])\n"
+        "query_uri = db['properties']['queryServiceUri']\n"
+        "db_name = db['displayName']\n"
+        "print(f'KQL database: {db_name} @ {query_uri}')"
+    )
+    connect = (
+        "%reload_ext Kqlmagic\n"
+        "from IPython import get_ipython\n"
+        "kusto_token = notebookutils.credentials.getToken(query_uri)\n"
+        "conn = (\n"
+        "    f\"azureDataExplorer://aadtoken='{kusto_token}';\"\n"
+        "    f\"cluster='{query_uri}';database='{db_name}'\"\n"
+        ")\n"
+        "get_ipython().run_line_magic('kql', conn)"
+    )
+    run = (
+        "import json\n"
+        "from IPython import get_ipython\n"
+        f"KQL_SCRIPT = json.loads(r'''{json.dumps(kql_script)}''')\n"
+        "get_ipython().run_cell_magic('kql', '', KQL_SCRIPT)\n"
+        "print('KQL setup scripts applied.')"
+    )
+    return {
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": (
+                    "# Apply KQL setup scripts\n\n"
+                    "Applies the Eventhouse KQL setup (tables, ingestion mappings, "
+                    "functions, materialized views) with Kqlmagic. Generated from "
+                    "`fabric/kql_database/*.kql` by `build_artifacts` — do not edit by hand."
+                ),
+            },
+            _code_cell("%pip install --quiet Kqlmagic"),
+            _code_cell(resolve),
+            _code_cell(connect),
+            _code_cell(run),
+        ],
+        "metadata": {
+            "language_info": {"name": "python"},
+            "kernelspec": {"name": "synapse_pyspark", "display_name": "Synapse PySpark"},
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+
+
+def _code_cell(source: str) -> dict:
+    return {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": source,
+    }
+
+
 def stage_querysets(
     repo_root: Path,
     output_dir: Path,
@@ -284,6 +390,7 @@ def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
     names = {Path(name).stem for name in _selected_notebooks(notebook_groups)}
     if "setup" in notebook_groups:
         names.update(SETUP_NOTEBOOKS)
+        names.add(KQL_APPLY_NOTEBOOK)
     return names
 
 
@@ -322,13 +429,21 @@ def build_workspace(
             ).name
         )
 
-    # One-time setup notebooks publish into a separate "Setup" workspace folder.
+    # One-time setup notebooks publish into a separate "Setup" workspace folder,
+    # along with a generated 00-apply-kql notebook that applies the Eventhouse
+    # KQL setup scripts.
     if "setup" in notebook_groups:
+        setup_dir = output_dir / SETUP_FOLDER
         staged_items.extend(
             item.name
             for item in stage_setup_notebooks(
-                repo_root, output_dir / SETUP_FOLDER, lakehouse_name=lakehouse_name
+                repo_root, setup_dir, lakehouse_name=lakehouse_name
             )
+        )
+        staged_items.append(
+            stage_kql_apply_notebook(
+                repo_root, setup_dir, kql_database_name=kql_database_name
+            ).name
         )
 
     # Power BI items publish into a "Power BI" workspace folder.

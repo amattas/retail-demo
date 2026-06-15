@@ -164,6 +164,34 @@ def test_stage_querysets_returns_empty_when_no_sources(tmp_path: Path) -> None:
     assert not (output / "retail_querysets.KQLQueryset").exists()
 
 
+def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    kql_dir = repo / "fabric" / "kql_database"
+    kql_dir.mkdir(parents=True)
+    (kql_dir / "01-create-tables.kql").write_text(
+        ".create table receipts (id:string)", encoding="utf-8"
+    )
+    (kql_dir / "02-create-functions.kql").write_text(
+        ".create function foo() { receipts | count }", encoding="utf-8"
+    )
+
+    output = tmp_path / "workspace"
+    item = build_artifacts.stage_kql_apply_notebook(repo, output, kql_database_name="retail_kql")
+
+    assert item == output / "00-apply-kql.Notebook"
+    platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
+    assert platform["metadata"]["type"] == "Notebook"
+    assert platform["metadata"]["displayName"] == "00-apply-kql"
+    notebook = json.loads((item / "notebook-content.ipynb").read_text(encoding="utf-8"))
+    text = "\n".join(
+        c["source"] if isinstance(c["source"], str) else "".join(c["source"])
+        for c in notebook["cells"]
+    )
+    assert "Kqlmagic" in text
+    assert "create table receipts" in text  # embedded KQL
+    assert "retail_kql" in text  # target database name
+
+
 def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:
     source_root = tmp_path / "repo"
     for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:
@@ -324,6 +352,12 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
     _write_json(
         repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
         {"metadata": {"type": "Report"}},
+    )
+
+    # KQL source for the generated 00-apply-kql notebook (setup group).
+    (repo / "fabric" / "kql_database").mkdir(parents=True)
+    (repo / "fabric" / "kql_database" / "01-create-tables.kql").write_text(
+        ".create table receipts (id:string)", encoding="utf-8"
     )
 
     build_artifacts.build_workspace(
