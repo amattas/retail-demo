@@ -1,185 +1,294 @@
 # retail-setup
 
-Fabric-native setup utility: configure an environment, render parametrised
-notebooks, and optionally deploy to a Microsoft Fabric workspace.
+`retail-setup` is the current Fabric-native setup utility for this repository.
+It configures a target Fabric environment, renders setup notebooks, and can call
+the deployment framework for Terraform/fabric-cicd deployment.
 
-Full design: `docs/superpowers/specs/2026-06-12-setup-utility-design.md`
+Use this utility for new workspaces. `datagen-deprecated\` is retained for
+legacy reference only.
 
----
+## Supported workflow
 
-## Workflow
+1. Install the utility.
+2. Run `retail-setup configure` to write deployment and generation settings.
+3. Run `retail-setup render` to produce workspace-specific setup notebooks.
+4. Import notebooks manually, or run `retail-setup deploy`.
+5. Run setup notebooks 01-04 in Fabric.
+6. Optionally import and run `setup-05-stream-events.ipynb` as a live driver.
 
-### 1. Configure
+## Prerequisites
 
-Writes two files from interactive prompts (or `--` flags for scripting):
+Required:
 
-- `deploy/config/deploy.yml` + `deploy/config/environments/<env>.yml` —
-  deployment target values (workspace, lakehouse, eventhouse, …)
-- `utility/config.yaml` — data-generation values (store type, date range, …)
+- Python 3.11 or later.
+- A Microsoft Fabric tenant and capacity.
+- Permission to create or update the target Fabric workspace and items.
 
-```bash
+Required only for `retail-setup deploy`:
+
+- Terraform on `PATH`.
+- Azure CLI or Azure PowerShell authenticated to the target tenant.
+- `azure-identity` and `fabric-cicd` installed in the active Python environment.
+
+Fabric provides Spark for the notebooks. Local PySpark is only needed for
+development tests.
+
+## Install
+
+From the repository root:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .\utility
+```
+
+For automated deployment:
+
+```powershell
+python -m pip install azure-identity fabric-cicd
+```
+
+Confirm the CLI is available:
+
+```powershell
+retail-setup --help
+```
+
+## Configure
+
+`configure` writes both deployment and data-generation settings:
+
+- `deploy\config\deploy.yml`
+- `deploy\config\environments\<env>.yml`
+- `utility\config.yaml`
+
+`utility\config.yaml` and `utility\out\` are ignored by Git because they contain
+local environment-specific values.
+
+Interactive:
+
+```powershell
 retail-setup configure
-# or non-interactively:
-retail-setup configure \
-  --env dev \
-  --tenant-id 00000000-0000-0000-0000-000000000000 \
-  --workspace-name retail-demo-dev \
-  --capacity-name F64 \
-  --lakehouse-name retail_lakehouse \
-  --eventhouse-name retail_eventhouse \
-  --kql-database-name retail_kql \
-  --store-type grocery \
-  --start-date 2024-01-01 \
-  --end-date 2024-12-31 \
-  --store-count 20 \
+```
+
+Non-interactive example:
+
+```powershell
+retail-setup configure `
+  --env dev `
+  --tenant-id 00000000-0000-0000-0000-000000000000 `
+  --workspace-name retail-demo-dev `
+  --capacity-name F64 `
+  --lakehouse-name retail_lakehouse `
+  --eventhouse-name retail_eventhouse `
+  --kql-database-name retail_kql `
+  --store-type supercenter `
+  --start-date 2025-01-01 `
+  --end-date 2025-03-31 `
+  --store-count 50 `
   --seed 42
 ```
 
-Both `utility/config.yaml` and `utility/out/` are gitignored — they hold
-environment-specific values and rendered artefacts that must not be committed.
+### Generation defaults and validation
 
-### 2. Render
+The persisted generation settings are:
 
-Reads `utility/config.yaml` and `deploy/config/` and injects the nine tokens
-into copies of the committed setup notebooks, writing them to `utility/out/`.
+| Setting | Meaning |
+| --- | --- |
+| `store_type` | Dictionary/profile to use: `grocery`, `hardware`, `luxury`, or `supercenter`. |
+| `start_date` / `end_date` | Inclusive historical generation date range. |
+| `store_count` | Number of stores to generate. Must be between 1 and 2000. |
+| `seed` | Deterministic random seed. |
 
-```bash
-retail-setup render           # uses HEAD git SHA as DICTIONARY_REF
-retail-setup render --ref main  # pin a specific ref
+Derived defaults are applied by the engine:
+
+| Derived setting | Default |
+| --- | --- |
+| `silver_db` | `ag` |
+| `gold_db` | `au` |
+| `dc_count` | `max(1, store_count // 10)` |
+| `customer_count` | `store_count * 1000` |
+| `online_orders_per_day` | `store_count * 8` |
+| `transactions_per_store_day` | `400` |
+| `return_rate` | `0.01` |
+| `brands_per_product` | `3` |
+| `truck_capacity` | `15000` |
+
+## Render setup notebooks
+
+```powershell
+retail-setup render --env dev
 ```
 
-The rendered notebooks are written to `utility/out/`:
+By default, render pins dictionaries to the current Git `HEAD` SHA. Use `--ref`
+to pin a specific ref:
+
+```powershell
+retail-setup render --env dev --ref main
+```
+
+Rendered notebooks are written to `utility\out\`:
 
 - `setup-01-seed-dictionaries.ipynb`
 - `setup-02-generate-dimensions.ipynb`
 - `setup-03-generate-facts.ipynb`
 - `setup-04-build-gold.ipynb`
-- `setup-05-stream-events.ipynb` — optional live event generator (see step 5)
 
-### 3a. Import notebooks manually (no deploy framework)
-
-Upload the rendered notebooks from `utility/out/` to your Fabric workspace
-via the Fabric portal. Attach each to the target Lakehouse when prompted.
-
-### 3b. Deploy via the framework (requires Terraform + Fabric workspace access)
-
-```bash
-retail-setup deploy --env dev           # full run with Terraform confirmation gate
-retail-setup deploy --env dev --dry-run  # print the full plan, execute nothing
-retail-setup deploy --env dev --skip-terraform  # skip Terraform steps
-retail-setup deploy --env dev --yes     # pre-confirm the terraform apply prompt
-```
-
-The deploy command orchestrates (in order):
-
-1. `generate_configs` — write Terraform + fabric-cicd config files
-2. `terraform init / plan / apply` (unless `--skip-terraform`) — provision
-   workspace, lakehouse, and eventhouse; captures outputs
-3. `build_artifacts --notebook-groups core setup` — stage all notebooks
-4. `deploy_items` — publish staged items to Fabric
-5. `apply_kql` — apply the KQL database script
-6. `validate_deployment` — verify the deployed workspace
-
-Prerequisites: `terraform` on PATH; Azure CLI or PowerShell authenticated to
-the target tenant; `fabric-cicd` and `azure-identity` installed (framework
-deps, not bundled here).
-
-### 4. Run the setup notebooks in order
-
-In Fabric, open and run each notebook in sequence:
-
-1. `setup-01-seed-dictionaries` — loads product / employee / customer dictionaries
-2. `setup-02-generate-dimensions` — generates dimension tables into Lakehouse Delta
-3. `setup-03-generate-facts` — generates all 18 fact tables
-4. `setup-04-build-gold` — builds the 9 Gold aggregations
-
-### 5. (Optional) Stream live events
-
-`setup-05-stream-events` is a Spark Structured Streaming generator that emits the
-same 18 real-time event types datagen produced, as JSON `EventEnvelope`s, into a
-Fabric **Eventstream** — so the Eventstream → KQL `cusn.*` → Silver → Gold pipeline
-runs without the external datagen service, and **everything stays inside Fabric**
-(no standalone Azure Event Hubs namespace). It is **not** part of the ordered 1→4
-batch setup — run it after setup completes, as a long-running live driver.
-
-Key parameters (Fabric `parameters` cell, override per run):
-
-- `events_per_second` is now `source_rows_per_second` — rate-source rows/sec
-  (default 5). Each row emits one scenario bundle, so actual events/sec is higher.
-- `sink` — `"eventstream"` (default) or `"delta"` (a Lakehouse landing table for testing)
-- `run_seconds` — `0` runs forever; `>0` stops after N seconds (smoke test)
-- Eventstream: `eventstream_bootstrap`, `eventstream_name`, and
-  `eventstream_secret_keyvault` / `eventstream_secret_name`. Create a **Custom
-  Endpoint** source on the Eventstream; copy its Event-Hub/Kafka bootstrap server +
-  name from the protocol tab. The connection string is read at runtime from Key
-  Vault — never hardcoded.
-
-The Eventstream sink uses the Spark Kafka connector (`spark-sql-kafka-0-10`), which
-the Fabric Spark runtime provides by default.
-
-Design: `docs/superpowers/specs/2026-06-13-stream-generator-design.md`. The events
-carry valid foreign keys read from the dims that setup-02 wrote. Stop the streaming
-query to stop generating.
-
----
-
-## The nine render tokens
+These notebooks receive the nine render tokens:
 
 | Token | Source |
-|---|---|
-| `{{LAKEHOUSE_NAME}}` | `deploy/config/` → `lakehouse.name` for the target env |
-| `{{SILVER_DB}}` | `utility/config.yaml` → `silver_db` |
-| `{{GOLD_DB}}` | `utility/config.yaml` → `gold_db` |
-| `{{STORE_TYPE}}` | `utility/config.yaml` → `store_type` |
-| `{{START_DATE}}` | `utility/config.yaml` → `start_date` |
-| `{{END_DATE}}` | `utility/config.yaml` → `end_date` |
-| `{{STORE_COUNT}}` | `utility/config.yaml` → `store_count` |
-| `{{SEED}}` | `utility/config.yaml` → `seed` |
-| `{{DICTIONARY_REF}}` | `git rev-parse HEAD` at render time (`--ref` to override) |
+| --- | --- |
+| `{{LAKEHOUSE_NAME}}` | `deploy\config` lakehouse name for the target environment |
+| `{{SILVER_DB}}` | generation config (`ag` by default) |
+| `{{GOLD_DB}}` | generation config (`au` by default) |
+| `{{STORE_TYPE}}` | generation config |
+| `{{START_DATE}}` | generation config |
+| `{{END_DATE}}` | generation config |
+| `{{STORE_COUNT}}` | generation config |
+| `{{SEED}}` | generation config |
+| `{{DICTIONARY_REF}}` | current Git SHA, or `--ref` |
 
----
+## Manual Fabric import
 
-## Available store types
+Use this path when you already have a workspace and Lakehouse, or when you do
+not want Terraform/fabric-cicd deployment.
 
-| Store type | Description |
-|---|---|
-| `grocery` | Grocery / supermarket store profile |
-| `hardware` | Hardware / home-improvement store profile |
-| `luxury` | Luxury retail store profile |
-| `supercenter` | Supercenter (default) store profile |
+1. Create or open the target Fabric workspace.
+2. Create the Lakehouse using the same name passed to `--lakehouse-name`.
+3. Import the rendered notebooks from `utility\out\`.
+4. Attach each notebook to the target Lakehouse.
+5. Run setup notebooks 01-04 in order.
 
----
+## Automated deploy
 
-## Dev setup
+Use this path for a new workspace or for repeatable artifact deployment.
 
-```bash
-mamba create -n retail-setup python=3.12 -y
-mamba activate retail-setup
-cd utility
-pip install -e ".[dev]"
+Preview first:
+
+```powershell
+retail-setup deploy --env dev --dry-run
 ```
 
-### Run tests
+Run the full deployment:
 
-```bash
-# Utility package tests (from utility/)
-pytest -q
-
-# Deploy framework tests (from repo root)
-PYTHONPATH=. python -m pytest tests/deploy -q
+```powershell
+retail-setup deploy --env dev --yes
 ```
 
-### Rebuild notebooks from source scripts
+Skip Terraform when the workspace/resources already exist and you only want to
+stage/deploy supported Fabric items:
 
-The committed `.ipynb` files in `utility/notebooks/` are generated from
-`utility/scripts/` Python scripts. To regenerate them:
-
-```bash
-python scripts/build_notebooks.py
+```powershell
+retail-setup deploy --env dev --skip-terraform
 ```
 
-To verify notebooks are in sync with scripts (used in CI):
+The deploy command runs these steps in order:
 
-```bash
-python scripts/build_notebooks.py --check
+1. Generate Terraform and fabric-cicd config files.
+2. Run `terraform init`, `terraform plan`, and `terraform apply` unless
+   `--skip-terraform` is set.
+3. Capture Terraform outputs.
+4. Stage Fabric source-control item folders, including rendered setup notebooks
+   01-04.
+5. Deploy staged items through `fabric-cicd`.
+6. Write a combined KQL database script to
+   `deploy\.generated\<env>\database.kql`.
+7. Run offline deployment-file validation.
+
+The KQL script is not executed automatically. Open the generated
+`.execute database script` payload and run it in the target Fabric KQL database
+after the Eventhouse and KQL database exist.
+
+## Run setup notebooks in Fabric
+
+Run these in order:
+
+1. `setup-01-seed-dictionaries` seeds dictionary JSON under
+   `Files/setup/dictionaries`.
+2. `setup-02-generate-dimensions` writes dimensions and `dim_date`.
+3. `setup-03-generate-facts` writes the full Silver contract and
+   `setup_run_log`.
+4. `setup-04-build-gold` builds the Gold aggregate tables from persisted facts.
+
+Expected output:
+
+| Layer | Schema | Tables |
+| --- | --- | --- |
+| Silver | `ag` | 6 dimensions, `dim_date`, 18 `fact_*` tables, `setup_run_log` |
+| Gold | `au` | 9 aggregate tables |
+
+Gold tables:
+
+- `sales_minute_store`
+- `top_products_15m`
+- `inventory_position_current`
+- `dc_inventory_position_current`
+- `truck_dwell_daily`
+- `online_sales_daily`
+- `zone_dwell_minute`
+- `marketing_cost_daily`
+- `tender_mix_daily`
+
+## Optional live stream notebook
+
+`setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it
+is not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
+Import it manually if you want live synthetic events.
+
+The notebook emits the same 18 event type names used by the KQL/Eventstream
+pipeline. It can write to:
+
+- `sink = "eventstream"`: a Fabric Eventstream Custom Endpoint.
+- `sink = "delta"`: a Lakehouse landing table for smoke testing.
+
+Set these notebook parameters before running:
+
+| Parameter | Meaning |
+| --- | --- |
+| `source_rows_per_second` | Spark rate-source rows per second. Each row emits one scenario bundle. |
+| `sink` | `eventstream` or `delta`. |
+| `run_seconds` | `0` runs forever; a positive value stops after N seconds. |
+| `eventstream_bootstrap` | Custom Endpoint bootstrap server. |
+| `eventstream_name` | Custom Endpoint Event Hub/Kafka topic name. |
+| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret that stores the connection string. |
+
+Do not hardcode Eventstream connection strings in notebooks.
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `utility\config.yaml not found` | Run `retail-setup configure` before `render`. |
+| `store_type ... not found` | Use one of `grocery`, `hardware`, `luxury`, or `supercenter`. |
+| `setup notebooks not rendered` during deploy | Run `retail-setup render --env <env>` first. |
+| Terraform is not found | Install Terraform and ensure it is on `PATH`, or use `--skip-terraform`. |
+| `fabric_cicd` or `azure.identity` import error | Run `python -m pip install azure-identity fabric-cicd`. |
+| KQL tables are missing after deploy | Run `deploy\.generated\<env>\database.kql` manually in the target KQL database. |
+| Rendered notebooks still show `{{TOKEN}}` | Re-run `retail-setup render`; rendering fails if required tokens remain. |
+
+## Development
+
+Install dev dependencies:
+
+```powershell
+Set-Location utility
+python -m pip install -e ".[dev]"
 ```
+
+Run utility tests from `utility\`:
+
+```powershell
+python -m pytest -q
+```
+
+Rebuild committed notebooks from templates:
+
+```powershell
+python scripts\build_notebooks.py
+python scripts\build_notebooks.py --check
+```
+
+On Windows, use Python 3.11 for local PySpark tests. Fabric notebook execution
+does not require a local Spark installation.

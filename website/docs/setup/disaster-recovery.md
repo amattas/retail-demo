@@ -2,7 +2,7 @@
 
 Rollback procedures and recovery scenarios.
 
-## Rollback Bronze Layer
+## Rollback Optional Live Bronze Layer
 
 To remove Bronze shortcuts and start fresh:
 
@@ -20,14 +20,14 @@ print(f"Dropped Bronze schema: {BRONZE_SCHEMA}")
 print(f"Removed {len(shortcuts)} shortcuts")
 ```
 
-**Manual Cleanup** (if programmatic drop fails):
+**Manual cleanup** (if programmatic drop fails):
 1. Navigate to Lakehouse in Fabric workspace
 2. Expand Tables → `cusn` folder → delete each of the 18 Eventhouse shortcuts
-3. Expand Files → delete each of the 24 ADLS parquet shortcuts (if removing the batch layer too)
-4. Confirm deletions
+3. Confirm deletions
 
-**Recreate Bronze Layer**:
-- Follow `01-create-bronze-shortcuts.ipynb` to recreate shortcuts manually (see [Phase 2](02-bronze-layer.md))
+**Recreate live Bronze shortcuts**:
+- Run the KQL database script if needed.
+- Recreate Eventhouse shortcuts manually (see [Phase 2](02-bronze-layer.md)).
 
 ---
 
@@ -56,7 +56,7 @@ print(f"Removed {len(tables)} tables")
 4. Confirm deletion
 
 **Recreate Silver Layer**:
-- Re-run `02-historical-data-load.ipynb`
+- Re-run `setup-02-generate-dimensions` and `setup-03-generate-facts`.
 
 ---
 
@@ -85,7 +85,7 @@ print(f"Removed {len(tables)} tables")
 4. Confirm deletion
 
 **Recreate Gold Layer**:
-- Re-run `02-historical-data-load.ipynb` or `04-streaming-to-gold.ipynb`
+- Re-run `setup-04-build-gold`.
 
 ---
 
@@ -145,17 +145,16 @@ Use the reset notebook for complete cleanup:
 table_name = "fact_receipts"
 spark.sql(f"DROP TABLE IF EXISTS ag.{table_name}")
 
-# Re-run historical load notebook
-# This will recreate the table from Bronze shortcuts
+# Re-run setup-03-generate-facts, then setup-04-build-gold
 ```
 
-### Scenario 2: Missing Bronze Shortcuts
+### Scenario 2: Missing Live Eventhouse Shortcuts
 
-**Symptoms**: Bronze shortcuts lost connection or deleted accidentally
+**Symptoms**: Live Eventhouse shortcuts lost connection or were deleted accidentally
 
 **Recovery**:
-1. Run `01-create-bronze-shortcuts.ipynb`
-2. Manually recreate Eventhouse shortcuts
+1. Ensure the generated KQL script has been run in the KQL database.
+2. Manually recreate Eventhouse shortcuts into `cusn`.
 3. Verify with `SHOW TABLES IN cusn`
 
 ### Scenario 3: Pipeline Failures
@@ -175,7 +174,7 @@ spark.sql(f"DROP TABLE IF EXISTS ag.{table_name}")
 **Recovery** (in order):
 1. Stop all running pipelines
 2. Run `99-reset-lakehouse.ipynb` (drops Gold and Silver)
-3. Delete Eventhouse shortcuts manually
+3. Delete optional Eventhouse shortcuts manually
 4. Delete pipelines via Fabric portal
 5. Delete semantic model
 6. Re-run complete deployment from Phase 1
@@ -191,7 +190,8 @@ spark.sql(f"DROP TABLE IF EXISTS ag.{table_name}")
 
 ## Data Preservation
 
-Bronze shortcuts reference source data (ADLSv2, Eventhouse) - no data loss on rollback.
+Optional live Bronze shortcuts reference Eventhouse data - deleting shortcuts does
+not delete the Eventhouse source tables.
 
 Silver/Gold Delta tables can be backed up via:
 ```python

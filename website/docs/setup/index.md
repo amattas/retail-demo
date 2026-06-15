@@ -1,82 +1,62 @@
 # Setup Guide
 
-Complete guide from data generation through user-facing dashboards.
+This guide walks through a clean Microsoft Fabric workspace setup for the Retail
+Demo.
 
-This guide provides step-by-step instructions for deploying the Retail Demo solution using the Bronze/Silver/Gold medallion architecture.
+The current supported path uses the Fabric-native `retail-setup` utility. The
+legacy FastAPI/DuckDB generator is retained under `datagen-deprecated/`, but it
+is not the recommended path for a new workspace.
 
-## Quick Start Checklist
+## Quick start checklist
 
-- [ ] **Phase 1**: [Data Generation](01-data-generation.md) - Generate and upload sample data
-- [ ] **Phase 2**: [Bronze Layer](02-bronze-layer.md) - Create Fabric resources and shortcuts
-- [ ] **Phase 3**: [Silver Layer](03-silver-layer.md) - Upload notebooks and run historical load
-- [ ] **Phase 4**: [Gold Layer](04-gold-layer.md) - Verify aggregation tables
-- [ ] **Phase 5**: [Pipelines](05-pipelines.md) - Create scheduled pipelines
-- [ ] **Phase 6**: [Streaming](06-streaming.md) - Configure Eventstream for real-time data
-- [ ] **Phase 7**: [Dashboards](07-dashboards.md) - Create real-time dashboards and alerts
-- [ ] **Phase 8**: [Semantic Model](08-semantic-model-deployment.md) - Deploy Power BI semantic model and report
-- [ ] **Phase 9**: [ML Notebooks](09-ml-notebooks.md) - Deploy predictive analytics models
+- [ ] [Phase 1: Configure and render setup notebooks](01-data-generation.md)
+- [ ] [Phase 2: Create Fabric resources and KQL tables](02-bronze-layer.md)
+- [ ] [Phase 3: Generate Silver tables](03-silver-layer.md)
+- [ ] [Phase 4: Build Gold tables](04-gold-layer.md)
+- [ ] [Phase 5: Optional pipelines](05-pipelines.md)
+- [ ] [Phase 6: Optional live streaming](06-streaming.md)
+- [ ] [Phase 7: Dashboards](07-dashboards.md)
+- [ ] [Phase 8: Semantic Model](08-semantic-model-deployment.md)
+- [ ] [Phase 9: ML Notebooks](09-ml-notebooks.md)
 
 ## Prerequisites
 
-### Azure Resources
+- Python 3.11 or later.
+- Git.
+- A Microsoft Fabric tenant, capacity, and permissions to create or update the
+  target workspace.
+- Terraform, Azure CLI/Azure PowerShell, `azure-identity`, and `fabric-cicd` if
+  you use automated deployment.
 
-- **Azure Event Hubs Namespace** with hub named `retail-events`
-- **Azure Data Lake Storage Gen2** account (e.g., `stdretail`)
-  - Container: `supermarket`
-- **Microsoft Fabric Workspace** with Real-Time Intelligence capacity
+## Architecture overview
 
-### Local Development
+```text
+retail-setup configure/render
+        |
+        v
+Fabric setup notebooks 01-04
+        |
+        v
+Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
 
-- **Python 3.11** with Miniconda or Miniforge for the data generator
-- **Git** for cloning repository
-- **Azure CLI** (optional, for automated deployment)
-
-### Access & Permissions
-
-- Fabric workspace Contributor or Admin
-- ADLSv2 Storage Blob Data Contributor
-- Event Hubs Data Sender
-
-## Architecture Overview
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────────────────────────┐
-│   Datagen   │────▶│ Azure Event  │────▶│         Microsoft Fabric            │
-│   (Python)  │     │    Hubs      │     │                                     │
-└─────────────┘     └──────────────┘     │  ┌─────────────┐  ┌─────────────┐  │
-                                         │  │ Eventstream │  │  Lakehouse  │  │
-                                         │  └──────┬──────┘  └──────┬──────┘  │
-                                         │         │                │         │
-                                         │         ▼                ▼         │
-                                         │  ┌─────────────┐  ┌─────────────┐  │
-                                         │  │ Eventhouse  │  │  Notebooks  │  │
-                                         │  │   (KQL)     │  │  (PySpark)  │  │
-                                         │  └──────┬──────┘  └──────┬──────┘  │
-                                         │         │                │         │
-                                         │         ▼                ▼         │
-                                         │  ┌─────────────────────────────┐  │
-                                         │  │      Semantic Model         │  │
-                                         │  │    (Power BI DirectQuery)   │  │
-                                         │  └─────────────────────────────┘  │
-                                         └─────────────────────────────────────┘
+Optional live path:
+setup-05-stream-events -> Fabric Eventstream -> Eventhouse/KQL -> Silver/Gold
 ```
 
-## Schema Naming Convention
+## Schema naming convention
 
 | Schema | Layer | Purpose |
-|--------|-------|---------|
-| `cusn` | Bronze | Eventhouse event table shortcuts (Tables/) |
-| `ag` | Silver | Cleaned, deduplicated, typed Delta tables |
-| `au` | Gold | Pre-aggregated KPIs for dashboards |
+| --- | --- | --- |
+| `cusn` | Bronze/live | Eventhouse event table shortcuts |
+| `ag` | Silver | Typed Delta dimensions/facts |
+| `au` | Gold | Pre-aggregated KPI tables |
 
-## Reference Documentation
+## Reference documentation
 
-- [Validation & Testing](validation.md) - End-to-end testing procedures
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
-- [Configuration Reference](configuration.md) - Environment variables
-- [Capacity Planning](capacity-planning.md) - Fabric SKU sizing
-- [Disaster Recovery](disaster-recovery.md) - Rollback procedures
+- [Configuration Reference](configuration.md)
+- [Validation & Testing](validation.md)
+- [Troubleshooting](troubleshooting.md)
+- [Capacity Planning](capacity-planning.md)
+- [Disaster Recovery](disaster-recovery.md)
 
-## Next Steps
-
-Start with [Phase 1: Data Generation](01-data-generation.md) to generate the sample retail data.
+Start with [Phase 1: Configure and render setup notebooks](01-data-generation.md).

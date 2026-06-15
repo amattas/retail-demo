@@ -1,17 +1,34 @@
 # Fabric Assets
 
-This folder organizes Microsoft Fabric Real-Time Intelligence assets for the retail demo. Each subfolder includes a README.md (what the asset does), AGENTS.md (implementation spec and constraints), and CLAUDE.md (assistant prompts and handoffs).
+This folder contains source assets for the Microsoft Fabric retail demo.
 
-Subprojects:
-- `eventstream/` – Ingest retail events from Azure Event Hubs and route to KQL DB + Lakehouse.
-- `kql_database/` – Real-Time Analytics KQL database, tables, retention policies, materialized views.
-- `querysets/` – KQL queries for dashboards, investigations, and operational runbooks.
-- `rules/` – Real-time rules (alerts/actions) for stockouts, reorders, late trucks, etc.
-- `dashboards/` – Real-Time Dashboards (and/or Power BI) for operations and CX.
-- `lakehouse/` – Bronze/Silver/Gold tables, Delta schemas, shortcuts, and medallion flows.
-- `pipelines/` – Data Pipelines to orchestrate ingest, transforms, and scheduled batch.
-- `notebooks/` – Fabric notebooks for feature engineering, ML, and batch enrichments.
-- `powerbi/` – Power BI semantic model (hybrid over KQL and Lakehouse).
+For a new workspace, start with the root `README.md` and `utility\README.md`.
+The current setup path is:
 
-Source-of-truth schema comes from `datagen/AGENTS.md` and `datagen/src/retail_datagen/streaming/schemas.py`.
+1. Configure and render notebooks with `retail-setup`.
+2. Deploy or manually import Fabric items.
+3. Run setup notebooks 01-04 to generate Lakehouse data.
+4. Run the generated KQL database script manually in the target KQL database.
+5. Optionally import and run `utility\notebooks\setup-05-stream-events.ipynb`
+   for live synthetic events.
 
+## Subfolders
+
+- `lakehouse\` — Fabric notebooks for historical setup, streaming transforms,
+  Gold aggregates, ML, and maintenance.
+- `kql_database\` — KQL table, mapping, function, and materialized-view scripts.
+- `powerbi\` — Power BI semantic model and report source files.
+- `pipelines\` — Pipeline notes for orchestrating notebook execution.
+- `dashboards\`, `querysets\`, `rules\` — Real-Time Intelligence source assets
+  and runbook content as they become deployable.
+
+## Current schema source of truth
+
+For Fabric-native setup notebooks, the Lakehouse table contract is defined in:
+
+```text
+utility\src\retail_setup\generation\schemas.py
+```
+
+The legacy generator under `datagen-deprecated\` remains useful for reference,
+but new workspaces should use the `utility\` setup notebooks.

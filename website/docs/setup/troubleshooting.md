@@ -1,151 +1,107 @@
 # Troubleshooting
 
-Common issues and solutions for the Retail Demo deployment.
+Common issues and fixes for the current `retail-setup` workflow.
 
-## Issue: Bronze Layer Incomplete
+## `utility/config.yaml not found`
 
-**Symptom**: `cusn` schema has < 18 tables, or `Files/` has < 24 shortcut folders
+Run configuration before rendering:
 
-**Diagnosis**:
+```powershell
+retail-setup configure
+retail-setup render --env dev
+```
+
+## Invalid store type
+
+Use one of the supported store types:
+
+- `grocery`
+- `hardware`
+- `luxury`
+- `supercenter`
+
+## Setup notebooks not rendered
+
+`retail-setup deploy` expects rendered notebooks 01-04 in `utility/out/` when
+the `setup` notebook group is staged.
+
+Fix:
+
+```powershell
+retail-setup render --env dev
+retail-setup deploy --env dev --dry-run
+```
+
+## Terraform command not found
+
+Install Terraform and make sure it is on `PATH`, or use `--skip-terraform` when
+the workspace and resources already exist:
+
+```powershell
+retail-setup deploy --env dev --skip-terraform
+```
+
+## `fabric_cicd` or `azure.identity` import error
+
+Install deployment dependencies:
+
+```powershell
+python -m pip install azure-identity fabric-cicd
+```
+
+## Authentication failure
+
+For `auth.mode: azure_cli`:
+
+```powershell
+az login --tenant <tenant-id>
+```
+
+For `auth.mode: azure_powershell`:
+
+```powershell
+Connect-AzAccount -Tenant <tenant-id>
+```
+
+## KQL tables are missing after deploy
+
+The deployment framework generates the KQL script but does not execute it.
+
+Fix:
+
+1. Open `deploy/.generated/<env>/database.kql`.
+2. Copy the full `.execute database script <|` payload.
+3. Run it in the target Fabric KQL database.
+
+## Silver or Gold tables are empty
+
+Check that setup notebooks 01-04 ran in order and completed successfully.
+
+Useful checks:
+
 ```sql
--- Count streaming shortcuts (Eventhouse)
-SELECT COUNT(*) as event_stream_count
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'cusn';
--- Expected: 18
+SELECT COUNT(*) FROM ag.dim_stores;
+SELECT COUNT(*) FROM ag.fact_receipts;
+SELECT COUNT(*) FROM au.sales_minute_store;
 ```
 
-```python
-# Count batch shortcuts (run in a Fabric notebook)
-from notebookutils import mssparkutils
-folders = [f.name for f in mssparkutils.fs.ls("Files/") if f.isDir]
-print(len(folders), folders)  # Expected: 24 (dim_* and fact_*)
-```
+If tables exist but are empty, re-run `setup-03-generate-facts` and then
+`setup-04-build-gold`.
 
-**Solutions**:
+## `setup-05-stream-events` is missing from `utility/out`
 
-1. **Missing batch shortcuts** (< 24 in `Files/`):
-   - Re-run the verification cells in `01-create-bronze-shortcuts.ipynb` to identify missing folders
-   - Create missing ADLS Gen2 shortcuts manually (see [Phase 2](02-bronze-layer.md))
-   - Verify parquet files exist in the storage account
+This is expected. `setup-05-stream-events.ipynb` is committed under
+`utility/notebooks/`, but it is not currently rendered or staged by
+`retail-setup`. Import it manually if you want live synthetic events.
 
-2. **Missing streaming shortcuts** (< 18 in `cusn`):
-   - Eventhouse shortcuts must be created manually (see [Phase 2](02-bronze-layer.md))
-   - Verify OneLake availability is enabled on the Eventhouse database
-   - Check KQL database has the event tables (`01-create-tables.kql`)
+## Live stream has no KQL rows
 
----
+Check:
 
-## Issue: Schema Mismatch Errors in Silver
+1. `setup-05-stream-events.ipynb` is using `sink = "eventstream"`.
+2. Eventstream Custom Endpoint parameters are set.
+3. The connection string is available from Key Vault.
+4. The generated KQL script has been run in the target KQL database.
 
-**Symptom**: `02-historical-data-load.ipynb` fails with "Schema mismatch detected"
-
-**Diagnosis**: Check notebook output for exact columns mismatched
-
-**Solutions**:
-
-1. **Fix schema alignment**:
-   - Compare batch parquet schema (from datagen)
-   - Compare streaming event schema (from KQL database)
-   - Update field mappings in notebook transform functions
-
----
-
-## Issue: No Data in Silver/Gold
-
-**Symptom**: Silver or Gold tables exist but have 0 rows
-
-**Diagnosis**:
-```sql
--- Check Bronze streaming shortcut has data
-SELECT COUNT(*) FROM cusn.receipt_created;
-```
-
-```python
-# Check batch parquet data (run in a Fabric notebook)
-spark.read.parquet("Files/fact_receipts").count()
-
--- Check pipeline execution history
--- In Fabric Portal → Pipelines → View runs
-```
-
-**Solutions**:
-
-1. **Bronze empty**: Generate more data (see [Phase 1](01-data-generation.md))
-2. **Pipeline not running**: Check pipeline schedule is active
-3. **Pipeline failing**: Check execution logs for errors
-4. **Transformation error**: Run notebook manually to see detailed errors
-
----
-
-## Issue: Dashboard Shows No Data
-
-**Symptom**: Real-Time Dashboard tiles are empty
-
-**Diagnosis**:
-```kql
-// In KQL Database Query Editor
-receipt_created | count
-mv_store_sales_minute | count
-```
-
-**Solutions**:
-
-1. **No streaming data**: Start data generator streaming (see [Phase 1](01-data-generation.md))
-2. **Eventstream not running**: Check Eventstream status in Fabric Portal
-3. **Materialized views not refreshing**: Check MV policies in KQL Database
-4. **Dashboard query errors**: Test each KQL query individually
-
----
-
-## Issue: Slow Dashboard Performance
-
-**Symptom**: Dashboard takes > 5 seconds to load tiles
-
-**Solutions**:
-
-1. **Use materialized views**: Pre-aggregate in KQL Database
-   ```kql
-   // Create materialized view for dashboard query
-   .create materialized-view mv_sales_15m on table receipt_created {
-       receipt_created
-       | where ingest_timestamp > ago(15m)
-       | summarize total_sales=sum(total) by bin(ingest_timestamp, 1m), store_id
-   }
-   ```
-
-2. **Add table policies**:
-   ```kql
-   // Set hot cache for faster queries
-   .alter table receipt_created policy caching hot = 7d
-   ```
-
-3. **Use Gold layer for historical**: Switch to `au` schema for queries > 7 days
-
----
-
-## Issue: Pipeline Failures
-
-**Symptom**: Pipelines failing with connection or timeout errors
-
-**Solutions**:
-
-1. Check pipeline parameters (SILVER_DB, BRONZE_SCHEMA, GOLD_DB)
-2. Verify environment variables are set correctly
-3. Increase timeout if processing large data volumes
-4. Check Fabric capacity is not throttled
-
----
-
-## Issue: Parquet Schema Conflicts
-
-**Symptom**: Error loading parquet files with mismatched schemas
-
-**Example error**: `CANNOT_MERGE_SCHEMAS: Failed to merge schemas`
-
-**Solution**: The `02-historical-data-load.ipynb` notebook handles this automatically by:
-- Reading each parquet file individually
-- Casting conflicting columns (e.g., Source) to string
-- Using `unionByName(allowMissingColumns=True)`
-
-If issues persist, run `99-reset-lakehouse.ipynb` and reload data.
+For a smoke test without Eventstream, use `sink = "delta"` in the stream
+notebook.

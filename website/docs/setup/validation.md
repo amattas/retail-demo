@@ -1,90 +1,95 @@
 # Validation & Testing
 
-End-to-end testing procedures to verify the deployment.
+Use these checks after running the setup notebooks in a new workspace.
 
-## End-to-End Data Flow Test
+## Render validation
 
-**Objective**: Verify data flows from generator → Bronze → Silver → Gold → Dashboard
+From the repository root:
 
-```bash
-# 1. Start streaming data generator
-curl -X POST http://localhost:8000/api/stream/start \
-  -H "Content-Type: application/json" \
-  -d '{"duration_minutes": 5, "burst_override": 100}'
-
-# 2. Wait 1 minute, then check Bronze layer (Eventhouse)
-# In KQL Database:
-receipt_created | where ingest_timestamp > ago(1h) | count
-# Expected: > 0 rows
-
-# 3. Wait 5 minutes (for Bronze → Silver pipeline)
-# In Lakehouse SQL:
-SELECT COUNT(*) FROM ag.fact_receipts WHERE event_ts > CURRENT_TIMESTAMP - INTERVAL 1 HOUR;
-# Expected: Matches KQL count (approximately)
-
-# 4. Wait 15 minutes (for Silver → Gold pipeline)
-# In Lakehouse SQL:
-SELECT MAX(ts) FROM au.sales_minute_store;
-# Expected: Within last 15 minutes
-
-# 5. Check Dashboard
-# Open Real-Time Dashboard
-# Expected: Latest data visible, auto-refreshing every 30 seconds
+```powershell
+retail-setup configure
+retail-setup render --env dev
+Get-ChildItem utility/out/*.ipynb
 ```
 
-## Schema Validation Test
+Expected rendered notebooks:
+
+- `setup-01-seed-dictionaries.ipynb`
+- `setup-02-generate-dimensions.ipynb`
+- `setup-03-generate-facts.ipynb`
+- `setup-04-build-gold.ipynb`
+
+## Silver validation
+
+In Lakehouse SQL Analytics:
 
 ```sql
--- Verify Bronze streaming shortcuts exist (Eventhouse tables)
-SELECT COUNT(*) as bronze_table_count FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'cusn';
--- Expected: 18 (batch parquet shortcuts live in Files/, not in a schema)
+SHOW TABLES IN ag;
 
--- Verify all Silver tables exist
-SELECT COUNT(*) as silver_table_count FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'ag';
--- Expected: 24
-
--- Verify all Gold tables exist
-SELECT COUNT(*) as gold_table_count FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'au';
--- Expected: 9+
-
--- Check for schema mismatches (should be 0)
--- This is reported at end of 02-historical-data-load.ipynb execution
-```
-
-## Performance Validation
-
-```sql
--- Check Gold aggregation freshness
-SELECT
-    'sales_minute_store' as table_name,
-    MAX(ts) as latest_timestamp,
-    TIMESTAMPDIFF(MINUTE, MAX(ts), CURRENT_TIMESTAMP) as minutes_lag
-FROM au.sales_minute_store
+SELECT 'dim_stores' AS table_name, COUNT(*) AS rows FROM ag.dim_stores
 UNION ALL
-SELECT
-    'top_products_15m',
-    MAX(computed_at),
-    TIMESTAMPDIFF(MINUTE, MAX(computed_at), CURRENT_TIMESTAMP)
-FROM au.top_products_15m;
--- Expected: < 20 minutes lag (15 min pipeline + processing)
+SELECT 'dim_products', COUNT(*) FROM ag.dim_products
+UNION ALL
+SELECT 'fact_receipts', COUNT(*) FROM ag.fact_receipts
+UNION ALL
+SELECT 'fact_payments', COUNT(*) FROM ag.fact_payments
+UNION ALL
+SELECT 'setup_run_log', COUNT(*) FROM ag.setup_run_log;
 ```
 
-## Expected Results Summary
+Expected:
 
-| Layer | Location | Expected Count |
-|-------|----------|----------------|
-| Bronze (batch) | `Files/` shortcuts | 24 folders |
-| Bronze (streaming) | `cusn` schema | 18 tables |
-| Silver | `ag` | 24 tables |
-| Gold | `au` | 9+ tables (more after Phase 9 ML notebooks) |
+- 7 dimension tables including `dim_date`.
+- 18 fact tables.
+- `setup_run_log`.
+- Non-zero row counts for core tables such as `dim_stores`,
+  `dim_products`, `fact_receipts`, and `fact_payments`.
 
-## Latency Targets
+## Gold validation
 
-| Path | Target | Use Case |
-|------|--------|----------|
-| Hot (KQL) | < 2s | Real-time dashboards, live KPIs |
-| Warm (alerts) | < 30s | Stockout alerts, anomaly detection |
-| Cold (Lakehouse) | < 15m | Historical reports, trend analysis |
+```sql
+SHOW TABLES IN au;
+
+SELECT * FROM au.sales_minute_store ORDER BY ts DESC LIMIT 10;
+SELECT * FROM au.online_sales_daily ORDER BY day DESC LIMIT 10;
+```
+
+Expected Gold tables:
+
+- `sales_minute_store`
+- `top_products_15m`
+- `inventory_position_current`
+- `dc_inventory_position_current`
+- `truck_dwell_daily`
+- `online_sales_daily`
+- `zone_dwell_minute`
+- `marketing_cost_daily`
+- `tender_mix_daily`
+
+## Optional live validation
+
+KQL:
+
+```kql
+receipt_created | count
+receipt_created | take 10
+```
+
+Lakehouse SQL after running streaming transforms:
+
+```sql
+SELECT COUNT(*) FROM ag.fact_receipts;
+SELECT MAX(ts) FROM au.sales_minute_store;
+```
+
+## Local utility validation
+
+For repository development:
+
+```powershell
+Set-Location utility
+python scripts/build_notebooks.py --check
+python -m pytest tests/test_cli_entrypoint.py tests/test_inject.py tests/test_cli_deploy.py -q
+```
+
+Use Python 3.11 for local PySpark tests on Windows.

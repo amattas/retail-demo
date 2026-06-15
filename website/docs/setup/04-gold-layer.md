@@ -1,64 +1,51 @@
-# Phase 4: Gold Layer Aggregation
+# Phase 4: Build Gold Tables
 
-The Gold layer creates pre-aggregated KPI tables for fast dashboard queries.
+The Gold layer contains pre-aggregated KPI tables for reporting. It is built
+from persisted Silver facts.
 
-## Step 4.1: Verify Gold Tables
+## Step 4.1: Run setup-04
 
-The Gold layer tables are created automatically by `02-historical-data-load.ipynb` (run in Phase 3).
+Run this notebook after `setup-03-generate-facts` completes:
 
-For ongoing streaming data, the Gold layer is updated by `04-streaming-to-gold.ipynb` which runs via pipeline (Phase 5).
+```text
+setup-04-build-gold
+```
 
-## Step 4.2: Gold Aggregation Tables
+It reads Silver tables from schema `ag` and writes Gold tables to schema `au`.
 
-**Gold tables created** (9 aggregated tables):
+## Gold tables
 
-| Gold Table | Granularity | Source | Description |
-|------------|-------------|--------|-------------|
-| `sales_minute_store` | Per minute, per store | fact_receipts | Sales velocity |
-| `top_products_15m` | Rolling 15 min | fact_receipt_lines | Product rankings |
-| `inventory_position_current` | Current snapshot | fact_store_inventory_txn | Current stock levels |
-| `dc_inventory_position_current` | Current snapshot | fact_dc_inventory_txn | DC stock levels |
-| `truck_dwell_daily` | Daily, per truck | fact_truck_moves | Logistics performance |
-| `tender_mix_daily` | Daily | fact_receipts | Payment method distribution |
-| `online_sales_daily` | Daily | fact_online_order_headers | Online revenue |
-| `zone_dwell_minute` | Per minute, per zone | fact_foot_traffic | Customer dwell times |
-| `marketing_cost_daily` | Daily, per campaign | fact_marketing | Marketing spend |
-
-**Note**: Additional ML prediction tables (e.g., `demand_forecast`, `stockout_risk`, `churn_predictions`) are added to the `au` schema by the ML notebooks in [Phase 9](09-ml-notebooks.md).
-
-**Time Estimate**: 5-15 minutes
+| Gold table | Source | Purpose |
+| --- | --- | --- |
+| `sales_minute_store` | `fact_receipts` | Sales velocity by minute/store |
+| `top_products_15m` | `fact_receipt_lines` | Product revenue and units in 15-minute windows |
+| `inventory_position_current` | `fact_store_inventory_txn` | Latest store inventory position |
+| `dc_inventory_position_current` | `fact_dc_inventory_txn` | Latest DC inventory position |
+| `truck_dwell_daily` | `fact_truck_moves` | Daily logistics dwell metrics |
+| `online_sales_daily` | `fact_online_order_headers` | Daily online sales |
+| `zone_dwell_minute` | `fact_foot_traffic` | Zone dwell and customer counts |
+| `marketing_cost_daily` | `fact_marketing` | Daily marketing impressions and cost |
+| `tender_mix_daily` | `fact_receipts` | Payment method mix |
 
 ## Verification
 
 ```sql
 SHOW TABLES IN au;
--- Should show 9 aggregated tables
 
--- Check latest sales data
 SELECT * FROM au.sales_minute_store
 ORDER BY ts DESC
 LIMIT 10;
 
--- Verify aggregation logic
 SELECT
-    DATE(ts) as date,
-    SUM(total_sales) as daily_total,
-    SUM(receipts) as transaction_count
-FROM au.sales_minute_store
-GROUP BY DATE(ts)
-ORDER BY date DESC
-LIMIT 7;
+    day,
+    orders,
+    total,
+    avg_order_value
+FROM au.online_sales_daily
+ORDER BY day DESC
+LIMIT 10;
 ```
 
-## Expected Gold Layer
+## Next step
 
-| Component | Value |
-|-----------|-------|
-| **Schema** | `au` |
-| **Tables** | 9 aggregated KPI tables |
-| **Format** | Delta Lake |
-| **Purpose** | Fast dashboard queries |
-
-## Next Step
-
-Continue to [Phase 5: Pipeline Setup](05-pipelines.md)
+Continue to [Phase 5: Optional pipelines](05-pipelines.md).

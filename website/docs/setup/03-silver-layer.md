@@ -1,83 +1,57 @@
-# Phase 3: Silver Layer Transformation
+# Phase 3: Generate Silver Tables
 
-The Silver layer combines batch historical data with streaming real-time data into validated Delta tables.
+The rendered setup notebooks generate Silver Delta tables directly in the
+Lakehouse. Use this path for a new workspace.
 
-## Step 3.1: Upload Lakehouse Notebooks
+## Step 3.1: Run setup notebooks 01-03
 
-Upload the following notebooks to your Lakehouse:
+Run these in Fabric, attached to the target Lakehouse:
 
-**In Lakehouse → Notebooks → Import**:
+1. `setup-01-seed-dictionaries`
+2. `setup-02-generate-dimensions`
+3. `setup-03-generate-facts`
 
-| Notebook | Purpose |
-|----------|---------|
-| `01-create-bronze-shortcuts.ipynb` | Create Bronze shortcuts |
-| `02-historical-data-load.ipynb` | Load historical data to Silver/Gold |
-| `03-streaming-to-silver.ipynb` | Process streaming events to Silver |
-| `04-streaming-to-gold.ipynb` | Aggregate Silver to Gold |
-| `05-maintain-delta-tables.ipynb` | OPTIMIZE and VACUUM routines |
-| `06-ml-demand-forecast.ipynb` | GBT demand forecasts |
-| `07-ml-market-basket.ipynb` | FP-Growth product associations |
-| `08-ml-customer-segmentation.ipynb` | RFM + K-means customer segments |
-| `09-ml-churn-prediction.ipynb` | Spark ML GBT churn risk scores |
-| `10-ml-promotion-effectiveness.ipynb` | Price elasticity & promotion lift |
-| `11-ml-journey-analysis.ipynb` | BLE beacon journey patterns |
-| `12-ml-stockout-prediction.ipynb` | Spark ML GBT stockout risk |
-| `13-ml-delivery-prediction.ipynb` | Spark ML GBT dwell predictions with empirical intervals |
-| `14-ml-dynamic-pricing.ipynb` | Elasticity-aware pricing + constraints |
-| `30-create-ontology.ipynb` | Optional: create or refresh a Fabric ontology from core Silver tables |
-| `90-augment-and-dedupe-receipts.ipynb` | Optional one-time migration: backfill `event_ts`/`event_date` on legacy Silver receipt-related tables and dedupe |
-| `99-reset-lakehouse.ipynb` | Reset all tables (optional, for testing) |
+`setup-01` writes dictionary JSON files under `Files/setup/dictionaries`.
+`setup-02` writes dimension tables and `dim_date`. `setup-03` writes the full
+Silver generation result and `setup_run_log`.
 
-## Step 3.2: Run Historical Data Load
+## Expected Silver output
 
-**Run `02-historical-data-load.ipynb`** - it will:
-
-1. ✅ Load 6 dimension tables from Files/ parquet to Silver (ag)
-2. ✅ Load 18 fact tables from Files/ parquet to Silver (ag)
-3. ✅ Create Gold aggregation tables in (au)
-4. ✅ Handle schema conflicts in parquet files automatically
-
-After the Silver tables exist, you can optionally run `30-create-ontology.ipynb` to create or refresh a Fabric ontology item over the core retail entities and relationships.
-
-### Processing Logic
-
-- **Dimensions**: Direct copy from Files/ parquet
-- **Facts**:
-  - Read parquet files from Files/
-  - Handle schema conflicts (e.g., Source column type variations)
-  - Write to Delta tables in Silver (ag)
-- **Gold**: Aggregate Silver tables into pre-computed KPIs in Gold (au)
-
-**Time Estimate**: 10-30 minutes (depends on data volume)
+| Component | Schema | Tables |
+| --- | --- | --- |
+| Dimensions | `ag` | `dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`, `dim_customers`, `dim_products`, `dim_date` |
+| Facts | `ag` | 18 `fact_*` tables |
+| Run log | `ag` | `setup_run_log` |
 
 ## Verification
 
-```sql
--- In Lakehouse SQL Analytics
-SHOW TABLES IN ag;
--- Should show 24 tables: 6 dims + 18 facts
+In Lakehouse SQL Analytics:
 
--- Check row counts
-SELECT 'fact_receipts' as table_name, COUNT(*) as rows FROM ag.fact_receipts
+```sql
+SHOW TABLES IN ag;
+
+SELECT 'fact_receipts' AS table_name, COUNT(*) AS rows FROM ag.fact_receipts
 UNION ALL
 SELECT 'fact_receipt_lines', COUNT(*) FROM ag.fact_receipt_lines
 UNION ALL
-SELECT 'dim_stores', COUNT(*) FROM ag.dim_stores;
-
--- Verify schema (should match batch schema exactly)
-DESCRIBE TABLE ag.fact_receipt_lines;
+SELECT 'dim_stores', COUNT(*) FROM ag.dim_stores
+UNION ALL
+SELECT 'setup_run_log', COUNT(*) FROM ag.setup_run_log;
 ```
 
-## Expected Silver Layer
+In a Fabric notebook:
 
-| Component | Value |
-|-----------|-------|
-| **Schema** | `ag` |
-| **Dimensions** | 6 tables |
-| **Facts** | 18 tables |
-| **Total Tables** | 24 Delta tables |
-| **Format** | Delta Lake |
+```python
+for table in ["dim_stores", "fact_receipts", "fact_payments"]:
+    print(table, spark.table(f"retail_lakehouse.ag.{table}").count())
+```
 
-## Next Step
+## Legacy medallion notebooks
 
-Continue to [Phase 4: Gold Layer](04-gold-layer.md)
+`fabric/lakehouse/02-historical-data-load.ipynb` remains available for the
+legacy parquet-shortcut flow. It is not the preferred path for new workspaces
+using `retail-setup`.
+
+## Next step
+
+Continue to [Phase 4: Build Gold tables](04-gold-layer.md).

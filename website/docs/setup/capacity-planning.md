@@ -21,11 +21,10 @@ Microsoft Fabric capacity is measured in Capacity Units (CU). Choose appropriate
 
 | Component | Daily Data Volume | Processing Time | Capacity Impact |
 |-----------|------------------|-----------------|-----------------|
-| **Datagen → Event Hubs** | 1-10M events | Continuous | Minimal (external) |
-| **Eventhouse Ingestion** | 1-10M events | Continuous | High (streaming) |
-| **Bronze Shortcuts** | 0 GB (references only) | <1 min | Minimal |
-| **Silver Transformation** | 500MB - 5GB | 5-10 min per run | Medium (every 5 min) |
-| **Gold Aggregation** | 100MB - 1GB | 3-5 min per run | Low (every 15 min) |
+| **Setup notebooks 01-03** | Depends on store/date range | One-time/on demand | Medium to high Spark usage |
+| **Gold build** | 100MB - 1GB | 3-5 min per run | Low to medium Spark usage |
+| **Optional live stream** | 1-10M events/day | Continuous | Eventstream/Eventhouse usage |
+| **Streaming transforms** | 500MB - 5GB/day | Scheduled/on demand | Medium Spark usage |
 | **Power BI DirectLake** | Varies by users | Real-time | Medium (concurrent queries) |
 
 ## Sizing Formula
@@ -87,7 +86,7 @@ Required CUs ≈ (Events per day / 1M) × 2 + (Concurrent users / 50) × 4
 2. **Use Auto-scale**: Enable for variable workloads
 3. **Optimize Queries**: Reduce CU consumption via Z-ordering, partitioning
 4. **Schedule Maintenance**: Run OPTIMIZE/VACUUM during off-hours
-5. **Archive Old Data**: Move inactive data to cold storage (ADLS)
+5. **Archive Old Data**: Move inactive demo data to cheaper storage when it is no longer needed
 6. **Consolidate Workspaces**: Share capacity across multiple projects
 7. **Monitor Idle Capacity**: Pause/scale down non-production during off-hours
 
@@ -105,6 +104,6 @@ Before deploying to production capacity:
 
 ## Region Considerations
 
-- Choose region close to data sources (ADLS, Event Hubs) to minimize latency
+- Choose a Fabric region close to users and optional live-event sources to minimize latency
 - Ensure region supports Real-Time Intelligence features
 - Consider multi-region deployment for high availability (advanced)
