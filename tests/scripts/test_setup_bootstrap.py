@@ -61,6 +61,13 @@ def test_install_prerequisites_dry_run_records_commands(monkeypatch):
     assert commands == [["testpm", "install", "terraform"]]
 
 
+def test_current_python_env_uses_launching_interpreter():
+    env = setup.current_python_env()
+
+    assert env.python == Path(sys.executable)
+    assert env.description == "current Python environment"
+
+
 def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")

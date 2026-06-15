@@ -46,8 +46,8 @@ The guided setup script:
 1. Detects Windows, macOS, or Linux.
 2. Offers to install missing CLI prerequisites with the OS package manager
    (`winget`/Chocolatey, Homebrew, `apt-get`, `dnf`, or `yum`).
-3. Uses conda when available and accepted; otherwise creates `.venv`.
-4. Installs Python dependencies.
+3. Uses the Python environment that launched the script.
+4. Installs Python dependencies into that environment.
 5. Runs `retail-setup configure`.
 6. Runs `retail-setup render`.
 7. Asks whether to run `retail-setup deploy`.
@@ -74,6 +74,9 @@ py -3.11 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e .\utility
 ```
+
+If you prefer conda, activate your conda environment before running
+`python .\scripts\setup.py` or before installing the package manually.
 
 For automated deployment:
 

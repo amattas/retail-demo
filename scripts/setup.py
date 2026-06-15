@@ -167,11 +167,6 @@ def prompt_yes_no(message: str, *, default: bool) -> bool:
     return answer in {"y", "yes"}
 
 
-def prompt_text(message: str, *, default: str) -> str:
-    answer = input(f"{message} [{default}]: ").strip()
-    return answer or default
-
-
 def run_command(command: list[str], *, cwd: Path = REPO_ROOT, dry_run: bool = False) -> None:
     rendered = " ".join(command)
     print(f"$ {rendered}")
@@ -219,95 +214,15 @@ def install_prerequisites(
             run_command(install_command, dry_run=dry_run)
 
 
-def _conda_env_exists(name: str) -> bool:
-    result = subprocess.run(
-        ["conda", "env", "list"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return False
-    return any(line.split() and line.split()[0] == name for line in result.stdout.splitlines())
-
-
-def _conda_python(env_name: str) -> Path:
-    result = subprocess.run(
-        [
-            "conda",
-            "run",
-            "-n",
-            env_name,
-            "python",
-            "-c",
-            "import sys; print(sys.executable)",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return Path(result.stdout.strip())
-
-
-def ensure_python_env(*, dry_run: bool, assume_yes: bool) -> PythonEnv:
-    """Create or select the Python environment for setup commands."""
-
-    conda_available = _command_exists("conda")
-    use_conda = False
-    if conda_available:
-        use_conda = assume_yes or prompt_yes_no(
-            "Use conda for the Python environment?", default=True
-        )
-
-    if use_conda:
-        env_name = (
-            "retail"
-            if assume_yes
-            else prompt_text("Conda environment name", default="retail")
-        )
-        if not dry_run and not _conda_env_exists(env_name):
-            run_command(
-                [
-                    "conda",
-                    "create",
-                    "-n",
-                    env_name,
-                    f"python={MIN_PYTHON[0]}.{MIN_PYTHON[1]}",
-                    "-y",
-                ]
-            )
-        elif dry_run:
-            run_command(
-                [
-                    "conda",
-                    "create",
-                    "-n",
-                    env_name,
-                    f"python={MIN_PYTHON[0]}.{MIN_PYTHON[1]}",
-                    "-y",
-                ],
-                dry_run=True,
-            )
-        python = (
-            _conda_python(env_name)
-            if not dry_run
-            else Path("conda") / "envs" / env_name / "python"
-        )
-        return PythonEnv(python=python, description=f"conda environment {env_name!r}")
+def current_python_env() -> PythonEnv:
+    """Use the Python interpreter that launched this setup script."""
 
     if sys.version_info < MIN_PYTHON:
         raise SystemExit(
-            "Python 3.11 or later is required for venv setup. "
-            "Install Python 3.11+ or rerun with conda available."
+            "Python 3.11 or later is required. Activate a Python 3.11+ conda "
+            "environment or virtual environment, then rerun this script."
         )
-
-    venv_dir = REPO_ROOT / ".venv"
-    if not venv_dir.exists() or dry_run:
-        run_command([sys.executable, "-m", "venv", str(venv_dir)], dry_run=dry_run)
-    python = venv_dir / (
-        "Scripts/python.exe" if platform.system().lower() == "windows" else "bin/python"
-    )
-    return PythonEnv(python=python, description=f"virtual environment at {venv_dir}")
+    return PythonEnv(python=Path(sys.executable), description="current Python environment")
 
 
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
@@ -401,7 +316,7 @@ def main() -> int:
             assume_yes=args.yes,
         )
 
-    env = ensure_python_env(dry_run=args.dry_run, assume_yes=args.yes)
+    env = current_python_env()
     install_python_dependencies(env, dry_run=args.dry_run)
     run_retail_setup(
         env,

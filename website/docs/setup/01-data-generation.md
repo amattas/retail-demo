@@ -14,9 +14,9 @@ Set-Location retail-demo
 python .\scripts\setup.py
 ```
 
-The guided setup detects your OS, offers to install missing prerequisites,
-sets up Python with conda or venv, installs dependencies, runs configure,
-renders notebooks, and asks whether to deploy.
+The guided setup detects your OS, offers to install missing prerequisites, uses
+the Python environment that launched the script, installs dependencies, runs
+configure, renders notebooks, and asks whether to deploy.
 
 `--env` selects `deploy/config/environments/<env>.yml` and writes generated
 deployment files under `deploy/.generated/<env>/`.
@@ -29,7 +29,8 @@ python .\scripts\setup.py --env dev --dry-run
 
 ## Step 1.2: Manual install path
 
-Use this path if you prefer to run each command yourself.
+Use this path if you prefer to create or activate an environment yourself before
+running each command. For conda, activate the conda environment first.
 
 ```powershell
 py -3.11 -m venv .venv

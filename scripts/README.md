@@ -10,8 +10,9 @@ Guided cross-platform setup for a new Fabric workspace.
 
 `setup.py` is the single entry point for local setup. It detects the operating
 system, offers to install missing CLI prerequisites with the OS package manager,
-sets up Python with conda or venv, installs Python dependencies, runs
-`retail-setup configure`, renders notebooks, and asks whether to deploy.
+uses the Python environment that launched the script, installs Python
+dependencies, runs `retail-setup configure`, renders notebooks, and asks whether
+to deploy.
 
 ### Usage
 

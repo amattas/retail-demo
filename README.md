@@ -52,9 +52,9 @@ python .\scripts\setup.py
 ```
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
-CLI prerequisites with the OS package manager; asks whether to use conda when it
-is available; falls back to `.venv`; installs Python dependencies; runs
-`retail-setup configure`; renders notebooks; and finally asks whether to deploy.
+CLI prerequisites with the OS package manager; installs Python dependencies into
+the environment that launched the script; runs `retail-setup configure`; renders
+notebooks; and finally asks whether to deploy.
 
 Use `--env` to select the deployment environment file under
 `deploy\config\environments\`. For example, `--env dev` uses
@@ -69,7 +69,9 @@ python .\scripts\setup.py --env dev --dry-run
 
 ### 2. Manual install path
 
-Use this path if you prefer to run each step yourself.
+Use this path if you prefer to create or activate an environment yourself before
+running setup. If you use conda, activate the conda environment first; if you use
+venv, create and activate it first.
 
 ```powershell
 py -3.11 -m venv .venv
