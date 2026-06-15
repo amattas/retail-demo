@@ -256,6 +256,16 @@ def configure(
         else "Store type"
     )
 
+    _prompted_values = (
+        tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
+        kql_database_name, store_type, start_date, end_date, store_count, seed,
+    )
+    if any(value is None for value in _prompted_values) and sys.stdin.isatty():
+        typer.echo("")
+        typer.echo("=" * 70)
+        typer.echo("  INPUT REQUIRED — review each value and press Enter to accept [default]")
+        typer.echo("=" * 70)
+
     tenant_id = _prompt_str(
         "Entra tenant ID",
         tenant_id,

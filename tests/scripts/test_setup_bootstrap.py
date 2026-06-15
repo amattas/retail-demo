@@ -135,33 +135,31 @@ def test_extract_tenant_id_treats_null_as_missing():
     assert setup._extract_tenant_id("subscription_id: x\n") is None
 
 
-def test_ensure_azure_login_skips_when_tenant_matches(monkeypatch):
+def test_ensure_azure_login_always_runs_az_login(monkeypatch):
     commands = []
     monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
-    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
-    monkeypatch.setattr(setup, "_active_az_tenant", lambda _: "tenant")
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
-
-    setup.ensure_azure_login("dev", dry_run=False)
-
-    assert commands == []
-
-
-def test_ensure_azure_login_runs_login_on_mismatch(monkeypatch):
-    commands = []
-    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "expected"))
     monkeypatch.setattr(setup, "_resolve_az", lambda: "C:/az.cmd")
-    monkeypatch.setattr(setup, "_active_az_tenant", lambda _: "active")
     monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
 
     setup.ensure_azure_login("dev", dry_run=False)
 
-    assert commands == [["C:/az.cmd", "login", "--tenant", "expected"]]
+    assert commands == [["C:/az.cmd", "login", "--tenant", "TENANT"]]
 
 
-def test_ensure_azure_login_noop_for_non_azure_cli(monkeypatch):
+def test_ensure_azure_login_uses_powershell_for_az_powershell(monkeypatch):
     commands = []
     monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_powershell", "TENANT"))
+    monkeypatch.setattr(setup.shutil, "which", lambda command: "pwsh" if command == "pwsh" else None)
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert commands == [["pwsh", "-NoProfile", "-Command", "Connect-AzAccount -Tenant TENANT"]]
+
+
+def test_ensure_azure_login_noop_when_no_tenant(monkeypatch):
+    commands = []
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", None))
     monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
 
     setup.ensure_azure_login("dev", dry_run=False)

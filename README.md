@@ -48,15 +48,21 @@ Run these commands from PowerShell unless noted otherwise.
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
-python .\scripts\setup.py
+.\scripts\setup.ps1
 ```
+
+`setup.ps1` is the Windows entry point — it works even with nothing installed.
+It uses Python 3.11+ if present, otherwise installs Miniforge with winget and
+creates a conda environment, then runs the guided setup. On macOS and Linux,
+activate a Python 3.11+ environment and run `python ./scripts/setup.py` instead.
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into
 the environment that launched the script; runs `retail-setup configure`; renders
-notebooks; and finally asks whether to deploy. When you deploy, it signs in to
-the configured Azure tenant with `az login --tenant <tenant_id>` first (unless
-the active Azure CLI tenant already matches).
+notebooks; and finally asks whether to deploy. When you deploy, it always signs
+in to the configured Azure tenant first (`az login --tenant <tenant_id>` for
+`auth.mode: azure_cli`, or `Connect-AzAccount` for `auth.mode: azure_powershell`)
+so deployment never runs under the wrong account.
 
 Use `--env` to select the deployment environment file under
 `deploy\config\environments\`. For example, `--env dev` uses
@@ -64,9 +70,9 @@ Use `--env` to select the deployment environment file under
 `deploy\.generated\dev\`.
 
 ```powershell
-python .\scripts\setup.py --env dev
-python .\scripts\setup.py --env dev --deploy
-python .\scripts\setup.py --env dev --dry-run
+.\scripts\setup.ps1 --env dev
+.\scripts\setup.ps1 --env dev --deploy
+.\scripts\setup.ps1 --env dev --dry-run
 ```
 
 ### 2. Manual install path

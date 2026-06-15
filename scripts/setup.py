@@ -292,27 +292,34 @@ def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
     return auth_mode, tenant_id
 
 
-def _active_az_tenant(az: str) -> str | None:
-    result = subprocess.run(
-        [az, "account", "show", "--query", "tenantId", "-o", "tsv"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
+def _powershell_login_command(tenant_id: str) -> list[str] | None:
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if pwsh is None:
         return None
-    return result.stdout.strip() or None
+    return [pwsh, "-NoProfile", "-Command", f"Connect-AzAccount -Tenant {tenant_id}"]
 
 
 def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
-    """Sign in to the configured Azure tenant before deploy when needed.
+    """Sign in to the configured Azure tenant before deploy.
 
-    Only acts for `auth.mode: azure_cli`. Skips login when the active Azure CLI
-    tenant already matches the configured tenant_id.
+    Always runs the login command so deploy never proceeds under the wrong
+    account or tenant. Supports `auth.mode: azure_cli` (`az login`) and
+    `auth.mode: azure_powershell` (`Connect-AzAccount`).
     """
 
     auth_mode, tenant_id = read_deploy_auth(deploy_env)
-    if auth_mode != "azure_cli" or not tenant_id:
+    if not tenant_id:
+        return
+
+    if auth_mode == "azure_powershell":
+        login = _powershell_login_command(tenant_id)
+        if login is None:
+            raise SystemExit(
+                "PowerShell is required for auth.mode=azure_powershell but was "
+                "not found on PATH."
+            )
+        print(f"Signing in to Azure tenant {tenant_id} with Azure PowerShell.")
+        run_command(login, dry_run=dry_run)
         return
 
     az = _resolve_az()
@@ -321,19 +328,7 @@ def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
             "Azure CLI (az) is required for deploy but was not found on PATH. "
             "Install Azure CLI, or set deploy config auth.mode to azure_powershell."
         )
-
-    active_tenant = None if dry_run else _active_az_tenant(az)
-    if active_tenant and active_tenant.lower() == tenant_id.lower():
-        print(f"Azure CLI already signed in to tenant {tenant_id}.")
-        return
-
-    if active_tenant:
-        print(
-            f"Active Azure CLI tenant {active_tenant} does not match "
-            f"configured tenant {tenant_id}; signing in."
-        )
-    else:
-        print(f"Signing in to Azure tenant {tenant_id}.")
+    print(f"Signing in to Azure tenant {tenant_id}.")
     run_command([az, "login", "--tenant", tenant_id], dry_run=dry_run)
 
 
