@@ -183,10 +183,12 @@ def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) ->
     assert platform["metadata"]["type"] == "Notebook"
     assert platform["metadata"]["displayName"] == "00-apply-kql"
     notebook = json.loads((item / "notebook-content.ipynb").read_text(encoding="utf-8"))
-    text = "\n".join(
-        c["source"] if isinstance(c["source"], str) else "".join(c["source"])
-        for c in notebook["cells"]
+    # Fabric requires every cell's source to be a list of strings, not a string.
+    assert all(isinstance(c["source"], list) for c in notebook["cells"])
+    assert all(
+        isinstance(line, str) for c in notebook["cells"] for line in c["source"]
     )
+    text = "".join("".join(c["source"]) for c in notebook["cells"])
     assert "Kqlmagic" in text
     assert "create table receipts" in text  # embedded KQL
     assert "retail_kql" in text  # target database name
