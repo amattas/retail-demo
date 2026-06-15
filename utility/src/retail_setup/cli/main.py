@@ -492,6 +492,7 @@ def _deploy_plan(
     env: str,
     skip_terraform: bool,
     lakehouse_name: str = "retail_lakehouse",
+    recreate: bool = False,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     py = sys.executable
@@ -509,6 +510,25 @@ def _deploy_plan(
                 cmd=["terraform", "-chdir=deploy/terraform", "init"],
                 description="Terraform init",
             ),
+        ]
+        if recreate:
+            steps += [
+                DeployStep(
+                    cmd=[
+                        "terraform",
+                        "-chdir=deploy/terraform",
+                        "destroy",
+                        f"-var-file={var_file}",
+                    ],
+                    needs_confirmation=True,
+                    description="Terraform destroy (recreate - DESTROYS the workspace and all items)",
+                ),
+                DeployStep(
+                    cmd=[py, "-c", "import time; time.sleep(30)"],
+                    description="Wait 30s for Fabric to finalize workspace deletion",
+                ),
+            ]
+        steps += [
             DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "plan", f"-var-file={var_file}"],
                 description="Terraform plan",
@@ -605,13 +625,31 @@ def deploy(
     yes: bool = typer.Option(
         False, "--yes", help="Pre-confirm gated steps (Terraform apply)."
     ),
+    recreate: bool = typer.Option(
+        False,
+        "--recreate",
+        help="Destroy the existing workspace and recreate it (clean slate).",
+    ),
 ) -> None:
     """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
 
     Prerequisite: the `terraform` binary must be on PATH unless --skip-terraform
     is given. Authentication is handled by the deploy framework scripts.
+
+    With --recreate, the deployment destroys the existing workspace (and every
+    item in it) and recreates it from scratch. This is destructive; use it only
+    for a clean-slate redeploy.
     """
     repo_root = repo_root.resolve()
+    if recreate and skip_terraform:
+        typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
+        raise typer.Exit(code=1)
+    if recreate and not dry_run:
+        typer.echo("")
+        typer.echo("!" * 70)
+        typer.echo("  WARNING: --recreate will DESTROY the existing workspace and ALL items")
+        typer.echo("  in it, wait 30 seconds, then recreate everything from scratch.")
+        typer.echo("!" * 70)
     if dry_run:
         # dry runs must not require live config; fall back to the default name
         try:
@@ -622,7 +660,7 @@ def deploy(
     else:
         lakehouse = _lakehouse_name(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
-    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse)
+    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse, recreate=recreate)
     total = len(plan)
 
     if dry_run:
@@ -634,7 +672,7 @@ def deploy(
     for i, step in enumerate(plan, start=1):
         _echo_step(i, total, step)
         if step.needs_confirmation and not yes:
-            if not typer.confirm("Apply this Terraform plan?"):
+            if not typer.confirm(f"Proceed with: {step.description}?"):
                 typer.echo("Aborted by user.")
                 raise typer.Exit(code=1)
         try:

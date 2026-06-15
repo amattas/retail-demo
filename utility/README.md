@@ -231,6 +231,14 @@ stage/deploy supported Fabric items:
 retail-setup deploy --env dev --skip-terraform
 ```
 
+For a clean slate, `--recreate` destroys the existing workspace (and every item
+in it), waits 30 seconds, then recreates everything. This is destructive and is
+gated by a confirmation prompt:
+
+```powershell
+retail-setup deploy --env dev --recreate
+```
+
 The deploy command runs these steps in order:
 
 1. Generate Terraform and fabric-cicd config files.

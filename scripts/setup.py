@@ -339,6 +339,7 @@ def run_retail_setup(
     dry_run: bool,
     assume_yes: bool,
     deploy_requested: bool,
+    recreate: bool = False,
 ) -> None:
     run_command(
         [str(env.python), "-m", "retail_setup.cli.main", "configure", "--env", deploy_env],
@@ -361,6 +362,8 @@ def run_retail_setup(
             "--env",
             deploy_env,
         ]
+        if recreate:
+            deploy_command.append("--recreate")
         if assume_yes:
             deploy_command.append("--yes")
         run_command(deploy_command, dry_run=dry_run)
@@ -383,6 +386,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Print commands without running them.")
     parser.add_argument("--yes", action="store_true", help="Accept setup prompts with defaults.")
     parser.add_argument("--deploy", action="store_true", help="Run deploy after configure/render.")
+    parser.add_argument(
+        "--recreate",
+        action="store_true",
+        help="Destroy and recreate the workspace during deploy (clean slate).",
+    )
     parser.add_argument(
         "--skip-prereqs",
         action="store_true",
@@ -415,7 +423,8 @@ def main() -> int:
         deploy_env=args.env,
         dry_run=args.dry_run,
         assume_yes=args.yes,
-        deploy_requested=args.deploy,
+        deploy_requested=args.deploy or args.recreate,
+        recreate=args.recreate,
     )
     return 0
 

@@ -39,6 +39,40 @@ def test_plan_orders_steps_and_gates_apply():
     assert apply_idx < build_idx < deploy_idx
 
 
+def test_recreate_inserts_destroy_and_sleep_before_plan():
+    plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
+    cmds = [" ".join(map(str, s.cmd)) for s in plan]
+    init_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "init" in c)
+    destroy_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "destroy" in c)
+    sleep_idx = next(i for i, c in enumerate(cmds) if "time.sleep(30)" in c)
+    plan_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and " plan " in f" {c} ")
+    assert init_idx < destroy_idx < sleep_idx < plan_idx
+    assert plan[destroy_idx].needs_confirmation
+
+
+def test_recreate_rejects_skip_terraform(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--recreate", "--skip-terraform"])
+    assert result.exit_code == 1, result.output
+    assert "--recreate cannot be combined with --skip-terraform" in result.output
+
+
+def test_recreate_dry_run_shows_destroy_step():
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--recreate", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "destroy" in result.output
+
+
+def test_recreate_warns_and_aborts_on_decline(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0))
+    # Decline the first gated step (Terraform destroy).
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--recreate"], input="n\n")
+    assert result.exit_code == 1, result.output
+    assert "WARNING" in result.output
+    assert "Aborted by user" in result.output
+
+
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):
     def fake_run(cmd, *args, **kwargs):
         if cmd and cmd[0] == "terraform":

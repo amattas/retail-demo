@@ -123,7 +123,25 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
     ]
 
 
-def test_extract_tenant_id_and_auth_mode():
+def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
+    commands = []
+    env = setup.PythonEnv(Path("python"), "test")
+    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
+
+    setup.run_retail_setup(
+        env,
+        deploy_env="qa",
+        dry_run=True,
+        assume_yes=True,
+        deploy_requested=True,
+        recreate=True,
+    )
+
+    deploy_cmd = commands[-1]
+    assert "--recreate" in deploy_cmd
+    assert deploy_cmd.index("--recreate") < deploy_cmd.index("--yes")
+
     text = "tenant_id: 11111111-1111-1111-1111-111111111111\nauth:\n  mode: azure_cli\n"
 
     assert setup._extract_tenant_id(text) == "11111111-1111-1111-1111-111111111111"

@@ -73,6 +73,7 @@ Use `--env` to select the deployment environment file under
 .\scripts\setup.ps1 --env dev
 .\scripts\setup.ps1 --env dev --deploy
 .\scripts\setup.ps1 --env dev --dry-run
+.\scripts\setup.ps1 --env dev --recreate   # clean slate: destroy + recreate the workspace
 ```
 
 ### 2. Manual install path
