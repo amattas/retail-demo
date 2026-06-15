@@ -96,8 +96,10 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_model.SemanticModel" in result.staged_items
     assert "retail_model.Report" in result.staged_items
     assert "retail_lakehouse.Lakehouse" in result.staged_items
-    assert "retail_eventhouse.Eventhouse" in result.staged_items
-    assert "retail_kql.KQLDatabase" in result.staged_items
+    # Eventhouse and KQLDatabase are Terraform-owned and must NOT be staged as
+    # fabric-cicd shell items (Fabric rejects a .platform-only definition).
+    assert "retail_eventhouse.Eventhouse" not in result.staged_items
+    assert "retail_kql.KQLDatabase" not in result.staged_items
 
 
 def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
@@ -158,7 +160,7 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
         {"metadata": {"type": "Report"}},
     )
 
-    result = build_artifacts.build_workspace(
+    build_artifacts.build_workspace(
         repo_root=repo,
         output_dir=out_dir,
         notebook_groups=["setup"],

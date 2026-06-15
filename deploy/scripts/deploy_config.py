@@ -358,8 +358,14 @@ def render_parameter_file(
                 ),
                 "replace_value": {config.environment: onelake_url},
                 "is_regex": "true",
+                # Scope by item type only. A `file_path` filter is matched
+                # relative to the repository directory (not the item folder),
+                # so "definition/expressions.tmdl" never matches the staged
+                # "<item>.SemanticModel/definition/expressions.tmdl" path and the
+                # OneLake URL rewrite is silently skipped. The regex only matches
+                # OneLake URLs, which appear solely in the semantic model's
+                # expressions.tmdl, so item_type scoping is sufficient and safe.
                 "item_type": "SemanticModel",
-                "file_path": "definition/expressions.tmdl",
             },
             {
                 "find_value": "DirectLake - retail_lakehouse",
