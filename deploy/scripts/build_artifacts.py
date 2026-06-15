@@ -164,12 +164,13 @@ def build_workspace(
     (output_dir / ".gitkeep").touch()
 
     staged_items: list[str] = []
-    for display_name, item_type in [
-        ("retail_lakehouse", "Lakehouse"),
-        ("retail_eventhouse", "Eventhouse"),
-        ("retail_kql", "KQLDatabase"),
-    ]:
-        staged_items.append(stage_shell_item(output_dir, display_name, item_type).name)
+    # Terraform provisions the Lakehouse, Eventhouse, and KQL Database. Only the
+    # Lakehouse is staged as a fabric-cicd shell item (it publishes cleanly and
+    # helps notebook `$items.Lakehouse` references resolve). Eventhouse and
+    # KQLDatabase are NOT staged: Fabric rejects a `.platform`-only definition
+    # update ("Definition parts cannot contain the .platform file only"), and
+    # Terraform already owns them.
+    staged_items.append(stage_shell_item(output_dir, "retail_lakehouse", "Lakehouse").name)
 
     for notebook_name in _selected_notebooks(notebook_groups):
         staged_items.append(

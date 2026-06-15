@@ -20,8 +20,6 @@ def test_load_environment_merges_defaults_and_environment() -> None:
     assert config.notebooks.include == ["core"]
     assert config.deployment.item_types_in_scope == [
         "Lakehouse",
-        "Eventhouse",
-        "KQLDatabase",
         "Notebook",
         "SemanticModel",
         "Report",
