@@ -837,11 +837,12 @@ def deploy(
 
     if not yes:
         if typer.confirm(
-            "Run the setup pipeline now (apply KQL setup, then generate "
-            "dimensions, facts, and gold)?",
+            "Run the setup pipeline now (generate dimensions, facts, and gold, "
+            "then train the ML models and build the ontology)?",
             default=False,
         ):
             _run_setup_pipeline(repo_root, env)
+            _print_ontology_relink_hint(repo_root, env)
         else:
             typer.echo(
                 "Skipping. Run later with: "
@@ -871,6 +872,28 @@ def _deploy_taskflow(repo_root: Path, env: str) -> None:
         )
 
 
+def _print_ontology_relink_hint(repo_root: Path, env: str) -> None:
+    """Explain why the ontology task-flow node is unbound and how it links.
+
+    The ontology is created at the end of the setup pipeline (``30-create-ontology``),
+    which runs after the task flow was deployed, so its node is dropped (unbound) at
+    this deploy. It binds automatically on the next ``retail-setup deploy`` (the task
+    flow step re-runs and the ontology now resolves by name), or immediately via a
+    standalone task flow deploy once the pipeline finishes.
+    """
+
+    workspace = _workspace_name(repo_root, env)
+    typer.echo("")
+    typer.echo(
+        "Note: the ontology is created at the end of the setup pipeline you just\n"
+        "started, so its task-flow node ('RetailOntology_AutoGen') is not linked yet.\n"
+        "It links automatically the next time you run 'retail-setup deploy' (once the\n"
+        "ontology exists). To link it sooner, re-run the task flow deploy after the\n"
+        "pipeline finishes:\n"
+        f"    python -m deploy.scripts.taskflow deploy --workspace {workspace}"
+    )
+
+
 def _run_setup_pipeline(repo_root: Path, env: str) -> None:
     """Start an on-demand run of the deployed setup pipeline.
 
@@ -881,7 +904,8 @@ def _run_setup_pipeline(repo_root: Path, env: str) -> None:
 
     typer.echo("")
     _hr("=")
-    typer.echo("  Generating the historical data (dimensions, then facts, then gold).")
+    typer.echo("  Running the setup pipeline: historical data (dimensions, facts, gold),")
+    typer.echo("  then the ML models, then the ontology -- in one chained run.")
     typer.echo("  This can take a while -- often several minutes to an hour or more,")
     typer.echo("  depending on the months of history and store count. It runs in")
     typer.echo("  Fabric, so you can close this and track progress in the workspace.")

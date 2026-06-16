@@ -149,7 +149,59 @@ def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> Non
     }
 
 
+def test_committed_setup_pipeline_chains_ml_then_ontology() -> None:
+    """The committed setup pipeline must run data load -> ML notebooks -> ontology,
+    with the ML and ontology notebook references mapped to deployed items."""
 
+    repo_root = Path(__file__).resolve().parents[2]
+    content = json.loads(
+        (
+            repo_root
+            / "fabric"
+            / "pipelines"
+            / "setup-pipeline.DataPipeline"
+            / "pipeline-content.json"
+        ).read_text(encoding="utf-8")
+    )
+    activities = {a["name"]: a for a in content["properties"]["activities"]}
+
+    # ML notebooks run after gold is built; every ML activity (directly or via an
+    # intra-ML dependency) follows setup-04-build-gold.
+    ml_names = [n for n in activities if "-ml-" in n]
+    assert ml_names, "expected inlined ML notebooks in the setup pipeline"
+    for name in ml_names:
+        assert activities[name]["type"] == "TridentNotebook"
+
+    # Ontology runs only after every ML notebook completes (it reads gold + ML).
+    ontology = activities["30-create-ontology"]
+    assert ontology["type"] == "TridentNotebook"
+    ontology_deps = {d["activity"] for d in ontology["dependsOn"]}
+    assert set(ml_names).issubset(ontology_deps)
+
+    # The ML + ontology notebook GUIDs are mapped to deployed notebooks.
+    config = deploy_config.load_environment("dev")
+    rendered = deploy_config.render_parameter_file(
+        config,
+        {
+            "workspace_id": "11111111-1111-1111-1111-111111111111",
+            "lakehouse_id": "22222222-2222-2222-2222-222222222222",
+            "lakehouse_name": "retail_lakehouse",
+        },
+    )
+    replacements = {
+        entry["find_value"]: entry["replace_value"]["dev"]
+        for entry in rendered["find_replace"]
+        if isinstance(entry["replace_value"].get("dev"), str)
+    }
+    assert (
+        replacements[ontology["typeProperties"]["notebookId"]]
+        == "$items.Notebook.30-create-ontology.$id"
+    )
+    sample_ml = activities["06-ml-demand-forecast"]
+    assert (
+        replacements[sample_ml["typeProperties"]["notebookId"]]
+        == "$items.Notebook.06-ml-demand-forecast.$id"
+    )
 def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
     config = deploy_config.load_environment("dev")
     terraform_outputs = {

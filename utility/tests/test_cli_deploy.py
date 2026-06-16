@@ -197,6 +197,22 @@ def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
     assert "run 'setup-pipeline' manually" in captured.err
 
 
+def test_ontology_relink_hint_names_workspace_and_command(tmp_path, capsys):
+    cfg = tmp_path / "deploy" / "config"
+    (cfg / "environments").mkdir(parents=True)
+    (cfg / "deploy.yml").write_text("workspace:\n  name: retail-demo\n", encoding="utf-8")
+    (cfg / "environments" / "dev.yml").write_text(
+        "workspace:\n  name: retail-demo-dev\n", encoding="utf-8"
+    )
+    from retail_setup.cli.main import _print_ontology_relink_hint
+
+    _print_ontology_relink_hint(tmp_path, "dev")
+
+    out = capsys.readouterr().out
+    assert "RetailOntology_AutoGen" in out
+    assert "deploy.scripts.taskflow deploy --workspace retail-demo-dev" in out
+
+
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):
     def fake_run(cmd, *args, **kwargs):
         if cmd and cmd[0] == "terraform":
