@@ -178,10 +178,10 @@ def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) ->
     output = tmp_path / "workspace"
     item = build_artifacts.stage_kql_apply_notebook(repo, output, kql_database_name="retail_kql")
 
-    assert item == output / "00-apply-kql.Notebook"
+    assert item == output / "setup-00-apply-kql.Notebook"
     platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
     assert platform["metadata"]["type"] == "Notebook"
-    assert platform["metadata"]["displayName"] == "00-apply-kql"
+    assert platform["metadata"]["displayName"] == "setup-00-apply-kql"
     notebook = json.loads((item / "notebook-content.ipynb").read_text(encoding="utf-8"))
     # Fabric requires every cell's source to be a list of strings, not a string.
     assert all(isinstance(c["source"], list) for c in notebook["cells"])
@@ -296,8 +296,30 @@ def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> 
 
     # streaming pipeline's notebooks are deployed; ML pipeline's are not.
     assert [p.name for p in staged] == ["streaming-data-load.DataPipeline"]
-    assert (output / "streaming-data-load.DataPipeline" / "pipeline-content.json").exists()
-    assert not (output / "machine-learning.DataPipeline").exists()
+    assert (
+        output / "Pipelines" / "streaming-data-load.DataPipeline" / "pipeline-content.json"
+    ).exists()
+    assert not (output / "Pipelines" / "machine-learning.DataPipeline").exists()
+
+
+def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write_pipeline(repo, "setup-pipeline", ["setup-00-apply-kql", "setup-01-seed-dictionaries"])
+    _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
+
+    output = tmp_path / "workspace"
+    output.mkdir()
+    deployed = {"setup-00-apply-kql", "setup-01-seed-dictionaries", "03-streaming-to-silver"}
+    staged = build_artifacts.stage_pipelines(repo, output, deployed)
+
+    # setup-pipeline joins the setup notebooks under "Setup"; others stay in "Pipelines".
+    assert (output / "Setup" / "setup-pipeline.DataPipeline").is_dir()
+    assert not (output / "Pipelines" / "setup-pipeline.DataPipeline").exists()
+    assert (output / "Pipelines" / "streaming-data-load.DataPipeline").is_dir()
+    assert {p.name for p in staged} == {
+        "setup-pipeline.DataPipeline",
+        "streaming-data-load.DataPipeline",
+    }
 
 
 def test_stage_pipelines_returns_empty_when_no_sources(tmp_path: Path) -> None:
@@ -392,7 +414,7 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
         {"metadata": {"type": "Report"}},
     )
 
-    # KQL source for the generated 00-apply-kql notebook (setup group).
+    # KQL source for the generated setup-00-apply-kql notebook (setup group).
     (repo / "fabric" / "kql_database").mkdir(parents=True)
     (repo / "fabric" / "kql_database" / "01-create-tables.kql").write_text(
         ".create table receipts (id:string)", encoding="utf-8"

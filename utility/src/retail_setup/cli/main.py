@@ -773,14 +773,14 @@ def deploy(
 
     typer.echo(f"Deploy complete for environment '{env}'.")
 
-    if not yes:
-        taskflow_path = repo_root / "fabric" / "taskflow" / "taskflow.json"
-        if taskflow_path.is_file() and typer.confirm(
-            "Wire up the workspace task flow now (the visual item graph)?",
-            default=False,
-        ):
-            _deploy_taskflow(repo_root, env)
+    # Wire up the workspace task flow automatically (the visual item graph that
+    # links the deployed items). Runs in both interactive and --yes modes.
+    taskflow_path = repo_root / "fabric" / "taskflow" / "taskflow.json"
+    if taskflow_path.is_file():
+        typer.echo("Wiring up the workspace task flow (the visual item graph)...")
+        _deploy_taskflow(repo_root, env)
 
+    if not yes:
         if typer.confirm(
             "Run the setup pipeline now (apply KQL setup, then generate "
             "dimensions, facts, and gold)?",

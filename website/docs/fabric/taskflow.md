@@ -40,7 +40,8 @@ python -m deploy.scripts.taskflow deploy --workspace "retail-demo-dev"
 item (stale source references, or items the target doesn't have such as data
 agents/ontology) are dropped and reported.
 
-`retail-setup deploy` offers to run this automatically at the end (interactive
-only): *"Wire up the workspace task flow now?"*.
+`retail-setup deploy` runs this **automatically** at the end of every deploy (in
+both interactive and `--yes` modes), once the workspace items it links have been
+published.
 
 See `fabric/taskflow/README.md` for the full data model and caveats.

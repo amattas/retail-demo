@@ -92,6 +92,7 @@ def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) 
 
     monkeypatch.setattr(taskflow, "_session", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "_token", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(taskflow, "_credential", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
     monkeypatch.setattr(
         taskflow,
@@ -124,6 +125,7 @@ def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -
 
     monkeypatch.setattr(taskflow, "_session", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "_token", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(taskflow, "_credential", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
     monkeypatch.setattr(taskflow, "list_workspace_items", lambda *_a: [])
     monkeypatch.setattr(taskflow, "resolve_cluster", lambda *_a: "https://c")
