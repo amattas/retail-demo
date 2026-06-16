@@ -143,3 +143,63 @@ def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:
     assert calls["query_uri"] == "https://cluster"
     assert calls["database_name"] == "retail_kql"
     assert "ThrowOnErrors=true" in calls["script"]
+
+
+def test_summarize_result_is_concise_on_success(capsys) -> None:
+    """A successful apply collapses to one line; no per-command text is dumped."""
+
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(
+        {
+            "CommandType": ["DatabaseScriptExecute", "TableCreate", "TableCreate"],
+            "CommandText": [
+                ".execute database script",
+                ".create-merge table receipt_created (store_id:long)",
+                ".create-merge table receipt_line_added (line_number:long)",
+            ],
+            "Result": ["Completed", "Completed", "Completed"],
+            "Reason": ["", "", ""],
+        }
+    )
+
+    apply_kql._summarize_result(frame)
+
+    out = capsys.readouterr().out
+    assert "KQL applied: 3/3 commands completed." in out
+    # The verbose command text must not be printed on success.
+    assert "create-merge table receipt_created" not in out
+
+
+def test_summarize_result_lists_only_failures(capsys) -> None:
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(
+        {
+            "CommandType": ["TableCreate", "FunctionCreate"],
+            "CommandText": [
+                ".create-merge table ok (x:long)",
+                ".create-or-alter function bad() { nope }",
+            ],
+            "Result": ["Completed", "Failed"],
+            "Reason": ["", "Semantic error: 'nope' is not defined"],
+        }
+    )
+
+    apply_kql._summarize_result(frame)
+
+    out = capsys.readouterr().out
+    assert "1/2 completed, 1 failed" in out
+    assert "FunctionCreate" in out and "not defined" in out
+    # The command that succeeded is not listed in the failure detail.
+    assert "create-merge table ok" not in out
+
+
+def test_summarize_result_falls_back_without_columns(capsys) -> None:
+    """A result object without a Result column still prints a count, not a dump."""
+
+    class _Frame:
+        def __len__(self) -> int:
+            return 7
+
+    apply_kql._summarize_result(_Frame())
+
+    assert "KQL applied: 7 command(s)." in capsys.readouterr().out

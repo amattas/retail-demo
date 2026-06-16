@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from deploy.scripts import _output as console
 from deploy.scripts.export_items import build_session, list_items
 
 if TYPE_CHECKING:
@@ -77,9 +78,9 @@ def main() -> int:
     session = build_session()
     pipeline_id = find_pipeline_id(session, workspace_id, args.pipeline)
     location = run_pipeline(session, workspace_id, pipeline_id)
-    print(f"Started pipeline run for {args.pipeline!r} ({pipeline_id}).")
+    console.info(f"Started pipeline run for {args.pipeline!r} ({pipeline_id}).")
     if location:
-        print(f"  Track the run at: {location}")
+        console.detail(f"Track the run at: {location}")
     return 0
 
 

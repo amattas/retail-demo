@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from deploy.scripts import _output as console
 from deploy.scripts.deploy_config import DEPLOY_ROOT, load_environment
 
 # Placeholders that staged item definitions may legitimately contain. They are
@@ -91,9 +92,9 @@ def main() -> int:
     errors = validate_generated_files(args.deploy_root, args.environment)
     if errors:
         for error in errors:
-            print(f"ERROR: {error}")
+            console.error(error)
         return 1
-    print("Deployment framework validation passed")
+    console.info("Deployment framework validation passed")
     return 0
 
 

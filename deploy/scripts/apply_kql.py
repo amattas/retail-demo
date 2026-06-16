@@ -14,6 +14,8 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from deploy.scripts import _output as console
+
 if TYPE_CHECKING:
     from azure.identity import AzureCliCredential
 
@@ -127,6 +129,35 @@ def _result_to_frame(response: Any) -> Any:
     return dataframe_from_result_table(response.primary_results[0])
 
 
+def _summarize_result(frame: Any) -> None:
+    """Print a concise summary of a ``.execute database script`` result.
+
+    The raw Kusto result has one wide row per command (including the full
+    command text), which is hundreds of rows for the retail schema. Collapse it
+    to a completed/failed count and only print details for failed commands.
+    """
+
+    total = len(frame)
+    columns = getattr(frame, "columns", None)
+    results = frame["Result"] if columns is not None and "Result" in columns else None
+    if results is None:
+        console.info(f"KQL applied: {total} command(s).")
+        return
+
+    failures = frame[results != "Completed"]
+    completed = total - len(failures)
+    if len(failures) == 0:
+        console.info(f"KQL applied: {completed}/{total} commands completed.")
+        return
+
+    console.info(f"KQL applied: {completed}/{total} completed, {len(failures)} failed:")
+    for _, row in failures.iterrows():
+        lines = str(row.get("CommandText", "")).strip().splitlines()
+        first_line = lines[0][:100] if lines else ""
+        reason = str(row.get("Reason", "")).strip()
+        console.detail(f"[{row.get('CommandType', '')}] {first_line} -> {reason}")
+
+
 def apply_to_database(
     *,
     script: str,
@@ -142,12 +173,11 @@ def apply_to_database(
         workspace_id, kql_database_id, credential
     )
     database_name = kql_database_name or resolved_name
-    print(f"Applying KQL to database '{database_name}' @ {query_uri}")
+    console.info(f"Applying KQL to '{database_name}' @ {query_uri}")
     response = execute_database_script(query_uri, database_name, script, credential)
 
     frame = _result_to_frame(response)
-    print(frame.to_string())
-    print(f"KQL setup scripts applied: {len(frame)} command(s).")
+    _summarize_result(frame)
     return len(frame)
 
 
@@ -182,7 +212,7 @@ def main() -> int:
     script = build_database_script(collect_kql_scripts(args.source_dir))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(script, encoding="utf-8")
-    print(f"Wrote combined KQL deployment script to {args.output}")
+    console.info(f"Wrote combined KQL script to {args.output}")
 
     if not args.execute:
         return 0

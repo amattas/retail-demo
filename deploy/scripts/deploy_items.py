@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from deploy.scripts import _output as console
 from deploy.scripts.deploy_config import DEPLOY_ROOT
 
 
@@ -25,15 +26,26 @@ def build_credential(auth_mode: str):
 
 
 def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
-    """Run fabric-cicd configuration deployment."""
+    """Run fabric-cicd configuration deployment with quiet, consistent output.
+
+    fabric-cicd logs verbose ``[info] HH:MM:SS - ####`` banners at INFO. Raise
+    its package logger to WARNING so only warnings and errors surface, and print
+    our own concise progress lines to match the other deploy steps.
+    """
+
+    import logging
 
     from fabric_cicd import deploy_with_config
 
+    logging.getLogger("fabric_cicd").setLevel(logging.WARNING)
+
+    console.info(f"Publishing Fabric items (environment '{environment}')...")
     deploy_with_config(
         config_file_path=str(config_path.resolve()),
         token_credential=build_credential(auth_mode),
         environment=environment,
     )
+    console.info("Published Fabric items.")
 
 
 def main() -> int:
