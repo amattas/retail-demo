@@ -4,11 +4,14 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import retail_setup.cli.main as cli
 from retail_setup.cli.main import (
     app,
     _deploy_plan,
     _validate_azure_cli_tenant,
     _RECREATE_WAIT_SECONDS,
+    _PIPELINE_TRIGGER_ATTEMPTS,
+    _run_setup_pipeline,
 )
 
 runner = CliRunner()
@@ -146,6 +149,39 @@ def test_workspace_name_prefers_environment_overlay(tmp_path):
     from retail_setup.cli.main import _workspace_name
 
     assert _workspace_name(tmp_path, "dev") == "retail-demo-dev"
+
+
+def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys):
+    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
+    attempts = {"n": 0}
+
+    def fake_run(_cmd, cwd=None):
+        attempts["n"] += 1
+        # Fail the first trigger, succeed on the retry.
+        return SimpleNamespace(returncode=1 if attempts["n"] == 1 else 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    _run_setup_pipeline(Path("."), "dev")
+
+    out = capsys.readouterr().out
+    assert "can take a while" in out
+    assert attempts["n"] == 2  # retried once after the initial failure
+
+
+def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
+    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
+    runs = {"n": 0}
+
+    def fake_run(_cmd, cwd=None):
+        runs["n"] += 1
+        return SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    _run_setup_pipeline(Path("."), "dev")
+
+    captured = capsys.readouterr()
+    assert runs["n"] == _PIPELINE_TRIGGER_ATTEMPTS
+    assert "run 'setup-pipeline' manually" in captured.err
 
 
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):

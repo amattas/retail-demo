@@ -51,6 +51,16 @@ Use `--skip-terraform` only when the workspace/resources already exist:
 retail-setup deploy --env dev --skip-terraform
 ```
 
+After the items publish, the deploy offers to run the **setup pipeline**, which
+generates the historical data in Fabric (dimensions, then facts, then gold). That
+generation runs asynchronously in Fabric and **can take a while** — often several
+minutes to an hour or more depending on the configured months of history and store
+count. You can close the CLI and track progress in the Fabric workspace.
+
+Transient failures self-heal: cold `az` token calls and flaky Fabric/Power BI REST
+calls are retried with backoff (token acquisition for the KQL apply, task flow, and
+pipeline trigger), and the pipeline trigger itself is retried a few times.
+
 ## Manual script workflow
 
 Run from the repository root:
@@ -130,3 +140,5 @@ does not.
 | `fabric_cicd` import error | Install `fabric-cicd` in the active Python environment. |
 | Authentication failure | Run `az account show --query "{tenantId:tenantId,user:user.name,name:name}" -o table` and confirm it matches deploy config. Run `az login --tenant <tenant-id>` for `azure_cli`, or `Connect-AzAccount -Tenant <tenant-id>` for `azure_powershell`. |
 | KQL tables missing | Run the generated `database.kql` script manually in the target KQL database. |
+| `az` token timeout / cold-start hang | A cold `az account get-access-token` can take ~90s; the deploy uses a 120s credential timeout and retries transient auth failures. Warming `az` first (`az account get-access-token --resource https://api.fabric.microsoft.com -o none`) avoids the delay. |
+| Setup pipeline not triggered | The CLI retries the trigger a few times, then prints a fallback. Open the workspace in Fabric and run `setup-pipeline` manually. |

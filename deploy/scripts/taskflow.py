@@ -78,7 +78,24 @@ def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredent
 
 
 def _token(scope: str, credential: AzureCliCredential) -> str:
-    return credential.get_token(scope).token
+    """Acquire an access token, retrying transient cold-``az`` auth failures.
+
+    A cold ``az account get-access-token`` (Power BI / Fabric audience) can time
+    out even with a generous process timeout; a retry usually succeeds once ``az``
+    has warmed up.
+    """
+
+    from azure.core.exceptions import ClientAuthenticationError
+
+    from deploy.scripts._retry import retry_call
+
+    return retry_call(
+        lambda: credential.get_token(scope).token,
+        retry_on=(ClientAuthenticationError,),
+        on_retry=lambda n, exc: console.warn(
+            f"Azure CLI token attempt {n} failed ({type(exc).__name__}); retrying..."
+        ),
+    )
 
 
 def _session(token: str) -> requests.Session:
