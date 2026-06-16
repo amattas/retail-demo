@@ -199,6 +199,57 @@ def test_stage_ml_experiments_creates_shell_items(tmp_path: Path) -> None:
     assert platform["metadata"]["displayName"] == "demand_forecast"
 
 
+def test_stage_data_agents_copies_item_folders(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for agent in ("retail-semantic-model-agent", "retail-ontology-agent"):
+        agent_dir = repo / "fabric" / "data-agents" / f"{agent}.DataAgent"
+        _write_json(agent_dir / ".platform", {"metadata": {"type": "DataAgent"}})
+        _write_json(
+            agent_dir / "Files" / "Config" / "data_agent.json", {"schema": "x"}
+        )
+
+    output = tmp_path / "workspace"
+    staged = build_artifacts.stage_data_agents(repo, output)
+
+    names = sorted(p.name for p in staged)
+    assert names == ["retail-ontology-agent.DataAgent", "retail-semantic-model-agent.DataAgent"]
+    # The full item definition (not just .platform) is copied into the
+    # "Data Agents" workspace folder.
+    copied = output / "Data Agents" / "retail-semantic-model-agent.DataAgent"
+    assert (copied / ".platform").is_file()
+    assert (copied / "Files" / "Config" / "data_agent.json").is_file()
+
+
+def test_stage_data_agents_empty_without_source(tmp_path: Path) -> None:
+    assert build_artifacts.stage_data_agents(tmp_path / "repo", tmp_path / "ws") == []
+
+
+def test_build_workspace_stages_data_agents(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:
+        _write_json(
+            repo / "fabric" / "lakehouse" / notebook_name,
+            {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5},
+        )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+    _write_json(
+        repo / "fabric" / "data-agents" / "retail-semantic-model-agent.DataAgent" / ".platform",
+        {"metadata": {"type": "DataAgent"}},
+    )
+
+    result = build_artifacts.build_workspace(repo, tmp_path / "ws", ["core"])
+
+    assert "retail-semantic-model-agent.DataAgent" in result.staged_items
+    assert (tmp_path / "ws" / "Data Agents" / "retail-semantic-model-agent.DataAgent").is_dir()
+
+
 def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"] + build_artifacts.NOTEBOOK_GROUPS["ml"]:

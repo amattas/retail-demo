@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from deploy.scripts import taskflow
@@ -100,11 +102,17 @@ def test_committed_taskflow_has_only_bindable_items() -> None:
     data = _json.loads(
         (repo_root / "fabric" / "taskflow" / "taskflow.json").read_text(encoding="utf-8")
     )
+    # Hash-suffixed runtime artifacts (e.g. RetailOntology_AutoGen_graph_<32 hex>,
+    # *_lh_<32 hex>) get a fresh GUID-derived suffix every run and can never bind by
+    # name. The stable ontology item name (RetailOntology_AutoGen, no hash) is fine.
+    hashed_autogen = re.compile(r"_AutoGen_(?:graph|lh)_[0-9a-f]{16,}", re.IGNORECASE)
     for task in data["tasks"]:
         for item in task["items"]:
             name = item.get("artifactName")
             assert name, f"null artifactName in task {task.get('name')!r}"
-            assert "_AutoGen_" not in str(name), f"unportable auto-gen reference: {name}"
+            assert not hashed_autogen.search(str(name)), (
+                f"unportable hash-suffixed reference: {name}"
+            )
 
 
 def test_to_workspace_resolves_names_to_target_guids_and_reports_unresolved() -> None:

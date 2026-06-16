@@ -57,6 +57,7 @@ deployment:
     - KQLQueryset
     - DataPipeline
     - MLExperiment
+    - DataAgent
   publish_skip: false
   unpublish_skip: true
   orphan_exclude_regex: "^DO_NOT_DELETE_.*"

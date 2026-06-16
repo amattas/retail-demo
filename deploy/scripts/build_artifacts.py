@@ -49,6 +49,7 @@ SETUP_FOLDER = "Setup"
 POWERBI_FOLDER = "Reporting"
 PIPELINES_FOLDER = "Pipelines"
 ML_FOLDER = "ML"
+DATA_AGENTS_FOLDER = "Data Agents"
 
 # MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
 # them as MLExperiment shell items so they exist (and are organized under the "ML"
@@ -348,6 +349,35 @@ def stage_ml_experiments(output_dir: Path) -> list[Path]:
     return [stage_shell_item(output_dir, name, "MLExperiment") for name in ML_EXPERIMENTS]
 
 
+def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
+    """Stage ``fabric/data-agents/*.DataAgent`` item folders into the workspace output.
+
+    Each Data Agent is a complete fabric-cicd item folder (``.platform`` plus a
+    ``Files/Config`` definition). They publish into a "Data Agents" workspace
+    folder. The agents reference the semantic model / ontology and source
+    workspace by GUID in their datasource configs; those GUIDs are remapped to the
+    target workspace at publish time by generated ``parameter.yml`` rules (see
+    ``deploy.scripts.deploy_config.render_parameter_file``).
+
+    Returns an empty list when no Data Agent sources exist.
+    """
+
+    source_dir = repo_root / "fabric" / "data-agents"
+    if not source_dir.is_dir():
+        return []
+    staged: list[Path] = []
+    for item_dir in sorted(source_dir.glob("*.DataAgent"), key=lambda path: path.name):
+        if not (item_dir / ".platform").is_file():
+            continue
+        destination = output_dir / DATA_AGENTS_FOLDER / item_dir.name
+        if destination.exists():
+            shutil.rmtree(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(item_dir, destination)
+        staged.append(destination)
+    return staged
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -429,6 +459,12 @@ def build_workspace(
         staged_items.extend(
             item.name for item in stage_ml_experiments(output_dir / ML_FOLDER)
         )
+    # Data Agents (Fabric copilots over the semantic model and ontology) publish
+    # into a "Data Agents" folder. Their datasource GUID references are remapped
+    # to the target workspace via generated parameter.yml rules.
+    staged_items.extend(
+        item.name for item in stage_data_agents(repo_root, output_dir)
+    )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
 

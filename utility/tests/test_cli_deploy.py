@@ -25,7 +25,7 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert calls == []
     out = result.output
     assert "generate_configs" in out and "terraform" in out
-    assert "build_artifacts" in out and "core setup ml" in out.replace("'", "")
+    assert "build_artifacts" in out and "core setup ml ontology reset" in out.replace("'", "")
     assert "deploy_items" in out and "apply_kql" in out and "validate_deployment" in out
 
 
@@ -34,6 +34,19 @@ def test_skip_terraform_drops_terraform_steps():
     flat = " ".join(" ".join(map(str, step.cmd)) for step in plan)
     assert "terraform" not in flat
     assert "generate_configs" in flat and "deploy_items" in flat
+
+
+def test_plan_builds_ontology_and_reset_notebook_groups():
+    plan = _deploy_plan("dev", skip_terraform=False)
+    build = next(s for s in plan if "build_artifacts" in " ".join(map(str, s.cmd)))
+    cmd = build.cmd
+    groups_idx = cmd.index("--notebook-groups")
+    lakehouse_idx = cmd.index("--lakehouse-name")
+    groups = cmd[groups_idx + 1 : lakehouse_idx]
+    # The deploy stages every notebook group needed to link the full task flow:
+    # ontology (30-create-ontology) and reset (99-reset-lakehouse) join the core
+    # pipeline, setup notebooks, and ML notebooks.
+    assert set(groups) == {"core", "setup", "ml", "ontology", "reset"}
 
 
 def test_plan_orders_steps_and_gates_apply():

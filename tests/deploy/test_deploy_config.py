@@ -26,6 +26,7 @@ def test_load_environment_merges_defaults_and_environment() -> None:
         "KQLQueryset",
         "DataPipeline",
         "MLExperiment",
+        "DataAgent",
     ]
 
 
@@ -89,6 +90,30 @@ def test_render_parameter_file_uses_dynamic_item_references() -> None:
         and entry["replace_value"]["dev"].startswith("$items.Notebook.")
     }
     assert "$items.Notebook.02-historical-data-load.$id" in notebook_replacements
+
+
+def test_render_parameter_file_remaps_data_agent_references() -> None:
+    config = deploy_config.load_environment("dev")
+    terraform_outputs = {
+        "workspace_id": "11111111-1111-1111-1111-111111111111",
+        "lakehouse_id": "22222222-2222-2222-2222-222222222222",
+        "lakehouse_name": "retail_lakehouse",
+    }
+
+    rendered = deploy_config.render_parameter_file(config, terraform_outputs)
+
+    agent_rules = {
+        entry["find_value"]: entry["replace_value"]["dev"]
+        for entry in rendered["find_replace"]
+        if entry.get("item_type") == "DataAgent"
+    }
+    # The Data Agents' source-workspace GUID resolves to the target workspace,
+    # and the semantic-model GUID resolves to the deployed SemanticModel.
+    assert agent_rules[deploy_config.DATA_AGENT_SOURCE_WORKSPACE_ID] == "$workspace.$id"
+    assert (
+        agent_rules[deploy_config.DATA_AGENT_SEMANTIC_MODEL_ID]
+        == f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
+    )
 
 
 def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> None:

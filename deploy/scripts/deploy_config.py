@@ -16,6 +16,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_ROOT = REPO_ROOT / "deploy"
 CONFIG_ROOT = DEPLOY_ROOT / "config"
 DEFAULT_CONFIG_PATH = CONFIG_ROOT / "deploy.yml"
+
+# Source-workspace GUIDs embedded in the committed Data Agent datasource configs
+# (fabric/data-agents/*.DataAgent). They are exported from the authoring
+# workspace and must be remapped to the target workspace at publish time via
+# generated parameter.yml rules. The semantic-model GUID resolves to the deployed
+# SemanticModel; the source workspace GUID resolves to the target workspace. The
+# ontology GUID points at a runtime-created artifact (the ontology notebook makes
+# it), so it cannot be resolved at deploy time and is rebound after that runs.
+DATA_AGENT_SOURCE_WORKSPACE_ID = "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
 
 
@@ -445,6 +455,30 @@ def render_parameter_file(
                 }
             ]
         }
+
+    # Data Agent datasource configs reference the source workspace and the
+    # semantic model by GUID. Remap them to the target workspace and the deployed
+    # SemanticModel so the agents bind in the new workspace. (The ontology agent's
+    # ontology GUID points at a runtime-created artifact and is left as-is; it is
+    # rebound after the ontology notebook runs.)
+    parameters["find_replace"].extend(
+        [
+            {
+                "find_value": DATA_AGENT_SOURCE_WORKSPACE_ID,
+                "replace_value": {config.environment: "$workspace.$id"},
+                "item_type": "DataAgent",
+            },
+            {
+                "find_value": DATA_AGENT_SEMANTIC_MODEL_ID,
+                "replace_value": {
+                    config.environment: (
+                        f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
+                    )
+                },
+                "item_type": "DataAgent",
+            },
+        ]
+    )
 
     return parameters
 

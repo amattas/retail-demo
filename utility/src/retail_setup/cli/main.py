@@ -640,6 +640,8 @@ def _deploy_plan(
                 "core",
                 "setup",
                 "ml",
+                "ontology",
+                "reset",
                 "--lakehouse-name",
                 lakehouse_name,
             ],
