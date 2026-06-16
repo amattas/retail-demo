@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from deploy.scripts import _output as console
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_ROOT = REPO_ROOT / "deploy"
 CONFIG_ROOT = DEPLOY_ROOT / "config"
@@ -533,9 +535,9 @@ def main() -> int:
         else None
     )
     paths = write_generated_configs(config, args.deploy_root, outputs)
-    print(f"Wrote {paths.tfvars}")
-    print(f"Wrote {paths.fabric_config}")
-    print(f"Wrote {paths.parameter}")
+    console.info(f"Wrote {paths.tfvars}")
+    console.info(f"Wrote {paths.fabric_config}")
+    console.info(f"Wrote {paths.parameter}")
     return 0
 
 

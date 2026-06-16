@@ -30,6 +30,8 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from deploy.scripts import _output as console
+
 if TYPE_CHECKING:
     import requests
     from azure.identity import AzureCliCredential
@@ -306,14 +308,14 @@ def main() -> int:
 
     if args.action == "export":
         out = export_taskflow(args.workspace, args.path)
-        print(f"Exported task flow to {out}")
+        console.info(f"Exported task flow to {out}")
     else:
         unresolved = deploy_taskflow(args.workspace, args.path)
-        print("Deployed task flow.")
+        console.info("Deployed task flow.")
         if unresolved:
-            print("Unresolved references (left unbound):")
+            console.warn("Unresolved references (left unbound):")
             for ref in unresolved:
-                print(f"  {ref}")
+                console.detail(ref)
     return 0
 
 

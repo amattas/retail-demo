@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from deploy.scripts import _output as console
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "deploy" / "workspace"
 PLATFORM_SCHEMA = (
@@ -478,9 +480,9 @@ def main() -> int:
         args.lakehouse_name,
         args.kql_database_name,
     )
-    print(f"Staged {len(result.staged_items)} items in {result.output_dir}")
+    console.info(f"Staged {len(result.staged_items)} items in {result.output_dir}")
     for item in result.staged_items:
-        print(f"  {item}")
+        console.detail(item)
     return 0
 
 
