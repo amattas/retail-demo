@@ -18,6 +18,11 @@ forwarded.
 On macOS and Linux, activate a Python 3.11+ environment and run `setup.py`
 directly.
 
+Use `setup.ps1` only if you don't already have Python — its sole job is to
+bootstrap a Python 3.11+ environment (installing Miniforge with winget when
+none is found) before delegating to `setup.py`. If you already have Python
+3.11+, run `python scripts\setup.py` directly to skip the Miniforge download.
+
 ## setup.py
 
 Guided cross-platform setup engine for a new Fabric workspace.

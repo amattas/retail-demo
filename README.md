@@ -51,10 +51,14 @@ Set-Location retail-demo
 .\scripts\setup.ps1
 ```
 
-`setup.ps1` is the Windows entry point — it works even with nothing installed.
+`setup.ps1` is the Windows entry point for machines with **nothing installed**.
 It uses Python 3.11+ if present, otherwise installs Miniforge with winget and
-creates a conda environment, then runs the guided setup. On macOS and Linux,
-activate a Python 3.11+ environment and run `python ./scripts/setup.py` instead.
+creates a conda environment, then runs the guided setup.
+
+**Already have Python 3.11+?** Run `python ./scripts/setup.py` directly to skip
+the Miniforge download — `setup.ps1` only installs Miniforge when no suitable
+Python is found. On macOS and Linux, run `python ./scripts/setup.py` from an
+activated Python 3.11+ environment.
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into

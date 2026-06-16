@@ -43,8 +43,9 @@ On Windows, from the repository root:
 
 `setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
 otherwise installs Miniforge with winget and creates a conda environment, then
-delegates to `scripts\setup.py`. On macOS and Linux, activate a Python 3.11+
-environment and run `python ./scripts/setup.py` directly.
+delegates to `scripts\setup.py`. If you already have Python 3.11+ (Windows,
+macOS, or Linux), run `python ./scripts/setup.py` directly to skip the Miniforge
+download.
 
 The guided setup:
 

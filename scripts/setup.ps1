@@ -18,8 +18,11 @@
         ./scripts/setup.ps1 --env dev --dry-run
 
 .NOTES
-    On macOS and Linux, run scripts/setup.py directly with an activated
-    Python 3.11+ environment.
+    Use this script only if you don't already have Python 3.11+. Its job is to
+    bootstrap a Python environment (installing Miniforge with winget when none
+    is found) before delegating to scripts/setup.py. If you already have Python
+    3.11+ — on Windows, macOS, or Linux — run scripts/setup.py directly from an
+    activated environment to skip the Miniforge download.
 #>
 
 [CmdletBinding()]
