@@ -21,9 +21,17 @@ def collect_kql_scripts(source_dir: Path = KQL_SOURCE_DIR) -> list[Path]:
 
 
 def build_database_script(scripts: list[Path]) -> str:
-    """Build one `.execute database script` payload from ordered KQL files."""
+    """Build one `.execute database script` payload from ordered KQL files.
 
-    parts = ["// Generated from fabric\\kql_database", ".execute database script <|"]
+    ``ThrowOnErrors=true`` makes the batch fail (and raise) on the first command
+    error. Without it, ``.execute database script`` *always* reports success even
+    when individual commands fail, which silently leaves the schema unapplied.
+    """
+
+    parts = [
+        "// Generated from fabric\\kql_database",
+        ".execute database script with (ThrowOnErrors=true) <|",
+    ]
     for script in scripts:
         parts.append(f"\n// BEGIN {script.name}")
         parts.append(script.read_text(encoding="utf-8").strip())

@@ -164,7 +164,7 @@ def test_stage_querysets_returns_empty_when_no_sources(tmp_path: Path) -> None:
     assert not (output / "retail_querysets.KQLQueryset").exists()
 
 
-def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) -> None:
+def test_stage_kql_apply_notebook_embeds_kusto_sdk_and_scripts(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     kql_dir = repo / "fabric" / "kql_database"
     kql_dir.mkdir(parents=True)
@@ -189,7 +189,13 @@ def test_stage_kql_apply_notebook_embeds_kqlmagic_and_scripts(tmp_path: Path) ->
         isinstance(line, str) for c in notebook["cells"] for line in c["source"]
     )
     text = "".join("".join(c["source"]) for c in notebook["cells"])
-    assert "Kqlmagic" in text
+    # Uses the Kusto Python SDK for reliable headless auth (not Kqlmagic).
+    assert "azure-kusto-data" in text
+    assert "KustoClient" in text
+    assert "execute_mgmt" in text
+    assert "Kqlmagic" not in text
+    # ThrowOnErrors=true makes a failed command raise instead of silent success.
+    assert "ThrowOnErrors=true" in text
     assert "create table receipts" in text  # embedded KQL
     assert "retail_kql" in text  # target database name
 

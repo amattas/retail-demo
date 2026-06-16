@@ -195,11 +195,13 @@ def stage_kql_apply_notebook(
 
     The notebook resolves the workspace's KQL database at runtime and runs the
     combined ``.execute database script`` (built from ``fabric/kql_database/*.kql``)
-    with Kqlmagic. It is chained first in the setup pipeline so the Eventhouse
-    schema exists before the data-generation notebooks run.
+    with the Kusto Python SDK (``azure-kusto-data``), authenticating with the
+    notebook's AAD token. It is chained first in the setup pipeline so the
+    Eventhouse schema exists before the data-generation notebooks run.
 
-    Note: notebook execution can't be validated outside Fabric — verify the first
-    run and adjust the Kqlmagic auth if a headless pipeline run can't sign in.
+    The script sets ``ThrowOnErrors=true`` so a failed command raises instead of
+    reporting silent success (``.execute database script`` succeeds by default
+    even when individual commands fail).
     """
 
     from deploy.scripts import apply_kql
@@ -219,7 +221,7 @@ def stage_kql_apply_notebook(
 
 
 def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict:
-    """Build the ipynb JSON for the KQL-apply notebook (Kqlmagic + embedded KQL)."""
+    """Build the ipynb JSON for the KQL-apply notebook (Kusto SDK + embedded KQL)."""
 
     resolve = (
         "import requests, notebookutils\n"
@@ -236,22 +238,22 @@ def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict
         "db_name = db['displayName']\n"
         "print(f'KQL database: {db_name} @ {query_uri}')"
     )
-    connect = (
-        "%reload_ext Kqlmagic\n"
-        "from IPython import get_ipython\n"
-        "kusto_token = notebookutils.credentials.getToken(query_uri)\n"
-        "conn = (\n"
-        "    f\"azureDataExplorer://aadtoken='{kusto_token}';\"\n"
-        "    f\"cluster='{query_uri}';database='{db_name}'\"\n"
-        ")\n"
-        "get_ipython().run_line_magic('kql', conn)"
-    )
     run = (
-        "import json\n"
-        "from IPython import get_ipython\n"
+        "import json, notebookutils\n"
+        "from azure.kusto.data import KustoClient, KustoConnectionStringBuilder\n"
+        "from azure.kusto.data.helpers import dataframe_from_result_table\n"
         f"KQL_SCRIPT = json.loads(r'''{json.dumps(kql_script)}''')\n"
-        "get_ipython().run_cell_magic('kql', '', KQL_SCRIPT)\n"
-        "print('KQL setup scripts applied.')"
+        "kusto_token = notebookutils.credentials.getToken(query_uri)\n"
+        "kcsb = KustoConnectionStringBuilder.with_aad_access_token_authentication(\n"
+        "    query_uri, kusto_token\n"
+        ")\n"
+        "client = KustoClient(kcsb)\n"
+        "# ThrowOnErrors=true (set in the script) makes execute_mgmt raise on the\n"
+        "# first failed command instead of reporting silent success.\n"
+        "resp = client.execute_mgmt(db_name, KQL_SCRIPT)\n"
+        "df = dataframe_from_result_table(resp.primary_results[0])\n"
+        "print(df.to_string())\n"
+        "print(f'KQL setup scripts applied: {len(df)} command(s).')"
     )
     return {
         "cells": [
@@ -261,13 +263,13 @@ def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict
                 "source": _source_lines(
                     "# Apply KQL setup scripts\n\n"
                     "Applies the Eventhouse KQL setup (tables, ingestion mappings, "
-                    "functions, materialized views) with Kqlmagic. Generated from "
-                    "`fabric/kql_database/*.kql` by `build_artifacts` — do not edit by hand."
+                    "functions, materialized views) with the Kusto Python SDK "
+                    "(`azure-kusto-data`). Generated from `fabric/kql_database/*.kql` "
+                    "by `build_artifacts` — do not edit by hand."
                 ),
             },
-            _code_cell("%pip install --quiet Kqlmagic"),
+            _code_cell("%pip install --quiet azure-kusto-data"),
             _code_cell(resolve),
-            _code_cell(connect),
             _code_cell(run),
         ],
         "metadata": {
