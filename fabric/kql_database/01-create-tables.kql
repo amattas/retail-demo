@@ -577,7 +577,7 @@
 {
     "MaximumBatchingTimeSpan": "00:01:00",
     "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -586,7 +586,7 @@
 {
     "MaximumBatchingTimeSpan": "00:01:00",
     "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -622,7 +622,7 @@
 {
     "MaximumBatchingTimeSpan": "00:01:00",
     "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -633,7 +633,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 100,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -642,7 +642,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 100,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -651,7 +651,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 10
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -660,7 +660,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 10
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -678,7 +678,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -687,7 +687,7 @@
 {
     "MaximumBatchingTimeSpan": "00:02:00",
     "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 
@@ -697,7 +697,7 @@
 {
     "MaximumBatchingTimeSpan": "00:01:00",
     "MaximumNumberOfItems": 100,
-    "MaximumRawDataSizeMB": 50
+    "MaximumRawDataSizeMB": 100
 }
 ```
 

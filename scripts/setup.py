@@ -241,7 +241,7 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
         dry_run=dry_run,
     )
     run_command(
-        [str(env.python), "-m", "pip", "install", "azure-identity", "fabric-cicd"],
+        [str(env.python), "-m", "pip", "install", "azure-identity", "azure-kusto-data", "fabric-cicd"],
         dry_run=dry_run,
     )
 

@@ -164,42 +164,6 @@ def test_stage_querysets_returns_empty_when_no_sources(tmp_path: Path) -> None:
     assert not (output / "retail_querysets.KQLQueryset").exists()
 
 
-def test_stage_kql_apply_notebook_embeds_kusto_sdk_and_scripts(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    kql_dir = repo / "fabric" / "kql_database"
-    kql_dir.mkdir(parents=True)
-    (kql_dir / "01-create-tables.kql").write_text(
-        ".create table receipts (id:string)", encoding="utf-8"
-    )
-    (kql_dir / "02-create-functions.kql").write_text(
-        ".create function foo() { receipts | count }", encoding="utf-8"
-    )
-
-    output = tmp_path / "workspace"
-    item = build_artifacts.stage_kql_apply_notebook(repo, output, kql_database_name="retail_kql")
-
-    assert item == output / "setup-00-apply-kql.Notebook"
-    platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
-    assert platform["metadata"]["type"] == "Notebook"
-    assert platform["metadata"]["displayName"] == "setup-00-apply-kql"
-    notebook = json.loads((item / "notebook-content.ipynb").read_text(encoding="utf-8"))
-    # Fabric requires every cell's source to be a list of strings, not a string.
-    assert all(isinstance(c["source"], list) for c in notebook["cells"])
-    assert all(
-        isinstance(line, str) for c in notebook["cells"] for line in c["source"]
-    )
-    text = "".join("".join(c["source"]) for c in notebook["cells"])
-    # Uses the Kusto Python SDK for reliable headless auth (not Kqlmagic).
-    assert "azure-kusto-data" in text
-    assert "KustoClient" in text
-    assert "execute_mgmt" in text
-    assert "Kqlmagic" not in text
-    # ThrowOnErrors=true makes a failed command raise instead of silent success.
-    assert "ThrowOnErrors=true" in text
-    assert "create table receipts" in text  # embedded KQL
-    assert "retail_kql" in text  # target database name
-
-
 def test_stage_ml_experiments_creates_shell_items(tmp_path: Path) -> None:
     staged = build_artifacts.stage_ml_experiments(tmp_path)
 
@@ -310,12 +274,12 @@ def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> 
 
 def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
-    _write_pipeline(repo, "setup-pipeline", ["setup-00-apply-kql", "setup-01-seed-dictionaries"])
+    _write_pipeline(repo, "setup-pipeline", ["setup-01-seed-dictionaries", "setup-02-generate-dimensions"])
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
 
     output = tmp_path / "workspace"
     output.mkdir()
-    deployed = {"setup-00-apply-kql", "setup-01-seed-dictionaries", "03-streaming-to-silver"}
+    deployed = {"setup-01-seed-dictionaries", "setup-02-generate-dimensions", "03-streaming-to-silver"}
     staged = build_artifacts.stage_pipelines(repo, output, deployed)
 
     # setup-pipeline joins the setup notebooks under "Setup"; others stay in "Pipelines".
@@ -333,29 +297,6 @@ def test_stage_pipelines_returns_empty_when_no_sources(tmp_path: Path) -> None:
     output = tmp_path / "workspace"
     output.mkdir()
     assert build_artifacts.stage_pipelines(repo, output, {"02-historical-data-load"}) == []
-
-
-def test_setup_pipeline_enables_inline_install_on_apply_kql() -> None:
-    """The setup-00-apply-kql activity must enable %pip in pipeline runs.
-
-    The generated KQL-apply notebook installs azure-kusto-data with %pip, which
-    Fabric disables in pipeline runs unless the notebook activity carries the
-    boolean parameter ``_inlineInstallationEnabled = True``.
-    """
-
-    repo_root = Path(__file__).resolve().parents[2]
-    content_path = (
-        repo_root
-        / "fabric"
-        / "pipelines"
-        / "setup-pipeline.DataPipeline"
-        / "pipeline-content.json"
-    )
-    content = json.loads(content_path.read_text(encoding="utf-8"))
-    activities = content["properties"]["activities"]
-    apply_kql = next(a for a in activities if a["name"] == "setup-00-apply-kql")
-    param = apply_kql["typeProperties"]["parameters"]["_inlineInstallationEnabled"]
-    assert param == {"value": "True", "type": "bool"}
 
 
 def test_build_workspace_stages_compatible_pipelines_in_folder(tmp_path: Path) -> None:
@@ -441,12 +382,6 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
     _write_json(
         repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
         {"metadata": {"type": "Report"}},
-    )
-
-    # KQL source for the generated setup-00-apply-kql notebook (setup group).
-    (repo / "fabric" / "kql_database").mkdir(parents=True)
-    (repo / "fabric" / "kql_database" / "01-create-tables.kql").write_text(
-        ".create table receipts (id:string)", encoding="utf-8"
     )
 
     build_artifacts.build_workspace(

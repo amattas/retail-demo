@@ -183,124 +183,6 @@ def stage_setup_notebooks(
     return staged
 
 
-KQL_APPLY_NOTEBOOK = "setup-00-apply-kql"
-
-
-def stage_kql_apply_notebook(
-    repo_root: Path,
-    output_dir: Path,
-    kql_database_name: str = "retail_kql",
-) -> Path:
-    """Generate and stage a notebook that applies the Eventhouse KQL setup scripts.
-
-    The notebook resolves the workspace's KQL database at runtime and runs the
-    combined ``.execute database script`` (built from ``fabric/kql_database/*.kql``)
-    with the Kusto Python SDK (``azure-kusto-data``), authenticating with the
-    notebook's AAD token. It is chained first in the setup pipeline so the
-    Eventhouse schema exists before the data-generation notebooks run.
-
-    The script sets ``ThrowOnErrors=true`` so a failed command raises instead of
-    reporting silent success (``.execute database script`` succeeds by default
-    even when individual commands fail).
-    """
-
-    from deploy.scripts import apply_kql
-
-    scripts = apply_kql.collect_kql_scripts(repo_root / "fabric" / "kql_database")
-    kql_script = apply_kql.build_database_script(scripts)
-    notebook = _kql_apply_notebook_content(kql_script, kql_database_name)
-
-    item_dir = output_dir / f"{KQL_APPLY_NOTEBOOK}.Notebook"
-    item_dir.mkdir(parents=True, exist_ok=True)
-    _write_platform(item_dir, "Notebook", KQL_APPLY_NOTEBOOK)
-    (item_dir / "notebook-content.ipynb").write_text(
-        json.dumps(notebook, indent=1, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    return item_dir
-
-
-def _kql_apply_notebook_content(kql_script: str, kql_database_name: str) -> dict:
-    """Build the ipynb JSON for the KQL-apply notebook (Kusto SDK + embedded KQL)."""
-
-    resolve = (
-        "import requests, notebookutils\n"
-        "ws_id = notebookutils.runtime.context['currentWorkspaceId']\n"
-        "tok = notebookutils.credentials.getToken('pbi')\n"
-        "resp = requests.get(\n"
-        "    f'https://api.fabric.microsoft.com/v1/workspaces/{ws_id}/kqlDatabases',\n"
-        "    headers={'Authorization': f'Bearer {tok}'},\n"
-        ")\n"
-        "resp.raise_for_status()\n"
-        "dbs = resp.json()['value']\n"
-        f"db = next((d for d in dbs if d['displayName'] == {kql_database_name!r}), dbs[0])\n"
-        "query_uri = db['properties']['queryServiceUri']\n"
-        "db_name = db['displayName']\n"
-        "print(f'KQL database: {db_name} @ {query_uri}')"
-    )
-    run = (
-        "import json, notebookutils\n"
-        "from azure.kusto.data import KustoClient, KustoConnectionStringBuilder\n"
-        "from azure.kusto.data.helpers import dataframe_from_result_table\n"
-        f"KQL_SCRIPT = json.loads(r'''{json.dumps(kql_script)}''')\n"
-        "kusto_token = notebookutils.credentials.getToken(query_uri)\n"
-        "kcsb = KustoConnectionStringBuilder.with_aad_access_token_authentication(\n"
-        "    query_uri, kusto_token\n"
-        ")\n"
-        "client = KustoClient(kcsb)\n"
-        "# ThrowOnErrors=true (set in the script) makes execute_mgmt raise on the\n"
-        "# first failed command instead of reporting silent success.\n"
-        "resp = client.execute_mgmt(db_name, KQL_SCRIPT)\n"
-        "df = dataframe_from_result_table(resp.primary_results[0])\n"
-        "print(df.to_string())\n"
-        "print(f'KQL setup scripts applied: {len(df)} command(s).')"
-    )
-    return {
-        "cells": [
-            {
-                "cell_type": "markdown",
-                "metadata": {},
-                "source": _source_lines(
-                    "# Apply KQL setup scripts\n\n"
-                    "Applies the Eventhouse KQL setup (tables, ingestion mappings, "
-                    "functions, materialized views) with the Kusto Python SDK "
-                    "(`azure-kusto-data`). Generated from `fabric/kql_database/*.kql` "
-                    "by `build_artifacts` — do not edit by hand."
-                ),
-            },
-            _code_cell("%pip install --quiet azure-kusto-data"),
-            _code_cell(resolve),
-            _code_cell(run),
-        ],
-        "metadata": {
-            "language_info": {"name": "python"},
-            "kernelspec": {"name": "synapse_pyspark", "display_name": "Synapse PySpark"},
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
-    }
-
-
-def _source_lines(source: str) -> list[str]:
-    """Split notebook cell source into a list of lines.
-
-    Fabric's notebook service requires ``cell.source`` to be a list of strings
-    (not a single string), even though both are valid per the ipynb schema.
-    """
-
-    return source.splitlines(keepends=True) or [""]
-
-
-def _code_cell(source: str) -> dict:
-    return {
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": _source_lines(source),
-    }
-
-
 def stage_querysets(
     repo_root: Path,
     output_dir: Path,
@@ -430,7 +312,6 @@ def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
     names = {Path(name).stem for name in _selected_notebooks(notebook_groups)}
     if "setup" in notebook_groups:
         names.update(SETUP_NOTEBOOKS)
-        names.add(KQL_APPLY_NOTEBOOK)
     return names
 
 
@@ -481,9 +362,9 @@ def build_workspace(
             ).name
         )
 
-    # One-time setup notebooks publish into a separate "Setup" workspace folder,
-    # along with a generated setup-00-apply-kql notebook that applies the
-    # Eventhouse KQL setup scripts.
+    # One-time setup notebooks publish into a separate "Setup" workspace folder.
+    # The Eventhouse KQL schema is applied separately by `deploy.scripts.apply_kql
+    # --execute` (using the operator's credentials), not by a Fabric notebook.
     if "setup" in notebook_groups:
         setup_dir = output_dir / SETUP_FOLDER
         staged_items.extend(
@@ -491,11 +372,6 @@ def build_workspace(
             for item in stage_setup_notebooks(
                 repo_root, setup_dir, lakehouse_name=lakehouse_name
             )
-        )
-        staged_items.append(
-            stage_kql_apply_notebook(
-                repo_root, setup_dir, kql_database_name=kql_database_name
-            ).name
         )
 
     # Power BI items publish into the "Reporting" workspace folder.
