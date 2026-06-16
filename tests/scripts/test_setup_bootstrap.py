@@ -79,6 +79,14 @@ def test_run_command_reports_nonzero_exit_without_traceback(monkeypatch, capsys)
     assert "$ terraform init" in capsys.readouterr().out
 
 
+def test_pip_flags_quiet_by_default_and_loud_when_verbose(monkeypatch):
+    monkeypatch.setattr(setup, "VERBOSE", False)
+    assert setup._pip_flags() == ["-q", "--progress-bar", "off"]
+
+    monkeypatch.setattr(setup, "VERBOSE", True)
+    assert setup._pip_flags() == []
+
+
 def test_run_command_label_hides_raw_command_on_success(monkeypatch, capsys):
     monkeypatch.setattr(setup, "VERBOSE", False)
     monkeypatch.setattr(setup.subprocess, "run", lambda command, **kwargs: None)

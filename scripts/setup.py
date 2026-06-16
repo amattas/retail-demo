@@ -279,20 +279,41 @@ def current_python_env() -> PythonEnv:
     return PythonEnv(python=Path(sys.executable), description="current Python environment")
 
 
+def _pip_flags() -> list[str]:
+    """Quiet pip in normal runs; let it be loud under --verbose.
+
+    ``-q`` drops pip's per-package "Collecting/Downloading/Installing" chatter and
+    progress bars while still surfacing warnings and errors. ``--verbose`` keeps
+    the full output for troubleshooting.
+    """
+
+    return [] if VERBOSE else ["-q", "--progress-bar", "off"]
+
+
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     print("Installing the Python packages the demo needs (this can take a minute).")
+    flags = _pip_flags()
     run_command(
-        [str(env.python), "-m", "pip", "install", "--upgrade", "pip"],
+        [str(env.python), "-m", "pip", "install", *flags, "--upgrade", "pip"],
         dry_run=dry_run,
         label="Updating pip",
     )
     run_command(
-        [str(env.python), "-m", "pip", "install", "-e", str(REPO_ROOT / "utility")],
+        [str(env.python), "-m", "pip", "install", *flags, "-e", str(REPO_ROOT / "utility")],
         dry_run=dry_run,
         label="Installing the retail-setup tool",
     )
     run_command(
-        [str(env.python), "-m", "pip", "install", "azure-identity", "azure-kusto-data", "fabric-cicd"],
+        [
+            str(env.python),
+            "-m",
+            "pip",
+            "install",
+            *flags,
+            "azure-identity",
+            "azure-kusto-data",
+            "fabric-cicd",
+        ],
         dry_run=dry_run,
         label="Installing Azure and Fabric libraries",
     )
