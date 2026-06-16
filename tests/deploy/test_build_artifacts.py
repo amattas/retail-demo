@@ -335,6 +335,29 @@ def test_stage_pipelines_returns_empty_when_no_sources(tmp_path: Path) -> None:
     assert build_artifacts.stage_pipelines(repo, output, {"02-historical-data-load"}) == []
 
 
+def test_setup_pipeline_enables_inline_install_on_apply_kql() -> None:
+    """The setup-00-apply-kql activity must enable %pip in pipeline runs.
+
+    The generated KQL-apply notebook installs azure-kusto-data with %pip, which
+    Fabric disables in pipeline runs unless the notebook activity carries the
+    boolean parameter ``_inlineInstallationEnabled = True``.
+    """
+
+    repo_root = Path(__file__).resolve().parents[2]
+    content_path = (
+        repo_root
+        / "fabric"
+        / "pipelines"
+        / "setup-pipeline.DataPipeline"
+        / "pipeline-content.json"
+    )
+    content = json.loads(content_path.read_text(encoding="utf-8"))
+    activities = content["properties"]["activities"]
+    apply_kql = next(a for a in activities if a["name"] == "setup-00-apply-kql")
+    param = apply_kql["typeProperties"]["parameters"]["_inlineInstallationEnabled"]
+    assert param == {"value": "True", "type": "bool"}
+
+
 def test_build_workspace_stages_compatible_pipelines_in_folder(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:

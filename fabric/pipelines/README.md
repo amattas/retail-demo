@@ -26,6 +26,12 @@ the **Setup** workspace folder alongside those notebooks (not the general
 script runs with `ThrowOnErrors=true` so a failed command fails the notebook
 instead of reporting silent success.
 
+The notebook installs `azure-kusto-data` with `%pip`, which Fabric disables in
+pipeline runs by default. The `setup-00-apply-kql` activity therefore carries the
+boolean parameter `_inlineInstallationEnabled = True`
+([docs](https://learn.microsoft.com/en-us/fabric/data-engineering/library-management#inline-installation))
+so the inline install runs during the pipeline.
+
 ## Re-exporting from Fabric
 
 To refresh these definitions from a live workspace, use the export script. It
