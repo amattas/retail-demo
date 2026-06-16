@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from retail_setup.cli.main import app, _deploy_plan, _validate_azure_cli_tenant
+from retail_setup.cli.main import (
+    app,
+    _deploy_plan,
+    _validate_azure_cli_tenant,
+    _RECREATE_WAIT_SECONDS,
+)
 
 runner = CliRunner()
 
@@ -33,21 +38,25 @@ def test_plan_orders_steps_and_gates_apply():
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     apply_idx = next(i for i, c in enumerate(cmds) if "apply" in c and "terraform" in c)
     assert plan[apply_idx].needs_confirmation
-    assert any("plan" in c for c in cmds[:apply_idx])
+    # The redundant `terraform plan` step was removed; apply previews + confirms.
+    assert not any(" plan " in f" {c} " for c in cmds)
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
     assert apply_idx < build_idx < deploy_idx
 
 
-def test_recreate_inserts_destroy_and_sleep_before_plan():
+def test_recreate_inserts_destroy_and_sleep_before_apply():
     plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     init_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "init" in c)
     destroy_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "destroy" in c)
-    sleep_idx = next(i for i, c in enumerate(cmds) if "time.sleep(30)" in c)
-    plan_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and " plan " in f" {c} ")
-    assert init_idx < destroy_idx < sleep_idx < plan_idx
+    sleep_idx = next(
+        i for i, c in enumerate(cmds) if f"time.sleep({_RECREATE_WAIT_SECONDS})" in c
+    )
+    apply_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "apply" in c)
+    assert init_idx < destroy_idx < sleep_idx < apply_idx
     assert plan[destroy_idx].needs_confirmation
+    assert not any(" plan " in f" {c} " for c in cmds)
 
 
 def test_recreate_rejects_skip_terraform(monkeypatch):
