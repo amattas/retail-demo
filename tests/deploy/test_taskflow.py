@@ -60,6 +60,53 @@ def test_to_portable_resolves_guids_to_names() -> None:
     assert "artifactName" not in task_flow["tasks"][0]["items"][0]
 
 
+def test_to_portable_drops_unnameable_items() -> None:
+    task_flow = {
+        "tasks": [
+            {
+                "id": "t1",
+                "items": [
+                    {
+                        "artifactUniqueId": "SynapseNotebook:nb1",
+                        "artifactType": "SynapseNotebook",
+                        "artifactObjectId": "nb1",
+                    },
+                    {
+                        "artifactUniqueId": "SynapseNotebook:gone",
+                        "artifactType": "SynapseNotebook",
+                        "artifactObjectId": "gone",
+                    },
+                ],
+            }
+        ],
+        "edges": [],
+    }
+
+    portable = taskflow.to_portable(task_flow, {"nb1": "01-create-bronze-shortcuts"})
+
+    items = portable["tasks"][0]["items"]
+    assert len(items) == 1  # the unnameable (deleted) item is dropped
+    assert items[0]["artifactName"] == "01-create-bronze-shortcuts"
+
+
+def test_committed_taskflow_has_only_bindable_items() -> None:
+    """The committed portable task flow must not carry null-name or workspace-
+    specific auto-generated references; both can never bind on deploy."""
+
+    import json as _json
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    data = _json.loads(
+        (repo_root / "fabric" / "taskflow" / "taskflow.json").read_text(encoding="utf-8")
+    )
+    for task in data["tasks"]:
+        for item in task["items"]:
+            name = item.get("artifactName")
+            assert name, f"null artifactName in task {task.get('name')!r}"
+            assert "_AutoGen_" not in str(name), f"unportable auto-gen reference: {name}"
+
+
 def test_to_workspace_resolves_names_to_target_guids_and_reports_unresolved() -> None:
     portable = {
         "tasks": [
