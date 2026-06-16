@@ -30,6 +30,14 @@ def test_build_database_script_sets_throw_on_errors(tmp_path: Path) -> None:
     assert "create-or-alter function foo" in script
 
 
+def test_build_database_script_starts_with_dot_command(tmp_path: Path) -> None:
+    # The Kusto management endpoint rejects a script whose first non-whitespace
+    # character is not a dot (e.g. a leading // comment).
+    _write_scripts(tmp_path)
+    script = apply_kql.build_database_script(apply_kql.collect_kql_scripts(tmp_path))
+    assert script.lstrip().startswith(".execute database script")
+
+
 def test_collect_kql_scripts_orders_and_validates(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         apply_kql.collect_kql_scripts(tmp_path / "missing")
@@ -74,6 +82,27 @@ def test_resolve_kql_database_returns_uri_and_name(monkeypatch) -> None:
     assert "/workspaces/ws-1/kqlDatabases/db-1" in captured["url"]
     assert captured["headers"]["Authorization"] == "Bearer tok"
     assert captured["scope"] == apply_kql.FABRIC_SCOPE
+
+
+def test_repo_kql_source_satisfies_kusto_constraints() -> None:
+    """Guard the real KQL source against constraints that aborted the deploy.
+
+    - ``ingestionbatching`` requires ``MaximumRawDataSizeMB >= 100``.
+    - ``backfill`` is not a valid property when *altering* an existing
+      materialized view, so it must not appear in ``.create-or-alter`` (which
+      would break idempotent re-deploys).
+    """
+
+    import re
+
+    for path in apply_kql.collect_kql_scripts():
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r'"MaximumRawDataSizeMB":\s*(\d+)', text):
+            assert int(match.group(1)) >= 100, f"{path.name}: {match.group(0)} < 100"
+        assert "backfill" not in text, (
+            f"{path.name}: remove the materialized-view 'backfill' property "
+            "(invalid on alter; breaks idempotent re-deploys)"
+        )
 
 
 def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:

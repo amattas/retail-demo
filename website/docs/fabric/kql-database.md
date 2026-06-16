@@ -128,8 +128,9 @@ KPI views (script 04) enforce a **7-day rolling window** (`ingest_timestamp > ag
 | `mv_sales_product_minute` | `receipt_line_added` | 1 minute | Product sales by minute |
 | `mv_tender_mix_15m` | `payment_processed` | 15 minutes | Payment method distribution |
 | `mv_zone_dwell_minute` | `customer_entered` | 1 minute | Customer dwell by store zone |
-| `mv_pending_recommendations` | `pricing_recommendation_created` | latest per ID | Pending pricing recommendations (`status == "PENDING"`, backfill enabled) |
-| `mv_pricing_approval_metrics` | `pricing_recommendation_approved` | 1 hour | Approval/rejection counts by decision type (backfill enabled) |
+| `mv_pending_recommendations` | `pricing_recommendation_created` | latest per ID | Pending pricing recommendations (`status == "PENDING"`) |
+| `mv_pricing_approval_metrics` | `pricing_recommendation_approved` | 1 hour | Approved-decision counts per hour |
+| `mv_pricing_rejection_metrics` | `pricing_recommendation_rejected` | 1 hour | Rejected-decision counts per hour |
 
 ## Use Cases
 

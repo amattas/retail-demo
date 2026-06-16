@@ -151,7 +151,7 @@
 
 // Materialized view for current pending recommendations
 // Useful for high-frequency dashboard queries
-.create-or-alter materialized-view with (backfill=true) mv_pending_recommendations on table pricing_recommendation_created
+.create-or-alter materialized-view mv_pending_recommendations on table pricing_recommendation_created
 {
     pricing_recommendation_created
     | where status == "PENDING"
@@ -159,15 +159,21 @@
 }
 
 // Materialized view for approval metrics
-// Pre-aggregates approval/rejection counts for trend analysis
-.create-or-alter materialized-view with (backfill=true) mv_pricing_approval_metrics on table pricing_recommendation_approved
+// Pre-aggregates approval counts for trend analysis. A materialized view can
+// reference only a single source (fact) table, so approvals and rejections are
+// tracked in separate views and unioned at query time.
+.create-or-alter materialized-view mv_pricing_approval_metrics on table pricing_recommendation_approved
 {
-    let approved = pricing_recommendation_approved
-        | extend decision_type = "Approved";
-    let rejected = pricing_recommendation_rejected
-        | extend decision_type = "Rejected";
-    approved
-    | union rejected
+    pricing_recommendation_approved
+    | extend decision_type = "Approved"
+    | summarize decisions = count() by bin(event_ts, 1h), decision_type
+}
+
+// Materialized view for rejection metrics (counterpart to mv_pricing_approval_metrics)
+.create-or-alter materialized-view mv_pricing_rejection_metrics on table pricing_recommendation_rejected
+{
+    pricing_recommendation_rejected
+    | extend decision_type = "Rejected"
     | summarize decisions = count() by bin(event_ts, 1h), decision_type
 }
 

@@ -42,10 +42,7 @@ def build_database_script(scripts: list[Path]) -> str:
     when individual commands fail, which silently leaves the schema unapplied.
     """
 
-    parts = [
-        "// Generated from fabric\\kql_database",
-        ".execute database script with (ThrowOnErrors=true) <|",
-    ]
+    parts = [".execute database script with (ThrowOnErrors=true) <|"]
     for script in scripts:
         parts.append(f"\n// BEGIN {script.name}")
         parts.append(script.read_text(encoding="utf-8").strip())
