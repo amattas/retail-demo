@@ -16,8 +16,9 @@ Set-Location retail-demo
 
 `setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
 otherwise installs Miniforge with winget and creates a conda environment, then
-runs the guided setup. On macOS and Linux, activate a Python 3.11+ environment
-and run `python ./scripts/setup.py` instead.
+runs the guided setup. If you already have Python 3.11+ (Windows, macOS, or
+Linux), run `python ./scripts/setup.py` directly to skip the Miniforge download
+— `setup.ps1` installs Miniforge only when no suitable Python is found.
 
 The guided setup detects your OS, offers to install missing prerequisites, uses
 the Python environment that launched the script, installs dependencies, runs

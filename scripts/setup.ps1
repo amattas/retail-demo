@@ -8,14 +8,21 @@
     script installs Miniforge with winget and creates a conda environment so
     users with nothing installed can still run the guided setup.
 
+    Only Miniforge is installed here. The remaining CLI prerequisites
+    (git, terraform, az) are installed by scripts/setup.py using the OS package
+    manager (winget on Windows) unless --skip-prereqs is passed.
+
     All arguments are forwarded to scripts/setup.py, for example:
         ./scripts/setup.ps1 --env dev
         ./scripts/setup.ps1 --env dev --deploy
         ./scripts/setup.ps1 --env dev --dry-run
 
 .NOTES
-    On macOS and Linux, run scripts/setup.py directly with an activated
-    Python 3.11+ environment.
+    Use this script only if you don't already have Python 3.11+. Its job is to
+    bootstrap a Python environment (installing Miniforge with winget when none
+    is found) before delegating to scripts/setup.py. If you already have Python
+    3.11+ — on Windows, macOS, or Linux — run scripts/setup.py directly from an
+    activated environment to skip the Miniforge download.
 #>
 
 [CmdletBinding()]
