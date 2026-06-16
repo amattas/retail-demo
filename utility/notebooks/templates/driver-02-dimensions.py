@@ -7,6 +7,33 @@
 # the package sources under `utility/src/retail_setup/`, never the cell.
 
 # %%
+# Fabric's Spark runtime ships an OLD typing_extensions and no pydantic, while the
+# inlined engine below imports pydantic. Install both on the driver, then make the
+# new typing_extensions actually load. Why each step:
+#  - subprocess pip (not %pip): a %pip kernel restart tears down the Spark session
+#    mid pipeline run and fails the activity.
+#  - pin pydantic <2.12: 2.12+ imports typing_extensions.Sentinel.
+#  - drop the stale modules from sys.modules: the runtime already imported the old
+#    typing_extensions, so the freshly installed copy is shadowed; evicting it lets
+#    the engine cell re-import the upgraded versions (pydantic needs symbols such
+#    as TypeIs that the runtime's typing_extensions lacks).
+#  - pydantic runs only on the driver (engine builds rows, then
+#    spark.createDataFrame), so a driver-side install is sufficient.
+import importlib
+import subprocess
+import sys
+
+subprocess.check_call([
+    sys.executable, "-m", "pip", "install", "--quiet",
+    "typing_extensions>=4.12.2", "pydantic>=2,<2.12",
+])
+for _name in [m for m in list(sys.modules)
+              if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
+                                        "pydantic", "pydantic_core"}]:
+    del sys.modules[_name]
+importlib.invalidate_caches()
+
+# %%
 # PARAMETERS — rendered by `retail-setup render`; defaults work unrendered
 def _param(value: str, default: str) -> str:
     return default if len(value) > 1 and value[0] == value[1] == "{" else value
