@@ -40,6 +40,11 @@ _GENERATION_KEYS = ("store_type", "start_date", "end_date", "store_count", "seed
 _DEFAULT_START_DATE = date(2025, 1, 1)
 _DEFAULT_END_DATE = date(2025, 3, 31)
 
+# After a recreate destroy, Fabric needs time to release the workspace name and
+# capacity before the same name can be created again. 30s proved too short, so
+# we wait longer before terraform apply recreates everything.
+_RECREATE_WAIT_SECONDS = 90
+
 
 def _default_repo_root() -> Path:
     """Walk up from cwd to the first directory containing deploy/config."""
@@ -573,19 +578,18 @@ def _deploy_plan(
                     description="Terraform destroy (recreate - DESTROYS the workspace and all items)",
                 ),
                 DeployStep(
-                    cmd=[py, "-c", "import time; time.sleep(30)"],
-                    description="Wait 30s for Fabric to finalize workspace deletion",
+                    cmd=[py, "-c", f"import time; time.sleep({_RECREATE_WAIT_SECONDS})"],
+                    description=(
+                        f"Wait {_RECREATE_WAIT_SECONDS}s for Fabric to finalize "
+                        "workspace deletion"
+                    ),
                 ),
             ]
         steps += [
             DeployStep(
-                cmd=["terraform", "-chdir=deploy/terraform", "plan", f"-var-file={var_file}"],
-                description="Terraform plan",
-            ),
-            DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "apply", f"-var-file={var_file}"],
                 needs_confirmation=True,
-                description="Terraform apply (confirmation required)",
+                description="Terraform apply (previews changes, then asks to confirm)",
             ),
             DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "output", "-json"],
@@ -645,9 +649,27 @@ def _deploy_plan(
     return steps
 
 
+def _hr(char: str = "-") -> None:
+    typer.echo(char * 60)
+
+
+def _deploy_banner(env: str, total: int, recreate: bool, dry_run: bool) -> None:
+    _hr("=")
+    typer.echo("  Deploy to Microsoft Fabric")
+    typer.echo(f"  Environment : {env}")
+    typer.echo(f"  Steps       : {total}")
+    if recreate:
+        typer.echo("  Mode        : recreate (destroys, then rebuilds from scratch)")
+    if dry_run:
+        typer.echo("  Preview     : dry run (nothing will be executed)")
+    _hr("=")
+
+
 def _echo_step(index: int, total: int, step: DeployStep) -> None:
     gate = " [requires confirmation]" if step.needs_confirmation else ""
     redirect = f" > {step.output_file}" if step.output_file else ""
+    typer.echo("")
+    _hr("-")
     typer.echo(f"[{index}/{total}] {step.description}{gate}")
     typer.echo(f"    {' '.join(step.cmd)}{redirect}")
 
@@ -703,7 +725,10 @@ def deploy(
         typer.echo("")
         typer.echo("!" * 70)
         typer.echo("  WARNING: --recreate will DESTROY the existing workspace and ALL items")
-        typer.echo("  in it, wait 30 seconds, then recreate everything from scratch.")
+        typer.echo(
+            f"  in it, wait {_RECREATE_WAIT_SECONDS} seconds, then recreate "
+            "everything from scratch."
+        )
         typer.echo("!" * 70)
     if dry_run:
         # dry runs must not require live config; fall back to the default name
@@ -733,8 +758,9 @@ def deploy(
     plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse, recreate=recreate)
     total = len(plan)
 
+    _deploy_banner(env, total, recreate, dry_run)
+
     if dry_run:
-        typer.echo(f"Deploy plan for environment '{env}' (dry run; nothing executed):")
         for i, step in enumerate(plan, start=1):
             _echo_step(i, total, step)
         return
@@ -774,7 +800,10 @@ def deploy(
             )
             raise typer.Exit(code=result.returncode)
 
-    typer.echo(f"Deploy complete for environment '{env}'.")
+    typer.echo("")
+    _hr("=")
+    typer.echo(f"  Deploy complete for environment '{env}'.")
+    _hr("=")
 
     # Wire up the workspace task flow automatically (the visual item graph that
     # links the deployed items). Runs in both interactive and --yes modes.
