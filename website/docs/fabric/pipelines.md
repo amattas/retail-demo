@@ -64,6 +64,11 @@ One-shot environment bootstrap: applies the Eventhouse KQL schema
 (`setup-00-apply-kql`), then runs the rendered setup notebooks in order to seed
 dictionaries, generate dimensions and facts, and build the Gold tables.
 
+The `setup-00-apply-kql` activity sets the boolean parameter
+`_inlineInstallationEnabled = True` so its `%pip install azure-kusto-data` runs
+during the pipeline — Fabric disables inline installs in pipeline runs by
+default.
+
 ### historical-data-load
 
 One-time load of historical batch data from `Files/` parquet shortcuts through
