@@ -17,14 +17,14 @@ workspace and use the Git-integration format that fabric-cicd publishes.
 
 `setup-pipeline` is authored in this repo (not exported). Its first step,
 `setup-00-apply-kql`, is a notebook **generated** by `build_artifacts` from
-`fabric/kql_database/*.kql` that applies the Eventhouse KQL setup with Kqlmagic;
+`fabric/kql_database/*.kql` that applies the Eventhouse KQL setup with the Kusto
+Python SDK (`azure-kusto-data`), authenticating with the notebook's AAD token;
 the remaining steps run the rendered setup notebooks in order. It publishes into
 the **Setup** workspace folder alongside those notebooks (not the general
 **Pipelines** folder). After `retail-setup deploy` completes, it offers to run
-`setup-pipeline` on demand (via `deploy.scripts.run_pipeline`). The
-`setup-00-apply-kql` notebook can only be validated by running it in Fabric —
-verify its first run and adjust the Kqlmagic auth if a headless pipeline run
-can't authenticate.
+`setup-pipeline` on demand (via `deploy.scripts.run_pipeline`). The combined
+script runs with `ThrowOnErrors=true` so a failed command fails the notebook
+instead of reporting silent success.
 
 ## Re-exporting from Fabric
 

@@ -43,8 +43,9 @@ dimensions, facts, and Gold tables.
 
 `setup-pipeline` is authored in this repo; its first step `setup-00-apply-kql` is
 a notebook **generated** from `fabric/kql_database/*.kql` that applies the
-Eventhouse KQL setup with Kqlmagic. The other four pipelines were exported from a
-live workspace with `deploy.scripts.export_pipelines`.
+Eventhouse KQL setup with the Kusto Python SDK (`azure-kusto-data`). The other
+four pipelines were exported from a live workspace with
+`deploy.scripts.export_pipelines`.
 
 ## Re-exporting
 
