@@ -20,6 +20,30 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_URL = "https://github.com/amattas/retail-demo/blob/main/README.md"
 MIN_PYTHON = (3, 11)
 
+# Set from --verbose in main(). When False, routine commands print a short,
+# plain-language progress line instead of the raw command. The raw command is
+# always shown if a step fails, so troubleshooting never loses information.
+VERBOSE = False
+
+
+def _banner(lines: list[str]) -> None:
+    """Print a boxed title block."""
+
+    width = 60
+    print("=" * width)
+    for line in lines:
+        print(f"  {line}")
+    print("=" * width)
+
+
+def _section(step: int, total: int, title: str) -> None:
+    """Print a numbered step header."""
+
+    print("")
+    print("-" * 60)
+    print(f"Step {step} of {total}: {title}")
+    print("-" * 60)
+
 
 @dataclass(frozen=True)
 class PackageManager:
@@ -145,12 +169,12 @@ def detect_package_manager(system: str | None = None) -> PackageManager | None:
 
 
 def prerequisites() -> dict[str, str]:
-    """Executables required or commonly used by the setup flow."""
+    """Command-line tools the setup flow needs, with plain-language reasons."""
 
     return {
-        "git": "clone and inspect the repository",
-        "terraform": "provision Fabric resources during deploy",
-        "az": "authenticate with Azure CLI for fabric-cicd",
+        "git": "Git - to work with the project files",
+        "terraform": "Terraform - to create the Microsoft Fabric resources",
+        "az": "Azure CLI - to sign in to Azure / Fabric",
     }
 
 
@@ -168,20 +192,43 @@ def prompt_yes_no(message: str, *, default: bool) -> bool:
     return answer in {"y", "yes"}
 
 
-def run_command(command: list[str], *, cwd: Path = REPO_ROOT, dry_run: bool = False) -> None:
+def run_command(
+    command: list[str],
+    *,
+    cwd: Path = REPO_ROOT,
+    dry_run: bool = False,
+    label: str | None = None,
+) -> None:
+    """Run a subprocess, showing friendly progress unless --verbose.
+
+    When ``label`` is given and we're not in verbose/dry-run mode, print the
+    plain-language label instead of the raw command. The raw command is always
+    revealed if the step fails, so troubleshooting keeps full detail.
+    """
+
     rendered = " ".join(command)
-    print(f"$ {rendered}")
+    show_raw = VERBOSE or dry_run or label is None
+    if show_raw:
+        print(f"$ {rendered}")
+    else:
+        print(f"  - {label}")
     if dry_run:
         return
     try:
         subprocess.run(command, cwd=cwd, check=True)
     except FileNotFoundError:
+        if not show_raw:
+            print(f"    (command: {rendered})")
         raise SystemExit(
-            f"Required executable not found: {command[0]}. Install it and ensure it is on PATH."
+            f"Required program not found: {command[0]}. "
+            "Install it and make sure it is on your PATH, then re-run setup."
         ) from None
     except subprocess.CalledProcessError as exc:
+        if not show_raw:
+            print(f"    (command: {rendered})")
         raise SystemExit(
-            f"Command failed with exit code {exc.returncode}: {rendered}"
+            f"That step failed (exit code {exc.returncode}). "
+            f"Command: {rendered}"
         ) from None
 
 
@@ -195,28 +242,30 @@ def install_prerequisites(
     """Install missing CLI tools with the detected package manager."""
 
     if not missing:
-        print("All CLI prerequisites are already on PATH.")
+        print("All required tools are already installed.")
         return
 
     descriptions = prerequisites()
-    print("Missing prerequisites:")
+    print("These required tools aren't installed yet:")
     for command in missing:
-        print(f"  - {command}: {descriptions[command]}")
+        print(f"  - {descriptions[command]}")
 
     if package_manager is None:
-        print("No supported OS package manager was detected.")
-        print("Install the missing tools manually, then rerun this script.")
+        print("")
+        print("Couldn't find a package manager to install them automatically.")
+        print("Please install the tools listed above, then re-run setup.")
         return
 
     if not assume_yes and not prompt_yes_no(
-        f"Install missing tools with {package_manager.name}?", default=True
+        f"Install them now with {package_manager.name}?", default=True
     ):
-        print("Skipping prerequisite installation.")
+        print("Skipping - install the tools above yourself, then re-run setup.")
         return
 
     for command in missing:
+        label = descriptions[command].split(" - ")[0]
         for install_command in package_manager.install_commands.get(command, []):
-            run_command(install_command, dry_run=dry_run)
+            run_command(install_command, dry_run=dry_run, label=f"Installing {label}")
 
 
 def current_python_env() -> PythonEnv:
@@ -231,18 +280,21 @@ def current_python_env() -> PythonEnv:
 
 
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
-    print(f"Installing Python dependencies into {env.description}.")
+    print("Installing the Python packages the demo needs (this can take a minute).")
     run_command(
         [str(env.python), "-m", "pip", "install", "--upgrade", "pip"],
         dry_run=dry_run,
+        label="Updating pip",
     )
     run_command(
         [str(env.python), "-m", "pip", "install", "-e", str(REPO_ROOT / "utility")],
         dry_run=dry_run,
+        label="Installing the retail-setup tool",
     )
     run_command(
         [str(env.python), "-m", "pip", "install", "azure-identity", "azure-kusto-data", "fabric-cicd"],
         dry_run=dry_run,
+        label="Installing Azure and Fabric libraries",
     )
 
 
@@ -341,17 +393,25 @@ def run_retail_setup(
     deploy_requested: bool,
     recreate: bool = False,
 ) -> None:
+    _section(3, 4, "Configuring the project")
     run_command(
         [str(env.python), "-m", "retail_setup.cli.main", "configure", "--env", deploy_env],
         dry_run=dry_run,
+        label=f"Configuring the project for '{deploy_env}'",
     )
     run_command(
         [str(env.python), "-m", "retail_setup.cli.main", "render", "--env", deploy_env],
         dry_run=dry_run,
+        label="Preparing the notebooks and scripts",
     )
+
+    _section(4, 4, "Deploying to Microsoft Fabric (optional)")
     deploy = deploy_requested
     if not assume_yes and not deploy:
-        deploy = prompt_yes_no("Run `retail-setup deploy` now?", default=False)
+        print("")
+        print("Deploying creates resources in Microsoft Fabric and may incur cost.")
+        print("You can also do it later with: retail-setup deploy --env " + deploy_env)
+        deploy = prompt_yes_no("Deploy to Microsoft Fabric now?", default=False)
     if deploy:
         ensure_azure_login(deploy_env, dry_run=dry_run)
         deploy_command = [
@@ -368,9 +428,10 @@ def run_retail_setup(
             deploy_command.append("--yes")
         run_command(deploy_command, dry_run=dry_run)
     else:
-        print("Skipping deploy.")
-        print(f"Deployment docs: {DOCS_URL}")
-        print("Run later with: retail-setup deploy --env " + deploy_env)
+        print("")
+        print("Skipping deploy for now. When you're ready:")
+        print("  retail-setup deploy --env " + deploy_env)
+        print(f"  Docs: {DOCS_URL}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -396,28 +457,53 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip OS package-manager prerequisite installation.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show the exact commands being run (more detail).",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
+    global VERBOSE
     args = parse_args()
-    print(f"Repository: {REPO_ROOT}")
-    print(f"Deployment environment: {args.env}")
-    print(
-        "`--env` selects deploy/config/environments/"
-        f"{args.env}.yml and deploy/.generated/{args.env}/ outputs."
-    )
+    VERBOSE = args.verbose
 
+    _banner(
+        [
+            "Retail Demo - Guided Setup",
+            "",
+            "This gets the demo running in a few steps:",
+            "  1. Check the required tools (Git, Terraform, Azure CLI)",
+            "  2. Install the Python packages",
+            "  3. Configure the project",
+            "  4. Optionally deploy to Microsoft Fabric",
+        ]
+    )
+    print(f"Environment: {args.env}   (change with --env)")
+    print(f"Project:     {REPO_ROOT}")
+    if not args.verbose:
+        print("Tip: add --verbose to see the exact commands being run.")
+    if args.dry_run:
+        print("Dry run: showing what would happen without making changes.")
+
+    total = 4
     if not args.skip_prereqs:
+        _section(1, total, "Checking the required tools")
         install_prerequisites(
             missing_prerequisites(),
             package_manager=detect_package_manager(),
             dry_run=args.dry_run,
             assume_yes=args.yes,
         )
+    else:
+        _section(1, total, "Checking the required tools (skipped)")
 
+    _section(2, total, "Installing the Python packages")
     env = current_python_env()
     install_python_dependencies(env, dry_run=args.dry_run)
+
     run_retail_setup(
         env,
         deploy_env=args.env,
@@ -426,6 +512,9 @@ def main() -> int:
         deploy_requested=args.deploy or args.recreate,
         recreate=args.recreate,
     )
+
+    print("")
+    print("Setup finished.")
     return 0
 
 

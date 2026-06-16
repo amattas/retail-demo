@@ -29,8 +29,10 @@ Guided cross-platform setup engine for a new Fabric workspace.
 
 ### Purpose
 
-`setup.py` is the single entry point for local setup logic. It detects the
-operating system, offers to install missing CLI prerequisites with the OS
+`setup.py` is the single entry point for local setup logic. It walks through four
+clearly labelled steps — check required tools, install Python packages, configure
+the project, and optionally deploy — using plain-language progress messages. It
+detects the operating system, offers to install missing CLI tools with the OS
 package manager, uses the Python environment that launched the script, installs
 Python dependencies, runs `retail-setup configure`, renders notebooks, signs in
 to the configured Azure tenant, and asks whether to deploy.
@@ -41,7 +43,12 @@ to the configured Azure tenant, and asks whether to deploy.
 python scripts\setup.py
 python scripts\setup.py --env dev --dry-run
 python scripts\setup.py --env dev --deploy
+python scripts\setup.py --verbose      # show the exact commands being run
 ```
+
+By default each step prints a short, friendly progress line; if a step fails the
+exact command is shown so it can be debugged. Add `--verbose` to always see the
+underlying commands.
 
 `--env` selects `deploy\config\environments\<env>.yml` and scopes generated
 deployment output under `deploy\.generated\<env>\`.

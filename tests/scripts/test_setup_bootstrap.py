@@ -71,11 +71,42 @@ def test_run_command_reports_nonzero_exit_without_traceback(monkeypatch, capsys)
     try:
         setup.run_command(["terraform", "init"])
     except SystemExit as exc:
-        assert "Command failed with exit code 7: terraform init" in str(exc)
+        assert "exit code 7" in str(exc)
+        assert "terraform init" in str(exc)
     else:
         raise AssertionError("run_command should raise SystemExit")
 
     assert "$ terraform init" in capsys.readouterr().out
+
+
+def test_run_command_label_hides_raw_command_on_success(monkeypatch, capsys):
+    monkeypatch.setattr(setup, "VERBOSE", False)
+    monkeypatch.setattr(setup.subprocess, "run", lambda command, **kwargs: None)
+
+    setup.run_command(["pip", "install", "thing"], label="Installing thing")
+
+    out = capsys.readouterr().out
+    assert "Installing thing" in out
+    assert "$ pip install thing" not in out
+
+
+def test_run_command_label_reveals_command_on_failure(monkeypatch, capsys):
+    monkeypatch.setattr(setup, "VERBOSE", False)
+
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(3, command)
+
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+
+    try:
+        setup.run_command(["pip", "install", "thing"], label="Installing thing")
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("run_command should raise SystemExit")
+
+    # The raw command must still appear so failures are debuggable.
+    assert "pip install thing" in capsys.readouterr().out
 
 
 def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
