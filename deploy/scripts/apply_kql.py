@@ -51,11 +51,16 @@ def build_database_script(scripts: list[Path]) -> str:
 
 
 def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
-    """Azure CLI credential with a generous process timeout (slow ``az.cmd`` on Windows)."""
+    """Azure CLI credential with a generous process timeout.
+
+    A *cold* ``az account get-access-token`` for the Kusto/Eventhouse audience can
+    take ~90s on Windows (warm calls are ~1s). 120s absorbs the cold-start
+    without making a genuinely-broken ``az`` hang excessively.
+    """
 
     from azure.identity import AzureCliCredential
 
-    return credential or AzureCliCredential(process_timeout=60)
+    return credential or AzureCliCredential(process_timeout=120)
 
 
 def resolve_kql_database(

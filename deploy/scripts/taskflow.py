@@ -64,14 +64,15 @@ ARTIFACT_TO_ITEM_TYPE = {
 def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
     """Azure CLI credential with a generous process timeout.
 
-    On Windows ``az.cmd`` is slow to start, so azure-identity's 10s default
-    frequently times out when fetching the Power BI and Fabric tokens back to
-    back. Allow more time, and reuse one credential for both token requests.
+    On Windows ``az.cmd`` is slow to start, and a *cold* token for the Power BI /
+    Fabric audience can take ~90s (the deploy fetches both back to back; warm
+    calls are ~1s). 120s absorbs the cold-start without making a genuinely-broken
+    ``az`` hang excessively. One credential is reused for both token requests.
     """
 
     from azure.identity import AzureCliCredential
 
-    return credential or AzureCliCredential(process_timeout=60)
+    return credential or AzureCliCredential(process_timeout=120)
 
 
 def _token(scope: str, credential: AzureCliCredential) -> str:
