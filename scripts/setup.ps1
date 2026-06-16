@@ -8,6 +8,10 @@
     script installs Miniforge with winget and creates a conda environment so
     users with nothing installed can still run the guided setup.
 
+    Only Miniforge is installed here. The remaining CLI prerequisites
+    (git, terraform, az) are installed by scripts/setup.py using the OS package
+    manager (winget on Windows) unless --skip-prereqs is passed.
+
     All arguments are forwarded to scripts/setup.py, for example:
         ./scripts/setup.ps1 --env dev
         ./scripts/setup.ps1 --env dev --deploy
