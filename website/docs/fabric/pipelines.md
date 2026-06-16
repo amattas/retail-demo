@@ -9,7 +9,7 @@ items** (`.platform`, `pipeline-content.json`, and an optional `.schedules`) tha
 
 | Pipeline | Recommended Schedule | Activities |
 |----------|---------------------|------------|
-| `setup-pipeline` | On demand | `setup-00-apply-kql` → `setup-01` → `setup-02` → `setup-03` → `setup-04` |
+| `setup-pipeline` | On demand | `setup-01` → `setup-02` → `setup-03` → `setup-04` |
 | `historical-data-load` | Once (manual) | `02-historical-data-load` |
 | `streaming-data-load` | Cron (every 5 minutes) | `03-streaming-to-silver` → `04-streaming-to-gold` (sequential) |
 | `daily-maintenance` | Daily 00:00 | `05-maintain-delta-tables` |
@@ -38,14 +38,17 @@ target at publish time (generated from the pipeline sources):
 fabric-cicd publishes Notebooks before Data Pipelines, so the references resolve.
 
 After a successful deploy, `retail-setup deploy` offers to **run `setup-pipeline`
-now** (via the Fabric Job Scheduler API) to apply the KQL setup and generate the
-dimensions, facts, and Gold tables.
+now** (via the Fabric Job Scheduler API) to generate the dimensions, facts, and
+Gold tables.
 
-`setup-pipeline` is authored in this repo; its first step `setup-00-apply-kql` is
-a notebook **generated** from `fabric/kql_database/*.kql` that applies the
-Eventhouse KQL setup with the Kusto Python SDK (`azure-kusto-data`). The other
-four pipelines were exported from a live workspace with
-`deploy.scripts.export_pipelines`.
+`setup-pipeline` is authored in this repo; the other four pipelines were exported
+from a live workspace with `deploy.scripts.export_pipelines`.
+
+The Eventhouse KQL schema is applied separately — `retail-setup deploy` runs
+`deploy.scripts.apply_kql --execute`, which connects to the KQL database with the
+Kusto Python SDK (`azure-kusto-data`) using your Azure CLI credentials. It does
+**not** run inside a Fabric notebook, whose identity lacks Eventhouse admin
+rights.
 
 ## Re-exporting
 
@@ -60,14 +63,10 @@ python -m deploy.scripts.export_pipelines --workspace-name "Retail Demo" --outpu
 
 ### setup-pipeline
 
-One-shot environment bootstrap: applies the Eventhouse KQL schema
-(`setup-00-apply-kql`), then runs the rendered setup notebooks in order to seed
-dictionaries, generate dimensions and facts, and build the Gold tables.
-
-The `setup-00-apply-kql` activity sets the boolean parameter
-`_inlineInstallationEnabled = True` so its `%pip install azure-kusto-data` runs
-during the pipeline — Fabric disables inline installs in pipeline runs by
-default.
+One-shot environment bootstrap: runs the rendered setup notebooks in order to
+seed dictionaries, generate dimensions and facts, and build the Gold tables. The
+Eventhouse KQL schema is applied beforehand by the deploy (`apply_kql --execute`),
+not by this pipeline.
 
 ### historical-data-load
 

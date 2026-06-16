@@ -8,7 +8,7 @@ streaming, maintenance, and ML.
 
 | Pipeline | Trigger | Notebook(s) | Purpose |
 | --- | --- | --- | --- |
-| `setup-pipeline` | On demand | `setup-00-apply-kql`, setup `01`–`04` | Apply KQL schema, then build historical demo data |
+| `setup-pipeline` | On demand | setup `01`–`04` | Build historical demo data (dimensions, facts, gold) |
 | `historical-data-load` | Manual | `02-historical-data-load` | Load historical batch data |
 | `streaming-data-load` | Cron (5 min) | `03-streaming-to-silver`, `04-streaming-to-gold` | Near-real-time Silver/Gold refresh |
 | `daily-maintenance` | Daily | `05-maintain-delta-tables` | Delta maintenance |

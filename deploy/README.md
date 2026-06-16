@@ -76,15 +76,26 @@ stream driver.
 
 ## KQL script execution
 
-`apply_kql` currently prepares one ordered `.execute database script` payload and
-writes it to the path passed with `--output`. It does **not** execute the script
-against Fabric.
+`apply_kql` builds one ordered `.execute database script with (ThrowOnErrors=true)`
+payload from `fabric\kql_database\*.kql` and writes it to the path passed with
+`--output`.
 
-After the Eventhouse and KQL database exist:
+With `--execute --environment <env>` it also **applies** the script to the
+Fabric Eventhouse KQL database. It resolves the database `queryServiceUri` from
+the Fabric REST API (workspace/database ids come from the generated
+`terraform-output.json`) and runs the batch with the Kusto Python SDK
+(`azure-kusto-data`), authenticating with your Azure CLI login. `retail-setup
+deploy` runs this step automatically. `ThrowOnErrors=true` makes a failed command
+fail the deploy instead of reporting silent success.
 
-1. Open `deploy\.generated\<env>\database.kql`.
-2. Copy the full script.
-3. Run it in the target Fabric KQL database.
+```powershell
+python -m deploy.scripts.apply_kql --execute --environment dev `
+    --output deploy\.generated\dev\database.kql
+```
+
+This runs in the deploy process — using **your** credentials, which have
+Eventhouse admin rights — rather than inside a Fabric notebook whose identity
+does not.
 
 ## Configuration notes
 

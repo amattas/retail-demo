@@ -6,8 +6,9 @@ views, anomaly-detection assets, and pricing-approval tables.
 
 ## Deployment
 
-`retail-setup deploy` and `deploy\scripts\apply_kql.py` generate a combined KQL
-database script at:
+`retail-setup deploy` runs `deploy\scripts\apply_kql.py --execute`, which builds
+a combined KQL database script and **applies it** to the Fabric Eventhouse KQL
+database. The combined script is also written to:
 
 ```text
 deploy\.generated\<env>\database.kql
@@ -16,11 +17,14 @@ deploy\.generated\<env>\database.kql
 The script is wrapped in:
 
 ```kql
-.execute database script <|
+.execute database script with (ThrowOnErrors=true) <|
 ```
 
-It is not executed automatically. After the Eventhouse and KQL database exist,
-open the generated script and run it in the target Fabric KQL database.
+`ThrowOnErrors=true` makes the batch fail on the first command error (by default
+`.execute database script` reports success even when commands fail). `apply_kql`
+connects with the Kusto Python SDK (`azure-kusto-data`) using your Azure CLI
+login — which has Eventhouse admin rights — so no manual step is required. To
+prepare the script without applying it, run `apply_kql` without `--execute`.
 
 ## Script order
 
