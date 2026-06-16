@@ -119,7 +119,15 @@ retail-setup configure
 
 Interactive prompts show the current config/default value in brackets. The
 store type prompt also lists the available dictionary profiles:
-`grocery`, `hardware`, `luxury`, and `supercenter`.
+`grocery`, `hardware`, `luxury`, and `supercenter`. After you pick the
+generation settings, `configure` prints an approximate **record-count estimate**
+(in-store receipts and lines, online orders, payments, customers) so you can
+gauge the output volume and runtime; interactively it then asks whether to use
+the settings or re-enter them.
+
+You choose **how many months** of history to generate rather than an explicit
+date range. The window **ends yesterday**, so real-time streaming continues
+seamlessly from today (`start_date`/`end_date` are derived from `months`).
 
 Non-interactive example:
 
@@ -133,8 +141,7 @@ retail-setup configure `
   --eventhouse-name retail_eventhouse `
   --kql-database-name retail_kql `
   --store-type supercenter `
-  --start-date 2025-01-01 `
-  --end-date 2025-03-31 `
+  --months 3 `
   --store-count 50 `
   --seed 42
 ```
@@ -146,7 +153,7 @@ The persisted generation settings are:
 | Setting | Meaning |
 | --- | --- |
 | `store_type` | Dictionary/profile to use: `grocery`, `hardware`, `luxury`, or `supercenter`. |
-| `start_date` / `end_date` | Inclusive historical generation date range. |
+| `months` | Months of historical data to generate. The window ends yesterday; `start_date`/`end_date` are derived from it (1–120). |
 | `store_count` | Number of stores to generate. Must be between 1 and 2000. |
 | `seed` | Deterministic random seed. |
 

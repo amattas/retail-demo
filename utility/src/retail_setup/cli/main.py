@@ -13,7 +13,6 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
@@ -37,9 +36,8 @@ def _main() -> None:
 
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
-_GENERATION_KEYS = ("store_type", "start_date", "end_date", "store_count", "seed")
-_DEFAULT_START_DATE = date(2025, 1, 1)
-_DEFAULT_END_DATE = date(2025, 3, 31)
+_GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
+_DEFAULT_MONTHS = 3
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
 # capacity before the same name can be created again. 30s proved too short, so
@@ -145,6 +143,23 @@ def _available_store_types() -> list[str]:
         return []
 
 
+def _print_record_estimate(generation: GenerationConfig) -> None:
+    """Show an approximate record-count breakdown for the chosen settings."""
+
+    from retail_setup.generation.estimate import estimate_record_counts
+
+    counts = estimate_record_counts(generation)
+    typer.echo("")
+    _hr("-")
+    typer.echo(
+        f"  Estimated records for {generation.start_date} to {generation.end_date} "
+        f"({generation.store_count} stores):"
+    )
+    for name, value in counts.items():
+        typer.echo(f"    {name:<20} ~ {value:>15,}")
+    _hr("-")
+
+
 def _load_deploy_environment(repo_root: Path, env: str):
     root = str(repo_root)
     if root not in sys.path:
@@ -235,10 +250,11 @@ def configure(
     store_type: Optional[str] = typer.Option(
         None, "--store-type", help="Store type. Available values are shown interactively."
     ),
-    start_date: Optional[str] = typer.Option(
-        None, "--start-date", help="Start date (YYYY-MM-DD)."
+    months: Optional[int] = typer.Option(
+        None,
+        "--months",
+        help="Months of historical data to generate (the window ends yesterday).",
     ),
-    end_date: Optional[str] = typer.Option(None, "--end-date", help="End date (YYYY-MM-DD)."),
     store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
 ) -> None:
@@ -271,7 +287,7 @@ def configure(
 
     _prompted_values = (
         tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
-        kql_database_name, store_type, start_date, end_date, store_count, seed,
+        kql_database_name, store_type, months, store_count, seed,
     )
     if any(value is None for value in _prompted_values) and sys.stdin.isatty():
         typer.echo("")
@@ -309,53 +325,51 @@ def configure(
         kql_database_name,
         default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
     )
-    store_type = _prompt_str(
-        store_type_prompt,
-        store_type,
-        default=existing_generation.get(
-            "store_type", GenerationConfig.model_fields["store_type"].default
-        ),
+    # Generation settings: prompt, show a record-count estimate, and (when
+    # interactive) offer to change them before committing. Validation happens
+    # before any file writes (the deploy YAMLs are written next and restored if
+    # framework validation later rejects them).
+    interactive = sys.stdin.isatty()
+    store_type_default = existing_generation.get(
+        "store_type", GenerationConfig.model_fields["store_type"].default
     )
-    start_date = _prompt_str(
-        "Start date (YYYY-MM-DD)",
-        start_date,
-        default=existing_generation.get("start_date", _DEFAULT_START_DATE.isoformat()),
-    )
-    end_date = _prompt_str(
-        "End date (YYYY-MM-DD)",
-        end_date,
-        default=existing_generation.get("end_date", _DEFAULT_END_DATE.isoformat()),
-    )
-    store_count = _prompt_int(
-        "Store count",
-        store_count,
-        default=int(
-            existing_generation.get(
-                "store_count", GenerationConfig.model_fields["store_count"].default
-            )
-        ),
-    )
-    seed = _prompt_int(
-        "Random seed",
-        seed,
-        default=int(
-            existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
-        ),
-    )
-
-    # Validate generation values before any file writes (deploy YAMLs are
-    # written next and restored if framework validation rejects them).
-    try:
-        generation = GenerationConfig(
-            store_type=store_type,
-            start_date=start_date,
-            end_date=end_date,
-            store_count=store_count,
-            seed=seed,
+    months_default = int(existing_generation.get("months", _DEFAULT_MONTHS))
+    store_count_default = int(
+        existing_generation.get(
+            "store_count", GenerationConfig.model_fields["store_count"].default
         )
-    except ValidationError as exc:
-        typer.echo(f"Invalid generation settings:\n{exc}")
-        raise typer.Exit(code=1)
+    )
+    seed_default = int(
+        existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
+    )
+    while True:
+        store_type = _prompt_str(store_type_prompt, store_type, default=store_type_default)
+        months = _prompt_int(
+            "Months of data to generate (history ends yesterday)",
+            months,
+            default=months_default,
+        )
+        store_count = _prompt_int("Store count", store_count, default=store_count_default)
+        seed = _prompt_int("Random seed", seed, default=seed_default)
+        try:
+            generation = GenerationConfig(
+                store_type=store_type,
+                months=months,
+                store_count=store_count,
+                seed=seed,
+            )
+        except ValidationError as exc:
+            typer.echo(f"Invalid generation settings:\n{exc}")
+            if interactive:
+                store_type = months = store_count = seed = None
+                continue
+            raise typer.Exit(code=1)
+
+        _print_record_estimate(generation)
+        if not interactive or typer.confirm("Use these settings?", default=True):
+            break
+        # Re-enter every generation value on the next loop iteration.
+        store_type = months = store_count = seed = None
 
     original_deploy = _update_yaml_file(
         deploy_yml,

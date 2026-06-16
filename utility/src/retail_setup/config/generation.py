@@ -1,6 +1,7 @@
 """Generation settings (utility/config.yaml). Environment settings live in deploy/config/."""
 
-from datetime import date
+import calendar
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
@@ -9,10 +10,25 @@ from pydantic import BaseModel, Field, model_validator
 from retail_setup.dictionaries.loader import available_store_types, default_dictionary_root
 
 
+def _subtract_months(anchor: date, months: int) -> date:
+    """Return the date ``months`` calendar months before ``anchor`` (day clamped)."""
+
+    month_index = anchor.month - 1 - months
+    year = anchor.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(anchor.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
 class GenerationConfig(BaseModel):
     store_type: str = "supercenter"
-    start_date: date
-    end_date: date
+    # Preferred input: number of months of history to generate. The window ends
+    # *yesterday* so real-time streaming continues seamlessly from today.
+    # ``start_date``/``end_date`` may be provided explicitly instead (back-compat);
+    # they are derived from ``months`` only when not both already supplied.
+    months: int | None = Field(default=None, ge=1, le=120)
+    start_date: date | None = None
+    end_date: date | None = None
     store_count: int = Field(default=50, gt=0, le=2000)
     seed: int = 42
     silver_db: str = "ag"
@@ -53,6 +69,18 @@ class GenerationConfig(BaseModel):
     def resolved_dictionary_root(self) -> Path:
         """Resolved dictionary root path (explicit override or package default)."""
         return Path(self.dictionary_root) if self.dictionary_root else default_dictionary_root()
+
+    @model_validator(mode="after")
+    def _derive_date_range(self) -> "GenerationConfig":
+        """Derive start/end from ``months`` (window ends yesterday) when needed."""
+
+        if self.months is not None and not (self.start_date and self.end_date):
+            end = date.today() - timedelta(days=1)
+            self.end_date = end
+            self.start_date = _subtract_months(end, self.months)
+        if self.start_date is None or self.end_date is None:
+            raise ValueError("provide `months`, or both `start_date` and `end_date`")
+        return self
 
     @model_validator(mode="after")
     def _date_order(self) -> "GenerationConfig":

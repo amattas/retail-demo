@@ -38,9 +38,13 @@ Important values:
 | Setting | Description |
 | --- | --- |
 | `store_type` | One of `grocery`, `hardware`, `luxury`, or `supercenter`. |
-| `start_date` / `end_date` | Inclusive historical generation date range. |
+| `months` | Months of historical data to generate. The window ends yesterday so streaming continues from today; `start_date`/`end_date` are derived from it. |
 | `store_count` | Number of stores to generate. |
 | `seed` | Deterministic random seed. |
+
+When you run `retail-setup configure`, it asks **how many months** of history to
+generate (not an explicit date range) and then prints an approximate
+record-count estimate so you can gauge the output volume before committing.
 
 The engine also has derived defaults:
 
