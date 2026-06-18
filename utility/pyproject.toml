@@ -8,7 +8,6 @@ version = "0.1.0"
 description = "Fabric-native setup utility: historical data generation + environment configuration"
 requires-python = ">=3.11"
 dependencies = [
-    "alive-progress>=3.1",
     "pydantic>=2.5",
     "pyyaml>=6.0",
     "typer>=0.12",
