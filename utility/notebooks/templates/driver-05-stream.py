@@ -30,12 +30,13 @@ run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (tes
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
 
 # Eventhouse (Kusto) sink — the default. Writes each event straight to its KQL
-# event table with the Fabric Spark connector. Copy the **Query URI** from the KQL
-# database details card (see the RTI Spark-connector tutorial linked above) and
-# paste it into `kusto_uri`; the operator identity running the notebook needs
-# ingestor/admin rights on the database. The tables must already exist (created by
-# the KQL setup), so no table is auto-created here.
-kusto_uri = ""                 # KQL database Query URI, e.g. "https://<host>.kusto.fabric.microsoft.com"
+# event table with the Fabric Spark connector. Leave `kusto_uri` blank and it is
+# resolved automatically at runtime from the `kql_database` below (its Query URI
+# in this workspace); set it explicitly only to target a different cluster. The
+# operator identity running the notebook needs ingestor/admin rights on the
+# database. The tables must already exist (created by the KQL setup), so no table
+# is auto-created here.
+kusto_uri = ""                 # blank = auto-resolve from kql_database; or a Query URI like "https://<host>.kusto.fabric.microsoft.com"
 kql_database = "retail_eventhouse"  # KQL database name (the Eventhouse's database)
 
 # Delta sink (used when sink == "delta") — a local landing table for debugging the
@@ -554,6 +555,35 @@ def write_to_eventhouse(batch_df, _batch_id):
         batch_df.unpersist()
 
 
+def _resolve_kusto_uri(database_name):
+    """Resolve the KQL database Query URI from the current Fabric workspace.
+
+    The Eventhouse Query URI is assigned by Fabric when the database is created,
+    so it is not known ahead of time and is left blank in the parameters. Resolve
+    it at runtime by matching the KQL database display name in this workspace and
+    returning its ``queryServiceUri`` (the same property the deploy's KQL step
+    uses). This lets the notebook run without anyone pasting the URI by hand.
+    """
+    import sempy.fabric as fabric
+
+    client = fabric.FabricRestClient()
+    workspace_id = fabric.get_notebook_workspace_id()
+    resp = client.get(f"v1/workspaces/{workspace_id}/kqlDatabases")
+    resp.raise_for_status()
+    databases = resp.json().get("value", [])
+    for item in databases:
+        if item.get("displayName") == database_name:
+            uri = (item.get("properties") or {}).get("queryServiceUri")
+            if uri:
+                return uri
+    found = ", ".join(sorted(d.get("displayName", "?") for d in databases)) or "<none>"
+    raise ValueError(
+        f"Could not find a KQL database named {database_name!r} in this workspace "
+        f"(found: {found}). Set kql_database to your Eventhouse database name, or "
+        "paste its Query URI into kusto_uri."
+    )
+
+
 # %%
 # Write the stream to the chosen sink. The checkpoint is sink-specific so the
 # sinks never share offset/commit state.
@@ -568,7 +598,10 @@ if sink == "eventhouse":
     # NOTE: the Kusto Spark connector (com.microsoft.kusto.spark) ships with the
     # Fabric Spark runtime. The notebook identity needs ingestor rights on the DB.
     if not kusto_uri:
-        raise ValueError("eventhouse sink requires kusto_uri (the KQL database Query URI)")
+        # Auto-resolve the Query URI from this workspace so the notebook works
+        # without manual configuration. Set kusto_uri explicitly to override.
+        kusto_uri = _resolve_kusto_uri(kql_database)
+        print(f"Using Eventhouse '{kql_database}' Query URI: {kusto_uri}")
     query = writer.foreachBatch(write_to_eventhouse).start()
 elif sink == "delta":
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {delta_landing_table.rsplit('.', 1)[0]}")
