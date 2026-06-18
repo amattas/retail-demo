@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 import retail_setup.cli.main as cli
@@ -73,6 +74,112 @@ def test_recreate_inserts_destroy_and_sleep_before_apply():
     assert init_idx < destroy_idx < sleep_idx < apply_idx
     assert plan[destroy_idx].needs_confirmation
     assert not any(" plan " in f" {c} " for c in cmds)
+
+
+def test_terraform_steps_auto_approve_to_avoid_double_prompt():
+    plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
+    tf = [s for s in plan if s.cmd and s.cmd[0] == "terraform"]
+    apply = next(s for s in tf if "apply" in s.cmd)
+    destroy = next(s for s in tf if "destroy" in s.cmd)
+    # A single confirmation gate stays in retail-setup; terraform itself is
+    # auto-approved so the user never has to say "yes" a second time.
+    assert "-auto-approve" in apply.cmd and apply.needs_confirmation
+    assert "-auto-approve" in destroy.cmd and destroy.needs_confirmation
+
+
+def test_is_terraform_apply_detects_apply_steps():
+    from retail_setup.cli.main import _is_terraform_apply, DeployStep
+
+    apply = DeployStep(cmd=["terraform", "-chdir=deploy/terraform", "apply", "-auto-approve"])
+    other = DeployStep(cmd=["terraform", "-chdir=deploy/terraform", "init"])
+    assert _is_terraform_apply(apply) is True
+    assert _is_terraform_apply(other) is False
+    assert _is_terraform_apply(DeployStep(cmd=[])) is False
+
+
+def test_cleanup_destroy_step_targets_environment():
+    from retail_setup.cli.main import _cleanup_destroy_step
+
+    step = _cleanup_destroy_step("prod")
+    assert step.cmd[:3] == ["terraform", "-chdir=deploy/terraform", "destroy"]
+    assert "-auto-approve" in step.cmd
+    assert "-var-file=environments/prod.tfvars" in step.cmd
+
+
+class _FakeUI:
+    """Minimal ConsoleUI stand-in for exercising cancel handling."""
+
+    def __init__(self, answer: bool) -> None:
+        self._answer = answer
+        self.logs: list[str] = []
+        self.phases: list[str] = []
+
+    def log(self, message: str = "") -> None:
+        self.logs.append(message)
+
+    def set_phase(self, text: str) -> None:
+        self.phases.append(text)
+
+    def status(self, text: str) -> None:
+        pass
+
+    def reset_cancel(self) -> None:
+        pass
+
+    def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
+        return self._answer
+
+
+def test_handle_cancel_runs_destroy_when_apply_started_and_confirmed(monkeypatch):
+    import typer
+
+    from retail_setup.cli.main import _handle_cancel
+
+    ran: list[list[str]] = []
+    monkeypatch.setattr(
+        "retail_setup.cli.main._run_step_streamed",
+        lambda step, root, ui: ran.append(step.cmd) or 0,
+    )
+    ui = _FakeUI(answer=True)
+    with pytest.raises(typer.Exit) as exc:
+        _handle_cancel(ui, Path("."), "dev", apply_started=True, skip_terraform=False)
+    assert exc.value.exit_code == 130
+    assert ran and "destroy" in ran[0]
+
+
+def test_handle_cancel_skips_destroy_when_declined(monkeypatch):
+    import typer
+
+    from retail_setup.cli.main import _handle_cancel
+
+    ran: list[list[str]] = []
+    monkeypatch.setattr(
+        "retail_setup.cli.main._run_step_streamed",
+        lambda step, root, ui: ran.append(step.cmd) or 0,
+    )
+    ui = _FakeUI(answer=False)
+    with pytest.raises(typer.Exit) as exc:
+        _handle_cancel(ui, Path("."), "dev", apply_started=True, skip_terraform=False)
+    assert exc.value.exit_code == 130
+    assert ran == []
+
+
+def test_handle_cancel_no_cleanup_prompt_before_apply(monkeypatch):
+    import typer
+
+    from retail_setup.cli.main import _handle_cancel
+
+    ran: list[list[str]] = []
+    monkeypatch.setattr(
+        "retail_setup.cli.main._run_step_streamed",
+        lambda step, root, ui: ran.append(step.cmd) or 0,
+    )
+    # answer=True would destroy if asked; apply_started=False must not even ask.
+    ui = _FakeUI(answer=True)
+    with pytest.raises(typer.Exit) as exc:
+        _handle_cancel(ui, Path("."), "dev", apply_started=False, skip_terraform=False)
+    assert exc.value.exit_code == 130
+    assert ran == []
 
 
 def test_recreate_rejects_skip_terraform(monkeypatch):
