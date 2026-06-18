@@ -9,3 +9,6 @@ eventhouse_name = "retail_eventhouse"
 kql_database_name = "retail_kql"
 eventstream_enabled = false
 eventstream_name = "retail_eventstream"
+spark_custom_pool_enabled = false
+tenant_id = "9d379b85-7b26-46a5-bbc8-2ce467f202b8"
+capacity_name = "amattas"

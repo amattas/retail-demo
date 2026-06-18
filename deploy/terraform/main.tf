@@ -87,3 +87,46 @@ resource "fabric_eventstream" "main" {
   display_name = var.eventstream_name
   workspace_id = local.workspace_id
 }
+
+# F64-optimized custom Spark pool for the setup run (opt-in via
+# spark_custom_pool_enabled). An F64 provides 128 base Spark vCores (64 CU x 2),
+# burstable to 384. Medium nodes are 8 vCores each, so the default 1-10 node
+# autoscale tops out at 80 vCores: strong parallelism for the one-time setup
+# while staying inside the base capacity (no bursting) and leaving headroom for
+# the Eventhouse. Executors cap at max_node_count - 1 (one node runs the driver).
+resource "fabric_spark_custom_pool" "setup" {
+  count        = var.spark_custom_pool_enabled ? 1 : 0
+  workspace_id = local.workspace_id
+  name         = var.spark_custom_pool_name
+  node_family  = "MemoryOptimized"
+  node_size    = var.spark_node_size
+  type         = "Workspace"
+
+  auto_scale = {
+    enabled        = true
+    min_node_count = var.spark_min_node_count
+    max_node_count = var.spark_max_node_count
+  }
+
+  dynamic_executor_allocation = {
+    enabled       = true
+    min_executors = 1
+    max_executors = max(var.spark_max_node_count - 1, 1)
+  }
+}
+
+# Make the custom pool the workspace default. The setup pipeline's notebook
+# (TridentNotebook) activities have no per-activity pool selector, so the
+# workspace default pool is how they pick up the custom pool.
+resource "fabric_spark_workspace_settings" "main" {
+  count        = var.spark_custom_pool_enabled ? 1 : 0
+  workspace_id = local.workspace_id
+
+  pool = {
+    customize_compute_enabled = true
+    default_pool = {
+      name = fabric_spark_custom_pool.setup[0].name
+      type = "Workspace"
+    }
+  }
+}

@@ -9,6 +9,29 @@ import pytest
 from deploy.scripts import apply_kql
 
 
+class _FakeRow:
+    """Stand-in for ``KustoResultRow`` — only ``to_dict`` is used."""
+
+    def __init__(self, data: dict) -> None:
+        self._data = data
+
+    def to_dict(self) -> dict:
+        return self._data
+
+
+class _FakeTable:
+    """Stand-in for ``KustoResultTable`` — iterable of rows with a length."""
+
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = [_FakeRow(row) for row in rows]
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+
 def _write_scripts(source_dir: Path) -> None:
     source_dir.mkdir(parents=True, exist_ok=True)
     (source_dir / "01-create-tables.kql").write_text(
@@ -117,21 +140,28 @@ def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:
         lambda ws, db, cred: ("https://cluster", "retail_kql"),
     )
 
-    class _Frame:
-        def __len__(self) -> int:
-            return 3
+    table = _FakeTable(
+        [
+            {
+                "CommandType": "TableCreate",
+                "CommandText": ".show tables",
+                "Result": "Completed",
+                "Reason": "",
+            }
+            for _ in range(3)
+        ]
+    )
 
-        def to_string(self) -> str:
-            return "<results>"
+    class _Response:
+        primary_results = [table]
 
     def fake_execute(query_uri, database_name, script, credential):
         calls["query_uri"] = query_uri
         calls["database_name"] = database_name
         calls["script"] = script
-        return object()
+        return _Response()
 
     monkeypatch.setattr(apply_kql, "execute_database_script", fake_execute)
-    monkeypatch.setattr(apply_kql, "_result_to_frame", lambda _response: _Frame())
 
     count = apply_kql.apply_to_database(
         script=".execute database script with (ThrowOnErrors=true) <|\n.show tables",
@@ -148,21 +178,30 @@ def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:
 def test_summarize_result_is_concise_on_success(capsys) -> None:
     """A successful apply collapses to one line; no per-command text is dumped."""
 
-    pd = pytest.importorskip("pandas")
-    frame = pd.DataFrame(
-        {
-            "CommandType": ["DatabaseScriptExecute", "TableCreate", "TableCreate"],
-            "CommandText": [
-                ".execute database script",
-                ".create-merge table receipt_created (store_id:long)",
-                ".create-merge table receipt_line_added (line_number:long)",
-            ],
-            "Result": ["Completed", "Completed", "Completed"],
-            "Reason": ["", "", ""],
-        }
+    table = _FakeTable(
+        [
+            {
+                "CommandType": "DatabaseScriptExecute",
+                "CommandText": ".execute database script",
+                "Result": "Completed",
+                "Reason": "",
+            },
+            {
+                "CommandType": "TableCreate",
+                "CommandText": ".create-merge table receipt_created (store_id:long)",
+                "Result": "Completed",
+                "Reason": "",
+            },
+            {
+                "CommandType": "TableCreate",
+                "CommandText": ".create-merge table receipt_line_added (line_number:long)",
+                "Result": "Completed",
+                "Reason": "",
+            },
+        ]
     )
 
-    apply_kql._summarize_result(frame)
+    apply_kql._summarize_result(table)
 
     out = capsys.readouterr().out
     assert "KQL applied: 3/3 commands completed." in out
@@ -171,20 +210,24 @@ def test_summarize_result_is_concise_on_success(capsys) -> None:
 
 
 def test_summarize_result_lists_only_failures(capsys) -> None:
-    pd = pytest.importorskip("pandas")
-    frame = pd.DataFrame(
-        {
-            "CommandType": ["TableCreate", "FunctionCreate"],
-            "CommandText": [
-                ".create-merge table ok (x:long)",
-                ".create-or-alter function bad() { nope }",
-            ],
-            "Result": ["Completed", "Failed"],
-            "Reason": ["", "Semantic error: 'nope' is not defined"],
-        }
+    table = _FakeTable(
+        [
+            {
+                "CommandType": "TableCreate",
+                "CommandText": ".create-merge table ok (x:long)",
+                "Result": "Completed",
+                "Reason": "",
+            },
+            {
+                "CommandType": "FunctionCreate",
+                "CommandText": ".create-or-alter function bad() { nope }",
+                "Result": "Failed",
+                "Reason": "Semantic error: 'nope' is not defined",
+            },
+        ]
     )
 
-    apply_kql._summarize_result(frame)
+    apply_kql._summarize_result(table)
 
     out = capsys.readouterr().out
     assert "1/2 completed, 1 failed" in out
@@ -196,10 +239,8 @@ def test_summarize_result_lists_only_failures(capsys) -> None:
 def test_summarize_result_falls_back_without_columns(capsys) -> None:
     """A result object without a Result column still prints a count, not a dump."""
 
-    class _Frame:
-        def __len__(self) -> int:
-            return 7
+    table = _FakeTable([{"CommandType": "X"} for _ in range(7)])
 
-    apply_kql._summarize_result(_Frame())
+    apply_kql._summarize_result(table)
 
     assert "KQL applied: 7 command(s)." in capsys.readouterr().out

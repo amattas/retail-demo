@@ -11,8 +11,8 @@ import json
 import subprocess
 import shutil
 import sys
+import time
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,14 +36,19 @@ def _main() -> None:
 
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
-_GENERATION_KEYS = ("store_type", "start_date", "end_date", "store_count", "seed")
-_DEFAULT_START_DATE = date(2025, 1, 1)
-_DEFAULT_END_DATE = date(2025, 3, 31)
+_GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
+_DEFAULT_MONTHS = 3
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
 # capacity before the same name can be created again. 30s proved too short, so
 # we wait longer before terraform apply recreates everything.
 _RECREATE_WAIT_SECONDS = 90
+
+# The setup pipeline runs asynchronously in Fabric; the CLI only needs to start
+# it. Retry the start a few times so a single transient failure (e.g. a cold az
+# token right after a long Terraform/publish step) doesn't leave it untriggered.
+_PIPELINE_TRIGGER_ATTEMPTS = 3
+_PIPELINE_TRIGGER_RETRY_WAIT = 10
 
 
 def _default_repo_root() -> Path:
@@ -131,11 +136,37 @@ def _prompt_int(name: str, value: int | None, *, default: int) -> int:
     return typer.prompt(name, default=default, show_default=True, type=int)
 
 
+def _prompt_bool(name: str, value: bool | None, *, default: bool) -> bool:
+    """Resolve a yes/no value: explicit flag wins; prompt only when interactive."""
+    if value is not None:
+        return value
+    if not sys.stdin.isatty():
+        return default
+    return typer.confirm(name, default=default)
+
+
 def _available_store_types() -> list[str]:
     try:
         return available_store_types(default_dictionary_root())
     except RuntimeError:
         return []
+
+
+def _print_record_estimate(generation: GenerationConfig) -> None:
+    """Show an approximate record-count breakdown for the chosen settings."""
+
+    from retail_setup.generation.estimate import estimate_record_counts
+
+    counts = estimate_record_counts(generation)
+    typer.echo("")
+    _hr("-")
+    typer.echo(
+        f"  Estimated records for {generation.start_date} to {generation.end_date} "
+        f"({generation.store_count} stores):"
+    )
+    for name, value in counts.items():
+        typer.echo(f"    {name:<20} ~ {value:>15,}")
+    _hr("-")
 
 
 def _load_deploy_environment(repo_root: Path, env: str):
@@ -225,13 +256,19 @@ def configure(
     kql_database_name: Optional[str] = typer.Option(
         None, "--kql-database-name", help="KQL database name."
     ),
+    use_custom_spark_pool: Optional[bool] = typer.Option(
+        None,
+        "--use-custom-spark-pool/--no-custom-spark-pool",
+        help="Run setup on an F64-optimized custom Spark pool instead of the default starter pool.",
+    ),
     store_type: Optional[str] = typer.Option(
         None, "--store-type", help="Store type. Available values are shown interactively."
     ),
-    start_date: Optional[str] = typer.Option(
-        None, "--start-date", help="Start date (YYYY-MM-DD)."
+    months: Optional[int] = typer.Option(
+        None,
+        "--months",
+        help="Months of historical data to generate (the window ends yesterday).",
     ),
-    end_date: Optional[str] = typer.Option(None, "--end-date", help="End date (YYYY-MM-DD)."),
     store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
 ) -> None:
@@ -264,7 +301,7 @@ def configure(
 
     _prompted_values = (
         tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
-        kql_database_name, store_type, start_date, end_date, store_count, seed,
+        kql_database_name, use_custom_spark_pool, store_type, months, store_count, seed,
     )
     if any(value is None for value in _prompted_values) and sys.stdin.isatty():
         typer.echo("")
@@ -302,53 +339,58 @@ def configure(
         kql_database_name,
         default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
     )
-    store_type = _prompt_str(
-        store_type_prompt,
-        store_type,
-        default=existing_generation.get(
-            "store_type", GenerationConfig.model_fields["store_type"].default
+    use_custom_spark_pool = _prompt_bool(
+        "Run setup on a custom Spark pool (optimized for F64) instead of the default starter pool",
+        use_custom_spark_pool,
+        default=bool(
+            _config_default(base_config, env_config, "spark.use_custom_pool") or False
         ),
     )
-    start_date = _prompt_str(
-        "Start date (YYYY-MM-DD)",
-        start_date,
-        default=existing_generation.get("start_date", _DEFAULT_START_DATE.isoformat()),
+    # Generation settings: prompt, show a record-count estimate, and (when
+    # interactive) offer to change them before committing. Validation happens
+    # before any file writes (the deploy YAMLs are written next and restored if
+    # framework validation later rejects them).
+    interactive = sys.stdin.isatty()
+    store_type_default = existing_generation.get(
+        "store_type", GenerationConfig.model_fields["store_type"].default
     )
-    end_date = _prompt_str(
-        "End date (YYYY-MM-DD)",
-        end_date,
-        default=existing_generation.get("end_date", _DEFAULT_END_DATE.isoformat()),
-    )
-    store_count = _prompt_int(
-        "Store count",
-        store_count,
-        default=int(
-            existing_generation.get(
-                "store_count", GenerationConfig.model_fields["store_count"].default
-            )
-        ),
-    )
-    seed = _prompt_int(
-        "Random seed",
-        seed,
-        default=int(
-            existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
-        ),
-    )
-
-    # Validate generation values before any file writes (deploy YAMLs are
-    # written next and restored if framework validation rejects them).
-    try:
-        generation = GenerationConfig(
-            store_type=store_type,
-            start_date=start_date,
-            end_date=end_date,
-            store_count=store_count,
-            seed=seed,
+    months_default = int(existing_generation.get("months", _DEFAULT_MONTHS))
+    store_count_default = int(
+        existing_generation.get(
+            "store_count", GenerationConfig.model_fields["store_count"].default
         )
-    except ValidationError as exc:
-        typer.echo(f"Invalid generation settings:\n{exc}")
-        raise typer.Exit(code=1)
+    )
+    seed_default = int(
+        existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
+    )
+    while True:
+        store_type = _prompt_str(store_type_prompt, store_type, default=store_type_default)
+        months = _prompt_int(
+            "Months of data to generate (history ends yesterday)",
+            months,
+            default=months_default,
+        )
+        store_count = _prompt_int("Store count", store_count, default=store_count_default)
+        seed = _prompt_int("Random seed", seed, default=seed_default)
+        try:
+            generation = GenerationConfig(
+                store_type=store_type,
+                months=months,
+                store_count=store_count,
+                seed=seed,
+            )
+        except ValidationError as exc:
+            typer.echo(f"Invalid generation settings:\n{exc}")
+            if interactive:
+                store_type = months = store_count = seed = None
+                continue
+            raise typer.Exit(code=1)
+
+        _print_record_estimate(generation)
+        if not interactive or typer.confirm("Use these settings?", default=True):
+            break
+        # Re-enter every generation value on the next loop iteration.
+        store_type = months = store_count = seed = None
 
     original_deploy = _update_yaml_file(
         deploy_yml,
@@ -358,6 +400,7 @@ def configure(
             "lakehouse.name": lakehouse_name,
             "eventhouse.name": eventhouse_name,
             "eventhouse.kql_database_name": kql_database_name,
+            "spark.use_custom_pool": use_custom_spark_pool,
         },
     )
     original_env = _update_yaml_file(env_yml, {"workspace.name": workspace_name})
@@ -619,6 +662,8 @@ def _deploy_plan(
                 "core",
                 "setup",
                 "ml",
+                "ontology",
+                "reset",
                 "--lakehouse-name",
                 lakehouse_name,
             ],
@@ -814,11 +859,12 @@ def deploy(
 
     if not yes:
         if typer.confirm(
-            "Run the setup pipeline now (apply KQL setup, then generate "
-            "dimensions, facts, and gold)?",
+            "Run the setup pipeline now (generate dimensions, facts, and gold, "
+            "then train the ML models and build the ontology)?",
             default=False,
         ):
             _run_setup_pipeline(repo_root, env)
+            _print_ontology_relink_hint(repo_root, env)
         else:
             typer.echo(
                 "Skipping. Run later with: "
@@ -848,8 +894,44 @@ def _deploy_taskflow(repo_root: Path, env: str) -> None:
         )
 
 
+def _print_ontology_relink_hint(repo_root: Path, env: str) -> None:
+    """Explain why the ontology task-flow node is unbound and how it links.
+
+    The ontology is created at the end of the setup pipeline (``30-create-ontology``),
+    which runs after the task flow was deployed, so its node is dropped (unbound) at
+    this deploy. It binds automatically on the next ``retail-setup deploy`` (the task
+    flow step re-runs and the ontology now resolves by name), or immediately via a
+    standalone task flow deploy once the pipeline finishes.
+    """
+
+    workspace = _workspace_name(repo_root, env)
+    typer.echo("")
+    typer.echo(
+        "Note: the ontology is created at the end of the setup pipeline you just\n"
+        "started, so its task-flow node ('RetailOntology_AutoGen') is not linked yet.\n"
+        "It links automatically the next time you run 'retail-setup deploy' (once the\n"
+        "ontology exists). To link it sooner, re-run the task flow deploy after the\n"
+        "pipeline finishes:\n"
+        f"    python -m deploy.scripts.taskflow deploy --workspace {workspace}"
+    )
+
+
 def _run_setup_pipeline(repo_root: Path, env: str) -> None:
-    """Start an on-demand run of the deployed setup pipeline."""
+    """Start an on-demand run of the deployed setup pipeline.
+
+    Prints a heads-up that generation can take a while (it runs asynchronously in
+    Fabric) and retries the trigger a few times so a transient failure doesn't
+    leave the pipeline unstarted.
+    """
+
+    typer.echo("")
+    _hr("=")
+    typer.echo("  Running the setup pipeline: historical data (dimensions, facts, gold),")
+    typer.echo("  then the ML models, then the ontology -- in one chained run.")
+    typer.echo("  This can take a while -- often several minutes to an hour or more,")
+    typer.echo("  depending on the months of history and store count. It runs in")
+    typer.echo("  Fabric, so you can close this and track progress in the workspace.")
+    _hr("=")
 
     cmd = [
         sys.executable,
@@ -861,13 +943,22 @@ def _run_setup_pipeline(repo_root: Path, env: str) -> None:
         "setup-pipeline",
     ]
     typer.echo("    " + " ".join(cmd))
-    result = subprocess.run(cmd, cwd=repo_root)
-    if result.returncode != 0:
-        typer.echo(
-            "Could not start the setup pipeline automatically. Open the workspace "
-            "in Fabric and run 'setup-pipeline' manually.",
-            err=True,
-        )
+    for attempt in range(1, _PIPELINE_TRIGGER_ATTEMPTS + 1):
+        result = subprocess.run(cmd, cwd=repo_root)
+        if result.returncode == 0:
+            return
+        if attempt < _PIPELINE_TRIGGER_ATTEMPTS:
+            typer.echo(
+                f"  Trigger attempt {attempt} failed (exit {result.returncode}); "
+                f"retrying in {_PIPELINE_TRIGGER_RETRY_WAIT}s...",
+                err=True,
+            )
+            time.sleep(_PIPELINE_TRIGGER_RETRY_WAIT)
+    typer.echo(
+        "Could not start the setup pipeline automatically. Open the workspace "
+        "in Fabric and run 'setup-pipeline' manually.",
+        err=True,
+    )
 
 
 if __name__ == "__main__":

@@ -109,3 +109,38 @@ variable "eventstream_name" {
   default     = "retail_eventstream"
   description = "Fabric Eventstream display name."
 }
+
+variable "spark_custom_pool_enabled" {
+  type        = bool
+  default     = false
+  description = "Create an F64-optimized custom Spark pool and set it as the workspace default pool so the setup pipeline runs on it. When false, setup uses the workspace starter pool."
+}
+
+variable "spark_custom_pool_name" {
+  type        = string
+  default     = "retail_setup_pool"
+  description = "Display name for the custom Spark pool."
+}
+
+variable "spark_node_size" {
+  type        = string
+  default     = "Medium"
+  description = "Custom Spark pool node size (MemoryOptimized family). One of: Small, Medium, Large, XLarge, XXLarge."
+
+  validation {
+    condition     = contains(["Small", "Medium", "Large", "XLarge", "XXLarge"], var.spark_node_size)
+    error_message = "spark_node_size must be one of: Small, Medium, Large, XLarge, XXLarge."
+  }
+}
+
+variable "spark_min_node_count" {
+  type        = number
+  default     = 1
+  description = "Custom Spark pool autoscale minimum node count."
+}
+
+variable "spark_max_node_count" {
+  type        = number
+  default     = 10
+  description = "Custom Spark pool autoscale maximum node count. The F64 default of 10 Medium (8 vCore) nodes = 80 vCores, inside an F64's 128 base Spark vCores (no bursting)."
+}

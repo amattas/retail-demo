@@ -121,37 +121,32 @@ def _terraform_outputs(environment: str) -> dict[str, Any]:
     return load_terraform_outputs(path)
 
 
-def _result_to_frame(response: Any) -> Any:
-    """Convert a Kusto response's primary result to a pandas DataFrame."""
-
-    from azure.kusto.data.helpers import dataframe_from_result_table
-
-    return dataframe_from_result_table(response.primary_results[0])
-
-
-def _summarize_result(frame: Any) -> None:
+def _summarize_result(table: Any) -> None:
     """Print a concise summary of a ``.execute database script`` result.
 
     The raw Kusto result has one wide row per command (including the full
     command text), which is hundreds of rows for the retail schema. Collapse it
     to a completed/failed count and only print details for failed commands.
+
+    Rows are read straight from the Kusto result table (each ``KustoResultRow``
+    exposes ``to_dict``), so this avoids pulling in pandas — an optional
+    ``azure-kusto-data`` extra that the deploy environment does not install.
     """
 
-    total = len(frame)
-    columns = getattr(frame, "columns", None)
-    results = frame["Result"] if columns is not None and "Result" in columns else None
-    if results is None:
+    rows = [row.to_dict() for row in table]
+    total = len(rows)
+    if not rows or "Result" not in rows[0]:
         console.info(f"KQL applied: {total} command(s).")
         return
 
-    failures = frame[results != "Completed"]
+    failures = [row for row in rows if row.get("Result") != "Completed"]
     completed = total - len(failures)
-    if len(failures) == 0:
+    if not failures:
         console.info(f"KQL applied: {completed}/{total} commands completed.")
         return
 
     console.info(f"KQL applied: {completed}/{total} completed, {len(failures)} failed:")
-    for _, row in failures.iterrows():
+    for row in failures:
         lines = str(row.get("CommandText", "")).strip().splitlines()
         first_line = lines[0][:100] if lines else ""
         reason = str(row.get("Reason", "")).strip()
@@ -174,11 +169,31 @@ def apply_to_database(
     )
     database_name = kql_database_name or resolved_name
     console.info(f"Applying KQL to '{database_name}' @ {query_uri}")
-    response = execute_database_script(query_uri, database_name, script, credential)
 
-    frame = _result_to_frame(response)
-    _summarize_result(frame)
-    return len(frame)
+    from deploy.scripts._retry import retry_call
+
+    # The Kusto SDK acquires the token inside execute_mgmt; a cold az token can
+    # raise KustoAuthenticationError. Retrying re-runs the (idempotent) script.
+    # The exception type is only available when the Kusto SDK is installed (it is
+    # in the deploy env); without it, retry_on=() simply means "don't retry".
+    try:
+        from azure.kusto.data.exceptions import KustoAuthenticationError
+
+        retry_on: tuple[type[BaseException], ...] = (KustoAuthenticationError,)
+    except ModuleNotFoundError:
+        retry_on = ()
+
+    response = retry_call(
+        lambda: execute_database_script(query_uri, database_name, script, credential),
+        retry_on=retry_on,
+        on_retry=lambda n, exc: console.warn(
+            f"Kusto auth attempt {n} failed ({type(exc).__name__}); retrying..."
+        ),
+    )
+
+    table = response.primary_results[0]
+    _summarize_result(table)
+    return len(table)
 
 
 def main() -> int:

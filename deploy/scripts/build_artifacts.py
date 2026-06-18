@@ -18,6 +18,25 @@ PLATFORM_SCHEMA = (
     "platformProperties/2.0.0/schema.json"
 )
 
+# fabric-cicd replaces this sentinel workspace id with the target workspace id
+# at publish time (its `_replace_workspace_ids`). The `$workspace.$id` token only
+# resolves inside parameter.yml replace_values, NOT when baked into item content,
+# so a notebook's default-lakehouse workspace binding must use this sentinel.
+_CURRENT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
+
+
+def _logical_id(item_type: str, display_name: str) -> str:
+    """Deterministic fabric-cicd logicalId for a staged item.
+
+    The same value is written to the item's ``.platform`` and referenced by
+    other items (e.g. a notebook's default lakehouse), so fabric-cicd's
+    ``_replace_logical_ids`` resolves the reference to the deployed item GUID.
+    Like ``$workspace.$id``, the ``$items.<type>.<name>.$id`` token only resolves
+    inside parameter.yml, so item content must reference the logicalId directly.
+    """
+
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"retail-demo:{item_type}:{display_name}"))
+
 # Workspace folder names used to organize published items. fabric-cicd maps the
 # staged directory structure to Fabric workspace folders, so staging an item
 # under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
@@ -30,6 +49,7 @@ SETUP_FOLDER = "Setup"
 POWERBI_FOLDER = "Reporting"
 PIPELINES_FOLDER = "Pipelines"
 ML_FOLDER = "ML"
+DATA_AGENTS_FOLDER = "Data Agents"
 
 # MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
 # them as MLExperiment shell items so they exist (and are organized under the "ML"
@@ -118,12 +138,12 @@ def stage_notebook(
     notebook = json.loads(source_path.read_text(encoding="utf-8"))
     metadata = notebook.setdefault("metadata", {})
     dependencies = metadata.setdefault("dependencies", {})
-    lakehouse_id_ref = f"$items.Lakehouse.{lakehouse_name}.$id"
+    lakehouse_logical_id = _logical_id("Lakehouse", lakehouse_name)
     dependencies["lakehouse"] = {
-        "default_lakehouse": lakehouse_id_ref,
+        "default_lakehouse": lakehouse_logical_id,
         "default_lakehouse_name": lakehouse_name,
-        "default_lakehouse_workspace_id": "$workspace.$id",
-        "known_lakehouses": [{"id": lakehouse_id_ref}],
+        "default_lakehouse_workspace_id": _CURRENT_WORKSPACE_ID,
+        "known_lakehouses": [{"id": lakehouse_logical_id}],
     }
     (item_dir / "notebook-content.ipynb").write_text(
         json.dumps(notebook, indent=1, ensure_ascii=False),
@@ -329,6 +349,35 @@ def stage_ml_experiments(output_dir: Path) -> list[Path]:
     return [stage_shell_item(output_dir, name, "MLExperiment") for name in ML_EXPERIMENTS]
 
 
+def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
+    """Stage ``fabric/data-agents/*.DataAgent`` item folders into the workspace output.
+
+    Each Data Agent is a complete fabric-cicd item folder (``.platform`` plus a
+    ``Files/Config`` definition). They publish into a "Data Agents" workspace
+    folder. The agents reference the semantic model / ontology and source
+    workspace by GUID in their datasource configs; those GUIDs are remapped to the
+    target workspace at publish time by generated ``parameter.yml`` rules (see
+    ``deploy.scripts.deploy_config.render_parameter_file``).
+
+    Returns an empty list when no Data Agent sources exist.
+    """
+
+    source_dir = repo_root / "fabric" / "data-agents"
+    if not source_dir.is_dir():
+        return []
+    staged: list[Path] = []
+    for item_dir in sorted(source_dir.glob("*.DataAgent"), key=lambda path: path.name):
+        if not (item_dir / ".platform").is_file():
+            continue
+        destination = output_dir / DATA_AGENTS_FOLDER / item_dir.name
+        if destination.exists():
+            shutil.rmtree(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(item_dir, destination)
+        staged.append(destination)
+    return staged
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -346,12 +395,13 @@ def build_workspace(
 
     staged_items: list[str] = []
     # Terraform provisions the Lakehouse, Eventhouse, and KQL Database. Only the
-    # Lakehouse is staged as a fabric-cicd shell item (it publishes cleanly and
-    # helps notebook `$items.Lakehouse` references resolve). Eventhouse and
-    # KQLDatabase are NOT staged: Fabric rejects a `.platform`-only definition
-    # update ("Definition parts cannot contain the .platform file only"), and
-    # Terraform already owns them.
-    staged_items.append(stage_shell_item(output_dir, "retail_lakehouse", "Lakehouse").name)
+    # Lakehouse is staged as a fabric-cicd shell item so its `.platform` logicalId
+    # exists in the deployment; notebook default-lakehouse bindings reference that
+    # same logicalId (see `_logical_id`) and fabric-cicd resolves it to the
+    # deployed lakehouse GUID. Eventhouse and KQLDatabase are NOT staged: Fabric
+    # rejects a `.platform`-only definition update ("Definition parts cannot
+    # contain the .platform file only"), and Terraform already owns them.
+    staged_items.append(stage_shell_item(output_dir, lakehouse_name, "Lakehouse").name)
 
     # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
     notebooks_dir = output_dir / NOTEBOOKS_FOLDER
@@ -409,6 +459,12 @@ def build_workspace(
         staged_items.extend(
             item.name for item in stage_ml_experiments(output_dir / ML_FOLDER)
         )
+    # Data Agents (Fabric copilots over the semantic model and ontology) publish
+    # into a "Data Agents" folder. Their datasource GUID references are remapped
+    # to the target workspace via generated parameter.yml rules.
+    staged_items.extend(
+        item.name for item in stage_data_agents(repo_root, output_dir)
+    )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
 
@@ -434,9 +490,7 @@ def _write_platform(item_dir: Path, item_type: str, display_name: str) -> None:
         "metadata": {"type": item_type, "displayName": display_name},
         "config": {
             "version": "2.0",
-            "logicalId": str(
-                uuid.uuid5(uuid.NAMESPACE_URL, f"retail-demo:{item_type}:{display_name}")
-            ),
+            "logicalId": _logical_id(item_type, display_name),
         },
     }
     (item_dir / ".platform").write_text(

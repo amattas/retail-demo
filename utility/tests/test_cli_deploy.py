@@ -4,11 +4,14 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import retail_setup.cli.main as cli
 from retail_setup.cli.main import (
     app,
     _deploy_plan,
     _validate_azure_cli_tenant,
     _RECREATE_WAIT_SECONDS,
+    _PIPELINE_TRIGGER_ATTEMPTS,
+    _run_setup_pipeline,
 )
 
 runner = CliRunner()
@@ -22,7 +25,7 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert calls == []
     out = result.output
     assert "generate_configs" in out and "terraform" in out
-    assert "build_artifacts" in out and "core setup ml" in out.replace("'", "")
+    assert "build_artifacts" in out and "core setup ml ontology reset" in out.replace("'", "")
     assert "deploy_items" in out and "apply_kql" in out and "validate_deployment" in out
 
 
@@ -31,6 +34,19 @@ def test_skip_terraform_drops_terraform_steps():
     flat = " ".join(" ".join(map(str, step.cmd)) for step in plan)
     assert "terraform" not in flat
     assert "generate_configs" in flat and "deploy_items" in flat
+
+
+def test_plan_builds_ontology_and_reset_notebook_groups():
+    plan = _deploy_plan("dev", skip_terraform=False)
+    build = next(s for s in plan if "build_artifacts" in " ".join(map(str, s.cmd)))
+    cmd = build.cmd
+    groups_idx = cmd.index("--notebook-groups")
+    lakehouse_idx = cmd.index("--lakehouse-name")
+    groups = cmd[groups_idx + 1 : lakehouse_idx]
+    # The deploy stages every notebook group needed to link the full task flow:
+    # ontology (30-create-ontology) and reset (99-reset-lakehouse) join the core
+    # pipeline, setup notebooks, and ML notebooks.
+    assert set(groups) == {"core", "setup", "ml", "ontology", "reset"}
 
 
 def test_plan_orders_steps_and_gates_apply():
@@ -146,6 +162,55 @@ def test_workspace_name_prefers_environment_overlay(tmp_path):
     from retail_setup.cli.main import _workspace_name
 
     assert _workspace_name(tmp_path, "dev") == "retail-demo-dev"
+
+
+def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys):
+    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
+    attempts = {"n": 0}
+
+    def fake_run(_cmd, cwd=None):
+        attempts["n"] += 1
+        # Fail the first trigger, succeed on the retry.
+        return SimpleNamespace(returncode=1 if attempts["n"] == 1 else 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    _run_setup_pipeline(Path("."), "dev")
+
+    out = capsys.readouterr().out
+    assert "can take a while" in out
+    assert attempts["n"] == 2  # retried once after the initial failure
+
+
+def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
+    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
+    runs = {"n": 0}
+
+    def fake_run(_cmd, cwd=None):
+        runs["n"] += 1
+        return SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    _run_setup_pipeline(Path("."), "dev")
+
+    captured = capsys.readouterr()
+    assert runs["n"] == _PIPELINE_TRIGGER_ATTEMPTS
+    assert "run 'setup-pipeline' manually" in captured.err
+
+
+def test_ontology_relink_hint_names_workspace_and_command(tmp_path, capsys):
+    cfg = tmp_path / "deploy" / "config"
+    (cfg / "environments").mkdir(parents=True)
+    (cfg / "deploy.yml").write_text("workspace:\n  name: retail-demo\n", encoding="utf-8")
+    (cfg / "environments" / "dev.yml").write_text(
+        "workspace:\n  name: retail-demo-dev\n", encoding="utf-8"
+    )
+    from retail_setup.cli.main import _print_ontology_relink_hint
+
+    _print_ontology_relink_hint(tmp_path, "dev")
+
+    out = capsys.readouterr().out
+    assert "RetailOntology_AutoGen" in out
+    assert "deploy.scripts.taskflow deploy --workspace retail-demo-dev" in out
 
 
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch):

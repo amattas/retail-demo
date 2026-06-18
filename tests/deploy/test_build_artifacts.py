@@ -29,12 +29,36 @@ def test_stage_notebook_creates_platform_and_notebook_content(tmp_path: Path) ->
         "displayName": "01-create-bronze-shortcuts",
     }
     notebook = json.loads((staged / "notebook-content.ipynb").read_text(encoding="utf-8"))
+    lakehouse_logical_id = build_artifacts._logical_id("Lakehouse", "retail_lakehouse")
     assert notebook["metadata"]["dependencies"]["lakehouse"] == {
-        "default_lakehouse": "$items.Lakehouse.retail_lakehouse.$id",
+        "default_lakehouse": lakehouse_logical_id,
         "default_lakehouse_name": "retail_lakehouse",
-        "default_lakehouse_workspace_id": "$workspace.$id",
-        "known_lakehouses": [{"id": "$items.Lakehouse.retail_lakehouse.$id"}],
+        "default_lakehouse_workspace_id": "00000000-0000-0000-0000-000000000000",
+        "known_lakehouses": [{"id": lakehouse_logical_id}],
     }
+
+
+def test_notebook_lakehouse_binding_matches_staged_lakehouse_logical_id(tmp_path: Path) -> None:
+    """The notebook's default-lakehouse id must equal the staged Lakehouse shell's
+    .platform logicalId so fabric-cicd resolves it to the deployed lakehouse GUID
+    (the $items.Lakehouse.<name>.$id token does NOT resolve in raw item content)."""
+
+    source = tmp_path / "fabric" / "lakehouse" / "01-create-bronze-shortcuts.ipynb"
+    _write_json(source, {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5})
+    output = tmp_path / "deploy" / "workspace"
+
+    lakehouse_dir = build_artifacts.stage_shell_item(output, "retail_lakehouse", "Lakehouse")
+    notebook_dir = build_artifacts.stage_notebook(source, output)
+
+    platform = json.loads((lakehouse_dir / ".platform").read_text(encoding="utf-8"))
+    notebook = json.loads((notebook_dir / "notebook-content.ipynb").read_text(encoding="utf-8"))
+    binding = notebook["metadata"]["dependencies"]["lakehouse"]
+
+    assert binding["default_lakehouse"] == platform["config"]["logicalId"]
+    assert binding["known_lakehouses"][0]["id"] == platform["config"]["logicalId"]
+    # No unresolved fabric-cicd tokens may leak into published notebook content.
+    assert "$workspace" not in json.dumps(notebook)
+    assert "$items" not in json.dumps(notebook)
 
 
 def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
@@ -173,6 +197,57 @@ def test_stage_ml_experiments_creates_shell_items(tmp_path: Path) -> None:
     platform = json.loads((item / ".platform").read_text(encoding="utf-8"))
     assert platform["metadata"]["type"] == "MLExperiment"
     assert platform["metadata"]["displayName"] == "demand_forecast"
+
+
+def test_stage_data_agents_copies_item_folders(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for agent in ("retail-semantic-model-agent", "retail-ontology-agent"):
+        agent_dir = repo / "fabric" / "data-agents" / f"{agent}.DataAgent"
+        _write_json(agent_dir / ".platform", {"metadata": {"type": "DataAgent"}})
+        _write_json(
+            agent_dir / "Files" / "Config" / "data_agent.json", {"schema": "x"}
+        )
+
+    output = tmp_path / "workspace"
+    staged = build_artifacts.stage_data_agents(repo, output)
+
+    names = sorted(p.name for p in staged)
+    assert names == ["retail-ontology-agent.DataAgent", "retail-semantic-model-agent.DataAgent"]
+    # The full item definition (not just .platform) is copied into the
+    # "Data Agents" workspace folder.
+    copied = output / "Data Agents" / "retail-semantic-model-agent.DataAgent"
+    assert (copied / ".platform").is_file()
+    assert (copied / "Files" / "Config" / "data_agent.json").is_file()
+
+
+def test_stage_data_agents_empty_without_source(tmp_path: Path) -> None:
+    assert build_artifacts.stage_data_agents(tmp_path / "repo", tmp_path / "ws") == []
+
+
+def test_build_workspace_stages_data_agents(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for notebook_name in build_artifacts.NOTEBOOK_GROUPS["core"]:
+        _write_json(
+            repo / "fabric" / "lakehouse" / notebook_name,
+            {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5},
+        )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.SemanticModel" / ".platform",
+        {"metadata": {"type": "SemanticModel"}},
+    )
+    _write_json(
+        repo / "fabric" / "powerbi" / "retail_model.Report" / ".platform",
+        {"metadata": {"type": "Report"}},
+    )
+    _write_json(
+        repo / "fabric" / "data-agents" / "retail-semantic-model-agent.DataAgent" / ".platform",
+        {"metadata": {"type": "DataAgent"}},
+    )
+
+    result = build_artifacts.build_workspace(repo, tmp_path / "ws", ["core"])
+
+    assert "retail-semantic-model-agent.DataAgent" in result.staged_items
+    assert (tmp_path / "ws" / "Data Agents" / "retail-semantic-model-agent.DataAgent").is_dir()
 
 
 def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path) -> None:

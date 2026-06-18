@@ -42,3 +42,8 @@ output "eventstream_id" {
   value       = var.eventstream_enabled ? fabric_eventstream.main[0].id : null
   description = "Retail Eventstream item ID when enabled."
 }
+
+output "spark_custom_pool_id" {
+  value       = var.spark_custom_pool_enabled ? fabric_spark_custom_pool.setup[0].id : null
+  description = "Custom Spark pool item ID when the custom pool is enabled."
+}

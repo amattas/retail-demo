@@ -1,63 +1,62 @@
-tenant_id: null
+tenant_id: 9d379b85-7b26-46a5-bbc8-2ce467f202b8
 subscription_id: null
-
 auth:
   mode: azure_cli
-
 workspace:
   name: retail-demo
   description: Microsoft Fabric retail demo workspace
   existing_id: null
   capacity_id: null
-  capacity_name: null
+  capacity_name: amattas
   skip_capacity_state_validation: false
   role_assignments: []
-
 lakehouse:
   name: retail_lakehouse
   enable_schemas: true
-
 eventhouse:
   name: retail_eventhouse
   minimum_consumption_units: null
   kql_database_name: retail_kql
   kql_scripts:
-    - 01-create-tables.kql
-    - 02-create-ingestion-mappings.kql
-    - 03-create-functions.kql
-    - 04-create-materialized-views.kql
-    - 06-ml-anomaly-detection.kql
-    - 07-pricing-approval-tables.kql
-
+  - 01-create-tables.kql
+  - 02-create-ingestion-mappings.kql
+  - 03-create-functions.kql
+  - 04-create-materialized-views.kql
+  - 06-ml-anomaly-detection.kql
+  - 07-pricing-approval-tables.kql
 eventstream:
   enabled: false
   name: retail_eventstream
   eventhub_connection_id: null
   eventhub_namespace: null
   eventhub_name: null
-  consumer_group: "$Default"
-
+  consumer_group: $Default
+spark:
+  use_custom_pool: false
+  custom_pool_name: retail_setup_pool
+  node_size: Medium
+  min_node_count: 1
+  max_node_count: 10
 notebooks:
   include:
-    - core
+  - core
   default_lakehouse_name: retail_lakehouse
-
 powerbi:
   semantic_model_name: retail_model
   report_name: retail_model
   semantic_model_connection_id: null
   refresh_after_deploy: false
-
 deployment:
   item_types_in_scope:
-    - Lakehouse
-    - Notebook
-    - SemanticModel
-    - Report
-    - KQLQueryset
-    - DataPipeline
-    - MLExperiment
+  - Lakehouse
+  - Notebook
+  - SemanticModel
+  - Report
+  - KQLQueryset
+  - DataPipeline
+  - MLExperiment
+  - DataAgent
   publish_skip: false
   unpublish_skip: true
-  orphan_exclude_regex: "^DO_NOT_DELETE_.*"
+  orphan_exclude_regex: ^DO_NOT_DELETE_.*
   feature_flags: []

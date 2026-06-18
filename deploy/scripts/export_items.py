@@ -36,13 +36,24 @@ _JSON_PART_NAMES = {".platform", ".schedules"}
 
 
 def build_session(credential: AzureCliCredential | None = None) -> requests.Session:
-    """Create an authenticated requests session for the Fabric REST API."""
+    """Create an authenticated requests session for the Fabric REST API.
+
+    Uses a generous credential process timeout and retries transient cold-``az``
+    token failures (the deploy's pipeline trigger runs this right after a long
+    Terraform/publish step, when the token cache may have lapsed).
+    """
 
     import requests
+    from azure.core.exceptions import ClientAuthenticationError
     from azure.identity import AzureCliCredential
 
-    credential = credential or AzureCliCredential()
-    token = credential.get_token(FABRIC_SCOPE).token
+    from deploy.scripts._retry import retry_call
+
+    credential = credential or AzureCliCredential(process_timeout=120)
+    token = retry_call(
+        lambda: credential.get_token(FABRIC_SCOPE).token,
+        retry_on=(ClientAuthenticationError,),
+    )
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {token}"
     return session

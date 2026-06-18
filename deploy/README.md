@@ -51,6 +51,16 @@ Use `--skip-terraform` only when the workspace/resources already exist:
 retail-setup deploy --env dev --skip-terraform
 ```
 
+After the items publish, the deploy offers to run the **setup pipeline**, which
+generates the historical data in Fabric (dimensions, then facts, then gold). That
+generation runs asynchronously in Fabric and **can take a while** — often several
+minutes to an hour or more depending on the configured months of history and store
+count. You can close the CLI and track progress in the Fabric workspace.
+
+Transient failures self-heal: cold `az` token calls and flaky Fabric/Power BI REST
+calls are retried with backoff (token acquisition for the KQL apply, task flow, and
+pipeline trigger), and the pipeline trigger itself is retried a few times.
+
 ## Manual script workflow
 
 Run from the repository root:
@@ -114,9 +124,34 @@ does not.
 - Data Pipelines in `fabric\pipelines\*.DataPipeline` deploy into a **Pipelines**
   folder; each pipeline is staged only when its notebooks are part of the deploy,
   and notebook references are remapped via generated `parameter.yml` rules.
+- The **setup pipeline** orchestrates the full one-time setup end to end:
+  `setup-01..04` (seed -> dimensions -> facts -> gold), then the **ML notebooks**
+  (06-14), then `30-create-ontology`. The ontology reads gold *and* ML tables, so
+  it runs only after every ML notebook completes. (The ML notebooks are inlined as
+  activities rather than invoking the standalone `machine-learning` pipeline,
+  because Fabric's Invoke pipeline activity requires a connection object the deploy
+  can't yet provision; the notebooks themselves are shared items, and the
+  `machine-learning` pipeline still exists for manual/standalone runs.) The
+  ontology is a one-time **setup** step; there is no scheduled ontology refresh
+  after incremental loads.
+- Data Agents in `fabric\data-agents\*.DataAgent` deploy into a **Data Agents**
+  folder (item type `DataAgent`, which must be in `item_types_in_scope`). Their
+  datasource configs reference the source workspace and the semantic model by
+  GUID; generated `parameter.yml` rules remap those to the target workspace and
+  the deployed `SemanticModel`. The ontology agent also references the ontology,
+  which is created when the setup pipeline runs `30-create-ontology`; the agent
+  binds to its ontology after that pipeline run completes.
+- The `retail-setup deploy` plan stages the `core`, `setup`, `ml`, `ontology`, and
+  `reset` notebook groups, so `30-create-ontology` and `99-reset-lakehouse` are
+  deployed alongside the core pipeline and ML notebooks. `99-reset-lakehouse` is
+  **not** orchestrated (it destroys lakehouse contents) — run it manually only.
 - Dashboard assets remain source inputs until their Fabric source-control item
   formats are validated. Task flows are deployed separately by
-  `deploy.scripts.taskflow` (offered as a prompt at the end of deploy).
+  `deploy.scripts.taskflow` (offered as a prompt at the end of deploy). The task
+  flow links items by display name, so a node binds once its item exists in the
+  workspace. The ontology node (`RetailOntology_AutoGen`) and ontology agent link
+  after the setup pipeline has run (it creates the ontology) and the task flow is
+  re-deployed.
 - Secrets must come from Azure login, GitHub Actions secrets, environment
   variables, Key Vault, or ignored local files. Do not commit secrets to YAML,
   Terraform files, notebooks, or generated artifacts.
@@ -130,3 +165,5 @@ does not.
 | `fabric_cicd` import error | Install `fabric-cicd` in the active Python environment. |
 | Authentication failure | Run `az account show --query "{tenantId:tenantId,user:user.name,name:name}" -o table` and confirm it matches deploy config. Run `az login --tenant <tenant-id>` for `azure_cli`, or `Connect-AzAccount -Tenant <tenant-id>` for `azure_powershell`. |
 | KQL tables missing | Run the generated `database.kql` script manually in the target KQL database. |
+| `az` token timeout / cold-start hang | A cold `az account get-access-token` can take ~90s; the deploy uses a 120s credential timeout and retries transient auth failures. Warming `az` first (`az account get-access-token --resource https://api.fabric.microsoft.com -o none`) avoids the delay. |
+| Setup pipeline not triggered | The CLI retries the trigger a few times, then prints a fallback. Open the workspace in Fabric and run `setup-pipeline` manually. |
