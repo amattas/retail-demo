@@ -2,7 +2,7 @@
 description: Run tests with coverage analysis
 ---
 ```bash
-cd /home/user/retail-demo/datagen && python -m pytest $ARGUMENTS -v --tb=short 2>&1 | head -150
+cd /home/user/retail-demo/utility && python -m pytest $ARGUMENTS -v --tb=short 2>&1 | head -150
 ```
 
 Analyze the test output:

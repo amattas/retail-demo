@@ -2,7 +2,7 @@
 description: Run ruff and mypy on the codebase
 ---
 ```bash
-cd /home/user/retail-demo/datagen && echo "=== Ruff Check ===" && ruff check src/ tests/ 2>&1 | tail -50 && echo -e "\n=== Mypy Check ===" && mypy src/ 2>&1 | tail -50
+cd /home/user/retail-demo/utility && echo "=== Ruff Check ===" && ruff check src/ tests/ 2>&1 | tail -50 && echo -e "\n=== Mypy Check ===" && mypy src/ 2>&1 | tail -50
 ```
 
 Analyze the output:

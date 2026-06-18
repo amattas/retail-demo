@@ -19,8 +19,8 @@ Tasks:
 
 **CRITICAL for PySpark Transforms:**
 Before implementing any transform that maps event data:
-1. Read the source event schema from `datagen/src/retail_datagen/streaming/schemas.py`
-2. Identify the exact Pydantic model for the event type (e.g., `ReorderTriggeredPayload`)
+1. Read the source event payloads from `utility/notebooks/templates/driver-05-stream.py` (and the Lakehouse contract in `utility/src/retail_setup/generation/schemas.py`)
+2. Identify the exact payload for the event type (e.g., `reorder_triggered`)
 3. Verify all field names and types match the source schema exactly
 4. Cross-reference with target table schema (KQL or Lakehouse)
 5. Do NOT guess field names - always validate against the authoritative source

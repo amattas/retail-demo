@@ -18,6 +18,13 @@
 # optional **live driver**, not part of the ordered batch setup. Stop the streaming
 # query to stop generating.
 #
+# Low latency: each Kusto write sets `flushImmediately` so events are queryable in
+# seconds instead of waiting for the table IngestionBatching policy (30s-2min), and
+# the per-table writes run concurrently so a micro-batch keeps up with the trigger.
+# If a table looks empty or rows seem dropped, run `.show ingestion failures` in the
+# KQL database — rows that fail schema/type validation are reported there, not lost
+# silently.
+#
 # This notebook is self-contained (no engine cell); it reuses the same
 # deterministic-hash and event-envelope conventions as the batch engine.
 
@@ -458,6 +465,7 @@ events = (b.select(F.explode(events_arr).alias("e"))
 # (`fabric/kql_database/02-create-ingestion-mappings.kql`) exactly: the envelope
 # fields are shared, and each event type contributes its `$.payload.*` fields. The
 # one rename is `inventory_updated.payload_source` <- `$.payload.source`.
+import json  # noqa: E402
 from pyspark.sql.types import (  # noqa: E402
     ArrayType, IntegerType, LongType, DoubleType, StringType, StructField, StructType)
 
@@ -502,6 +510,16 @@ EVENT_PAYLOADS = {
 }
 
 KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
+# flushImmediately tells the Kusto data-management service to flush each ingestion
+# right away instead of aggregating per the table IngestionBatching policy
+# (30s-2min). At this demo's low volume that cuts end-to-end latency from minutes
+# to seconds — the dominant cause of the live feed looking "exceptionally slow".
+# (Trade-off: more, smaller extents, acceptable for a demo.)
+_INGESTION_PROPERTIES = json.dumps({"flushImmediately": True})
+# The per-event_type writes each target a different table, so run them concurrently
+# to overlap the blob-stage + ingest round-trips; sequential writes serialize ~18
+# blocking calls per micro-batch and fall behind the trigger.
+_WRITE_PARALLELISM = 8
 
 
 def _from_json_schema(event_type):
@@ -530,27 +548,60 @@ def _kusto_columns(event_type):
     return cols
 
 
-def write_to_eventhouse(batch_df, _batch_id):
-    """foreachBatch sink: split by event_type and write each to its KQL table."""
+def _write_event_table(batch_df, event_type, token):
+    """Map one event_type subset to its KQL columns and append it to its table."""
+    mapped = (batch_df.where(F.col("event_type") == event_type)
+              .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
+              .select("e.*")
+              .select(*_kusto_columns(event_type)))
+    (mapped.write.format(KUSTO_FORMAT)
+        .option("kustoCluster", kusto_uri)
+        .option("kustoDatabase", kql_database)
+        .option("kustoTable", event_type)
+        .option("accessToken", token)
+        .option("tableCreateOptions", "FailIfNotExist")
+        .option("sparkIngestionProperties", _INGESTION_PROPERTIES)
+        .mode("Append").save())
+
+
+def write_to_eventhouse(batch_df, batch_id):
+    """foreachBatch sink: split by event_type and write each to its KQL table.
+
+    Each event_type targets a different table, so the writes run concurrently in a
+    bounded thread pool — this overlaps the blob-stage + ingest round-trips so a
+    micro-batch finishes inside the trigger window instead of serializing ~18
+    blocking calls (the old behaviour fell behind and looked "exceptionally slow").
+    Per-table failures are caught and logged instead of failing the whole batch;
+    run `.show ingestion failures` in the KQL database to see dropped rows.
+    """
+    import concurrent.futures as cf
+
     batch_df = batch_df.persist()
     try:
-        present = [r["event_type"] for r in batch_df.select("event_type").distinct().collect()]
+        seen = [r["event_type"] for r in batch_df.select("event_type").distinct().collect()]
+        present = [et for et in seen if et in EVENT_PAYLOADS]
+        unmapped = [et for et in seen if et not in EVENT_PAYLOADS]
+        if unmapped:
+            print(f"  skipping unmapped event_types: {unmapped}")
+        if not present:
+            return
         token = notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
-        for event_type in present:
-            if event_type not in EVENT_PAYLOADS:
-                print(f"  skipping unmapped event_type {event_type!r}")
-                continue
-            mapped = (batch_df.where(F.col("event_type") == event_type)
-                      .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
-                      .select("e.*")
-                      .select(*_kusto_columns(event_type)))
-            (mapped.write.format(KUSTO_FORMAT)
-                .option("kustoCluster", kusto_uri)
-                .option("kustoDatabase", kql_database)
-                .option("kustoTable", event_type)
-                .option("accessToken", token)
-                .option("tableCreateOptions", "FailIfNotExist")
-                .mode("Append").save())
+
+        def _task(event_type):
+            try:
+                _write_event_table(batch_df, event_type, token)
+                return (event_type, None)
+            except Exception as exc:  # noqa: BLE001 - surface per-table, don't fail the batch
+                return (event_type, exc)
+
+        with cf.ThreadPoolExecutor(max_workers=min(_WRITE_PARALLELISM, len(present))) as pool:
+            results = list(pool.map(_task, present))
+
+        failed = [(et, err) for et, err in results if err is not None]
+        print(f"batch {batch_id}: wrote {len(results) - len(failed)}/{len(results)} event tables"
+              + ("" if not failed else
+                 "; FAILED: " + ", ".join(f"{et} ({type(err).__name__}: {err})"
+                                          for et, err in failed)))
     finally:
         batch_df.unpersist()
 

@@ -24,7 +24,7 @@ Tasks:
    - Clarify naming and structure
 4. Run tests to verify behavior is unchanged:
    ```bash
-   cd /home/user/retail-demo/datagen && python -m pytest -q --tb=short
+   cd /home/user/retail-demo/utility && python -m pytest -q --tb=short
    ```
 
 Output:

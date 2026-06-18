@@ -340,7 +340,7 @@ For full human-in-the-loop workflow, build a custom Power App or Fabric app that
 3. Publishes `pricing_recommendation_approved` or `pricing_recommendation_rejected` events
 4. Updates `pricing_recommendation_created.status` (via KQL update policy or separate state table)
 
-**Note:** For Phase 3 MVP, approvals can be simulated via direct KQL inserts or Event Hubs test events.
+**Note:** For Phase 3 MVP, approvals can be simulated via direct KQL inserts or test events from the `stream-events` notebook.
 
 ## Data Flow
 
@@ -436,8 +436,8 @@ To test the dashboard before full integration:
 
 - **Phase 1 Notebook:** `fabric/lakehouse/14-ml-dynamic-pricing.ipynb`
 - **Dashboard Template:** `fabric/dashboards/pricing-approval.template.json`
-- **KQL Tables Script:** (To be created in `fabric/kql_database/07-pricing-approval-tables.kql`)
-- **Event Schemas:** (To be added to `datagen/src/retail_datagen/streaming/schemas.py`)
+- **KQL Tables Script:** `fabric/kql_database/07-pricing-approval-tables.kql`
+- **Event Schemas:** `utility/notebooks/templates/driver-05-stream.py`
 
 ## References
 

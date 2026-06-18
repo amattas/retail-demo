@@ -16,6 +16,6 @@ Review KQL files for:
 1. **Script wrapper**: All scripts should use `.execute database script <| ... ` for batch execution
 2. **Table naming**: Event tables should use snake_case (e.g., `receipt_created`, not `ReceiptCreated`)
 3. **Materialized view naming**: Should be unique and descriptive
-4. **Column consistency**: Check that column names match schema definitions in `datagen/src/retail_datagen/streaming/schemas.py`
+4. **Column consistency**: Check that column names match schema definitions in `utility/notebooks/templates/driver-05-stream.py`
 
 Report any inconsistencies found.

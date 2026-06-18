@@ -59,6 +59,12 @@
           "artifactType": "KustoDatabase",
           "artifactObjectId": "bc856a99-066c-4865-993a-7d188fbca851",
           "artifactName": "retail_eventhouse"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:58150da8-1265-4d24-930b-41195745f7d9",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "stream-events"
         }
       ],
       "loc": "-220 120"
@@ -301,6 +307,12 @@
           "artifactType": "Ontology",
           "artifactObjectId": null,
           "artifactName": "RetailOntology_AutoGen"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:c252d353-6199-4028-bbda-41efa03736a4",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "30-create-ontology"
         }
       ],
       "loc": "800 -60"
