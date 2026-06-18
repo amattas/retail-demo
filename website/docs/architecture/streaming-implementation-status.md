@@ -6,7 +6,7 @@ This document tracks which fact tables have streaming integration implemented in
 
 ## Current Status: All Event Types Integrated
 
-All 18 streaming event types defined in `datagen/src/retail_datagen/streaming/schemas.py` are processed into Silver by `03-streaming-to-silver.ipynb`.
+All 18 streaming event types defined in `utility/notebooks/templates/driver-05-stream.py` are processed into Silver by `03-streaming-to-silver.ipynb`.
 
 | Status | Count |
 |--------|-------|
@@ -14,9 +14,9 @@ All 18 streaming event types defined in `datagen/src/retail_datagen/streaming/sc
 | Batch-only fact tables (no streaming equivalent by design) | 2 (`fact_truck_inventory`, `fact_promo_lines`) |
 
 :::note Deployment-pending item
-Per `STATUS.md`, the remaining manual deployment task is publishing the Power BI semantic model (`fabric/powerbi/retail_model.pbip`).
+The remaining manual deployment task is publishing the Power BI semantic model (`fabric/powerbi/retail_model.pbip`).
 
-For live data, run `stream-events.ipynb` with `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"`. Until that notebook writes events to Eventhouse, the Silver streaming path processes zero rows.
+For live data, run `stream-events.ipynb` with `sink = "eventhouse"` and `kql_database = "retail_eventhouse"` (leave `kusto_uri` blank to auto-resolve). It writes events directly to Eventhouse via the Spark Kusto connector; the Silver streaming path then processes rows on each `03`/`04` run.
 :::
 
 ---

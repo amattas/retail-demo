@@ -11,7 +11,7 @@ Synthetic retail datasets for analytics POCs with a unified Local Data UI, histo
 
 ## Quick Start
 
-- Launch the app from the `datagen/` directory: `./launch.sh`, then open http://localhost:8000
+- Launch the app from the `datagen-deprecated/` directory: `./launch.sh`, then open http://localhost:8000
   - Or run directly: `python -m uvicorn retail_datagen.main:app --app-dir src --host 0.0.0.0 --port 8000 --reload`
 - Interactive API docs: http://localhost:8000/docs (Swagger) and http://localhost:8000/redoc
 - Tabs:

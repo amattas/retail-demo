@@ -2,7 +2,7 @@
 description: Run full verification suite (lint + type check + tests)
 ---
 ```bash
-cd /home/user/retail-demo/datagen && \
+cd /home/user/retail-demo/utility && \
   echo "=== Ruff Check ===" && \
   ruff check src/ tests/ && \
   echo -e "\n=== Mypy Check ===" && \

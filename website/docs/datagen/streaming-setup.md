@@ -27,7 +27,7 @@ pip install -e .
 
 ### 2. Verify Installation
 
-Start the FastAPI server from the `datagen/` directory:
+Start the FastAPI server from the `datagen-deprecated/` directory:
 
 ```bash
 ./launch.sh

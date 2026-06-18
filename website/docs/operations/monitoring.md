@@ -71,7 +71,7 @@ spark.table(WATERMARK_TABLE).show(truncate=False)
 ```
 
 **Warning Signs:**
-- ⚠️ 0 events processed while datagen is streaming → Check `stream-events` Eventhouse writes and `cusn` shortcuts
+- ⚠️ 0 events processed while `stream-events` is streaming → Check `stream-events` Eventhouse writes and `cusn` shortcuts
 - ⚠️ Watermarks not advancing → Events not arriving or notebook failing mid-run
 - ⚠️ Execution time > 15 minutes → Check data volume or optimize queries
 

@@ -13,7 +13,7 @@ Use the following format:
 
 Examples:
 - `feat(kql): add materialized views for sales KPIs`
-- `fix(datagen): handle null payloads in streaming`
+- `fix(utility): handle null payloads in streaming`
 - `chore(notebooks): update Silver to Gold transforms`
 
 ## Types
