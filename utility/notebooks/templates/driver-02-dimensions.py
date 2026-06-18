@@ -7,6 +7,33 @@
 # the package sources under `utility/src/retail_setup/`, never the cell.
 
 # %%
+# Fabric's Spark runtime ships an OLD typing_extensions and no pydantic, while the
+# inlined engine below imports pydantic. Install both on the driver, then make the
+# new typing_extensions actually load. Why each step:
+#  - subprocess pip (not %pip): a %pip kernel restart tears down the Spark session
+#    mid pipeline run and fails the activity.
+#  - pin pydantic <2.12: 2.12+ imports typing_extensions.Sentinel.
+#  - drop the stale modules from sys.modules: the runtime already imported the old
+#    typing_extensions, so the freshly installed copy is shadowed; evicting it lets
+#    the engine cell re-import the upgraded versions (pydantic needs symbols such
+#    as TypeIs that the runtime's typing_extensions lacks).
+#  - pydantic runs only on the driver (engine builds rows, then
+#    spark.createDataFrame), so a driver-side install is sufficient.
+import importlib
+import subprocess
+import sys
+
+subprocess.check_call([
+    sys.executable, "-m", "pip", "install", "--quiet",
+    "typing_extensions>=4.12.2", "pydantic>=2,<2.12",
+])
+for _name in [m for m in list(sys.modules)
+              if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
+                                        "pydantic", "pydantic_core"}]:
+    del sys.modules[_name]
+importlib.invalidate_caches()
+
+# %%
 # PARAMETERS — rendered by `retail-setup render`; defaults work unrendered
 def _param(value: str, default: str) -> str:
     return default if len(value) > 1 and value[0] == value[1] == "{" else value
@@ -22,6 +49,11 @@ SEED = int(_param("{{SEED}}", "42"))
 DICTIONARY_REF = _param("{{DICTIONARY_REF}}", "main")
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")  # engine timestamps depend on it
+# Reorder seeded-draw math ((xxhash64(...)/1e12)*k -> (xxhash64(...)*k)/1e12) to
+# cut rounding-error propagation and silence Fabric's Spark advisor. The rewrite
+# shifts draws by <=1 ULP (generation is statistical, no exact-value contracts);
+# set in every engine driver so dims and facts stay mutually consistent.
+spark.conf.set("spark.advise.divisionExprConvertRule.enable", "true")
 
 # %% [engine]
 
@@ -52,4 +84,7 @@ dims["dim_date"] = generate_dim_date(
 spark.sql(f"CREATE DATABASE IF NOT EXISTS {LAKEHOUSE_NAME}.{SILVER_DB}")
 for name, df in dims.items():
     write_to_lakehouse(df, LAKEHOUSE_NAME, SILVER_DB, name)
-    print(f"wrote {LAKEHOUSE_NAME}.{SILVER_DB}.{name}: {df.count():,} rows")
+    # Count the written table, not df: df.count() would recompute the dimension
+    # generation; the persisted Delta table answers count() from metadata.
+    n = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{name}").count()
+    print(f"wrote {LAKEHOUSE_NAME}.{SILVER_DB}.{name}: {n:,} rows")

@@ -1,6 +1,6 @@
 # Streaming API Reference
 
-Complete REST API reference for real-time event streaming endpoints.
+Complete REST API reference for the deprecated local generator's legacy streaming endpoints. The current Fabric live path is `stream-events.ipynb` writing directly to Eventhouse; see [Phase 6](../setup/06-streaming.md).
 
 ## Base URL
 
@@ -18,7 +18,7 @@ Currently no authentication required for local development. For production deplo
 
 ### Start Streaming
 
-Start real-time event streaming to Azure Event Hub.
+Start legacy real-time event streaming to the configured target.
 
 ```http
 POST /stream/start
@@ -375,7 +375,7 @@ PUT /stream/config
 **Parameters (all optional):**
 - `emit_interval_ms` (integer): Time between bursts
 - `burst` (integer): Events per burst
-- `azure_connection_string` (string): Event Hub connection string
+- `azure_connection_string` (string): Legacy Event Hub connection string
 - `max_batch_size` (integer): Max events per batch
 - `batch_timeout_ms` (integer): Batch timeout
 
@@ -407,7 +407,7 @@ curl -X PUT http://localhost:8000/api/stream/config \
 
 ### Test Azure Connection
 
-Test connection to Azure Event Hub.
+Test the legacy streaming connection.
 
 ```http
 POST /stream/test
@@ -450,7 +450,7 @@ curl -X POST http://localhost:8000/api/stream/test
 
 ### Validate Connection String
 
-Validate the format of a connection string without opening a connection. Detects Fabric RTI Eventstream endpoints and returns sanitized metadata (never the key itself).
+Validate the format of a legacy connection string without opening a connection; returns sanitized metadata (never the key itself).
 
 ```http
 POST /stream/validate-connection
@@ -704,7 +704,7 @@ GET /stream/outbox/preview?status_filter=pending&limit=100
 
 ### Drain Outbox
 
-Drain all pending outbox events to Event Hub with pacing.
+Drain all pending outbox events to the legacy streaming target with pacing.
 
 ```http
 POST /stream/outbox/drain
@@ -941,7 +941,7 @@ All events use a standard envelope format for consistency and traceability.
 - `schema_version` (string): Event schema version (default: "1.0")
 - `source` (string): Source system (default: "retail-datagen")
 - `correlation_id` (string, optional): Links related events
-- `partition_key` (string, optional): Event Hub partition key
+- `partition_key` (string, optional): Partition key for the legacy streaming target
 
 ---
 

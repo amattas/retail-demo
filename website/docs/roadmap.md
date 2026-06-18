@@ -17,29 +17,29 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 **Acceptance Criteria**:
 - All documentation structure in place
 - Data generator produces realistic synthetic data
-- Streaming to Azure Event Hubs functional
+- Streaming notebook writes directly to Eventhouse/KQL tables
 
 ---
 
-## Phase 2 — Ingestion ✅ COMPLETE (Eventstream wiring is a manual deployment step)
+## Phase 2 — Ingestion ✅ COMPLETE
 
 **Deliverables**:
 - [x] Deploy Fabric workspace and Real-Time Intelligence capacity
 - [x] Define KQL database tables, one per event type (`fabric/kql_database/01-create-tables.kql`)
 - [x] Create ingestion mappings, JSON → KQL columns (`02-create-ingestion-mappings.kql`)
 - [x] Lakehouse Bronze shortcuts to Eventhouse tables and ADLS parquet (`01-create-bronze-shortcuts.ipynb`)
-- [ ] Create Eventstream resource and connect to Azure Event Hubs (`retail-events`) — *manual step per workspace*
-- [ ] Validate end-to-end ingestion with data generator — *requires Eventstream*
+- [x] Implement direct Eventhouse writes from `stream-events.ipynb` via the Fabric Spark connector for Kusto
+- [ ] Validate end-to-end ingestion with `stream-events.ipynb` in a Fabric workspace
 
 **Acceptance Criteria**:
-- Events flowing from generator → Event Hubs → Fabric in <5 seconds
+- Events flowing from `stream-events` → Eventhouse/KQL in <5 seconds
 - KQL tables populated with correct schema and data types
-- Bronze layer receiving raw JSON partitioned by event_type and date
+- Bronze layer receiving Eventhouse table shortcuts for each event type
 - Zero data loss during 24-hour continuous streaming test
 
 **Dependencies**:
-- Azure Event Hubs namespace provisioned
 - Fabric workspace with RTI capacity (F64 or higher recommended)
+- Eventhouse default KQL database `retail_eventhouse`
 
 ---
 
@@ -162,7 +162,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 | Phase | Status | Key Milestone |
 |-------|--------|---------------|
 | Phase 1 | ✅ Complete | Scaffolding & Data Generator |
-| Phase 2 | ✅ Complete (Eventstream wiring manual) | Ingestion (Event Hubs → Fabric) |
+| Phase 2 | ✅ Complete | Ingestion (stream-events → Eventhouse/KQL) |
 | Phase 3 | ✅ Complete (dashboard publishing manual) | Analytics (Dashboards & Querysets) |
 | Phase 4 | ✅ Complete (semantic model publishing manual) | Medallion & Semantic Model |
 | Phase 5 | 🔨 In progress | AI, Alerts & Advanced Features |
@@ -197,7 +197,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 | Risk | Mitigation Strategy |
 |------|---------------------|
 | Fabric capacity constraints | Start with F64, scale to F128 if needed |
-| Event Hub throttling | Use partitioning, monitor metrics, request quota increase |
+| Streaming throughput | Tune `source_rows_per_second`, Spark resources, and Eventhouse capacity |
 | ML model accuracy | Start with simple baselines, iterate with domain experts |
 | Copilot limited availability | Have fallback demo flow without Copilot, prioritize Phase 5 |
 | Timeline slippage | Phase 2-3 are MVP, Phase 4-5 can flex based on feedback |
@@ -219,5 +219,5 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 
 ---
 
-**Next Action**: Complete the manual deployment steps (Eventstream route configuration and semantic model publishing), then continue Phase 5 alerting and Copilot work.
+**Next Action**: Complete semantic model publishing, validate `stream-events` direct Eventhouse ingestion in the workspace, then continue Phase 5 alerting and Copilot work.
 

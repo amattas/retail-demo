@@ -1,6 +1,6 @@
 # Configuration Guide
 
-Complete reference for configuring the retail data generator.
+Complete reference for configuring the legacy retail data generator. For the current Fabric setup workflow, see [Configuration Reference](../setup/configuration.md).
 
 ## Configuration File
 
@@ -18,7 +18,7 @@ Sensitive values should use environment variables instead of config file:
 
 | Variable | Purpose |
 |----------|---------|
-| `AZURE_EVENTHUB_CONNECTION_STRING` | Event Hub connection string |
+| `AZURE_EVENTHUB_CONNECTION_STRING` | Legacy Event Hub connection string |
 | `AZURE_STORAGE_ACCOUNT_URI` | Storage account URI |
 | `AZURE_STORAGE_ACCOUNT_KEY` | Storage account key |
 | `RETAIL_DATAGEN_TEST_MODE` | Set to `true` for test mode |
@@ -109,7 +109,7 @@ Controls data generation scale and volume.
 
 ### realtime (required)
 
-Controls streaming to Azure Event Hub.
+Controls legacy streaming to Azure Event Hub.
 
 ```json
 {
@@ -135,7 +135,7 @@ Controls streaming to Azure Event Hub.
 |-------|------|---------|-------------|
 | `emit_interval_ms` | int | required | Ms between event bursts |
 | `burst` | int | required | Events per burst |
-| `azure_connection_string` | string | "" | Event Hub connection (prefer env var) |
+| `azure_connection_string` | string | "" | Legacy Event Hub connection (prefer env var) |
 | `max_batch_size` | int | 256 | Max events per batch |
 | `batch_timeout_ms` | int | 1,000 | Batch timeout in ms |
 | `retry_attempts` | int | 3 | Retry attempts on failure |
@@ -173,7 +173,7 @@ File system paths for data files.
 
 ### stream (required)
 
-Event Hub name configuration.
+Legacy Event Hub name configuration.
 
 ```json
 {
@@ -185,7 +185,7 @@ Event Hub name configuration.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `hub` | string | Event Hub name |
+| `hub` | string | Legacy Event Hub name |
 
 ---
 
@@ -387,19 +387,13 @@ Per-channel cost ranges exist for nine channels (email, display, social, search,
 
 ## Connection String Format
 
-Azure Event Hub connection strings follow this format:
+Legacy Azure Event Hub connection strings follow this format:
 
 ```
 Endpoint=sb://<namespace>.servicebus.windows.net/;SharedAccessKeyName=<name>;SharedAccessKey=<key>;EntityPath=<hub>
 ```
 
-For Fabric Real-Time Intelligence (RTI) Eventstream custom endpoints:
-
-```
-Endpoint=sb://eventstream-<id>.servicebus.windows.net/;SharedAccessKeyName=<name>;SharedAccessKey=<key>;EntityPath=<stream>
-```
-
-The generator detects `eventstream-*` endpoints and applies Fabric-specific validation automatically.
+The current Fabric RTI live path does not use connection strings or custom endpoints. Use `stream-events.ipynb` with `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"` instead.
 
 ---
 

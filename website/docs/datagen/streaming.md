@@ -1,6 +1,6 @@
 # Real-Time Event Streaming System
 
-The retail data generator includes a comprehensive real-time event streaming system that generates and streams synthetic retail events to Azure Event Hub. This system simulates live retail operations with realistic patterns, correlations, and timing.
+The deprecated local retail data generator includes a real-time event streaming system. It is retained as legacy reference material; the current Fabric live path uses `stream-events.ipynb` to write directly to Eventhouse/KQL with the Fabric Spark connector for Kusto.
 
 ## 🚀 Quick Start
 
@@ -32,13 +32,13 @@ asyncio.run(stream_events())
 
 1. **EventStreamer** - Main orchestration engine
 2. **EventFactory** - Generates realistic retail events
-3. **AzureEventHubClient** - Azure integration with resilience
+3. **AzureEventHubClient** - legacy Azure integration with resilience
 4. **Event Schemas** - Type-safe event definitions
 
 ### Event Flow
 
 ```
-EventFactory → EventBuffer → BatchProcessor → AzureEventHub
+EventFactory → EventBuffer → BatchProcessor → Legacy streaming target
      ↓              ↓             ↓              ↓
   Statistics → DeadLetterQueue → CircuitBreaker → Monitoring
 ```
@@ -278,7 +278,7 @@ curl -X POST http://localhost:8000/api/stream/test
 **Connection Failures**
 - Verify Azure connection string
 - Check network connectivity
-- Validate Event Hub name
+- Validate legacy target name
 
 **High Memory Usage**
 - Reduce `max_buffer_size`
@@ -291,7 +291,7 @@ curl -X POST http://localhost:8000/api/stream/test
 - Optimize `max_batch_size`
 
 **Event Delivery Failures**
-- Check Azure Event Hub quotas
+- Check legacy target quotas
 - Verify authentication
 - Monitor circuit breaker state
 
@@ -316,7 +316,7 @@ logging.basicConfig(level=logging.DEBUG)
 - `connection_failures` - Azure connectivity issues
 
 ### Health Checks
-- Azure Event Hub connectivity
+- Legacy target connectivity
 - Circuit breaker state
 - Buffer utilization
 - Error rates
@@ -341,8 +341,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## 🎯 Production Deployment
 
-### Azure Event Hub Setup
-1. Create Event Hub namespace
+### Legacy Azure Event Hub Setup
+1. Create an Event Hub namespace for legacy testing, if needed
 2. Create retail-events hub
 3. Configure access policies
 4. Set up monitoring alerts
@@ -359,7 +359,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### Scaling Considerations
 - Multiple streamer instances
-- Event Hub partition strategy
+- Legacy target partition strategy
 - Load balancing across regions
 
 ## 📚 API Reference

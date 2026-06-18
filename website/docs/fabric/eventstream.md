@@ -1,22 +1,53 @@
-# Eventstream
+# Direct Eventhouse Streaming
 
-Fabric Eventstream that ingests retail events from Azure Event Hubs and routes them to the Eventhouse (KQL database).
+The Fabric Eventstream item has been removed. Live retail events are written directly from the `stream-events` notebook to the Eventhouse KQL database.
 
 :::note
-The Eventstream is configured directly in the Fabric portal — there is no exported definition in the repository. This page documents the expected configuration.
+This file keeps its original filename so existing documentation links continue to work. It now documents the direct Eventhouse write path, not a Fabric Eventstream resource.
 :::
+
+## Ingestion path
+
+```text
+stream-events notebook
+  -> Spark Structured Streaming foreachBatch
+  -> split micro-batch by event_type
+  -> Fabric Spark connector for Kusto
+  -> retail_eventhouse KQL event tables
+```
+
+The notebook template is `utility/notebooks/templates/driver-05-stream.py` and the generated/imported notebook is `utility/notebooks/stream-events.ipynb`.
+
+Inside `foreachBatch`, the notebook filters each micro-batch by `event_type` and appends each subset to its matching KQL table with the Fabric Spark connector for Kusto:
+
+```python
+format("com.microsoft.kusto.spark.synapse.datasource")
+```
+
+The connector options include `kustoCluster`, `kustoDatabase`, `kustoTable`, `accessToken`, and `tableCreateOptions=FailIfNotExist`; writes use append mode. The access token comes from `notebookutils.credentials.getToken(<query_uri>)`.
+
+Reference: [Use a notebook with Apache Spark to query a KQL database](https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector).
 
 ## Configuration
 
-- **Source**: Azure Event Hubs, hub `retail-events` (from datagen config)
-- **Envelope**: See `datagen/src/retail_datagen/streaming/schemas.py` (event envelope and payload models)
-- **Destination**: Eventhouse KQL database — one table per event type, using the `EventMapping` ingestion mappings from `fabric/kql_database/02-create-ingestion-mappings.kql`
-- **Routing**: Events are routed by `event_type`; unrecognized types land in the `unknown_event` catch-all table
-- **Partitioning**: Uses `partition_key` or derived keys (`store_id`, `dc_id`)
+- **Source**: Spark Structured Streaming rate source that generates synthetic retail events.
+- **Routing**: Events are routed by `event_type` inside `foreachBatch`; unrecognized types land in the `unknown_event` catch-all table.
+- **Destination**: The single Eventhouse KQL database, `retail_eventhouse`, with one table per event type.
+- **Lakehouse access**: Bronze streaming tables are OneLake shortcuts (`cusn` schema) that point at the Eventhouse tables (see [Lakehouse](./lakehouse.md)).
 
-The Lakehouse does **not** require a separate Eventstream sink: Bronze streaming tables are OneLake shortcuts (`cusn` schema) that point at the Eventhouse tables (see [Lakehouse](./lakehouse.md)).
+## Notebook parameters
 
-## Event Types Routed (18)
+| Parameter | Meaning |
+| --- | --- |
+| `source_rows_per_second` | Spark rate-source rows per second. |
+| `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
+| `run_seconds` | `0` runs forever; positive values stop after N seconds. |
+| `kusto_uri` | Leave blank to auto-resolve the Query URI from `kql_database` in this workspace; set it only to target a different cluster. |
+| `kql_database` | KQL database name; default is `retail_eventhouse`. |
+
+There are no Eventstream, Kafka, Event Hub, bootstrap-server, or Key Vault secret parameters for the live notebook.
+
+## Event Types Written (18)
 
 - **Transactions**: `receipt_created`, `receipt_line_added`, `payment_processed`
 - **Inventory**: `inventory_updated`, `stockout_detected`, `reorder_triggered`
@@ -27,10 +58,11 @@ The Lakehouse does **not** require a separate Eventstream sink: Bronze streaming
 
 ## Setup Steps
 
-1. Create the Eventstream resource in your Fabric workspace
-2. Add the Event Hubs source (SAS or Key Vault–backed connection)
-3. Add the Eventhouse destination and map each event type to its KQL table
-4. Verify ingestion mappings match `02-create-ingestion-mappings.kql`
-5. Confirm events arrive with `ingest_timestamp` populated and `unknown_event` stays empty
+1. Run the generated KQL database script so all destination tables already exist.
+2. Open `utility/notebooks/stream-events.ipynb` in Fabric and attach it to the Lakehouse.
+3. Leave `sink = "eventhouse"` and `kql_database = "retail_eventhouse"`; leave
+   `kusto_uri` blank to auto-resolve the Query URI, or set it to override.
+4. Start the notebook and confirm events arrive with `ingest_timestamp` populated.
+5. Enable OneLake availability and create `cusn` shortcuts if you want Lakehouse Silver/Gold processing.
 
 See [Phase 6: Streaming](../setup/06-streaming.md) for detailed setup instructions.

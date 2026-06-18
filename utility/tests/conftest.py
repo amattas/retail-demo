@@ -35,6 +35,12 @@ def spark():
         if _env_jdk.exists():
             os.environ["JAVA_HOME"] = str(_env_jdk)
 
+    # generate_all caches ~25 DataFrames to avoid recomputing the generation DAG;
+    # under the default ~1g local heap that starves the driver JVM (CI hit
+    # java.lang.OutOfMemoryError on .count()). _JAVA_OPTIONS wins over Spark's
+    # default -Xmx, so it reliably raises the local driver heap before launch.
+    os.environ.setdefault("_JAVA_OPTIONS", "-Xmx3g")
+
     session = (
         SparkSession.builder.master("local[2]")
         .appName("retail-setup-tests")

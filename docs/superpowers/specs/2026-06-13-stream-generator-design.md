@@ -197,9 +197,9 @@ Both use `checkpointLocation`. `run_seconds==0` → default (continuous) trigger
 - New cell-marker template `utility/notebooks/templates/driver-05-stream.py`
   (markdown + code cells, **no `# %% [engine]` cell** — the streaming logic is
   self-contained and does not need the batch engine concatenation).
-- Register `setup-05-stream-events` in `scripts/build_notebooks.py` (`TEMPLATE_FOR`) and
+- Register `stream-events` in `scripts/build_notebooks.py` (`TEMPLATE_FOR`) and
   exclude it from `needs_engine` (like `setup-01`).
-- `python scripts/build_notebooks.py` regenerates `utility/notebooks/setup-05-stream-events.ipynb`;
+- `python scripts/build_notebooks.py` regenerates `utility/notebooks/stream-events.ipynb`;
   `--check` (CI) keeps it in sync.
 - Render tokens reused: `{{LAKEHOUSE_NAME}}`, `{{STORE_TYPE}}`, `{{SEED}}`. No new
   secret tokens (EH connection is a runtime Key Vault secret).
@@ -237,6 +237,6 @@ Both use `checkpointLocation`. `run_seconds==0` → default (continuous) trigger
 2. **Scope:** all 18 event types via 6 scenario generators.
 3. **Runtime model:** `rate` source + pure-Catalyst transform (approach A), continuous
    with a bounded test mode.
-4. **Placement:** a `utility` template notebook (`setup-05-stream-events`) built via
+4. **Placement:** a `utility` template notebook (`stream-events`) built via
    `build_notebooks.py`, consistent with setup-01..04.
 5. **Envelope `source`:** defaults to `"retail-datagen"` for drop-in compatibility.

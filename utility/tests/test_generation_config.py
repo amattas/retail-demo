@@ -21,6 +21,53 @@ def test_end_before_start_rejected():
         GenerationConfig(start_date=date(2025, 3, 1), end_date=date(2025, 1, 1))
 
 
+def test_months_derives_window_ending_yesterday():
+    from datetime import timedelta
+
+    cfg = GenerationConfig(store_type="grocery", months=3)
+    yesterday = date.today() - timedelta(days=1)
+    assert cfg.end_date == yesterday
+    assert cfg.months == 3
+    assert cfg.start_date < cfg.end_date
+    # ~3 calendar months earlier (allow the trailing partial day from inclusivity)
+    assert 89 <= (cfg.end_date - cfg.start_date).days <= 93
+
+
+def test_months_required_when_dates_absent():
+    with pytest.raises(ValidationError, match="months"):
+        GenerationConfig(store_type="grocery")
+
+
+def test_explicit_dates_take_precedence_over_months():
+    cfg = GenerationConfig(
+        store_type="grocery",
+        months=6,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 31),
+    )
+    assert cfg.start_date == date(2025, 1, 1)
+    assert cfg.end_date == date(2025, 1, 31)
+
+
+def test_subtract_months_clamps_day():
+    from retail_setup.config.generation import _subtract_months
+
+    assert _subtract_months(date(2025, 3, 31), 1) == date(2025, 2, 28)
+    assert _subtract_months(date(2025, 1, 15), 1) == date(2024, 12, 15)
+    assert _subtract_months(date(2024, 3, 31), 1) == date(2024, 2, 29)  # leap year
+
+
+def test_yaml_round_trip_months(tmp_path: Path):
+    from datetime import timedelta
+
+    p = tmp_path / "config.yaml"
+    p.write_text("store_type: grocery\nmonths: 2\nstore_count: 10\nseed: 7\n")
+    cfg = load_generation_config(p)
+    assert cfg.months == 2
+    assert cfg.store_count == 10
+    assert cfg.end_date == date.today() - timedelta(days=1)
+
+
 def test_store_type_must_exist_on_disk():
     with pytest.raises(ValidationError, match="store_type"):
         GenerationConfig(
@@ -49,14 +96,33 @@ def test_scale_defaults_derive_from_store_count():
 
 def test_scale_overrides_respected():
     cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                           store_count=40, dc_count=2, customer_count=500,
+                           store_count=40, dc_count=2, customer_count=8000,
                            transactions_per_store_day=50)
-    assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 500, 50)
+    assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 8000, 50)
+
+
+def test_customer_count_floored_at_minimum():
+    from retail_setup.config.generation import MIN_CUSTOMER_COUNT
+
+    # Small store counts derive fewer than the minimum -> floored.
+    small = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                             store_count=1)
+    assert small.customer_count == MIN_CUSTOMER_COUNT  # 1 * 1000 -> floored
+    # An explicitly tiny override is lifted too, so the churn model can train.
+    explicit = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                                store_count=1, customer_count=10)
+    assert explicit.customer_count == MIN_CUSTOMER_COUNT
+    # The floor is a no-op once the derived value reaches it (store_count >= 5).
+    big = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
+                           store_count=50)
+    assert big.customer_count == 50_000
 
 
 def test_explicit_dictionary_root(tmp_path):
     # a fake root with one valid store type
-    import json, shutil
+    import json
+    import shutil
+
     from retail_setup.dictionaries.loader import default_dictionary_root
 
     src = default_dictionary_root()

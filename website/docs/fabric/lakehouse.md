@@ -26,7 +26,7 @@ Rendered by `retail-setup render` into `utility/out/`:
 | `setup-03-generate-facts.ipynb` | Once/on demand | Generates all Silver fact tables and `setup_run_log`. |
 | `setup-04-build-gold.ipynb` | After facts | Builds the 9 Gold aggregate tables. |
 
-`setup-05-stream-events.ipynb` is committed under `utility/notebooks/` and is
+`stream-events.ipynb` is committed under `utility/notebooks/` and is
 imported manually when live synthetic events are needed.
 
 ## Legacy/core notebooks in `fabric/lakehouse`

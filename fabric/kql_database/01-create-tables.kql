@@ -1,5 +1,6 @@
 // 01 Tables
-// Purpose: Create event tables for streaming ingestion from Eventstream
+// Purpose: Create event tables for streaming ingestion (written by the
+//          stream-events notebook via the Spark Kusto connector)
 // Run this entire script at once using .execute database script
 // ============================================================================
 //
@@ -462,7 +463,8 @@
 // STREAMING INGESTION POLICIES
 // ============================================================================
 // Enable streaming ingestion on all event tables to allow real-time data flow
-// from Eventstream. Without this, data would only arrive via batch ingestion.
+// from the stream-events notebook (Spark Kusto connector). Without this, data
+// would only arrive via batch ingestion.
 // ============================================================================
 
 // --- TRANSACTION EVENTS ---
@@ -718,7 +720,7 @@
 // .show table * policy ingestionbatching
 // | project TableName, MaximumBatchingTimeSpan, MaximumNumberOfItems
 //
-// -- Verify Eventstream connection is working:
+// -- Verify streaming ingestion is working:
 // receipt_created
 // | where ingest_timestamp > ago(5m)
 // | count

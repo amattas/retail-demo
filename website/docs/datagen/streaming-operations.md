@@ -1,6 +1,6 @@
 # Streaming Operations Guide
 
-Comprehensive guide for monitoring, troubleshooting, and operating real-time event streaming in production.
+Legacy guide for monitoring, troubleshooting, and operating the deprecated local generator's streaming mode. The current Fabric live path writes directly from `stream-events.ipynb` to Eventhouse/KQL.
 
 ## Table of Contents
 
@@ -174,7 +174,7 @@ curl http://localhost:8000/api/stream/statistics | jq '.circuit_breaker_trips'
 curl http://localhost:8000/api/stream/statistics | jq '.connection_failures'
 ```
 
-### Azure Event Hub Metrics
+### Legacy Target Metrics
 
 Monitor these in Azure Portal:
 
@@ -254,7 +254,7 @@ readinessProbe:
 **Symptoms:**
 - High `connection_failures` count
 - Circuit breaker opens immediately
-- Events not reaching Azure Event Hub
+- Events not reaching the legacy streaming target
 
 **Diagnosis:**
 ```bash
@@ -309,11 +309,11 @@ curl http://localhost:8000/api/stream/dlq/summary | jq '.size'
 
 **Solutions:**
 
-1. **Azure Event Hub throttling:**
+1. **Legacy streaming target throttling:**
    - Check Azure metrics for throttled requests
    - Reduce `burst` size: `curl -X PUT http://localhost:8000/api/stream/config -d '{"burst": 50}'`
    - Increase `emit_interval_ms`: `curl -X PUT http://localhost:8000/api/stream/config -d '{"emit_interval_ms": 1000}'`
-   - Upgrade Event Hub tier (Standard → Premium)
+   - Upgrade the target streaming tier if applicable
 
 2. **Network congestion:**
    - Increase `batch_timeout_ms` to allow more time for sends
@@ -409,12 +409,12 @@ curl http://localhost:8000/api/stream/config | jq '.realtime.emit_interval_ms, .
 
 **Symptoms:**
 - `events_sent_successfully` shows high counts
-- Azure Event Hub shows no incoming messages
+- Legacy streaming target shows no incoming messages
 - No errors reported
 
 **Diagnosis:**
 ```bash
-# Verify Event Hub name
+# Verify legacy target name
 curl http://localhost:8000/api/stream/config | jq '.stream.hub'
 
 # Check recent events
@@ -423,13 +423,13 @@ curl http://localhost:8000/api/stream/events/recent?limit=5
 
 **Solutions:**
 
-1. **Verify Event Hub name matches:**
+1. **Verify legacy target name matches:**
    - Check `stream.hub` in config
-   - Verify Event Hub exists in Azure Portal
+   - Verify the target exists in Azure Portal
    - Check EntityPath in connection string
 
-2. **Check Azure Event Hub metrics:**
-   - Navigate to Azure Portal → Event Hub → Metrics
+2. **Check target metrics:**
+   - Navigate to the target's Azure Portal metrics
    - Look at "Incoming Messages" (should match events_sent)
    - Check "Throttled Requests" (should be 0)
 
@@ -588,9 +588,9 @@ Returns statistics about the retry operation (retried, succeeded, failed counts)
 
 **Throughput**: ~5000 events/sec
 
-**Warning**: High throughput may hit Event Hub throttling limits. Monitor Azure metrics.
+**Warning**: High throughput may hit target throttling limits. Monitor Azure metrics.
 
-### Azure Event Hub Limits
+### Legacy Target Limits
 
 **Standard Tier:**
 - Ingress: 1 MB/sec or 1000 events/sec
@@ -743,7 +743,7 @@ spec:
 **Multiple Instances:**
 - Not currently supported (stateful application)
 - Future: Shared state via Redis/Database
-- Event Hub partitioning required
+- Partitioning required
 
 ---
 
@@ -759,12 +759,12 @@ spec:
 2. **Monitor Continuously**
    - Set up alerts for key metrics
    - Check DLQ regularly for patterns
-   - Monitor Azure Event Hub metrics
+   - Monitor target metrics
 
 3. **Enable Circuit Breaker**
    - Prevents cascading failures
    - Allows automatic recovery
-   - Protects Azure Event Hub from overload
+   - Protects the target from overload
 
 4. **Use Dead Letter Queue**
    - Analyze failed events for patterns

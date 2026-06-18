@@ -18,7 +18,7 @@ path for a new workspace.
 - Lakehouse Silver tables in schema `ag`: dimensions, `dim_date`, 18 fact
   tables, and `setup_run_log`.
 - Lakehouse Gold tables in schema `au`: 9 aggregate tables for reporting.
-- Optional live event generation through `setup-05-stream-events.ipynb`.
+- Optional live event generation through `stream-events.ipynb`.
 
 ## Prerequisites
 
@@ -52,13 +52,15 @@ Set-Location retail-demo
 ```
 
 `setup.ps1` is the Windows entry point for machines with **nothing installed**.
-It uses Python 3.11+ if present, otherwise installs Miniforge with winget and
-creates a conda environment, then runs the guided setup.
+If conda is installed it uses a `retail-demo` conda environment (created with
+Python 3.14 when missing); otherwise it uses a local `.venv` (created from a
+system Python 3.11+); and if neither is available it installs Miniforge with
+winget. It activates that environment, runs the guided setup, and then switches
+your shell back to the environment you started from.
 
-**Already have Python 3.11+?** Run `python ./scripts/setup.py` directly to skip
-the Miniforge download — `setup.ps1` only installs Miniforge when no suitable
-Python is found. On macOS and Linux, run `python ./scripts/setup.py` from an
-activated Python 3.11+ environment.
+**Prefer to manage Python yourself?** Activate a Python 3.11+ conda environment
+or virtual environment and run `python ./scripts/setup.py` directly. On macOS and
+Linux, run `python ./scripts/setup.py` from an activated Python 3.11+ environment.
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into
@@ -121,7 +123,7 @@ retail-setup configure `
   --capacity-name F64 `
   --lakehouse-name retail_lakehouse `
   --eventhouse-name retail_eventhouse `
-  --kql-database-name retail_kql `
+  --kql-database-name retail_eventhouse `
   --store-type supercenter `
   --start-date 2025-01-01 `
   --end-date 2025-03-31 `
@@ -200,17 +202,21 @@ Expected Lakehouse output:
 
 ### 7. Optional live event generation
 
-`setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it is
-not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
-Import it manually if you want a live stream driver.
+`stream-events.ipynb` is committed under `utility\notebooks\`, rendered to
+`utility\out\` and staged by `retail-setup deploy` (the `stream` notebook group)
+into the **Streaming** workspace folder. Run it as the optional live stream
+driver — it is started/stopped manually, not part of the setup pipeline.
 
-The notebook can write to:
+The notebook writes each event **directly to its Eventhouse KQL table** with the
+Fabric Spark connector for Kusto, splitting each micro-batch by `event_type`. It
+can write to:
 
-- a Fabric Eventstream Custom Endpoint (`sink = "eventstream"`), or
+- the Eventhouse KQL event tables (`sink = "eventhouse"`, the default), or
 - a Delta landing table (`sink = "delta"`) for smoke testing.
 
 Set its parameters in Fabric before running: `source_rows_per_second`, `sink`,
-`run_seconds`, and Eventstream connection settings.
+`run_seconds`, and `kql_database`. Leave `kusto_uri` blank to auto-resolve the
+KQL database Query URI from `kql_database`, or set it to target a different cluster.
 
 ## Project structure
 

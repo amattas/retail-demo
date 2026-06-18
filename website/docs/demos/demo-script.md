@@ -4,22 +4,21 @@
 
 Agenda (15–20 minutes)
 - 1 min: Context and architecture
-- 5–7 min: Live ingest (Eventstream → KQL + Lakehouse)
+- 5–7 min: Live ingest (stream-events → KQL + Lakehouse)
 - 5–7 min: Dashboards and queries
 - 2–3 min: Alerts and actions
 
 1) Set the stage (Architecture)
-- Open docs page [Architecture](../architecture/index.md) and highlight: datagen → Event Hubs → Eventstream → KQL DB (hot), with Lakehouse Bronze reading the same event tables via shortcuts.
+- Open docs page [Architecture](../architecture/index.md) and highlight: stream-events notebook → Eventhouse/KQL DB (hot), with Lakehouse Bronze reading the same event tables via shortcuts.
 - Emphasize: all data is synthetic; schemas from `datagen/src/retail_datagen/streaming/schemas.py`.
 
 2) Start live data
-- In terminal or REST client, start streaming:
-  - `POST /api/stream/start` (see [Streaming API](../datagen/streaming-api.md) and the [Setup Guide](../setup/index.md)).
+- In Fabric, open `stream-events.ipynb`, set `sink = "eventhouse"` and `kql_database = "retail_eventhouse"` (leave `kusto_uri` blank to auto-resolve), then run it.
 - Mention envelope: event_type, trace_id, ingest_timestamp; payload varies by event.
 
-3) Eventstream in Fabric
-- Show Eventstream canvas: source `retail-events` routing events to the typed KQL tables.
-- Open the ingestion mapping for one event (e.g., `receipt_created`) — mappings are defined in `fabric/kql_database/02-create-ingestion-mappings.kql`.
+3) Direct Eventhouse ingestion
+- Explain that the notebook uses Structured Streaming `foreachBatch` to split each micro-batch by `event_type` and append to typed KQL tables with the Fabric Spark connector for Kusto.
+- Open one event table (e.g., `receipt_created`) and show new rows arriving.
 - Point out the Lakehouse Bronze shortcuts (`Tables/cusn/`) that expose the same event tables to Spark.
 
 4) Hot-path queries (KQL DB)

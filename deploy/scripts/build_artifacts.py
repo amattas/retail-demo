@@ -49,6 +49,11 @@ SETUP_FOLDER = "Setup"
 POWERBI_FOLDER = "Reporting"
 PIPELINES_FOLDER = "Pipelines"
 ML_FOLDER = "ML"
+DATA_AGENTS_FOLDER = "Data Agents"
+# The live streaming generator notebook publishes under "Streaming". Kept out of
+# "Setup" because stream-events is the optional long-running driver, not part of
+# the ordered one-time setup pipeline.
+STREAMING_FOLDER = "Streaming"
 
 # MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
 # them as MLExperiment shell items so they exist (and are organized under the "ML"
@@ -86,6 +91,7 @@ NOTEBOOK_GROUPS = {
     ],
     "ontology": ["30-create-ontology.ipynb"],
     "setup": [],  # handled specially by stage_setup_notebooks — not fabric/lakehouse path
+    "stream": [],  # handled specially by stage_stream_notebooks — utility/out path
     "utility": ["90-augment-and-dedupe-receipts.ipynb"],
     "reset": ["99-reset-lakehouse.ipynb"],
 }
@@ -95,6 +101,14 @@ SETUP_NOTEBOOKS = [
     "setup-02-generate-dimensions",
     "setup-03-generate-facts",
     "setup-04-build-gold",
+]
+
+# The live streaming generator. Rendered alongside the setup notebooks (shares
+# the same {{TOKEN}} substitution) but staged separately under "Streaming" and
+# deliberately NOT added to the setup pipeline — it runs continuously and is
+# started/stopped manually.
+STREAM_NOTEBOOKS = [
+    "stream-events",
 ]
 
 # The one Data Pipeline that orchestrates the setup notebooks. It publishes into
@@ -204,10 +218,47 @@ def stage_setup_notebooks(
     return staged
 
 
+def stage_stream_notebooks(
+    repo_root: Path,
+    output_dir: Path,
+    lakehouse_name: str = "retail_lakehouse",
+) -> list[Path]:
+    """Stage the rendered streaming-generator notebook(s) as Fabric `.Notebook` items.
+
+    Like the setup notebooks, ``stream-events`` is rendered to
+    ``utility/out/`` by ``retail-setup render`` before staging. It is the live
+    driver, so it publishes into the "Streaming" folder and is never added to the
+    setup pipeline — it is started/stopped manually.
+    """
+
+    rendered_dir = repo_root / "utility" / "out"
+    missing = [
+        name
+        for name in STREAM_NOTEBOOKS
+        if not (rendered_dir / f"{name}.ipynb").exists()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            f"stream notebooks not rendered — run `retail-setup render` first "
+            f"(expected at utility/out/): {missing}"
+        )
+
+    staged: list[Path] = []
+    for name in STREAM_NOTEBOOKS:
+        staged.append(
+            stage_notebook(
+                rendered_dir / f"{name}.ipynb",
+                output_dir,
+                lakehouse_name=lakehouse_name,
+            )
+        )
+    return staged
+
+
 def stage_querysets(
     repo_root: Path,
     output_dir: Path,
-    kql_database_name: str = "retail_kql",
+    kql_database_name: str = "retail_eventhouse",
     display_name: str = "retail_querysets",
 ) -> list[Path]:
     """Stage `fabric/querysets/*.kql` as one Fabric `.KQLQueryset` item.
@@ -333,6 +384,8 @@ def _deployed_notebook_names(notebook_groups: list[str]) -> set[str]:
     names = {Path(name).stem for name in _selected_notebooks(notebook_groups)}
     if "setup" in notebook_groups:
         names.update(SETUP_NOTEBOOKS)
+    if "stream" in notebook_groups:
+        names.update(STREAM_NOTEBOOKS)
     return names
 
 
@@ -348,12 +401,41 @@ def stage_ml_experiments(output_dir: Path) -> list[Path]:
     return [stage_shell_item(output_dir, name, "MLExperiment") for name in ML_EXPERIMENTS]
 
 
+def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
+    """Stage ``fabric/data-agents/*.DataAgent`` item folders into the workspace output.
+
+    Each Data Agent is a complete fabric-cicd item folder (``.platform`` plus a
+    ``Files/Config`` definition). They publish into a "Data Agents" workspace
+    folder. The agents reference the semantic model / ontology and source
+    workspace by GUID in their datasource configs; those GUIDs are remapped to the
+    target workspace at publish time by generated ``parameter.yml`` rules (see
+    ``deploy.scripts.deploy_config.render_parameter_file``).
+
+    Returns an empty list when no Data Agent sources exist.
+    """
+
+    source_dir = repo_root / "fabric" / "data-agents"
+    if not source_dir.is_dir():
+        return []
+    staged: list[Path] = []
+    for item_dir in sorted(source_dir.glob("*.DataAgent"), key=lambda path: path.name):
+        if not (item_dir / ".platform").is_file():
+            continue
+        destination = output_dir / DATA_AGENTS_FOLDER / item_dir.name
+        if destination.exists():
+            shutil.rmtree(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(item_dir, destination)
+        staged.append(destination)
+    return staged
+
+
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     notebook_groups: list[str] | None = None,
     lakehouse_name: str = "retail_lakehouse",
-    kql_database_name: str = "retail_kql",
+    kql_database_name: str = "retail_eventhouse",
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -364,13 +446,13 @@ def build_workspace(
     (output_dir / ".gitkeep").touch()
 
     staged_items: list[str] = []
-    # Terraform provisions the Lakehouse, Eventhouse, and KQL Database. Only the
-    # Lakehouse is staged as a fabric-cicd shell item so its `.platform` logicalId
-    # exists in the deployment; notebook default-lakehouse bindings reference that
-    # same logicalId (see `_logical_id`) and fabric-cicd resolves it to the
-    # deployed lakehouse GUID. Eventhouse and KQLDatabase are NOT staged: Fabric
+    # Terraform provisions the Lakehouse and Eventhouse. Only the Lakehouse is
+    # staged as a fabric-cicd shell item so its `.platform` logicalId exists in the
+    # deployment; notebook default-lakehouse bindings reference that same logicalId
+    # (see `_logical_id`) and fabric-cicd resolves it to the deployed lakehouse
+    # GUID. The Eventhouse (and its default KQL database) is NOT staged: Fabric
     # rejects a `.platform`-only definition update ("Definition parts cannot
-    # contain the .platform file only"), and Terraform already owns them.
+    # contain the .platform file only"), and Terraform already owns it.
     staged_items.append(stage_shell_item(output_dir, lakehouse_name, "Lakehouse").name)
 
     # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
@@ -393,6 +475,19 @@ def build_workspace(
             item.name
             for item in stage_setup_notebooks(
                 repo_root, setup_dir, lakehouse_name=lakehouse_name
+            )
+        )
+
+    # The live streaming generator notebook publishes into a separate "Streaming"
+    # folder. Opt-in via the "stream" group so a default deploy is unaffected. The
+    # notebook writes events straight to the Eventhouse KQL tables via the Spark
+    # connector (no Eventstream).
+    if "stream" in notebook_groups:
+        streaming_dir = output_dir / STREAMING_FOLDER
+        staged_items.extend(
+            item.name
+            for item in stage_stream_notebooks(
+                repo_root, streaming_dir, lakehouse_name=lakehouse_name
             )
         )
 
@@ -429,6 +524,12 @@ def build_workspace(
         staged_items.extend(
             item.name for item in stage_ml_experiments(output_dir / ML_FOLDER)
         )
+    # Data Agents (Fabric copilots over the semantic model and ontology) publish
+    # into a "Data Agents" folder. Their datasource GUID references are remapped
+    # to the target workspace via generated parameter.yml rules.
+    staged_items.extend(
+        item.name for item in stage_data_agents(repo_root, output_dir)
+    )
     return BuildResult(output_dir=output_dir, staged_items=sorted(staged_items))
 
 
@@ -488,7 +589,7 @@ def main() -> int:
         choices=sorted(NOTEBOOK_GROUPS),
     )
     parser.add_argument("--lakehouse-name", default="retail_lakehouse")
-    parser.add_argument("--kql-database-name", default="retail_kql")
+    parser.add_argument("--kql-database-name", default="retail_eventhouse")
     args = parser.parse_args()
 
     result = build_workspace(

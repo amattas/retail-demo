@@ -1,12 +1,12 @@
 # Streaming Setup Guide
 
-Complete guide for setting up real-time event streaming to Azure Event Hub or Microsoft Fabric Real-Time Intelligence.
+Legacy guide for the deprecated local generator's Event Hub streaming mode. The current Fabric live path uses `stream-events.ipynb` to write directly to Eventhouse/KQL with the Fabric Spark connector for Kusto; see [Phase 6: Optional Live Streaming](../setup/06-streaming.md).
 
 ## Prerequisites
 
 - **Python 3.11+** (strict requirement)
-- **Azure Event Hub** or **Microsoft Fabric RTI** workspace
-- **Connection string** with send permissions
+- Legacy Azure Event Hub target, if you are running the deprecated local generator
+- Connection string with send permissions for that legacy target
 - **Historical data** must be generated first (streaming requires existing base data)
 
 ## Installation
@@ -41,7 +41,7 @@ python -m uvicorn retail_datagen.main:app --app-dir src --host 0.0.0.0 --port 80
 
 Access the application at http://localhost:8000 (Swagger docs at http://localhost:8000/docs).
 
-## Azure Event Hub Configuration
+## Legacy Azure Event Hub Configuration
 
 ### Option A: Environment Variable (Recommended)
 
@@ -104,53 +104,21 @@ export AZURE_EVENTHUB_CONNECTION_STRING="$(az keyvault secret show \
 - Azure Key Vault instance
 - Managed identity or service principal with secret read access
 
-## Microsoft Fabric RTI Setup
+## Current Microsoft Fabric RTI Setup
 
-Microsoft Fabric Real-Time Intelligence uses Event Hubs as its streaming backend.
+Do not create a Fabric Eventstream for this demo. For current Fabric RTI live
+ingestion, import and run `utility/notebooks/stream-events.ipynb` with:
 
-### Step 1: Create Event Stream in Fabric
+| Parameter | Value |
+| --- | --- |
+| `sink` | `eventhouse` |
+| `kusto_uri` | KQL database Query URI from the database details card |
+| `kql_database` | `retail_eventhouse` |
 
-1. Navigate to your Fabric workspace
-2. Click **New** → **Eventstream**
-3. Name your event stream (e.g., "retail-events")
-4. Wait for provisioning to complete
-
-### Step 2: Get Connection String
-
-1. Open your Event Stream
-2. Navigate to the **Keys** or **Settings** section
-3. Copy the **Connection string-primary key**
-4. Format will be: `Endpoint=sb://eventstream-xxx.servicebus.windows.net/;SharedAccessKeyName=...`
-
-### Step 3: Configure retail-datagen
-
-Set the connection string using environment variable:
-
-```bash
-export AZURE_EVENTHUB_CONNECTION_STRING="<your-fabric-eventstream-connection-string>"
-```
-
-Or add to `config.json`:
-
-```json
-{
-  "realtime": {
-    "azure_connection_string": "<your-fabric-eventstream-connection-string>"
-  },
-  "stream": {
-    "hub": "retail-events"
-  }
-}
-```
-
-### Step 4: Configure Event Stream Destination
-
-In Fabric, configure where events should flow:
-
-1. **Lakehouse**: Direct ingestion to Delta tables
-2. **KQL Database**: Real-time analytics with Kusto Query Language
-3. **Eventhouse**: Advanced real-time intelligence scenarios
-4. **Custom endpoint**: Webhook, Function, Logic App
+The notebook uses Structured Streaming `foreachBatch` to route by `event_type`
+and append to KQL tables through the Fabric Spark connector for Kusto. See
+[Phase 6: Optional Live Streaming](../setup/06-streaming.md) and Microsoft's
+[Spark connector tutorial](https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector).
 
 ## Connection String Format
 
@@ -178,7 +146,7 @@ Endpoint=sb://retail-analytics.servicebus.windows.net/;SharedAccessKeyName=RootM
 
 ### Test Connection
 
-Use the API to test your Azure Event Hub connection:
+For the legacy generator, use the API to test the Azure Event Hub connection:
 
 ```bash
 curl -X POST http://localhost:8000/api/stream/test
@@ -279,7 +247,7 @@ Key configuration options in `config.json`:
 - **Medium throughput**: `emit_interval_ms: 500`, `burst: 100` (default)
 - **High throughput**: `emit_interval_ms: 100`, `burst: 500`
 
-**Warning:** High throughput may hit Event Hub throttling limits. Monitor failure rates.
+**Warning:** High throughput may hit legacy Event Hub throttling limits. Monitor failure rates.
 
 ## Troubleshooting
 
@@ -345,4 +313,4 @@ curl -X POST http://localhost:8000/api/generate/fact \
 For issues or questions:
 - Check the server's terminal output (the app logs to stdout) or the `logs/` directory
 - Review [streaming-operations.md](streaming-operations.md) troubleshooting section
-- Check Azure Event Hub metrics in Azure Portal
+- Check the target streaming service metrics in Azure Portal

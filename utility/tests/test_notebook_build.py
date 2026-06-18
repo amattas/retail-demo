@@ -7,7 +7,7 @@ from pathlib import Path
 UTILITY = Path(__file__).resolve().parents[1]
 PY = sys.executable
 NOTEBOOKS = ["setup-01-seed-dictionaries", "setup-02-generate-dimensions",
-             "setup-03-generate-facts", "setup-04-build-gold", "setup-05-stream-events"]
+             "setup-03-generate-facts", "setup-04-build-gold", "stream-events"]
 
 
 def test_build_produces_notebooks(tmp_path):
@@ -48,9 +48,9 @@ def test_setup01_fetch_is_pinned_and_local_first():
 
 
 def test_stream_notebook_code_compiles():
-    nb = json.loads((UTILITY / "notebooks" / "setup-05-stream-events.ipynb").read_text())
+    nb = json.loads((UTILITY / "notebooks" / "stream-events.ipynb").read_text())
     code = "\n".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code")
-    compile(code, "<setup-05>", "exec")
+    compile(code, "<stream-events>", "exec")
     # a Fabric parameters cell is tagged so the pipeline can override it
     assert any("parameters" in c["metadata"].get("tags", []) for c in nb["cells"])
 

@@ -56,13 +56,22 @@ def write_all(
         else:
             df.write.format(fmt).mode("overwrite").save(f"{base_path}/{db}/{name}")
 
+    def _count(db: str, name: str) -> int:
+        # Count the just-written table, not the in-memory df: df.count() would
+        # re-execute the entire (deterministic) generation lineage a second time,
+        # while a freshly written Delta/Parquet table answers count() from file
+        # metadata. Same value, a fraction of the work.
+        if lakehouse is not None:
+            return spark.table(f"{lakehouse}.{db}.{name}").count()
+        return spark.read.format(fmt).load(f"{base_path}/{db}/{name}").count()
+
     written: list[tuple[str, int]] = []
     for name, df in tables.items():
         _write(df, cfg.silver_db, name)
-        written.append((name, df.count()))
+        written.append((name, _count(cfg.silver_db, name)))
     for name, df in gold.items():
         _write(df, cfg.gold_db, name)
-        written.append((name, df.count()))
+        written.append((name, _count(cfg.gold_db, name)))
 
     log_rows = [
         (run_id, cfg.store_type, cfg.seed, cfg.start_date, cfg.end_date,

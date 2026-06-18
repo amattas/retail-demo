@@ -23,7 +23,7 @@ Microsoft Fabric capacity is measured in Capacity Units (CU). Choose appropriate
 |-----------|------------------|-----------------|-----------------|
 | **Setup notebooks 01-03** | Depends on store/date range | One-time/on demand | Medium to high Spark usage |
 | **Gold build** | 100MB - 1GB | 3-5 min per run | Low to medium Spark usage |
-| **Optional live stream** | 1-10M events/day | Continuous | Eventstream/Eventhouse usage |
+| **Optional live stream** | 1-10M events/day | Continuous | Spark streaming/Eventhouse usage |
 | **Streaming transforms** | 500MB - 5GB/day | Scheduled/on demand | Medium Spark usage |
 | **Power BI DirectLake** | Varies by users | Real-time | Medium (concurrent queries) |
 

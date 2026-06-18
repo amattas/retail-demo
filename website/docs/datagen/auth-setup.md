@@ -1,6 +1,6 @@
 # Credential Management Guide
 
-Comprehensive guide for securely managing Azure Event Hub credentials and sensitive configuration.
+Legacy guide for securely managing the deprecated local generator's streaming credentials and sensitive configuration. The current Fabric live path uses Fabric notebook identity and does not use Event Hub connection strings.
 
 ## Table of Contents
 
@@ -62,11 +62,11 @@ Comprehensive guide for securely managing Azure Event Hub credentials and sensit
 **Grant minimum necessary permissions:**
 
 - **Development**: Send-only permissions
-- **Production**: Send-only with specific Event Hub access
+- **Production**: Send-only with specific legacy target access
 - **Monitoring**: Listen-only permissions
 - **Management**: Separate credentials for admin operations
 
-**Azure Event Hub Access Policies:**
+**Legacy Azure Event Hub Access Policies:**
 
 ```
 Development Policy (Send Only):
@@ -681,7 +681,7 @@ If credentials are compromised:
 
 ### Enable Audit Logging
 
-**Azure Event Hub diagnostic settings:**
+**Legacy Azure Event Hub diagnostic settings:**
 
 ```bash
 az monitor diagnostic-settings create \
@@ -717,7 +717,7 @@ AzureDiagnostics
 | project TimeGenerated, CallerIPAddress, Resource, OperationName
 | order by TimeGenerated desc
 
-// Event Hub operations
+// Legacy streaming operations
 AzureDiagnostics
 | where ResourceType == "EVENTHUBS"
 | where Category == "OperationalLogs"
@@ -740,7 +740,7 @@ echo "=== Key Vault Secrets ==="
 az keyvault secret list --vault-name $VAULT_NAME --query "[].{Name:name, Created:attributes.created, Updated:attributes.updated}" -o table
 
 echo ""
-echo "=== Event Hub Access Policies ==="
+echo "=== Legacy Event Hub Access Policies ==="
 az eventhubs namespace authorization-rule list \
   --resource-group $RESOURCE_GROUP \
   --namespace-name $NAMESPACE \

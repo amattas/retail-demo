@@ -10,6 +10,7 @@ core:
   - KQLQueryset
   - DataPipeline
   - MLExperiment
+  - DataAgent
   parameter: parameter.yml
 publish:
   skip:

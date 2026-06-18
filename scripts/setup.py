@@ -435,6 +435,11 @@ def run_retail_setup(
         deploy = prompt_yes_no("Deploy to Microsoft Fabric now?", default=False)
     if deploy:
         ensure_azure_login(deploy_env, dry_run=dry_run)
+        if not dry_run:
+            print("")
+            print("Starting the interactive deploy. While it runs you'll see a live")
+            print("progress bar; press Esc to cancel (you'll be asked whether to remove")
+            print("any Fabric artifacts already created).")
         deploy_command = [
             str(env.python),
             "-m",

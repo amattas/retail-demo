@@ -29,7 +29,7 @@ retail-setup setup notebooks
 Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
 
 Optional live path:
-setup-05-stream-events -> Eventstream -> Eventhouse/KQL -> Lakehouse shortcuts (cusn)
+stream-events -> Eventhouse/KQL (Spark connector) -> Lakehouse shortcuts (cusn)
         |                                                       |
         +-------------------------------------------------------+
                                 streaming transforms -> ag -> au

@@ -44,9 +44,9 @@ Validation loop used for this review:
 | Gold aggregations | Nine `au` aggregate tables generated from Silver facts | Ported |
 | Semantic model contract | Explicit schema source plus TMDL contract tests | New |
 | Cross-table validation | `run_invariants()` checks FKs, dates, discounts, stockout xor, truck timing, pricing | Ported / New |
-| Event Hubs streaming client | Spark Structured Streaming to Fabric Eventstream custom endpoint or Delta landing table | Reworked / Platform |
-| Event types and envelopes | `setup-05-stream-events` emits the same 18 legacy `EventType` values and envelope shape | Ported |
-| DLQ, circuit breaker, outbox, retry, metrics | Fabric Eventstream, Spark, and Fabric monitoring own these concerns | Platform / Dropped |
+| Event Hubs streaming client | Spark Structured Streaming writing directly to the Eventhouse KQL tables (Spark Kusto connector) or a Delta landing table | Reworked / Platform |
+| Event types and envelopes | `stream-events` emits the same 18 legacy `EventType` values and envelope shape | Ported |
+| DLQ, circuit breaker, outbox, retry, metrics | Fabric Eventhouse, Spark, and Fabric monitoring own these concerns | Platform / Dropped |
 | Deployment automation | `retail-setup deploy` orchestrates config generation, Terraform, artifacts, KQL, validation | New |
 
 ## Intentional non-parity
@@ -56,7 +56,7 @@ Validation loop used for this review:
 | FastAPI dashboard/status/progress/preview surfaces | Replaced by Fabric notebooks, Lakehouse tables, and SQL endpoint access. |
 | DuckDB incremental resume/watermarks | Reworked to deterministic full-window overwrite plus run logging. |
 | Parquet folder export and Blob upload | Superseded by Lakehouse Delta tables. |
-| Event Hubs DLQ/circuit breaker/outbox/Prometheus code | Platform-owned by Fabric Eventstream/Spark/monitoring. |
+| Event Hubs DLQ/circuit breaker/outbox/Prometheus code | Platform-owned by Fabric Eventhouse/Spark/monitoring. |
 | Stateful truck queueing/timeouts/recovery | Poor fit for the stateless batch generator; timing and capacity legs remain modelled. |
 | Supplier truck leg with `DCID=0` | Supplier inbound is represented as DC inventory transactions. |
 | Explicit RTV outbound transactions | Non-restocked returns simply do not re-enter inventory. |

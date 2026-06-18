@@ -7,12 +7,6 @@
       "description": "Ingest batch and real-time data into a single location within your Fabric workspace.",
       "items": [
         {
-          "artifactUniqueId": "SynapseNotebook:8a58519f-4156-40ba-a466-7d31d5e26fcd",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": "8a58519f-4156-40ba-a466-7d31d5e26fcd",
-          "artifactName": null
-        },
-        {
           "artifactUniqueId": "SynapseNotebook:90009e22-24ab-4750-b2f6-b72cf6db2741",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
@@ -91,18 +85,6 @@
       "description": "Clean, transform, extract, and load your data for analysis and modeling tasks.",
       "items": [
         {
-          "artifactUniqueId": "SynapseNotebook:18e17653-c8fb-456e-a4fa-44743c948866",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": "18e17653-c8fb-456e-a4fa-44743c948866",
-          "artifactName": null
-        },
-        {
-          "artifactUniqueId": "SynapseNotebook:543e9201-1cbe-4da2-b8f8-0a634fa8bcdc",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": "543e9201-1cbe-4da2-b8f8-0a634fa8bcdc",
-          "artifactName": null
-        },
-        {
           "artifactUniqueId": "Pipeline:3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
           "artifactType": "Pipeline",
           "artifactObjectId": "3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
@@ -128,12 +110,6 @@
       "type": "general",
       "name": "General",
       "items": [
-        {
-          "artifactUniqueId": "SynapseNotebook:c3d99c89-ceb3-482d-b0e7-62625929f45e",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": "c3d99c89-ceb3-482d-b0e7-62625929f45e",
-          "artifactName": null
-        },
         {
           "artifactUniqueId": "Pipeline:1ec9af37-769b-49e8-adb8-0ee36d961b7d",
           "artifactType": "Pipeline",
@@ -165,7 +141,7 @@
           "artifactUniqueId": "3:4416500",
           "artifactType": "dataset",
           "artifactObjectId": null,
-          "artifactName": null
+          "artifactName": "retail_model"
         }
       ],
       "loc": "800 120"
@@ -202,18 +178,6 @@
           "artifactType": "MLExperiment",
           "artifactObjectId": null,
           "artifactName": "demand_forecast"
-        },
-        {
-          "artifactUniqueId": "SynapseNotebook:cffb7610-e761-485e-8f75-7f2c8a7730d2",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": null
-        },
-        {
-          "artifactUniqueId": "SynapseNotebook:07998890-6802-419e-84c6-66d1f7d741d2",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": null
         },
         {
           "artifactUniqueId": "SynapseNotebook:22cf947e-4e21-4f59-b653-fc2b316d4b27",
@@ -333,52 +297,10 @@
       "description": "Package your items for distribution as customized, easy-to-use apps.",
       "items": [
         {
-          "artifactUniqueId": "Ontology:573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd",
-          "artifactType": "Ontology",
-          "artifactObjectId": null,
-          "artifactName": null
-        },
-        {
-          "artifactUniqueId": "GraphIndex:2a5ecefc-1e17-47b7-8ead-26d4be95c41e",
-          "artifactType": "GraphIndex",
-          "artifactObjectId": null,
-          "artifactName": null
-        },
-        {
-          "artifactUniqueId": "Lakehouse:1003054e-bb57-4c1b-8a2b-eae6e4fe67c7",
-          "artifactType": "Lakehouse",
-          "artifactObjectId": null,
-          "artifactName": null
-        },
-        {
-          "artifactUniqueId": "SqlAnalyticsEndpoint:a2ccc340-587d-4b58-8506-b5a6ef9852b1",
-          "artifactType": "SqlAnalyticsEndpoint",
-          "artifactObjectId": null,
-          "artifactName": null
-        },
-        {
           "artifactUniqueId": "Ontology:ab4766aa-2ebf-4b76-86b6-7efe733d918d",
           "artifactType": "Ontology",
           "artifactObjectId": null,
-          "artifactName": "Retail Ontology"
-        },
-        {
-          "artifactUniqueId": "GraphIndex:778d7f93-af99-41f2-8442-6330dc789bcf",
-          "artifactType": "GraphIndex",
-          "artifactObjectId": null,
-          "artifactName": "RetailOntology_AutoGen_graph_ab4766aa2ebf4b7686b67efe733d918d"
-        },
-        {
-          "artifactUniqueId": "Lakehouse:d292daaf-0c5c-455a-b401-cad1143075a7",
-          "artifactType": "Lakehouse",
-          "artifactObjectId": null,
-          "artifactName": "RetailOntology_AutoGen_lh_ab4766aa2ebf4b7686b67efe733d918d"
-        },
-        {
-          "artifactUniqueId": "SqlAnalyticsEndpoint:5e48187f-572a-4325-82d0-64c7aa0d41c9",
-          "artifactType": "SqlAnalyticsEndpoint",
-          "artifactObjectId": null,
-          "artifactName": "RetailOntology_AutoGen_lh_ab4766aa2ebf4b7686b67efe733d918d"
+          "artifactName": "RetailOntology_AutoGen"
         }
       ],
       "loc": "800 -60"

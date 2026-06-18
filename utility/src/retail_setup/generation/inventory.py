@@ -43,10 +43,10 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.inventory_balances import (
-    TXN_COLS as _TXN_COLS,
-    draw_int as _draw_int,
-    stockouts as _stockouts,
-    with_balances as _with_balances,
+    TXN_COLS,
+    draw_int,
+    stockouts,
+    with_balances,
 )
 from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
@@ -107,7 +107,7 @@ def _sale_txns(sales: dict[str, DataFrame], rets: dict[str, DataFrame],
 
     sale = _lines_to_txns(sales, "SALE", F.lit("CUSTOMER_PURCHASE"))
     ret = _lines_to_txns(rets, "RETURN", F.col("receipt_id_ext"), restock_gate=True)
-    return sale.unionByName(ret).select(*_TXN_COLS)
+    return sale.unionByName(ret).select(*TXN_COLS)
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +153,11 @@ def _reorders(store_txns: DataFrame, store_dc: DataFrame, d: seeded_draws,
             .withColumn("_rank", F.row_number().over(top_w))
             .filter(F.col("_rank") <= _REORDER_TOP_N)
             .filter(d.u(keys, "reorder-gate") < F.lit(_REORDER_GATE))
-            .withColumn("reorder_point", _draw_int(d.u(keys, "reorder-point"), 5, 20))
+            .withColumn("reorder_point", draw_int(d.u(keys, "reorder-point"), 5, 20))
             .withColumn("current_quantity", F.greatest(
                 F.lit(0).cast("long"),
                 F.col("reorder_point") - F.col("demand")))
-            .withColumn("reorder_quantity", _draw_int(d.u(keys, "reorder-qty"), 50, 200))
+            .withColumn("reorder_quantity", draw_int(d.u(keys, "reorder-qty"), 50, 200))
             # split a store-day's products across truck legs by capacity: each
             # leg holds <= truck_capacity units (datagen multi-truck shipments).
             .withColumn("_cum_qty", F.sum("reorder_quantity").over(
@@ -328,7 +328,7 @@ def _dc_txns(spark: SparkSession, truck_inv: DataFrame, n_products: int,
         "dc_id long, _day_off long",
     ).withColumn("event_date",
                  F.date_add(F.lit(cfg.start_date), F.col("_day_off").cast("int")))
-    n_ship = _draw_int(d.u(["dc_id", "event_date"], "supplier-n"), 1, 3)
+    n_ship = draw_int(d.u(["dc_id", "event_date"], "supplier-n"), 1, 3)
     keys = ["dc_id", "event_date", "seq", "pick"]
     inbound = (grid
                .withColumn("seq", F.explode(F.sequence(F.lit(1), n_ship)))
@@ -336,7 +336,7 @@ def _dc_txns(spark: SparkSession, truck_inv: DataFrame, n_products: int,
                .withColumn("product_id",
                            (d.h64(keys, "supplier-prod") % F.lit(n_products)
                             + F.lit(1)).cast("long"))
-               .withColumn("quantity", _draw_int(d.u(keys, "supplier-qty"), 50, 500))
+               .withColumn("quantity", draw_int(d.u(keys, "supplier-qty"), 50, 500))
                .withColumn("source", F.concat(
                    F.lit("SUPPLIER-"), F.col("dc_id").cast("string"), F.lit("-"),
                    F.col("event_date").cast("string"), F.lit("-"),
@@ -350,7 +350,7 @@ def _dc_txns(spark: SparkSession, truck_inv: DataFrame, n_products: int,
                    F.col("pick").cast("string"), F.lit("-"),
                    F.col("product_id").cast("string")))
                .withColumnRenamed("dc_id", "node_id")
-               .select(*_TXN_COLS))
+               .select(*TXN_COLS))
 
     # --- outbound: mirror truck LOADs (negative qty, source = shipment_id).
     outbound = (truck_inv.filter(F.col("action") == "LOAD")
@@ -403,8 +403,8 @@ def generate_inventory_chain(
     dc_raw = _dc_txns(spark, truck_inv, n_products, d, cfg)
     store_raw = demand_txns.unionByName(_store_inbound(truck_inv))
 
-    store_bal = _with_balances(store_raw, 40, 120, "ST", d, cfg)
-    dc_bal = _with_balances(dc_raw, 500, 2000, "DC", d, cfg)
+    store_bal = with_balances(store_raw, 40, 120, "ST", d, cfg)
+    dc_bal = with_balances(dc_raw, 500, 2000, "DC", d, cfg)
 
     fact_store_txn = _with_index(
         store_bal.withColumnRenamed("node_id", "store_id"),
@@ -416,8 +416,8 @@ def generate_inventory_chain(
         .withColumnRenamed("source", "Source"),
         "fact_dc_inventory_txn")
 
-    stockouts = (_stockouts(store_bal, "ST", "StoreID")
-                 .unionByName(_stockouts(dc_bal, "DC", "DCID")))
+    stockouts_df = (stockouts(store_bal, "ST", "StoreID")
+                    .unionByName(stockouts(dc_bal, "DC", "DCID")))
 
     return {
         "fact_store_inventory_txn": fact_store_txn,
@@ -425,5 +425,5 @@ def generate_inventory_chain(
         "fact_truck_moves": _with_index(truck_moves, "fact_truck_moves"),
         "fact_truck_inventory": _with_index(truck_inv, "fact_truck_inventory"),
         "fact_reorders": _with_index(reorders, "fact_reorders"),
-        "fact_stockouts": _with_index(stockouts, "fact_stockouts"),
+        "fact_stockouts": _with_index(stockouts_df, "fact_stockouts"),
     }

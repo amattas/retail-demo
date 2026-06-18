@@ -21,7 +21,7 @@ from retail_setup.generation.runtime import seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
 
 # operating_hours literal -> (open_hour, close_hour); "24h" maps to 0/24
-OPERATING_HOURS = {"6-22": (6, 22), "7-22": (7, 22), "7-23": (7, 23), "24h": (0, 24)}
+OPERATING_HOURS_MAP = {"6-22": (6, 22), "7-22": (7, 22), "7-23": (7, 23), "24h": (0, 24)}
 
 BASE_CONVERSION = 0.20
 PEAK_HOURS = (12, 13, 17, 18, 19)
@@ -71,7 +71,7 @@ def generate_store_ops(
 
     # operating_hours -> open/close hour via a F.when chain over known formats
     open_hour, close_hour = None, None
-    for literal, (o, c) in OPERATING_HOURS.items():
+    for literal, (o, c) in OPERATING_HOURS_MAP.items():
         cond = F.col("operating_hours") == literal
         open_hour = F.when(cond, o) if open_hour is None else open_hour.when(cond, o)
         close_hour = F.when(cond, c) if close_hour is None else close_hour.when(cond, c)
@@ -131,7 +131,7 @@ def generate_foot_traffic(
 
     # operating_hours -> open/close hour via a F.when chain over known formats
     open_hour, close_hour = None, None
-    for literal, (o, c) in OPERATING_HOURS.items():
+    for literal, (o, c) in OPERATING_HOURS_MAP.items():
         cond = F.col("operating_hours") == literal
         open_hour = F.when(cond, o) if open_hour is None else open_hour.when(cond, o)
         close_hour = F.when(cond, c) if close_hour is None else close_hour.when(cond, c)

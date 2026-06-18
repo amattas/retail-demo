@@ -215,15 +215,26 @@ def _guid_name_map(items: list[dict[str, Any]]) -> dict[str, str]:
 
 
 def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict[str, Any]:
-    """Replace each item's GUID with its display name so the flow is workspace-agnostic."""
+    """Replace each item's GUID with its display name so the flow is workspace-agnostic.
+
+    Items whose GUID can't be resolved to a name (deleted/stale references, or ids
+    not present in the workspace item listing) are dropped rather than emitted with
+    ``artifactName: null`` — a null name can never bind on deploy and only adds
+    noise to the unresolved-reference report.
+    """
 
     portable = json.loads(json.dumps(task_flow))  # deep copy
     for task in portable.get("tasks", []):
+        kept: list[dict[str, Any]] = []
         for item in task.get("items", []):
             artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(":")
             name = guid_to_name.get(item.get("artifactObjectId") or guid)
-            item["artifactName"] = name  # None when unresolved (e.g. legacy dataset id)
+            if name is None:
+                continue
+            item["artifactName"] = name
             item["artifactType"] = item.get("artifactType", artifact_type)
+            kept.append(item)
+        task["items"] = kept
     return portable
 
 

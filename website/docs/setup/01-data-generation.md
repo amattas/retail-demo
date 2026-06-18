@@ -74,7 +74,7 @@ retail-setup configure `
   --capacity-name F64 `
   --lakehouse-name retail_lakehouse `
   --eventhouse-name retail_eventhouse `
-  --kql-database-name retail_kql `
+  --kql-database-name retail_eventhouse `
   --store-type supercenter `
   --start-date 2025-01-01 `
   --end-date 2025-03-31 `

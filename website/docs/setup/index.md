@@ -40,7 +40,7 @@ Fabric setup notebooks 01-04
 Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
 
 Optional live path:
-setup-05-stream-events -> Fabric Eventstream -> Eventhouse/KQL -> Silver/Gold
+stream-events -> Eventhouse/KQL (Spark connector) -> Silver/Gold
 ```
 
 ## Schema naming convention

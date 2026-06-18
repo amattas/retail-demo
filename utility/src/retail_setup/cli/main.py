@@ -8,19 +8,21 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 from __future__ import annotations
 
 import json
+import queue
 import subprocess
 import shutil
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, NoReturn, Optional
 
 import typer
 import yaml
 from pydantic import ValidationError
 
+from retail_setup.cli.console import ConsoleUI, use_rich_ui
 from retail_setup.config.generation import GenerationConfig, load_generation_config
 from retail_setup.dictionaries.loader import (
     available_store_types,
@@ -37,9 +39,8 @@ def _main() -> None:
 
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
-_GENERATION_KEYS = ("store_type", "start_date", "end_date", "store_count", "seed")
-_DEFAULT_START_DATE = date(2025, 1, 1)
-_DEFAULT_END_DATE = date(2025, 3, 31)
+_GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
+_DEFAULT_MONTHS = 3
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
 # capacity before the same name can be created again. 30s proved too short, so
@@ -138,11 +139,37 @@ def _prompt_int(name: str, value: int | None, *, default: int) -> int:
     return typer.prompt(name, default=default, show_default=True, type=int)
 
 
+def _prompt_bool(name: str, value: bool | None, *, default: bool) -> bool:
+    """Resolve a yes/no value: explicit flag wins; prompt only when interactive."""
+    if value is not None:
+        return value
+    if not sys.stdin.isatty():
+        return default
+    return typer.confirm(name, default=default)
+
+
 def _available_store_types() -> list[str]:
     try:
         return available_store_types(default_dictionary_root())
     except RuntimeError:
         return []
+
+
+def _print_record_estimate(generation: GenerationConfig) -> None:
+    """Show an approximate record-count breakdown for the chosen settings."""
+
+    from retail_setup.generation.estimate import estimate_record_counts
+
+    counts = estimate_record_counts(generation)
+    typer.echo("")
+    _hr("-")
+    typer.echo(
+        f"  Estimated records for {generation.start_date} to {generation.end_date} "
+        f"({generation.store_count} stores):"
+    )
+    for name, value in counts.items():
+        typer.echo(f"    {name:<20} ~ {value:>15,}")
+    _hr("-")
 
 
 def _load_deploy_environment(repo_root: Path, env: str):
@@ -232,13 +259,19 @@ def configure(
     kql_database_name: Optional[str] = typer.Option(
         None, "--kql-database-name", help="KQL database name."
     ),
+    use_custom_spark_pool: Optional[bool] = typer.Option(
+        None,
+        "--use-custom-spark-pool/--no-custom-spark-pool",
+        help="Run setup on an F64-optimized custom Spark pool instead of the default starter pool.",
+    ),
     store_type: Optional[str] = typer.Option(
         None, "--store-type", help="Store type. Available values are shown interactively."
     ),
-    start_date: Optional[str] = typer.Option(
-        None, "--start-date", help="Start date (YYYY-MM-DD)."
+    months: Optional[int] = typer.Option(
+        None,
+        "--months",
+        help="Months of historical data to generate (the window ends yesterday).",
     ),
-    end_date: Optional[str] = typer.Option(None, "--end-date", help="End date (YYYY-MM-DD)."),
     store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
 ) -> None:
@@ -271,7 +304,7 @@ def configure(
 
     _prompted_values = (
         tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
-        kql_database_name, store_type, start_date, end_date, store_count, seed,
+        kql_database_name, use_custom_spark_pool, store_type, months, store_count, seed,
     )
     if any(value is None for value in _prompted_values) and sys.stdin.isatty():
         typer.echo("")
@@ -309,53 +342,58 @@ def configure(
         kql_database_name,
         default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
     )
-    store_type = _prompt_str(
-        store_type_prompt,
-        store_type,
-        default=existing_generation.get(
-            "store_type", GenerationConfig.model_fields["store_type"].default
+    use_custom_spark_pool = _prompt_bool(
+        "Run setup on a custom Spark pool (optimized for F64) instead of the default starter pool",
+        use_custom_spark_pool,
+        default=bool(
+            _config_default(base_config, env_config, "spark.use_custom_pool") or False
         ),
     )
-    start_date = _prompt_str(
-        "Start date (YYYY-MM-DD)",
-        start_date,
-        default=existing_generation.get("start_date", _DEFAULT_START_DATE.isoformat()),
+    # Generation settings: prompt, show a record-count estimate, and (when
+    # interactive) offer to change them before committing. Validation happens
+    # before any file writes (the deploy YAMLs are written next and restored if
+    # framework validation later rejects them).
+    interactive = sys.stdin.isatty()
+    store_type_default = existing_generation.get(
+        "store_type", GenerationConfig.model_fields["store_type"].default
     )
-    end_date = _prompt_str(
-        "End date (YYYY-MM-DD)",
-        end_date,
-        default=existing_generation.get("end_date", _DEFAULT_END_DATE.isoformat()),
-    )
-    store_count = _prompt_int(
-        "Store count",
-        store_count,
-        default=int(
-            existing_generation.get(
-                "store_count", GenerationConfig.model_fields["store_count"].default
-            )
-        ),
-    )
-    seed = _prompt_int(
-        "Random seed",
-        seed,
-        default=int(
-            existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
-        ),
-    )
-
-    # Validate generation values before any file writes (deploy YAMLs are
-    # written next and restored if framework validation rejects them).
-    try:
-        generation = GenerationConfig(
-            store_type=store_type,
-            start_date=start_date,
-            end_date=end_date,
-            store_count=store_count,
-            seed=seed,
+    months_default = int(existing_generation.get("months", _DEFAULT_MONTHS))
+    store_count_default = int(
+        existing_generation.get(
+            "store_count", GenerationConfig.model_fields["store_count"].default
         )
-    except ValidationError as exc:
-        typer.echo(f"Invalid generation settings:\n{exc}")
-        raise typer.Exit(code=1)
+    )
+    seed_default = int(
+        existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
+    )
+    while True:
+        store_type = _prompt_str(store_type_prompt, store_type, default=store_type_default)
+        months = _prompt_int(
+            "Months of data to generate (history ends yesterday)",
+            months,
+            default=months_default,
+        )
+        store_count = _prompt_int("Store count", store_count, default=store_count_default)
+        seed = _prompt_int("Random seed", seed, default=seed_default)
+        try:
+            generation = GenerationConfig(
+                store_type=store_type,
+                months=months,
+                store_count=store_count,
+                seed=seed,
+            )
+        except ValidationError as exc:
+            typer.echo(f"Invalid generation settings:\n{exc}")
+            if interactive:
+                store_type = months = store_count = seed = None
+                continue
+            raise typer.Exit(code=1)
+
+        _print_record_estimate(generation)
+        if not interactive or typer.confirm("Use these settings?", default=True):
+            break
+        # Re-enter every generation value on the next loop iteration.
+        store_type = months = store_count = seed = None
 
     original_deploy = _update_yaml_file(
         deploy_yml,
@@ -365,6 +403,7 @@ def configure(
             "lakehouse.name": lakehouse_name,
             "eventhouse.name": eventhouse_name,
             "eventhouse.kql_database_name": kql_database_name,
+            "spark.use_custom_pool": use_custom_spark_pool,
         },
     )
     original_env = _update_yaml_file(env_yml, {"workspace.name": workspace_name})
@@ -579,6 +618,7 @@ def _deploy_plan(
                         "terraform",
                         "-chdir=deploy/terraform",
                         "destroy",
+                        "-auto-approve",
                         f"-var-file={var_file}",
                     ],
                     needs_confirmation=True,
@@ -594,9 +634,15 @@ def _deploy_plan(
             ]
         steps += [
             DeployStep(
-                cmd=["terraform", "-chdir=deploy/terraform", "apply", f"-var-file={var_file}"],
+                cmd=[
+                    "terraform",
+                    "-chdir=deploy/terraform",
+                    "apply",
+                    "-auto-approve",
+                    f"-var-file={var_file}",
+                ],
                 needs_confirmation=True,
-                description="Terraform apply (previews changes, then asks to confirm)",
+                description="Terraform apply (previews changes; auto-approved after you confirm)",
             ),
             DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "output", "-json"],
@@ -626,6 +672,9 @@ def _deploy_plan(
                 "core",
                 "setup",
                 "ml",
+                "ontology",
+                "reset",
+                "stream",
                 "--lakehouse-name",
                 lakehouse_name,
             ],
@@ -690,6 +739,215 @@ def _missing_executable_message(executable: str) -> str:
             "already exist."
         )
     return f"Required executable not found: {executable}\nInstall it and ensure it is on PATH."
+
+
+def _terminate_process(proc: "subprocess.Popen[str]") -> None:
+    """Terminate a child process, escalating to kill if it ignores SIGTERM."""
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    except Exception:
+        pass
+
+
+def _is_terraform_apply(step: DeployStep) -> bool:
+    return bool(step.cmd) and step.cmd[0] == "terraform" and "apply" in step.cmd
+
+
+def _cleanup_destroy_step(env: str) -> DeployStep:
+    """A `terraform destroy` step used to remove artifacts after a cancel."""
+    var_file = f"environments/{env}.tfvars"
+    return DeployStep(
+        cmd=[
+            "terraform",
+            "-chdir=deploy/terraform",
+            "destroy",
+            "-auto-approve",
+            f"-var-file={var_file}",
+        ],
+        description="Terraform destroy (remove artifacts from the cancelled deploy)",
+    )
+
+
+def _run_step_captured(step: DeployStep, repo_root: Path, ui: ConsoleUI) -> int:
+    """Run a step whose stdout is captured to a file (e.g. terraform output -json)."""
+    assert step.output_file is not None
+    out_path = repo_root / step.output_file
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = subprocess.run(step.cmd, cwd=repo_root, capture_output=True, text=True)
+    except FileNotFoundError:
+        ui.log(_missing_executable_message(step.cmd[0] if step.cmd else "<unknown>"))
+        raise typer.Exit(code=127) from None
+    if result.returncode == 0:
+        out_path.write_text(result.stdout)
+    elif result.stderr:
+        ui.log(result.stderr.rstrip())
+    return result.returncode
+
+
+def _run_step_streamed(step: DeployStep, repo_root: Path, ui: ConsoleUI) -> Optional[int]:
+    """Run a step, streaming its output to the scrolling log.
+
+    Returns the exit code, or None if the run was cancelled (ESC) mid-flight.
+    """
+    if step.output_file:
+        return _run_step_captured(step, repo_root, ui)
+    try:
+        proc = subprocess.Popen(
+            step.cmd,
+            cwd=repo_root,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except FileNotFoundError:
+        ui.log(_missing_executable_message(step.cmd[0] if step.cmd else "<unknown>"))
+        raise typer.Exit(code=127) from None
+
+    lines: "queue.Queue[Optional[str]]" = queue.Queue()
+
+    def _reader() -> None:
+        try:
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                lines.put(line)
+        finally:
+            lines.put(None)
+
+    reader = threading.Thread(target=_reader, name="step-reader", daemon=True)
+    reader.start()
+
+    cancelling = False
+    while True:
+        if ui.cancelled and not cancelling:
+            cancelling = True
+            ui.status("cancelling…")
+            _terminate_process(proc)
+        try:
+            line = lines.get(timeout=0.1)
+        except queue.Empty:
+            continue
+        if line is None:
+            break
+        ui.log(line.rstrip("\n"))
+    proc.wait()
+    return None if cancelling else proc.returncode
+
+
+def _handle_cancel(
+    ui: ConsoleUI,
+    repo_root: Path,
+    env: str,
+    *,
+    apply_started: bool,
+    skip_terraform: bool,
+) -> NoReturn:
+    """Handle an ESC cancellation, optionally tearing down created artifacts."""
+    ui.log("")
+    ui.log("Cancelled (esc).")
+    if apply_started and not skip_terraform:
+        if ui.prompt_yes_no(
+            "Remove the artifacts created so far? This runs 'terraform destroy'.",
+            default=False,
+        ):
+            ui.reset_cancel()
+            ui.set_phase("Cleanup: terraform destroy")
+            ui.status("removing created artifacts")
+            rc = _run_step_streamed(_cleanup_destroy_step(env), repo_root, ui)
+            if rc == 0:
+                ui.log("Cleanup complete — created artifacts removed.")
+            else:
+                ui.log("Cleanup did not finish cleanly; some artifacts may remain.")
+        else:
+            ui.log("Leaving created artifacts in place.")
+    raise typer.Exit(code=130)
+
+
+def _run_plan_plain(
+    repo_root: Path, env: str, plan: list[DeployStep], total: int, *, yes: bool
+) -> None:
+    """Execute the deploy plan with plain output (non-interactive / no TTY)."""
+    for i, step in enumerate(plan, start=1):
+        _echo_step(i, total, step)
+        if step.needs_confirmation and not yes:
+            if not typer.confirm(f"Proceed with: {step.description}?"):
+                typer.echo("Aborted by user.")
+                raise typer.Exit(code=1)
+        try:
+            if step.output_file:
+                out_path = repo_root / step.output_file
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                result = subprocess.run(
+                    step.cmd, cwd=repo_root, capture_output=True, text=True
+                )
+                if result.returncode == 0:
+                    out_path.write_text(result.stdout)
+                elif result.stderr:
+                    typer.echo(result.stderr, err=True)
+            else:
+                result = subprocess.run(step.cmd, cwd=repo_root)
+        except FileNotFoundError:
+            executable = step.cmd[0] if step.cmd else "<unknown>"
+            typer.echo(
+                f"Deploy failed at step {i}/{total}: {step.description}",
+                err=True,
+            )
+            typer.echo(_missing_executable_message(executable), err=True)
+            raise typer.Exit(code=127) from None
+        if result.returncode != 0:
+            typer.echo(
+                f"Deploy failed at step {i}/{total} "
+                f"(exit {result.returncode}): {' '.join(step.cmd)}",
+                err=True,
+            )
+            raise typer.Exit(code=result.returncode)
+
+
+def _run_plan_rich(
+    repo_root: Path,
+    env: str,
+    plan: list[DeployStep],
+    total: int,
+    *,
+    yes: bool,
+    skip_terraform: bool,
+) -> None:
+    """Execute the deploy plan with the interactive console (progress + esc)."""
+    apply_started = False
+    with ConsoleUI(total, title=f"Deploy to Fabric · {env}") as ui:
+        for i, step in enumerate(plan, start=1):
+            if ui.cancelled:
+                _handle_cancel(
+                    ui, repo_root, env,
+                    apply_started=apply_started, skip_terraform=skip_terraform,
+                )
+            ui.set_phase(f"[{i}/{total}] {step.description}")
+            ui.advance(completed=i - 1)
+            ui.status("")
+            if step.needs_confirmation and not yes:
+                if not ui.prompt_yes_no(
+                    f"Proceed with: {step.description}?", default=True
+                ):
+                    ui.log("Aborted by user.")
+                    raise typer.Exit(code=1)
+            if _is_terraform_apply(step):
+                apply_started = True
+            rc = _run_step_streamed(step, repo_root, ui)
+            if rc is None:
+                _handle_cancel(
+                    ui, repo_root, env,
+                    apply_started=apply_started, skip_terraform=skip_terraform,
+                )
+            if rc != 0:
+                ui.log(f"Step {i}/{total} failed (exit {rc}): {' '.join(step.cmd)}")
+                raise typer.Exit(code=rc)
+            ui.advance(completed=i)
 
 
 @app.command()
@@ -772,40 +1030,12 @@ def deploy(
             _echo_step(i, total, step)
         return
 
-    for i, step in enumerate(plan, start=1):
-        _echo_step(i, total, step)
-        if step.needs_confirmation and not yes:
-            if not typer.confirm(f"Proceed with: {step.description}?"):
-                typer.echo("Aborted by user.")
-                raise typer.Exit(code=1)
-        try:
-            if step.output_file:
-                out_path = repo_root / step.output_file
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                result = subprocess.run(
-                    step.cmd, cwd=repo_root, capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    out_path.write_text(result.stdout)
-                elif result.stderr:
-                    typer.echo(result.stderr, err=True)
-            else:
-                result = subprocess.run(step.cmd, cwd=repo_root)
-        except FileNotFoundError:
-            executable = step.cmd[0] if step.cmd else "<unknown>"
-            typer.echo(
-                f"Deploy failed at step {i}/{total}: {step.description}",
-                err=True,
-            )
-            typer.echo(_missing_executable_message(executable), err=True)
-            raise typer.Exit(code=127) from None
-        if result.returncode != 0:
-            typer.echo(
-                f"Deploy failed at step {i}/{total} "
-                f"(exit {result.returncode}): {' '.join(step.cmd)}",
-                err=True,
-            )
-            raise typer.Exit(code=result.returncode)
+    if use_rich_ui(dry_run=dry_run):
+        _run_plan_rich(
+            repo_root, env, plan, total, yes=yes, skip_terraform=skip_terraform
+        )
+    else:
+        _run_plan_plain(repo_root, env, plan, total, yes=yes)
 
     typer.echo("")
     _hr("=")
@@ -821,11 +1051,12 @@ def deploy(
 
     if not yes:
         if typer.confirm(
-            "Run the setup pipeline now (apply KQL setup, then generate "
-            "dimensions, facts, and gold)?",
+            "Run the setup pipeline now (generate dimensions, facts, and gold, "
+            "then train the ML models and build the ontology)?",
             default=False,
         ):
             _run_setup_pipeline(repo_root, env)
+            _print_ontology_relink_hint(repo_root, env)
         else:
             typer.echo(
                 "Skipping. Run later with: "
@@ -855,6 +1086,28 @@ def _deploy_taskflow(repo_root: Path, env: str) -> None:
         )
 
 
+def _print_ontology_relink_hint(repo_root: Path, env: str) -> None:
+    """Explain why the ontology task-flow node is unbound and how it links.
+
+    The ontology is created at the end of the setup pipeline (``30-create-ontology``),
+    which runs after the task flow was deployed, so its node is dropped (unbound) at
+    this deploy. It binds automatically on the next ``retail-setup deploy`` (the task
+    flow step re-runs and the ontology now resolves by name), or immediately via a
+    standalone task flow deploy once the pipeline finishes.
+    """
+
+    workspace = _workspace_name(repo_root, env)
+    typer.echo("")
+    typer.echo(
+        "Note: the ontology is created at the end of the setup pipeline you just\n"
+        "started, so its task-flow node ('RetailOntology_AutoGen') is not linked yet.\n"
+        "It links automatically the next time you run 'retail-setup deploy' (once the\n"
+        "ontology exists). To link it sooner, re-run the task flow deploy after the\n"
+        "pipeline finishes:\n"
+        f"    python -m deploy.scripts.taskflow deploy --workspace {workspace}"
+    )
+
+
 def _run_setup_pipeline(repo_root: Path, env: str) -> None:
     """Start an on-demand run of the deployed setup pipeline.
 
@@ -865,7 +1118,8 @@ def _run_setup_pipeline(repo_root: Path, env: str) -> None:
 
     typer.echo("")
     _hr("=")
-    typer.echo("  Generating the historical data (dimensions, then facts, then gold).")
+    typer.echo("  Running the setup pipeline: historical data (dimensions, facts, gold),")
+    typer.echo("  then the ML models, then the ontology -- in one chained run.")
     typer.echo("  This can take a while -- often several minutes to an hour or more,")
     typer.echo("  depending on the months of history and store count. It runs in")
     typer.echo("  Fabric, so you can close this and track progress in the workspace.")

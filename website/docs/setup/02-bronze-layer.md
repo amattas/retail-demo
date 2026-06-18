@@ -17,9 +17,7 @@ Required for historical setup:
 Required for optional live streaming:
 
 - Eventhouse.
-- KQL database.
-- Eventstream with a Custom Endpoint source, if you use
-  `setup-05-stream-events.ipynb`.
+- The Eventhouse's default KQL database, named `retail_eventhouse` by default.
 
 Use the same names passed to `retail-setup configure`.
 

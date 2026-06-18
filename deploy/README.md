@@ -80,9 +80,8 @@ python -m deploy.scripts.validate_deployment --environment dev
 ```
 
 `build_artifacts --notebook-groups setup` stages the rendered setup notebooks
-01-04 from `utility\out\`. It does not stage `setup-05-stream-events.ipynb`.
-Import `setup-05-stream-events.ipynb` manually if you want the optional live
-stream driver.
+01-04 from `utility\out\`. The streaming generator `stream-events.ipynb` is
+staged separately by the `stream` notebook group (into the **Streaming** folder).
 
 ## KQL script execution
 
@@ -115,8 +114,6 @@ does not.
   **Pipelines**, and bootstrapped MLflow experiments under **ML** (with the `ml`
   notebook group). The Lakehouse and queryset stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
-- Eventstream deployment is disabled by default because Fabric source-control
-  item definitions for Eventstream are not yet part of this framework.
 - Curated KQL queries in `fabric\querysets\*.kql` deploy as a single
   `retail_querysets.KQLQueryset` item (one tab per `.kql` file) bound to the
   Eventhouse KQL database. `clusterUri` is resolved by fabric-cicd at publish
@@ -124,9 +121,34 @@ does not.
 - Data Pipelines in `fabric\pipelines\*.DataPipeline` deploy into a **Pipelines**
   folder; each pipeline is staged only when its notebooks are part of the deploy,
   and notebook references are remapped via generated `parameter.yml` rules.
+- The **setup pipeline** orchestrates the full one-time setup end to end:
+  `setup-01..04` (seed -> dimensions -> facts -> gold), then the **ML notebooks**
+  (06-14), then `30-create-ontology`. The ontology reads gold *and* ML tables, so
+  it runs only after every ML notebook completes. (The ML notebooks are inlined as
+  activities rather than invoking the standalone `machine-learning` pipeline,
+  because Fabric's Invoke pipeline activity requires a connection object the deploy
+  can't yet provision; the notebooks themselves are shared items, and the
+  `machine-learning` pipeline still exists for manual/standalone runs.) The
+  ontology is a one-time **setup** step; there is no scheduled ontology refresh
+  after incremental loads.
+- Data Agents in `fabric\data-agents\*.DataAgent` deploy into a **Data Agents**
+  folder (item type `DataAgent`, which must be in `item_types_in_scope`). Their
+  datasource configs reference the source workspace and the semantic model by
+  GUID; generated `parameter.yml` rules remap those to the target workspace and
+  the deployed `SemanticModel`. The ontology agent also references the ontology,
+  which is created when the setup pipeline runs `30-create-ontology`; the agent
+  binds to its ontology after that pipeline run completes.
+- The `retail-setup deploy` plan stages the `core`, `setup`, `ml`, `ontology`, and
+  `reset` notebook groups, so `30-create-ontology` and `99-reset-lakehouse` are
+  deployed alongside the core pipeline and ML notebooks. `99-reset-lakehouse` is
+  **not** orchestrated (it destroys lakehouse contents) — run it manually only.
 - Dashboard assets remain source inputs until their Fabric source-control item
   formats are validated. Task flows are deployed separately by
-  `deploy.scripts.taskflow` (offered as a prompt at the end of deploy).
+  `deploy.scripts.taskflow` (offered as a prompt at the end of deploy). The task
+  flow links items by display name, so a node binds once its item exists in the
+  workspace. The ontology node (`RetailOntology_AutoGen`) and ontology agent link
+  after the setup pipeline has run (it creates the ontology) and the task flow is
+  re-deployed.
 - Secrets must come from Azure login, GitHub Actions secrets, environment
   variables, Key Vault, or ignored local files. Do not commit secrets to YAML,
   Terraform files, notebooks, or generated artifacts.

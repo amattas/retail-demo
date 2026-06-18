@@ -42,6 +42,14 @@ def generate_all(
         spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5))
 
     sales = receipts_mod.generate_receipts_group(spark, t, dicts.profile, cfg)
+    # fact_receipts/lines (SALE-only) each feed several independent builders —
+    # returns, promotions, foot traffic, BLE, inventory — plus the SALE/RETURN
+    # unions below. Persist them so this shared, expensive lineage (xxhash draws
+    # + line explode) is computed once instead of once per consumer. Generation
+    # is fully deterministic, so a cached frame is byte-identical to a recomputed
+    # one: realism is unchanged, only the redundant recomputation is removed.
+    sales["fact_receipts"] = sales["fact_receipts"].cache()
+    sales["fact_receipt_lines"] = sales["fact_receipt_lines"].cache()
     rets = returns_mod.generate_returns(spark, sales, t, cfg)
     t["fact_receipts"] = sales["fact_receipts"].unionByName(rets["fact_receipts"])
     t["fact_receipt_lines"] = sales["fact_receipt_lines"].unionByName(
@@ -64,4 +72,14 @@ def generate_all(
     pings, zc = sensors.generate_ble(spark, sales["fact_receipts"], t, cfg)
     t["fact_ble_pings"], t["fact_customer_zone_changes"] = pings, zc
     t.update(inventory.generate_inventory_chain(spark, sales, rets, t, cfg))
+    # Downstream the driver runs run_invariants (50+ count/join/distinct actions
+    # over these frames) and then write_all (one write + count per table).
+    # Without caching, every one of those actions re-executes the full generation
+    # DAG from scratch — the dominant cost of the setup run. Persist each table so
+    # it materializes exactly once (on the first invariant pass) and all later
+    # reads hit the cache. Deterministic generation ⇒ cached == recomputed, so
+    # the simulation output is identical. cache() is MEMORY_AND_DISK, so large
+    # frames spill to local SSD rather than failing under memory pressure.
+    for name in t:
+        t[name] = t[name].cache()
     return GenerationResult(tables=t)

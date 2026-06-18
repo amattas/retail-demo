@@ -4,10 +4,12 @@ Utility scripts for configuring and deploying the retail demo components.
 
 ## setup.ps1 (Windows entry point)
 
-Guided Windows bootstrap. It ensures a Python 3.11+ environment exists —
-using Python on PATH if suitable, otherwise installing Miniforge with winget and
-creating a conda environment — then delegates to `setup.py`. All arguments are
-forwarded.
+Guided Windows bootstrap. It prepares a Python environment, delegates to
+`setup.py`, then switches your shell back to the environment that was active
+before it ran. It uses a conda environment named `retail-demo` (created with
+Python 3.14 when missing) if conda is installed; otherwise a local `.venv` in
+the repo root (created from a system Python 3.11+ when missing); and if neither
+is available, it installs Miniforge with winget. All arguments are forwarded.
 
 ```powershell
 .\scripts\setup.ps1
@@ -18,10 +20,11 @@ forwarded.
 On macOS and Linux, activate a Python 3.11+ environment and run `setup.py`
 directly.
 
-Use `setup.ps1` only if you don't already have Python — its sole job is to
-bootstrap a Python 3.11+ environment (installing Miniforge with winget when
-none is found) before delegating to `setup.py`. If you already have Python
-3.11+, run `python scripts\setup.py` directly to skip the Miniforge download.
+`setup.ps1` manages the environment for you: it creates or reuses the
+`retail-demo` conda environment (or a `.venv`), runs the guided setup, and
+restores your original environment afterward. If you'd rather manage the
+environment yourself, activate a Python 3.11+ conda environment or virtual
+environment and run `python scripts\setup.py` directly.
 
 ## setup.py
 

@@ -9,7 +9,7 @@ The current setup path is:
 2. Deploy or manually import Fabric items.
 3. Run setup notebooks 01-04 to generate Lakehouse data.
 4. Run the generated KQL database script manually in the target KQL database.
-5. Optionally import and run `utility\notebooks\setup-05-stream-events.ipynb`
+5. Optionally import and run `utility\notebooks\stream-events.ipynb`
    for live synthetic events.
 
 ## Subfolders

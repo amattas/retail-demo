@@ -29,7 +29,26 @@ Important values:
 | `lakehouse.name` | Target Lakehouse name. |
 | `eventhouse.name` | Target Eventhouse name. |
 | `eventhouse.kql_database_name` | Target KQL database name. |
+| `spark.use_custom_pool` | Run setup on a custom Spark pool (`true`) or the workspace starter pool (`false`, default). |
 | `auth.mode` | `azure_cli` or `azure_powershell`. |
+
+### Custom Spark pool
+
+`retail-setup configure` asks whether to run the setup on the **default starter
+pool** or a **custom Spark pool**. When you opt in (`spark.use_custom_pool: true`,
+or `--use-custom-spark-pool`), the deploy creates a workspace custom pool and
+makes it the workspace **default pool** so the setup pipeline's notebooks run on
+it. The sizing defaults are tuned for an **F64** capacity (128 base Spark vCores):
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `spark.custom_pool_name` | `retail_setup_pool` | Custom pool display name. |
+| `spark.node_size` | `Medium` | MemoryOptimized: `Small`, `Medium`, `Large`, `XLarge`, `XXLarge`. |
+| `spark.min_node_count` | `1` | Autoscale floor (scales to 1 node when idle). |
+| `spark.max_node_count` | `10` | 10 Medium (8 vCore) nodes = 80 vCores, inside an F64's 128 base vCores (no bursting). |
+
+`fabric_spark_custom_pool` is a preview Terraform resource, so the provider's
+`preview` mode is enabled automatically only when the custom pool is requested.
 
 ## Generation settings
 
@@ -38,9 +57,13 @@ Important values:
 | Setting | Description |
 | --- | --- |
 | `store_type` | One of `grocery`, `hardware`, `luxury`, or `supercenter`. |
-| `start_date` / `end_date` | Inclusive historical generation date range. |
+| `months` | Months of historical data to generate. The window ends yesterday so streaming continues from today; `start_date`/`end_date` are derived from it. |
 | `store_count` | Number of stores to generate. |
 | `seed` | Deterministic random seed. |
+
+When you run `retail-setup configure`, it asks **how many months** of history to
+generate (not an explicit date range) and then prints an approximate
+record-count estimate so you can gauge the output volume before committing.
 
 The engine also has derived defaults:
 
@@ -49,8 +72,13 @@ The engine also has derived defaults:
 | `silver_db` | `ag` |
 | `gold_db` | `au` |
 | `dc_count` | `max(1, store_count // 10)` |
-| `customer_count` | `store_count * 1000` |
+| `customer_count` | `max(store_count * 1000, 5000)` |
 | `online_orders_per_day` | `store_count * 8` |
+
+`customer_count` is floored at 5,000 so even small-store demos generate enough
+customers for the churn model's train/test split (which needs at least two
+customers in each of its active and churned classes). The floor is a no-op once
+`store_count` reaches 5.
 
 ## Notebook parameters
 
@@ -70,16 +98,23 @@ Rendered setup notebooks receive these tokens:
 
 ## Optional live stream parameters
 
-`setup-05-stream-events.ipynb` is imported manually and configured in Fabric:
+`stream-events.ipynb` is the live streaming generator. It is the long-running
+driver, so it is **not** added to the setup pipeline — start and stop it
+manually. Configure it in Fabric:
 
 | Parameter | Description |
 | --- | --- |
 | `source_rows_per_second` | Spark rate-source rows per second. |
-| `sink` | `eventstream` or `delta`. |
+| `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` for continuous streaming, or a positive test duration. |
-| `eventstream_bootstrap` | Eventstream Custom Endpoint bootstrap server. |
-| `eventstream_name` | Eventstream Custom Endpoint topic/Event Hub name. |
-| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret that stores the connection string. |
+| `kusto_uri` | Leave blank to auto-resolve the Query URI from `kql_database` in this workspace; set it only to target a different cluster. |
+| `kql_database` | KQL database name; default is `retail_eventhouse`. |
+
+With `sink = "eventhouse"`, `stream-events.ipynb` uses Structured Streaming
+`foreachBatch` to split each micro-batch by `event_type` and append each subset
+to the matching Eventhouse table via the Fabric Spark connector for Kusto. See
+[Direct Eventhouse Streaming](../fabric/eventstream.md) for details and the
+Microsoft connector tutorial link.
 
 Do not store secrets in committed configuration files or notebooks.
 

@@ -17,7 +17,7 @@ item, with one tab per file (the tab title is the file name without its
 extension). The queryset's data source is bound to the Eventhouse KQL database:
 
 - `clusterUri` is left empty so fabric-cicd fills it from the deployed KQL
-  database, matched by `databaseItemName` (default `retail_kql`).
+  database, matched by `databaseItemName` (default `retail_eventhouse`).
 - `databaseItemId` carries the `FABRIC_KQL_DATABASE_RESOURCE_ID` placeholder,
   which `parameter.yml` rewrites with the Terraform-provisioned KQL database id.
 

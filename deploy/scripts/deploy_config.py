@@ -16,6 +16,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_ROOT = REPO_ROOT / "deploy"
 CONFIG_ROOT = DEPLOY_ROOT / "config"
 DEFAULT_CONFIG_PATH = CONFIG_ROOT / "deploy.yml"
+
+# Source-workspace GUIDs embedded in the committed Data Agent datasource configs
+# (fabric/data-agents/*.DataAgent). They are exported from the authoring
+# workspace and must be remapped to the target workspace at publish time via
+# generated parameter.yml rules. The semantic-model GUID resolves to the deployed
+# SemanticModel; the source workspace GUID resolves to the target workspace. The
+# ontology GUID points at a runtime-created artifact (the ontology notebook makes
+# it), so it cannot be resolved at deploy time and is rebound after that runs.
+DATA_AGENT_SOURCE_WORKSPACE_ID = "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
 
 
@@ -69,15 +79,19 @@ class PowerBIConfig:
 
 
 @dataclass(frozen=True)
-class EventstreamConfig:
-    """Fabric Eventstream deployment configuration."""
+class SparkConfig:
+    """Custom Spark pool configuration for setup runs.
 
-    enabled: bool
-    name: str
-    eventhub_connection_id: str | None
-    eventhub_namespace: str | None
-    eventhub_name: str | None
-    consumer_group: str
+    When ``use_custom_pool`` is true the deploy creates a workspace custom Spark
+    pool and makes it the workspace default pool so the setup pipeline notebooks
+    run on it. Defaults are tuned for an F64 capacity (128 base Spark vCores).
+    """
+
+    use_custom_pool: bool
+    custom_pool_name: str
+    node_size: str
+    min_node_count: int
+    max_node_count: int
 
 
 @dataclass(frozen=True)
@@ -104,7 +118,7 @@ class DeployConfig:
     eventhouse: EventhouseConfig
     notebooks: NotebooksConfig
     powerbi: PowerBIConfig
-    eventstream: EventstreamConfig
+    spark: SparkConfig
     deployment: DeploymentConfig
 
 
@@ -173,7 +187,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     eventhouse = data.get("eventhouse", {})
     notebooks = data.get("notebooks", {})
     powerbi = data.get("powerbi", {})
-    eventstream = data.get("eventstream", {})
+    spark = data.get("spark", {})
     deployment = data.get("deployment", {})
     auth = data.get("auth", {})
 
@@ -229,15 +243,12 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             ),
             refresh_after_deploy=bool(powerbi.get("refresh_after_deploy", False)),
         ),
-        eventstream=EventstreamConfig(
-            enabled=bool(eventstream.get("enabled", False)),
-            name=str(eventstream.get("name", "retail_eventstream")),
-            eventhub_connection_id=_optional_string(
-                eventstream.get("eventhub_connection_id")
-            ),
-            eventhub_namespace=_optional_string(eventstream.get("eventhub_namespace")),
-            eventhub_name=_optional_string(eventstream.get("eventhub_name")),
-            consumer_group=str(eventstream.get("consumer_group", "$Default")),
+        spark=SparkConfig(
+            use_custom_pool=bool(spark.get("use_custom_pool", False)),
+            custom_pool_name=str(spark.get("custom_pool_name", "retail_setup_pool")),
+            node_size=str(spark.get("node_size", "Medium")),
+            min_node_count=int(spark.get("min_node_count", 1)),
+            max_node_count=int(spark.get("max_node_count", 10)),
         ),
         deployment=DeploymentConfig(
             item_types_in_scope=[
@@ -288,10 +299,16 @@ def render_tfvars(config: DeployConfig) -> str:
         "lakehouse_name": config.lakehouse.name,
         "lakehouse_enable_schemas": config.lakehouse.enable_schemas,
         "eventhouse_name": config.eventhouse.name,
-        "kql_database_name": config.eventhouse.kql_database_name,
-        "eventstream_enabled": config.eventstream.enabled,
-        "eventstream_name": config.eventstream.name,
+        "spark_custom_pool_enabled": config.spark.use_custom_pool,
     }
+
+    # Pool sizing only matters when the custom pool is enabled; emit it then so
+    # the default (starter-pool) tfvars stays minimal.
+    if config.spark.use_custom_pool:
+        values["spark_custom_pool_name"] = config.spark.custom_pool_name
+        values["spark_node_size"] = config.spark.node_size
+        values["spark_min_node_count"] = config.spark.min_node_count
+        values["spark_max_node_count"] = config.spark.max_node_count
 
     optional_values = {
         "tenant_id": config.tenant_id,
@@ -445,6 +462,30 @@ def render_parameter_file(
                 }
             ]
         }
+
+    # Data Agent datasource configs reference the source workspace and the
+    # semantic model by GUID. Remap them to the target workspace and the deployed
+    # SemanticModel so the agents bind in the new workspace. (The ontology agent's
+    # ontology GUID points at a runtime-created artifact and is left as-is; it is
+    # rebound after the ontology notebook runs.)
+    parameters["find_replace"].extend(
+        [
+            {
+                "find_value": DATA_AGENT_SOURCE_WORKSPACE_ID,
+                "replace_value": {config.environment: "$workspace.$id"},
+                "item_type": "DataAgent",
+            },
+            {
+                "find_value": DATA_AGENT_SEMANTIC_MODEL_ID,
+                "replace_value": {
+                    config.environment: (
+                        f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
+                    )
+                },
+                "item_type": "DataAgent",
+            },
+        ]
+    )
 
     return parameters
 
