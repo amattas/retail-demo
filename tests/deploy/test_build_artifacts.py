@@ -29,12 +29,36 @@ def test_stage_notebook_creates_platform_and_notebook_content(tmp_path: Path) ->
         "displayName": "01-create-bronze-shortcuts",
     }
     notebook = json.loads((staged / "notebook-content.ipynb").read_text(encoding="utf-8"))
+    lakehouse_logical_id = build_artifacts._logical_id("Lakehouse", "retail_lakehouse")
     assert notebook["metadata"]["dependencies"]["lakehouse"] == {
-        "default_lakehouse": "$items.Lakehouse.retail_lakehouse.$id",
+        "default_lakehouse": lakehouse_logical_id,
         "default_lakehouse_name": "retail_lakehouse",
-        "default_lakehouse_workspace_id": "$workspace.$id",
-        "known_lakehouses": [{"id": "$items.Lakehouse.retail_lakehouse.$id"}],
+        "default_lakehouse_workspace_id": "00000000-0000-0000-0000-000000000000",
+        "known_lakehouses": [{"id": lakehouse_logical_id}],
     }
+
+
+def test_notebook_lakehouse_binding_matches_staged_lakehouse_logical_id(tmp_path: Path) -> None:
+    """The notebook's default-lakehouse id must equal the staged Lakehouse shell's
+    .platform logicalId so fabric-cicd resolves it to the deployed lakehouse GUID
+    (the $items.Lakehouse.<name>.$id token does NOT resolve in raw item content)."""
+
+    source = tmp_path / "fabric" / "lakehouse" / "01-create-bronze-shortcuts.ipynb"
+    _write_json(source, {"metadata": {}, "cells": [], "nbformat": 4, "nbformat_minor": 5})
+    output = tmp_path / "deploy" / "workspace"
+
+    lakehouse_dir = build_artifacts.stage_shell_item(output, "retail_lakehouse", "Lakehouse")
+    notebook_dir = build_artifacts.stage_notebook(source, output)
+
+    platform = json.loads((lakehouse_dir / ".platform").read_text(encoding="utf-8"))
+    notebook = json.loads((notebook_dir / "notebook-content.ipynb").read_text(encoding="utf-8"))
+    binding = notebook["metadata"]["dependencies"]["lakehouse"]
+
+    assert binding["default_lakehouse"] == platform["config"]["logicalId"]
+    assert binding["known_lakehouses"][0]["id"] == platform["config"]["logicalId"]
+    # No unresolved fabric-cicd tokens may leak into published notebook content.
+    assert "$workspace" not in json.dumps(notebook)
+    assert "$items" not in json.dumps(notebook)
 
 
 def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
