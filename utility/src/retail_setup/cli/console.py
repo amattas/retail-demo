@@ -132,6 +132,7 @@ class _Keyboard:
 
     # -- background ESC watcher ----------------------------------------------
     def start_watch(self) -> None:
+        self._stop.clear()  # re-arm after a previous stop_watch() (e.g. paused())
         if not self.available or self._thread is not None:
             return
         if self._impl == "posix" and not self._enter_cbreak():

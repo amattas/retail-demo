@@ -103,6 +103,19 @@ def test_disabled_by_no_ui_env(monkeypatch):
     assert ui.enabled is False
 
 
+def test_keyboard_start_watch_rearms_stop():
+    # Regression: after an interactive child (paused() -> stop_watch), the next
+    # footer prompt must read keys again. start_watch() must clear the _stop event
+    # or read_key_blocking() returns immediately and prompts silently no-op.
+    from retail_setup.cli.console import _Keyboard
+
+    kb = _Keyboard(lambda: None)
+    kb.stop_watch()
+    assert kb._stop.is_set()
+    kb.start_watch()
+    assert not kb._stop.is_set()
+
+
 # --- line-edit logic -------------------------------------------------------- #
 def test_edit_buffer_transitions():
     assert edit_buffer("ab", "c") == ("abc", "edit")
