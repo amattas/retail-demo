@@ -11,7 +11,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 **Deliverables**:
 - ✅ Create `fabric/*` asset folders with build specs (README, AGENTS, CLAUDE per directory)
 - ✅ Initialize docs site (now Docusaurus) and update root guides
-- ✅ Define data contracts in datagen (schemas, event types, fact tables)
+- ✅ Define data contracts in the data generator (schemas, event types, fact tables)
 - ✅ Implement data generator (master data, historical facts, real-time streaming)
 
 **Acceptance Criteria**:
@@ -76,7 +76,7 @@ This roadmap outlines the phased implementation of the Microsoft Fabric Real-Tim
 - [ ] Enable Fabric Copilot on KQL database and validate NL queries
 
 **Acceptance Criteria**:
-- Silver tables match historical fact schemas from datagen
+- Silver tables match historical fact schemas from the data generator
 - Gold aggregates update daily via pipelines
 - Semantic Model supports both real-time and historical analysis
 - Copilot correctly interprets 10+ common business questions

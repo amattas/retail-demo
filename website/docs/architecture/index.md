@@ -46,21 +46,24 @@ This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthet
 
 ## Components
 
-### Datagen (`datagen/`)
-Python package for synthetic retail data generation.
+### Data generator (`utility/`)
+The Fabric-native `retail-setup` utility generates synthetic retail data directly in Fabric Spark via the setup notebooks, and renders/deploys the Fabric items.
 
 | Module | Purpose |
 |--------|---------|
-| `master_generators/` | Dimension tables (stores, customers, products, DCs, trucks) |
-| `fact_generators/` | 18 fact tables (receipts, inventory, logistics, marketing) |
-| `retail_patterns/` | Business logic (customer journey, inventory flow, campaigns) |
-| `streaming/` | Legacy real-time event streaming reference code |
+| `src/retail_setup/generation/` | Spark-native dimension, fact, and Gold generation, the table contract (`schemas.py`), and cross-table invariants |
+| `src/retail_setup/dictionaries/` | JSON seed dictionaries and store-type profiles |
+| `src/retail_setup/config/` | Generation and deployment configuration models |
+| `src/retail_setup/cli/` | `retail-setup` CLI (`configure`/`render`/`deploy`) |
+| `notebooks/templates/` | Notebook driver templates, including the `stream-events` live driver (`driver-05-stream.py`) |
 
 **Key features:**
-- DuckDB for local analytical storage
-- Pydantic models with validation
+- Deterministic, seeded Spark generation (reproducible runs)
+- Outputs Delta tables to the Lakehouse (Silver `ag`, Gold `au`)
 - Realistic temporal patterns (seasonality, dayparts, holidays)
-- Configurable via `config.json`
+- Configurable via `utility/config.yaml` and deploy environment YAML
+
+> The legacy FastAPI/DuckDB/Event Hub generator is retained under `datagen-deprecated/` for reference only.
 
 ### Fabric KQL Database (`fabric/kql_database/`)
 Eventhouse schema and queries.
@@ -109,7 +112,7 @@ All events use a standard envelope:
 }
 ```
 
-The 18 event types and payload models are defined in `datagen/src/retail_datagen/streaming/schemas.py`. Events that fail to match a known type land in the `unknown_event` KQL table.
+The 18 event types and payload models are defined in `utility/notebooks/templates/driver-05-stream.py`. Events that fail to match a known type land in the `unknown_event` KQL table.
 
 ---
 

@@ -7,11 +7,11 @@ Source-of-truth schemas derive from the data generator.
 **Standard:** All column names use `snake_case` throughout the data pipeline.
 
 **Rationale:**
-- Aligns with Python (PEP 8) naming conventions used in datagen
+- Aligns with Python (PEP 8) naming conventions used in the data generator
 - Consistent with KQL table names and event types
 - Avoids case-sensitivity issues across platforms
 
-**Scope:** DuckDB, KQL tables, Lakehouse Silver/Gold tables
+**Scope:** KQL tables, Lakehouse Silver/Gold tables
 
 **Examples:** `event_ts`, `receipt_id_ext`, `customer_id`, `store_id`
 
@@ -20,10 +20,10 @@ Source-of-truth schemas derive from the data generator.
 ---
 
 Event Envelope:
-- See `datagen/src/retail_datagen/streaming/schemas.py` for `EventEnvelope` and payloads.
+- See `utility/notebooks/templates/driver-05-stream.py` for the event envelope and payloads.
 - Event types (18 total): `receipt_created`, `receipt_line_added`, `payment_processed`, `inventory_updated`, `stockout_detected`, `reorder_triggered`, `customer_entered`, `customer_zone_changed`, `ble_ping_detected`, `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`, `ad_impression`, `promotion_applied`, `online_order_created`, `online_order_picked`, `online_order_shipped`.
 
-Historical Facts and Dimensions (current DuckDB):
+Historical Facts and Dimensions (Lakehouse Silver `ag`):
 - Dimensions (`dim_*`):
   - dim_geographies: ID, City, State, ZipCode, District, Region
   - dim_stores: ID, StoreNumber, Address, GeographyID, tax_rate, volume_class, store_format, operating_hours, daily_traffic_multiplier
@@ -103,6 +103,6 @@ Gold tables are pre-aggregated for dashboards. They are built by `02-historical-
 
 ### Notes
 
-- Silver columns mirror datagen historical facts materialized in DuckDB
+- Silver columns mirror the historical fact schemas produced by the `utility` setup notebooks
 - Bronze is accessed via shortcuts: `Tables/cusn/<event_table>` (Eventhouse) and `Files/<table_name>` (ADLS parquet)
 - Online orders are split into headers and lines to match the generator schema; streaming pick/ship status events land in `ag.fact_online_order_status`

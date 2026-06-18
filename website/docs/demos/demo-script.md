@@ -1,6 +1,6 @@
 # Presenter Demo Script — Retail Fabric RTI
 
->Audience: Retail ops/IT stakeholders. Goal: show end-to-end live analytics built entirely on synthetic data from `datagen` streaming into Microsoft Fabric RTI.
+>Audience: Retail ops/IT stakeholders. Goal: show end-to-end live analytics built entirely on synthetic data from the data generator streaming into Microsoft Fabric RTI.
 
 Agenda (15–20 minutes)
 - 1 min: Context and architecture
@@ -10,7 +10,7 @@ Agenda (15–20 minutes)
 
 1) Set the stage (Architecture)
 - Open docs page [Architecture](../architecture/index.md) and highlight: stream-events notebook → Eventhouse/KQL DB (hot), with Lakehouse Bronze reading the same event tables via shortcuts.
-- Emphasize: all data is synthetic; schemas from `datagen/src/retail_datagen/streaming/schemas.py`.
+- Emphasize: all data is synthetic; schemas from `utility/src/retail_setup/generation/schemas.py`.
 
 2) Start live data
 - In Fabric, open `stream-events.ipynb`, set `sink = "eventhouse"` and `kql_database = "retail_eventhouse"` (leave `kusto_uri` blank to auto-resolve), then run it.

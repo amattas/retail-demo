@@ -13,18 +13,20 @@ description: Describes the primary technologies, frameworks, libraries, and lang
 
 | Language | Usage | Version |
 |----------|-------|---------|
-| Python | datagen, notebooks | 3.10+ |
+| Python | utility (retail-setup), notebooks | 3.11+ |
 | PySpark | Fabric notebooks | Spark 3.x |
 | KQL | Eventhouse queries | N/A |
 | JSON/YAML | Fabric item definitions | N/A |
 
 ## Frameworks & Libraries
 
-### Data Generation (datagen)
-- **DuckDB**: Local analytical database for historical data
-- **Faker**: Synthetic data generation
-- **Pydantic**: Data validation and event schemas
-- **azure-eventhub**: Event streaming to Azure
+### Data Generation (utility / `retail-setup`)
+- **PySpark**: Deterministic, Spark-native generation (Fabric provides Spark at runtime)
+- **Pydantic v2**: Configuration models and validation
+- **Typer**: `retail-setup` CLI (configure/render/deploy)
+- **PyYAML**: Configuration files
+
+> The legacy DuckDB/FastAPI/Event Hub generator lives under `datagen-deprecated/`.
 
 ### Lakehouse
 - **Delta Lake**: ACID transactions, schema enforcement
@@ -32,16 +34,15 @@ description: Describes the primary technologies, frameworks, libraries, and lang
 
 ### Real-Time Analytics
 - **Microsoft Fabric Eventhouse**: KQL-based analytics
-- **Eventstream**: Event routing and transformation
+- **Spark Kusto connector**: Direct event writes from `stream-events.ipynb` to Eventhouse
 
 ## Project Architecture
 
 ```
 Event Flow:
-  datagen (Python)
-    → Azure Event Hubs
-    → Eventstream
-    → KQL Tables + Lakehouse Bronze
+  stream-events.ipynb (PySpark)
+    → Eventhouse KQL tables (Spark Kusto connector)
+    → Lakehouse Silver (ag) → Gold (au)
 
 Data Layers:
   Bronze (raw JSON)
@@ -52,10 +53,10 @@ Data Layers:
 
 ## Key Dependencies
 
-See `datagen/pyproject.toml` for Python dependencies.
+See `utility/pyproject.toml` for Python dependencies.
 
 Core packages:
-- `pydantic` - Schema validation
-- `duckdb` - Local analytics
-- `faker` - Data generation
-- `azure-eventhub` - Event streaming
+- `pydantic` - Configuration and schema validation
+- `typer` - `retail-setup` CLI
+- `pyyaml` - Configuration files
+- `pyspark` - Generation runtime (local dev/test; Fabric provides Spark)

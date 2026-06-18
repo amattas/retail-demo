@@ -290,7 +290,7 @@ validation_summary = rules.get_validation_summary()
 ## 🧪 Testing & Validation
 
 ```bash
-cd datagen
+cd datagen-deprecated
 
 # Full test suite
 python -m pytest tests/

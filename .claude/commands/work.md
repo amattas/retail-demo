@@ -49,10 +49,10 @@ Execute the following workflow to process GitHub issues systematically.
    - Follow CLAUDE.md guidelines
    - Write tests for changes
 4. Run local verification:
-   - `ruff check datagen/` - Linting
-   - `ruff format datagen/` - Formatting
-   - `mypy datagen/src/` - Type checking
-   - `pytest datagen/tests/` - Tests
+   - `ruff check utility/` - Linting
+   - `ruff format utility/` - Formatting
+   - `mypy utility/src/` - Type checking
+   - `pytest utility/tests/` - Tests
 
 ## Phase 5: Pull Request
 

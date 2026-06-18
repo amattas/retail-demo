@@ -9,13 +9,16 @@ This file defines how Claude orchestrates subagents and skills for the SDLC in t
 Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generation.
 
 ### Key Components
-- **datagen**: Python package for synthetic retail data generation (DuckDB, Event Hubs)
+- **utility**: Fabric-native `retail-setup` utility (CLI: configure/render/deploy) and setup notebooks that generate synthetic retail data directly in Fabric Spark (active path)
+- **deploy**: Terraform + fabric-cicd deployment framework
 - **fabric/kql_database**: KQL scripts for Eventhouse tables, functions, materialized views
-- **fabric/notebooks**: PySpark notebooks for Lakehouse Bronze -> Silver -> Gold transforms
+- **fabric/lakehouse**: PySpark notebooks for Lakehouse Bronze -> Silver -> Gold transforms and ML
 - **utility stream-events notebook**: Spark Structured Streaming that writes synthetic events directly to the Eventhouse KQL tables via the Spark Kusto connector
+- **datagen-deprecated**: Legacy FastAPI/DuckDB/Event Hub generator, retained for reference only
 
 ### Reference Files
-- Event schemas: `datagen/src/retail_datagen/streaming/schemas.py`
+- Streaming event payloads: `utility/notebooks/templates/driver-05-stream.py`
+- Lakehouse table contract: `utility/src/retail_setup/generation/schemas.py`
 - KQL tables: `fabric/kql_database/01-create-tables.kql`
 - Silver transforms: `fabric/lakehouse/03-streaming-to-silver.ipynb`
 - Gold aggregations: `fabric/lakehouse/04-streaming-to-gold.ipynb`
@@ -68,7 +71,7 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generatio
 
 | Agent | Skills | Scope |
 |-------|--------|-------|
-| `component-impl-backend` | coding-standards, tech-stack | Python code (datagen) |
+| `component-impl-backend` | coding-standards, tech-stack | Python code (utility) |
 | `component-impl-worker` | coding-standards, tech-stack | KQL scripts, notebooks |
 | `test-writer` | testing-guidelines | Test files |
 | `doc-writer` | documentation-standards | Documentation |
@@ -103,13 +106,18 @@ retail-demo/
 ├── .mcp.json           # MCP server configuration
 ├── context/            # Wave A outputs
 ├── templates/          # Document templates
-├── datagen/            # Python data generator
+├── utility/            # Fabric-native retail-setup utility + setup notebooks (active)
+├── deploy/             # Terraform + fabric-cicd deployment framework
+├── scripts/            # setup.ps1/setup.py bootstrap + semantic-model helpers
+├── datagen-deprecated/ # Legacy FastAPI/DuckDB/Event Hub generator (reference only)
 ├── fabric/
 │   ├── kql_database/   # KQL scripts
-│   ├── notebooks/      # PySpark notebooks
+│   ├── lakehouse/      # PySpark notebooks (setup, transforms, ML)
+│   ├── pipelines/      # Fabric data pipelines
 │   ├── dashboards/     # Real-time dashboards
 │   └── powerbi/        # Power BI model
-└── docs/               # Documentation
+├── website/            # Docusaurus documentation site
+└── docs/               # Design specs and plans
 ```
 
 ## Global Norms
@@ -126,13 +134,13 @@ retail-demo/
 **Standard:** Use `snake_case` for all column names throughout the data pipeline.
 
 **Rationale:**
-- Aligns with Python (PEP 8) naming conventions used in datagen
+- Aligns with Python (PEP 8) naming conventions used in the data generator
 - Consistent with KQL table names and event types
 - Avoids case-sensitivity issues across platforms
 - Improves readability in SQL and KQL queries
 
 **Scope:**
-- DuckDB dimension and fact tables (datagen output)
+- Lakehouse Silver dimension and fact tables (utility generator output)
 - KQL event tables in Eventhouse (cusn schema)
 - Lakehouse Silver tables (ag schema)
 - Lakehouse Gold tables (au schema)
@@ -160,8 +168,9 @@ retail-demo/
 **Critical:** When implementing transforms that map event data to fact/dimension tables:
 
 1. **Always reference source schemas first** before writing transform code
-   - Event schemas: `datagen/src/retail_datagen/streaming/schemas.py`
-   - Find the relevant Pydantic model (e.g., `ReorderTriggeredPayload`)
+   - Streaming event payloads: `utility/notebooks/templates/driver-05-stream.py` (`EVENT_PAYLOADS`)
+   - Lakehouse table contract: `utility/src/retail_setup/generation/schemas.py` (`TABLES`)
+   - Find the relevant event payload (e.g., `reorder_triggered`)
    - Verify exact field names and types in the source schema
 
 2. **Validate field mappings** by cross-referencing:
@@ -176,7 +185,7 @@ retail-demo/
 
 **Example workflow:**
 ```
-1. Read event schema: datagen/src/retail_datagen/streaming/schemas.py
+1. Read event payloads: utility/notebooks/templates/driver-05-stream.py
 2. Identify exact field names (e.g., reorder_quantity, not quantity_ordered)
 3. Write transform using F.col("reorder_quantity")
 4. Validate against both source schema and target table
@@ -197,14 +206,12 @@ retail-demo/
 
 ## Open Issues
 
-See GitHub issues #7-#13 for missing fact tables in datagen:
-- #7: fact_payments
-- #8: fact_stockouts
-- #9: fact_reorders
-- #10: fact_promotions
-- #11: fact_store_ops
-- #12: fact_customer_zone_changes
-- #13: truck_departed events
+The fact tables formerly tracked in issues #7-#13 (fact_payments, fact_stockouts,
+fact_reorders, fact_promotions, fact_store_ops, fact_customer_zone_changes) and the
+`truck_departed` event are all implemented — see
+`utility/src/retail_setup/generation/schemas.py` and
+`utility/notebooks/templates/driver-05-stream.py`. Check the GitHub issue tracker
+for current open work.
 
 ---
 

@@ -6,7 +6,7 @@ This document maps batch parquet fact tables to their corresponding streaming ev
 
 ## Architecture Context
 
-- **Batch Parquet** (`Files/fact_*`): Historical data from datagen, uploaded to ADLSv2 and surfaced via Lakehouse `Files/` shortcuts
+- **Batch Parquet** (`Files/fact_*`): Historical data from the data generator, uploaded to ADLSv2 and surfaced via Lakehouse `Files/` shortcuts
 - **Streaming Events** (`cusn.receipt_created`, etc.): Real-time events from Eventhouse, surfaced via `Tables/cusn/` shortcuts
 - **Silver** (`ag.fact_*`): Batch data is loaded once by `02-historical-data-load.ipynb`; streaming events are then appended incrementally by `03-streaming-to-silver.ipynb`
 
@@ -272,7 +272,7 @@ Each event type is processed by `process_events(source_table, target_table, tran
 
 To add streaming support for a new event type:
 
-1. **Verify Event Schema**: Check `fabric/kql_database/01-create-tables.kql` and the Pydantic payload model in `datagen/src/retail_datagen/streaming/schemas.py`
+1. **Verify Event Schema**: Check `fabric/kql_database/01-create-tables.kql` and the event payload definition in `utility/notebooks/templates/driver-05-stream.py`
 2. **Create Transform Function**: Add to `03-streaming-to-silver.ipynb`
    ```python
    def transform_{event_name}(df):
@@ -289,14 +289,14 @@ To add streaming support for a new event type:
 ## Schema Evolution Guidance
 
 ### When Batch Schema Changes
-1. Update datagen field mappings in `datagen/src/retail_datagen/generators/fact_generators/field_mapping.py`
+1. Update the Lakehouse table contract in `utility/src/retail_setup/generation/schemas.py`
 2. Regenerate parquet files with new schema
 3. Upload to ADLSv2 (overwrite or new partition)
 4. Bronze shortcuts automatically reflect new schema
 5. Update Silver transform functions if field names changed
 
 ### When Streaming Schema Changes
-1. Update Pydantic event models in `datagen/src/retail_datagen/streaming/schemas.py`
+1. Update the event payload definitions in `utility/notebooks/templates/driver-05-stream.py`
 2. Update KQL event table definitions in `fabric/kql_database/01-create-tables.kql` and mappings in `02-create-ingestion-mappings.kql`
 3. Eventhouse shortcuts automatically reflect new schema
 4. Update transform functions in `03-streaming-to-silver.ipynb` for affected mappings
@@ -313,6 +313,6 @@ To add streaming support for a new event type:
 
 - [Architecture](./index.md)
 - [Streaming Implementation Status](./streaming-implementation-status.md)
-- [Field Mapping Reference](https://github.com/amattas/retail-demo/blob/main/datagen/src/retail_datagen/generators/fact_generators/field_mapping.py)
+- [Table Contract Reference](https://github.com/amattas/retail-demo/blob/main/utility/src/retail_setup/generation/schemas.py)
 - [KQL Event Schemas](https://github.com/amattas/retail-demo/blob/main/fabric/kql_database/01-create-tables.kql)
 - [Silver Transformation Notebook](https://github.com/amattas/retail-demo/blob/main/fabric/lakehouse/03-streaming-to-silver.ipynb)

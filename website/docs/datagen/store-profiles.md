@@ -179,7 +179,7 @@ Tests validate:
 Run the variability tests with:
 
 ```bash
-cd datagen
+cd datagen-deprecated
 python -m pytest tests/unit/test_store_profile_variability.py -v
 ```
 
