@@ -9,6 +9,16 @@ from pydantic import BaseModel, Field, model_validator
 
 from retail_setup.dictionaries.loader import available_store_types, default_dictionary_root
 
+# Minimum number of synthetic customers, regardless of store_count. The churn
+# model (fabric/lakehouse/09-ml-churn-prediction.ipynb) needs at least two
+# customers in each class (active / churned) to build a train/test split. With
+# geography affinity concentrating purchases on nearby customers, very small
+# customer pools (e.g. a 1-store demo deriving 1,000) can leave fewer than two
+# churned customers and abort training. Flooring the count keeps small-store
+# demos trainable. This is a no-op for store_count >= 5, where the derived
+# value (store_count * 1000) already exceeds the floor.
+MIN_CUSTOMER_COUNT = 5000
+
 
 def _subtract_months(anchor: date, months: int) -> date:
     """Return the date ``months`` calendar months before ``anchor`` (day clamped)."""
@@ -94,6 +104,10 @@ class GenerationConfig(BaseModel):
             self.dc_count = max(1, self.store_count // 10)
         if self.customer_count is None:
             self.customer_count = self.store_count * 1000
+        # Guarantee enough customers for the churn model's two-class train/test
+        # split; see MIN_CUSTOMER_COUNT above. Applied to the final value so an
+        # explicitly small customer_count is lifted too.
+        self.customer_count = max(self.customer_count, MIN_CUSTOMER_COUNT)
         if self.online_orders_per_day is None:
             self.online_orders_per_day = self.store_count * 8
         return self
