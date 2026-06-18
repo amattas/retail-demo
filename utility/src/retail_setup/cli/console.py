@@ -519,11 +519,14 @@ class ConsoleUI:
     # -- pausing for interactive child processes -----------------------------
     @contextmanager
     def paused(self) -> Iterator[None]:
-        """Freeze the panel and release the terminal/keyboard to a child process.
+        """Release the whole terminal to an interactive child process.
 
-        The fixed footer stays drawn (so it isn't lost), but the spinner stops
-        animating and ESC watching pauses so the child can read stdin and print
-        in the scroll region above the panel.
+        A child process (``configure``'s many prompts, or ``deploy`` with its own
+        console) can't share our fixed footer, and its output would otherwise
+        collide with or overflow into the panel. So we tear the panel down — drop
+        the scroll region, clear the reserved lines, show the cursor — giving the
+        child a normal full-height terminal. The bar, separator, and footer are
+        rebuilt as soon as the child returns.
         """
         if not self._active:
             yield
@@ -535,11 +538,22 @@ class ConsoleUI:
         if self._keyboard is not None:
             self._keyboard.pause()
             self._keyboard.stop_watch()
+        with self._lock:
+            self._write(f"{CSI}r")  # release the scroll region
+            for row in (self._rows - 2, self._rows - 1, self._rows):
+                self._write(f"{CSI}{row};1H{CSI}2K")  # clear the panel rows
+            self._write(f"{CSI}{self._rows - 2};1H")  # cursor where the panel was
+            self._write(f"{CSI}?25h")  # show cursor for the child
+            self._flush()
         try:
             yield
         finally:
             with self._lock:
                 self._cols, self._rows = self._term_size()
+                self._write(f"{CSI}?25l")  # hide cursor again
+                region_bottom = self._rows - _PANEL_LINES
+                self._write(f"{CSI}{1};{region_bottom}r")  # re-establish region
+                self._write(f"{CSI}{region_bottom};1H")  # park cursor in the region
                 self._draw_panel()
                 self._flush()
             if self._keyboard is not None:
