@@ -50,23 +50,12 @@ def _check_cancelled() -> None:
         raise SystemExit(130)
 
 
-def _try_pip_install(package: str) -> bool:
-    """Best-effort, quiet install of a single package into this interpreter."""
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-q", package], check=True
-        )
-        return True
-    except Exception:
-        return False
-
-
 def _load_console() -> Any:
     """Return the guided ConsoleUI class for an interactive run, or None.
 
-    Imported lazily (installing ``alive-progress`` if needed) so this script
-    still runs on the standard library alone when there is no terminal or the
-    dependency is unavailable. Honors ``RETAIL_SETUP_NO_UI`` and requires a TTY.
+    Imported lazily so this script still runs on the standard library alone when
+    there is no terminal. The console itself has no third-party dependency.
+    Honors ``RETAIL_SETUP_NO_UI`` and requires a TTY.
     """
     if os.environ.get("RETAIL_SETUP_NO_UI", "").lower() in ("1", "true", "yes"):
         return None
@@ -75,11 +64,6 @@ def _load_console() -> Any:
             return None
     except Exception:
         return None
-    try:
-        import alive_progress  # noqa: F401
-    except Exception:
-        if not _try_pip_install("alive-progress"):
-            return None
     src = REPO_ROOT / "utility" / "src"
     if src.is_dir() and str(src) not in sys.path:
         sys.path.insert(0, str(src))
