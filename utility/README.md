@@ -42,7 +42,7 @@ On Windows, from the repository root:
 ```
 
 `setup.ps1` works even with nothing installed. If conda is installed it uses a
-`retail-demo` conda environment (created with Python 3.14 when missing);
+`retail-demo` conda environment (created with Python 3.13 when missing);
 otherwise it uses a local `.venv` (created from a system Python 3.11+); and if
 neither is available it installs Miniforge with winget. It activates that
 environment, delegates to `scripts\setup.py`, and then switches your shell back

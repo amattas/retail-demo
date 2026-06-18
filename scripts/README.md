@@ -7,7 +7,7 @@ Utility scripts for configuring and deploying the retail demo components.
 Guided Windows bootstrap. It prepares a Python environment, delegates to
 `setup.py`, then switches your shell back to the environment that was active
 before it ran. It uses a conda environment named `retail-demo` (created with
-Python 3.14 when missing) if conda is installed; otherwise a local `.venv` in
+Python 3.13 when missing) if conda is installed; otherwise a local `.venv` in
 the repo root (created from a system Python 3.11+ when missing); and if neither
 is available, it installs Miniforge with winget. All arguments are forwarded.
 
