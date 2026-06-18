@@ -9,7 +9,7 @@
 
     Environment selection order:
       1. If conda is installed, use a conda environment named 'retail-demo'
-         (created with Python 3.14 when it does not exist) and activate it.
+         (created with Python 3.13 when it does not exist) and activate it.
       2. Otherwise, if a local virtual environment (.venv in the repo root)
          exists, activate it; if it does not exist, create it from a suitable
          system Python (3.11+) and activate it.
@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $SetupPy = Join-Path $PSScriptRoot 'setup.py'
 $CondaEnvName = 'retail-demo'
-$CondaPythonVersion = '3.14'
+$CondaPythonVersion = '3.13'
 $VenvPath = Join-Path $RepoRoot '.venv'
 
 function Get-EnvSnapshot {
