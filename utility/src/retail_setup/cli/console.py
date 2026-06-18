@@ -44,27 +44,30 @@ _ANSI = {
 }
 
 # Dancing-shrug spinner frames, in the order requested: both up, left down, both
-# up, right down, both up, both down, both up, both down. ``¯`` is a raised hand;
-# dropping it to ``_`` lowers that arm.
+# up, right down, both up, both down, both up, both down. The whole arm swings —
+# the forearm slash flips and the hand/shoulder glyphs swap — so it reads as the
+# arm articulating at the shoulder rather than the hand dropping off.
+#   arm up   -> "¯\\_" (left) / "_/¯" (right)   hand high, forearm out
+#   arm down -> "_/¯" (left) / "¯\\_" (right)   hand low, forearm in
 _DANCE_UNICODE = (
-    "¯\\_(ツ)_/¯",  # both up
-    "_\\_(ツ)_/¯",  # left down
-    "¯\\_(ツ)_/¯",  # both up
-    "¯\\_(ツ)_/_",  # right down
-    "¯\\_(ツ)_/¯",  # both up
-    "_\\_(ツ)_/_",  # both down
-    "¯\\_(ツ)_/¯",  # both up
-    "_\\_(ツ)_/_",  # both down
+    "¯\\_(ツ)_/¯",   # both up
+    "_/¯(ツ)_/¯",   # left arm down, right up
+    "¯\\_(ツ)_/¯",   # both up
+    "¯\\_(ツ)¯\\_",  # right arm down, left up
+    "¯\\_(ツ)_/¯",   # both up
+    "_/¯(ツ)¯\\_",   # both down
+    "¯\\_(ツ)_/¯",   # both up
+    "_/¯(ツ)¯\\_",   # both down
 )
 _DANCE_ASCII = (
-    "\\o/",  # both up
-    "_o/",   # left down
-    "\\o/",  # both up
-    "\\o_",  # right down
-    "\\o/",  # both up
-    "_o_",   # both down
-    "\\o/",  # both up
-    "_o_",   # both down
+    "\\o/",   # both up
+    "/o/",    # left down, right up
+    "\\o/",   # both up
+    "\\o\\",  # right down, left up
+    "\\o/",   # both up
+    "/o\\",   # both down
+    "\\o/",   # both up
+    "/o\\",   # both down
 )
 
 
