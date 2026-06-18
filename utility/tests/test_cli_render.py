@@ -29,7 +29,13 @@ def test_render_writes_rendered_notebooks(tmp_path):
     assert result.exit_code == 0, result.output
     out = tmp_path / "utility" / "out"
     files = sorted(p.name for p in out.glob("*.ipynb"))
-    assert len(files) == 4
+    assert files == [
+        "setup-01-seed-dictionaries.ipynb",
+        "setup-02-generate-dimensions.ipynb",
+        "setup-03-generate-facts.ipynb",
+        "setup-04-build-gold.ipynb",
+        "stream-events.ipynb",
+    ]
     s1 = (out / "setup-01-seed-dictionaries.ipynb").read_text()
     assert "deadbeef" in s1 and "{{" not in s1
     assert "lh_x" in (out / "setup-02-generate-dimensions.ipynb").read_text()
