@@ -97,6 +97,26 @@ def test_forced_rich_path_renders_progress():
 
 
 @pytest.mark.skipif(not _HAVE_ALIVE, reason="alive_progress not installed")
+def test_log_routes_through_alive_hook_when_bar_active():
+    import contextlib
+    import sys
+
+    # In a real run self._stream IS sys.stdout, so alive renders the bar and its
+    # print hook both target the same stream. Mirror that by redirecting stdout.
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        ui = ConsoleUI(2, title="t", enabled=True, force_tty=True)
+        before = sys.stdout
+        with ui:
+            # alive replaced sys.stdout with its hook so prints scroll above the
+            # pinned bar instead of colliding with it.
+            assert sys.stdout is not before
+            ui.log("a scrolling line")
+        assert sys.stdout is before  # hook uninstalled on exit
+    assert "a scrolling line" in buf.getvalue()
+
+
+@pytest.mark.skipif(not _HAVE_ALIVE, reason="alive_progress not installed")
 def test_dancing_spinner_builds_both_styles():
     # Both the unicode shrug and the ASCII fallback must construct without error.
     assert _dancing_spinner(ascii_only=False) is not None

@@ -334,8 +334,17 @@ class ConsoleUI:
 
     # -- output --------------------------------------------------------------
     def log(self, message: str = "") -> None:
-        """Write a line to the scrolling region above the footer."""
-        print(message, file=self._stream)
+        """Write a line to the scrolling region above the footer.
+
+        When the bar is live, alive_progress has replaced ``sys.stdout`` with a
+        hook that scrolls printed lines above the bar and keeps the bar pinned to
+        the bottom. We must print through that hooked ``sys.stdout`` (not the
+        original stream captured at init) or the line collides with the bar.
+        """
+        if self._bar is not None:
+            print(message)
+        else:
+            print(message, file=self._stream)
 
     def set_phase(self, text: str) -> None:
         if self._bar is not None:
