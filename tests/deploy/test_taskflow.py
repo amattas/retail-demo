@@ -2,7 +2,27 @@
 
 from __future__ import annotations
 
+import pytest
+
 from deploy.scripts import taskflow
+
+
+def test_token_retries_transient_auth_failure(monkeypatch) -> None:
+    """A cold-az ClientAuthenticationError is retried; a later success returns."""
+
+    azcore = pytest.importorskip("azure.core.exceptions")
+    monkeypatch.setattr("time.sleep", lambda *_a: None)
+    calls = {"n": 0}
+
+    class _Cred:
+        def get_token(self, _scope):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise azcore.ClientAuthenticationError("cold az")
+            return type("T", (), {"token": "tok"})()
+
+    assert taskflow._token("scope", _Cred()) == "tok"
+    assert calls["n"] == 2
 
 
 def test_to_portable_resolves_guids_to_names() -> None:

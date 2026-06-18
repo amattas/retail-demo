@@ -174,7 +174,27 @@ def apply_to_database(
     )
     database_name = kql_database_name or resolved_name
     console.info(f"Applying KQL to '{database_name}' @ {query_uri}")
-    response = execute_database_script(query_uri, database_name, script, credential)
+
+    from deploy.scripts._retry import retry_call
+
+    # The Kusto SDK acquires the token inside execute_mgmt; a cold az token can
+    # raise KustoAuthenticationError. Retrying re-runs the (idempotent) script.
+    # The exception type is only available when the Kusto SDK is installed (it is
+    # in the deploy env); without it, retry_on=() simply means "don't retry".
+    try:
+        from azure.kusto.data.exceptions import KustoAuthenticationError
+
+        retry_on: tuple[type[BaseException], ...] = (KustoAuthenticationError,)
+    except ModuleNotFoundError:
+        retry_on = ()
+
+    response = retry_call(
+        lambda: execute_database_script(query_uri, database_name, script, credential),
+        retry_on=retry_on,
+        on_retry=lambda n, exc: console.warn(
+            f"Kusto auth attempt {n} failed ({type(exc).__name__}); retrying..."
+        ),
+    )
 
     frame = _result_to_frame(response)
     _summarize_result(frame)

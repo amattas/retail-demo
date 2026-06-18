@@ -11,6 +11,7 @@ import json
 import subprocess
 import shutil
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -44,6 +45,12 @@ _DEFAULT_END_DATE = date(2025, 3, 31)
 # capacity before the same name can be created again. 30s proved too short, so
 # we wait longer before terraform apply recreates everything.
 _RECREATE_WAIT_SECONDS = 90
+
+# The setup pipeline runs asynchronously in Fabric; the CLI only needs to start
+# it. Retry the start a few times so a single transient failure (e.g. a cold az
+# token right after a long Terraform/publish step) doesn't leave it untriggered.
+_PIPELINE_TRIGGER_ATTEMPTS = 3
+_PIPELINE_TRIGGER_RETRY_WAIT = 10
 
 
 def _default_repo_root() -> Path:
@@ -849,7 +856,20 @@ def _deploy_taskflow(repo_root: Path, env: str) -> None:
 
 
 def _run_setup_pipeline(repo_root: Path, env: str) -> None:
-    """Start an on-demand run of the deployed setup pipeline."""
+    """Start an on-demand run of the deployed setup pipeline.
+
+    Prints a heads-up that generation can take a while (it runs asynchronously in
+    Fabric) and retries the trigger a few times so a transient failure doesn't
+    leave the pipeline unstarted.
+    """
+
+    typer.echo("")
+    _hr("=")
+    typer.echo("  Generating the historical data (dimensions, then facts, then gold).")
+    typer.echo("  This can take a while -- often several minutes to an hour or more,")
+    typer.echo("  depending on the months of history and store count. It runs in")
+    typer.echo("  Fabric, so you can close this and track progress in the workspace.")
+    _hr("=")
 
     cmd = [
         sys.executable,
@@ -861,13 +881,22 @@ def _run_setup_pipeline(repo_root: Path, env: str) -> None:
         "setup-pipeline",
     ]
     typer.echo("    " + " ".join(cmd))
-    result = subprocess.run(cmd, cwd=repo_root)
-    if result.returncode != 0:
-        typer.echo(
-            "Could not start the setup pipeline automatically. Open the workspace "
-            "in Fabric and run 'setup-pipeline' manually.",
-            err=True,
-        )
+    for attempt in range(1, _PIPELINE_TRIGGER_ATTEMPTS + 1):
+        result = subprocess.run(cmd, cwd=repo_root)
+        if result.returncode == 0:
+            return
+        if attempt < _PIPELINE_TRIGGER_ATTEMPTS:
+            typer.echo(
+                f"  Trigger attempt {attempt} failed (exit {result.returncode}); "
+                f"retrying in {_PIPELINE_TRIGGER_RETRY_WAIT}s...",
+                err=True,
+            )
+            time.sleep(_PIPELINE_TRIGGER_RETRY_WAIT)
+    typer.echo(
+        "Could not start the setup pipeline automatically. Open the workspace "
+        "in Fabric and run 'setup-pipeline' manually.",
+        err=True,
+    )
 
 
 if __name__ == "__main__":
