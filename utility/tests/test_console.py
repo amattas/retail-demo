@@ -5,6 +5,7 @@ import pytest
 from retail_setup.cli.console import (
     ConsoleUI,
     _HAVE_ALIVE,
+    _dancing_spinner,
     _plain_text,
     _plain_yes_no,
     use_rich_ui,
@@ -93,3 +94,38 @@ def test_forced_rich_path_renders_progress():
     out = buf.getvalue()
     assert out  # the bar wrote something
     assert "100%" in out  # reached completion
+
+
+@pytest.mark.skipif(not _HAVE_ALIVE, reason="alive_progress not installed")
+def test_dancing_spinner_builds_both_styles():
+    # Both the unicode shrug and the ASCII fallback must construct without error.
+    assert _dancing_spinner(ascii_only=False) is not None
+    assert _dancing_spinner(ascii_only=True) is not None
+
+
+@pytest.mark.skipif(not _HAVE_ALIVE, reason="alive_progress not installed")
+def test_color_styles_title_and_footer(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    buf = io.StringIO()
+    ui = ConsoleUI(2, title="Setup", enabled=True, force_tty=True, stream=buf)
+    assert ui._color is True
+    with ui as u:
+        u.set_phase("Step 1/2: working")
+        u.status("installing")
+        u.advance(completed=1)
+    out = buf.getvalue()
+    assert "\033[1;32m" in out  # green accent on the phase title
+    assert "\033[2m" in out     # dim footer hint
+
+
+@pytest.mark.skipif(not _HAVE_ALIVE, reason="alive_progress not installed")
+def test_no_color_env_disables_color(monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    buf = io.StringIO()
+    ui = ConsoleUI(2, title="Setup", enabled=True, force_tty=True, stream=buf)
+    assert ui._color is False
+    with ui as u:
+        u.set_phase("Step 1/2: working")
+        u.advance(completed=1)
+    out = buf.getvalue()
+    assert "\033[1;32m" not in out  # no ANSI color codes when NO_COLOR is set

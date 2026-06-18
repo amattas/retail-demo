@@ -32,6 +32,34 @@ except Exception:  # pragma: no cover - exercised only when the dep is missing
 
 ESC = "\x1b"
 _DISABLE_ENV = "RETAIL_SETUP_NO_UI"
+_NO_COLOR = "NO_COLOR"
+
+# Copilot-style accent colors (ANSI). Applied only to the title/footer text we
+# render ourselves; the bar fill and spinner stay the terminal default so
+# alive_progress's width math is never thrown off by invisible escape codes.
+_ANSI = {
+    "green": "\033[1;32m",
+    "cyan": "\033[36m",
+    "dim": "\033[2m",
+    "reset": "\033[0m",
+}
+
+
+def _dancing_spinner(ascii_only: bool) -> Any:
+    """A little person dancing at the end of the line while work happens.
+
+    Frames are passed as a single tuple so each full string is one frame (a bare
+    multi-char string would instead animate character-by-character). Falls back
+    to a plain ASCII dancer on legacy code pages that can't render the shrug.
+    """
+    from alive_progress.animations.spinners import frame_spinner_factory
+
+    if ascii_only:
+        # arms wave up -> out -> down -> out
+        return frame_spinner_factory(("\\o/", "|o|", "/o\\", "|o|"))
+    # the classic shrug, arms flapping up then down so it looks like it's dancing
+    return frame_spinner_factory(("¯\\_(ツ)_/¯", "_/¯(ツ)¯\\_"))
+
 
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +241,7 @@ class ConsoleUI:
         self._stream = stream or sys.stdout
         self._force_tty = force_tty
         self.enabled = self._decide_enabled(enabled)
+        self._color = self._supports_color()
         self._bar: Any = None
         self._bar_cm: Any = None
         self._cancel = threading.Event()
@@ -246,6 +275,19 @@ class ConsoleUI:
         enc = (getattr(self._stream, "encoding", "") or "").lower()
         return "utf" not in enc
 
+    def _supports_color(self) -> bool:
+        # Color only when the live bar is shown; honor the NO_COLOR convention.
+        if os.environ.get(_NO_COLOR) is not None:
+            return False
+        return self.enabled
+
+    def _style(self, text: str, *names: str) -> str:
+        """Wrap ``text`` in ANSI styles when color is enabled."""
+        if not self._color or not text:
+            return text
+        prefix = "".join(_ANSI[name] for name in names)
+        return f"{prefix}{text}{_ANSI['reset']}"
+
     def __enter__(self) -> "ConsoleUI":
         if not self.enabled:
             if self.title:
@@ -253,7 +295,7 @@ class ConsoleUI:
             return self
         options: dict[str, Any] = dict(
             manual=True,
-            title=self.title,
+            title=self._style(self.title, "green"),
             enrich_print=False,
             receipt=False,
             dual_line=True,
@@ -266,7 +308,11 @@ class ConsoleUI:
             options["force_tty"] = self._force_tty
         if self._ascii:
             options["bar"] = "classic"
-            options["spinner"] = "classic"
+        try:
+            options["spinner"] = _dancing_spinner(self._ascii)
+        except Exception:
+            if self._ascii:
+                options["spinner"] = "classic"
         self._bar_cm = alive_bar(self.total_steps, **options)
         self._bar = self._bar_cm.__enter__()
         self._refresh_footer()
@@ -294,7 +340,7 @@ class ConsoleUI:
     def set_phase(self, text: str) -> None:
         if self._bar is not None:
             try:
-                self._bar.title = text
+                self._bar.title = self._style(text, "green")
             except Exception:
                 pass
         elif not self.enabled:
@@ -320,7 +366,11 @@ class ConsoleUI:
     def _refresh_footer(self) -> None:
         if self._bar is None:
             return
-        parts = [p for p in (self._status, self.hint) if p]
+        parts = []
+        if self._status:
+            parts.append(self._style(self._status, "cyan"))
+        if self.hint:
+            parts.append(self._style(self.hint, "dim"))
         try:
             self._bar.text("  ·  ".join(parts))
         except Exception:
