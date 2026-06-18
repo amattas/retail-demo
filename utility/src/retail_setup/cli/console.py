@@ -339,6 +339,17 @@ class ConsoleUI:
 
     # -- prompts -------------------------------------------------------------
     @contextmanager
+    def paused(self) -> Iterator[None]:
+        """Public context manager: suspend the bar and ESC watcher.
+
+        Use it to hand the terminal to an interactive child process (e.g. a
+        subprocess that prompts or renders its own console); the bar resumes when
+        the context exits.
+        """
+        with self._paused():
+            yield
+
+    @contextmanager
     def _paused(self) -> Iterator[None]:
         if self._watcher is not None:
             self._watcher.pause()
