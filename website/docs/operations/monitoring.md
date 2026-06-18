@@ -71,7 +71,7 @@ spark.table(WATERMARK_TABLE).show(truncate=False)
 ```
 
 **Warning Signs:**
-- ⚠️ 0 events processed while datagen is streaming → Check Eventstream routes and `cusn` shortcuts
+- ⚠️ 0 events processed while datagen is streaming → Check `stream-events` Eventhouse writes and `cusn` shortcuts
 - ⚠️ Watermarks not advancing → Events not arriving or notebook failing mid-run
 - ⚠️ Execution time > 15 minutes → Check data volume or optimize queries
 
@@ -333,7 +333,7 @@ def send_teams_alert(title, message, color="ff0000"):
 if total == 0:
     send_teams_alert(
         title="⚠️ Silver Layer Processed Zero Events",
-        message="No new streaming events were processed.\\nCheck Eventstream routes and cusn shortcuts.",
+        message="No new streaming events were processed.\\nCheck `stream-events` Eventhouse writes and cusn shortcuts.",
         color="ffa500"  # Orange
     )
 ```
@@ -387,7 +387,7 @@ Forward Fabric metrics to Azure Monitor for centralized monitoring:
 3. Send to:
    - Log Analytics workspace
    - Storage account (archival)
-   - Event Hub (streaming)
+   - Streaming destination, if configured
 
 **Create Azure Monitor Alerts:**
 1. Navigate to Azure Monitor → **Alerts**
@@ -554,7 +554,7 @@ payment_processed | join kind=leftanti (receipt_created) on receipt_id | take 5
 // Hot tiles under 2s
 set query_datascope=hotcache; mv_store_sales_minute | where ts > ago(10m) | count
 
-// Ingestion lag estimate (Event Hubs to KQL)
+// Ingestion lag estimate (stream-events to KQL)
 receipt_created | extend lag_ms = datetime_diff('millisecond', ingest_timestamp, now()) | summarize avg(lag_ms)
 ```
 

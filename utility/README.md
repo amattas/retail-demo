@@ -14,7 +14,7 @@ legacy reference only.
 3. Run `retail-setup render` to produce workspace-specific setup notebooks.
 4. Import notebooks manually, or run `retail-setup deploy`.
 5. Run setup notebooks 01-04 in Fabric.
-6. Optionally import and run `setup-05-stream-events.ipynb` as a live driver.
+6. Optionally run `stream-events.ipynb` (the live streaming driver).
 
 ## Prerequisites
 
@@ -139,7 +139,7 @@ retail-setup configure `
   --capacity-name F64 `
   --lakehouse-name retail_lakehouse `
   --eventhouse-name retail_eventhouse `
-  --kql-database-name retail_kql `
+  --kql-database-name retail_eventhouse `
   --store-type supercenter `
   --months 3 `
   --store-count 50 `
@@ -296,14 +296,21 @@ Gold tables:
 
 ## Optional live stream notebook
 
-`setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it
-is not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
-Import it manually if you want live synthetic events.
+`stream-events.ipynb` is committed under `utility\notebooks\`. It is rendered to
+`utility\out\` alongside the setup notebooks and staged by `retail-setup deploy`
+(the `stream` notebook group) into the **Streaming** workspace folder. It is the
+optional long-running live driver, started/stopped manually — not part of the
+ordered setup pipeline.
 
-The notebook emits the same 18 event type names used by the KQL/Eventstream
-pipeline. It can write to:
+The notebook emits the same 18 event type names as the batch pipeline and writes
+each event **directly to its Eventhouse KQL table** with the Fabric Spark
+connector for Kusto (`com.microsoft.kusto.spark.synapse.datasource`), splitting
+each micro-batch by `event_type` inside `foreachBatch`. This follows the RTI
+tutorial *Use a notebook with Apache Spark to query a KQL database*
+(https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector). It
+can write to:
 
-- `sink = "eventstream"`: a Fabric Eventstream Custom Endpoint.
+- `sink = "eventhouse"` (default): the Eventhouse KQL event tables.
 - `sink = "delta"`: a Lakehouse landing table for smoke testing.
 
 Set these notebook parameters before running:
@@ -311,13 +318,14 @@ Set these notebook parameters before running:
 | Parameter | Meaning |
 | --- | --- |
 | `source_rows_per_second` | Spark rate-source rows per second. Each row emits one scenario bundle. |
-| `sink` | `eventstream` or `delta`. |
+| `sink` | `eventhouse` or `delta`. |
 | `run_seconds` | `0` runs forever; a positive value stops after N seconds. |
-| `eventstream_bootstrap` | Custom Endpoint bootstrap server. |
-| `eventstream_name` | Custom Endpoint Event Hub/Kafka topic name. |
-| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret that stores the connection string. |
+| `kusto_uri` | KQL database **Query URI** (copy from the KQL database details card). |
+| `kql_database` | KQL database name (default `retail_eventhouse`). |
 
-Do not hardcode Eventstream connection strings in notebooks.
+The KQL event tables must already exist (created by the KQL setup); the notebook
+writes with `tableCreateOptions=FailIfNotExist`, and its identity needs ingestor
+rights on the database.
 
 ## Troubleshooting
 

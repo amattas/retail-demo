@@ -93,16 +93,23 @@ Rendered setup notebooks receive these tokens:
 
 ## Optional live stream parameters
 
-`setup-05-stream-events.ipynb` is imported manually and configured in Fabric:
+`stream-events.ipynb` is the live streaming generator. It is the long-running
+driver, so it is **not** added to the setup pipeline — start and stop it
+manually. Configure it in Fabric:
 
 | Parameter | Description |
 | --- | --- |
 | `source_rows_per_second` | Spark rate-source rows per second. |
-| `sink` | `eventstream` or `delta`. |
+| `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` for continuous streaming, or a positive test duration. |
-| `eventstream_bootstrap` | Eventstream Custom Endpoint bootstrap server. |
-| `eventstream_name` | Eventstream Custom Endpoint topic/Event Hub name. |
-| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret that stores the connection string. |
+| `kusto_uri` | KQL database Query URI copied from the KQL database details card. |
+| `kql_database` | KQL database name; default is `retail_eventhouse`. |
+
+With `sink = "eventhouse"`, `stream-events.ipynb` uses Structured Streaming
+`foreachBatch` to split each micro-batch by `event_type` and append each subset
+to the matching Eventhouse table via the Fabric Spark connector for Kusto. See
+[Direct Eventhouse Streaming](../fabric/eventstream.md) for details and the
+Microsoft connector tutorial link.
 
 Do not store secrets in committed configuration files or notebooks.
 

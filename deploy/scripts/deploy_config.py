@@ -79,18 +79,6 @@ class PowerBIConfig:
 
 
 @dataclass(frozen=True)
-class EventstreamConfig:
-    """Fabric Eventstream deployment configuration."""
-
-    enabled: bool
-    name: str
-    eventhub_connection_id: str | None
-    eventhub_namespace: str | None
-    eventhub_name: str | None
-    consumer_group: str
-
-
-@dataclass(frozen=True)
 class SparkConfig:
     """Custom Spark pool configuration for setup runs.
 
@@ -130,7 +118,6 @@ class DeployConfig:
     eventhouse: EventhouseConfig
     notebooks: NotebooksConfig
     powerbi: PowerBIConfig
-    eventstream: EventstreamConfig
     spark: SparkConfig
     deployment: DeploymentConfig
 
@@ -200,7 +187,6 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     eventhouse = data.get("eventhouse", {})
     notebooks = data.get("notebooks", {})
     powerbi = data.get("powerbi", {})
-    eventstream = data.get("eventstream", {})
     spark = data.get("spark", {})
     deployment = data.get("deployment", {})
     auth = data.get("auth", {})
@@ -256,16 +242,6 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
                 powerbi.get("semantic_model_connection_id")
             ),
             refresh_after_deploy=bool(powerbi.get("refresh_after_deploy", False)),
-        ),
-        eventstream=EventstreamConfig(
-            enabled=bool(eventstream.get("enabled", False)),
-            name=str(eventstream.get("name", "retail_eventstream")),
-            eventhub_connection_id=_optional_string(
-                eventstream.get("eventhub_connection_id")
-            ),
-            eventhub_namespace=_optional_string(eventstream.get("eventhub_namespace")),
-            eventhub_name=_optional_string(eventstream.get("eventhub_name")),
-            consumer_group=str(eventstream.get("consumer_group", "$Default")),
         ),
         spark=SparkConfig(
             use_custom_pool=bool(spark.get("use_custom_pool", False)),
@@ -323,9 +299,6 @@ def render_tfvars(config: DeployConfig) -> str:
         "lakehouse_name": config.lakehouse.name,
         "lakehouse_enable_schemas": config.lakehouse.enable_schemas,
         "eventhouse_name": config.eventhouse.name,
-        "kql_database_name": config.eventhouse.kql_database_name,
-        "eventstream_enabled": config.eventstream.enabled,
-        "eventstream_name": config.eventstream.name,
         "spark_custom_pool_enabled": config.spark.use_custom_pool,
     }
 

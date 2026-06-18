@@ -30,7 +30,7 @@ These write directly to the Lakehouse:
   are the legacy/core medallion notebooks for shortcut-based Bronze/Silver/Gold
   operation and maintenance.
 - `03-streaming-to-silver.ipynb` and `04-streaming-to-gold.ipynb` process
-  Eventhouse/Eventstream data into Silver/Gold.
+  Eventhouse event data into Silver/Gold.
 - `06-ml-*` through `14-ml-*` are optional ML/advanced analytics notebooks.
 - `30-create-ontology.ipynb` creates a Fabric ontology from core Silver retail
   tables.

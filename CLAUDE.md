@@ -12,7 +12,7 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generatio
 - **datagen**: Python package for synthetic retail data generation (DuckDB, Event Hubs)
 - **fabric/kql_database**: KQL scripts for Eventhouse tables, functions, materialized views
 - **fabric/notebooks**: PySpark notebooks for Lakehouse Bronze -> Silver -> Gold transforms
-- **fabric/eventstream**: Event routing from Event Hubs to KQL + Lakehouse
+- **utility stream-events notebook**: Spark Structured Streaming that writes synthetic events directly to the Eventhouse KQL tables via the Spark Kusto connector
 
 ### Reference Files
 - Event schemas: `datagen/src/retail_datagen/streaming/schemas.py`
@@ -107,7 +107,6 @@ retail-demo/
 ├── fabric/
 │   ├── kql_database/   # KQL scripts
 │   ├── notebooks/      # PySpark notebooks
-│   ├── eventstream/    # Event routing
 │   ├── dashboards/     # Real-time dashboards
 │   └── powerbi/        # Power BI model
 └── docs/               # Documentation
@@ -184,7 +183,7 @@ retail-demo/
 ```
 
 ### Data Architecture
-- Event tables: Streaming-only (from Eventstream)
+- Event tables: Streaming-only (from the stream-events notebook via the Spark Kusto connector)
 - Dimension/Fact tables: Historical (via Lakehouse shortcuts)
 - Gold layer: Aggregations built in PySpark notebooks
 

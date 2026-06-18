@@ -80,9 +80,8 @@ python -m deploy.scripts.validate_deployment --environment dev
 ```
 
 `build_artifacts --notebook-groups setup` stages the rendered setup notebooks
-01-04 from `utility\out\`. It does not stage `setup-05-stream-events.ipynb`.
-Import `setup-05-stream-events.ipynb` manually if you want the optional live
-stream driver.
+01-04 from `utility\out\`. The streaming generator `stream-events.ipynb` is
+staged separately by the `stream` notebook group (into the **Streaming** folder).
 
 ## KQL script execution
 
@@ -115,8 +114,6 @@ does not.
   **Pipelines**, and bootstrapped MLflow experiments under **ML** (with the `ml`
   notebook group). The Lakehouse and queryset stay at the workspace root.
 - `unpublish_skip` defaults to `true` to avoid deleting items unexpectedly.
-- Eventstream deployment is disabled by default because Fabric source-control
-  item definitions for Eventstream are not yet part of this framework.
 - Curated KQL queries in `fabric\querysets\*.kql` deploy as a single
   `retail_querysets.KQLQueryset` item (one tab per `.kql` file) bound to the
   Eventhouse KQL database. `clusterUri` is resolved by fabric-cicd at publish

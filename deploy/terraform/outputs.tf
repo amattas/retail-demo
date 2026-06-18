@@ -29,18 +29,13 @@ output "eventhouse_name" {
 }
 
 output "kql_database_id" {
-  value       = fabric_kql_database.main.id
-  description = "Retail KQL Database item ID."
+  value       = tolist(fabric_eventhouse.main.properties.database_ids)[0]
+  description = "Retail KQL Database item ID (the Eventhouse's default database)."
 }
 
 output "kql_database_name" {
-  value       = fabric_kql_database.main.display_name
-  description = "Retail KQL Database display name."
-}
-
-output "eventstream_id" {
-  value       = var.eventstream_enabled ? fabric_eventstream.main[0].id : null
-  description = "Retail Eventstream item ID when enabled."
+  value       = fabric_eventhouse.main.display_name
+  description = "Retail KQL Database display name (matches the Eventhouse name)."
 }
 
 output "spark_custom_pool_id" {

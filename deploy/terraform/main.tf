@@ -72,21 +72,10 @@ resource "fabric_eventhouse" "main" {
   }
 }
 
-resource "fabric_kql_database" "main" {
-  display_name = var.kql_database_name
-  workspace_id = local.workspace_id
-
-  configuration = {
-    database_type = "ReadWrite"
-    eventhouse_id = fabric_eventhouse.main.id
-  }
-}
-
-resource "fabric_eventstream" "main" {
-  count        = var.eventstream_enabled ? 1 : 0
-  display_name = var.eventstream_name
-  workspace_id = local.workspace_id
-}
+# The Eventhouse auto-creates a single default KQL database with the same display
+# name (its id is exposed in properties.database_ids). We use that default database
+# for all tables/scripts rather than creating a second fabric_kql_database — one
+# Eventhouse, one KQL database. The id/name are surfaced via outputs.
 
 # F64-optimized custom Spark pool for the setup run (opt-in via
 # spark_custom_pool_enabled). An F64 provides 128 base Spark vCores (64 CU x 2),

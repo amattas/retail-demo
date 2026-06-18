@@ -5,25 +5,19 @@
 This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthetic retail data. It combines streaming analytics (KQL/Eventhouse) with batch processing (Lakehouse/PySpark) to provide both real-time and historical insights.
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────────────────────────┐
-│   Datagen   │────▶│ Azure Event  │────▶│         Microsoft Fabric            │
-│   (Python)  │     │    Hubs      │     │                                     │
-└─────────────┘     └──────────────┘     │  ┌─────────────┐  ┌─────────────┐  │
-                                         │  │ Eventstream │  │  Lakehouse  │  │
-                                         │  └──────┬──────┘  └──────┬──────┘  │
-                                         │         │                │         │
-                                         │         ▼                ▼         │
-                                         │  ┌─────────────┐  ┌─────────────┐  │
-                                         │  │ Eventhouse  │  │  Notebooks  │  │
-                                         │  │   (KQL)     │  │  (PySpark)  │  │
-                                         │  └──────┬──────┘  └──────┬──────┘  │
-                                         │         │                │         │
-                                         │         ▼                ▼         │
-                                         │  ┌─────────────────────────────┐  │
-                                         │  │      Semantic Model         │  │
-                                         │  │    (Power BI DirectQuery)   │  │
-                                         │  └─────────────────────────────┘  │
-                                         └─────────────────────────────────────┘
+┌────────────────┐     ┌─────────────────────────────────────────────┐
+│ stream-events  │────▶│              Microsoft Fabric               │
+│   notebook     │     │                                             │
+│ (Spark stream) │     │  ┌─────────────┐    ┌────────────────────┐  │
+└────────────────┘     │  │ Eventhouse  │───▶│ Lakehouse shortcuts │  │
+                       │  │   (KQL)     │    │ + Notebooks        │  │
+                       │  └──────┬──────┘    └─────────┬──────────┘  │
+                       │         │                     │             │
+                       │         ▼                     ▼             │
+                       │  ┌─────────────────────────────────────┐    │
+                       │  │ Semantic Model + Real-Time Content  │    │
+                       │  └─────────────────────────────────────┘    │
+                       └─────────────────────────────────────────────┘
 ```
 
 ---
@@ -33,9 +27,9 @@ This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthet
 ### Real-Time Path (Hot Path)
 **Latency target: < 2 seconds**
 
-1. **Datagen** generates synthetic retail events (receipts, inventory, foot traffic)
-2. **Event Hubs** receives events via `retail-events` hub
-3. **Eventstream** routes events to typed KQL tables
+1. **`stream-events` notebook** generates synthetic retail events (receipts, inventory, foot traffic)
+2. **Spark Structured Streaming** processes micro-batches with `foreachBatch`
+3. **Fabric Spark connector for Kusto** appends each `event_type` subset to its typed KQL table
 4. **Eventhouse** stores events with materialized views for pre-aggregated KPIs
 5. **Real-Time Dashboards** query materialized views
 
@@ -60,7 +54,7 @@ Python package for synthetic retail data generation.
 | `master_generators/` | Dimension tables (stores, customers, products, DCs, trucks) |
 | `fact_generators/` | 18 fact tables (receipts, inventory, logistics, marketing) |
 | `retail_patterns/` | Business logic (customer journey, inventory flow, campaigns) |
-| `streaming/` | Real-time event streaming to Event Hubs |
+| `streaming/` | Legacy real-time event streaming reference code |
 
 **Key features:**
 - DuckDB for local analytical storage
@@ -132,11 +126,10 @@ The 18 event types and payload models are defined in `datagen/src/retail_datagen
 ## Deployment
 
 See [Setup Guide](../setup/index.md) for deployment instructions. Requires:
-- Azure Event Hubs namespace
 - Microsoft Fabric workspace with Eventhouse and Lakehouse
 
 :::note
-Two steps remain manual deployment tasks in a Fabric workspace: configuring the Eventstream routes (Event Hubs → KQL tables) and deploying the Power BI semantic model. All KQL scripts, notebooks, pipelines, and the PBIP project are in the repo and ready to deploy.
+The live streaming path writes directly from `stream-events.ipynb` to the `retail_eventhouse` KQL database through the Fabric Spark connector for Kusto. The remaining manual deployment task is publishing the Power BI semantic model.
 :::
 
 ---
@@ -205,7 +198,7 @@ The Bronze layer serves as the data ingestion layer in the Medallion architectur
 ┌─────────────────────────────────────────────────────────────┐
 │ ADLSv2 Parquet (Historical)        Eventhouse (Real-Time)  │
 │ - 6 Dimension Folders              - 18 Event Tables        │
-│ - 18 Fact Folders                  - Streaming from APIs    │
+│ - 18 Fact Folders                  - Streaming from notebook    │
 │ - Monthly partitions               - Live events            │
 └─────────────────┬───────────────────────────┬───────────────┘
                   │                           │

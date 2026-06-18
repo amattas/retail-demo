@@ -73,11 +73,11 @@ TEMPLATE_FOR = {
     "setup-02-generate-dimensions": "driver-02-dimensions.py",
     "setup-03-generate-facts": "driver-03-facts.py",
     "setup-04-build-gold": "driver-04-gold.py",
-    "setup-05-stream-events": "driver-05-stream.py",
+    "stream-events": "driver-05-stream.py",
 }
 
 # Notebooks that do NOT embed the batch engine cell (self-contained logic).
-NO_ENGINE = {"setup-01-seed-dictionaries", "setup-05-stream-events"}
+NO_ENGINE = {"setup-01-seed-dictionaries", "stream-events"}
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 

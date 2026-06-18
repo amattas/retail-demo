@@ -1,8 +1,8 @@
-# Streaming Workflow Documentation
+# Legacy Streaming Workflow Documentation
 
 ## Design
 
-The streaming system uses an **outbox pattern** to ensure all fact table events are streamed in chronological order.
+The deprecated local generator's streaming system uses an **outbox pattern** to ensure all fact table events are streamed in chronological order. The current Fabric live path uses `stream-events.ipynb` to write directly to Eventhouse/KQL.
 
 ## How It Works
 
@@ -28,7 +28,7 @@ while streaming:
     item = outbox_lease_next(conn)
 
     if item:
-        # Send event to Azure Event Hub
+        # Send event to the legacy streaming target
         await client.send_event(event)
         outbox_ack_sent(conn, item['outbox_id'])
     else:
@@ -40,7 +40,7 @@ while streaming:
         )
 ```
 
-**Purpose**: Real-time streaming to Azure Event Hub
+**Purpose**: Legacy real-time streaming
 **Outbox**: Populated ONLY when empty
 **Use Case**: Continuous event streaming
 

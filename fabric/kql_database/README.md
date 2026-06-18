@@ -60,9 +60,11 @@ The live stream path uses one KQL table per event type:
 - `online_order_picked`
 - `online_order_shipped`
 
-`utility\notebooks\setup-05-stream-events.ipynb` can emit these event type names
-to a Fabric Eventstream Custom Endpoint. Import that notebook manually if you
-want live events; it is not currently rendered or staged by `retail-setup`.
+`utility\notebooks\stream-events.ipynb` can emit these event type names and
+write them **directly to the Eventhouse KQL tables** with the Fabric Spark
+connector for Kusto (routed by `event_type`). It is rendered and staged by
+`retail-setup deploy` (the optional `stream` notebook group); run it manually to
+generate live events.
 
 ## Use cases
 

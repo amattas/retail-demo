@@ -13,13 +13,10 @@ All 18 streaming event types defined in `datagen/src/retail_datagen/streaming/sc
 | Streaming implemented (event → Silver transform) | 18 of 18 event types |
 | Batch-only fact tables (no streaming equivalent by design) | 2 (`fact_truck_inventory`, `fact_promo_lines`) |
 
-:::note Deployment-pending items
-Per `STATUS.md`, the code is complete but two steps remain manual deployment tasks in a Fabric workspace:
+:::note Deployment-pending item
+Per `STATUS.md`, the remaining manual deployment task is publishing the Power BI semantic model (`fabric/powerbi/retail_model.pbip`).
 
-1. **Eventstream configuration** — wiring routes from Event Hubs to the KQL event tables
-2. **Semantic model deployment** — publishing the Power BI semantic model (`fabric/powerbi/retail_model.pbip`)
-
-Until the Eventstream is configured in the workspace, no streaming events arrive in Eventhouse, so the Silver streaming path processes zero rows.
+For live data, run `stream-events.ipynb` with `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"`. Until that notebook writes events to Eventhouse, the Silver streaming path processes zero rows.
 :::
 
 ---

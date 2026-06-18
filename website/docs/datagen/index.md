@@ -2,11 +2,12 @@
 
 :::warning Deprecated for new workspace setup
 This section documents the legacy FastAPI/DuckDB/Event Hub generator retained
-under `datagen-deprecated/`. For a clean Microsoft Fabric workspace, use the
-Fabric-native `retail-setup` workflow in [Setup Guide](../setup/index.md).
+under `datagen-deprecated/`. It is not the current Fabric live-ingestion path.
+For a clean Microsoft Fabric workspace, use the Fabric-native `retail-setup`
+workflow and the direct Eventhouse streaming notebook in [Setup Guide](../setup/index.md).
 :::
 
-Synthetic retail datasets for analytics POCs with a unified Local Data UI, historical generation, and realtime streaming to Azure Event Hub or Microsoft Fabric RTI.
+Synthetic retail datasets for analytics POCs with a unified Local Data UI, historical generation, and legacy realtime streaming.
 
 ## Quick Start
 
@@ -72,6 +73,6 @@ See: [fact-generation.md](fact-generation.md)
 
 ## Security
 
-- Event Hub credentials: environment, Key Vault, or config
+- Legacy streaming credentials: environment, Key Vault, or config
 - Storage credentials (for upload): account URI + key
 - See [auth-setup.md](auth-setup.md)

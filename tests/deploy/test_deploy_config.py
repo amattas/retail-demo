@@ -19,8 +19,10 @@ def test_load_environment_merges_defaults_and_environment() -> None:
     assert config.lakehouse.name == "retail_lakehouse"
     assert config.powerbi.semantic_model_name == "retail_model"
     assert config.notebooks.include == ["core"]
-    # Custom Spark pool is opt-in; defaults are F64-tuned.
-    assert config.spark.use_custom_pool is False
+    # Custom Spark pool sizing defaults are F64-tuned. The use_custom_pool toggle
+    # is user-set via `configure` (written into deploy.yml), so assert its type
+    # rather than a specific value — a user enabling the pool must not break this.
+    assert isinstance(config.spark.use_custom_pool, bool)
     assert config.spark.node_size == "Medium"
     assert config.spark.max_node_count == 10
     assert config.deployment.item_types_in_scope == [
@@ -51,14 +53,18 @@ def test_render_tfvars_omits_empty_optional_values() -> None:
 
 
 def test_render_tfvars_spark_pool_toggle() -> None:
-    config = deploy_config.load_environment("dev")
+    base = deploy_config.load_environment("dev")
 
-    # Off by default: emit only the toggle, no sizing noise.
-    default_tfvars = deploy_config.render_tfvars(config)
-    assert "spark_custom_pool_enabled = false" in default_tfvars
-    assert "spark_node_size" not in default_tfvars
+    # Build both states explicitly so the test does not depend on the user-set
+    # use_custom_pool value committed in deploy.yml.
+    disabled = replace(base, spark=replace(base.spark, use_custom_pool=False))
+    enabled = replace(base, spark=replace(base.spark, use_custom_pool=True))
 
-    enabled = replace(config, spark=replace(config.spark, use_custom_pool=True))
+    # Off: emit only the toggle, no sizing noise.
+    off_tfvars = deploy_config.render_tfvars(disabled)
+    assert "spark_custom_pool_enabled = false" in off_tfvars
+    assert "spark_node_size" not in off_tfvars
+
     tfvars = deploy_config.render_tfvars(enabled)
     assert "spark_custom_pool_enabled = true" in tfvars
     assert 'spark_node_size = "Medium"' in tfvars

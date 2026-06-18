@@ -18,6 +18,11 @@ A pipeline is staged only when every notebook it orchestrates is part of the
 deploy, so its notebook references always resolve. The default `core setup ml`
 groups deploy all five.
 
+The optional live streaming generator (`stream-events`) is started/stopped
+manually and is not part of a pipeline. It writes directly to Eventhouse through
+the Fabric Spark connector for Kusto. See [Configuration → live stream
+parameters](configuration.md) and [Direct Eventhouse Streaming](../fabric/eventstream.md).
+
 ## Run the setup pipeline
 
 After a successful deploy, `retail-setup deploy` asks:

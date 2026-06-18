@@ -99,27 +99,12 @@ az role assignment create \
 - If ADLS has network restrictions, add Fabric workspace IP ranges
 - Or enable "Allow Azure services on the trusted services list"
 
-### Azure Event Hubs
-
-Eventhouse shortcuts and data ingestion require Event Hubs permissions.
-
-**Required Permissions:**
-- **Azure Event Hubs Data Receiver** (for Eventhouse ingestion)
-- **Azure Event Hubs Data Sender** (for datagen streaming)
-
-**Assign via Azure Portal:**
-1. Navigate to Event Hubs namespace → **Access Control (IAM)**
-2. Add role assignment for **Azure Event Hubs Data Receiver**
-3. Assign to Eventhouse cluster service principal
-4. Add role assignment for **Azure Event Hubs Data Sender**
-5. Assign to datagen application or user
-
 ### Eventhouse (KQL Database)
 
 Bronze layer streaming shortcuts require read access to Eventhouse tables.
 
 **Required Permissions:**
-- **Database User** role on KQL database (minimum)
+- **Database User** role on KQL database for the `stream-events` notebook identity that writes events directly
 - **Database Viewer** role (read-only, recommended for shortcuts)
 
 **Assign via Fabric Portal:**
@@ -180,7 +165,6 @@ az ad sp create-for-rbac \
 Assign the service principal to:
 - **Fabric workspace**: Member role (for deployment)
 - **ADLS storage account**: Storage Blob Data Reader
-- **Event Hubs namespace**: Azure Event Hubs Data Receiver
 
 ### Use in CI/CD Pipelines
 
@@ -283,7 +267,6 @@ role: RegionalManagers
 
 ### 4. Network Security
 - Enable ADLS firewall and allow only Fabric IP ranges
-- Use private endpoints for Event Hubs if required
 - Restrict Fabric workspace to specific Azure AD tenants
 
 ### 5. Data Encryption
@@ -405,7 +388,6 @@ role: RegionalManagers
 
 - [Microsoft Fabric Workspace Roles](https://learn.microsoft.com/fabric/get-started/roles-workspaces)
 - [Azure RBAC for Storage](https://learn.microsoft.com/azure/storage/blobs/assign-azure-role-data-access)
-- [Event Hubs Authorization](https://learn.microsoft.com/azure/event-hubs/authorize-access-azure-active-directory)
 - [Power BI Row-Level Security](https://learn.microsoft.com/power-bi/admin/service-admin-rls)
 
 ---
@@ -419,6 +401,5 @@ role: RegionalManagers
 | **Fabric Workspace** | Member | Create/publish items | Workspace → Access |
 | **Fabric Workspace** | Admin | Full control | Workspace → Access |
 | **ADLS Container** | Storage Blob Data Reader | Read parquet files | Azure Portal → IAM |
-| **Event Hubs** | Data Receiver | Ingest events | Azure Portal → IAM |
 | **Eventhouse** | Viewer | Read tables | Eventhouse → Permissions |
 | **Semantic Model** | RLS Role | Row-filtered data | Power BI → Security |

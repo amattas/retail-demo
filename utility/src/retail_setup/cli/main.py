@@ -664,6 +664,7 @@ def _deploy_plan(
                 "ml",
                 "ontology",
                 "reset",
+                "stream",
                 "--lakehouse-name",
                 lakehouse_name,
             ],

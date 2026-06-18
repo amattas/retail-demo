@@ -9,7 +9,7 @@ import Link from '@docusaurus/Link';
 
 A Microsoft Fabric Real-Time Intelligence demo for the retail industry. A
 synthetic data generator produces historical and streaming retail data, and
-Fabric assets (Eventstream, KQL Database, Lakehouse medallion layers,
+Fabric assets (Eventhouse/KQL Database, Lakehouse medallion layers,
 dashboards, and a Power BI semantic model) turn it into real-time analytics,
 alerting, and decision support.
 
@@ -32,7 +32,7 @@ alerting, and decision support.
   <Link className="pd-card" to="/fabric/">
     <span className="pd-card-kicker">Component</span>
     <span className="pd-card-title">Fabric components</span>
-    <span className="pd-card-desc">KQL database, Lakehouse notebooks, Eventstream, dashboards, semantic model.</span>
+    <span className="pd-card-desc">KQL database, Lakehouse notebooks, dashboards, semantic model.</span>
   </Link>
   <Link className="pd-card" to="/demos/demo-script">
     <span className="pd-card-kicker">Presenting</span>
@@ -48,9 +48,9 @@ alerting, and decision support.
 
 ## What's inside
 
-- **Eventstream** routes events from Azure Event Hubs to KQL tables and the Lakehouse
-- **KQL Database** with event tables, functions, and materialized views for hot KPIs
+- **Streaming notebook** writes events directly to KQL tables with the Fabric Spark connector for Kusto
+- **KQL Database** (`retail_eventhouse`) with event tables, functions, and materialized views for hot KPIs
 - **Lakehouse** Bronze → Silver → Gold medallion layers for persistence and history
 - **Real-Time Dashboards** and querysets over the materialized views
 - **Power BI semantic model** with curated DAX measures and hierarchies
-- **Synthetic data generator** (Python/DuckDB) with a local web UI and Event Hubs streaming
+- **Synthetic data generation** through Fabric setup notebooks and optional live streaming to Eventhouse

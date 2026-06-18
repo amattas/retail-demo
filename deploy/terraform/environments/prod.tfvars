@@ -6,6 +6,3 @@ role_assignments = []
 lakehouse_name = "retail_lakehouse"
 lakehouse_enable_schemas = true
 eventhouse_name = "retail_eventhouse"
-kql_database_name = "retail_kql"
-eventstream_enabled = false
-eventstream_name = "retail_eventstream"

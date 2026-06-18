@@ -1,5 +1,8 @@
 // 02 Ingestion Mappings
-// Purpose: Create JSON ingestion mappings for Eventstream → KQL DB
+// Purpose: Optional JSON ingestion mappings for queued raw-envelope ingestion.
+//          The live stream-events notebook writes typed columns via the Spark
+//          Kusto connector and does not use these mappings; they are kept for
+//          ad-hoc queued ingestion of raw JSON event envelopes.
 // Run AFTER 01-create-tables.kql (tables must exist before mappings)
 // Run this entire script at once using .execute database script
 // ============================================================================
@@ -418,7 +421,8 @@
 // CATCH-ALL FOR UNKNOWN EVENTS
 // ============================================================================
 // This mapping captures the full event envelope with payload as dynamic.
-// Use this as the default route in Eventstream for unrecognized event types.
+// Use this as the default route for unrecognized event types when ingesting raw
+// JSON envelopes (queued ingestion).
 
 .create-or-alter table unknown_event ingestion json mapping 'EventMapping'
 ```

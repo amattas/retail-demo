@@ -1,15 +1,22 @@
 # %% [markdown]
-# # Setup 05 — Stream live events
+# # Stream live events
 # Part of the retail-demo setup utility. A Spark Structured Streaming generator
 # that continuously emits synthetic retail events as JSON `EventEnvelope`s,
-# replacing datagen's Python streamer. Output feeds a Fabric **Eventstream**
-# (custom endpoint) → KQL `cusn.*` → Silver → Gold (unchanged) — everything stays
-# inside Fabric, with no standalone Azure Event Hubs namespace.
+# replacing datagen's Python streamer. Each event is written **directly to the
+# Fabric Eventhouse** with the Spark Kusto connector — routed by `event_type` to
+# its KQL event table (`receipt_created`, `inventory_updated`, …) → Silver → Gold
+# (unchanged). Everything stays inside Fabric: no Eventstream, no Event Hubs.
 #
-# Design: `docs/superpowers/specs/2026-06-13-stream-generator-design.md`.
+# The connector write pattern follows the Real-Time Intelligence tutorial
+# "Use a notebook with Apache Spark to query a KQL database"
+# (https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector):
+# `df.write.format("com.microsoft.kusto.spark.synapse.datasource")`. In-stream the
+# write runs inside `foreachBatch`, splitting each micro-batch by `event_type` so
+# every event lands in the same typed table the batch pipeline uses.
 #
-# Run this AFTER setup-01..04. It is the optional **live driver**, not part of
-# the ordered batch setup. Stop the streaming query to stop generating.
+# Run this AFTER the setup notebooks (the KQL tables must already exist). It is the
+# optional **live driver**, not part of the ordered batch setup. Stop the streaming
+# query to stop generating.
 #
 # This notebook is self-contained (no engine cell); it reuses the same
 # deterministic-hash and event-envelope conventions as the batch engine.
@@ -18,23 +25,21 @@
 # Fabric parameters — override per run via the pipeline/parameterization.
 source_rows_per_second = 5     # rate-source rows/sec. Each row emits ONE scenario
                                # bundle, so actual events/sec is several× this.
-sink = "eventstream"           # "eventstream" | "delta"
+sink = "eventhouse"            # "eventhouse" | "delta"
 run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (test/smoke)
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
 
-# Fabric Eventstream sink (used when sink == "eventstream"). Writes to a Fabric
-# Eventstream **Custom Endpoint** source, which is Event-Hub/Kafka-compatible — so
-# everything stays inside Fabric (no standalone Azure Event Hubs namespace). Copy
-# the "Event hub name" + bootstrap server from the custom endpoint's Kafka /
-# Event-Hub protocol tab; the connection string is read at runtime from Key Vault
-# — never hardcode it here.
-eventstream_bootstrap = ""     # custom-endpoint bootstrap server, "<host>:9093"
-eventstream_name = ""          # custom-endpoint event hub (Kafka topic) name
-eventstream_secret_keyvault = ""  # Key Vault URI holding the connection string
-eventstream_secret_name = ""      # secret name in that Key Vault
+# Eventhouse (Kusto) sink — the default. Writes each event straight to its KQL
+# event table with the Fabric Spark connector. Copy the **Query URI** from the KQL
+# database details card (see the RTI Spark-connector tutorial linked above) and
+# paste it into `kusto_uri`; the operator identity running the notebook needs
+# ingestor/admin rights on the database. The tables must already exist (created by
+# the KQL setup), so no table is auto-created here.
+kusto_uri = ""                 # KQL database Query URI, e.g. "https://<host>.kusto.fabric.microsoft.com"
+kql_database = "retail_eventhouse"  # KQL database name (the Eventhouse's database)
 
-# Delta sink (used when sink == "delta"). A landing table a Fabric Eventstream
-# Delta source — or a tail job — can consume.
+# Delta sink (used when sink == "delta") — a local landing table for debugging the
+# generator without a KQL database. Not part of the live demo path.
 delta_landing_table = ""       # default derived from LAKEHOUSE_NAME below if blank
 
 checkpoint_path = "Files/setup/stream/checkpoint"
@@ -190,7 +195,7 @@ def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=N
         _str(session).alias("session_id"),
         _str(parent).alias("parent_event_id"),
     ))
-    return F.when(cond, F.struct(pkey.alias("key"), value.alias("value")))
+    return F.when(cond, F.struct(pkey.alias("key"), value.alias("value"), et.alias("event_type")))
 
 # %%
 # Build the event stream: one `rate` row -> a referentially-consistent bundle of
@@ -442,38 +447,134 @@ events_arr = F.array(
 
 events = (b.select(F.explode(events_arr).alias("e"))
           .where(F.col("e").isNotNull())
-          .select(F.col("e.key").alias("key"), F.col("e.value").alias("value")))
+          .select(F.col("e.key").alias("key"), F.col("e.value").alias("value"),
+                  F.col("e.event_type").alias("event_type")))
 
 # %%
-# Write the stream to the chosen sink. The checkpoint is sink-specific so the two
+# Eventhouse (Kusto) routing. Each micro-batch is split by `event_type` and each
+# subset is written to its own KQL table with the Fabric Spark connector. The
+# per-table column mapping mirrors the KQL `EventMapping` ingestion mappings
+# (`fabric/kql_database/02-create-ingestion-mappings.kql`) exactly: the envelope
+# fields are shared, and each event type contributes its `$.payload.*` fields. The
+# one rename is `inventory_updated.payload_source` <- `$.payload.source`.
+from pyspark.sql.types import (  # noqa: E402
+    ArrayType, IntegerType, LongType, DoubleType, StringType, StructField, StructType)
+
+_ISO_FMT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+_SPARK_TYPE = {
+    "long": LongType(), "int": IntegerType(), "real": DoubleType(),
+    "string": StringType(),
+    "datetime": StringType(),     # parsed from the ISO string, then cast below
+    "dynamic": ArrayType(LongType()),  # only product_ids (array<long>)
+}
+
+# Envelope fields ($.<field>) — identical for every event table.
+ENVELOPE = [
+    ("event_type", "string"), ("trace_id", "string"),
+    ("ingest_timestamp", "datetime"), ("schema_version", "string"),
+    ("source", "string"), ("correlation_id", "string"),
+    ("partition_key", "string"), ("session_id", "string"),
+    ("parent_event_id", "string"),
+]
+
+# Per event type: (kusto_column, json_payload_field, datatype). Generated from the
+# KQL ingestion mappings; keep in sync if those change.
+EVENT_PAYLOADS = {
+    "receipt_created": [("store_id", "store_id", "long"), ("customer_id", "customer_id", "long"), ("receipt_id", "receipt_id", "string"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("item_count", "item_count", "long")],
+    "receipt_line_added": [("receipt_id", "receipt_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string")],
+    "payment_processed": [("receipt_id", "receipt_id", "string"), ("order_id", "order_id", "string"), ("payment_method", "payment_method", "string"), ("amount", "amount", "real"), ("amount_cents", "amount_cents", "long"), ("transaction_id", "transaction_id", "string"), ("processing_time", "processing_time", "datetime"), ("processing_time_ms", "processing_time_ms", "int"), ("status", "status", "string"), ("decline_reason", "decline_reason", "string"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
+    "inventory_updated": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("quantity_delta", "quantity_delta", "long"), ("reason", "reason", "string"), ("payload_source", "source", "string")],
+    "stockout_detected": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("last_known_quantity", "last_known_quantity", "long"), ("detection_time", "detection_time", "datetime")],
+    "reorder_triggered": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("current_quantity", "current_quantity", "long"), ("reorder_quantity", "reorder_quantity", "long"), ("reorder_point", "reorder_point", "long"), ("priority", "priority", "string")],
+    "customer_entered": [("store_id", "store_id", "long"), ("sensor_id", "sensor_id", "string"), ("zone", "zone", "string"), ("customer_count", "customer_count", "long"), ("dwell_time", "dwell_time", "long")],
+    "customer_zone_changed": [("store_id", "store_id", "long"), ("customer_ble_id", "customer_ble_id", "string"), ("from_zone", "from_zone", "string"), ("to_zone", "to_zone", "string"), ("timestamp", "timestamp", "datetime")],
+    "ble_ping_detected": [("store_id", "store_id", "long"), ("beacon_id", "beacon_id", "string"), ("customer_ble_id", "customer_ble_id", "string"), ("rssi", "rssi", "long"), ("zone", "zone", "string")],
+    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long")],
+    "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
+    "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
+    "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
+    "ad_impression": [("channel", "channel", "string"), ("campaign_id", "campaign_id", "string"), ("creative_id", "creative_id", "string"), ("customer_ad_id", "customer_ad_id", "string"), ("impression_id", "impression_id", "string"), ("cost", "cost", "real"), ("device_type", "device_type", "string")],
+    "promotion_applied": [("receipt_id", "receipt_id", "string"), ("promo_code", "promo_code", "string"), ("discount_amount", "discount_amount", "real"), ("discount_cents", "discount_cents", "long"), ("discount_type", "discount_type", "string"), ("product_count", "product_count", "long"), ("product_ids", "product_ids", "dynamic"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
+    "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string")],
+    "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
+    "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
+}
+
+KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
+
+
+def _from_json_schema(event_type):
+    """from_json schema for the full envelope: typed top-level fields + payload struct."""
+    payload = StructType([
+        StructField(jf, _SPARK_TYPE[dt], True) for _col, jf, dt in EVENT_PAYLOADS[event_type]
+    ])
+    fields = [StructField(name, _SPARK_TYPE[dt], True) for name, dt in ENVELOPE]
+    fields.append(StructField("payload", payload, True))
+    return StructType(fields)
+
+
+def _kusto_columns(event_type):
+    """Project a parsed-envelope frame to the target KQL table's exact columns."""
+    cols = []
+    for name, dt in ENVELOPE:
+        c = F.col(name)
+        if dt == "datetime":
+            c = F.to_timestamp(c, _ISO_FMT)
+        cols.append(c.alias(name))
+    for col, jf, dt in EVENT_PAYLOADS[event_type]:
+        c = F.col("payload").getField(jf)
+        if dt == "datetime":
+            c = F.to_timestamp(c, _ISO_FMT)
+        cols.append(c.alias(col))
+    return cols
+
+
+def write_to_eventhouse(batch_df, _batch_id):
+    """foreachBatch sink: split by event_type and write each to its KQL table."""
+    batch_df = batch_df.persist()
+    try:
+        present = [r["event_type"] for r in batch_df.select("event_type").distinct().collect()]
+        token = notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
+        for event_type in present:
+            if event_type not in EVENT_PAYLOADS:
+                print(f"  skipping unmapped event_type {event_type!r}")
+                continue
+            mapped = (batch_df.where(F.col("event_type") == event_type)
+                      .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
+                      .select("e.*")
+                      .select(*_kusto_columns(event_type)))
+            (mapped.write.format(KUSTO_FORMAT)
+                .option("kustoCluster", kusto_uri)
+                .option("kustoDatabase", kql_database)
+                .option("kustoTable", event_type)
+                .option("accessToken", token)
+                .option("tableCreateOptions", "FailIfNotExist")
+                .mode("Append").save())
+    finally:
+        batch_df.unpersist()
+
+
+# %%
+# Write the stream to the chosen sink. The checkpoint is sink-specific so the
 # sinks never share offset/commit state.
 writer = events.writeStream.option("checkpointLocation", f"{checkpoint_path}/{sink}")
 if int(run_seconds) > 0:
     writer = writer.trigger(processingTime="2 seconds")
+elif sink == "eventhouse":
+    # Batch a few seconds of events per Kusto write to keep ingestion calls coarse.
+    writer = writer.trigger(processingTime="10 seconds")
 
-if sink == "eventstream":
-    # NOTE: requires the Spark Kafka connector (spark-sql-kafka-0-10) on the
-    # cluster classpath — provided by the Fabric Spark runtime by default.
-    if not (eventstream_bootstrap and eventstream_name
-            and eventstream_secret_keyvault and eventstream_secret_name):
-        raise ValueError("eventstream sink requires eventstream_bootstrap, eventstream_name, "
-                         "eventstream_secret_keyvault and eventstream_secret_name")
-    conn = mssparkutils.credentials.getSecret(  # noqa: F821
-        eventstream_secret_keyvault, eventstream_secret_name)
-    jaas = ('org.apache.kafka.common.security.plain.PlainLoginModule required '
-            f'username="$ConnectionString" password="{conn}";')
-    query = (writer.format("kafka")
-             .option("kafka.bootstrap.servers", eventstream_bootstrap)
-             .option("kafka.security.protocol", "SASL_SSL")
-             .option("kafka.sasl.mechanism", "PLAIN")
-             .option("kafka.sasl.jaas.config", jaas)
-             .option("topic", eventstream_name)
-             .start())
+if sink == "eventhouse":
+    # NOTE: the Kusto Spark connector (com.microsoft.kusto.spark) ships with the
+    # Fabric Spark runtime. The notebook identity needs ingestor rights on the DB.
+    if not kusto_uri:
+        raise ValueError("eventhouse sink requires kusto_uri (the KQL database Query URI)")
+    query = writer.foreachBatch(write_to_eventhouse).start()
 elif sink == "delta":
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {delta_landing_table.rsplit('.', 1)[0]}")
     query = writer.format("delta").toTable(delta_landing_table)
 else:
-    raise ValueError(f"unknown sink: {sink!r} (expected 'eventstream' or 'delta')")
+    raise ValueError(f"unknown sink: {sink!r} (expected 'eventhouse' or 'delta')")
 
 if int(run_seconds) > 0:
     query.awaitTermination(int(run_seconds))

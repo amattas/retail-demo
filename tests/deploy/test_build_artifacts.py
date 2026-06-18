@@ -433,6 +433,36 @@ def test_setup_group_requires_rendered_notebooks(tmp_path: Path) -> None:
         )
 
 
+def test_stage_stream_notebooks_stages_rendered_generator(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    out_dir = tmp_path / "workspace"
+    rendered = repo / "utility" / "out"
+    rendered.mkdir(parents=True)
+    for name in build_artifacts.STREAM_NOTEBOOKS:
+        _write_json(
+            rendered / f"{name}.ipynb",
+            {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
+        )
+
+    staged = build_artifacts.stage_stream_notebooks(
+        repo_root=repo, output_dir=out_dir, lakehouse_name="lh"
+    )
+
+    assert [item.name for item in staged] == [
+        f"{name}.Notebook" for name in build_artifacts.STREAM_NOTEBOOKS
+    ]
+    item = out_dir / "stream-events.Notebook"
+    assert (item / ".platform").exists()
+    assert (item / "notebook-content.ipynb").exists()
+
+
+def test_stage_stream_notebooks_requires_render(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="retail-setup render"):
+        build_artifacts.stage_stream_notebooks(
+            repo_root=tmp_path, output_dir=tmp_path / "ws", lakehouse_name="lh"
+        )
+
+
 def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
     tmp_path: Path,
 ) -> None:

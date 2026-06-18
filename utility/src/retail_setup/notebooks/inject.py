@@ -18,6 +18,12 @@ REQUIRED_TOKENS = [
 NOTEBOOKS = [
     "setup-01-seed-dictionaries", "setup-02-generate-dimensions",
     "setup-03-generate-facts", "setup-04-build-gold",
+    # The live streaming generator. Rendered alongside the batch setup notebooks
+    # (it shares the {{LAKEHOUSE_NAME}}/{{STORE_TYPE}}/... tokens) but it is the
+    # optional long-running driver, so it is staged separately by the deploy
+    # ("stream" group) and is NOT part of the ordered setup pipeline. It has no
+    # number prefix because it is the only notebook in the streaming path.
+    "stream-events",
 ]
 _NOTEBOOK_DIR = Path(__file__).resolve().parents[3] / "notebooks"
 

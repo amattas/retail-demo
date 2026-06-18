@@ -6,7 +6,7 @@ populate the Lakehouse for a new workspace walkthrough.
 The current Fabric-native live driver is:
 
 ```text
-utility/notebooks/setup-05-stream-events.ipynb
+utility/notebooks/stream-events.ipynb
 ```
 
 This notebook is committed in the repository, but it is not currently rendered
@@ -16,39 +16,35 @@ want live synthetic events.
 ## Step 6.1: Prepare Eventhouse/KQL
 
 1. Run the generated `deploy/.generated/<env>/database.kql` script in the target
-   KQL database.
-2. Enable OneLake availability on the KQL database.
-3. Create Lakehouse shortcuts from Eventhouse event tables into schema `cusn` if
+   KQL database, `retail_eventhouse`.
+2. Copy the KQL database **Query URI** from the database details card; this is the
+   value for the notebook's `kusto_uri` parameter.
+3. Enable OneLake availability on the KQL database.
+4. Create Lakehouse shortcuts from Eventhouse event tables into schema `cusn` if
    you want to run `03-streaming-to-silver.ipynb`.
 
-## Step 6.2: Create Eventstream Custom Endpoint
+## Step 6.2: Run the streaming generator
 
-In Fabric Eventstream:
-
-1. Create or open the Eventstream.
-2. Add a Custom Endpoint source.
-3. Copy the endpoint bootstrap server and Event Hub/Kafka topic name.
-4. Store the endpoint connection string in Key Vault.
-
-Do not hardcode connection strings in notebooks.
-
-## Step 6.3: Run setup-05
-
-Import `utility/notebooks/setup-05-stream-events.ipynb`, attach it to the
-Lakehouse, and set parameters:
+Open `utility/notebooks/stream-events.ipynb`, attach it to the Lakehouse, and set
+parameters:
 
 | Parameter | Meaning |
 | --- | --- |
 | `source_rows_per_second` | Spark rate-source rows per second. |
-| `sink` | `eventstream` or `delta`. |
+| `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` runs forever; positive values stop after N seconds. |
-| `eventstream_bootstrap` | Custom Endpoint bootstrap server. |
-| `eventstream_name` | Custom Endpoint topic/Event Hub name. |
-| `eventstream_secret_keyvault` / `eventstream_secret_name` | Key Vault secret location for the connection string. |
+| `kusto_uri` | KQL database Query URI copied from the KQL database details card. |
+| `kql_database` | KQL database name; default is `retail_eventhouse`. |
 
-Use `sink = "delta"` for a quick smoke test without Eventstream.
+With `sink = "eventhouse"`, the notebook uses Spark Structured Streaming
+`foreachBatch` to split each micro-batch by `event_type` and append each subset
+to the matching KQL table through the Fabric Spark connector for Kusto. This
+follows Microsoft's [Spark connector tutorial](https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector).
 
-## Step 6.4: Process live events into Silver/Gold
+Use `sink = "delta"` only for a local/debug smoke test that does not write to
+Eventhouse.
+
+## Step 6.3: Process live events into Silver/Gold
 
 After events land in KQL/Eventhouse and shortcuts exist:
 

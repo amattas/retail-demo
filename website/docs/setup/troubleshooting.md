@@ -125,9 +125,9 @@ SELECT COUNT(*) FROM au.sales_minute_store;
 If tables exist but are empty, re-run `setup-03-generate-facts` and then
 `setup-04-build-gold`.
 
-## `setup-05-stream-events` is missing from `utility/out`
+## `stream-events` is missing from `utility/out`
 
-This is expected. `setup-05-stream-events.ipynb` is committed under
+This is expected. `stream-events.ipynb` is committed under
 `utility/notebooks/`, but it is not currently rendered or staged by
 `retail-setup`. Import it manually if you want live synthetic events.
 
@@ -135,10 +135,11 @@ This is expected. `setup-05-stream-events.ipynb` is committed under
 
 Check:
 
-1. `setup-05-stream-events.ipynb` is using `sink = "eventstream"`.
-2. Eventstream Custom Endpoint parameters are set.
-3. The connection string is available from Key Vault.
-4. The generated KQL script has been run in the target KQL database.
+1. `stream-events.ipynb` is using `sink = "eventhouse"`.
+2. `kusto_uri` is set to the KQL database Query URI.
+3. `kql_database` is set to `retail_eventhouse` unless you intentionally renamed the database.
+4. The generated KQL script has been run in the target KQL database so destination tables already exist.
+5. The notebook can obtain an access token with `notebookutils.credentials.getToken(kusto_uri)`.
 
-For a smoke test without Eventstream, use `sink = "delta"` in the stream
-notebook.
+For a local/debug smoke test without Eventhouse writes, use `sink = "delta"` in
+the stream notebook.

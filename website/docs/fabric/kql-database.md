@@ -4,7 +4,7 @@ Fabric Real-Time Intelligence Eventhouse (KQL database) for hot-path storage and
 
 ## Overview
 
-- **Ingest**: Eventstream-mapped tables (one per event type), streaming ingestion enabled on all tables
+- **Ingest**: Direct writes from `stream-events.ipynb` via the Fabric Spark connector for Kusto, one table per event type
 - **Retention**: Configurable by table category (see below)
 - **Policies**: Per-table ingestion batching (30s high-volume, 1m medium, 2m low-volume), materialized views for KPIs
 
@@ -15,7 +15,7 @@ Run in numbered order with `.execute database script` (there is no `05` script):
 | Script | Purpose |
 |--------|---------|
 | `01-create-tables.kql` | Event tables, retention, streaming ingestion, and batching policies |
-| `02-create-ingestion-mappings.kql` | JSON-to-column `EventMapping` mappings for Eventstream (one per event table) |
+| `02-create-ingestion-mappings.kql` | JSON-to-column `EventMapping` mappings retained for compatibility and typed ingestion scenarios (one per event table) |
 | `03-create-functions.kql` | Reusable KQL helper/KPI functions |
 | `04-create-materialized-views.kql` | Pre-aggregated KPIs via materialized views |
 | `06-ml-anomaly-detection.kql` | `anomaly_alerts` table and time-series anomaly detection functions |
@@ -144,8 +144,8 @@ KPI views (script 04) enforce a **7-day rolling window** (`ingest_timestamp > ag
 
 ## Build Tasks
 
-1. Create an Eventhouse / KQL database in your Fabric workspace
+1. Create an Eventhouse in your Fabric workspace; use its single default KQL database, `retail_eventhouse`
 2. Run scripts in order (01, 02, 03, 04, 06, 07)
-3. Connect Eventstream to the KQL database
-4. Verify streaming ingestion is enabled and receiving data
+3. Run `stream-events.ipynb` with `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"`
+4. Verify the Spark connector appends events to the KQL tables
 5. Test materialized views with sample queries

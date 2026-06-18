@@ -18,7 +18,7 @@ path for a new workspace.
 - Lakehouse Silver tables in schema `ag`: dimensions, `dim_date`, 18 fact
   tables, and `setup_run_log`.
 - Lakehouse Gold tables in schema `au`: 9 aggregate tables for reporting.
-- Optional live event generation through `setup-05-stream-events.ipynb`.
+- Optional live event generation through `stream-events.ipynb`.
 
 ## Prerequisites
 
@@ -121,7 +121,7 @@ retail-setup configure `
   --capacity-name F64 `
   --lakehouse-name retail_lakehouse `
   --eventhouse-name retail_eventhouse `
-  --kql-database-name retail_kql `
+  --kql-database-name retail_eventhouse `
   --store-type supercenter `
   --start-date 2025-01-01 `
   --end-date 2025-03-31 `
@@ -200,17 +200,20 @@ Expected Lakehouse output:
 
 ### 7. Optional live event generation
 
-`setup-05-stream-events.ipynb` is committed under `utility\notebooks\`, but it is
-not currently rendered to `utility\out\` or staged by `retail-setup deploy`.
-Import it manually if you want a live stream driver.
+`stream-events.ipynb` is committed under `utility\notebooks\`, rendered to
+`utility\out\` and staged by `retail-setup deploy` (the `stream` notebook group)
+into the **Streaming** workspace folder. Run it as the optional live stream
+driver — it is started/stopped manually, not part of the setup pipeline.
 
-The notebook can write to:
+The notebook writes each event **directly to its Eventhouse KQL table** with the
+Fabric Spark connector for Kusto, splitting each micro-batch by `event_type`. It
+can write to:
 
-- a Fabric Eventstream Custom Endpoint (`sink = "eventstream"`), or
+- the Eventhouse KQL event tables (`sink = "eventhouse"`, the default), or
 - a Delta landing table (`sink = "delta"`) for smoke testing.
 
 Set its parameters in Fabric before running: `source_rows_per_second`, `sink`,
-`run_seconds`, and Eventstream connection settings.
+`run_seconds`, `kusto_uri` (the KQL database Query URI), and `kql_database`.
 
 ## Project structure
 

@@ -1,7 +1,7 @@
 find_replace:
 - find_value: (https://onelake\.dfs\.fabric\.microsoft\.com/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36})
   replace_value:
-    dev: https://onelake.dfs.fabric.microsoft.com/8920deff-4cb2-4a45-80b6-e03d5d5ee641/fb9aa51e-4fc2-41b6-86be-87135217f722
+    dev: https://onelake.dfs.fabric.microsoft.com/51fd2f07-b03c-4a62-b478-b6ba435edcc0/ab2c3968-855e-4fe2-8591-a39fc757acfd
   is_regex: 'true'
   item_type: SemanticModel
 - find_value: DirectLake - retail_lakehouse
@@ -82,7 +82,7 @@ find_replace:
   item_type: DataPipeline
 - find_value: FABRIC_KQL_DATABASE_RESOURCE_ID
   replace_value:
-    dev: 8f22b6a5-3be5-4b6f-aa18-f4ced6b78d40
+    dev: c41c8466-3026-4fd7-b35c-22b2c8e01771
   item_type:
   - KQLDashboard
   - KQLQueryset

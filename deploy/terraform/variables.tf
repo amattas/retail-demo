@@ -92,24 +92,6 @@ variable "eventhouse_minimum_consumption_units" {
   description = "Optional Eventhouse minimum consumption units."
 }
 
-variable "kql_database_name" {
-  type        = string
-  default     = "retail_kql"
-  description = "Fabric KQL Database display name."
-}
-
-variable "eventstream_enabled" {
-  type        = bool
-  default     = false
-  description = "Create an Eventstream shell."
-}
-
-variable "eventstream_name" {
-  type        = string
-  default     = "retail_eventstream"
-  description = "Fabric Eventstream display name."
-}
-
 variable "spark_custom_pool_enabled" {
   type        = bool
   default     = false
