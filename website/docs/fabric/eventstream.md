@@ -42,7 +42,7 @@ Reference: [Use a notebook with Apache Spark to query a KQL database](https://le
 | `source_rows_per_second` | Spark rate-source rows per second. |
 | `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` runs forever; positive values stop after N seconds. |
-| `kusto_uri` | KQL database Query URI copied from the KQL database details card. |
+| `kusto_uri` | Leave blank to auto-resolve the Query URI from `kql_database` in this workspace; set it only to target a different cluster. |
 | `kql_database` | KQL database name; default is `retail_eventhouse`. |
 
 There are no Eventstream, Kafka, Event Hub, bootstrap-server, or Key Vault secret parameters for the live notebook.
@@ -60,7 +60,8 @@ There are no Eventstream, Kafka, Event Hub, bootstrap-server, or Key Vault secre
 
 1. Run the generated KQL database script so all destination tables already exist.
 2. Open `utility/notebooks/stream-events.ipynb` in Fabric and attach it to the Lakehouse.
-3. Set `sink = "eventhouse"`, `kusto_uri` to the KQL database Query URI, and `kql_database = "retail_eventhouse"`.
+3. Leave `sink = "eventhouse"` and `kql_database = "retail_eventhouse"`; leave
+   `kusto_uri` blank to auto-resolve the Query URI, or set it to override.
 4. Start the notebook and confirm events arrive with `ingest_timestamp` populated.
 5. Enable OneLake availability and create `cusn` shortcuts if you want Lakehouse Silver/Gold processing.
 

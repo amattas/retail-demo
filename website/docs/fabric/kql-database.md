@@ -146,6 +146,6 @@ KPI views (script 04) enforce a **7-day rolling window** (`ingest_timestamp > ag
 
 1. Create an Eventhouse in your Fabric workspace; use its single default KQL database, `retail_eventhouse`
 2. Run scripts in order (01, 02, 03, 04, 06, 07)
-3. Run `stream-events.ipynb` with `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"`
+3. Run `stream-events.ipynb` with `sink = "eventhouse"` and `kql_database = "retail_eventhouse"` (leave `kusto_uri` blank to auto-resolve, or set it to override)
 4. Verify the Spark connector appends events to the KQL tables
 5. Test materialized views with sample queries

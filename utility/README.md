@@ -41,11 +41,14 @@ On Windows, from the repository root:
 .\scripts\setup.ps1
 ```
 
-`setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
-otherwise installs Miniforge with winget and creates a conda environment, then
-delegates to `scripts\setup.py`. If you already have Python 3.11+ (Windows,
-macOS, or Linux), run `python ./scripts/setup.py` directly to skip the Miniforge
-download.
+`setup.ps1` works even with nothing installed. If conda is installed it uses a
+`retail-demo` conda environment (created with Python 3.14 when missing);
+otherwise it uses a local `.venv` (created from a system Python 3.11+); and if
+neither is available it installs Miniforge with winget. It activates that
+environment, delegates to `scripts\setup.py`, and then switches your shell back
+to the environment you started from. To manage Python yourself, activate a
+Python 3.11+ environment (Windows, macOS, or Linux) and run
+`python ./scripts/setup.py` directly.
 
 The guided setup:
 
@@ -164,7 +167,7 @@ Derived defaults are applied by the engine:
 | `silver_db` | `ag` |
 | `gold_db` | `au` |
 | `dc_count` | `max(1, store_count // 10)` |
-| `customer_count` | `store_count * 1000` |
+| `customer_count` | `max(store_count * 1000, 5000)` |
 | `online_orders_per_day` | `store_count * 8` |
 | `transactions_per_store_day` | `400` |
 | `return_rate` | `0.01` |
@@ -240,17 +243,29 @@ retail-setup deploy --env dev --skip-terraform
 ```
 
 For a clean slate, `--recreate` destroys the existing workspace (and every item
-in it), waits 30 seconds, then recreates everything. This is destructive and is
-gated by a confirmation prompt:
+in it), waits for Fabric to release the workspace name, then recreates
+everything. This is destructive and is gated by a single confirmation prompt:
 
 ```powershell
 retail-setup deploy --env dev --recreate
 ```
 
+### Interactive deploy console
+
+When run in a terminal (a TTY), `retail-setup deploy` shows an interactive
+console: a scrolling log on top and a fixed status footer with a smooth progress
+bar and an `esc to cancel or abort` hint. Press **Esc** to cancel; if Terraform
+has already started creating resources, you're asked whether to remove the
+artifacts created so far (a `terraform destroy`). Gated steps ask for a single
+confirmation — Terraform runs with `-auto-approve`, so you never confirm twice.
+In non-interactive contexts (CI, piped output, `--yes`, `--dry-run`) it falls
+back to plain line-by-line output. Set `RETAIL_SETUP_NO_UI=1` to force the plain
+output even in a terminal.
+
 The deploy command runs these steps in order:
 
 1. Generate Terraform and fabric-cicd config files.
-2. Run `terraform init`, `terraform plan`, and `terraform apply` unless
+2. Run `terraform init` and `terraform apply` (auto-approved) unless
    `--skip-terraform` is set.
 3. Capture Terraform outputs.
 4. Stage Fabric source-control item folders, including rendered setup notebooks
@@ -320,7 +335,7 @@ Set these notebook parameters before running:
 | `source_rows_per_second` | Spark rate-source rows per second. Each row emits one scenario bundle. |
 | `sink` | `eventhouse` or `delta`. |
 | `run_seconds` | `0` runs forever; a positive value stops after N seconds. |
-| `kusto_uri` | KQL database **Query URI** (copy from the KQL database details card). |
+| `kusto_uri` | Leave blank to auto-resolve the **Query URI** from `kql_database` in this workspace; set it only to target a different cluster. |
 | `kql_database` | KQL database name (default `retail_eventhouse`). |
 
 The KQL event tables must already exist (created by the KQL setup); the notebook

@@ -136,8 +136,8 @@ This is expected. `stream-events.ipynb` is committed under
 Check:
 
 1. `stream-events.ipynb` is using `sink = "eventhouse"`.
-2. `kusto_uri` is set to the KQL database Query URI.
-3. `kql_database` is set to `retail_eventhouse` unless you intentionally renamed the database.
+2. `kusto_uri` is blank (auto-resolved from `kql_database`) or set to the KQL database Query URI.
+3. `kql_database` is set to `retail_eventhouse` unless you intentionally renamed the database. Auto-resolution matches this name to a KQL database in the workspace, so it must be exact.
 4. The generated KQL script has been run in the target KQL database so destination tables already exist.
 5. The notebook can obtain an access token with `notebookutils.credentials.getToken(kusto_uri)`.
 

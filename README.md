@@ -52,13 +52,15 @@ Set-Location retail-demo
 ```
 
 `setup.ps1` is the Windows entry point for machines with **nothing installed**.
-It uses Python 3.11+ if present, otherwise installs Miniforge with winget and
-creates a conda environment, then runs the guided setup.
+If conda is installed it uses a `retail-demo` conda environment (created with
+Python 3.14 when missing); otherwise it uses a local `.venv` (created from a
+system Python 3.11+); and if neither is available it installs Miniforge with
+winget. It activates that environment, runs the guided setup, and then switches
+your shell back to the environment you started from.
 
-**Already have Python 3.11+?** Run `python ./scripts/setup.py` directly to skip
-the Miniforge download — `setup.ps1` only installs Miniforge when no suitable
-Python is found. On macOS and Linux, run `python ./scripts/setup.py` from an
-activated Python 3.11+ environment.
+**Prefer to manage Python yourself?** Activate a Python 3.11+ conda environment
+or virtual environment and run `python ./scripts/setup.py` directly. On macOS and
+Linux, run `python ./scripts/setup.py` from an activated Python 3.11+ environment.
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into
@@ -213,7 +215,8 @@ can write to:
 - a Delta landing table (`sink = "delta"`) for smoke testing.
 
 Set its parameters in Fabric before running: `source_rows_per_second`, `sink`,
-`run_seconds`, `kusto_uri` (the KQL database Query URI), and `kql_database`.
+`run_seconds`, and `kql_database`. Leave `kusto_uri` blank to auto-resolve the
+KQL database Query URI from `kql_database`, or set it to target a different cluster.
 
 ## Project structure
 

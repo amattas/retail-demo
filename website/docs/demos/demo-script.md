@@ -13,7 +13,7 @@ Agenda (15–20 minutes)
 - Emphasize: all data is synthetic; schemas from `datagen/src/retail_datagen/streaming/schemas.py`.
 
 2) Start live data
-- In Fabric, open `stream-events.ipynb`, set `sink = "eventhouse"`, `kusto_uri`, and `kql_database = "retail_eventhouse"`, then run it.
+- In Fabric, open `stream-events.ipynb`, set `sink = "eventhouse"` and `kql_database = "retail_eventhouse"` (leave `kusto_uri` blank to auto-resolve), then run it.
 - Mention envelope: event_type, trace_id, ingest_timestamp; payload varies by event.
 
 3) Direct Eventhouse ingestion

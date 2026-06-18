@@ -72,8 +72,13 @@ The engine also has derived defaults:
 | `silver_db` | `ag` |
 | `gold_db` | `au` |
 | `dc_count` | `max(1, store_count // 10)` |
-| `customer_count` | `store_count * 1000` |
+| `customer_count` | `max(store_count * 1000, 5000)` |
 | `online_orders_per_day` | `store_count * 8` |
+
+`customer_count` is floored at 5,000 so even small-store demos generate enough
+customers for the churn model's train/test split (which needs at least two
+customers in each of its active and churned classes). The floor is a no-op once
+`store_count` reaches 5.
 
 ## Notebook parameters
 
@@ -102,7 +107,7 @@ manually. Configure it in Fabric:
 | `source_rows_per_second` | Spark rate-source rows per second. |
 | `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` for continuous streaming, or a positive test duration. |
-| `kusto_uri` | KQL database Query URI copied from the KQL database details card. |
+| `kusto_uri` | Leave blank to auto-resolve the Query URI from `kql_database` in this workspace; set it only to target a different cluster. |
 | `kql_database` | KQL database name; default is `retail_eventhouse`. |
 
 With `sink = "eventhouse"`, `stream-events.ipynb` uses Structured Streaming

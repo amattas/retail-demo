@@ -17,10 +17,8 @@ want live synthetic events.
 
 1. Run the generated `deploy/.generated/<env>/database.kql` script in the target
    KQL database, `retail_eventhouse`.
-2. Copy the KQL database **Query URI** from the database details card; this is the
-   value for the notebook's `kusto_uri` parameter.
-3. Enable OneLake availability on the KQL database.
-4. Create Lakehouse shortcuts from Eventhouse event tables into schema `cusn` if
+2. Enable OneLake availability on the KQL database.
+3. Create Lakehouse shortcuts from Eventhouse event tables into schema `cusn` if
    you want to run `03-streaming-to-silver.ipynb`.
 
 ## Step 6.2: Run the streaming generator
@@ -33,7 +31,7 @@ parameters:
 | `source_rows_per_second` | Spark rate-source rows per second. |
 | `sink` | `eventhouse` for direct KQL writes, or `delta` for local/debug smoke tests. |
 | `run_seconds` | `0` runs forever; positive values stop after N seconds. |
-| `kusto_uri` | KQL database Query URI copied from the KQL database details card. |
+| `kusto_uri` | Leave blank to auto-resolve the Query URI from `kql_database` in this workspace; set it only to target a different cluster. |
 | `kql_database` | KQL database name; default is `retail_eventhouse`. |
 
 With `sink = "eventhouse"`, the notebook uses Spark Structured Streaming
