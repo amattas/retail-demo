@@ -222,3 +222,132 @@ def test_ensure_azure_login_noop_when_no_tenant(monkeypatch):
     setup.ensure_azure_login("dev", dry_run=False)
 
     assert commands == []
+
+
+# --- guided console (TTY) integration -------------------------------------- #
+import contextlib
+from types import SimpleNamespace
+
+
+class _FakeUI:
+    """Stand-in for retail_setup.cli.console.ConsoleUI."""
+
+    def __init__(self, *, answer=True, cancelled=False):
+        self.logs = []
+        self.phases = []
+        self.advances = []
+        self.paused_count = 0
+        self.entered = self.exited = False
+        self._answer = answer
+        self._cancelled = cancelled
+
+    def __enter__(self):
+        self.entered = True
+        return self
+
+    def __exit__(self, *exc):
+        self.exited = True
+        return False
+
+    def log(self, text=""):
+        self.logs.append(text)
+
+    def set_phase(self, text):
+        self.phases.append(text)
+
+    def advance(self, *, completed=None, fraction=None):
+        self.advances.append(completed)
+
+    @property
+    def cancelled(self):
+        return self._cancelled
+
+    def prompt_yes_no(self, message, *, default=False):
+        return self._answer
+
+    @contextlib.contextmanager
+    def paused(self):
+        self.paused_count += 1
+        yield
+
+
+def test_emit_routes_to_active_ui(monkeypatch):
+    ui = _FakeUI()
+    monkeypatch.setattr(setup, "_UI", ui)
+    setup._emit("hello")
+    assert ui.logs == ["hello"]
+
+
+def test_section_advances_bar_when_ui_active(monkeypatch):
+    ui = _FakeUI()
+    monkeypatch.setattr(setup, "_UI", ui)
+    setup._section(3, 4, "Configuring the project")
+    assert ui.phases == ["Step 3/4: Configuring the project"]
+    assert ui.advances == [2]  # completed = step - 1
+
+
+def test_prompt_yes_no_delegates_to_ui(monkeypatch):
+    ui = _FakeUI(answer=False)
+    monkeypatch.setattr(setup, "_UI", ui)
+    assert setup.prompt_yes_no("ok?", default=True) is False
+
+
+def test_run_command_streams_output_when_ui_active(monkeypatch):
+    ui = _FakeUI()
+    monkeypatch.setattr(setup, "_UI", ui)
+
+    class _FakeProc:
+        def __init__(self):
+            self.stdout = iter(["line one\n", "line two\n"])
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(setup.subprocess, "Popen", lambda *a, **k: _FakeProc())
+    setup.run_command(["pip", "install", "thing"], label="Installing thing")
+    assert "line one" in ui.logs and "line two" in ui.logs
+
+
+def test_run_command_pauses_for_interactive_when_ui_active(monkeypatch):
+    ui = _FakeUI()
+    monkeypatch.setattr(setup, "_UI", ui)
+    ran = []
+    monkeypatch.setattr(setup.subprocess, "run", lambda command, **k: ran.append(command))
+
+    setup.run_command(["az", "login"], interactive=True)
+
+    assert ran == [["az", "login"]]
+    assert ui.paused_count == 1  # bar paused so the child owns the terminal
+
+
+def test_load_console_returns_none_without_tty(monkeypatch):
+    # pytest's stdout is not a TTY, so the guided console must stay disabled.
+    monkeypatch.delenv("RETAIL_SETUP_NO_UI", raising=False)
+    assert setup._load_console() is None
+
+
+def test_load_console_disabled_by_env(monkeypatch):
+    monkeypatch.setenv("RETAIL_SETUP_NO_UI", "1")
+    assert setup._load_console() is None
+
+
+def test_main_drives_console_and_resets_ui(monkeypatch):
+    ui = _FakeUI()
+    monkeypatch.setattr(setup, "_load_console", lambda: (lambda *a, **k: ui))
+    monkeypatch.setattr(
+        setup, "parse_args",
+        lambda: SimpleNamespace(env="dev", dry_run=False, yes=True, deploy=False,
+                                recreate=False, skip_prereqs=True, verbose=False),
+    )
+    monkeypatch.setattr(setup, "current_python_env",
+                        lambda: setup.PythonEnv(Path("python"), "test"))
+    monkeypatch.setattr(setup, "install_python_dependencies", lambda *a, **k: None)
+    monkeypatch.setattr(setup, "run_retail_setup", lambda *a, **k: None)
+
+    rc = setup.main()
+
+    assert rc == 0
+    assert ui.entered and ui.exited
+    assert setup._UI is None  # reset after the run
+    assert any("Step 2/4" in p for p in ui.phases)
