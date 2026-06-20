@@ -1,0 +1,136 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "retail-datagen"
+version = "1.0.0"
+description = "Synthetic retail data generator with real-time streaming"
+authors = [{name = "Retail DataGen", email = "noreply@example.com"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pandas>=2.1.0",
+    "numpy>=1.24.0",
+    "faker>=20.0.0",
+    "azure-eventhub>=5.11.0",
+    "python-multipart>=0.0.6",
+    "prometheus-client>=0.19.0",
+    "pyarrow>=14.0.0",
+    "duckdb>=1.0.0",
+    "jinja2>=3.1.0",
+    "cachetools>=5.3.0",
+    # SQLAlchemy required for async session support and query building in generators
+    "sqlalchemy>=2.0.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.88.0",
+    "httpx>=0.24.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+
+#[project.scripts]
+# Removed until a proper CLI is added
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+# Excluded paths:
+# - data/**/*: Generated data files, not source code
+# - sourcedata/supercenter/*.py: Auto-generated from CSV dictionaries. These files
+#   contain large data literals (e.g., 579 geography dicts) that exceed line-length
+#   limits. Reformatting would hurt readability. Data is validated by Pydantic at
+#   runtime, so linting provides minimal value here.
+exclude = ["data/**/*", "src/retail_datagen/sourcedata/supercenter/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+# Ignore these rules:
+# - E402: module-level import not at top (pytest.importorskip and conftest patterns)
+# - N806: variable in function should be lowercase (math convention: D, P, S, R)
+# - N818: exception name should end with Error suffix (existing base exception)
+# - UP042: replace `str, Enum` with `StrEnum` — the str/Enum idiom is deliberate
+#   (16 enums); StrEnum changes str() output, so the autofix is unsafe. Keep as-is.
+ignore = ["E402", "N806", "N818", "UP042"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["retail_datagen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "--strict-markers --strict-config"
+markers = [
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow",
+    "asyncio: marks tests as async (using pytest-asyncio)",
+]
+
+[tool.mypy]
+python_version = "3.11"
+# Gradual typing adoption - enable stricter checks incrementally
+# See GitHub issues for tracking re-enabling disabled codes
+warn_return_any = false
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+check_untyped_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+no_implicit_optional = true
+exclude = ["data/.*", "tests/.*"]
+
+# Disabled error codes - track progress via GitHub issues
+# Priority order for re-enabling: var-annotated > index > misc > func-returns-value > assignment > return-value > operator > override > arg-type > union-attr > call-arg
+disable_error_code = [
+    # High-volume structural issues (need significant refactoring)
+    "call-arg",           # ~184 errors: mixin cross-calls
+    "union-attr",         # ~76 errors: Optional access without None checks
+    "arg-type",           # ~51 errors: type mismatches in function args
+    # Medium-volume issues (incremental fixes possible)
+    "index",              # ~30 errors: indexing optional/union types
+    "misc",               # ~25 errors: await types, property issues
+    "func-returns-value", # ~26 errors: stub method return types
+    "override",           # ~22 errors: mixin method signature mismatches
+    "operator",           # ~23 errors: operator type issues
+    # Lower-volume issues (quick fixes)
+    "var-annotated",      # ~15 errors: missing variable type annotations
+    "assignment",         # ~14 errors: type mismatches in assignments
+    "return-value",       # ~10 errors: return type mismatches
+    "dict-item",          # ~6 errors: dict literal type issues
+    "no-redef",           # ~4 errors: name redefinitions
+    "str-bytes-safe",     # ~2 errors: bytes in f-strings
+    "valid-type",         # ~1 error: invalid type annotation
+    "type-var",           # ~1 error: type variable issues
+    "call-overload",      # ~1 error: numpy overload issues
+]
+
+# Ignore missing imports for third-party libs without stubs
+[[tool.mypy.overrides]]
+module = [
+    "faker.*",
+    "azure.*",
+    "prometheus_client.*",
+    "duckdb.*",
+    "pyarrow.*",
+    "cachetools.*",
+    "sqlalchemy.*",
+    "pandas.*",
+]
+ignore_missing_imports = true
+
+# Ignore empty-body and override errors for mixin base types
+# These are intentional: stub methods for type checking cross-mixin calls
+[[tool.mypy.overrides]]
+module = "retail_datagen.generators.fact_generators.base_types"
+disable_error_code = ["empty-body", "override"]

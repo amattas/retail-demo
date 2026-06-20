@@ -1,0 +1,900 @@
+"""
+Azure Event Hub client wrapper for real-time streaming.
+
+This module provides a wrapper around the Azure Event Hub producer client
+with proper error handling, retry logic, and batch management.
+"""
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Any
+
+try:
+    from azure.core.exceptions import AzureError
+    from azure.eventhub import EventData
+    from azure.eventhub.aio import EventHubProducerClient
+    from azure.eventhub.exceptions import EventHubError
+
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+
+    # Mock classes for development without Azure SDK
+    class EventData:
+        def __init__(self, body: str):
+            self.body = body
+
+    class EventHubProducerClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class EventHubError(Exception):
+        pass
+
+    class AzureError(Exception):
+        pass
+
+
+from ..shared.credential_utils import sanitize_connection_string
+from ..shared.logging_utils import get_structured_logger
+from ..shared.metrics import metrics_collector
+from .schemas import EventEnvelope
+
+logger = logging.getLogger(__name__)
+
+
+class CircuitBreaker:
+    """Simple circuit breaker implementation for Azure Event Hub failures."""
+
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+        self.metrics = metrics_collector
+
+        # Initialize metric
+        self.metrics.update_circuit_breaker_state(self.state)
+
+    def call(self, func):
+        """Execute function with circuit breaker protection."""
+        if self.state == "OPEN":
+            if self._should_attempt_reset():
+                self.state = "HALF_OPEN"
+                self.metrics.update_circuit_breaker_state(self.state)
+            else:
+                raise EventHubError("Circuit breaker is OPEN")
+
+        try:
+            result = func()
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+
+    async def call_async(self, func):
+        """Execute coroutine function with circuit breaker protection."""
+        if self.state == "OPEN":
+            if self._should_attempt_reset():
+                self.state = "HALF_OPEN"
+                self.metrics.update_circuit_breaker_state(self.state)
+            else:
+                raise EventHubError("Circuit breaker is OPEN")
+
+        try:
+            result = await func()
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+
+    def _should_attempt_reset(self) -> bool:
+        """Check if enough time has passed to attempt reset."""
+        if self.last_failure_time is None:
+            return True
+
+        time_since_failure = (
+            datetime.now(UTC) - self.last_failure_time
+        ).total_seconds()
+        return time_since_failure >= self.recovery_timeout
+
+    def _on_success(self):
+        """Reset circuit breaker on successful operation."""
+        self.failure_count = 0
+        if self.state != "CLOSED":
+            self.state = "CLOSED"
+            self.metrics.update_circuit_breaker_state(self.state)
+
+    def _on_failure(self):
+        """Handle failure and potentially open circuit."""
+        self.failure_count += 1
+        self.last_failure_time = datetime.now(UTC)
+
+        # Record failure metric
+        self.metrics.record_circuit_breaker_failure()
+
+        if self.failure_count >= self.failure_threshold:
+            if self.state != "OPEN":
+                self.state = "OPEN"
+                self.metrics.update_circuit_breaker_state(self.state)
+                self.metrics.record_circuit_breaker_trip()
+
+
+class AzureEventHubClient:
+    """
+    Azure Event Hub producer client wrapper with error handling and batching.
+
+    Provides robust Event Hub integration with:
+    - Automatic retry with exponential backoff
+    - Circuit breaker pattern for failure handling
+    - Optimized batch processing
+    - Connection pooling and resource management
+    - Comprehensive error handling and logging
+    """
+
+    def __init__(
+        self,
+        connection_string: str,
+        hub_name: str = "",
+        max_batch_size: int = 256,
+        batch_timeout_ms: int = 1000,
+        retry_attempts: int = 3,
+        backoff_multiplier: float = 2.0,
+        circuit_breaker_enabled: bool = True,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_recovery_timeout: int = 60,
+    ):
+        """
+        Initialize Azure Event Hub client.
+
+        Args:
+            connection_string: Azure Event Hub connection string
+            hub_name: Name of the Event Hub (can be empty if EntityPath is
+                in connection string)
+            max_batch_size: Maximum events per batch
+            batch_timeout_ms: Maximum time to wait for batch completion
+            retry_attempts: Number of retry attempts on failures
+            backoff_multiplier: Multiplier for exponential backoff
+            circuit_breaker_enabled: Whether to use circuit breaker pattern
+            circuit_breaker_failure_threshold: Number of failures before circuit
+                breaker opens
+            circuit_breaker_recovery_timeout: Seconds to wait before attempting
+                to close circuit breaker
+        """
+        if not AZURE_AVAILABLE:
+            logger.warning("Azure Event Hub SDK not available - using mock client")
+
+        self.connection_string = connection_string
+        self.hub_name = hub_name
+        self.max_batch_size = max_batch_size
+        self.batch_timeout_ms = batch_timeout_ms
+        self.retry_attempts = retry_attempts
+        self.backoff_multiplier = backoff_multiplier
+
+        self._client: EventHubProducerClient | None = None
+        self._is_connected = False
+        self._event_buffer: list[EventEnvelope] = []
+        # Lock for buffer operations: Lazy-initialized via _get_buffer_lock() to ensure
+        # it's created in an async context rather than during __init__ which may run
+        # outside an event loop
+        self._buffer_lock: asyncio.Lock | None = None
+        # Lock for statistics updates: Separate from buffer lock to avoid contention
+        # between buffer operations and send operations
+        self._stats_lock: asyncio.Lock | None = None
+        # Flag to prevent multiple concurrent auto-flush tasks from being scheduled
+        self._is_flushing = False
+        self._statistics = {
+            "events_sent": 0,
+            "events_failed": 0,
+            "batches_sent": 0,
+            "connection_failures": 0,
+            "last_send_time": None,
+        }
+
+        # Circuit breaker for failure handling
+        self.circuit_breaker = (
+            CircuitBreaker(
+                failure_threshold=circuit_breaker_failure_threshold,
+                recovery_timeout=circuit_breaker_recovery_timeout,
+            )
+            if circuit_breaker_enabled
+            else None
+        )
+
+        # Structured logger
+        self.log = get_structured_logger(__name__)
+        self.log.info(
+            "Initializing Azure Event Hub client",
+            hub_name=hub_name or "from_connection_string",
+            max_batch_size=max_batch_size,
+        )
+
+        # Determine mock mode: either Azure SDK missing or explicit mock scheme
+        self._is_mock = (not AZURE_AVAILABLE) or (
+            isinstance(connection_string, str)
+            and connection_string.startswith("mock://")
+        )
+
+        # Initialize client only for real (non-mock) connections
+        if (not self._is_mock) and connection_string and hub_name:
+            self._initialize_client()
+
+    def _get_buffer_lock(self) -> asyncio.Lock:
+        """Get the buffer lock, lazily initializing it if needed.
+
+        This ensures the lock is created in an async context rather than
+        potentially during __init__ which may run outside an event loop.
+
+        Returns:
+            The asyncio.Lock instance for buffer synchronization
+        """
+        if self._buffer_lock is None:
+            self._buffer_lock = asyncio.Lock()
+        return self._buffer_lock
+
+    def _get_stats_lock(self) -> asyncio.Lock:
+        """Get the statistics lock, lazily initializing it if needed.
+
+        Separate from buffer lock to avoid contention between buffer
+        operations and statistics updates during send operations.
+
+        Returns:
+            The asyncio.Lock instance for statistics synchronization
+        """
+        if self._stats_lock is None:
+            self._stats_lock = asyncio.Lock()
+        return self._stats_lock
+
+    async def _update_statistics(
+        self,
+        events_sent: int = 0,
+        events_failed: int = 0,
+        batches_sent: int = 0,
+        update_last_send_time: bool = False,
+    ) -> None:
+        """Update statistics counters with lock protection.
+
+        Thread-safety: Uses async lock to ensure atomic counter updates
+        during concurrent send operations.
+
+        Args:
+            events_sent: Number of events successfully sent to add
+            events_failed: Number of events that failed to add
+            batches_sent: Number of batches sent to add
+            update_last_send_time: Whether to update last_send_time to now
+        """
+        async with self._get_stats_lock():
+            if events_sent:
+                self._statistics["events_sent"] += events_sent
+            if events_failed:
+                self._statistics["events_failed"] += events_failed
+            if batches_sent:
+                self._statistics["batches_sent"] += batches_sent
+            if update_last_send_time:
+                self._statistics["last_send_time"] = datetime.now(UTC)
+
+    def _initialize_client(self):
+        """Initialize the Azure Event Hub producer client."""
+        try:
+            self._client = EventHubProducerClient.from_connection_string(
+                conn_str=self.connection_string, eventhub_name=self.hub_name
+            )
+            # Log sanitized connection string to avoid exposing keys
+            sanitized = sanitize_connection_string(self.connection_string)
+            logger.info(
+                f"Azure Event Hub client initialized for hub: {self.hub_name} "
+                f"(connection configured: {sanitized})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize Event Hub client: {e}")
+            self._statistics["connection_failures"] += 1
+            raise
+
+    async def connect(self) -> bool:
+        """
+        Establish connection to Azure Event Hub.
+
+        This method explicitly initializes async locks in an async context to ensure
+        they are created within a running event loop. This prevents potential
+        RuntimeError exceptions if locks are accessed before the event loop is ready.
+
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        logger.info("🔌 Attempting to connect to Azure Event Hub...")
+
+        # Explicitly initialize locks in async context
+        # This ensures locks are created within a running event loop
+        if self._buffer_lock is None:
+            self._buffer_lock = asyncio.Lock()
+        if self._stats_lock is None:
+            self._stats_lock = asyncio.Lock()
+
+        if self._is_mock:
+            logger.info("✅ Mock Azure client - connection simulated (test mode)")
+            self._is_connected = True
+            metrics_collector.update_connection_status(True)
+            return True
+
+        try:
+            if not self._client:
+                logger.info("Initializing Azure Event Hub client...")
+                self._initialize_client()
+
+            logger.info("Testing connection by getting partition properties...")
+            # Test connection by getting partition information
+            partition_props = await self._client.get_partition_properties("0")
+            if partition_props:
+                self._is_connected = True
+                metrics_collector.update_connection_status(True)
+                logger.info("✅ Successfully connected to Azure Event Hub")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Failed to connect to Azure Event Hub: {e}", exc_info=True)
+            self._statistics["connection_failures"] += 1
+            self._is_connected = False
+            metrics_collector.update_connection_status(False)
+            metrics_collector.record_connection_failure()
+
+        return False
+
+    async def disconnect(self):
+        """Close connection to Azure Event Hub."""
+        if self._client and AZURE_AVAILABLE:
+            try:
+                await self._client.close()
+                logger.info("Azure Event Hub client disconnected")
+            except Exception as e:
+                logger.error(f"Error during disconnect: {e}")
+
+        self._is_connected = False
+        metrics_collector.update_connection_status(False)
+
+    def is_connected(self) -> bool:
+        """Check if client is connected to Event Hub."""
+        return self._is_connected
+
+    async def send_event(self, event: EventEnvelope) -> bool:
+        """
+        Send a single event to Event Hub.
+
+        Args:
+            event: Event envelope to send
+
+        Returns:
+            bool: True if sent successfully, False otherwise
+        """
+        logger.info(
+            f"Azure client send_event: type={event.event_type}, "
+            f"connected={self._is_connected}"
+        )
+        result = await self.send_events([event])
+        logger.info(f"Azure client send_event result: {result}")
+        return result
+
+    async def send_events(self, events: list[EventEnvelope]) -> bool:
+        """
+        Send multiple events to Event Hub with batching and retry logic.
+
+        IMPORTANT: Deadlock Prevention Constraint
+        -----------------------------------------
+        This method is called from flush_buffer() which may be triggered by
+        add_to_buffer(). To prevent deadlocks, this method and any methods it
+        calls (e.g., _send_batch, _send_batch_direct) must NEVER attempt to
+        acquire _buffer_lock or call methods that do (add_to_buffer, flush_buffer).
+
+        Verification Checklist for Future Modifications:
+        1. ✓ send_events() does not acquire _buffer_lock
+        2. ✓ _send_batch() does not acquire _buffer_lock
+        3. ✓ _send_batch_direct() does not acquire _buffer_lock
+        4. ✓ _update_statistics() uses _stats_lock only (separate from _buffer_lock)
+        5. ✓ No calls to add_to_buffer() or flush_buffer() in send path
+
+        If this constraint is violated, the following deadlock sequence occurs:
+        - Task A: add_to_buffer() → acquires _buffer_lock → calls flush_buffer()
+        - Task B: flush_buffer() tries to acquire _buffer_lock (already held) → deadlock
+
+        The current implementation avoids this by:
+        - Using asyncio.create_task() to schedule flush outside the lock
+        - Ensuring send path never acquires _buffer_lock
+
+        Args:
+            events: List of event envelopes to send
+
+        Returns:
+            bool: True if all events sent successfully, False otherwise
+        """
+        if not events:
+            return True
+
+        if not self._is_connected:
+            self.log.error("Client not connected to Event Hub", event_count=len(events))
+            return False
+
+        batch_id = events[0].correlation_id if events else "unknown"
+
+        self.log.debug(
+            "Sending event batch",
+            batch_id=batch_id,
+            event_count=len(events),
+            batch_size_kb=self._estimate_batch_size(events),
+        )
+
+        # Process events in batches
+        success = True
+        for i in range(0, len(events), self.max_batch_size):
+            batch = events[i : i + self.max_batch_size]
+            batch_success = await self._send_batch(batch)
+            if not batch_success:
+                success = False
+
+        if success:
+            self.log.info(
+                "Batch sent successfully",
+                batch_id=batch_id,
+                event_count=len(events),
+                total_sent=self._statistics["events_sent"],
+            )
+        else:
+            self.log.error(
+                "Batch send failed",
+                batch_id=batch_id,
+                event_count=len(events),
+                total_failed=self._statistics["events_failed"],
+            )
+
+        return success
+
+    def _estimate_batch_size(self, events: list[EventEnvelope]) -> float:
+        """Estimate batch size in KB."""
+        import sys
+
+        total_size = sum(sys.getsizeof(e.model_dump_json()) for e in events)
+        return total_size / 1024
+
+    async def _send_batch(self, events: list[EventEnvelope]) -> bool:
+        """
+        Send a batch of events with retry logic.
+
+        Args:
+            events: Batch of events to send
+
+        Returns:
+            bool: True if batch sent successfully, False otherwise
+        """
+        attempt = 0
+        while attempt < self.retry_attempts:
+            try:
+                if self.circuit_breaker:
+                    success = await self.circuit_breaker.call_async(
+                        lambda: self._send_batch_direct(events)
+                    )
+                else:
+                    success = await self._send_batch_direct(events)
+
+                if success:
+                    await self._update_statistics(
+                        events_sent=len(events),
+                        batches_sent=1,
+                        update_last_send_time=True,
+                    )
+                    logger.debug(f"Successfully sent batch of {len(events)} events")
+                    return True
+
+            except Exception as e:
+                attempt += 1
+                await self._update_statistics(events_failed=len(events))
+                logger.warning(
+                    f"Batch send attempt {attempt}/{self.retry_attempts} failed: {e}"
+                )
+
+                if attempt < self.retry_attempts:
+                    # Exponential backoff
+                    wait_time = self.backoff_multiplier ** (attempt - 1)
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"Failed to send batch after {self.retry_attempts} attempts"
+                    )
+
+        return False
+
+    async def _send_batch_direct(self, events: list[EventEnvelope]) -> bool:
+        """
+        Direct batch send to Event Hub without retry logic.
+
+        Groups events by partition_key since Azure EventDataBatch can only
+        have one partition_key per batch.
+
+        Args:
+            events: Events to send
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not AZURE_AVAILABLE:
+            # Mock implementation for testing
+            logger.debug(f"Mock send: {len(events)} events")
+            return True
+
+        try:
+            # Group events by partition_key (None is a valid key for round-robin)
+            from collections import defaultdict
+
+            events_by_partition = defaultdict(list)
+            for event in events:
+                partition_key = event.partition_key if event.partition_key else None
+                events_by_partition[partition_key].append(event)
+
+            # Send each partition group separately
+            for partition_key, partition_events in events_by_partition.items():
+                # Create EventData objects for this partition
+                event_data_list = []
+                for event in partition_events:
+                    event_json = event.model_dump_json()
+
+                    # Encode JSON string to UTF-8 bytes for Azure Event Hub
+                    event_data = EventData(event_json.encode("utf-8"))
+
+                    # Set application properties for Eventstream routing
+                    # "Table" property routes to KQL tables
+                    event_data.properties = {"Table": event.event_type.value}
+
+                    event_data_list.append(event_data)
+
+                # Create batch with partition_key (if not None)
+                if partition_key:
+                    batch = await self._client.create_batch(partition_key=partition_key)
+                else:
+                    batch = await self._client.create_batch()
+
+                # Add events to batch, handling overflow
+                for event_data in event_data_list:
+                    try:
+                        batch.add(event_data)
+                    except ValueError:
+                        # Batch is full, send it and create a new one
+                        await self._client.send_batch(batch)
+                        if partition_key:
+                            batch = await self._client.create_batch(
+                                partition_key=partition_key
+                            )
+                        else:
+                            batch = await self._client.create_batch()
+                        batch.add(event_data)
+
+                # Send any remaining events in this partition
+                if len(batch) > 0:
+                    await self._client.send_batch(batch)
+
+            return True
+
+        except EventHubError as e:
+            logger.error(f"Event Hub specific error: {e}")
+            raise
+        except AzureError as e:
+            logger.error(f"Azure service error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error sending batch: {e}")
+            raise
+
+    async def add_to_buffer(self, event: EventEnvelope) -> bool:
+        """
+        Add event to internal buffer for batching.
+
+        Thread-safety: This method uses an async lock to protect buffer access.
+        The decision to flush is made atomically while holding the lock, but the
+        flush is scheduled outside the lock to avoid holding it during I/O.
+
+        Args:
+            event: Event to buffer
+
+        Returns:
+            bool: True if buffer needs flushing (reached max size), False otherwise
+        """
+        should_schedule_flush = False
+        async with self._get_buffer_lock():
+            self._event_buffer.append(event)
+            # Check if buffer needs flushing
+            needs_flush = len(self._event_buffer) >= self.max_batch_size
+            # Only schedule flush if needed and not already flushing
+            if needs_flush and not self._is_flushing:
+                self._is_flushing = True
+                should_schedule_flush = True
+
+        # Auto-flush if buffer reaches max size and we're in an async context
+        # Note: We schedule outside the lock to avoid holding lock during I/O,
+        # but the decision to flush is made atomically inside the lock.
+        if should_schedule_flush:
+            try:
+                # Create task directly - we're already in an async context
+                asyncio.create_task(self._flush_and_reset())
+            except Exception as e:
+                # If task creation fails, reset the flushing flag to avoid
+                # deadlock where _is_flushing stays True forever, blocking
+                # all future auto-flushes
+                logger.error(f"Failed to schedule auto-flush task: {e}")
+                async with self._get_buffer_lock():
+                    self._is_flushing = False
+
+        return needs_flush
+
+    async def flush_buffer(self) -> bool:
+        """
+        Flush all buffered events to Event Hub.
+
+        Thread-safety: Uses async lock to safely copy and clear the buffer.
+        The actual send happens outside the lock to minimize lock hold time.
+
+        Returns:
+            bool: True if all events sent successfully, False otherwise
+        """
+        async with self._get_buffer_lock():
+            if not self._event_buffer:
+                return True
+
+            events_to_send = self._event_buffer.copy()
+            self._event_buffer.clear()
+
+        return await self.send_events(events_to_send)
+
+    async def _flush_and_reset(self) -> bool:
+        """
+        Internal method that flushes buffer and resets the flushing flag.
+
+        This method is called by the auto-flush mechanism to ensure the
+        _is_flushing flag is properly reset after flush completes, whether
+        the flush succeeds or fails.
+
+        Thread-safety: The _is_flushing flag is reset under lock protection
+        in the finally block to ensure proper synchronization.
+
+        Returns:
+            bool: True if flush succeeded, False otherwise
+        """
+        try:
+            return await self.flush_buffer()
+        finally:
+            async with self._get_buffer_lock():
+                self._is_flushing = False
+
+    async def get_statistics(self) -> dict[str, Any]:
+        """
+        Get client statistics and performance metrics.
+
+        Thread-safety: Reads buffer_size under buffer lock, and reads _statistics
+        under stats lock. This ensures consistent reads during concurrent operations.
+
+        Returns:
+            dict: Statistics about client performance including:
+                - buffer_size: Current number of events in buffer
+                - events_sent: Total events successfully sent
+                - batches_sent: Total batches sent
+                - is_connected: Current connection status
+                - circuit_breaker_state: Current circuit breaker state
+        """
+        async with self._get_buffer_lock():
+            buffer_size = len(self._event_buffer)
+        async with self._get_stats_lock():
+            # Copy statistics under lock for consistency
+            stats = self._statistics.copy()
+        stats.update(
+            {
+                "is_connected": self._is_connected,
+                "buffer_size": buffer_size,
+                "circuit_breaker_state": (
+                    self.circuit_breaker.state if self.circuit_breaker else "DISABLED"
+                ),
+                "hub_name": self.hub_name,
+            }
+        )
+        return stats
+
+    async def health_check(self) -> dict[str, Any]:
+        """
+        Perform health check of the Event Hub connection.
+
+        Returns:
+            dict: Health status and diagnostic information
+        """
+        health_status = {
+            "healthy": False,
+            "connection_status": "disconnected",
+            "last_send_time": self._statistics["last_send_time"],
+            "total_events_sent": self._statistics["events_sent"],
+            "total_failures": self._statistics["events_failed"],
+            "circuit_breaker_state": (
+                self.circuit_breaker.state if self.circuit_breaker else "DISABLED"
+            ),
+        }
+
+        if self._is_connected:
+            try:
+                if AZURE_AVAILABLE and self._client:
+                    # Test connection with a simple operation
+                    hub_props = await self._client.get_eventhub_properties()
+                    if hub_props:
+                        health_status["healthy"] = True
+                        health_status["connection_status"] = "connected"
+                        # hub_props is EventHubProperties with partition_ids attribute
+                        health_status["partition_count"] = len(
+                            hub_props.partition_ids  # type: ignore[attr-defined]
+                        )
+                else:
+                    # Mock client is always healthy when connected
+                    health_status["healthy"] = True
+                    health_status["connection_status"] = "connected (mock)"
+
+            except Exception as e:
+                logger.error(f"Health check failed: {e}")
+                health_status["connection_status"] = f"unhealthy: {str(e)}"
+
+        return health_status
+
+    @asynccontextmanager
+    async def managed_connection(self):
+        """
+        Async context manager for automatic connection management.
+
+        Usage:
+            async with client.managed_connection():
+                await client.send_event(event)
+        """
+        try:
+            await self.connect()
+            yield self
+        finally:
+            await self.disconnect()
+
+    def _parse_connection_string(self, conn_str: str) -> dict:
+        """
+        Parse Event Hub connection string to extract metadata.
+
+        Args:
+            conn_str: Connection string to parse
+
+        Returns:
+            dict: Metadata extracted from connection string with keys:
+                - endpoint: Event Hub namespace endpoint (e.g., 'sb://xxx.servicebus.windows.net')
+                - entity_path: Event Hub name (if present in connection string)
+                - namespace: Namespace name extracted from endpoint
+                - key_name: SharedAccessKeyName value
+                - is_fabric_rti: Boolean indicating if this is a Fabric RTI connection
+        """
+        metadata = {}
+
+        try:
+            parts = conn_str.split(";")
+            for part in parts:
+                if "=" in part:
+                    key, value = part.split("=", 1)
+                    if key == "Endpoint":
+                        metadata["endpoint"] = value
+                        # Extract namespace from endpoint
+                        if "sb://" in value:
+                            namespace = value.split("sb://")[1].split(".")[0]
+                            metadata["namespace"] = namespace
+                    elif key == "EntityPath":
+                        metadata["entity_path"] = value
+                    elif key == "SharedAccessKeyName":
+                        metadata["key_name"] = value
+
+            # Detect Fabric RTI (namespace starts with "eventstream-")
+            namespace = metadata.get("namespace", "")
+            if namespace.startswith("eventstream-"):
+                metadata["is_fabric_rti"] = True
+            else:
+                metadata["is_fabric_rti"] = False
+
+        except Exception as e:
+            logger.warning(f"Error parsing connection string: {e}")
+
+        return metadata
+
+    async def test_connection(self) -> tuple[bool, str, dict]:
+        """
+        Test connection to Event Hub without sending events.
+
+        This method validates the connection by creating a producer client
+        and fetching Event Hub properties, which proves the connection works
+        without actually sending any data.
+
+        Returns:
+            tuple: (success, message, metadata)
+                - success: True if connection test passed
+                - message: Descriptive message about the test result
+                - metadata: Dictionary with connection details
+                    (endpoint, partition info, etc.)
+
+        Example:
+            success, msg, metadata = await client.test_connection()
+            if success:
+                print(f"Connected! Hub: {metadata['entity_path']}")
+        """
+        if not AZURE_AVAILABLE:
+            # Return mock success for development without Azure SDK
+            return await self._test_connection_mock()
+
+        try:
+            # Parse connection string to extract metadata
+            metadata = self._parse_connection_string(self.connection_string)
+
+            # Determine hub name (from constructor or EntityPath in connection string)
+            hub_name = self.hub_name or metadata.get("entity_path")
+            if not hub_name:
+                return (
+                    False,
+                    (
+                        "Hub name not specified and EntityPath not found "
+                        "in connection string"
+                    ),
+                    {},
+                )
+
+            # Create a temporary producer client with short timeout
+            logger.info(f"Testing connection to Event Hub: {hub_name}")
+
+            # azure-eventhub lacks type stubs, so mypy doesn't know
+            # EventHubProducerClient supports async context management.
+            # SDK docs confirm this pattern: https://learn.microsoft.com/azure
+            async with EventHubProducerClient.from_connection_string(  # type: ignore[attr-defined]
+                conn_str=self.connection_string,
+                eventhub_name=hub_name,
+                logging_enable=False,
+            ) as producer:
+                # Get Event Hub metadata (proves connection works)
+                properties = await producer.get_eventhub_properties()
+
+                # Handle both dict and object response formats (SDK version differences)
+                if isinstance(properties, dict):
+                    partition_ids = properties.get("partition_ids", [])
+                    created_at = properties.get("created_at")
+                else:
+                    partition_ids = properties.partition_ids
+                    created_at = properties.created_at
+
+                # Add partition information to metadata
+                metadata.update(
+                    {
+                        "hub_name": hub_name,
+                        "partition_count": len(partition_ids),
+                        "partition_ids": list(partition_ids),
+                        "created_at": (created_at.isoformat() if created_at else None),
+                    }
+                )
+
+                logger.info(
+                    f"Successfully connected to Event Hub '{hub_name}' "
+                    f"with {len(partition_ids)} partitions"
+                )
+
+                return True, "Connection successful", metadata
+
+        except EventHubError as e:
+            error_msg = f"Event Hub error: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg, {}
+        except Exception as e:
+            error_msg = f"Connection failed: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg, {}
+
+    async def _test_connection_mock(self) -> tuple[bool, str, dict]:
+        """Mock connection test for development without Azure SDK."""
+        metadata = {
+            "endpoint": "mock://localhost",
+            "entity_path": "mock-hub",
+            "namespace": "mock",
+            "is_fabric_rti": False,
+            "hub_name": self.hub_name or "mock-hub",
+            "partition_count": 4,
+            "partition_ids": ["0", "1", "2", "3"],
+        }
+        logger.info("Mock connection test (Azure SDK not installed)")
+        return True, "Mock connection successful (Azure SDK not installed)", metadata
