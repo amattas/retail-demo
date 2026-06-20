@@ -35,20 +35,22 @@ development tests.
 
 ## Guided setup
 
-On Windows, from the repository root:
+Use the bootstrap script for your shell:
 
 ```powershell
 .\scripts\setup.ps1
 ```
 
-`setup.ps1` works even with nothing installed. If conda is installed it uses a
-`retail-demo` conda environment (created with Python 3.13 when missing);
-otherwise it uses a local `.venv` (created from a system Python 3.11+); and if
-neither is available it installs Miniforge with winget. It activates that
-environment, delegates to `scripts\setup.py`, and then switches your shell back
-to the environment you started from. To manage Python yourself, activate a
-Python 3.11+ environment (Windows, macOS, or Linux) and run
-`python ./scripts/setup.py` directly.
+```bash
+./scripts/setup.sh
+```
+
+`setup.ps1` (Windows) and `setup.sh` (macOS/Linux) work even with nothing
+installed. If conda is installed they use a `retail-demo` conda environment
+(created with Python 3.13 when missing); otherwise they use a local `.venv`
+(created from a system Python 3.11+); and if neither is available they install
+Miniforge. To manage Python yourself, activate a Python 3.11+ environment and
+run `python ./scripts/setup.py` directly.
 
 The guided setup:
 
@@ -71,6 +73,12 @@ Examples:
 .\scripts\setup.ps1 --env dev
 .\scripts\setup.ps1 --env dev --deploy
 .\scripts\setup.ps1 --env dev --dry-run
+```
+
+```bash
+./scripts/setup.sh --env dev
+./scripts/setup.sh --env dev --deploy
+./scripts/setup.sh --env dev --dry-run
 ```
 
 `--env` selects `deploy\config\environments\<env>.yml` and generated outputs
@@ -250,17 +258,13 @@ everything. This is destructive and is gated by a single confirmation prompt:
 retail-setup deploy --env dev --recreate
 ```
 
-### Interactive deploy console
+### Linear deploy output
 
-When run in a terminal (a TTY), `retail-setup deploy` shows an interactive
-console: a scrolling log on top and a fixed status footer with a smooth progress
-bar and an `esc to cancel or abort` hint. Press **Esc** to cancel; if Terraform
-has already started creating resources, you're asked whether to remove the
-artifacts created so far (a `terraform destroy`). Gated steps ask for a single
-confirmation — Terraform runs with `-auto-approve`, so you never confirm twice.
-In non-interactive contexts (CI, piped output, `--yes`, `--dry-run`) it falls
-back to plain line-by-line output. Set `RETAIL_SETUP_NO_UI=1` to force the plain
-output even in a terminal.
+`retail-setup deploy` prints a linear log. Each step and command is wrapped in
+plain ASCII dividers, so copied logs and CI output show exactly what ran and in
+what order. There is no fixed-footer TUI, progress bar, or Esc-to-cancel mode.
+Gated steps ask for a single confirmation — Terraform runs with
+`-auto-approve`, so you never confirm twice.
 
 The deploy command runs these steps in order:
 
@@ -273,9 +277,11 @@ The deploy command runs these steps in order:
 5. Deploy staged items through `fabric-cicd`.
 6. Write a combined KQL database script to
    `deploy\.generated\<env>\database.kql`.
-7. Run offline deployment-file validation.
+7. Apply the KQL script to the target Eventhouse KQL database.
+8. Run offline deployment-file validation.
 
-The KQL script is not executed automatically. Open the generated
+The generated KQL script is retained for review and troubleshooting. If you
+follow a manual import path instead of `retail-setup deploy`, open the generated
 `.execute database script` payload and run it in the target Fabric KQL database
 after the Eventhouse and KQL database exist.
 

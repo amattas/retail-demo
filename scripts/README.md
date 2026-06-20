@@ -2,14 +2,18 @@
 
 Utility scripts for configuring and deploying the retail demo components.
 
-## setup.ps1 (Windows entry point)
+## setup.ps1 / setup.sh (bootstrap entry points)
 
-Guided Windows bootstrap. It prepares a Python environment, delegates to
-`setup.py`, then switches your shell back to the environment that was active
-before it ran. It uses a conda environment named `retail-demo` (created with
-Python 3.13 when missing) if conda is installed; otherwise a local `.venv` in
-the repo root (created from a system Python 3.11+ when missing); and if neither
-is available, it installs Miniforge with winget. All arguments are forwarded.
+Guided bootstraps for machines that may not have Python ready yet.
+
+- `setup.ps1` is the Windows/PowerShell entry point.
+- `setup.sh` is the macOS/Linux Bash entry point.
+
+Both scripts prepare a Python environment, delegate to `setup.py`, and forward
+all arguments. They use a conda environment named `retail-demo` (created with
+Python 3.13 when missing) if conda is installed; otherwise they use a local
+`.venv` in the repo root (created from a system Python 3.11+ when missing); and
+if neither is available, they install Miniforge.
 
 ```powershell
 .\scripts\setup.ps1
@@ -17,14 +21,14 @@ is available, it installs Miniforge with winget. All arguments are forwarded.
 .\scripts\setup.ps1 --env dev --deploy
 ```
 
-On macOS and Linux, activate a Python 3.11+ environment and run `setup.py`
-directly.
+```bash
+./scripts/setup.sh
+./scripts/setup.sh --env dev --dry-run
+./scripts/setup.sh --env dev --deploy
+```
 
-`setup.ps1` manages the environment for you: it creates or reuses the
-`retail-demo` conda environment (or a `.venv`), runs the guided setup, and
-restores your original environment afterward. If you'd rather manage the
-environment yourself, activate a Python 3.11+ conda environment or virtual
-environment and run `python scripts\setup.py` directly.
+If you'd rather manage the environment yourself, activate a Python 3.11+ conda
+environment or virtual environment and run `python scripts/setup.py` directly.
 
 ## setup.py
 
@@ -34,11 +38,12 @@ Guided cross-platform setup engine for a new Fabric workspace.
 
 `setup.py` is the single entry point for local setup logic. It walks through four
 clearly labelled steps — check required tools, install Python packages, configure
-the project, and optionally deploy — using plain-language progress messages. It
-detects the operating system, offers to install missing CLI tools with the OS
-package manager, uses the Python environment that launched the script, installs
-Python dependencies, runs `retail-setup configure`, renders notebooks, signs in
-to the configured Azure tenant, and asks whether to deploy.
+the project, and optionally deploy — using linear output with ASCII dividers
+between each step and command. It detects the operating system, offers to install
+missing CLI tools with the OS package manager, uses the Python environment that
+launched the script, installs Python dependencies, runs `retail-setup configure`,
+renders notebooks, signs in to the configured Azure tenant, and asks whether to
+deploy.
 
 ### Usage
 
@@ -49,9 +54,9 @@ python scripts\setup.py --env dev --deploy
 python scripts\setup.py --verbose      # show the exact commands being run
 ```
 
-By default each step prints a short, friendly progress line; if a step fails the
-exact command is shown so it can be debugged. Add `--verbose` to always see the
-underlying commands.
+Each step prints the exact command under a divider so logs are easy to follow and
+copy into issues. Add `--verbose` to keep pip and dependency installation output
+fully expanded instead of quieting routine package-manager chatter.
 
 `--env` selects `deploy\config\environments\<env>.yml` and scopes generated
 deployment output under `deploy\.generated\<env>\`.

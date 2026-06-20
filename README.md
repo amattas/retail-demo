@@ -41,7 +41,7 @@ only needed for utility development/tests.
 
 ## New workspace walkthrough
 
-Run these commands from PowerShell unless noted otherwise.
+Use the bootstrap script for your shell:
 
 ### 1. Clone and run the guided setup
 
@@ -51,16 +51,22 @@ Set-Location retail-demo
 .\scripts\setup.ps1
 ```
 
-`setup.ps1` is the Windows entry point for machines with **nothing installed**.
-If conda is installed it uses a `retail-demo` conda environment (created with
-Python 3.13 when missing); otherwise it uses a local `.venv` (created from a
-system Python 3.11+); and if neither is available it installs Miniforge with
-winget. It activates that environment, runs the guided setup, and then switches
-your shell back to the environment you started from.
+```bash
+git clone https://github.com/amattas/retail-demo.git
+cd retail-demo
+./scripts/setup.sh
+```
+
+`setup.ps1` is the Windows entry point and `setup.sh` is the macOS/Linux entry
+point for machines with **nothing installed**. If conda is installed they use a
+`retail-demo` conda environment (created with Python 3.13 when missing);
+otherwise they use a local `.venv` (created from a system Python 3.11+); and if
+neither is available they install Miniforge (`winget` on Windows, the Miniforge
+installer on macOS/Linux). The bootstrap activates that environment, runs the
+guided setup, and then exits with the setup result.
 
 **Prefer to manage Python yourself?** Activate a Python 3.11+ conda environment
-or virtual environment and run `python ./scripts/setup.py` directly. On macOS and
-Linux, run `python ./scripts/setup.py` from an activated Python 3.11+ environment.
+or virtual environment and run `python ./scripts/setup.py` directly.
 
 The guided setup detects Windows, macOS, or Linux; offers to install missing
 CLI prerequisites with the OS package manager; installs Python dependencies into
@@ -80,6 +86,13 @@ Use `--env` to select the deployment environment file under
 .\scripts\setup.ps1 --env dev --deploy
 .\scripts\setup.ps1 --env dev --dry-run
 .\scripts\setup.ps1 --env dev --recreate   # clean slate: destroy + recreate the workspace
+```
+
+```bash
+./scripts/setup.sh --env dev
+./scripts/setup.sh --env dev --deploy
+./scripts/setup.sh --env dev --dry-run
+./scripts/setup.sh --env dev --recreate    # clean slate: destroy + recreate the workspace
 ```
 
 ### 2. Manual install path
@@ -172,11 +185,17 @@ retail-setup deploy --env dev --yes
 
 `retail-setup deploy` renders the deployment plan, runs Terraform unless
 `--skip-terraform` is used, stages Fabric item folders, deploys supported items
-with `fabric-cicd`, and writes a combined KQL database script to
-`deploy\.generated\dev\database.kql`.
+with `fabric-cicd`, writes a combined KQL database script to
+`deploy\.generated\dev\database.kql`, and applies that script to the Eventhouse
+KQL database.
 
-The KQL script is not executed automatically. Open the generated script and run
-it in the target Fabric KQL database after the Eventhouse/KQL database exists.
+Deploy output is intentionally linear: each step and command is separated by
+plain ASCII dividers so logs are easy to follow in terminals, CI, and copied
+transcripts. There is no fixed-footer TUI or progress-bar mode.
+
+The generated KQL script is retained for review and troubleshooting. If you use
+the manual import path instead of `retail-setup deploy`, run that script in the
+target Fabric KQL database after the Eventhouse/KQL database exists.
 
 ### 6. Run the setup notebooks in Fabric
 

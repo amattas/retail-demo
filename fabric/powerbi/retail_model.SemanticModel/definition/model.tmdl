@@ -20,7 +20,6 @@ ref table marketing_cost_daily
 ref table zone_dwell_minute
 ref table inventory_position_current
 ref table truck_dwell_daily
-ref table _watermarks
 ref table sales_minute_store
 ref table dc_inventory_position_current
 ref table dim_customers
@@ -52,4 +51,3 @@ ref table churn_predictions
 ref table customer_segments
 ref table demand_forecast
 ref table stockout_risk
-

@@ -30,17 +30,33 @@ is not the recommended path for a new workspace.
 
 ## Architecture overview
 
-```text
-retail-setup configure/render
-        |
-        v
-Fabric setup notebooks 01-04
-        |
-        v
-Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
+```mermaid
+flowchart TD
+    Bootstrap[setup.ps1 / setup.sh / setup.py]
+    Configure[retail-setup configure]
+    Render[retail-setup render]
+    Deploy{Deploy now?}
+    Terraform[Terraform<br/>workspace, Lakehouse, Eventhouse]
+    Publish[fabric-cicd publish<br/>notebooks, Power BI, pipelines, agents]
+    KQL[Apply generated KQL script<br/>Eventhouse tables + functions]
+    Pipeline[Run setup-pipeline]
+    Silver[(Silver ag<br/>dimensions + facts)]
+    Gold[(Gold au<br/>aggregates + ML)]
+    Semantic[Power BI semantic model]
+    Ontology[Retail ontology<br/>business map]
+    Stream[Optional stream-events]
+    Eventhouse[(Eventhouse KQL tables)]
 
-Optional live path:
-stream-events -> Eventhouse/KQL (Spark connector) -> Silver/Gold
+    Bootstrap --> Configure --> Render --> Deploy
+    Deploy -- yes --> Terraform --> Publish --> KQL --> Pipeline
+    Deploy -- no/manual --> Pipeline
+    Pipeline --> Silver --> Gold
+    Gold --> Semantic
+    Silver --> Semantic
+    Silver --> Ontology
+    Gold --> Ontology
+    Stream --> Eventhouse
+    Eventhouse --> Ontology
 ```
 
 ## Schema naming convention
@@ -50,6 +66,10 @@ stream-events -> Eventhouse/KQL (Spark connector) -> Silver/Gold
 | `cusn` | Bronze/live | Eventhouse event table shortcuts |
 | `ag` | Silver | Typed Delta dimensions/facts |
 | `au` | Gold | Pre-aggregated KPI tables |
+
+`retail-setup deploy` and the bootstrap scripts use linear output with ASCII
+dividers around each step and command. There is no fixed-footer TUI or progress
+bar mode.
 
 ## Reference documentation
 

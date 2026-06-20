@@ -108,7 +108,7 @@ After publishing:
    - **Semantic model**: `retail_model`
    - **Report**: `retail_model`
 3. Open the semantic model to verify:
-   - All 38 tables are present: 7 dimensions (including `dim_date`), 18 fact tables, 9 Gold aggregation tables, and 4 ML prediction tables (`demand_forecast`, `stockout_risk`, `customer_segments`, `churn_predictions`), plus the `_watermarks` helper table
+   - All 38 modeled tables are present: 7 dimensions (including `dim_date`), 18 fact tables, 9 Gold aggregation tables, and 4 ML prediction tables (`demand_forecast`, `stockout_risk`, `customer_segments`, `churn_predictions`)
    - Relationships are active
    - Data refreshes successfully
 

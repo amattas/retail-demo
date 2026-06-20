@@ -2,7 +2,6 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 from typer.testing import CliRunner
 
 import retail_setup.cli.main as cli
@@ -106,82 +105,6 @@ def test_cleanup_destroy_step_targets_environment():
     assert "-var-file=environments/prod.tfvars" in step.cmd
 
 
-class _FakeUI:
-    """Minimal ConsoleUI stand-in for exercising cancel handling."""
-
-    def __init__(self, answer: bool) -> None:
-        self._answer = answer
-        self.logs: list[str] = []
-        self.phases: list[str] = []
-
-    def log(self, message: str = "") -> None:
-        self.logs.append(message)
-
-    def set_phase(self, text: str) -> None:
-        self.phases.append(text)
-
-    def status(self, text: str) -> None:
-        pass
-
-    def reset_cancel(self) -> None:
-        pass
-
-    def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
-        return self._answer
-
-
-def test_handle_cancel_runs_destroy_when_apply_started_and_confirmed(monkeypatch):
-    import typer
-
-    from retail_setup.cli.main import _handle_cancel
-
-    ran: list[list[str]] = []
-    monkeypatch.setattr(
-        "retail_setup.cli.main._run_step_streamed",
-        lambda step, root, ui: ran.append(step.cmd) or 0,
-    )
-    ui = _FakeUI(answer=True)
-    with pytest.raises(typer.Exit) as exc:
-        _handle_cancel(ui, Path("."), "dev", apply_started=True, skip_terraform=False)
-    assert exc.value.exit_code == 130
-    assert ran and "destroy" in ran[0]
-
-
-def test_handle_cancel_skips_destroy_when_declined(monkeypatch):
-    import typer
-
-    from retail_setup.cli.main import _handle_cancel
-
-    ran: list[list[str]] = []
-    monkeypatch.setattr(
-        "retail_setup.cli.main._run_step_streamed",
-        lambda step, root, ui: ran.append(step.cmd) or 0,
-    )
-    ui = _FakeUI(answer=False)
-    with pytest.raises(typer.Exit) as exc:
-        _handle_cancel(ui, Path("."), "dev", apply_started=True, skip_terraform=False)
-    assert exc.value.exit_code == 130
-    assert ran == []
-
-
-def test_handle_cancel_no_cleanup_prompt_before_apply(monkeypatch):
-    import typer
-
-    from retail_setup.cli.main import _handle_cancel
-
-    ran: list[list[str]] = []
-    monkeypatch.setattr(
-        "retail_setup.cli.main._run_step_streamed",
-        lambda step, root, ui: ran.append(step.cmd) or 0,
-    )
-    # answer=True would destroy if asked; apply_started=False must not even ask.
-    ui = _FakeUI(answer=True)
-    with pytest.raises(typer.Exit) as exc:
-        _handle_cancel(ui, Path("."), "dev", apply_started=False, skip_terraform=False)
-    assert exc.value.exit_code == 130
-    assert ran == []
-
-
 def test_recreate_rejects_skip_terraform(monkeypatch):
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
     result = runner.invoke(app, ["deploy", "--env", "dev", "--recreate", "--skip-terraform"])
@@ -203,6 +126,18 @@ def test_recreate_warns_and_aborts_on_decline(monkeypatch):
     assert result.exit_code == 1, result.output
     assert "WARNING" in result.output
     assert "Aborted by user" in result.output
+
+
+def test_deploy_prints_linear_command_dividers(monkeypatch):
+    monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: SimpleNamespace(returncode=0))
+
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--yes", "--skip-terraform"])
+
+    assert result.exit_code == 0, result.output
+    assert "Running step" in result.output
+    assert "====" in result.output
+    assert "$items" not in result.output
 
 
 def test_deploy_offers_reset_when_workspace_exists(monkeypatch):

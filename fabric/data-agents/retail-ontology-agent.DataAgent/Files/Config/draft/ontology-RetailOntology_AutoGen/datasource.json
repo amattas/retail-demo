@@ -3,7 +3,7 @@
   "artifactId": "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd",
   "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471",
   "dataSourceInstructions": null,
-  "displayName": "retail_ontology",
+  "displayName": "RetailOntology_AutoGen",
   "type": "ontology",
   "userDescription": null,
   "metadata": {},
@@ -66,3 +66,4 @@
     }
   ]
 }
+

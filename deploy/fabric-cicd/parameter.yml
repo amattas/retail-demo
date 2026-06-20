@@ -1,7 +1,7 @@
 find_replace:
 - find_value: (https://onelake\.dfs\.fabric\.microsoft\.com/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36})
   replace_value:
-    dev: https://onelake.dfs.fabric.microsoft.com/51fd2f07-b03c-4a62-b478-b6ba435edcc0/ab2c3968-855e-4fe2-8591-a39fc757acfd
+    dev: https://onelake.dfs.fabric.microsoft.com/4a67575f-df22-4c68-a87f-bbf940390a7f/8c8698dd-a438-4cf2-8a77-09cbc24592d0
   is_regex: 'true'
   item_type: SemanticModel
 - find_value: DirectLake - retail_lakehouse
@@ -82,7 +82,7 @@ find_replace:
   item_type: DataPipeline
 - find_value: FABRIC_KQL_DATABASE_RESOURCE_ID
   replace_value:
-    dev: c41c8466-3026-4fd7-b35c-22b2c8e01771
+    dev: 64c6984b-b2b4-4fdf-9827-01d395eb74c4
   item_type:
   - KQLDashboard
   - KQLQueryset
@@ -93,6 +93,10 @@ find_replace:
 - find_value: 07e6f51e-aaac-4594-bf50-94db9c1daf89
   replace_value:
     dev: $items.SemanticModel.retail_model.$id
+  item_type: DataAgent
+- find_value: 573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd
+  replace_value:
+    dev: $items.Ontology.RetailOntology_AutoGen.$id
   item_type: DataAgent
 key_value_replace:
 - find_key: $.properties.activities[*].typeProperties.workspaceId

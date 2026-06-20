@@ -42,7 +42,9 @@ Lakehouse notebooks so the PBIP opens cleanly in a freshly deployed demo.
 - Store/customer event facts: `Foot Traffic`, `BLE Pings`,
   `Customer Zone Changes`, `Store Operations`
 - Marketing and promotion facts: `Marketing`, `Promotions`, `Promotion Lines`
-- Technical tracking: `_watermarks`
+Streaming watermark state (`ag._watermarks`) is operational metadata and is not
+part of the semantic model, because a fresh historical setup may not create it
+until streaming transforms run.
 
 ### Optional ML & Predictive Analytics Tables
 

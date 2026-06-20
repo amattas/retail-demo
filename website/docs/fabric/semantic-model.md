@@ -8,7 +8,7 @@ Power BI semantic model and report for unified analytics, shipped as a PBIP proj
 - **TMDL model**: `retail_model.SemanticModel/` (model definition in TMDL format)
 - **Report definition**: `retail_model.Report/` (PBIR pages and visuals)
 
-## Model Contents (39 tables, 145 measures, 56 relationships)
+## Model Contents (38 tables, 145 measures, 56 relationships)
 
 ### Dimensions (7)
 
@@ -45,9 +45,8 @@ Inventory, operations, and marketing: `fact_store_inventory_txn`, `fact_dc_inven
 
 Other ML output tables in the Lakehouse (`product_recommendations`, `price_elasticity`, `promotion_lift`, `journey_patterns`, `dwell_predictions`, `pricing_recommendations`, …) are not currently part of the semantic model — see [Lakehouse](./lakehouse.md) for the full list.
 
-### System
-
-`_watermarks` tracks streaming processing timestamps (not used in visuals).
+Streaming watermark state (`ag._watermarks`) is operational metadata and is not
+modeled. It is created by the streaming transforms when needed.
 
 ## Measures (145)
 
@@ -84,15 +83,27 @@ Measures are organized in display folders on their host tables. Highlights by gr
 
 ## Optional Fabric Ontology
 
-The repo also includes `fabric/lakehouse/30-create-ontology.ipynb`, an optional notebook that creates or replaces a Fabric ontology item from core Silver tables in `ag`.
+The repo also includes `fabric/lakehouse/30-create-ontology.ipynb`, an optional
+notebook that creates or replaces a Fabric ontology item from the same business
+entities used in the semantic model.
 
 - **Purpose**: Generate retail entity and relationship definitions directly in Fabric
-- **Source tables**: Silver dimensions and facts (`ag`), plus ML outputs (`au.customer_segments`, `au.churn_predictions`)
-- **Parameters**: `SILVER_DB`, `LAKEHOUSE_NAME`, `ONTOLOGY_NAME`, `ONTOLOGY_DESCRIPTION`, `DELETE_EXISTING`
+- **Lakehouse sources**: Silver dimensions/facts (`ag`) plus ML outputs
+  (`au.customer_segments`, `au.churn_predictions`)
+- **Eventhouse sources**: selected KQL event tables as TimeSeries bindings on
+  existing business entities, such as `Receipt`, `Payment`, `Store`, and
+  `Product`
+- **Parameters**: `SILVER_DB`, `GOLD_DB`, `BRONZE_DB`, `LAKEHOUSE_NAME`,
+  `EVENTHOUSE_NAME`, `KQL_DATABASE_NAME`, `KUSTO_URI`, `ONTOLOGY_NAME`,
+  `ONTOLOGY_DESCRIPTION`, `DELETE_EXISTING`
 - **Naming note**: If `ONTOLOGY_NAME` contains spaces or other unsupported characters, the notebook normalizes it to a Fabric-safe item name
-- **Run timing**: Manual, after `02-historical-data-load.ipynb` has created the Silver tables
+- **Run timing**: Manual or setup-pipeline, after the Lakehouse Silver/Gold
+  tables exist and after Eventhouse tables exist when live bindings are desired
 
-This complements the semantic model: the semantic model remains the analytics layer, while the ontology captures business entities and relationships as a Fabric ontology item.
+This complements the semantic model: the semantic model remains the analytics
+layer, while the ontology captures business entities and relationships as a
+Fabric ontology item. The ontology is not a separate event-log graph; realtime
+tables attach to the existing business entities as additional bindings.
 
 ## Deployment
 

@@ -108,7 +108,7 @@ retail-demo/
 ├── templates/          # Document templates
 ├── utility/            # Fabric-native retail-setup utility + setup notebooks (active)
 ├── deploy/             # Terraform + fabric-cicd deployment framework
-├── scripts/            # setup.ps1/setup.py bootstrap + semantic-model helpers
+├── scripts/            # setup.ps1/setup.sh/setup.py bootstrap + semantic-model helpers
 ├── datagen-deprecated/ # Legacy FastAPI/DuckDB/Event Hub generator (reference only)
 ├── fabric/
 │   ├── kql_database/   # KQL scripts

@@ -6,7 +6,7 @@ a new workspace.
 
 ## Step 1.1: Run guided setup
 
-From PowerShell:
+Use the bootstrap script for your shell:
 
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
@@ -14,11 +14,17 @@ Set-Location retail-demo
 .\scripts\setup.ps1
 ```
 
-`setup.ps1` works even with nothing installed: it uses Python 3.11+ if present,
-otherwise installs Miniforge with winget and creates a conda environment, then
-runs the guided setup. If you already have Python 3.11+ (Windows, macOS, or
-Linux), run `python ./scripts/setup.py` directly to skip the Miniforge download
-— `setup.ps1` installs Miniforge only when no suitable Python is found.
+```bash
+git clone https://github.com/amattas/retail-demo.git
+cd retail-demo
+./scripts/setup.sh
+```
+
+`setup.ps1` (Windows) and `setup.sh` (macOS/Linux) work even with nothing
+installed. They create or reuse a `retail-demo` conda environment, fall back to a
+local `.venv` when conda is unavailable, and install Miniforge only when no
+suitable Python 3.11+ runtime is available. If you already have a Python 3.11+
+environment, run `python ./scripts/setup.py` directly.
 
 The guided setup detects your OS, offers to install missing prerequisites, uses
 the Python environment that launched the script, installs dependencies, runs
@@ -33,6 +39,12 @@ deployment files under `deploy/.generated/<env>/`.
 .\scripts\setup.ps1 --env dev
 .\scripts\setup.ps1 --env dev --deploy
 .\scripts\setup.ps1 --env dev --dry-run
+```
+
+```bash
+./scripts/setup.sh --env dev
+./scripts/setup.sh --env dev --deploy
+./scripts/setup.sh --env dev --dry-run
 ```
 
 ## Step 1.2: Manual install path

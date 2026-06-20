@@ -8,21 +8,18 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 from __future__ import annotations
 
 import json
-import queue
 import subprocess
 import shutil
 import sys
-import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, NoReturn, Optional
+from typing import Any, Optional
 
 import typer
 import yaml
 from pydantic import ValidationError
 
-from retail_setup.cli.console import ConsoleUI, use_rich_ui
 from retail_setup.config.generation import GenerationConfig, load_generation_config
 from retail_setup.dictionaries.loader import (
     available_store_types,
@@ -709,6 +706,17 @@ def _hr(char: str = "-") -> None:
     typer.echo(char * 60)
 
 
+def _command_divider(title: str, command: list[str] | None = None) -> None:
+    """Print a clear command boundary for the linear deploy flow."""
+
+    typer.echo("")
+    _hr("=")
+    typer.echo(f"  {title}")
+    if command:
+        typer.echo("  " + " ".join(command))
+    _hr("=")
+
+
 def _deploy_banner(env: str, total: int, recreate: bool, dry_run: bool) -> None:
     _hr("=")
     typer.echo("  Deploy to Microsoft Fabric")
@@ -741,24 +749,13 @@ def _missing_executable_message(executable: str) -> str:
     return f"Required executable not found: {executable}\nInstall it and ensure it is on PATH."
 
 
-def _terminate_process(proc: "subprocess.Popen[str]") -> None:
-    """Terminate a child process, escalating to kill if it ignores SIGTERM."""
-    try:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-    except Exception:
-        pass
-
 
 def _is_terraform_apply(step: DeployStep) -> bool:
     return bool(step.cmd) and step.cmd[0] == "terraform" and "apply" in step.cmd
 
 
 def _cleanup_destroy_step(env: str) -> DeployStep:
-    """A `terraform destroy` step used to remove artifacts after a cancel."""
+    """A `terraform destroy` step used before recreate."""
     var_file = f"environments/{env}.tfvars"
     return DeployStep(
         cmd=[
@@ -768,113 +765,18 @@ def _cleanup_destroy_step(env: str) -> DeployStep:
             "-auto-approve",
             f"-var-file={var_file}",
         ],
-        description="Terraform destroy (remove artifacts from the cancelled deploy)",
+        description="Terraform destroy (remove existing workspace before recreate)",
     )
-
-
-def _run_step_captured(step: DeployStep, repo_root: Path, ui: ConsoleUI) -> int:
-    """Run a step whose stdout is captured to a file (e.g. terraform output -json)."""
-    assert step.output_file is not None
-    out_path = repo_root / step.output_file
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        result = subprocess.run(step.cmd, cwd=repo_root, capture_output=True, text=True)
-    except FileNotFoundError:
-        ui.log(_missing_executable_message(step.cmd[0] if step.cmd else "<unknown>"))
-        raise typer.Exit(code=127) from None
-    if result.returncode == 0:
-        out_path.write_text(result.stdout)
-    elif result.stderr:
-        ui.log(result.stderr.rstrip())
-    return result.returncode
-
-
-def _run_step_streamed(step: DeployStep, repo_root: Path, ui: ConsoleUI) -> Optional[int]:
-    """Run a step, streaming its output to the scrolling log.
-
-    Returns the exit code, or None if the run was cancelled (ESC) mid-flight.
-    """
-    if step.output_file:
-        return _run_step_captured(step, repo_root, ui)
-    try:
-        proc = subprocess.Popen(
-            step.cmd,
-            cwd=repo_root,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-    except FileNotFoundError:
-        ui.log(_missing_executable_message(step.cmd[0] if step.cmd else "<unknown>"))
-        raise typer.Exit(code=127) from None
-
-    lines: "queue.Queue[Optional[str]]" = queue.Queue()
-
-    def _reader() -> None:
-        try:
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                lines.put(line)
-        finally:
-            lines.put(None)
-
-    reader = threading.Thread(target=_reader, name="step-reader", daemon=True)
-    reader.start()
-
-    cancelling = False
-    while True:
-        if ui.cancelled and not cancelling:
-            cancelling = True
-            ui.status("cancelling…")
-            _terminate_process(proc)
-        try:
-            line = lines.get(timeout=0.1)
-        except queue.Empty:
-            continue
-        if line is None:
-            break
-        ui.log(line.rstrip("\n"))
-    proc.wait()
-    return None if cancelling else proc.returncode
-
-
-def _handle_cancel(
-    ui: ConsoleUI,
-    repo_root: Path,
-    env: str,
-    *,
-    apply_started: bool,
-    skip_terraform: bool,
-) -> NoReturn:
-    """Handle an ESC cancellation, optionally tearing down created artifacts."""
-    ui.log("")
-    ui.log("Cancelled (esc).")
-    if apply_started and not skip_terraform:
-        if ui.prompt_yes_no(
-            "Remove the artifacts created so far? This runs 'terraform destroy'.",
-            default=False,
-        ):
-            ui.reset_cancel()
-            ui.set_phase("Cleanup: terraform destroy")
-            ui.status("removing created artifacts")
-            rc = _run_step_streamed(_cleanup_destroy_step(env), repo_root, ui)
-            if rc == 0:
-                ui.log("Cleanup complete — created artifacts removed.")
-            else:
-                ui.log("Cleanup did not finish cleanly; some artifacts may remain.")
-        else:
-            ui.log("Leaving created artifacts in place.")
-    raise typer.Exit(code=130)
 
 
 def _run_plan_plain(
     repo_root: Path, env: str, plan: list[DeployStep], total: int, *, yes: bool
 ) -> None:
-    """Execute the deploy plan with plain output (non-interactive / no TTY)."""
+    """Execute the deploy plan linearly with clear command dividers."""
+    _ = env
     for i, step in enumerate(plan, start=1):
         _echo_step(i, total, step)
+        _command_divider(f"Running step {i}/{total}: {step.description}", step.cmd)
         if step.needs_confirmation and not yes:
             if not typer.confirm(f"Proceed with: {step.description}?"):
                 typer.echo("Aborted by user.")
@@ -888,6 +790,7 @@ def _run_plan_plain(
                 )
                 if result.returncode == 0:
                     out_path.write_text(result.stdout)
+                    typer.echo(f"Wrote output to {step.output_file}")
                 elif result.stderr:
                     typer.echo(result.stderr, err=True)
             else:
@@ -907,47 +810,6 @@ def _run_plan_plain(
                 err=True,
             )
             raise typer.Exit(code=result.returncode)
-
-
-def _run_plan_rich(
-    repo_root: Path,
-    env: str,
-    plan: list[DeployStep],
-    total: int,
-    *,
-    yes: bool,
-    skip_terraform: bool,
-) -> None:
-    """Execute the deploy plan with the interactive console (progress + esc)."""
-    apply_started = False
-    with ConsoleUI(total, title=f"Deploy to Fabric · {env}") as ui:
-        for i, step in enumerate(plan, start=1):
-            if ui.cancelled:
-                _handle_cancel(
-                    ui, repo_root, env,
-                    apply_started=apply_started, skip_terraform=skip_terraform,
-                )
-            ui.set_phase(f"[{i}/{total}] {step.description}")
-            ui.advance(completed=i - 1)
-            ui.status("")
-            if step.needs_confirmation and not yes:
-                if not ui.prompt_yes_no(
-                    f"Proceed with: {step.description}?", default=True
-                ):
-                    ui.log("Aborted by user.")
-                    raise typer.Exit(code=1)
-            if _is_terraform_apply(step):
-                apply_started = True
-            rc = _run_step_streamed(step, repo_root, ui)
-            if rc is None:
-                _handle_cancel(
-                    ui, repo_root, env,
-                    apply_started=apply_started, skip_terraform=skip_terraform,
-                )
-            if rc != 0:
-                ui.log(f"Step {i}/{total} failed (exit {rc}): {' '.join(step.cmd)}")
-                raise typer.Exit(code=rc)
-            ui.advance(completed=i)
 
 
 @app.command()
@@ -1030,12 +892,7 @@ def deploy(
             _echo_step(i, total, step)
         return
 
-    if use_rich_ui(dry_run=dry_run):
-        _run_plan_rich(
-            repo_root, env, plan, total, yes=yes, skip_terraform=skip_terraform
-        )
-    else:
-        _run_plan_plain(repo_root, env, plan, total, yes=yes)
+    _run_plan_plain(repo_root, env, plan, total, yes=yes)
 
     typer.echo("")
     _hr("=")
