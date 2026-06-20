@@ -135,12 +135,15 @@ def test_render_parameter_file_remaps_data_agent_references() -> None:
         for entry in rendered["find_replace"]
         if entry.get("item_type") == "DataAgent"
     }
-    # The Data Agents' source-workspace GUID resolves to the target workspace,
-    # and the semantic-model GUID resolves to the deployed SemanticModel.
+    # Data Agent source references resolve to target workspace artifacts.
     assert agent_rules[deploy_config.DATA_AGENT_SOURCE_WORKSPACE_ID] == "$workspace.$id"
     assert (
         agent_rules[deploy_config.DATA_AGENT_SEMANTIC_MODEL_ID]
         == f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
+    )
+    assert (
+        agent_rules[deploy_config.DATA_AGENT_ONTOLOGY_ID]
+        == f"$items.Ontology.{deploy_config.ONTOLOGY_ITEM_NAME}.$id"
     )
 
 

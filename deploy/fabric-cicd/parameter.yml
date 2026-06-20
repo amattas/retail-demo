@@ -94,6 +94,10 @@ find_replace:
   replace_value:
     dev: $items.SemanticModel.retail_model.$id
   item_type: DataAgent
+- find_value: 573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd
+  replace_value:
+    dev: $items.Ontology.RetailOntology_AutoGen.$id
+  item_type: DataAgent
 key_value_replace:
 - find_key: $.properties.activities[*].typeProperties.workspaceId
   replace_value:

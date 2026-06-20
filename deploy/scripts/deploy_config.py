@@ -21,11 +21,12 @@ DEFAULT_CONFIG_PATH = CONFIG_ROOT / "deploy.yml"
 # (fabric/data-agents/*.DataAgent). They are exported from the authoring
 # workspace and must be remapped to the target workspace at publish time via
 # generated parameter.yml rules. The semantic-model GUID resolves to the deployed
-# SemanticModel; the source workspace GUID resolves to the target workspace. The
-# ontology GUID points at a runtime-created artifact (the ontology notebook makes
-# it), so it cannot be resolved at deploy time and is rebound after that runs.
+# SemanticModel; the ontology GUID resolves to the stable runtime-created
+# RetailOntology_AutoGen item once the ontology notebook has run.
 DATA_AGENT_SOURCE_WORKSPACE_ID = "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
 DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
+DATA_AGENT_ONTOLOGY_ID = "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd"
+ONTOLOGY_ITEM_NAME = "RetailOntology_AutoGen"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
 
 
@@ -463,11 +464,10 @@ def render_parameter_file(
             ]
         }
 
-    # Data Agent datasource configs reference the source workspace and the
-    # semantic model by GUID. Remap them to the target workspace and the deployed
-    # SemanticModel so the agents bind in the new workspace. (The ontology agent's
-    # ontology GUID points at a runtime-created artifact and is left as-is; it is
-    # rebound after the ontology notebook runs.)
+    # Data Agent datasource configs reference the source workspace and source
+    # artifacts by GUID. Remap them to target workspace items so agents bind in
+    # the deployed workspace. The ontology item is created by 30-create-ontology,
+    # so this replacement resolves once the ontology exists and deploy is rerun.
     parameters["find_replace"].extend(
         [
             {
@@ -481,6 +481,13 @@ def render_parameter_file(
                     config.environment: (
                         f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
                     )
+                },
+                "item_type": "DataAgent",
+            },
+            {
+                "find_value": DATA_AGENT_ONTOLOGY_ID,
+                "replace_value": {
+                    config.environment: f"$items.Ontology.{ONTOLOGY_ITEM_NAME}.$id"
                 },
                 "item_type": "DataAgent",
             },

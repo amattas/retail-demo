@@ -10,7 +10,7 @@ workspace.
 | Agent | Data source | Bound artifact |
 | --- | --- | --- |
 | `retail-semantic-model-agent` | Semantic model | `retail_model` |
-| `retail-ontology-agent` | Ontology | `retail_ontology` |
+| `retail-ontology-agent` | Ontology | `RetailOntology_AutoGen` |
 
 Each agent's `Files/Config/draft/<source>/datasource.json` carries the schema
 the agent reasons over (tables/columns or ontology entities) plus the binding to
