@@ -32,8 +32,9 @@ These write directly to the Lakehouse:
 - `03-streaming-to-silver.ipynb` and `04-streaming-to-gold.ipynb` process
   Eventhouse event data into Silver/Gold.
 - `06-ml-*` through `14-ml-*` are optional ML/advanced analytics notebooks.
-- `30-create-ontology.ipynb` creates a Fabric ontology from core Silver retail
-  tables.
+- `30-create-ontology.ipynb` creates a Fabric ontology from Silver/Gold
+  business entities and adds Eventhouse TimeSeries bindings where live event
+  tables carry the same entity keys.
 - `90-augment-and-dedupe-receipts.ipynb` and `99-reset-lakehouse.ipynb` are
   manual utilities.
 

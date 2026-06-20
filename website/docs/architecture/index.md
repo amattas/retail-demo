@@ -15,7 +15,8 @@ This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthet
                        │         │                     │             │
                        │         ▼                     ▼             │
                        │  ┌─────────────────────────────────────┐    │
-                       │  │ Semantic Model + Real-Time Content  │    │
+                       │  │ Semantic Model + Retail Ontology    │    │
+                       │  │ (Lakehouse + Eventhouse bindings)   │    │
                        │  └─────────────────────────────────────┘    │
                        └─────────────────────────────────────────────┘
 ```
@@ -32,6 +33,8 @@ This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthet
 3. **Fabric Spark connector for Kusto** appends each `event_type` subset to its typed KQL table
 4. **Eventhouse** stores events with materialized views for pre-aggregated KPIs
 5. **Real-Time Dashboards** query materialized views
+6. **Retail ontology** binds selected Eventhouse tables as TimeSeries sources on
+   the same business entities used for Lakehouse history.
 
 ### Batch Path (Warm/Cold Path)
 **Latency target: < 15 minutes**
@@ -41,6 +44,27 @@ This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthet
    - Bronze → Silver (`ag` schema): field mapping, type casting, watermark-based incremental loads
    - Silver → Gold (`au` schema): aggregations, business metrics
 3. **Semantic Model** provides unified view for Power BI
+
+### Ontology Path (Business Map)
+
+The Fabric ontology is a business relationship map, not a graph of event-log
+rows. `30-create-ontology.ipynb` creates stable business entities such as
+`Receipt`, `Payment`, `Store`, `Product`, and `Customer`.
+
+Each entity keeps its Lakehouse `NonTimeSeries` binding for historical Silver or
+Gold data. Where an Eventhouse table contains the same business key, the entity
+also receives one or more Eventhouse `KustoTable` TimeSeries bindings. Examples:
+
+- `Receipt`: `ag.fact_receipts` plus `receipt_created` and `receipt_line_added`.
+- `Payment`: `ag.fact_payments` plus `payment_processed`.
+- `Store`: `ag.dim_stores` plus receipt, payment, promotion, inventory,
+  customer, truck, and store-operation event tables.
+- `Product`: `ag.dim_products` plus receipt-line, inventory, stockout, and
+  reorder event tables.
+
+Business relationships also receive Eventhouse contextualizations where the live
+event table carries both keys, such as `ReceiptPlacedByCustomer` via
+`receipt_created` and `PaymentForReceipt` via `payment_processed`.
 
 ---
 
@@ -245,4 +269,3 @@ df = spark.sql("SELECT * FROM cusn.inventory_updated")
 ### Implementation
 
 The Bronze layer shortcuts are created via notebook: `fabric/lakehouse/01-create-bronze-shortcuts.ipynb`
-

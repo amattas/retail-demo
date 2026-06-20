@@ -41,7 +41,7 @@ Skip Terraform when resources already exist:
 retail-setup deploy --env dev --skip-terraform
 ```
 
-## Step 2.3: Run the generated KQL script
+## Step 2.3: Apply the generated KQL script
 
 `retail-setup deploy` generates:
 
@@ -49,11 +49,14 @@ retail-setup deploy --env dev --skip-terraform
 deploy/.generated/dev/database.kql
 ```
 
-Open that file and run the full `.execute database script <|` payload in the
-target Fabric KQL database. This creates the event tables, ingestion mappings,
-functions, and materialized views used by the live path.
+In the automated path, `retail-setup deploy` applies that script to the target
+Fabric KQL database after the Eventhouse exists. The file is retained for review
+and troubleshooting.
 
-The KQL script is not executed automatically by the deployment framework.
+If you are doing a manual import instead of `retail-setup deploy`, open that file
+and run the full `.execute database script <|` payload in the target Fabric KQL
+database. This creates the event tables, ingestion mappings, functions, and
+materialized views used by the live path.
 
 ## Event tables
 

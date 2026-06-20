@@ -41,6 +41,9 @@ Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
 
 Optional live path:
 stream-events -> Eventhouse/KQL (Spark connector) -> Silver/Gold
+                                    |
+                                    v
+                        Ontology TimeSeries bindings
 ```
 
 ## Schema naming convention
@@ -50,6 +53,10 @@ stream-events -> Eventhouse/KQL (Spark connector) -> Silver/Gold
 | `cusn` | Bronze/live | Eventhouse event table shortcuts |
 | `ag` | Silver | Typed Delta dimensions/facts |
 | `au` | Gold | Pre-aggregated KPI tables |
+
+`retail-setup deploy` and the bootstrap scripts use linear output with ASCII
+dividers around each step and command. There is no fixed-footer TUI or progress
+bar mode.
 
 ## Reference documentation
 

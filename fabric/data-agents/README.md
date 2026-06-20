@@ -31,15 +31,17 @@ The official `fab export` produces the same Git format but needs its own
 
 ## Deployment status
 
-Data agents are **not yet** published by `retail-setup deploy`. The
-`datasource.json` binds to the **source** workspace's artifact by `artifactId`
-and `workspaceId`, so publishing to another workspace requires:
+Data agents are published by `retail-setup deploy` when `DataAgent` is in
+`deployment.item_types_in_scope`. The deployment parameter file rewrites
+source-workspace and semantic-model ids so the agents bind in the target
+workspace:
 
 - `workspaceId` → `$workspace.$id`
 - `artifactId` → `$items.SemanticModel.retail_model.$id` /
-  `$items.Ontology.retail_ontology.$id` (the `displayName` in `datasource.json`
-  matches the deployed item name)
+  the runtime-created ontology item id
 
-Both the bound semantic model and ontology must be deployed first. Wiring this
-into the deployment framework (staging + `item_types_in_scope` + the parameter
-remap, mirroring how Data Pipelines are handled) is a follow-up.
+The ontology is created by `30-create-ontology.ipynb` during the setup pipeline,
+after the initial item publish. If the ontology agent or task-flow ontology node
+is unbound immediately after a first deployment, rerun `retail-setup deploy
+--env <env> --skip-terraform --yes` or redeploy the task flow after the setup
+pipeline has created `RetailOntology_AutoGen`.

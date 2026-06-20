@@ -123,14 +123,15 @@ does not.
   and notebook references are remapped via generated `parameter.yml` rules.
 - The **setup pipeline** orchestrates the full one-time setup end to end:
   `setup-01..04` (seed -> dimensions -> facts -> gold), then the **ML notebooks**
-  (06-14), then `30-create-ontology`. The ontology reads gold *and* ML tables, so
-  it runs only after every ML notebook completes. (The ML notebooks are inlined as
-  activities rather than invoking the standalone `machine-learning` pipeline,
-  because Fabric's Invoke pipeline activity requires a connection object the deploy
-  can't yet provision; the notebooks themselves are shared items, and the
-  `machine-learning` pipeline still exists for manual/standalone runs.) The
-  ontology is a one-time **setup** step; there is no scheduled ontology refresh
-  after incremental loads.
+  (06-14), then `30-create-ontology`. The ontology reads Silver/Gold business
+  tables, ML outputs, and Eventhouse table schemas, so it runs only after every
+  ML notebook completes and after the KQL tables exist. (The ML notebooks are
+  inlined as activities rather than invoking the standalone `machine-learning`
+  pipeline, because Fabric's Invoke pipeline activity requires a connection
+  object the deploy can't yet provision; the notebooks themselves are shared
+  items, and the `machine-learning` pipeline still exists for
+  manual/standalone runs.) The ontology is a one-time **setup** step; there is no
+  scheduled ontology refresh after incremental loads.
 - Data Agents in `fabric\data-agents\*.DataAgent` deploy into a **Data Agents**
   folder (item type `DataAgent`, which must be in `item_types_in_scope`). Their
   datasource configs reference the source workspace and the semantic model by

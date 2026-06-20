@@ -31,6 +31,7 @@ Lakehouse Silver (ag) -> Lakehouse Gold (au) -> Power BI
 Optional live path:
 stream-events -> Eventhouse/KQL (Spark connector) -> Lakehouse shortcuts (cusn)
         |                                                       |
+        +------------------> Ontology TimeSeries bindings       |
         +-------------------------------------------------------+
                                 streaming transforms -> ag -> au
 ```

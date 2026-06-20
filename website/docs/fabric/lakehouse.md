@@ -39,7 +39,7 @@ imported manually when live synthetic events are needed.
 | `04-streaming-to-gold.ipynb` | Silver -> Gold aggregations for live data. |
 | `05-maintain-delta-tables.ipynb` | OPTIMIZE/VACUUM routines. |
 | `06-ml-*` through `14-ml-*` | Optional ML/advanced analytics outputs. |
-| `30-create-ontology.ipynb` | Manual Fabric ontology creation from Silver tables. |
+| `30-create-ontology.ipynb` | Creates the retail ontology from Silver/Gold business entities plus Eventhouse TimeSeries bindings. |
 | `90-augment-and-dedupe-receipts.ipynb` | Legacy receipt cleanup utility. |
 | `99-reset-lakehouse.ipynb` | Destructive reset of Silver/Gold tables. |
 

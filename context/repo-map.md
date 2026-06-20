@@ -35,7 +35,7 @@ Microsoft Fabric item definitions and scripts.
 - `powerbi/` - Power BI semantic model + report (`retail_model.pbip`)
 
 ### `/scripts`
-Root bootstrap (`setup.ps1`, `setup.py`) and Power BI semantic-model helpers.
+Root bootstrap (`setup.ps1`, `setup.sh`, `setup.py`) and Power BI semantic-model helpers.
 
 ### `/datagen-deprecated`
 Legacy FastAPI/DuckDB/Event Hub generator (reference only).
@@ -68,7 +68,7 @@ Design specs and plans.
 
 ## Entry Points
 
-- Guided setup: `scripts/setup.ps1` or `python scripts/setup.py`
+- Guided setup: `scripts/setup.ps1`, `scripts/setup.sh`, or `python scripts/setup.py`
 - Data generation + deploy: `retail-setup configure` / `render` / `deploy`
 - Live streaming: `utility/notebooks/stream-events.ipynb`
 - Analytics: materialized views in Eventhouse + Power BI semantic model

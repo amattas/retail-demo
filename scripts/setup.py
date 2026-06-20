@@ -8,7 +8,6 @@ before project dependencies are installed.
 from __future__ import annotations
 
 import argparse
-import os
 import platform
 import re
 import shutil
@@ -16,7 +15,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_URL = "https://github.com/amattas/retail-demo/blob/main/README.md"
@@ -27,52 +25,16 @@ MIN_PYTHON = (3, 11)
 # always shown if a step fails, so troubleshooting never loses information.
 VERBOSE = False
 
-# Active guided console (a retail_setup.cli.console.ConsoleUI) or None. When set
-# (interactive TTY runs), section headers drive a fixed-footer progress bar with
-# an "esc to cancel or abort" hint and command output scrolls in the region above
-# it; when None (CI, pipes, dry runs, tests), output stays plain line-by-line.
-_UI: Any = None
-
-
 def _emit(text: str = "") -> None:
-    """Write a line to the guided console's scrolling log, or plain stdout."""
-    if _UI is not None:
-        _UI.log(text)
-    else:
-        print(text)
+    """Write a line to stdout."""
+
+    print(text)
 
 
-def _check_cancelled() -> None:
-    """Abort the guided setup if the user pressed Esc (TTY console only)."""
-    if _UI is not None and _UI.cancelled:
-        _emit("")
-        _emit("Cancelled (esc).")
-        raise SystemExit(130)
+def _divider(char: str = "-", *, width: int = 72) -> None:
+    """Print a visual separator for the linear setup flow."""
 
-
-def _load_console() -> Any:
-    """Return the guided ConsoleUI class for an interactive run, or None.
-
-    Imported lazily so this script still runs on the standard library alone when
-    there is no terminal. The console itself has no third-party dependency.
-    Honors ``RETAIL_SETUP_NO_UI`` and requires a TTY.
-    """
-    if os.environ.get("RETAIL_SETUP_NO_UI", "").lower() in ("1", "true", "yes"):
-        return None
-    try:
-        if not (sys.stdout.isatty() and sys.stdin.isatty()):
-            return None
-    except Exception:
-        return None
-    src = REPO_ROOT / "utility" / "src"
-    if src.is_dir() and str(src) not in sys.path:
-        sys.path.insert(0, str(src))
-    try:
-        from retail_setup.cli.console import ConsoleUI
-
-        return ConsoleUI
-    except Exception:
-        return None
+    _emit(char * width)
 
 
 def _banner(lines: list[str]) -> None:
@@ -86,16 +48,14 @@ def _banner(lines: list[str]) -> None:
 
 
 def _section(step: int, total: int, title: str) -> None:
-    """Print a numbered step header, or advance the guided progress bar."""
+    """Print a numbered step header."""
 
-    if _UI is not None:
-        _UI.set_phase(f"Step {step}/{total}: {title}")
-        _UI.advance(completed=step - 1)
-        return
-    print("")
-    print("-" * 60)
-    print(f"Step {step} of {total}: {title}")
-    print("-" * 60)
+    _emit("")
+    _divider("=")
+    _emit(f"  Step {step} of {total}: {title}")
+    _divider("=")
+
+
 
 
 @dataclass(frozen=True)
@@ -238,8 +198,6 @@ def missing_prerequisites() -> list[str]:
 def prompt_yes_no(message: str, *, default: bool) -> bool:
     """Prompt for a yes/no answer."""
 
-    if _UI is not None:
-        return _UI.prompt_yes_no(message, default=default)
     suffix = "Y/n" if default else "y/N"
     answer = input(f"{message} [{suffix}]: ").strip().lower()
     if not answer:
@@ -255,38 +213,25 @@ def run_command(
     label: str | None = None,
     interactive: bool = False,
 ) -> None:
-    """Run a subprocess, showing friendly progress unless --verbose.
+    """Run a subprocess linearly with a clear divider and command label."""
 
-    When ``label`` is given and we're not in verbose/dry-run mode, print the
-    plain-language label instead of the raw command. The raw command is always
-    revealed if the step fails, so troubleshooting keeps full detail.
-
-    With the guided console active, non-interactive commands stream their output
-    into the scrolling log above the progress bar. ``interactive`` commands (ones
-    that prompt or render their own console, e.g. ``configure``/``deploy`` or a
-    package-manager/login that may ask questions) pause the bar and take over the
-    terminal instead.
-    """
-
+    _ = interactive
     rendered = " ".join(command)
-    show_raw = VERBOSE or dry_run or label is None
-    _emit(f"$ {rendered}" if show_raw else f"  - {label}")
+    title = label or rendered
+    _emit("")
+    _divider("-")
+    _emit(f"  {title}")
+    _emit(f"  $ {rendered}")
+    _divider("-")
     if dry_run:
         return
-    if _UI is not None and not interactive:
-        _run_streamed(command, cwd, rendered, show_raw)
-        return
-    if _UI is not None:
-        with _UI.paused():
-            _run_inherit(command, cwd, rendered, show_raw)
-    else:
-        _run_inherit(command, cwd, rendered, show_raw)
+    _run_inherit(command, cwd, rendered, show_raw=True)
 
 
 def _run_inherit(
     command: list[str], cwd: Path, rendered: str, show_raw: bool
 ) -> None:
-    """Run a command with inherited stdio (the child owns the terminal)."""
+    """Run a command with inherited stdio so output stays linear."""
     try:
         subprocess.run(command, cwd=cwd, check=True)
     except FileNotFoundError:
@@ -304,44 +249,6 @@ def _run_inherit(
             f"Command: {rendered}"
         ) from None
 
-
-def _run_streamed(
-    command: list[str], cwd: Path, rendered: str, show_raw: bool
-) -> None:
-    """Run a command, streaming its output into the guided console's log."""
-    try:
-        proc = subprocess.Popen(
-            command,
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-    except FileNotFoundError:
-        if not show_raw:
-            _emit(f"    (command: {rendered})")
-        raise SystemExit(
-            f"Required program not found: {command[0]}. "
-            "Install it and make sure it is on your PATH, then re-run setup."
-        ) from None
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        if _UI is not None and _UI.cancelled:
-            proc.terminate()
-            break
-        _emit(line.rstrip("\n"))
-    proc.wait()
-    if _UI is not None and _UI.cancelled:
-        raise SystemExit(130)
-    if proc.returncode != 0:
-        if not show_raw:
-            _emit(f"    (command: {rendered})")
-        raise SystemExit(
-            f"That step failed (exit code {proc.returncode}). "
-            f"Command: {rendered}"
-        )
 
 
 def install_prerequisites(
@@ -555,9 +462,7 @@ def run_retail_setup(
         ensure_azure_login(deploy_env, dry_run=dry_run)
         if not dry_run:
             _emit("")
-            _emit("Starting the interactive deploy. While it runs you'll see a live")
-            _emit("progress bar; press Esc to cancel (you'll be asked whether to remove")
-            _emit("any Fabric artifacts already created).")
+            _emit("Starting deploy. Each command prints below its own divider.")
         deploy_command = [
             str(env.python),
             "-m",
@@ -632,7 +537,6 @@ def _run_guided(args: argparse.Namespace) -> int:
     total = 4
     if not args.skip_prereqs:
         _section(1, total, "Checking the required tools")
-        _check_cancelled()
         install_prerequisites(
             missing_prerequisites(),
             package_manager=detect_package_manager(),
@@ -643,11 +547,9 @@ def _run_guided(args: argparse.Namespace) -> int:
         _section(1, total, "Checking the required tools (skipped)")
 
     _section(2, total, "Installing the Python packages")
-    _check_cancelled()
     env = current_python_env()
     install_python_dependencies(env, dry_run=args.dry_run)
 
-    _check_cancelled()
     run_retail_setup(
         env,
         deploy_env=args.env,
@@ -657,33 +559,16 @@ def _run_guided(args: argparse.Namespace) -> int:
         recreate=args.recreate,
     )
 
-    if _UI is not None:
-        _UI.advance(completed=total)
     _emit("")
     _emit("Setup finished.")
     return 0
 
 
 def main() -> int:
-    global VERBOSE, _UI
+    global VERBOSE
     args = parse_args()
     VERBOSE = args.verbose
-
-    # A dry run prints the plan; a non-TTY/CI run stays plain. Otherwise drive the
-    # guided console: a scrolling log over a fixed footer with a smooth progress
-    # bar and an "esc to cancel or abort" hint.
-    console_cls = None if args.dry_run else _load_console()
-    if console_cls is None:
-        return _run_guided(args)
-
-    with console_cls(
-        4, title="Retail Demo - Guided Setup", hint="esc to cancel or abort"
-    ) as ui:
-        _UI = ui
-        try:
-            return _run_guided(args)
-        finally:
-            _UI = None
+    return _run_guided(args)
 
 
 if __name__ == "__main__":
