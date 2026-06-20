@@ -4,21 +4,25 @@
 
 This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthetic retail data. It combines streaming analytics (KQL/Eventhouse) with batch processing (Lakehouse/PySpark) to provide both real-time and historical insights.
 
-```
-┌────────────────┐     ┌─────────────────────────────────────────────┐
-│ stream-events  │────▶│              Microsoft Fabric               │
-│   notebook     │     │                                             │
-│ (Spark stream) │     │  ┌─────────────┐    ┌────────────────────┐  │
-└────────────────┘     │  │ Eventhouse  │───▶│ Lakehouse shortcuts │  │
-                       │  │   (KQL)     │    │ + Notebooks        │  │
-                       │  └──────┬──────┘    └─────────┬──────────┘  │
-                       │         │                     │             │
-                       │         ▼                     ▼             │
-                       │  ┌─────────────────────────────────────┐    │
-                       │  │ Semantic Model + Retail Ontology    │    │
-                       │  │ (Lakehouse + Eventhouse bindings)   │    │
-                       │  └─────────────────────────────────────┘    │
-                       └─────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    Stream[stream-events notebook<br/>Spark Structured Streaming]
+    Eventhouse[(Eventhouse / KQL<br/>18 event tables)]
+    MV[Materialized views<br/>live KPIs]
+    Dash[Real-Time dashboards]
+    Bronze[Lakehouse cusn shortcuts<br/>optional live Bronze]
+    Silver[(Lakehouse Silver ag<br/>dimensions + facts)]
+    Gold[(Lakehouse Gold au<br/>aggregates + ML outputs)]
+    Semantic[Power BI semantic model<br/>DirectLake]
+    Ontology[Retail ontology<br/>business entities]
+
+    Stream --> Eventhouse
+    Eventhouse --> MV --> Dash
+    Eventhouse --> Bronze --> Silver --> Gold --> Semantic
+    Silver --> Semantic
+    Silver --> Ontology
+    Gold --> Ontology
+    Eventhouse -->|KustoTable TimeSeries bindings| Ontology
 ```
 
 ---
@@ -65,6 +69,45 @@ also receives one or more Eventhouse `KustoTable` TimeSeries bindings. Examples:
 Business relationships also receive Eventhouse contextualizations where the live
 event table carries both keys, such as `ReceiptPlacedByCustomer` via
 `receipt_created` and `PaymentForReceipt` via `payment_processed`.
+
+```mermaid
+erDiagram
+    STORE ||--o{ RECEIPT : "ReceiptAtStore"
+    CUSTOMER ||--o{ RECEIPT : "ReceiptPlacedByCustomer"
+    RECEIPT ||--o{ PRODUCT : "ReceiptContainsProduct"
+    RECEIPT ||--o{ PAYMENT : "PaymentForReceipt"
+    ONLINE_ORDER ||--o{ PAYMENT : "PaymentForOnlineOrder"
+    CUSTOMER ||--o{ ONLINE_ORDER : "OnlineOrderPlacedByCustomer"
+    RECEIPT ||--o{ PROMOTION : "PromotionAppliedToReceipt"
+    STORE ||--o{ PROMOTION : "PromotionAtStore"
+    CUSTOMER ||--o{ PROMOTION : "PromotionByCustomer"
+    GEOGRAPHY ||--o{ STORE : "StoreLocatedInGeography"
+    GEOGRAPHY ||--o{ CUSTOMER : "CustomerLocatedInGeography"
+    GEOGRAPHY ||--o{ DISTRIBUTION_CENTER : "DistributionCenterLocatedInGeography"
+    DISTRIBUTION_CENTER ||--o{ TRUCK : "TruckAssignedToDistributionCenter"
+    STORE ||--o{ PRODUCT : "StoreHasStockoutRiskForProduct"
+
+    STORE {
+        lakehouse ag_dim_stores
+        kusto receipt_created
+        kusto inventory_updated
+        kusto store_opened
+    }
+    RECEIPT {
+        lakehouse ag_fact_receipts
+        kusto receipt_created
+        kusto receipt_line_added
+    }
+    PAYMENT {
+        lakehouse ag_fact_payments
+        kusto payment_processed
+    }
+    PRODUCT {
+        lakehouse ag_dim_products
+        kusto receipt_line_added
+        kusto stockout_detected
+    }
+```
 
 ---
 
