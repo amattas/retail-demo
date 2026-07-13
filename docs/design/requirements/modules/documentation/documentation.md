@@ -24,7 +24,15 @@ current repository.
 
 ### REQ-PUBLISH-001 - Branch publishing
 
-The documentation workflow shall build from `docs/` and push generated output
-to an orphan `gh-pages` branch without the Pages artifact deployment actions.
+The documentation workflow shall build current content from `docs/`, build
+historical content from immutable SemVer tags, and push generated output to an
+orphan `gh-pages` branch without the Pages artifact deployment actions.
+
+### REQ-PUBLISH-002 - Version selector
+
+The published site shall show `main` as **Latest** and the highest stable SemVer
+patch revision for every tagged `major.minor` line. Release URLs shall remain
+stable at `major.minor` while selector labels show the selected
+`major.minor.patch` revision.
 
 See [the site specification](../../../specifications/modules/documentation/site.md).
