@@ -452,6 +452,18 @@ def _lakehouse_name(repo_root: Path, env: str) -> str:
     return str(name)
 
 
+def _auth_mode(repo_root: Path, env: str) -> str:
+    """Resolve auth.mode from deploy config; the environment overlay wins."""
+
+    base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
+    env_path = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    overlay = yaml.safe_load(env_path.read_text()) or {} if env_path.is_file() else {}
+    mode = _get_by_path(overlay, "auth.mode")
+    if mode is None:
+        mode = _get_by_path(base, "auth.mode")
+    return str(mode or "azure_cli")
+
+
 def _workspace_name(repo_root: Path, env: str) -> str:
     """Resolve the target workspace.name from deploy config (overlay wins)."""
     base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
@@ -871,14 +883,14 @@ def deploy(
         # dry runs must not require live config; fall back to the default name
         try:
             lakehouse = _lakehouse_name(repo_root, env)
-            auth_mode = _load_deploy_environment(repo_root, env).auth_mode
+            auth_mode = _auth_mode(repo_root, env)
         except (ImportError, typer.Exit, OSError, KeyError, yaml.YAMLError):
             lakehouse = "retail_lakehouse"
             auth_mode = "azure_cli"
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
         lakehouse = _lakehouse_name(repo_root, env)
-        auth_mode = _load_deploy_environment(repo_root, env).auth_mode
+        auth_mode = _auth_mode(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.

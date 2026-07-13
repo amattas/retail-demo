@@ -33,10 +33,11 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
 
 
 def test_dry_run_uses_configured_auth_mode(monkeypatch):
+    assert hasattr(cli, "_auth_mode")
     monkeypatch.setattr(
         cli,
-        "_load_deploy_environment",
-        lambda *_args: SimpleNamespace(auth_mode="azure_powershell"),
+        "_auth_mode",
+        lambda *_args: "azure_powershell",
     )
 
     result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
@@ -45,11 +46,13 @@ def test_dry_run_uses_configured_auth_mode(monkeypatch):
     assert "--auth-mode azure_powershell" in result.output
 
 
-def test_dry_run_falls_back_when_deploy_config_loader_is_unavailable(monkeypatch):
-    def unavailable(*_args):
-        raise ImportError("deploy helpers unavailable")
+def test_dry_run_falls_back_when_auth_config_is_unavailable(monkeypatch):
+    assert hasattr(cli, "_auth_mode")
 
-    monkeypatch.setattr(cli, "_load_deploy_environment", unavailable)
+    def unavailable(*_args):
+        raise OSError("deploy config unavailable")
+
+    monkeypatch.setattr(cli, "_auth_mode", unavailable)
 
     result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
 
