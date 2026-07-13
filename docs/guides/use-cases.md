@@ -1,0 +1,52 @@
+# Use cases
+
+The demo supports several retail stories, but their current maturity differs.
+
+| Use case | Current evidence | Status |
+| --- | --- | --- |
+| Real-time POS and product performance | Receipt, line, payment events; KQL aggregates; Direct Lake report | Implemented core story |
+| Inventory signals and replenishment | Inventory, stockout, and reorder events/tables | Implemented signals; current-state semantics need `IMP-009` |
+| Customer presence and in-store movement | Entry, BLE, and zone-change events | Implemented synthetic scenario |
+| Omnichannel fulfillment | Online-order headers, lines, picked, and shipped events | Implemented with documented live/history differences |
+| Supply-chain dwell | Truck events and logistics surfaces | Limited until `IMP-006` |
+| Marketing attribution and promotion ROI | Impressions, promotions, receipts, and payments | Limited until `IMP-007` |
+| Machine-learning insights | Forecast, churn, segmentation, stockout, delivery, pricing notebooks | Optional; trust gates in `IMP-008` |
+| Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Optional and capability-gated |
+
+## Core presentation journeys
+
+### Store operations
+
+Start a bounded live stream, show minute sales and store activity in Eventhouse,
+then show durable Silver/Gold data and the store-operations report page.
+
+### Inventory and replenishment
+
+Show inventory movements, reorder signals, stockout detections, and current
+inventory Gold output. Label detections and snapshots accurately; do not call a
+recent detection "open" without state folding.
+
+### Omnichannel
+
+Follow an order from creation through picked and shipped events, then compare
+store and online sales in the semantic model.
+
+### Customer journey
+
+Use synthetic entry, BLE, and zone-change data to discuss store flow and dwell.
+State clearly that identifiers are synthetic-but-sensitive.
+
+## Optional enhancement journeys
+
+- Governed pricing approval and writeback:
+  [ENH-002](../requirements/modules/power-bi/backlog.md#enh-002)
+- Persona-specific agents and Copilot:
+  [ENH-003](../requirements/modules/ml-ai/backlog.md#enh-003)
+  and [ENH-004](../requirements/modules/ml-ai/backlog.md#enh-004)
+- Supplier collaboration, embedded analytics, and retail media are product ideas,
+  not current deployed capabilities.
+- Deterministic weather, holiday, vendor, and customer-state scenarios:
+  [ENH-009](../requirements/modules/generation/backlog.md#enh-009)
+
+The [traceability ledger](../requirements/traceability.md) is the authority for
+implemented and verified status.

@@ -1,49 +1,40 @@
-# Docs — build the Docusaurus site and deploy to GitHub Pages on every push
-# to main. Replaces the old MkDocs workflow (mkdocs-pages.yml); docs ship when
-# they merge. Template reused from the pydmp docs-site workflow.
 name: Docs
 
 on:
   push:
     branches: [main]
     paths:
-      - 'website/**'
+      - 'docs/**'
+      - 'zensical.toml'
+      - 'requirements-docs.txt'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: pages
+  group: docs-gh-pages
   cancel-in-progress: false
 
 jobs:
   docs:
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          python-version: "3.13"
       - name: Build
-        working-directory: website
         run: |
-          npm ci
-          npm run build
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+          python -m pip install --disable-pip-version-check -r requirements-docs.txt
+          python -m zensical build --clean
+      - name: Publish gh-pages branch
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
         with:
-          path: website/build
-      - uses: actions/deploy-pages@v5
-        id: deployment
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./site
+          force_orphan: true

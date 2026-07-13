@@ -123,11 +123,6 @@ fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /deploy/terraform/*.tfstate.*
 /deploy/terraform/.terraform.lock.hcl
 
-# Docusaurus site (website/)
-website/node_modules/
-website/build/
-website/.docusaurus/
-
 # Setup utility — rendered notebooks and local config (contain env-specific values)
 utility/out/
 utility/config.yaml

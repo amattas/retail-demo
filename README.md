@@ -1,259 +1,88 @@
-# Microsoft Fabric Real-Time Intelligence Retail Demo
+# Microsoft Fabric Retail Demo
 
-This repository contains a Microsoft Fabric retail demo that generates synthetic
-retail data, deploys Fabric assets, and builds Lakehouse Silver/Gold tables plus
-a Power BI semantic model.
+This repository deploys a Microsoft Fabric retail demo with deterministic
+historical data, optional live Eventhouse events, Lakehouse Silver/Gold tables,
+ML outputs, an ontology, Data Agents, and a Direct Lake Power BI model.
 
-The current supported setup path is the Fabric-native `retail-setup` utility in
-`utility\`. The older FastAPI/DuckDB generator is kept under `datagen-deprecated\`
-for reference and compatibility investigations, but it is not the recommended
-path for a new workspace.
+## Quick start
 
-## What you get
+Prerequisites:
 
-- A Fabric workspace with a Lakehouse, Eventhouse, KQL database, notebooks,
-  semantic model, and report artifacts.
-- Setup notebooks that generate deterministic synthetic retail data directly in
-  Fabric Spark.
-- Lakehouse Silver tables in schema `ag`: dimensions, `dim_date`, 18 fact
-  tables, and `setup_run_log`.
-- Lakehouse Gold tables in schema `au`: 9 aggregate tables for reporting.
-- Optional live event generation through `stream-events.ipynb`.
+- Microsoft Fabric tenant, capacity, and workspace permissions
+- Git
+- Python 3.11 or later
+- Terraform and Azure CLI or Azure PowerShell for automated deployment
 
-## Prerequisites
-
-Required for notebook render/manual import:
-
-- Python 3.11 or later.
-- Git.
-- A Microsoft Fabric tenant, capacity, and workspace permissions.
-
-Required for automated deployment:
-
-- Terraform on `PATH`.
-- Azure CLI or Azure PowerShell authenticated to the target tenant.
-- Python packages `azure-identity` and `fabric-cicd`.
-- Permission to create or update the target Fabric workspace, Lakehouse,
-  Eventhouse, KQL database, semantic model, and report.
-
-Fabric provides the Spark runtime used by the setup notebooks. Local PySpark is
-only needed for utility development/tests.
-
-## New workspace walkthrough
-
-Use the bootstrap script for your shell:
-
-### 1. Clone and run the guided setup
+Run the guided bootstrap:
 
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
-.\scripts\setup.ps1
+.\scripts\setup.ps1 --env dev
 ```
 
 ```bash
 git clone https://github.com/amattas/retail-demo.git
 cd retail-demo
-./scripts/setup.sh
-```
-
-`setup.ps1` is the Windows entry point and `setup.sh` is the macOS/Linux entry
-point for machines with **nothing installed**. If conda is installed they use a
-`retail-demo` conda environment (created with Python 3.13 when missing);
-otherwise they use a local `.venv` (created from a system Python 3.11+); and if
-neither is available they install Miniforge (`winget` on Windows, the Miniforge
-installer on macOS/Linux). The bootstrap activates that environment, runs the
-guided setup, and then exits with the setup result.
-
-**Prefer to manage Python yourself?** Activate a Python 3.11+ conda environment
-or virtual environment and run `python ./scripts/setup.py` directly.
-
-The guided setup detects Windows, macOS, or Linux; offers to install missing
-CLI prerequisites with the OS package manager; installs Python dependencies into
-the environment that launched the script; runs `retail-setup configure`; renders
-notebooks; and finally asks whether to deploy. When you deploy, it always signs
-in to the configured Azure tenant first (`az login --tenant <tenant_id>` for
-`auth.mode: azure_cli`, or `Connect-AzAccount` for `auth.mode: azure_powershell`)
-so deployment never runs under the wrong account.
-
-Use `--env` to select the deployment environment file under
-`deploy\config\environments\`. For example, `--env dev` uses
-`deploy\config\environments\dev.yml` and writes generated deployment files under
-`deploy\.generated\dev\`.
-
-```powershell
-.\scripts\setup.ps1 --env dev
-.\scripts\setup.ps1 --env dev --deploy
-.\scripts\setup.ps1 --env dev --dry-run
-.\scripts\setup.ps1 --env dev --recreate   # clean slate: destroy + recreate the workspace
-```
-
-```bash
 ./scripts/setup.sh --env dev
-./scripts/setup.sh --env dev --deploy
-./scripts/setup.sh --env dev --dry-run
-./scripts/setup.sh --env dev --recreate    # clean slate: destroy + recreate the workspace
 ```
 
-### 2. Manual install path
-
-Use this path if you prefer to create or activate an environment yourself before
-running setup. If you use conda, activate the conda environment first; if you use
-venv, create and activate it first.
+The bootstrap prepares Python, configures the target, renders notebooks, and
+offers to deploy. To deploy without the prompts:
 
 ```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.\scripts\setup.ps1 --env dev --deploy
+```
 
-python -m pip install --upgrade pip
+For a manually managed Python environment:
+
+```powershell
 python -m pip install -e .\utility
-```
-
-For automated deployment, also install the deployment helpers:
-
-```powershell
-python -m pip install azure-identity fabric-cicd
-```
-
-### 3. Configure the target workspace and data generation
-
-Interactive:
-
-```powershell
-retail-setup configure
-```
-
-The interactive prompts show current config/default values in brackets and list
-the available store types.
-
-Non-interactive example:
-
-```powershell
-retail-setup configure `
-  --env dev `
-  --tenant-id 00000000-0000-0000-0000-000000000000 `
-  --workspace-name retail-demo-dev `
-  --capacity-name F64 `
-  --lakehouse-name retail_lakehouse `
-  --eventhouse-name retail_eventhouse `
-  --kql-database-name retail_eventhouse `
-  --store-type supercenter `
-  --start-date 2025-01-01 `
-  --end-date 2025-03-31 `
-  --store-count 50 `
-  --seed 42
-```
-
-This updates:
-
-- `deploy\config\deploy.yml`
-- `deploy\config\environments\dev.yml`
-- `utility\config.yaml`
-
-`utility\config.yaml` is intentionally ignored by Git because it contains local
-environment choices.
-
-### 4. Render the setup notebooks
-
-```powershell
+retail-setup configure --env dev --months 3 --store-count 50 --seed 42
 retail-setup render --env dev
-```
-
-This writes rendered setup notebooks to `utility\out\`:
-
-- `setup-01-seed-dictionaries.ipynb`
-- `setup-02-generate-dimensions.ipynb`
-- `setup-03-generate-facts.ipynb`
-- `setup-04-build-gold.ipynb`
-
-### 5. Deploy or import the artifacts
-
-Manual path:
-
-1. Create or open the Fabric workspace.
-2. Create the target Lakehouse using the same name passed to
-   `--lakehouse-name`.
-3. Import the rendered notebooks from `utility\out\`.
-4. Attach each notebook to the target Lakehouse.
-
-Automated path:
-
-```powershell
 retail-setup deploy --env dev --dry-run
 retail-setup deploy --env dev --yes
 ```
 
-`retail-setup deploy` renders the deployment plan, runs Terraform unless
-`--skip-terraform` is used, stages Fabric item folders, deploys supported items
-with `fabric-cicd`, writes a combined KQL database script to
-`deploy\.generated\dev\database.kql`, and applies that script to the Eventhouse
-KQL database.
+Rendering produces five workspace-specific notebooks in `utility\out\`:
+setup 01 through 04 and `stream-events.ipynb`.
 
-Deploy output is intentionally linear: each step and command is separated by
-plain ASCII dividers so logs are easy to follow in terminals, CI, and copied
-transcripts. There is no fixed-footer TUI or progress-bar mode.
+## What is deployed
 
-The generated KQL script is retained for review and troubleshooting. If you use
-the manual import path instead of `retail-setup deploy`, run that script in the
-target Fabric KQL database after the Eventhouse/KQL database exists.
+- Lakehouse Silver (`ag`): seven dimensions and eighteen facts
+- Lakehouse Gold (`au`): nine aggregate tables
+- Eventhouse/KQL: eighteen typed business event tables plus query assets
+- ML and AI: four active Power BI ML outputs, ontology, and two Data Agents
+- Power BI: a 38-table Direct Lake semantic model and report
 
-### 6. Run the setup notebooks in Fabric
+The setup notebooks generate historical data directly in Fabric. The optional
+stream notebook writes typed events directly to Eventhouse through the Spark
+Kusto connector.
 
-Run these notebooks in order:
+## Documentation
 
-1. `setup-01-seed-dictionaries` seeds dictionary JSON under
-   `Files/setup/dictionaries`.
-2. `setup-02-generate-dimensions` writes dimension tables and `dim_date`.
-3. `setup-03-generate-facts` writes the full Silver data contract and
-   `setup_run_log`.
-4. `setup-04-build-gold` builds the 9 Gold aggregate tables from persisted
-   Silver facts.
+- [Getting started](docs/guides/getting-started.md)
+- [Demo script](docs/guides/demo-script.md)
+- [Operations](docs/guides/operations.md)
+- [Architecture](docs/architecture/overview.md)
+- [Specifications](docs/specifications/README.md)
+- [Requirements and backlogs](docs/requirements/README.md)
+- [Security](SECURITY.md)
+- [Improvement index](IMPROVEMENTS.md)
 
-Expected Lakehouse output:
+Documentation under `docs/` is the canonical source for the Zensical site.
+See [documentation maintenance](docs/guides/documentation.md) for local build
+and publishing instructions.
 
-- Silver schema `ag`: `dim_geographies`, `dim_stores`,
-  `dim_distribution_centers`, `dim_trucks`, `dim_customers`, `dim_products`,
-  `dim_date`, 18 `fact_*` tables, and `setup_run_log`.
-- Gold schema `au`: `sales_minute_store`, `top_products_15m`,
-  `inventory_position_current`, `dc_inventory_position_current`,
-  `truck_dwell_daily`, `online_sales_daily`, `zone_dwell_minute`,
-  `marketing_cost_daily`, and `tender_mix_daily`.
+## Repository layout
 
-### 7. Optional live event generation
+| Path | Purpose |
+| --- | --- |
+| `utility/` | `retail-setup`, generation engine, templates, and notebooks |
+| `deploy/` | Terraform, artifact staging, Fabric deployment, and validation |
+| `fabric/` | KQL, Lakehouse, pipelines, Power BI, agents, and RTI assets |
+| `scripts/` | Cross-platform bootstrap and Power BI helpers |
+| `docs/` | Canonical guides, requirements, specifications, architecture, and security |
 
-`stream-events.ipynb` is committed under `utility\notebooks\`, rendered to
-`utility\out\` and staged by `retail-setup deploy` (the `stream` notebook group)
-into the **Streaming** workspace folder. Run it as the optional live stream
-driver — it is started/stopped manually, not part of the setup pipeline.
-
-The notebook writes each event **directly to its Eventhouse KQL table** with the
-Fabric Spark connector for Kusto, splitting each micro-batch by `event_type`. It
-can write to:
-
-- the Eventhouse KQL event tables (`sink = "eventhouse"`, the default), or
-- a Delta landing table (`sink = "delta"`) for smoke testing.
-
-Set its parameters in Fabric before running: `source_rows_per_second`, `sink`,
-`run_seconds`, and `kql_database`. Leave `kusto_uri` blank to auto-resolve the
-KQL database Query URI from `kql_database`, or set it to target a different cluster.
-
-## Project structure
-
-```text
-retail-demo\
-├── utility\              # Current Fabric-native setup utility and notebooks
-├── deploy\               # Terraform/fabric-cicd deployment framework
-├── fabric\               # Fabric source assets, KQL, Lakehouse, Power BI
-├── datagen-deprecated\   # Legacy FastAPI/DuckDB/Event Hub generator
-└── scripts\              # Supporting scripts for semantic model/local state
-```
-
-## More documentation
-
-- `utility\README.md` — detailed setup utility usage.
-- `deploy\README.md` — deployment framework details.
-- `fabric\lakehouse\README.md` — Lakehouse notebook groups and outputs.
-- `fabric\kql_database\README.md` — KQL database scripts and expected event
-  tables.
-
-All generated data is synthetic and for demo purposes only.
+All generated data is synthetic and intended for demonstrations, not production
+decision-making.
