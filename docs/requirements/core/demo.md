@@ -7,8 +7,8 @@
 The supported path shall use the Fabric-native `retail-setup` utility, setup
 notebooks, deployment framework, and Fabric source assets.
 
-**Acceptance:** A new contributor can identify one supported entry point and no
-public guide presents a removed local generator as an alternative.
+**Acceptance:** A new contributor can identify one supported entry point, and
+every public guide uses that Fabric-native path.
 
 ### REQ-CORE-002 - Synthetic data handling
 

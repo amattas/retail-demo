@@ -86,12 +86,6 @@ Current derived defaults include:
 - `brands_per_product = 3`
 - `truck_capacity = 15000`
 
-## Removed active-path behavior
-
-Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
-Hubs, outbox, DLQ, and Prometheus surfaces are not part of the supported
-Fabric-native contract.
-
 ## Verification
 
 - `utility/tests/generation/test_schema_contract.py`

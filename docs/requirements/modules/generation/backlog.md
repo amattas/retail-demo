@@ -21,6 +21,6 @@
 ## Settled - do not reopen
 
 - Generation is Spark-native and deterministic.
-- Lakehouse Delta tables replace local DuckDB/parquet as the active contract.
+- Lakehouse Delta tables are the persistence contract.
 - New data columns use `snake_case`; legacy TMDL-bound exceptions remain
   documented until migrated.
