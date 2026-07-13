@@ -8,6 +8,7 @@ must link to those owners rather than redefine contracts.
 | --- | --- |
 | [Getting started](getting-started.md) | Configure, render, deploy, run, and validate a workspace |
 | [Presenter demo](demo-script.md) | Run a defensible 15-20 minute walkthrough |
+| [Presenter journeys](presenter-journeys.md) | Run focused 5-7 minute persona prompt packs |
 | [Use cases](use-cases.md) | Select implemented and proposed business stories |
 | [Operations](operations.md) | Monitor, troubleshoot, recover, and reset |
 | [Documentation](documentation.md) | Build and publish the Zensical site |

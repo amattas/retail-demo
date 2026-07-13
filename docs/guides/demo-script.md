@@ -4,6 +4,10 @@
 **Duration:** 15-20 minutes  
 **Data:** Synthetic
 
+For a standalone 5-7 minute persona walkthrough, use the
+[presenter journeys](presenter-journeys.md) for retail operations,
+merchandising, or executive/analytics audiences.
+
 ## Before the audience arrives
 
 1. Complete the [getting-started guide](getting-started.md).
@@ -51,7 +55,8 @@ partition fields) and typed payload mapping.
 
 ## 3. Ask operational questions
 
-Use checked-in queryset tabs for:
+Choose a supported path from the [presenter journeys](presenter-journeys.md),
+or use checked-in queryset tabs for:
 
 - Recent sales and top products.
 - Inventory movements and stockout detections.
@@ -59,7 +64,8 @@ Use checked-in queryset tabs for:
 - Store presence and zone dwell.
 
 Be precise: recent stockout detections are not the same as unresolved current
-stockout state.
+stockout state. Truck dwell is not a supported proof point until
+[issue #317](https://github.com/amattas/retail-demo/issues/317) is completed.
 
 ## 4. Show durable history
 

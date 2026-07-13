@@ -16,6 +16,7 @@ nav = [
     { "Guide index" = "guides/README.md" },
     { "Getting started" = "guides/getting-started.md" },
     { "Presenter demo" = "guides/demo-script.md" },
+    { "Presenter journeys" = "guides/presenter-journeys.md" },
     { "Use cases" = "guides/use-cases.md" },
     { "Operations" = "guides/operations.md" },
     { "Documentation" = "guides/documentation.md" },
