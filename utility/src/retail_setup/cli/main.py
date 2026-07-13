@@ -34,6 +34,7 @@ app = typer.Typer(no_args_is_help=True)
 def _main() -> None:
     """retail-setup: configure, render, and deploy the Fabric setup utility."""
 
+
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
 _GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
@@ -217,7 +218,9 @@ def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
                 "Azure CLI is required for auth.mode=azure_cli but `az` was not found on PATH.",
                 err=True,
             )
-            typer.echo("Install Azure CLI or set deploy config auth.mode to azure_powershell.", err=True)
+            typer.echo(
+                "Install Azure CLI or set deploy config auth.mode to azure_powershell.", err=True
+            )
         else:
             typer.echo("Azure CLI is not logged in.", err=True)
             typer.echo(f"Run: az login --tenant {config.tenant_id}", err=True)
@@ -247,9 +250,7 @@ def configure(
     capacity_name: Optional[str] = typer.Option(
         None, "--capacity-name", help="Fabric capacity name."
     ),
-    lakehouse_name: Optional[str] = typer.Option(
-        None, "--lakehouse-name", help="Lakehouse name."
-    ),
+    lakehouse_name: Optional[str] = typer.Option(None, "--lakehouse-name", help="Lakehouse name."),
     eventhouse_name: Optional[str] = typer.Option(
         None, "--eventhouse-name", help="Eventhouse name."
     ),
@@ -294,14 +295,21 @@ def configure(
 
     store_types = _available_store_types()
     store_type_prompt = (
-        f"Store type (available: {', '.join(store_types)})"
-        if store_types
-        else "Store type"
+        f"Store type (available: {', '.join(store_types)})" if store_types else "Store type"
     )
 
     _prompted_values = (
-        tenant_id, workspace_name, capacity_name, lakehouse_name, eventhouse_name,
-        kql_database_name, use_custom_spark_pool, store_type, months, store_count, seed,
+        tenant_id,
+        workspace_name,
+        capacity_name,
+        lakehouse_name,
+        eventhouse_name,
+        kql_database_name,
+        use_custom_spark_pool,
+        store_type,
+        months,
+        store_count,
+        seed,
     )
     if any(value is None for value in _prompted_values) and sys.stdin.isatty():
         typer.echo("")
@@ -342,9 +350,7 @@ def configure(
     use_custom_spark_pool = _prompt_bool(
         "Run setup on a custom Spark pool (optimized for F64) instead of the default starter pool",
         use_custom_spark_pool,
-        default=bool(
-            _config_default(base_config, env_config, "spark.use_custom_pool") or False
-        ),
+        default=bool(_config_default(base_config, env_config, "spark.use_custom_pool") or False),
     )
     # Generation settings: prompt, show a record-count estimate, and (when
     # interactive) offer to change them before committing. Validation happens
@@ -356,9 +362,7 @@ def configure(
     )
     months_default = int(existing_generation.get("months", _DEFAULT_MONTHS))
     store_count_default = int(
-        existing_generation.get(
-            "store_count", GenerationConfig.model_fields["store_count"].default
-        )
+        existing_generation.get("store_count", GenerationConfig.model_fields["store_count"].default)
     )
     seed_default = int(
         existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
@@ -448,6 +452,18 @@ def _lakehouse_name(repo_root: Path, env: str) -> str:
     return str(name)
 
 
+def _auth_mode(repo_root: Path, env: str) -> str:
+    """Resolve auth.mode from deploy config; the environment overlay wins."""
+
+    base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
+    env_path = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    overlay = yaml.safe_load(env_path.read_text()) or {} if env_path.is_file() else {}
+    mode = _get_by_path(overlay, "auth.mode")
+    if mode is None:
+        mode = _get_by_path(base, "auth.mode")
+    return str(mode or "azure_cli")
+
+
 def _workspace_name(repo_root: Path, env: str) -> str:
     """Resolve the target workspace.name from deploy config (overlay wins)."""
     base = yaml.safe_load((repo_root / "deploy" / "config" / "deploy.yml").read_text()) or {}
@@ -471,10 +487,14 @@ def _workspace_exists(repo_root: Path, workspace_name: str) -> bool:
     try:
         result = subprocess.run(
             [
-                az, "rest",
-                "--resource", "https://api.fabric.microsoft.com",
-                "--url", "https://api.fabric.microsoft.com/v1/workspaces",
-                "-o", "json",
+                az,
+                "rest",
+                "--resource",
+                "https://api.fabric.microsoft.com",
+                "--url",
+                "https://api.fabric.microsoft.com/v1/workspaces",
+                "-o",
+                "json",
             ],
             cwd=repo_root,
             capture_output=True,
@@ -490,10 +510,7 @@ def _workspace_exists(repo_root: Path, workspace_name: str) -> bool:
         data = json.loads(result.stdout)
     except json.JSONDecodeError:
         return False
-    return any(
-        str(item.get("displayName", "")) == workspace_name
-        for item in data.get("value", [])
-    )
+    return any(str(item.get("displayName", "")) == workspace_name for item in data.get("value", []))
 
 
 def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
@@ -590,6 +607,7 @@ def _deploy_plan(
     skip_terraform: bool,
     lakehouse_name: str = "retail_lakehouse",
     recreate: bool = False,
+    auth_mode: str = "azure_cli",
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     py = sys.executable
@@ -624,8 +642,7 @@ def _deploy_plan(
                 DeployStep(
                     cmd=[py, "-c", f"import time; time.sleep({_RECREATE_WAIT_SECONDS})"],
                     description=(
-                        f"Wait {_RECREATE_WAIT_SECONDS}s for Fabric to finalize "
-                        "workspace deletion"
+                        f"Wait {_RECREATE_WAIT_SECONDS}s for Fabric to finalize workspace deletion"
                     ),
                 ),
             ]
@@ -678,7 +695,15 @@ def _deploy_plan(
             description="Build deployment artifacts",
         ),
         DeployStep(
-            cmd=[py, "-m", "deploy.scripts.deploy_items", "--environment", env],
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.deploy_items",
+                "--environment",
+                env,
+                "--auth-mode",
+                auth_mode,
+            ],
             description="Deploy Fabric items",
         ),
         DeployStep(
@@ -689,6 +714,8 @@ def _deploy_plan(
                 "--execute",
                 "--environment",
                 env,
+                "--auth-mode",
+                auth_mode,
                 "--output",
                 f"deploy/.generated/{env}/database.kql",
             ],
@@ -749,7 +776,6 @@ def _missing_executable_message(executable: str) -> str:
     return f"Required executable not found: {executable}\nInstall it and ensure it is on PATH."
 
 
-
 def _is_terraform_apply(step: DeployStep) -> bool:
     return bool(step.cmd) and step.cmd[0] == "terraform" and "apply" in step.cmd
 
@@ -785,9 +811,7 @@ def _run_plan_plain(
             if step.output_file:
                 out_path = repo_root / step.output_file
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                result = subprocess.run(
-                    step.cmd, cwd=repo_root, capture_output=True, text=True
-                )
+                result = subprocess.run(step.cmd, cwd=repo_root, capture_output=True, text=True)
                 if result.returncode == 0:
                     out_path.write_text(result.stdout)
                     typer.echo(f"Wrote output to {step.output_file}")
@@ -824,9 +848,7 @@ def deploy(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Print the command plan without executing anything."
     ),
-    yes: bool = typer.Option(
-        False, "--yes", help="Pre-confirm gated steps (Terraform apply)."
-    ),
+    yes: bool = typer.Option(False, "--yes", help="Pre-confirm gated steps (Terraform apply)."),
     recreate: bool = typer.Option(
         False,
         "--recreate",
@@ -861,11 +883,14 @@ def deploy(
         # dry runs must not require live config; fall back to the default name
         try:
             lakehouse = _lakehouse_name(repo_root, env)
-        except (typer.Exit, OSError, KeyError, yaml.YAMLError):
+            auth_mode = _auth_mode(repo_root, env)
+        except (ImportError, typer.Exit, OSError, KeyError, yaml.YAMLError):
             lakehouse = "retail_lakehouse"
+            auth_mode = "azure_cli"
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
         lakehouse = _lakehouse_name(repo_root, env)
+        auth_mode = _auth_mode(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.
@@ -882,7 +907,13 @@ def deploy(
                     recreate = True
                 else:
                     typer.echo("Keeping it — updating the existing workspace in place.")
-    plan = _deploy_plan(env, skip_terraform, lakehouse_name=lakehouse, recreate=recreate)
+    plan = _deploy_plan(
+        env,
+        skip_terraform,
+        lakehouse_name=lakehouse,
+        recreate=recreate,
+        auth_mode=auth_mode,
+    )
     total = len(plan)
 
     _deploy_banner(env, total, recreate, dry_run)
@@ -904,7 +935,7 @@ def deploy(
     taskflow_path = repo_root / "fabric" / "taskflow" / "taskflow.json"
     if taskflow_path.is_file():
         typer.echo("Wiring up the workspace task flow (the visual item graph)...")
-        _deploy_taskflow(repo_root, env)
+        _deploy_taskflow(repo_root, env, auth_mode=auth_mode)
 
     if not yes:
         if typer.confirm(
@@ -912,8 +943,8 @@ def deploy(
             "then train the ML models and build the ontology)?",
             default=False,
         ):
-            _run_setup_pipeline(repo_root, env)
-            _print_ontology_relink_hint(repo_root, env)
+            _run_setup_pipeline(repo_root, env, auth_mode=auth_mode)
+            _print_ontology_relink_hint(repo_root, env, auth_mode=auth_mode)
         else:
             typer.echo(
                 "Skipping. Run later with: "
@@ -921,7 +952,12 @@ def deploy(
             )
 
 
-def _deploy_taskflow(repo_root: Path, env: str) -> None:
+def _deploy_taskflow(
+    repo_root: Path,
+    env: str,
+    *,
+    auth_mode: str = "azure_cli",
+) -> None:
     """Deploy the workspace task flow to the target workspace."""
 
     workspace = _workspace_name(repo_root, env)
@@ -932,18 +968,26 @@ def _deploy_taskflow(repo_root: Path, env: str) -> None:
         "deploy",
         "--workspace",
         workspace,
+        "--auth-mode",
+        auth_mode,
     ]
     typer.echo("    " + " ".join(cmd))
     result = subprocess.run(cmd, cwd=repo_root)
     if result.returncode != 0:
         typer.echo(
             "Could not deploy the task flow automatically. Run later with: "
-            f"python -m deploy.scripts.taskflow deploy --workspace {workspace!r}.",
+            "python -m deploy.scripts.taskflow deploy "
+            f"--workspace {workspace!r} --auth-mode {auth_mode}.",
             err=True,
         )
 
 
-def _print_ontology_relink_hint(repo_root: Path, env: str) -> None:
+def _print_ontology_relink_hint(
+    repo_root: Path,
+    env: str,
+    *,
+    auth_mode: str = "azure_cli",
+) -> None:
     """Explain why the ontology task-flow node is unbound and how it links.
 
     The ontology is created at the end of the setup pipeline (``30-create-ontology``),
@@ -961,11 +1005,17 @@ def _print_ontology_relink_hint(repo_root: Path, env: str) -> None:
         "It links automatically the next time you run 'retail-setup deploy' (once the\n"
         "ontology exists). To link it sooner, re-run the task flow deploy after the\n"
         "pipeline finishes:\n"
-        f"    python -m deploy.scripts.taskflow deploy --workspace {workspace}"
+        "    python -m deploy.scripts.taskflow deploy "
+        f"--workspace {workspace} --auth-mode {auth_mode}"
     )
 
 
-def _run_setup_pipeline(repo_root: Path, env: str) -> None:
+def _run_setup_pipeline(
+    repo_root: Path,
+    env: str,
+    *,
+    auth_mode: str = "azure_cli",
+) -> None:
     """Start an on-demand run of the deployed setup pipeline.
 
     Prints a heads-up that generation can take a while (it runs asynchronously in
@@ -990,6 +1040,8 @@ def _run_setup_pipeline(repo_root: Path, env: str) -> None:
         env,
         "--pipeline",
         "setup-pipeline",
+        "--auth-mode",
+        auth_mode,
     ]
     typer.echo("    " + " ".join(cmd))
     for attempt in range(1, _PIPELINE_TRIGGER_ATTEMPTS + 1):

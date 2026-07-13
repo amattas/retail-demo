@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 import retail_setup.cli.main as cli
 from retail_setup.cli.main import (
     app,
+    _deploy_taskflow,
     _deploy_plan,
     _validate_azure_cli_tenant,
     _RECREATE_WAIT_SECONDS,
@@ -25,8 +26,38 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert calls == []
     out = result.output
     assert "generate_configs" in out and "terraform" in out
-    assert "build_artifacts" in out and "core setup ml ontology reset stream" in out.replace("'", "")
+    assert "build_artifacts" in out and "core setup ml ontology reset stream" in out.replace(
+        "'", ""
+    )
     assert "deploy_items" in out and "apply_kql" in out and "validate_deployment" in out
+
+
+def test_dry_run_uses_configured_auth_mode(monkeypatch):
+    assert hasattr(cli, "_auth_mode")
+    monkeypatch.setattr(
+        cli,
+        "_auth_mode",
+        lambda *_args: "azure_powershell",
+    )
+
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert "--auth-mode azure_powershell" in result.output
+
+
+def test_dry_run_falls_back_when_auth_config_is_unavailable(monkeypatch):
+    assert hasattr(cli, "_auth_mode")
+
+    def unavailable(*_args):
+        raise OSError("deploy config unavailable")
+
+    monkeypatch.setattr(cli, "_auth_mode", unavailable)
+
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert "--auth-mode azure_cli" in result.output
 
 
 def test_skip_terraform_drops_terraform_steps():
@@ -34,6 +65,29 @@ def test_skip_terraform_drops_terraform_steps():
     flat = " ".join(" ".join(map(str, step.cmd)) for step in plan)
     assert "terraform" not in flat
     assert "generate_configs" in flat and "deploy_items" in flat
+
+
+def test_plan_propagates_selected_auth_mode():
+    import inspect
+
+    assert "auth_mode" in inspect.signature(_deploy_plan).parameters
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=True,
+        auth_mode="azure_powershell",
+    )
+    authenticated = [
+        step.cmd
+        for step in plan
+        if any(
+            name in step.cmd for name in ("deploy.scripts.deploy_items", "deploy.scripts.apply_kql")
+        )
+    ]
+
+    assert len(authenticated) == 2
+    assert all(
+        command[command.index("--auth-mode") + 1] == "azure_powershell" for command in authenticated
+    )
 
 
 def test_plan_builds_ontology_and_reset_notebook_groups():
@@ -66,9 +120,7 @@ def test_recreate_inserts_destroy_and_sleep_before_apply():
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     init_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "init" in c)
     destroy_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "destroy" in c)
-    sleep_idx = next(
-        i for i, c in enumerate(cmds) if f"time.sleep({_RECREATE_WAIT_SECONDS})" in c
-    )
+    sleep_idx = next(i for i, c in enumerate(cmds) if f"time.sleep({_RECREATE_WAIT_SECONDS})" in c)
     apply_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "apply" in c)
     assert init_idx < destroy_idx < sleep_idx < apply_idx
     assert plan[destroy_idx].needs_confirmation
@@ -209,18 +261,36 @@ def test_workspace_name_prefers_environment_overlay(tmp_path):
 def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys):
     monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
     attempts = {"n": 0}
+    commands = []
 
-    def fake_run(_cmd, cwd=None):
+    def fake_run(cmd, cwd=None):
+        commands.append(cmd)
         attempts["n"] += 1
         # Fail the first trigger, succeed on the retry.
         return SimpleNamespace(returncode=1 if attempts["n"] == 1 else 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
-    _run_setup_pipeline(Path("."), "dev")
+    _run_setup_pipeline(Path("."), "dev", auth_mode="azure_powershell")
 
     out = capsys.readouterr().out
     assert "can take a while" in out
     assert attempts["n"] == 2  # retried once after the initial failure
+    assert all(
+        command[command.index("--auth-mode") + 1] == "azure_powershell" for command in commands
+    )
+
+
+def test_deploy_taskflow_passes_selected_auth_mode(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(cli, "_workspace_name", lambda *_args: "retail-demo-dev")
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, cwd=None: calls.append(cmd) or SimpleNamespace(returncode=0),
+    )
+
+    _deploy_taskflow(tmp_path, "dev", auth_mode="azure_powershell")
+
+    assert calls[0][calls[0].index("--auth-mode") + 1] == "azure_powershell"
 
 
 def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):

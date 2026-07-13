@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES
 from deploy.scripts.export_items import build_session, list_items
 
 if TYPE_CHECKING:
@@ -72,10 +73,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a Fabric Data Pipeline on demand")
     parser.add_argument("--environment", default="dev")
     parser.add_argument("--pipeline", required=True, help="Pipeline display name.")
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default="azure_cli",
+        help="Operator credential used for Fabric REST requests.",
+    )
     args = parser.parse_args()
 
     workspace_id = workspace_id_from_outputs(args.environment)
-    session = build_session()
+    session = build_session(auth_mode=args.auth_mode)
     pipeline_id = find_pipeline_id(session, workspace_id, args.pipeline)
     location = run_pipeline(session, workspace_id, pipeline_id)
     console.info(f"Started pipeline run for {args.pipeline!r} ({pipeline_id}).")

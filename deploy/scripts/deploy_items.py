@@ -6,23 +6,8 @@ import argparse
 from pathlib import Path
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES, build_credential
 from deploy.scripts.deploy_config import DEPLOY_ROOT
-
-
-def build_credential(auth_mode: str):
-    """Build an explicit Azure credential for fabric-cicd."""
-
-    if auth_mode == "azure_cli":
-        from azure.identity import AzureCliCredential
-
-        return AzureCliCredential()
-    if auth_mode == "azure_powershell":
-        from azure.identity import AzurePowerShellCredential
-
-        return AzurePowerShellCredential()
-    raise ValueError(
-        "Unsupported auth mode. Use 'azure_cli' or 'azure_powershell' for this wrapper."
-    )
 
 
 def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
@@ -60,7 +45,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--auth-mode",
-        choices=["azure_cli", "azure_powershell"],
+        choices=AUTH_MODES,
         default="azure_cli",
     )
     args = parser.parse_args()

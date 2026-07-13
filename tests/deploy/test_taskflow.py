@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import inspect
 import re
+import sys
 
 import pytest
 
@@ -25,6 +27,61 @@ def test_token_retries_transient_auth_failure(monkeypatch) -> None:
 
     assert taskflow._token("scope", _Cred()) == "tok"
     assert calls["n"] == 2
+
+
+def test_taskflow_clients_accept_selected_auth_mode() -> None:
+    assert "auth_mode" in inspect.signature(taskflow.export_taskflow).parameters
+    assert "auth_mode" in inspect.signature(taskflow.deploy_taskflow).parameters
+
+
+def test_credential_uses_selected_auth_mode(monkeypatch) -> None:
+    assert "auth_mode" in inspect.signature(taskflow._credential).parameters
+    calls: list[str] = []
+    expected = object()
+    monkeypatch.setattr(
+        taskflow,
+        "build_credential",
+        lambda auth_mode: calls.append(auth_mode) or expected,
+        raising=False,
+    )
+
+    actual = taskflow._credential(auth_mode="azure_powershell")
+
+    assert actual is expected
+    assert calls == ["azure_powershell"]
+
+
+def test_main_passes_selected_auth_mode(monkeypatch, tmp_path) -> None:
+    calls: dict[str, object] = {}
+    path = tmp_path / "taskflow.json"
+    path.write_text('{"tasks": [], "edges": []}', encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "taskflow",
+            "deploy",
+            "--workspace",
+            "retail-demo",
+            "--path",
+            str(path),
+            "--auth-mode",
+            "azure_powershell",
+        ],
+    )
+    monkeypatch.setattr(
+        taskflow,
+        "deploy_taskflow",
+        lambda *args, **kwargs: calls.update(kwargs) or [],
+    )
+
+    try:
+        result = taskflow.main()
+    except SystemExit as exc:
+        pytest.fail(f"--auth-mode was not accepted: {exc}")
+
+    assert result == 0
+    assert calls["auth_mode"] == "azure_powershell"
 
 
 def test_to_portable_resolves_guids_to_names() -> None:
@@ -50,7 +107,10 @@ def test_to_portable_resolves_guids_to_names() -> None:
         ],
         "edges": [],
     }
-    guid_to_name = {"nb-guid": "02-historical-data-load", "pl-guid": "historical-data-load"}
+    guid_to_name = {
+        "nb-guid": "02-historical-data-load",
+        "pl-guid": "historical-data-load",
+    }
 
     portable = taskflow.to_portable(task_flow, guid_to_name)
 
@@ -100,7 +160,9 @@ def test_committed_taskflow_has_only_bindable_items() -> None:
 
     repo_root = Path(__file__).resolve().parents[2]
     data = _json.loads(
-        (repo_root / "fabric" / "taskflow" / "taskflow.json").read_text(encoding="utf-8")
+        (repo_root / "fabric" / "taskflow" / "taskflow.json").read_text(
+            encoding="utf-8"
+        )
     )
     # Hash-suffixed runtime artifacts (e.g. RetailOntology_AutoGen_graph_<32 hex>,
     # *_lh_<32 hex>) get a fresh GUID-derived suffix every run and can never bind by
@@ -121,7 +183,10 @@ def test_to_workspace_resolves_names_to_target_guids_and_reports_unresolved() ->
             {
                 "id": "t1",
                 "items": [
-                    {"artifactType": "SynapseNotebook", "artifactName": "02-historical-data-load"},
+                    {
+                        "artifactType": "SynapseNotebook",
+                        "artifactName": "02-historical-data-load",
+                    },
                     {"artifactType": "Pipeline", "artifactName": "missing-pipeline"},
                 ],
             }
@@ -154,7 +219,10 @@ def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) 
                     {
                         "id": "t1",
                         "items": [
-                            {"artifactType": "Pipeline", "artifactName": "setup-pipeline"}
+                            {
+                                "artifactType": "Pipeline",
+                                "artifactName": "setup-pipeline",
+                            }
                         ],
                     }
                 ],
@@ -172,7 +240,9 @@ def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) 
     monkeypatch.setattr(
         taskflow,
         "list_workspace_items",
-        lambda *_a: [{"type": "DataPipeline", "displayName": "setup-pipeline", "id": "pl"}],
+        lambda *_a: [
+            {"type": "DataPipeline", "displayName": "setup-pipeline", "id": "pl"}
+        ],
     )
     monkeypatch.setattr(taskflow, "resolve_cluster", lambda *_a: "https://c")
     monkeypatch.setattr(taskflow, "get_taskflow", lambda *_a: None)  # no existing flow
@@ -183,7 +253,9 @@ def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) 
         return 201
 
     monkeypatch.setattr(taskflow, "create_taskflow", fake_create)
-    monkeypatch.setattr(taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1))
+    monkeypatch.setattr(
+        taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1)
+    )
 
     unresolved = taskflow.deploy_taskflow("retail-demo-dev", path)
 
@@ -195,7 +267,9 @@ def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -
     import json as _json
 
     path = tmp_path / "taskflow.json"
-    path.write_text(_json.dumps({"id": "x", "tasks": [], "edges": []}), encoding="utf-8")
+    path.write_text(
+        _json.dumps({"id": "x", "tasks": [], "edges": []}), encoding="utf-8"
+    )
     calls = {"create": 0, "put": 0}
 
     monkeypatch.setattr(taskflow, "_session", lambda *_a, **_k: object())
@@ -209,8 +283,14 @@ def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -
         "get_taskflow",
         lambda *_a: {"resourceId": "r", "etag": "e", "taskFlow": {"id": "i"}},
     )
-    monkeypatch.setattr(taskflow, "create_taskflow", lambda *a, **k: calls.update(create=calls["create"] + 1))
-    monkeypatch.setattr(taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1))
+    monkeypatch.setattr(
+        taskflow,
+        "create_taskflow",
+        lambda *a, **k: calls.update(create=calls["create"] + 1),
+    )
+    monkeypatch.setattr(
+        taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1)
+    )
 
     taskflow.deploy_taskflow("retail-demo-dev", path)
 

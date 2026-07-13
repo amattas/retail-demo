@@ -14,6 +14,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from deploy.scripts._auth import AUTH_MODES
 from deploy.scripts.export_items import (
     build_session,
     export_items,
@@ -23,7 +24,7 @@ from deploy.scripts.export_items import (
 )
 
 if TYPE_CHECKING:
-    from azure.identity import AzureCliCredential
+    from azure.core.credentials import TokenCredential
 
 ITEM_TYPE = "DataPipeline"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -58,11 +59,19 @@ def write_item(output_dir: Path, display_name: str, definition: dict[str, Any]) 
 def export_pipelines(
     workspace_name: str,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
 ) -> list[Path]:
     """Export all DataPipeline items from a workspace into item folders."""
 
-    return export_items(workspace_name, ITEM_TYPE, output_dir, credential)
+    return export_items(
+        workspace_name,
+        ITEM_TYPE,
+        output_dir,
+        credential,
+        auth_mode=auth_mode,
+    )
 
 
 def main() -> int:
@@ -77,9 +86,19 @@ def main() -> int:
         help='Source workspace display name, e.g. "Retail Demo".',
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default="azure_cli",
+        help="Operator credential used for Fabric REST requests.",
+    )
     args = parser.parse_args()
 
-    written = export_pipelines(args.workspace_name, args.output_dir)
+    written = export_pipelines(
+        args.workspace_name,
+        args.output_dir,
+        auth_mode=args.auth_mode,
+    )
     print(f"Exported {len(written)} pipeline(s) to {args.output_dir}")
     for item in written:
         print(f"  {item.name}")
