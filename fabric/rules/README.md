@@ -1,11 +1,11 @@
-# Real-Time Rules
+# Real-time rule scenarios
 
-Real-time rules/alerts driving actions for operations and CX.
+This directory records candidate operational actions such as stockout,
+replenishment, truck-dwell, queue, and customer-arrival alerts.
 
-Examples:
-- Stockout detected → Teams alert + create reorder task
-- Reorder triggered (URGENT) → escalate to on-call + SMS
-- Truck dwell > SLA → alert logistics channel
-- Queue length/dwell high → open register or deploy associate
-- High-value customer enters store → notify concierge device
+These are design inputs, not guaranteed deployed Fabric Activator or rule
+artifacts. Do not present them as active automations until deployment and runtime
+evidence exist.
 
+See the [analytics backlog](../../docs/requirements/modules/analytics/backlog.md)
+and [traceability ledger](../../docs/requirements/traceability.md).

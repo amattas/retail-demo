@@ -14,7 +14,7 @@ Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generatio
 - **fabric/kql_database**: KQL scripts for Eventhouse tables, functions, materialized views
 - **fabric/lakehouse**: PySpark notebooks for Lakehouse Bronze -> Silver -> Gold transforms and ML
 - **utility stream-events notebook**: Spark Structured Streaming that writes synthetic events directly to the Eventhouse KQL tables via the Spark Kusto connector
-- **datagen-deprecated**: Legacy FastAPI/DuckDB/Event Hub generator, retained for reference only
+- **docs**: Canonical Zensical source for guides, requirements, specifications, architecture, security, and traceability
 
 ### Reference Files
 - Streaming event payloads: `utility/notebooks/templates/driver-05-stream.py`
@@ -109,15 +109,13 @@ retail-demo/
 ├── utility/            # Fabric-native retail-setup utility + setup notebooks (active)
 ├── deploy/             # Terraform + fabric-cicd deployment framework
 ├── scripts/            # setup.ps1/setup.sh/setup.py bootstrap + semantic-model helpers
-├── datagen-deprecated/ # Legacy FastAPI/DuckDB/Event Hub generator (reference only)
 ├── fabric/
 │   ├── kql_database/   # KQL scripts
 │   ├── lakehouse/      # PySpark notebooks (setup, transforms, ML)
 │   ├── pipelines/      # Fabric data pipelines
 │   ├── dashboards/     # Real-time dashboards
 │   └── powerbi/        # Power BI model
-├── website/            # Docusaurus documentation site
-└── docs/               # Design specs and plans
+└── docs/               # Canonical Zensical documentation source
 ```
 
 ## Global Norms
@@ -131,7 +129,7 @@ retail-demo/
 
 ### Column Naming Convention
 
-**Standard:** Use `snake_case` for all column names throughout the data pipeline.
+**Standard:** Use `snake_case` for new column names throughout the data pipeline.
 
 **Rationale:**
 - Aligns with Python (PEP 8) naming conventions used in the data generator
@@ -149,9 +147,13 @@ retail-demo/
 - Correct: `event_ts`, `receipt_id_ext`, `customer_id`, `store_id`
 - Incorrect: `EventTs`, `ReceiptIdExt`, `customerId`, `storeId`
 
-**Exception:**
-- Semantic Model display names can use user-friendly formats (e.g., "Event Timestamp", "Receipt ID")
-- These are presentation layer only and do not affect underlying column names
+**Exceptions:**
+- Existing physical schemas retain some PascalCase and mixed-case fields for
+  compatibility with current TMDL bindings.
+- Semantic Model display names can use user-friendly formats (e.g.,
+  "Event Timestamp", "Receipt ID").
+- Always verify the authoritative schema instead of renaming existing fields by
+  convention alone.
 
 ### KQL Development
 - Use `.execute database script` for batch operations
@@ -193,7 +195,8 @@ retail-demo/
 
 ### Data Architecture
 - Event tables: Streaming-only (from the stream-events notebook via the Spark Kusto connector)
-- Dimension/Fact tables: Historical (via Lakehouse shortcuts)
+- Dimension/Fact tables: Historical setup notebooks write the base contract directly to Lakehouse
+- Eventhouse shortcuts: Optional streaming projection into Lakehouse Silver/Gold
 - Gold layer: Aggregations built in PySpark notebooks
 
 ## When NOT to Over-Parallelize
@@ -224,11 +227,6 @@ for current open work.
 - Event timestamps must be monotonically increasing within a batch
 - Use `pd.Timestamp.utcnow()` in pandas, not `pd.Timestamp.now()`
 
-**DuckDB**
-- Close connections explicitly; don't rely on garbage collection
-- Use `read_only=True` for concurrent read access
-- Batch inserts (1000+ rows) for performance
-
 **KQL**
 - Materialized view names must be unique across the entire database
 - Always wrap multi-statement scripts in `.execute database script <|`
@@ -239,7 +237,7 @@ for current open work.
 - Use `model_validate()` not deprecated `.parse_obj()`
 - Define `model_config` not inner `class Config`
 
-**Event Hubs / Streaming**
+**Streaming**
 - Events can arrive out of order; design consumers accordingly
 - Use partition keys for ordering guarantees within a partition
 - Set reasonable batch sizes (100-500 events) to balance latency vs throughput

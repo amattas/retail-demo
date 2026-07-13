@@ -1,18 +1,11 @@
-# Dashboards
+# Dashboard templates
 
-Real-Time Dashboards (and/or Power BI reports) for operations and CX.
+This directory contains Real-Time Dashboard template material and setup notes.
+It is not currently guaranteed as a first-class `retail-setup deploy` output.
 
-Initial Dashboards:
-- Store Ops: sales/minute, queue/dwell, stockouts, workforce signals
-- Inventory Control: low stock, stockout map, reorder backlog, shrink suspects
-- Supply Chain: arrivals/departures, dwell, lane performance, ETA risk
-- Marketing: impressions → visits → purchases, promo lift, ROAS
-- Dynamic Pricing Approval: ML pricing recommendations, approval workflow, audit trail
+Use the deployed Power BI report for the supported presentation path. Treat
+dashboard templates as manual or experimental assets until their Fabric
+source-control format and deployment validation are completed.
 
-Data Sources:
-- KQL DB materialized views (hot path)
-- Lakehouse Gold (historical overlays)
-
-Templates
-- Minimal Real-Time dashboard template: `retail-ops.template.json` (replace KQL DB resource ID after import)
-- Dynamic Pricing Approval dashboard: `pricing-approval.template.json` (see `PRICING_APPROVAL_DASHBOARD.md` for setup)
+See the [demo script](../../docs/guides/demo-script.md) and
+[analytics backlog](../../docs/requirements/modules/analytics/backlog.md).
