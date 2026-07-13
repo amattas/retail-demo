@@ -125,6 +125,11 @@ CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
 DEVICES = ["mobile", "desktop", "tablet"]
 PROMOS = ["SAVE10", "BFRIDAY30", "SUMMER25"]
 FULFILL = ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"]
+TRUCK_DWELL_THRESHOLD_MINUTES = 90
+TRUCK_NORMAL_DWELL_MINUTES_MIN = 30
+TRUCK_NORMAL_DWELL_MINUTES_MAX = 75
+TRUCK_LATE_DWELL_MINUTES = 120
+TRUCK_LATE_BUCKET_MODULUS = 5
 
 # Named promo catalog for the live feed (mirrors batch receipts.PROMO_CATALOG):
 # (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
@@ -338,6 +343,25 @@ inv_reason = F.when(disrupted, F.lit("DISRUPTION")).otherwise(F.lit("SALE"))
 inv_source = F.when(disrupted, F.lit("DC_OUTAGE")).otherwise(F.lit("STORE"))
 op_type = F.when(_u(F.col("v"), "op") < 0.5, "opened").otherwise("closed")
 truck_id = F.concat(F.lit("TRK"), F.lpad(_id(F.col("v"), "truck", TRUCK_COUNT).cast("string"), 4, "0"))
+truck_estimated_unload_minutes = (
+    _h(
+        F.col("v"),
+        "unload",
+        TRUCK_NORMAL_DWELL_MINUTES_MAX - TRUCK_NORMAL_DWELL_MINUTES_MIN + 1,
+    )
+    + F.lit(TRUCK_NORMAL_DWELL_MINUTES_MIN)
+).cast("long")
+truck_is_late = (
+    F.pmod(F.col("v"), F.lit(TRUCK_LATE_BUCKET_MODULUS)) == F.lit(0)
+)
+truck_dwell_minutes = F.when(
+    truck_is_late,
+    F.lit(TRUCK_LATE_DWELL_MINUTES).cast("long"),
+).otherwise(truck_estimated_unload_minutes)
+truck_arrival_ts = F.timestamp_seconds(F.unix_timestamp(F.col("ts")))
+truck_departure_ts = F.timestamp_seconds(
+    F.unix_timestamp(truck_arrival_ts) + truck_dwell_minutes * F.lit(60)
+)
 
 events_arr = F.array(
     # --- shopping session ---
@@ -409,15 +433,15 @@ events_arr = F.array(
     # --- logistics (truck arrived + departed share truck/shipment) ---
     slot(log, "truck_arrived", F.struct(
         truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
-        _iso(F.col("ts")).alias("arrival_time"),
-        (_h(F.col("v"), "unload", 60) + F.lit(15)).cast("long").alias("estimated_unload_duration"),
-    ), F.col("ts"), F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
+        _iso(truck_arrival_ts).alias("arrival_time"),
+        truck_estimated_unload_minutes.alias("estimated_unload_duration"),
+    ), truck_arrival_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
         session=F.col("shipment_id")),
     slot(log, "truck_departed", F.struct(
         truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
-        _iso(F.col("ts")).alias("departure_time"),
-        (_h(F.col("v"), "unload2", 60) + F.lit(15)).cast("long").alias("actual_unload_duration"),
-    ), F.col("ts"), F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
+        _iso(truck_departure_ts).alias("departure_time"),
+        truck_dwell_minutes.alias("actual_unload_duration"),
+    ), truck_departure_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
         session=F.col("shipment_id")),
 
     # --- marketing ---

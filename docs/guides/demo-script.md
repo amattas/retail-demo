@@ -94,9 +94,11 @@ optional governed action. Otherwise, describe it from the owning backlog:
 
 ## Do not overclaim
 
-Until their backlogs are closed, avoid using these as headline proof points:
+Avoid using these as headline proof points without the stated qualification:
 
-- Truck dwell: [IMP-006](../requirements/modules/streaming/backlog.md#imp-006)
+- Truck dwell is implemented in source under
+  [IMP-006](../requirements/modules/streaming/backlog.md#imp-006), but do not
+  present it as live-validated until a Fabric smoke run has been recorded.
 - Marketing attribution and ROAS: [IMP-007](../requirements/modules/streaming/backlog.md#imp-007)
 - Unresolved/current-state KPIs: [IMP-009](../requirements/modules/power-bi/backlog.md#imp-009)
 - Ungated ML output: [IMP-008](../requirements/modules/ml-ai/backlog.md#imp-008)
