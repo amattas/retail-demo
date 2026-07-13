@@ -9,10 +9,10 @@
 // Event tables reference dimension IDs (store_id, customer_id, product_id, etc.)
 // without database-level FK constraints. Validation is handled as follows:
 //
-// 1. SOURCE VALIDATION (Primary): The datagen Python package validates all
-//    foreign key relationships before generating events. See:
-//    - datagen/src/retail_datagen/shared/validators.py (SyntheticDataValidator)
-//    - datagen/src/retail_datagen/generators/retail_patterns.py (BusinessRulesEngine)
+// 1. SOURCE VALIDATION (Primary): Historical generation validates cross-table
+//    relationships before writing Lakehouse tables. See:
+//    - utility/src/retail_setup/generation/invariants.py
+//    - utility/src/retail_setup/generation/schemas.py
 //
 // 2. POST-INGESTION QUERIES: For data quality monitoring, use these queries:
 //

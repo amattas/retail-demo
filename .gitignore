@@ -96,17 +96,10 @@ data/facts/**/*.csv
 *.wal
 
 # Generated documentation and reports
-datagen/site/
 *_report.json
 
 # Data directories
-/datagen/data/*.db*
-/datagen/data/*.json
-/datagen/data/cache
-/datagen/data/export
-/datagen/data
 site/
-/datagen/event_histograms
 /fabric/lakehouse/.stubs
 /fabric/lakehouse/5219ac70-71d4-4dfc-af32-5b8a6c29a471
 fabric/lakehouse/.work-folder-info
