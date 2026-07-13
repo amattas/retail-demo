@@ -39,14 +39,14 @@ State clearly that identifiers are synthetic-but-sensitive.
 ## Optional enhancement journeys
 
 - Governed pricing approval and writeback:
-  [ENH-002](../requirements/modules/power-bi/backlog.md#enh-002)
+  [ENH-002](../design/requirements/modules/power-bi/backlog.md#enh-002)
 - Persona-specific agents and Copilot:
-  [ENH-003](../requirements/modules/ml-ai/backlog.md#enh-003)
-  and [ENH-004](../requirements/modules/ml-ai/backlog.md#enh-004)
+  [ENH-003](../design/requirements/modules/ml-ai/backlog.md#enh-003)
+  and [ENH-004](../design/requirements/modules/ml-ai/backlog.md#enh-004)
 - Supplier collaboration, embedded analytics, and retail media are product ideas,
   not current deployed capabilities.
 - Deterministic weather, holiday, vendor, and customer-state scenarios:
-  [ENH-009](../requirements/modules/generation/backlog.md#enh-009)
+  [ENH-009](../design/requirements/modules/generation/backlog.md#enh-009)
 
-The [traceability ledger](../requirements/traceability.md) is the authority for
+The [traceability ledger](../design/requirements/traceability.md) is the authority for
 implemented and verified status.

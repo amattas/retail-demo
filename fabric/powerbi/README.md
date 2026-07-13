@@ -26,5 +26,5 @@ Use `scripts\configure_semantic_model.py` when a local PBIP copy needs its
 OneLake target rewritten. Automated deployment performs target parameterization
 through the deployment framework.
 
-See the [semantic-model specification](../../docs/specifications/modules/power-bi/semantic-model.md)
-and [Power BI backlog](../../docs/requirements/modules/power-bi/backlog.md).
+See the [semantic-model specification](../../docs/design/specifications/modules/power-bi/semantic-model.md)
+and [Power BI backlog](../../docs/design/requirements/modules/power-bi/backlog.md).

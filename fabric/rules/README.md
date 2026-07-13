@@ -7,5 +7,5 @@ These are design inputs, not guaranteed deployed Fabric Activator or rule
 artifacts. Do not present them as active automations until deployment and runtime
 evidence exist.
 
-See the [analytics backlog](../../docs/requirements/modules/analytics/backlog.md)
-and [traceability ledger](../../docs/requirements/traceability.md).
+See the [analytics backlog](../../docs/design/requirements/modules/analytics/backlog.md)
+and [traceability ledger](../../docs/design/requirements/traceability.md).

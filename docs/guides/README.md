@@ -7,6 +7,9 @@ must link to those owners rather than redefine contracts.
 | Guide | Use it for |
 | --- | --- |
 | [Getting started](getting-started.md) | Configure, render, deploy, run, and validate a workspace |
+| [Deployed walkthrough](deployed-walkthrough.md) | Orient an audience and choose a focused walkthrough |
+| [Data platform walkthrough](deployed-data-platform.md) | Show pipelines, notebooks, Lakehouse, and Eventhouse |
+| [Analytics and AI walkthrough](deployed-analytics-ai.md) | Show ontology, grounded agent answers, and Power BI |
 | [Presenter demo](demo-script.md) | Run a defensible 15-20 minute walkthrough |
 | [Presenter journeys](presenter-journeys.md) | Run focused 5-7 minute persona prompt packs |
 | [Use cases](use-cases.md) | Select implemented and proposed business stories |
@@ -15,4 +18,4 @@ must link to those owners rather than redefine contracts.
 
 For exact behavior, follow the linked specification. For unresolved work, use
 the owning module backlog under
-[`requirements/modules/`](../requirements/modules/).
+[`requirements/modules/`](../design/requirements/modules/).

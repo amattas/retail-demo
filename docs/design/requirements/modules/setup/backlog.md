@@ -10,7 +10,7 @@
 - **Acceptance:** A presenter can choose a preset and reproduce its documented
   "wow moment" without inventing setup steps.
 - **Current boundary:** Persona journeys and prompt packs are documented in the
-  [presenter guide](../../../guides/presenter-journeys.md). The deployment
+  [presenter guide](../../../../guides/presenter-journeys.md). The deployment
   presets, measured runtimes, and preset-specific asset controls remain open.
 
 ## Settled - do not reopen

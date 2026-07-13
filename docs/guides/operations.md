@@ -1,7 +1,7 @@
 # Operations guide
 
 This guide summarizes routine operation. Exact failure and recovery behavior is
-owned by the [operations runbook](../specifications/modules/operations/runbook.md).
+owned by the [operations runbook](../design/specifications/modules/operations/runbook.md).
 
 ## Readiness checklist
 
@@ -29,7 +29,7 @@ Correlate them with:
 - Pending alert/action state where deployed.
 
 These signals are not yet unified; see
-[IMP-013](../requirements/modules/operations/backlog.md#imp-013).
+[IMP-013](../design/requirements/modules/operations/backlog.md#imp-013).
 
 ## Quick KQL checks
 
@@ -84,8 +84,8 @@ utilization. Do not promise fixed runtimes without a measured profile.
 ## Known reliability work
 
 - Fail-fast and replay safety:
-  [IMP-002](../requirements/modules/operations/backlog.md#imp-002)
+  [IMP-002](../design/requirements/modules/operations/backlog.md#imp-002)
 - Environment isolation:
-  [IMP-004](../requirements/modules/deployment/backlog.md#imp-004)
+  [IMP-004](../design/requirements/modules/deployment/backlog.md#imp-004)
 - Active-path CI:
-  [IMP-014](../requirements/modules/operations/backlog.md#imp-014)
+  [IMP-014](../design/requirements/modules/operations/backlog.md#imp-014)

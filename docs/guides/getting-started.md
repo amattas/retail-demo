@@ -76,7 +76,7 @@ retail-setup configure `
 yesterday so live streaming can begin today.
 
 Configuration writes shared/environment deployment YAML and ignored local
-generation settings. See the [CLI specification](../specifications/modules/setup/cli.md).
+generation settings. See the [CLI specification](../design/specifications/modules/setup/cli.md).
 
 ## 3. Render setup notebooks
 
@@ -105,11 +105,11 @@ local deployment output, and offers to start the setup pipeline.
 
 Review the current limitations before relying on a live deploy:
 
-- Authentication/target propagation repair: [IMP-001](../requirements/modules/deployment/backlog.md#imp-001)
-- Environment isolation: [IMP-004](../requirements/modules/deployment/backlog.md#imp-004)
-- Live readiness validation: [IMP-013](../requirements/modules/operations/backlog.md#imp-013)
+- Authentication/target propagation repair: [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
+- Environment isolation: [IMP-004](../design/requirements/modules/deployment/backlog.md#imp-004)
+- Live readiness validation: [IMP-013](../design/requirements/modules/operations/backlog.md#imp-013)
 
-See the [deployment specification](../specifications/modules/deployment/framework.md).
+See the [deployment specification](../design/specifications/modules/deployment/framework.md).
 
 ## 5. Run historical setup
 
@@ -121,7 +121,7 @@ manually. Expected base output:
 
 Confirm the table contract against
 [`schemas.py`](https://github.com/amattas/retail-demo/blob/main/utility/src/retail_setup/generation/schemas.py)
-and the [data-contract specification](../specifications/modules/generation/data-contract.md).
+and the [data-contract specification](../design/specifications/modules/generation/data-contract.md).
 
 ## 6. Start optional live streaming
 
@@ -137,7 +137,7 @@ Kusto connector. It does not require Kafka, Event Hubs, or a Fabric Eventstream.
 
 Run the streaming-to-Silver and streaming-to-Gold path only after the Eventhouse
 shortcuts and required tables exist. See the
-[event contract](../specifications/modules/streaming/event-contract.md).
+[event contract](../design/specifications/modules/streaming/event-contract.md).
 
 ## 7. Open analytics surfaces
 
@@ -150,5 +150,5 @@ shortcuts and required tables exist. See the
 ## 8. Validate readiness
 
 Use the [operations guide](operations.md) and
-[runbook](../specifications/modules/operations/runbook.md). Do not treat a local
+[runbook](../design/specifications/modules/operations/runbook.md). Do not treat a local
 staging validation as proof that the workspace is usable.

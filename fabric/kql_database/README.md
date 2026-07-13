@@ -20,6 +20,6 @@ the operator identity. The generated payload remains at
 The live stream targets eighteen typed business event tables. `unknown_event`
 is a catch-all KQL table, not a nineteenth generated business event.
 
-See the [event contract](../../docs/specifications/modules/streaming/event-contract.md),
-[Fabric analytics specification](../../docs/specifications/modules/analytics/fabric-analytics.md),
-and [data schema](../../docs/architecture/data-schema.md).
+See the [event contract](../../docs/design/specifications/modules/streaming/event-contract.md),
+[Fabric analytics specification](../../docs/design/specifications/modules/analytics/fabric-analytics.md),
+and [data schema](../../docs/design/architecture/data-schema.md).
