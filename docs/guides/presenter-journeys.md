@@ -10,10 +10,28 @@ Before presenting:
 
 1. Complete [Getting started](getting-started.md), including the ordered KQL
    scripts and rendered `stream-events.ipynb`.
-2. Set the notebook sink to `eventhouse`, confirm the target KQL database, and
-   run a bounded stream.
+2. Override the stream parameters with these presenter settings:
+
+    ```python
+    source_rows_per_second = 10
+    sink = "eventhouse"
+    run_seconds = 180
+    ```
+
+   The source template defaults to `source_rows_per_second = 5` and
+   `run_seconds = 0`; zero runs indefinitely. Each source row emits one
+   scenario bundle, so the presenter settings create a three-minute bounded
+   run rather than a fixed business-event count.
 3. Confirm the `retail_querysets.KQLQueryset` item is bound to that database.
 4. Keep the [Operations guide](operations.md) open for recovery.
+
+After the notebook prints `stopped after 180s`, run the persona readiness query
+every 15 seconds for up to five minutes. Proceed only when every required row
+in that query has `rows > 0` and a `latest` timestamp within the last 10
+minutes. Eventhouse ingestion is asynchronous, so notebook completion alone is
+not readiness proof. For journeys that use `mv_store_sales_minute`, also run
+the store-sales query during that polling window and require at least one
+recent minute bucket.
 
 The following surfaces are not part of these reproducible core journeys:
 
@@ -55,6 +73,7 @@ Run this readiness check:
 ```kql
 union withsource=table_name receipt_created, online_order_created,
   online_order_picked, online_order_shipped
+| where ingest_timestamp > ago(10m)
 | summarize rows = count(), latest = max(ingest_timestamp) by table_name
 | order by table_name asc
 ```
@@ -114,12 +133,13 @@ union withsource=table_name receipt_created, online_order_created,
 
 ### Reset and recovery
 
-1. Stop the bounded stream if it is still running.
-2. Rerun it with the same saved notebook parameters; wait for the readiness
-   query's `latest` values to advance.
-3. If they do not advance, verify the Query URI, database name, permissions,
+1. If the notebook exceeds its bounded run, cancel the active Spark query.
+2. Rerun it with `source_rows_per_second = 10` and `run_seconds = 180`.
+3. Poll the readiness query every 15 seconds for up to five minutes; require
+   all four tables and recent `latest` values.
+4. If they do not advance, verify the Query URI, database name, permissions,
    and notebook errors using [Operations](operations.md#common-recovery-paths).
-4. Do not run the destructive Lakehouse reset for a presenter retry.
+5. Do not run the destructive Lakehouse reset for a presenter retry.
 
 ## Merchandising: product demand and replenishment signals
 
@@ -141,9 +161,15 @@ Run this readiness check:
 ```kql
 union withsource=signal receipt_line_added, inventory_updated,
   stockout_detected, reorder_triggered
+| where ingest_timestamp > ago(10m)
 | summarize rows = count(), latest = max(ingest_timestamp) by signal
 | order by signal asc
 ```
+
+`stockout_detected` and `reorder_triggered` are conditional inventory events.
+If either row is absent after the first five-minute readiness wait, run one
+more bounded stream with the same presenter settings and repeat the wait.
+Present the replenishment step only after all four rows pass.
 
 ### Run the journey
 
@@ -218,13 +244,17 @@ union withsource=signal receipt_line_added, inventory_updated,
 
 ### Reset and recovery
 
-1. Stop and rerun the bounded stream with the same parameters.
-2. Confirm `latest` advances for `receipt_line_added` and at least one inventory
-   signal before presenting.
-3. If a table is missing, reapply the ordered KQL scripts to the intended
+1. Rerun the bounded stream with `source_rows_per_second = 10` and
+   `run_seconds = 180`.
+2. Poll every 15 seconds for up to five minutes and require recent rows for
+   `receipt_line_added`, `inventory_updated`, `stockout_detected`, and
+   `reorder_triggered`.
+3. Because the last two events are conditional, run one additional identical
+   bounded stream and repeat the poll before using the fallback.
+4. If a table is missing, reapply the ordered KQL scripts to the intended
    database; if rows are missing, follow the live-ingestion recovery path in
    [Operations](operations.md#common-recovery-paths).
-4. Preserve prior events; no destructive reset is needed.
+5. Preserve prior events; no destructive reset is needed.
 
 ## Executive and analytics: recent performance summary
 
@@ -246,6 +276,7 @@ Run this readiness check:
 
 ```kql
 union withsource=table_name payment_processed, online_order_created
+| where ingest_timestamp > ago(10m)
 | summarize rows = count(), latest = max(ingest_timestamp) by table_name
 | order by table_name asc
 ```
@@ -318,9 +349,10 @@ union withsource=table_name payment_processed, online_order_created
 
 ### Reset and recovery
 
-1. Stop and rerun the bounded stream with the saved parameters.
-2. Rerun the readiness and store-sales queries until their latest timestamps
-   advance.
+1. Rerun the bounded stream with `source_rows_per_second = 10` and
+   `run_seconds = 180`.
+2. Poll the readiness query every 15 seconds for up to five minutes, then rerun
+   the store-sales query and confirm recent minute buckets.
 3. If only a visualization surface fails, remain in the KQL queryset and follow
    the Power BI recovery entry in
    [Operations](operations.md#common-recovery-paths).
