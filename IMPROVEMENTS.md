@@ -1,8 +1,8 @@
 # Improvements
 
-The review roadmap has been reconciled into the canonical module backlogs under
-[`docs/design/requirements/modules/`](docs/design/requirements/modules/). This file remains as
-a stable entry point; it is not a second backlog.
+The review roadmap has been reconciled into the canonical module backlogs
+listed by [requirements ownership](docs/design/requirements/README.md). This
+file remains as a stable entry point; it is not a second backlog.
 
 | Owner | Canonical backlog |
 | --- | --- |

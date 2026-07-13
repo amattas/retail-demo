@@ -9,7 +9,7 @@ Canonical repository documentation is organized by ownership:
 | Exact behavior and interfaces | [`docs/design/specifications/`](docs/design/specifications/README.md) |
 | Current topology and data flow | [`docs/design/architecture/`](docs/design/architecture/overview.md) |
 | Threats and controls | [`docs/design/security/`](docs/design/security/threat-model.md) |
-| Implementation gaps and enhancements | Module backlogs under [`docs/design/requirements/modules/`](docs/design/requirements/modules/) |
+| Implementation gaps and enhancements | Module backlogs listed by [requirements ownership](docs/design/requirements/README.md) |
 | Evidence and state | [`docs/design/requirements/traceability.md`](docs/design/requirements/traceability.md) |
 
 Authoritative implementation contracts:

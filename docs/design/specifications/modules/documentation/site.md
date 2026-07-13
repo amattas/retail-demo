@@ -30,6 +30,10 @@ Task-focused user documentation remains under `docs/guides/`. Normative
 technical material remains under `docs/design/` so implementation detail does
 not dominate the primary user journey.
 
+Top-level navigation groups remain collapsible. Do not enable
+`navigation.sections`, which renders them as persistent sidebar groups on
+desktop.
+
 ## Owner rules
 
 - Requirements: outcomes, constraints, acceptance, stable IDs, backlogs.
@@ -59,6 +63,24 @@ python -m zensical build --clean
 ```
 
 The build must succeed with no missing nav target or broken internal link.
+Generated output is written to the ignored `site/` directory.
+
+For a local preview:
+
+```powershell
+python -m zensical serve
+```
+
+## Maintainer checklist
+
+1. Update the canonical owner and all derived links in the same change.
+2. Preserve stable requirement, threat, control, improvement, and enhancement
+   IDs.
+3. Keep module backlogs limited to `Open` and `Settled - do not reopen`.
+4. Use Mermaid for diagrams.
+5. Run `python -m zensical build --clean`.
+6. Check for broken links, missing navigation targets, stale `website/`
+   references, and dated plans that still own durable content.
 
 ## Publishing workflow
 

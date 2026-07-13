@@ -69,8 +69,8 @@ Kusto connector.
 - [Improvement index](IMPROVEMENTS.md)
 
 Documentation under `docs/` is the canonical source for the Zensical site.
-See [documentation maintenance](docs/guides/documentation.md) for local build
-and publishing instructions.
+See the [documentation site specification](docs/design/specifications/modules/documentation/site.md)
+for local build and publishing instructions.
 
 ## Repository layout
 
