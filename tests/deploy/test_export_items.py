@@ -3,15 +3,68 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import json
+import sys
 from pathlib import Path
 
-from deploy.scripts import export_items
+import pytest
+
+from deploy.scripts import export_items, export_pipelines
 
 
 def _b64(payload: object) -> str:
     text = payload if isinstance(payload, str) else json.dumps(payload)
     return base64.b64encode(text.encode("utf-8")).decode("ascii")
+
+
+def test_export_clients_accept_selected_auth_mode() -> None:
+    assert "auth_mode" in inspect.signature(export_items.build_session).parameters
+    assert "auth_mode" in inspect.signature(export_items.export_items).parameters
+    assert (
+        "auth_mode" in inspect.signature(export_pipelines.export_pipelines).parameters
+    )
+
+
+@pytest.mark.parametrize(
+    ("module", "function_name"),
+    [
+        (export_items, "export_items"),
+        (export_pipelines, "export_pipelines"),
+    ],
+)
+def test_export_main_passes_selected_auth_mode(
+    monkeypatch,
+    tmp_path: Path,
+    module,
+    function_name: str,
+) -> None:
+    calls: dict[str, object] = {}
+    argv = [
+        module.__name__,
+        "--workspace-name",
+        "retail-demo",
+        "--output-dir",
+        str(tmp_path),
+        "--auth-mode",
+        "azure_powershell",
+    ]
+    if module is export_items:
+        argv.extend(["--item-type", "DataAgent"])
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(
+        module,
+        function_name,
+        lambda *args, **kwargs: calls.update(kwargs) or [],
+    )
+
+    try:
+        result = module.main()
+    except SystemExit as exc:
+        pytest.fail(f"--auth-mode was not accepted: {exc}")
+
+    assert result == 0
+    assert calls["auth_mode"] == "azure_powershell"
 
 
 def test_write_item_writes_nested_parts_for_data_agent(tmp_path: Path) -> None:
@@ -37,7 +90,9 @@ def test_write_item_writes_nested_parts_for_data_agent(tmp_path: Path) -> None:
     platform = json.loads((item_dir / ".platform").read_text(encoding="utf-8"))
     assert platform["metadata"]["type"] == "DataAgent"
     # Nested part directories are created.
-    datasource = item_dir / "Files/Config/draft/semantic-model-retail_model/datasource.json"
+    datasource = (
+        item_dir / "Files/Config/draft/semantic-model-retail_model/datasource.json"
+    )
     assert json.loads(datasource.read_text(encoding="utf-8"))["artifactId"] == "abc"
 
 

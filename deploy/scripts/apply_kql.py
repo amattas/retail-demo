@@ -1,11 +1,11 @@
 """Prepare or execute ordered KQL database scripts.
 
 ``--execute`` applies the combined script directly to the Fabric Eventhouse KQL
-database using the operator's Azure CLI login (``AzureCliCredential``). This is
-the supported path: the deploy runs locally with the user's credentials, which
-have Eventhouse admin rights — unlike a Fabric notebook's identity, which does
-not. The script resolves the database's ``queryServiceUri`` from the Fabric REST
-API, then runs the batch with the Kusto Python SDK.
+database using the configured operator credential. This is the supported path:
+the deploy runs locally with the user's permissions, which include Eventhouse
+administration — unlike a Fabric notebook's identity. The script resolves the
+database's ``queryServiceUri`` from the Fabric REST API, then runs the batch with
+the Kusto Python SDK.
 """
 
 from __future__ import annotations
@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES, build_credential
 
 if TYPE_CHECKING:
-    from azure.identity import AzureCliCredential
+    from azure.core.credentials import TokenCredential
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 KQL_SOURCE_DIR = REPO_ROOT / "fabric" / "kql_database"
@@ -52,23 +53,20 @@ def build_database_script(scripts: list[Path]) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
-    """Azure CLI credential with a generous process timeout.
+def _credential(
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+) -> TokenCredential:
+    """Return an injected credential or construct the configured operator login."""
 
-    A *cold* ``az account get-access-token`` for the Kusto/Eventhouse audience can
-    take ~90s on Windows (warm calls are ~1s). 120s absorbs the cold-start
-    without making a genuinely-broken ``az`` hang excessively.
-    """
-
-    from azure.identity import AzureCliCredential
-
-    return credential or AzureCliCredential(process_timeout=120)
+    return credential or build_credential(auth_mode)
 
 
 def resolve_kql_database(
     workspace_id: str,
     kql_database_id: str,
-    credential: AzureCliCredential,
+    credential: TokenCredential,
 ) -> tuple[str, str]:
     """Return ``(query_service_uri, database_name)`` for a Fabric KQL database."""
 
@@ -97,13 +95,15 @@ def execute_database_script(
     query_uri: str,
     database_name: str,
     script: str,
-    credential: AzureCliCredential,
+    credential: TokenCredential,
 ) -> Any:
     """Run a KQL management script against the database with the Kusto SDK."""
 
     from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 
-    kcsb = KustoConnectionStringBuilder.with_azure_token_credential(query_uri, credential)
+    kcsb = KustoConnectionStringBuilder.with_azure_token_credential(
+        query_uri, credential
+    )
     with KustoClient(kcsb) as client:
         return client.execute_mgmt(database_name, script)
 
@@ -159,11 +159,12 @@ def apply_to_database(
     workspace_id: str,
     kql_database_id: str,
     kql_database_name: str | None = None,
-    credential: AzureCliCredential | None = None,
+    auth_mode: str = "azure_cli",
+    credential: TokenCredential | None = None,
 ) -> int:
     """Resolve the KQL database and apply the combined script. Returns row count."""
 
-    credential = _credential(credential)
+    credential = _credential(credential, auth_mode=auth_mode)
     query_uri, resolved_name = resolve_kql_database(
         workspace_id, kql_database_id, credential
     )
@@ -215,12 +216,21 @@ def main() -> int:
         "--environment",
         help="Read workspace/database ids from deploy/.generated/<env>/terraform-output.json.",
     )
-    parser.add_argument("--workspace-id", help="Fabric workspace id (overrides --environment).")
+    parser.add_argument(
+        "--workspace-id", help="Fabric workspace id (overrides --environment)."
+    )
     parser.add_argument(
         "--kql-database-id", help="Fabric KQL database id (overrides --environment)."
     )
     parser.add_argument(
-        "--kql-database-name", help="KQL database name (overrides resolved display name)."
+        "--kql-database-name",
+        help="KQL database name (overrides resolved display name).",
+    )
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default="azure_cli",
+        help="Operator credential used for Fabric and Kusto requests.",
     )
     args = parser.parse_args()
 
@@ -251,6 +261,7 @@ def main() -> int:
         workspace_id=str(workspace_id),
         kql_database_id=str(kql_database_id),
         kql_database_name=kql_database_name and str(kql_database_name),
+        auth_mode=args.auth_mode,
     )
     return 0
 

@@ -31,10 +31,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES, build_credential
 
 if TYPE_CHECKING:
     import requests
-    from azure.identity import AzureCliCredential
+    from azure.core.credentials import TokenCredential
 
 PBI_SCOPE = "https://analysis.windows.net/powerbi/api/.default"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
@@ -63,27 +64,18 @@ ARTIFACT_TO_ITEM_TYPE = {
 }
 
 
-def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
-    """Azure CLI credential with a generous process timeout.
+def _credential(
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+) -> TokenCredential:
+    """Return an injected credential or construct the configured operator login."""
 
-    On Windows ``az.cmd`` is slow to start, and a *cold* token for the Power BI /
-    Fabric audience can take ~90s (the deploy fetches both back to back; warm
-    calls are ~1s). 120s absorbs the cold-start without making a genuinely-broken
-    ``az`` hang excessively. One credential is reused for both token requests.
-    """
-
-    from azure.identity import AzureCliCredential
-
-    return credential or AzureCliCredential(process_timeout=120)
+    return credential or build_credential(auth_mode)
 
 
-def _token(scope: str, credential: AzureCliCredential) -> str:
-    """Acquire an access token, retrying transient cold-``az`` auth failures.
-
-    A cold ``az account get-access-token`` (Power BI / Fabric audience) can time
-    out even with a generous process timeout; a retry usually succeeds once ``az``
-    has warmed up.
-    """
+def _token(scope: str, credential: TokenCredential) -> str:
+    """Acquire an access token, retrying transient operator-login failures."""
 
     from azure.core.exceptions import ClientAuthenticationError
 
@@ -205,7 +197,9 @@ def create_taskflow(
         "tasks": task_flow.get("tasks", []),
         "edges": task_flow.get("edges", []),
     }
-    response = pbi_session.post(url, json=body, headers={"Content-Type": "application/json"})
+    response = pbi_session.post(
+        url, json=body, headers={"Content-Type": "application/json"}
+    )
     response.raise_for_status()
     return response.status_code
 
@@ -214,7 +208,9 @@ def _guid_name_map(items: list[dict[str, Any]]) -> dict[str, str]:
     return {str(i["id"]): str(i.get("displayName", "")) for i in items}
 
 
-def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict[str, Any]:
+def to_portable(
+    task_flow: dict[str, Any], guid_to_name: dict[str, str]
+) -> dict[str, Any]:
     """Replace each item's GUID with its display name so the flow is workspace-agnostic.
 
     Items whose GUID can't be resolved to a name (deleted/stale references, or ids
@@ -227,7 +223,9 @@ def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict
     for task in portable.get("tasks", []):
         kept: list[dict[str, Any]] = []
         for item in task.get("items", []):
-            artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(":")
+            artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(
+                ":"
+            )
             name = guid_to_name.get(item.get("artifactObjectId") or guid)
             if name is None:
                 continue
@@ -271,15 +269,19 @@ def to_workspace(
 def export_taskflow(
     workspace: str,
     output_path: Path = DEFAULT_TASKFLOW_PATH,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
 ) -> Path:
     """Export a workspace task flow to a portable JSON file (artifacts by name)."""
 
-    credential = _credential(credential)
+    credential = _credential(credential, auth_mode=auth_mode)
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
-    workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(
-        fabric, workspace
+    workspace_id = (
+        workspace
+        if _looks_like_guid(workspace)
+        else find_workspace_id(fabric, workspace)
     )
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
@@ -297,16 +299,20 @@ def export_taskflow(
 def deploy_taskflow(
     workspace: str,
     input_path: Path = DEFAULT_TASKFLOW_PATH,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
 ) -> list[str]:
     """Deploy a portable task flow to a workspace. Returns unresolved references."""
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
-    credential = _credential(credential)
+    credential = _credential(credential, auth_mode=auth_mode)
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
-    workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(
-        fabric, workspace
+    workspace_id = (
+        workspace
+        if _looks_like_guid(workspace)
+        else find_workspace_id(fabric, workspace)
     )
     items = list_workspace_items(fabric, workspace_id)
     name_type_to_guid = {
@@ -332,13 +338,27 @@ def main() -> int:
     parser.add_argument("action", choices=["export", "deploy"])
     parser.add_argument("--workspace", required=True, help="Workspace name or id.")
     parser.add_argument("--path", type=Path, default=DEFAULT_TASKFLOW_PATH)
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default="azure_cli",
+        help="Operator credential used for Power BI and Fabric requests.",
+    )
     args = parser.parse_args()
 
     if args.action == "export":
-        out = export_taskflow(args.workspace, args.path)
+        out = export_taskflow(
+            args.workspace,
+            args.path,
+            auth_mode=args.auth_mode,
+        )
         console.info(f"Exported task flow to {out}")
     else:
-        unresolved = deploy_taskflow(args.workspace, args.path)
+        unresolved = deploy_taskflow(
+            args.workspace,
+            args.path,
+            auth_mode=args.auth_mode,
+        )
         console.info("Deployed task flow.")
         if unresolved:
             console.warn("Unresolved references (left unbound):")

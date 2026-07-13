@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,9 +41,7 @@ def test_find_pipeline_id_matches_display_name() -> None:
         def get(self, url: str, params: dict | None = None) -> _FakeResponse:
             return _FakeResponse()
 
-    assert (
-        run_pipeline.find_pipeline_id(_FakeSession(), "ws", "setup-pipeline") == "2"
-    )
+    assert run_pipeline.find_pipeline_id(_FakeSession(), "ws", "setup-pipeline") == "2"
 
 
 def test_find_pipeline_id_raises_when_missing() -> None:
@@ -59,3 +58,38 @@ def test_find_pipeline_id_raises_when_missing() -> None:
 
     with pytest.raises(ValueError, match="not found"):
         run_pipeline.find_pipeline_id(_FakeSession(), "ws", "setup-pipeline")
+
+
+def test_main_passes_selected_auth_mode_to_session(monkeypatch) -> None:
+    calls: dict[str, str] = {}
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline",
+            "--environment",
+            "dev",
+            "--pipeline",
+            "setup-pipeline",
+            "--auth-mode",
+            "azure_powershell",
+        ],
+    )
+    monkeypatch.setattr(run_pipeline, "workspace_id_from_outputs", lambda _env: "ws")
+
+    def fake_build_session(*, auth_mode: str):
+        calls["auth_mode"] = auth_mode
+        return object()
+
+    monkeypatch.setattr(run_pipeline, "build_session", fake_build_session)
+    monkeypatch.setattr(run_pipeline, "find_pipeline_id", lambda *_args: "pipeline-id")
+    monkeypatch.setattr(run_pipeline, "run_pipeline", lambda *_args: None)
+
+    try:
+        result = run_pipeline.main()
+    except SystemExit as exc:
+        pytest.fail(f"--auth-mode was not accepted: {exc}")
+
+    assert result == 0
+    assert calls["auth_mode"] == "azure_powershell"

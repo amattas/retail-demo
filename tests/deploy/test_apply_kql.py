@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+import sys
 from pathlib import Path
 
 import pytest
@@ -81,7 +83,9 @@ def test_resolve_kql_database_returns_uri_and_name(monkeypatch) -> None:
         def json(self) -> dict:
             return {
                 "displayName": "retail_kql",
-                "properties": {"queryServiceUri": "https://cluster.kusto.fabric.microsoft.com"},
+                "properties": {
+                    "queryServiceUri": "https://cluster.kusto.fabric.microsoft.com"
+                },
             }
 
     captured: dict[str, object] = {}
@@ -173,6 +177,82 @@ def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:
     assert calls["query_uri"] == "https://cluster"
     assert calls["database_name"] == "retail_kql"
     assert "ThrowOnErrors=true" in calls["script"]
+
+
+def test_apply_to_database_uses_selected_auth_mode(monkeypatch) -> None:
+    assert "auth_mode" in inspect.signature(apply_kql.apply_to_database).parameters
+    calls: dict[str, object] = {}
+    credential = object()
+
+    def fake_credential(provided=None, *, auth_mode: str):
+        calls["provided"] = provided
+        calls["auth_mode"] = auth_mode
+        return credential
+
+    monkeypatch.setattr(apply_kql, "_credential", fake_credential)
+    monkeypatch.setattr(
+        apply_kql,
+        "resolve_kql_database",
+        lambda *_args: ("https://cluster", "retail_kql"),
+    )
+
+    class _Response:
+        primary_results = [_FakeTable([])]
+
+    monkeypatch.setattr(
+        apply_kql,
+        "execute_database_script",
+        lambda *_args: _Response(),
+    )
+
+    apply_kql.apply_to_database(
+        script=".execute database script <| .show tables",
+        workspace_id="workspace-id",
+        kql_database_id="non-default-database-id",
+        auth_mode="azure_powershell",
+    )
+
+    assert calls == {"provided": None, "auth_mode": "azure_powershell"}
+
+
+def test_main_passes_selected_auth_mode(monkeypatch, tmp_path: Path) -> None:
+    output = tmp_path / "database.kql"
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "apply_kql",
+            "--execute",
+            "--workspace-id",
+            "workspace-id",
+            "--kql-database-id",
+            "database-id",
+            "--auth-mode",
+            "azure_powershell",
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(apply_kql, "collect_kql_scripts", lambda _source: [])
+    monkeypatch.setattr(
+        apply_kql,
+        "build_database_script",
+        lambda _scripts: ".execute database script <| .show tables",
+    )
+    monkeypatch.setattr(
+        apply_kql,
+        "apply_to_database",
+        lambda **kwargs: calls.update(kwargs) or 0,
+    )
+
+    try:
+        result = apply_kql.main()
+    except SystemExit as exc:
+        pytest.fail(f"--auth-mode was not accepted: {exc}")
+
+    assert result == 0
+    assert calls["auth_mode"] == "azure_powershell"
 
 
 def test_summarize_result_is_concise_on_success(capsys) -> None:
