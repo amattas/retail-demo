@@ -63,7 +63,7 @@
       "title": "Truck Dwell by Site (24h)",
       "type": "kql",
       "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
-      "query": "mv_truck_sla | where arrival_time > ago(24h) | extend site=iif(isnotnull(store_id), strcat('Store-', tostring(store_id)), strcat('DC-', tostring(dc_id))) | summarize avg_dwell_min=avg(dwell_seconds)/60.0 by site | top 10 by avg_dwell_min desc"
+      "query": "fn_truck_sla() | where arrival_time > ago(24h) | summarize avg_dwell_min=avg(dwell_minutes) by site | top 10 by avg_dwell_min desc"
     }
   ]
 }

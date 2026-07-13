@@ -96,10 +96,20 @@ Silver mappings are separately implemented in
 the historical contract is documented in
 [Fabric analytics](../analytics/fabric-analytics.md).
 
+## Truck lifecycle
+
+`truck_arrived` and `truck_departed` share `truck_id`, `dc_id`, `store_id`, and
+`shipment_id`. The departure payload and envelope timestamp are later than the
+arrival timestamp. Normal dwell is a deterministic 30-75 minutes; every fifth
+eligible logistics value takes the deterministic 120-minute late path, above the
+90-minute rule threshold.
+
+Silver joins the two event tables on all four lifecycle keys and writes one
+completed `fact_truck_moves` row. Eventhouse and Gold expose dwell in minutes
+with `STORE_<id>` / `DC_<id>` site labels.
+
 ## Known scenario defects
 
-- Arrival and departure timing does not yet support a trustworthy truck-dwell
-  story (`IMP-006`).
 - Campaign/purchase linkage and promotion financial reconciliation are not yet
   trustworthy (`IMP-007`).
 - One shared event/table manifest and fixture suite are still required

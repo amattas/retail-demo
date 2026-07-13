@@ -45,6 +45,12 @@ The Eventhouse shortcut path is optional for incremental live projection.
 watermarks in `ag._watermarks`, appends transformed output, then advances the
 watermark.
 
+Truck arrival/departure is handled as one lifecycle: Silver joins the two
+sources on truck, distribution center, store, and shipment before appending a
+completed `fact_truck_moves` row. It scans the retained truck sources and
+anti-joins completed Silver lifecycle keys so delayed counterparts are not lost
+behind a watermark.
+
 Known divergences:
 
 - `inventory_updated` populates store inventory transactions with incomplete

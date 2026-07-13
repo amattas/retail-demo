@@ -26,21 +26,33 @@
 // ============================================================================
 
 // NOTE: Materialized views don't support joins. Use this function instead.
-// Validates dwell time by filtering:
-//   - Unmatched arrivals (no corresponding departure)
-//   - Invalid records where departure_time < arrival_time (data quality issue)
+// One row per completed lifecycle. Dwell is reported in seconds and minutes;
+// site labels match Lakehouse Gold (STORE_<id> / DC_<id>).
 .create-or-alter function with (folder = "kpis") fn_truck_sla()
 {
     truck_arrived
-    | project truck_id, dc_id, store_id, shipment_id, arrival_time, trace_id
-    | join kind=leftouter (
+    | summarize arg_min(arrival_time, *) by truck_id, dc_id, store_id, shipment_id
+    | project truck_id, dc_id, store_id, shipment_id, arrival_time,
+              arrival_ingest_timestamp = ingest_timestamp,
+              arrival_trace_id = trace_id
+    | join kind=inner (
         truck_departed
-        | project truck_id, dc_id, store_id, shipment_id, departure_time
+        | summarize arg_max(departure_time, *) by truck_id, dc_id, store_id, shipment_id
+        | project truck_id, dc_id, store_id, shipment_id, departure_time,
+                  departure_ingest_timestamp = ingest_timestamp,
+                  departure_trace_id = trace_id,
+                  actual_unload_duration
     ) on truck_id, dc_id, store_id, shipment_id
-    | extend dwell_seconds = iif(
-        isnotnull(departure_time) and datetime_diff('second', departure_time, arrival_time) >= 0,
-        toreal(datetime_diff('second', departure_time, arrival_time)),
-        real(null)
-      )
-    | where isnotnull(dwell_seconds)  // Filter out unmatched arrivals and negative dwell times
+    | extend dwell_seconds = datetime_diff('second', departure_time, arrival_time)
+    | where dwell_seconds > 0
+    | extend dwell_minutes = toreal(dwell_seconds) / 60.0,
+             site = iif(
+                 isnotnull(store_id),
+                 strcat('STORE_', tostring(store_id)),
+                 strcat('DC_', tostring(dc_id))
+             )
+    | project truck_id, dc_id, store_id, shipment_id, site,
+              arrival_time, departure_time, dwell_seconds, dwell_minutes,
+              actual_unload_duration, arrival_ingest_timestamp,
+              departure_ingest_timestamp, arrival_trace_id, departure_trace_id
 }
