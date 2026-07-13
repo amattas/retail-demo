@@ -7,8 +7,12 @@
 - Pinned dependency: `requirements-docs.txt`
 - Generated output: `site/`
 - Publish branch: `gh-pages`
+- Version selection: `scripts/docs_versioning.py`
+- Version publisher: `scripts/publish_versioned_docs.py`
 
-`website/` and Docusaurus are retired and must not return as a parallel source.
+`website/` and Docusaurus are retired and must not return as a parallel current
+source. The version publisher may read their documentation from immutable
+historical tags when reconstructing an archived release.
 
 ## Information architecture
 
@@ -29,6 +33,10 @@ Docusaurus-only metadata.
 Task-focused user documentation remains under `docs/guides/`. Normative
 technical material remains under `docs/design/` so implementation detail does
 not dominate the primary user journey.
+
+Top-level navigation groups remain collapsible. Do not enable
+`navigation.sections`, which renders them as persistent sidebar groups on
+desktop.
 
 ## Owner rules
 
@@ -59,19 +67,58 @@ python -m zensical build --clean
 ```
 
 The build must succeed with no missing nav target or broken internal link.
+Generated output is written to the ignored `site/` directory.
+
+For a local preview:
+
+```powershell
+python -m zensical serve
+```
+
+## Maintainer checklist
+
+1. Update the canonical owner and all derived links in the same change.
+2. Preserve stable requirement, threat, control, improvement, and enhancement
+   IDs.
+3. Keep module backlogs limited to `Open` and `Settled - do not reopen`.
+4. Use Mermaid for diagrams.
+5. Run `python -m zensical build --clean`.
+6. Check for broken links, missing navigation targets, stale `website/`
+   references, and dated plans that still own durable content.
 
 ## Publishing workflow
 
 `.github/workflows/docs.yml`:
 
 - triggers from canonical docs/config changes;
+- fetches `main` plus the complete tag history;
 - checks out with an immutable action SHA;
-- installs Python and the pinned Zensical package;
-- builds `site/`;
-- pushes `site/` to an orphan `gh-pages` branch with an immutable action SHA;
+- installs Python, pinned Zensical, and the commit-pinned Zensical `mike` fork;
+- rebuilds the orphan `gh-pages` branch through `mike`;
 - uses `contents: write`;
 - does not request Pages OIDC permissions;
 - does not use Pages artifact deployment actions.
+
+## Published versions
+
+The version selector contains:
+
+- `main`, displayed as **Latest** and published at `/latest/`;
+- one entry for each stable SemVer `major.minor` line that has tags;
+- the highest numeric patch revision in each line, displayed as the normalized
+  `major.minor.patch` value and published at `/major.minor/`.
+
+Tags may use an optional `v` prefix. Pre-release tags and non-SemVer tags are
+excluded. Historical pages are built from the selected tag's own documentation
+source. The publisher supports the repository's previous MkDocs and Docusaurus
+layouts so older release entries do not substitute current documentation.
+
+Every publication reconstructs the generated branch from the currently tagged
+version set. The root page redirects to **Latest**.
+
+Pull-request CI builds the current site and the complete version set without
+pushing, so tag selection, legacy-source compatibility, and selector metadata
+fail before publication.
 
 ## External Pages setting
 

@@ -55,6 +55,7 @@ verification evidence are exact.
 | `REQ-DOCS-003` | `verified` | [Documentation site](../specifications/modules/documentation/site.md) | `zensical.toml`; `requirements-docs.txt` | `python -m zensical build --clean` reports no issues |
 | `REQ-DOCS-004` | `implemented` | [Documentation site](../specifications/modules/documentation/site.md) | Reconciled canonical pages and README entry points | Generated inventory/docs-contract automation remains `IMP-015` |
 | `REQ-PUBLISH-001` | `blocked` | [Documentation site](../specifications/modules/documentation/site.md) | `.github/workflows/docs.yml` pushes `site/` to `gh-pages` | Repository Pages source must be changed from GitHub Actions to `gh-pages` root, then workflow run verified |
+| `REQ-PUBLISH-002` | `implemented` | [Documentation site](../specifications/modules/documentation/site.md) | `scripts/docs_versioning.py`; `scripts/publish_versioned_docs.py`; Zensical `mike` provider; full-history docs workflow | Local multi-version build and selector metadata test |
 
 ## Threats
 

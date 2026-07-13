@@ -53,3 +53,31 @@ jobs:
           python -m pytest tests/deploy tests/scripts/test_workflow_references.py -q
         env:
           PYTHONPATH: .
+
+  docs-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+
+      - name: Install documentation tools
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-docs.txt
+          python -m pip install pytest pyyaml
+
+      - name: Test version selection
+        run: python -m pytest tests/scripts/test_publish_versioned_docs.py -q
+
+      - name: Build current and versioned documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m zensical build --clean
+          python scripts/publish_versioned_docs.py --branch docs-version-ci

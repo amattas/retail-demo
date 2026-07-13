@@ -42,6 +42,3 @@ under [Design Documentation](design/README.md):
 - [Specifications](design/specifications/README.md) own exact interfaces and workflows.
 - [Architecture](design/architecture/overview.md) owns current components and data flow.
 - [Security](design/security/threat-model.md) owns threats and controls.
-
-Generated site output is published from `site/` to the `gh-pages` branch. See
-[documentation operations](guides/documentation.md).
