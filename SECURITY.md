@@ -36,5 +36,5 @@ semantic models, ontologies, or data agents.
 Never commit secrets. Use Azure sign-in, GitHub Actions secrets, environment
 variables, Key Vault, or ignored local configuration.
 
-See the canonical [threat model](docs/security/threat-model.md) and
-[security controls](docs/security/controls.md).
+See the canonical [threat model](docs/design/security/threat-model.md) and
+[security controls](docs/design/security/controls.md).

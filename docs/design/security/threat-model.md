@@ -1,6 +1,6 @@
 # Threat model
 
-This document owns the security threats for the Retail Fabric RTI demo. The
+This document owns the security threats for the Microsoft Fabric Retail Demo. The
 related controls are defined in [controls.md](controls.md), and implementation
 evidence is tracked in
 [requirements traceability](../requirements/traceability.md).

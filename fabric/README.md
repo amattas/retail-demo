@@ -16,5 +16,5 @@ or template assets.
 | `taskflow/` | Portable workspace task-flow definition |
 
 The historical setup notebooks are rendered from `utility/`, not authored in
-this directory. See the [architecture overview](../docs/architecture/overview.md)
-and [deployment specification](../docs/specifications/modules/deployment/framework.md).
+this directory. See the [architecture overview](../docs/design/architecture/overview.md)
+and [deployment specification](../docs/design/specifications/modules/deployment/framework.md).

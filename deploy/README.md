@@ -41,6 +41,6 @@ rule source files are not yet guaranteed publishable workspace items.
 - Secrets must come from identity, environment variables, a secret store, or
   ignored local files.
 
-See the [deployment specification](../docs/specifications/modules/deployment/framework.md),
+See the [deployment specification](../docs/design/specifications/modules/deployment/framework.md),
 [operations guide](../docs/guides/operations.md), and
-[deployment backlog](../docs/requirements/modules/deployment/backlog.md).
+[deployment backlog](../docs/design/requirements/modules/deployment/backlog.md).

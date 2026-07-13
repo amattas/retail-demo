@@ -36,18 +36,18 @@ recent minute bucket.
 The following surfaces are not part of these reproducible core journeys:
 
 - Dashboard templates require validated import and binding
-  ([ENH-001](../requirements/modules/analytics/backlog.md#enh-001)).
+  ([ENH-001](../design/requirements/modules/analytics/backlog.md#enh-001)).
 - Ontology and agent experiences require their capability, source, and access
   gates; the journeys do not depend on conversational answers.
 - ML output remains optional until its trust gates pass
-  ([IMP-008](../requirements/modules/ml-ai/backlog.md#imp-008)).
+  ([IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)).
 - Pricing actions and writeback remain optional
-  ([ENH-002](../requirements/modules/power-bi/backlog.md#enh-002)).
+  ([ENH-002](../design/requirements/modules/power-bi/backlog.md#enh-002)).
 - Recent inventory and stockout events are signals, not unresolved
   current-state KPIs
-  ([IMP-009](../requirements/modules/power-bi/backlog.md#imp-009)).
+  ([IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)).
 - Marketing attribution remains limited
-  ([IMP-007](../requirements/modules/streaming/backlog.md#imp-007)).
+  ([IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)).
 - Truck dwell is unavailable as a supported proof point until
   [issue #317](https://github.com/amattas/retail-demo/issues/317) is completed.
 

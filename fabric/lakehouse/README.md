@@ -22,6 +22,6 @@ Notable groups in this directory:
 - `30-create-ontology`: ontology creation and Eventhouse TimeSeries bindings
 - `90` and `99`: manual augmentation/reset utilities
 
-See the [historical data contract](../../docs/specifications/modules/generation/data-contract.md),
-[Fabric analytics specification](../../docs/specifications/modules/analytics/fabric-analytics.md),
-and [data flow](../../docs/architecture/data-flow.md).
+See the [historical data contract](../../docs/design/specifications/modules/generation/data-contract.md),
+[Fabric analytics specification](../../docs/design/specifications/modules/analytics/fabric-analytics.md),
+and [data flow](../../docs/design/architecture/data-flow.md).

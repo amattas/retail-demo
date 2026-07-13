@@ -25,4 +25,4 @@ tenant, and optionally deploys.
 
 See [getting started](../docs/guides/getting-started.md),
 [operations](../docs/guides/operations.md), and the
-[semantic-model specification](../docs/specifications/modules/power-bi/semantic-model.md).
+[semantic-model specification](../docs/design/specifications/modules/power-bi/semantic-model.md).

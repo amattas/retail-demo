@@ -64,9 +64,7 @@ Kusto connector.
 - [Getting started](docs/guides/getting-started.md)
 - [Demo script](docs/guides/demo-script.md)
 - [Operations](docs/guides/operations.md)
-- [Architecture](docs/architecture/overview.md)
-- [Specifications](docs/specifications/README.md)
-- [Requirements and backlogs](docs/requirements/README.md)
+- [Design documentation](docs/design/README.md)
 - [Security](SECURITY.md)
 - [Improvement index](IMPROVEMENTS.md)
 

@@ -19,6 +19,7 @@ python -m zensical serve
 
 ## Ownership
 
+- Design documentation is grouped under `docs/design/`.
 - Requirements own outcomes, stable IDs, acceptance criteria, and backlogs.
 - Specifications own exact interfaces, mappings, workflows, and errors.
 - Architecture owns current components, boundaries, dependencies, and flow.
@@ -47,7 +48,7 @@ One repository setting remains external to the workflow:
 
 Until that setting is changed and the first workflow succeeds,
 `REQ-PUBLISH-001` remains
-[blocked](../requirements/traceability.md#requirements).
+[blocked](../design/requirements/traceability.md#requirements).
 
 ## Change checklist
 

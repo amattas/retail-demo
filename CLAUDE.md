@@ -6,7 +6,7 @@ This file defines how Claude orchestrates subagents and skills for the SDLC in t
 
 ## Project: Retail Demo
 
-Microsoft Fabric Real-Time Intelligence demo powered by synthetic data generation.
+Microsoft Fabric retail demo powered by synthetic data generation.
 
 ### Key Components
 - **utility**: Fabric-native `retail-setup` utility (CLI: configure/render/deploy) and setup notebooks that generate synthetic retail data directly in Fabric Spark (active path)

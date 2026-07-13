@@ -17,5 +17,5 @@ Ontology creation occurs at the end of the asynchronous setup pipeline, after
 the deploy task-flow step. Re-run the deploy command above after the pipeline if
 the ontology node is not linked.
 
-See the [deployment specification](../../docs/specifications/modules/deployment/framework.md)
-and [infrastructure architecture](../../docs/architecture/infrastructure.md).
+See the [deployment specification](../../docs/design/specifications/modules/deployment/framework.md)
+and [infrastructure architecture](../../docs/design/architecture/infrastructure.md).

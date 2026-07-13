@@ -12,6 +12,6 @@ Pipeline definitions use Fabric Git item format and are published through
 `fabric-cicd` when all referenced notebooks are staged. The Eventhouse KQL
 schema is applied separately by the local deploy process.
 
-See the [deployment specification](../../docs/specifications/modules/deployment/framework.md),
-[operations specification](../../docs/specifications/modules/operations/runbook.md),
-and [infrastructure architecture](../../docs/architecture/infrastructure.md).
+See the [deployment specification](../../docs/design/specifications/modules/deployment/framework.md),
+[operations specification](../../docs/design/specifications/modules/operations/runbook.md),
+and [infrastructure architecture](../../docs/design/architecture/infrastructure.md).

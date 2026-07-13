@@ -28,11 +28,11 @@ notebook is optional and runs separately.
 ## Contract owners
 
 - CLI and render behavior:
-  [setup specification](../docs/specifications/modules/setup/cli.md)
+  [setup specification](../docs/design/specifications/modules/setup/cli.md)
 - Historical tables:
-  [data contract](../docs/specifications/modules/generation/data-contract.md)
+  [data contract](../docs/design/specifications/modules/generation/data-contract.md)
 - Live events:
-  [event contract](../docs/specifications/modules/streaming/event-contract.md)
+  [event contract](../docs/design/specifications/modules/streaming/event-contract.md)
 - Supported operator path:
   [getting started](../docs/guides/getting-started.md)
 

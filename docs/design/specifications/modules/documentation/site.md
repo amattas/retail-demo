@@ -16,14 +16,19 @@ Navigation is explicit in `zensical.toml`:
 
 1. Home
 2. Guides
-3. Requirements
-4. Specifications
-5. Architecture
-6. Security
+3. Design Documentation
+   - Requirements
+   - Specifications
+   - Architecture
+   - Security
 
 All nav targets must exist. Canonical Markdown uses relative links, Mermaid
 diagrams, and Zensical-compatible Markdown rather than MDX/React or
 Docusaurus-only metadata.
+
+Task-focused user documentation remains under `docs/guides/`. Normative
+technical material remains under `docs/design/` so implementation detail does
+not dominate the primary user journey.
 
 ## Owner rules
 

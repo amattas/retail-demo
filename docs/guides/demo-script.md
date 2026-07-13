@@ -4,6 +4,9 @@
 **Duration:** 15-20 minutes  
 **Data:** Synthetic
 
+For a browser-first tour of the deployed workspace, use the
+[deployed solution walkthrough](deployed-walkthrough.md).
+
 For a standalone 5-7 minute persona walkthrough, use the
 [presenter journeys](presenter-journeys.md) for retail operations,
 merchandising, or executive/analytics audiences.
@@ -19,7 +22,7 @@ merchandising, or executive/analytics audiences.
 
 ## 1. Frame the architecture
 
-Open the [architecture overview](../architecture/overview.md).
+Open the [architecture overview](../design/architecture/overview.md).
 
 Talk track:
 
@@ -89,16 +92,16 @@ predictive pages as supported output.
 If a validated pricing approval or alert scenario is available, show it as an
 optional governed action. Otherwise, describe it from the owning backlog:
 
-- [RTI dashboards and Activator](../requirements/modules/analytics/backlog.md#enh-001)
-- [Closed-loop pricing](../requirements/modules/power-bi/backlog.md#enh-002)
+- [RTI dashboards and Activator](../design/requirements/modules/analytics/backlog.md#enh-001)
+- [Closed-loop pricing](../design/requirements/modules/power-bi/backlog.md#enh-002)
 
 ## Do not overclaim
 
 Avoid using these as headline proof points without the stated qualification:
 
 - Truck dwell is implemented in source under
-  [IMP-006](../requirements/modules/streaming/backlog.md#imp-006), but do not
+  [IMP-006](../design/requirements/modules/streaming/backlog.md#imp-006), but do not
   present it as live-validated until a Fabric smoke run has been recorded.
-- Marketing attribution and ROAS: [IMP-007](../requirements/modules/streaming/backlog.md#imp-007)
-- Unresolved/current-state KPIs: [IMP-009](../requirements/modules/power-bi/backlog.md#imp-009)
-- Ungated ML output: [IMP-008](../requirements/modules/ml-ai/backlog.md#imp-008)
+- Marketing attribution and ROAS: [IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)
+- Unresolved/current-state KPIs: [IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)
+- Ungated ML output: [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)
