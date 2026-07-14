@@ -29,7 +29,7 @@
 - **Outcome:** Every prediction includes model lineage, intended-use limits,
   feature evidence, calibration, and prediction-versus-outcome diagnostics.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - ML outputs are not assumed to exist in a core deployment.
 - Ontology and other preview-dependent automation require capability preflight.

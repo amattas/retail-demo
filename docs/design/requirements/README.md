@@ -44,7 +44,7 @@ Only these states are allowed:
 Each module has one requirements page and one backlog. A backlog contains only:
 
 - `## Open`
-- `## Settled - do not reopen`
+- `## Settled — do not reopen`
 
 Completed-work histories do not belong in backlogs. Git history and
 [traceability.md](traceability.md) retain completion evidence.

@@ -9,6 +9,11 @@
 
 The shell wrappers converge on the Python guided setup.
 
+The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
+editable utility plus `azure-identity`, `azure-kusto-data`, and `fabric-cicd`.
+The lower-level deploy framework supports Azure PowerShell, but the guided
+prerequisite check still expects Azure CLI.
+
 ## `configure`
 
 `retail-setup configure --env <name>` writes:
@@ -16,6 +21,9 @@ The shell wrappers converge on the Python guided setup.
 - `deploy/config/deploy.yml`
 - `deploy/config/environments/<name>.yml`
 - ignored `utility/config.yaml`
+
+The two deployment YAML files are tracked and can become modified by local
+configuration. They are reviewable inputs, not secret stores.
 
 The active non-interactive inputs include:
 
@@ -76,6 +84,11 @@ plan, deploys the task flow, and can start `setup-pipeline`.
 
 `setup-pipeline` runs asynchronously and currently includes setup notebooks,
 ML notebooks 06 through 14, and ontology creation.
+
+`--yes` pre-confirms Terraform apply but suppresses the interactive
+setup-pipeline prompt. `--skip-terraform` requires accurate prior Terraform
+outputs for downstream workspace and KQL identifiers. `--recreate` uses a
+fixed 90-second wait between destroy and apply.
 
 ## Output behavior
 

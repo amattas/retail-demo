@@ -49,7 +49,8 @@ Truck arrival/departure is handled as one lifecycle: Silver joins the two
 sources on truck, distribution center, store, and shipment before appending a
 completed `fact_truck_moves` row. It scans the retained truck sources and
 anti-joins completed Silver lifecycle keys so delayed counterparts are not lost
-behind a watermark.
+behind a watermark. `tests/test_truck_dwell_contract.py` verifies the
+cross-layer source contract; live Fabric execution remains a separate gate.
 
 Known divergences:
 

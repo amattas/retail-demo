@@ -19,11 +19,15 @@ The supported repository path is:
 | `deploy/config/environments/<env>.yml` | Environment overlay |
 | `utility/config.yaml` | Ignored local generation configuration |
 | `utility/out/` | Rendered notebooks |
-| `deploy/.generated/<env>/` | Generated deployment config, outputs, and KQL |
+| `deploy/terraform/environments/<env>.tfvars` | Generated, tracked Terraform input |
+| `deploy/fabric-cicd/config.yml` | Generated, tracked publication configuration |
+| `deploy/fabric-cicd/parameter.yml` | Generated, tracked binding rewrites |
+| `deploy/.generated/<env>/` | Ignored live Terraform outputs and combined KQL |
 | `deploy/workspace/` | Generated Fabric item staging |
 
-Environment selection must be explicit. Generated and local files are not
-durable sources of truth.
+Environment selection must be explicit. Generated tracked files are reviewable
+templates, not authoritative target state. Ignored generated and local files
+are not durable sources of truth.
 
 ## Time and determinism
 

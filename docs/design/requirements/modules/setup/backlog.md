@@ -13,7 +13,7 @@
   [presenter guide](../../../../guides/presenter-journeys.md). The deployment
   presets, measured runtimes, and preset-specific asset controls remain open.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - `retail-setup` is the supported setup path.
 - Historical range input is `--months`; explicit public

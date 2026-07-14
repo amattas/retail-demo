@@ -7,10 +7,11 @@ engine, notebook templates, dictionaries, and tests.
 
 ```powershell
 python -m pip install -e .\utility
+python -m pip install azure-identity azure-kusto-data fabric-cicd
 retail-setup configure --env dev --months 3 --store-count 50 --seed 42
 retail-setup render --env dev
 retail-setup deploy --env dev --dry-run
-retail-setup deploy --env dev --yes
+retail-setup deploy --env dev
 ```
 
 `configure` writes ignored local generation settings and target deployment
@@ -35,6 +36,8 @@ notebook is optional and runs separately.
   [event contract](../docs/design/specifications/modules/streaming/event-contract.md)
 - Supported operator path:
   [getting started](../docs/guides/getting-started.md)
+- Deployment modes and recovery:
+  [deployment guide](../docs/guides/deployment.md)
 
 The authoritative base table schema is
 `src/retail_setup/generation/schemas.py`. The authoritative live payload mapping

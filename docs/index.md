@@ -8,6 +8,7 @@ serves analytics through KQL, Power BI, ontology, and data-agent surfaces.
 ## Start here
 
 - [Set up a workspace](guides/getting-started.md)
+- [Deploy and update a workspace](guides/deployment.md)
 - [Tour a deployed workspace](guides/deployed-walkthrough.md)
 - [Present the demo](guides/demo-script.md)
 - [Choose a use case](guides/use-cases.md)

@@ -23,7 +23,7 @@
   keyboard/mobile support, contrast, culture, currency, and forecast confidence
   are intentionally designed.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - The active semantic model is Direct Lake, not a documented KQL/Lakehouse
   hybrid.

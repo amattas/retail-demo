@@ -18,7 +18,7 @@
 - **Acceptance:** Broad-use users and agents cannot retrieve row-level
   identity-like fields without an intentional privileged path.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Synthetic identity-like data is sensitive demo data, not "no-risk" data.
 - Secrets are supplied through identity, secret stores, environment variables,

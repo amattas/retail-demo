@@ -47,7 +47,7 @@ desktop.
 - Guides: derived user procedures.
 - Root/component READMEs: concise local entry points and links.
 
-Module backlogs contain only `Open` and `Settled - do not reopen`.
+Module backlogs contain only `Open` and `Settled — do not reopen`.
 
 ## Temporary artifacts
 
@@ -110,8 +110,9 @@ The version selector contains:
 
 Tags may use an optional `v` prefix. Pre-release tags and non-SemVer tags are
 excluded. Historical pages are built from the selected tag's own documentation
-source. The publisher supports the repository's previous MkDocs and Docusaurus
-layouts so older release entries do not substitute current documentation.
+source. Current pages always build with Zensical. Historical compatibility can
+read the repository's previous MkDocs and Docusaurus layouts so older release
+entries do not substitute current documentation.
 
 Every publication reconstructs the generated branch from the currently tagged
 version set. The root page redirects to **Latest**.
@@ -122,12 +123,13 @@ fail before publication.
 
 ## External Pages setting
 
-GitHub repository settings must select:
+GitHub repository settings currently select:
 
 - Source: **Deploy from a branch**
 - Branch: `gh-pages`
 - Folder: `/ (root)`
 
-The workflow cannot prove this external setting from source. Track it as a
-blocked publishing requirement until the branch is created and the site URL is
-verified.
+GitHub reports the site as built, the root redirects to `/latest/`, and the
+published selector metadata contains **Latest** plus the selected stable minor
+lines. Recheck the Pages API, the latest Docs workflow run, and the live site
+after changing the workflow, branch, or repository Pages settings.

@@ -78,12 +78,20 @@ identity.
 ## External dependencies
 
 - Microsoft Fabric tenant and capacity
-- Terraform
-- Azure CLI or Azure PowerShell
+- Terraform 1.8 or later, below 2.0
+- Azure CLI for guided setup; Azure CLI or Azure PowerShell for direct deploy
 - `fabric-cicd`
 - `azure-identity`
 - `azure-kusto-data`
 - Fabric Spark and Spark Kusto connector
+
+## Local deployment state
+
+Merged configuration generates tracked Terraform and `fabric-cicd` inputs plus
+ignored live outputs and staged item folders. Local Terraform state remains in
+one checkout-level location and is not isolated per environment. Concurrent or
+interleaved dev/test/prod deployment from one checkout is therefore outside the
+current safe operating boundary.
 
 ## Current constraints
 

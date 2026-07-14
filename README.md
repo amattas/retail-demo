@@ -11,7 +11,9 @@ Prerequisites:
 - Microsoft Fabric tenant, capacity, and workspace permissions
 - Git
 - Python 3.11 or later
-- Terraform and Azure CLI or Azure PowerShell for automated deployment
+- Terraform 1.8 or later, below 2.0
+- Azure CLI for the guided bootstrap; Azure CLI or Azure PowerShell for the
+  lower-level deployment framework
 
 Run the guided bootstrap:
 
@@ -38,6 +40,7 @@ For a manually managed Python environment:
 
 ```powershell
 python -m pip install -e .\utility
+python -m pip install azure-identity azure-kusto-data fabric-cicd
 retail-setup configure --env dev --months 3 --store-count 50 --seed 42
 retail-setup render --env dev
 retail-setup deploy --env dev --dry-run
@@ -46,6 +49,9 @@ retail-setup deploy --env dev --yes
 
 Rendering produces five workspace-specific notebooks in `utility\out\`:
 setup 01 through 04 and `stream-events.ipynb`.
+
+`--yes` pre-confirms the Terraform apply gate but does not start the setup
+pipeline. Run setup notebooks 01-04 or trigger `setup-pipeline` after deploy.
 
 ## What is deployed
 
@@ -62,6 +68,7 @@ Kusto connector.
 ## Documentation
 
 - [Getting started](docs/guides/getting-started.md)
+- [Deployment](docs/guides/deployment.md)
 - [Demo script](docs/guides/demo-script.md)
 - [Operations](docs/guides/operations.md)
 - [Design documentation](docs/design/README.md)

@@ -18,20 +18,8 @@
 - **Acceptance:** One deterministic scenario traces impression to purchase and
   balances all financial totals.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Direct Eventhouse ingestion is the supported live architecture.
 - The removed Kafka/Eventstream custom-endpoint design is not a future default.
 - Event field names must be read from source schemas rather than inferred.
-
-## Implemented
-
-### IMP-006 - Repair the truck dwell story end to end {#imp-006}
-
-- **State:** Implemented in source; live Fabric smoke validation has not been
-  performed as part of this change.
-- **Evidence:** The stream generator emits paired lifecycle keys with positive
-  dwell and a deterministic 120-minute late path. Silver joins arrival and
-  departure before writing `fact_truck_moves`; Gold, `fn_truck_sla()`, the
-  truck-dwell queryset/dashboard, and the 90-minute rule share keys, site labels,
-  and minute units. Cross-layer contract tests cover these mappings.

@@ -19,7 +19,35 @@ flowchart LR
 ```
 
 The current CLI applies Terraform directly; it does not insert a separate
-interactive `terraform plan` step.
+interactive `terraform plan` step. The CLI confirmation occurs before apply;
+Terraform then prints its change preview and proceeds with `-auto-approve`.
+
+## Command modes
+
+| Mode | Exact behavior |
+| --- | --- |
+| `--dry-run` | Prints the command plan without authentication, subprocess execution, or live target validation. |
+| `--yes` | Pre-confirms gated Terraform steps and suppresses the post-deploy setup-pipeline prompt. |
+| `--skip-terraform` | Omits Terraform steps; downstream helpers still require accurate prior outputs. |
+| `--recreate` | Runs destroy, waits 90 seconds, then applies and publishes. |
+
+`--recreate` and `--skip-terraform` are mutually exclusive. A normal
+interactive run detects an existing workspace by display name and offers
+update-in-place or recreate. `--yes` skips that prompt.
+
+## Generated files
+
+| Path | Role | Tracked |
+| --- | --- | --- |
+| `deploy/terraform/environments/<env>.tfvars` | Terraform input rendered from merged YAML | Yes |
+| `deploy/fabric-cicd/config.yml` | Publication environment and item scope | Yes |
+| `deploy/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Yes |
+| `deploy/.generated/<env>/terraform-output.json` | Captured live identifiers | No |
+| `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | No |
+| `deploy/workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
+
+Tracked generated files are reviewable templates and may change during local
+configure/deploy. They do not replace live target verification.
 
 ## Current notebook groups
 
@@ -107,6 +135,8 @@ that is not a stable public source-control item contract.
 - Task-flow deployment currently reports an error and continues.
 - Setup-pipeline trigger retries, then prints a manual fallback.
 - Recreate currently uses a fixed wait after destroy.
+- Local deployment validation checks generated files only; it does not query
+  live item, binding, run, or data readiness.
 
 The required fail-fast, replay-safe, and deletion-polling behavior is owned by
 [IMP-002](../../../requirements/modules/operations/backlog.md#imp-002).
