@@ -67,8 +67,9 @@ or use checked-in queryset tabs for:
 - Store presence and zone dwell.
 
 Be precise: recent stockout detections are not the same as unresolved current
-stockout state. Truck dwell is not a supported proof point until
-[issue #317](https://github.com/amattas/retail-demo/issues/317) is completed.
+stockout state. Truck dwell is implemented and covered by cross-layer contract
+tests, but present it only after a bounded live run produces recent
+`fn_truck_sla()` rows in the selected workspace.
 
 ## 4. Show durable history
 
@@ -99,9 +100,10 @@ optional governed action. Otherwise, describe it from the owning backlog:
 
 Avoid using these as headline proof points without the stated qualification:
 
-- Truck dwell is implemented in source under
-  [IMP-006](../design/requirements/modules/streaming/backlog.md#imp-006), but do not
-  present it as live-validated until a Fabric smoke run has been recorded.
+- Truck dwell behavior is owned by the
+  [event contract](../design/specifications/modules/streaming/event-contract.md#truck-lifecycle);
+  do not present it as live-validated until a Fabric smoke run has been
+  recorded.
 - Marketing attribution and ROAS: [IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)
 - Unresolved/current-state KPIs: [IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)
 - Ungated ML output: [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)

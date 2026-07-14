@@ -33,7 +33,7 @@
   governance, catalog, labels, and Purview/DLP touchpoints are part of the
   operator story.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Prefer Fabric-native monitoring where it provides the required signal.
 - Run history and failures are evidence, not disposable console output.

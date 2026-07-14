@@ -10,7 +10,7 @@
 - **Acceptance:** Stockout, truck SLA, and pricing scenarios can be reset and
   triggered predictably from a selected profile.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Eventhouse owns the hot event path and KQL aggregations.
 - Lakehouse owns durable Silver/Gold history and Direct Lake consumption.

@@ -15,7 +15,7 @@ Security controls use the states defined by
 | `SEC-007` | `accepted` | Pin privileged actions, plugins, providers, and dependency sets to reviewed immutable versions. | `.github/workflows/docs.yml`; `requirements-docs.txt`; `IMP-003` | Repository-wide workflow and dependency audit. |
 | `SEC-008` | `accepted` | Retain deployment, pipeline, watermark, ingestion, model, and alert evidence with actionable failure signals. | Fabric monitoring surfaces; `setup_run_log`; `ag._watermarks` | Post-deploy readiness and freshness checks. |
 | `SEC-009` | `accepted` | Isolate environments and require explicit confirmation and target validation for destructive operations. | Environment files; deploy dry-run and recreate flows | Separate state tests and wrong-target negative tests. |
-| `SEC-010` | `implemented` | Publish only reviewed current Markdown from `docs/` and documentation captured in immutable SemVer tags; exclude temporary plans and generated source artifacts. | `zensical.toml`; `.github/workflows/docs.yml`; `scripts/docs_versioning.py` | Successful multi-version build and inspection of `gh-pages`. |
+| `SEC-010` | `verified` | Publish only reviewed current Markdown from `docs/` and documentation captured in immutable SemVer tags; exclude temporary plans and generated source artifacts. | `zensical.toml`; `.github/workflows/docs.yml`; `scripts/docs_versioning.py` | Successful Docs workflow run, `gh-pages` branch inspection, and live `/latest/` plus `versions.json` inspection. |
 | `SEC-011` | `proposed` | Fail closed for required writes and preserve failed payloads or replay evidence before advancing progress. | `IMP-002` | Injected-failure tests for streaming, transforms, and deployment. |
 
 ## Minimum deployment baseline

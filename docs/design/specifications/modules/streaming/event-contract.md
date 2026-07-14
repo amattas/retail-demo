@@ -108,6 +108,11 @@ Silver joins the two event tables on all four lifecycle keys and writes one
 completed `fact_truck_moves` row. Eventhouse and Gold expose dwell in minutes
 with `STORE_<id>` / `DC_<id>` site labels.
 
+`tests/test_truck_dwell_contract.py` verifies the generator, rendered stream
+notebook, KQL table/function contract, Silver join, Gold aggregation, queryset,
+dashboard template, and 90-minute rule. A live Fabric smoke run remains the
+deployment verification gate.
+
 ## Known scenario defects
 
 - Campaign/purchase linkage and promotion financial reconciliation are not yet

@@ -48,8 +48,8 @@ The following surfaces are not part of these reproducible core journeys:
   ([IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)).
 - Marketing attribution remains limited
   ([IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)).
-- Truck dwell is unavailable as a supported proof point until
-  [issue #317](https://github.com/amattas/retail-demo/issues/317) is completed.
+- Truck dwell is implemented but remains outside these core journeys until a
+  bounded live run returns recent `fn_truck_sla()` rows.
 
 ## Retail operations: live store and fulfillment pulse
 
@@ -119,8 +119,8 @@ union withsource=table_name receipt_created, online_order_created,
    investigation when needed."
 
 4. **Close (1 minute).** Point back to the latest ingestion timestamps as the
-   evidence of freshness. Do not add truck dwell unless issue #317 is closed
-   and its acceptance criteria have been validated in the demo workspace.
+   evidence of freshness. Add truck dwell only after a bounded live run returns
+   recent paired lifecycle rows from `fn_truck_sla()` in the demo workspace.
 
 ### Fallback
 

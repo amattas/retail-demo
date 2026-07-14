@@ -29,7 +29,7 @@
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - `retail-setup deploy` is the supported orchestrator.
 - Terraform provisions resources; `fabric-cicd` publishes supported items; KQL

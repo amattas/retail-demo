@@ -7,6 +7,7 @@ must link to those owners rather than redefine contracts.
 | Guide | Use it for |
 | --- | --- |
 | [Getting started](getting-started.md) | Configure, render, deploy, run, and validate a workspace |
+| [Deployment](deployment.md) | Preview, provision, publish, update, recreate, and troubleshoot a deployment |
 | [Deployed walkthrough](deployed-walkthrough.md) | Orient an audience and choose a focused walkthrough |
 | [Data platform walkthrough](deployed-data-platform.md) | Show pipelines, notebooks, Lakehouse, and Eventhouse |
 | [Analytics and AI walkthrough](deployed-analytics-ai.md) | Show ontology, grounded agent answers, and Power BI |

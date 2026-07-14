@@ -11,7 +11,7 @@
 - **Acceptance:** Public onboarding, deployment output, workspace inventory, and
   model documentation agree and pass docs-contract tests.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Canonical site source is `docs/`; `website/docs/` is retired.
 - Zensical replaces Docusaurus.

@@ -18,7 +18,7 @@
 - **Acceptance:** Scenario presets preserve determinism and move documented KPI
   targets in predictable directions.
 
-## Settled - do not reopen
+## Settled — do not reopen
 
 - Generation is Spark-native and deterministic.
 - Lakehouse Delta tables replace local DuckDB/parquet as the active contract.
