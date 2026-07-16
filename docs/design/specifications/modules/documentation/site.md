@@ -4,7 +4,8 @@
 
 - Canonical source: `docs/`
 - Configuration: `zensical.toml`
-- Pinned dependency: `requirements-docs.txt`
+- Dependency input: `requirements-docs.in`
+- Hash-locked dependency set: `requirements-docs.txt`
 - Generated output: `site/`
 - Publish branch: `gh-pages`
 - Version selection: `scripts/docs_versioning.py`
@@ -62,7 +63,7 @@ published source tree.
 ## Build
 
 ```powershell
-python -m pip install -r requirements-docs.txt
+python -m pip install --require-hashes -r requirements-docs.txt
 python -m zensical build --clean
 ```
 

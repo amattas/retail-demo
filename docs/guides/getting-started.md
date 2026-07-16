@@ -143,9 +143,8 @@ Use this path when you want to run each command explicitly.
     ```powershell
     py -3.11 -m venv .venv
     .\.venv\Scripts\Activate.ps1
-    python -m pip install --upgrade pip
-    python -m pip install -e .\utility
-    python -m pip install azure-identity azure-kusto-data fabric-cicd
+    python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
+    python -m pip install --no-deps -e .\utility
     ```
 
 === "macOS or Linux"
@@ -153,9 +152,8 @@ Use this path when you want to run each command explicitly.
     ```bash
     python3 -m venv .venv
     source .venv/bin/activate
-    python -m pip install --upgrade pip
-    python -m pip install -e ./utility
-    python -m pip install azure-identity azure-kusto-data fabric-cicd
+    python -m pip install --require-hashes -r ./utility/requirements-deploy.txt
+    python -m pip install --no-deps -e ./utility
     ```
 
 ## 4. Configure the target and data volume

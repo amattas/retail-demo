@@ -2,14 +2,6 @@
 
 ## Open
 
-### IMP-003 - Harden CI and dependency supply-chain execution {#imp-003}
-
-- **Priority / effort:** P1 / S
-- **Outcome:** Privileged actions, plugins, providers, and dependencies use
-  reviewed immutable references and minimum permissions.
-- **Acceptance:** Repository-wide audit finds no mutable privileged execution;
-  dependency changes are reviewable repository changes.
-
 ### IMP-011 - Add a default privacy, governance, and AI safety baseline {#imp-011}
 
 - **Priority / effort:** P2 / M
@@ -23,5 +15,10 @@
 - Synthetic identity-like data is sensitive demo data, not "no-risk" data.
 - Secrets are supplied through identity, secret stores, environment variables,
   or ignored local files.
+- Workflow actions use reviewed commit SHAs and no workflow installs runtime
+  plugin marketplaces; Python dependencies, Terraform providers, and downloaded
+  bootstrap installers use committed locks or checksums.
+- Operating-system package managers and GitHub-hosted runner images remain
+  external trust roots; project dependency changes are repository-reviewed.
 - Security guidance without implementation or verification remains `accepted`,
   not `verified`.

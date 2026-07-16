@@ -48,7 +48,8 @@ is `notebooks/templates/driver-05-stream.py`.
 
 ```powershell
 Set-Location utility
-python -m pip install -e ".[dev]"
+python -m pip install --require-hashes -r requirements-ci.txt
+python -m pip install --no-deps -e .
 python -m pytest -q
 python scripts\build_notebooks.py --check
 ```

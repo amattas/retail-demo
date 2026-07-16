@@ -25,7 +25,9 @@ import sys
 
 subprocess.check_call([
     sys.executable, "-m", "pip", "install", "--quiet",
-    "typing_extensions>=4.12.2", "pydantic>=2,<2.12",
+    "annotated-types==0.7.0", "pydantic==2.11.10",
+    "pydantic-core==2.33.2", "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
 ])
 for _name in [m for m in list(sys.modules)
               if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",

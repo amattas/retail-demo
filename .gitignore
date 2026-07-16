@@ -116,7 +116,6 @@ fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /deploy/terraform/.terraform/
 /deploy/terraform/*.tfstate
 /deploy/terraform/*.tfstate.*
-/deploy/terraform/.terraform.lock.hcl
 
 # Setup utility — rendered notebooks and local config (contain env-specific values)
 utility/out/
