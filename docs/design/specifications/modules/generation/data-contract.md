@@ -25,9 +25,9 @@ Lakehouse table/column/type contract. `engine.py` owns orchestration,
 
 ### Operational output
 
-`setup_run_log` records table-level setup output. Its current writer behavior
-overwrites rather than appends a durable multi-run history; that gap is tracked
-by `IMP-002`.
+`setup_run_log` appends a unique setup-attempt record, table-level completion
+records, and a final completion or failure record. Reusing an existing `run_id`
+is rejected so retries cannot create ambiguous duplicate history.
 
 ## Gold output
 

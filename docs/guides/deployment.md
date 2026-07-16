@@ -153,8 +153,8 @@ Important configuration boundaries:
 | `utility/out/` | Rendered workspace-specific notebooks | No |
 
 Keep the Eventhouse and KQL database display names aligned. The Eventhouse
-creates one default KQL database with the Eventhouse display name, and broader
-target propagation remains open under `IMP-001`.
+creates one default KQL database with the Eventhouse display name; provisioning
+a separately named database is not a supported topology.
 
 ### Starter pool or custom pool
 
@@ -368,7 +368,7 @@ state and output evidence must survive cleanup.
 
 ## Current limitations
 
-- Authentication and target propagation:
+- Alternate authentication and renamed-target verification:
   [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
 - Tiered GA-safe deployment profiles:
   [IMP-012](../design/requirements/modules/deployment/backlog.md#imp-012)

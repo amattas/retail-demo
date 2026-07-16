@@ -35,6 +35,7 @@ source_rows_per_second = 5     # rate-source rows/sec. Each row emits ONE scenar
 sink = "eventhouse"            # "eventhouse" | "delta"
 run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (test/smoke)
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
+stream_id = ""                 # blank = persist a UUID beside the checkpoint
 
 # Eventhouse (Kusto) sink — the default. Writes each event straight to its KQL
 # event table with the Fabric Spark connector. Leave `kusto_uri` blank and it is
@@ -66,6 +67,62 @@ spark.conf.set("spark.sql.session.timeZone", "UTC")  # ingest_timestamp depends 
 
 if not delta_landing_table:
     delta_landing_table = f"{LAKEHOUSE_NAME}.cusn_landing.events"
+
+# A logical stream keeps one stable identity across notebook and Spark retries.
+# Deleting the checkpoint root also deletes this metadata and starts a fresh ID
+# namespace, preventing business-key collisions between intentional resets.
+import re
+import uuid
+
+from notebookutils import mssparkutils
+
+_STREAM_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def _validate_stream_id(value):
+    value = str(value).strip()
+    if not _STREAM_ID_PATTERN.fullmatch(value):
+        raise ValueError(
+            "stream_id must be 1-64 characters using letters, numbers, '.', '_', or '-'"
+        )
+    return value
+
+
+def _resolve_stream_id(root, requested):
+    metadata_dir = f"{root.rstrip('/')}/_metadata"
+    identity_path = f"{metadata_dir}/stream_id"
+    requested = str(requested).strip()
+
+    if mssparkutils.fs.exists(identity_path):
+        persisted = _validate_stream_id(mssparkutils.fs.head(identity_path, 128).strip())
+        if requested and requested != persisted:
+            raise ValueError(
+                f"stream_id {requested!r} does not match checkpoint identity "
+                f"{persisted!r}; use the persisted value or reset {root!r}"
+            )
+        return persisted
+
+    candidate = _validate_stream_id(requested or uuid.uuid4().hex)
+    mssparkutils.fs.mkdirs(metadata_dir)
+    try:
+        created = mssparkutils.fs.put(identity_path, candidate, False)
+    except Exception:
+        if not mssparkutils.fs.exists(identity_path):
+            raise
+        created = False
+    if not created:
+        persisted = _validate_stream_id(mssparkutils.fs.head(identity_path, 128).strip())
+        if requested and persisted != requested:
+            raise ValueError(
+                f"stream_id {requested!r} lost a checkpoint identity race to "
+                f"{persisted!r}; restart with the persisted value"
+            )
+        return persisted
+    return candidate
+
+
+STREAM_ID = _resolve_stream_id(checkpoint_path, stream_id)
+print(f"stream identity: {STREAM_ID}")
 
 # %%
 # Dimension ID ranges — read from the Silver dims that setup-02 wrote, so events
@@ -199,7 +256,8 @@ def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=N
     value = F.to_json(F.struct(
         et.alias("event_type"),
         payload.alias("payload"),
-        F.concat(F.lit("TRC-"), F.abs(F.xxhash64(trace_seed, et)).cast("string")).alias("trace_id"),
+        F.concat(F.lit("TRC-"),
+                 F.abs(F.xxhash64(F.lit(STREAM_ID), trace_seed, et)).cast("string")).alias("trace_id"),
         _iso(ts).alias("ingest_timestamp"),
         F.lit("1.0").alias("schema_version"),
         F.lit(event_source).alias("source"),
@@ -218,6 +276,7 @@ rate = spark.readStream.format("rate").option("rowsPerSecond", int(source_rows_p
 
 v = F.col("value")
 ts = F.col("timestamp")
+stream_prefix = F.lit(f"{STREAM_ID}-")
 # scenario is applied AFTER the select below, so it must reference the renamed
 # column `v` (not the source `value`).
 scenario = (F.when(_u(F.col("v"), "scenario") < 0.55, "shopping")
@@ -234,10 +293,10 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("store_id", _id(F.col("v"), "store", STORE_COUNT))
       .withColumn("customer_id", _id(F.col("v"), "cust", CUSTOMER_COUNT))
       .withColumn("dc_id", _id(F.col("v"), "dc", DC_COUNT))
-      .withColumn("receipt_id", F.concat(F.lit("RCP-"), F.col("v").cast("string")))
-      .withColumn("order_id", F.concat(F.lit("ONL-"), F.col("v").cast("string")))
-      .withColumn("shipment_id", F.concat(F.lit("SHP-"), F.col("v").cast("string")))
-      .withColumn("session_id", F.concat(F.lit("SES-"), F.col("v").cast("string")))
+      .withColumn("receipt_id", F.concat(F.lit("RCP-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("order_id", F.concat(F.lit("ONL-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
       .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
       .withColumn("tender", _pick(F.col("v"), "tender", TENDERS))
@@ -389,7 +448,7 @@ events_arr = F.array(
         F.col("receipt_id"), F.lit(None).cast("string").alias("order_id"),
         F.col("tender").alias("payment_method"), F.col("total").alias("amount"),
         (F.round(F.col("total") * F.lit(100))).cast("long").alias("amount_cents"),
-        F.concat(F.lit("TXN-"), F.col("v").cast("string")).alias("transaction_id"),
+        F.concat(F.lit("TXN-"), stream_prefix, F.col("v").cast("string")).alias("transaction_id"),
         _iso(F.col("ts")).alias("processing_time"),
         (_h(F.col("v"), "ptime", 3000) + F.lit(200)).cast("int").alias("processing_time_ms"),
         F.lit("APPROVED").alias("status"), F.lit(None).cast("string").alias("decline_reason"),
@@ -450,7 +509,7 @@ events_arr = F.array(
         F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
         F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
         F.concat(F.lit("AD"), _id(F.col("v"), "adcust", CUSTOMER_COUNT).cast("string")).alias("customer_ad_id"),
-        F.concat(F.lit("IMP-"), F.col("v").cast("string")).alias("impression_id"),
+        F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
         F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
         _pick(F.col("v"), "dev", DEVICES).alias("device_type"),
     ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
@@ -539,7 +598,7 @@ KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
 # (30s-2min). At this demo's low volume that cuts end-to-end latency from minutes
 # to seconds — the dominant cause of the live feed looking "exceptionally slow".
 # (Trade-off: more, smaller extents, acceptable for a demo.)
-_INGESTION_PROPERTIES = json.dumps({"flushImmediately": True})
+
 # The per-event_type writes each target a different table, so run them concurrently
 # to overlap the blob-stage + ingest round-trips; sequential writes serialize ~18
 # blocking calls per micro-batch and fall behind the trigger.
@@ -572,8 +631,21 @@ def _kusto_columns(event_type):
     return cols
 
 
-def _write_event_table(batch_df, event_type, token):
+def _kusto_write_metadata(event_type, batch_id):
+    """Return deterministic connector metadata for an idempotent table batch."""
+    identity = f"retail-demo:{STREAM_ID}:{event_type}:{int(batch_id)}"
+    ingestion_properties = json.dumps({
+        "flushImmediately": True,
+        "ingestByTags": [identity],
+        "ingestIfNotExists": [identity],
+    })
+    request_id = str(uuid.uuid5(uuid.NAMESPACE_URL, identity))
+    return ingestion_properties, request_id
+
+
+def _write_event_table(batch_df, event_type, batch_id, token):
     """Map one event_type subset to its KQL columns and append it to its table."""
+    ingestion_properties, request_id = _kusto_write_metadata(event_type, batch_id)
     mapped = (batch_df.where(F.col("event_type") == event_type)
               .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
               .select("e.*")
@@ -584,7 +656,10 @@ def _write_event_table(batch_df, event_type, token):
         .option("kustoTable", event_type)
         .option("accessToken", token)
         .option("tableCreateOptions", "FailIfNotExist")
-        .option("sparkIngestionProperties", _INGESTION_PROPERTIES)
+        .option("writeMode", "Transactional")
+        .option("requestId", request_id)
+        .option("ensureNoDuplicatedBlobs", "true")
+        .option("sparkIngestionPropertiesJson", ingestion_properties)
         .mode("Append").save())
 
 
@@ -595,8 +670,9 @@ def write_to_eventhouse(batch_df, batch_id):
     bounded thread pool — this overlaps the blob-stage + ingest round-trips so a
     micro-batch finishes inside the trigger window instead of serializing ~18
     blocking calls (the old behaviour fell behind and looked "exceptionally slow").
-    Per-table failures are caught and logged instead of failing the whole batch;
-    run `.show ingestion failures` in the KQL database to see dropped rows.
+    Per-table errors are collected so every worker can finish, then raised to
+    prevent Spark from committing the checkpoint. Deterministic Kusto ingestion
+    tags make already-completed sibling writes idempotent when the batch replays.
     """
     import concurrent.futures as cf
 
@@ -606,26 +682,32 @@ def write_to_eventhouse(batch_df, batch_id):
         present = [et for et in seen if et in EVENT_PAYLOADS]
         unmapped = [et for et in seen if et not in EVENT_PAYLOADS]
         if unmapped:
-            print(f"  skipping unmapped event_types: {unmapped}")
+            raise ValueError(f"unmapped event_types in batch {batch_id}: {unmapped}")
         if not present:
             return
         token = notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
 
         def _task(event_type):
             try:
-                _write_event_table(batch_df, event_type, token)
+                _write_event_table(batch_df, event_type, batch_id, token)
                 return (event_type, None)
-            except Exception as exc:  # noqa: BLE001 - surface per-table, don't fail the batch
+            except Exception as exc:  # noqa: BLE001 - collect, then fail the batch below
                 return (event_type, exc)
 
         with cf.ThreadPoolExecutor(max_workers=min(_WRITE_PARALLELISM, len(present))) as pool:
             results = list(pool.map(_task, present))
 
         failed = [(et, err) for et, err in results if err is not None]
-        print(f"batch {batch_id}: wrote {len(results) - len(failed)}/{len(results)} event tables"
-              + ("" if not failed else
-                 "; FAILED: " + ", ".join(f"{et} ({type(err).__name__}: {err})"
-                                          for et, err in failed)))
+        succeeded = len(results) - len(failed)
+        print(f"batch {batch_id}: wrote {succeeded}/{len(results)} event tables")
+        if failed:
+            detail = ", ".join(
+                f"{event_type} ({type(error).__name__}: {error})"
+                for event_type, error in failed
+            )
+            raise RuntimeError(
+                f"batch {batch_id} failed required Eventhouse writes: {detail}"
+            )
     finally:
         batch_df.unpersist()
 

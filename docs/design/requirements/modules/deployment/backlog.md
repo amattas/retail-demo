@@ -2,16 +2,22 @@
 
 ## Open
 
-### IMP-001 - Restore the deploy authentication and targeting contract {#imp-001}
+### IMP-001 - Verify alternate authentication and target selection {#imp-001}
 
-- **Priority / effort:** P0 / M
-- **Outcome:** Fabric REST, KQL, task-flow, export, and pipeline calls use the
-  real token, selected auth mode, workspace, and KQL database.
-- **Evidence:** `deploy/scripts/export_items.py`,
-  `deploy/scripts/taskflow.py`, `deploy/scripts/apply_kql.py`,
-  `deploy/scripts/run_pipeline.py`, and `utility/src/retail_setup/cli/main.py`.
-- **Acceptance:** Request-contract tests cover both auth modes and a non-default
-  KQL database, followed by a live smoke deployment.
+- **Priority / effort:** P2 / M
+- **Current boundary:** The Azure CLI path using the Terraform-resolved
+  workspace and Eventhouse default KQL database is implemented. The selected
+  auth mode reaches Fabric REST, KQL, task-flow, export, publication, and
+  pipeline clients.
+- **Remaining outcome:** Azure PowerShell and renamed-target deployments use
+  the configured tenant and Terraform-resolved item IDs without display-name
+  ambiguity or contradictory KQL database configuration.
+- **Acceptance:** Both credential types receive the configured tenant;
+  task-flow deployment uses the resolved workspace ID; the effective KQL
+  database name reaches staged artifacts; configuration rejects an unsupported
+  Eventhouse/KQL-name split; request-contract tests cover bearer headers and
+  non-default names and IDs; and Azure PowerShell plus renamed-Eventhouse smoke
+  tests succeed.
 
 ### IMP-012 - Introduce tiered deployment profiles and preview gating {#imp-012}
 
@@ -40,4 +46,6 @@
 - `retail-setup deploy` is the supported orchestrator.
 - Terraform provisions resources; `fabric-cicd` publishes supported items; KQL
   scripts remain ordered source.
+- The supported Eventhouse topology uses its automatically created default KQL
+  database with the same display name.
 - Destructive reset assets are never part of an automatic normal run.
