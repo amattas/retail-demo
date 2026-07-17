@@ -62,7 +62,7 @@ def test_wait_for_workspace_absence_returns_once_workspace_disappears(
         calls["n"] += 1
         return response
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(_workspace_wait, "_default_http_get", fake_get)
     sleeps: list[float] = []
 
     _workspace_wait.wait_for_workspace_absence(
@@ -80,7 +80,9 @@ def test_wait_for_workspace_absence_returns_once_workspace_disappears(
 
 def test_wait_for_workspace_absence_times_out_when_still_present(monkeypatch) -> None:
     monkeypatch.setattr(
-        "requests.get", lambda *_a, **_k: _FakeResponse(["retail-demo-dev"])
+        _workspace_wait,
+        "_default_http_get",
+        lambda *_a, **_k: _FakeResponse(["retail-demo-dev"]),
     )
     clock_values = iter([0.0, 0.0, 5.0, 5.0, 10.0, 10.0])
 
@@ -99,7 +101,9 @@ def test_wait_for_workspace_absence_times_out_when_still_present(monkeypatch) ->
 
 def test_wait_for_workspace_absence_is_case_insensitive(monkeypatch) -> None:
     monkeypatch.setattr(
-        "requests.get", lambda *_a, **_k: _FakeResponse(["Retail-Demo-Dev"])
+        _workspace_wait,
+        "_default_http_get",
+        lambda *_a, **_k: _FakeResponse(["Retail-Demo-Dev"]),
     )
 
     with pytest.raises(_workspace_wait.WorkspaceDeletionTimeout):
@@ -126,7 +130,9 @@ def test_wait_for_workspace_absence_builds_credential_for_selected_auth_mode(
         return _FakeCredential()
 
     monkeypatch.setattr(_workspace_wait, "build_credential", fake_build_credential)
-    monkeypatch.setattr("requests.get", lambda *_a, **_k: _FakeResponse([]))
+    monkeypatch.setattr(
+        _workspace_wait, "_default_http_get", lambda *_a, **_k: _FakeResponse([])
+    )
 
     _workspace_wait.wait_for_workspace_absence(
         "retail-demo-dev",
@@ -161,7 +167,7 @@ def test_wait_for_workspace_absence_finds_workspace_only_present_on_second_page(
             return _FakeResponse(["retail-demo-dev"])
         return _FakeResponse(["other"], continuation_token="tok-1")
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(_workspace_wait, "_default_http_get", fake_get)
 
     with pytest.raises(
         _workspace_wait.WorkspaceDeletionTimeout, match="retail-demo-dev"
@@ -189,7 +195,7 @@ def test_wait_for_workspace_absence_follows_continuation_uri_across_pages(
             return _FakeResponse(["retail-demo-dev"])
         return _FakeResponse(["other"], continuation_uri=next_page_url)
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(_workspace_wait, "_default_http_get", fake_get)
 
     with pytest.raises(
         _workspace_wait.WorkspaceDeletionTimeout, match="retail-demo-dev"
@@ -222,7 +228,7 @@ def test_wait_for_workspace_absence_fails_closed_on_repeated_continuation_token(
         # report it absent.
         return _FakeResponse(["other"], continuation_token="tok-loop")
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(_workspace_wait, "_default_http_get", fake_get)
 
     with pytest.raises(
         _workspace_wait.WorkspacePaginationError, match="repeated pagination"

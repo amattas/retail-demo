@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from deploy.scripts._auth import build_credential
 
@@ -28,6 +28,24 @@ FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 # how often to re-check while waiting.
 DEFAULT_TIMEOUT_SECONDS = 180
 DEFAULT_POLL_INTERVAL_SECONDS = 10
+
+# A callable with the subset of `requests.get`'s signature this module uses.
+HttpGet = Callable[..., Any]
+
+
+def _default_http_get(
+    url: str, *, headers: dict[str, str], params: dict[str, str] | None, timeout: int
+) -> Any:
+    """Perform the workspace-listing GET with `requests`.
+
+    `requests` is imported lazily (and injected in tests via `http_get`) so the
+    deploy framework's lightweight contract tests can exercise the pagination
+    logic without the `requests` dependency installed.
+    """
+
+    import requests
+
+    return requests.get(url, headers=headers, params=params, timeout=timeout)
 
 
 class WorkspaceDeletionTimeout(TimeoutError):
@@ -44,7 +62,7 @@ class WorkspacePaginationError(RuntimeError):
     """
 
 
-def _list_workspace_names(credential: TokenCredential) -> set[str]:
+def _list_workspace_names(credential: TokenCredential, http_get: HttpGet) -> set[str]:
     """Return the case-folded display names of every workspace visible to the token.
 
     Fully exhausts Fabric's pagination before returning: a workspace that only
@@ -56,8 +74,6 @@ def _list_workspace_names(credential: TokenCredential) -> set[str]:
     workspaces and falsely declaring the target absent.
     """
 
-    import requests
-
     token = credential.get_token(FABRIC_SCOPE).token
     headers = {"Authorization": f"Bearer {token}"}
     base_url = f"{FABRIC_API}/workspaces"
@@ -67,7 +83,7 @@ def _list_workspace_names(credential: TokenCredential) -> set[str]:
     url = base_url
     params: dict[str, str] | None = None
     while True:
-        response = requests.get(url, headers=headers, params=params, timeout=30)
+        response = http_get(url, headers=headers, params=params, timeout=30)
         response.raise_for_status()
         payload = response.json()
         names.update(
@@ -108,6 +124,7 @@ def wait_for_workspace_absence(
     poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
+    http_get: HttpGet | None = None,
 ) -> None:
     """Block until ``workspace_name`` no longer appears in the tenant's workspaces.
 
@@ -118,10 +135,11 @@ def wait_for_workspace_absence(
     """
 
     credential = credential or build_credential(auth_mode)
+    http_get = http_get or _default_http_get
     target = workspace_name.casefold()
     deadline = clock() + timeout_seconds
     while True:
-        if target not in _list_workspace_names(credential):
+        if target not in _list_workspace_names(credential, http_get):
             return
         if clock() >= deadline:
             raise WorkspaceDeletionTimeout(
