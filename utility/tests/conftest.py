@@ -6,6 +6,13 @@ from pathlib import Path
 # Make utility/scripts importable so catalog_builder and catalogs/* can be imported directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+# Make the repo root importable so the deploy framework (deploy.scripts.*) resolves
+# the same way it does from a real repo checkout. The retail-setup CLI shells out to
+# and imports deploy.scripts for target-safety validation; without the repo root on
+# sys.path those imports fail under the installed-package CI job (which runs from
+# utility/), so exercise them here exactly as an operator would.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import pytest
 
 

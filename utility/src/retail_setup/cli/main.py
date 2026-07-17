@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -123,12 +124,27 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
 
 
 def _environment_name_for_workspace(repo_root: Path, workspace_name: str) -> str:
-    """Resolve the stable environment identity derived from a workspace name."""
+    """Resolve the stable environment identity derived from a workspace name.
 
+    Delegates to the deploy framework so the normalization stays single-sourced;
+    when the deploy package is not importable (installed wheel / no repo checkout
+    on sys.path) it falls back to an equivalent local implementation so the CLI
+    stays usable.
+    """
     root = str(repo_root)
     if root not in sys.path:
         sys.path.insert(0, root)
-    from deploy.scripts.deploy_config import environment_name_for_workspace
+    try:
+        from deploy.scripts.deploy_config import environment_name_for_workspace
+    except ImportError:
+        normalized = re.sub(r"[^a-z0-9]+", "-", workspace_name.strip().lower()).strip("-")
+        if normalized.startswith("retail-demo-"):
+            normalized = normalized.removeprefix("retail-demo-")
+        if not normalized:
+            raise ValueError(
+                "workspace.name must contain at least one ASCII letter or number"
+            ) from None
+        return normalized
 
     return environment_name_for_workspace(workspace_name)
 
