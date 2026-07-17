@@ -71,7 +71,7 @@ def main() -> int:
     """Start an on-demand run of a named Fabric pipeline."""
 
     parser = argparse.ArgumentParser(description="Run a Fabric Data Pipeline on demand")
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", required=True)
     parser.add_argument("--pipeline", required=True, help="Pipeline display name.")
     parser.add_argument(
         "--auth-mode",

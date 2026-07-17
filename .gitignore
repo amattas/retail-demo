@@ -108,6 +108,8 @@ fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /.github/skills
 
 # Deployment framework generated files and local Terraform state
+/deploy/config/environments/*.yml
+!/deploy/config/environments/.gitkeep
 /deploy/.generated/
 /deploy/workspace/*
 !/deploy/workspace/.gitkeep

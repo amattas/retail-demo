@@ -6,7 +6,7 @@ and creates or updates the target flow.
 
 ```powershell
 python -m deploy.scripts.taskflow export --workspace "Retail Demo" --path fabric\taskflow\taskflow.json
-python -m deploy.scripts.taskflow deploy --workspace "retail-demo-dev" --path fabric\taskflow\taskflow.json
+python -m deploy.scripts.taskflow deploy --workspace "retail-demo-alice" --path fabric\taskflow\taskflow.json
 ```
 
 Task-flow access uses undocumented Power BI metadata-cluster endpoints and may

@@ -1,3 +1,13 @@
+output "deployment_environment" {
+  value       = var.environment
+  description = "Workspace-derived deployment environment identity."
+}
+
+output "tenant_id" {
+  value       = var.tenant_id
+  description = "Microsoft Entra tenant associated with this deployment state."
+}
+
 output "workspace_id" {
   value       = local.workspace_id
   description = "Target Fabric workspace ID."

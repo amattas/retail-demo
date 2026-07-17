@@ -21,9 +21,9 @@
     manager (winget on Windows) unless --skip-prereqs is passed.
 
     All arguments are forwarded to scripts/setup.py, for example:
-        ./scripts/setup.ps1 --env dev
-        ./scripts/setup.ps1 --env dev --deploy
-        ./scripts/setup.ps1 --env dev --dry-run
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice --deploy
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice --dry-run
 
 .NOTES
     The environment that is active when the script starts is captured up front
@@ -42,6 +42,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $SetupPy = Join-Path $PSScriptRoot 'setup.py'
 $CondaEnvName = 'retail-demo'
 $CondaPythonVersion = '3.13'
+$MiniforgeVersion = '26.3.2-3'
 $VenvPath = Join-Path $RepoRoot '.venv'
 
 function Get-EnvSnapshot {
@@ -127,6 +128,8 @@ function Install-Miniforge {
     }
     Write-Host 'Installing Miniforge with winget...'
     winget install --id CondaForge.Miniforge3 -e `
+        --version $MiniforgeVersion --source winget `
+        --disable-interactivity --silent `
         --accept-package-agreements --accept-source-agreements
     $conda = Resolve-Conda
     if (-not $conda) {

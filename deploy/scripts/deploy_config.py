@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,25 @@ DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
 DATA_AGENT_ONTOLOGY_ID = "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd"
 ONTOLOGY_ITEM_NAME = "RetailOntology_AutoGen"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
+_OUTPUT_ID_KEYS = (
+    "workspace_id",
+    "lakehouse_id",
+    "eventhouse_id",
+    "kql_database_id",
+)
+
+
+def environment_name_for_workspace(workspace_name: str) -> str:
+    """Return the normalized deployment environment for a workspace name."""
+
+    normalized = re.sub(r"[^a-z0-9]+", "-", workspace_name.strip().lower()).strip("-")
+    if normalized.startswith("retail-demo-"):
+        normalized = normalized.removeprefix("retail-demo-")
+    if not normalized:
+        raise ValueError(
+            "workspace.name must contain at least one ASCII letter or number"
+        )
+    return normalized
 
 
 @dataclass(frozen=True)
@@ -173,13 +194,41 @@ def load_environment(
 ) -> DeployConfig:
     """Load merged deployment config for an environment."""
 
+    if environment != environment_name_for_workspace(environment):
+        raise ValueError(
+            "Environment names must use normalized workspace-name form "
+            "(lowercase letters, numbers, and hyphens)"
+        )
     env_path = environments_root / f"{environment}.yml"
     if not env_path.exists():
         raise FileNotFoundError(f"Environment config not found: {env_path}")
 
     merged = _deep_merge(_load_yaml(config_path), _load_yaml(env_path))
     merged["environment"] = environment
-    return _to_deploy_config(merged)
+    config = _to_deploy_config(merged)
+    expected_environment = environment_name_for_workspace(config.workspace.name)
+    if config.environment != expected_environment:
+        raise ValueError(
+            f"Environment {config.environment!r} does not match workspace "
+            f"{config.workspace.name!r}; use {expected_environment!r}"
+        )
+    if config.tenant_id is None:
+        raise ValueError("tenant_id is required in the workspace environment")
+    try:
+        uuid.UUID(config.tenant_id)
+    except ValueError as exc:
+        raise ValueError("tenant_id must be a valid UUID") from exc
+    if config.workspace.existing_id is not None:
+        try:
+            uuid.UUID(config.workspace.existing_id)
+        except ValueError as exc:
+            raise ValueError("workspace.existing_id must be a valid UUID") from exc
+    if config.eventhouse.name != config.eventhouse.kql_database_name:
+        raise ValueError(
+            "eventhouse.name and eventhouse.kql_database_name must match because "
+            "the supported topology uses the Eventhouse default KQL database"
+        )
+    return config
 
 
 def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
@@ -325,25 +374,31 @@ def render_tfvars(config: DeployConfig) -> str:
         {key: value for key, value in optional_values.items() if value is not None}
     )
 
-    return "\n".join(
-        f"{key} = {_hcl_value(value)}" for key, value in values.items()
-    ) + "\n"
+    return (
+        "\n".join(f"{key} = {_hcl_value(value)}" for key, value in values.items())
+        + "\n"
+    )
 
 
-def render_fabric_cicd_config(config: DeployConfig) -> dict[str, Any]:
+def render_fabric_cicd_config(
+    config: DeployConfig,
+    terraform_outputs: dict[str, Any],
+    *,
+    repository_directory: str = "../workspace",
+) -> dict[str, Any]:
     """Render fabric-cicd config.yml content."""
 
     rendered: dict[str, Any] = {
         "core": {
-            "workspace": {config.environment: config.workspace.name},
-            "repository_directory": "../workspace",
+            "workspace_id": {
+                config.environment: _require_output(terraform_outputs, "workspace_id")
+            },
+            "repository_directory": repository_directory,
             "item_types_in_scope": config.deployment.item_types_in_scope,
             "parameter": "parameter.yml",
         },
         "publish": {"skip": {config.environment: config.deployment.publish_skip}},
-        "unpublish": {
-            "skip": {config.environment: config.deployment.unpublish_skip}
-        },
+        "unpublish": {"skip": {config.environment: config.deployment.unpublish_skip}},
     }
 
     if config.deployment.orphan_exclude_regex:
@@ -368,7 +423,9 @@ def collect_pipeline_notebook_refs(repo_root: Path = REPO_ROOT) -> dict[str, str
     refs: dict[str, str] = {}
     if not pipelines_dir.is_dir():
         return refs
-    for content_path in sorted(pipelines_dir.glob("*.DataPipeline/pipeline-content.json")):
+    for content_path in sorted(
+        pipelines_dir.glob("*.DataPipeline/pipeline-content.json")
+    ):
         content = json.loads(content_path.read_text(encoding="utf-8"))
         for activity in content.get("properties", {}).get("activities", []):
             if activity.get("type") != "TridentNotebook":
@@ -413,9 +470,7 @@ def render_parameter_file(
             },
             {
                 "find_value": "DirectLake - retail_lakehouse",
-                "replace_value": {
-                    config.environment: f"DirectLake - {lakehouse_name}"
-                },
+                "replace_value": {config.environment: f"DirectLake - {lakehouse_name}"},
                 "item_type": "SemanticModel",
             },
         ],
@@ -518,6 +573,50 @@ def load_terraform_outputs(path: Path) -> dict[str, Any]:
     }
 
 
+def validate_terraform_outputs(
+    config: DeployConfig, terraform_outputs: dict[str, Any]
+) -> None:
+    """Reject incomplete, placeholder, or wrong-environment Terraform outputs."""
+
+    expected_values = {
+        "deployment_environment": config.environment,
+        "tenant_id": config.tenant_id,
+        "workspace_name": config.workspace.name,
+        "lakehouse_name": config.lakehouse.name,
+        "eventhouse_name": config.eventhouse.name,
+        "kql_database_name": config.eventhouse.kql_database_name,
+    }
+    for key, expected in expected_values.items():
+        actual = _require_output(terraform_outputs, key)
+        if actual != expected:
+            raise ValueError(
+                f"Terraform output {key} targets {actual!r}; expected {expected!r}"
+            )
+
+    parsed_ids: dict[str, uuid.UUID] = {}
+    for key in _OUTPUT_ID_KEYS:
+        value = _require_output(terraform_outputs, key)
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError(
+                f"Terraform output {key} is not a valid Fabric item ID: {value!r}"
+            ) from exc
+        if parsed.int == 0 or value.lower().startswith("00000000-0000-0000-0000-"):
+            raise ValueError(
+                f"Terraform output {key} contains an unresolved placeholder ID"
+            )
+        parsed_ids[key] = parsed
+
+    if config.workspace.existing_id is not None:
+        expected_workspace_id = uuid.UUID(config.workspace.existing_id)
+        if parsed_ids["workspace_id"] != expected_workspace_id:
+            raise ValueError(
+                "Terraform output workspace_id does not match "
+                f"workspace.existing_id {config.workspace.existing_id!r}"
+            )
+
+
 def write_generated_configs(
     config: DeployConfig,
     deploy_root: Path,
@@ -525,18 +624,28 @@ def write_generated_configs(
 ) -> GeneratedConfigPaths:
     """Write generated tfvars and fabric-cicd configuration files."""
 
-    terraform_outputs = terraform_outputs or _synthetic_outputs(config)
-    tfvars_path = (
-        deploy_root / "terraform" / "environments" / f"{config.environment}.tfvars"
-    )
-    fabric_config_path = deploy_root / "fabric-cicd" / "config.yml"
-    parameter_path = deploy_root / "fabric-cicd" / "parameter.yml"
+    if terraform_outputs is None:
+        terraform_outputs = _synthetic_outputs(config)
+    else:
+        validate_terraform_outputs(config, terraform_outputs)
+
+    environment_root = deploy_root / ".generated" / config.environment
+    tfvars_path = environment_root / "terraform.tfvars"
+    fabric_config_path = environment_root / "fabric-cicd" / "config.yml"
+    parameter_path = environment_root / "fabric-cicd" / "parameter.yml"
 
     tfvars_path.parent.mkdir(parents=True, exist_ok=True)
     fabric_config_path.parent.mkdir(parents=True, exist_ok=True)
 
     tfvars_path.write_text(render_tfvars(config), encoding="utf-8")
-    _write_yaml(fabric_config_path, render_fabric_cicd_config(config))
+    _write_yaml(
+        fabric_config_path,
+        render_fabric_cicd_config(
+            config,
+            terraform_outputs,
+            repository_directory="../../../workspace",
+        ),
+    )
     _write_yaml(parameter_path, render_parameter_file(config, terraform_outputs))
 
     return GeneratedConfigPaths(
@@ -567,7 +676,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate Terraform and fabric-cicd deployment config files"
     )
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", required=True)
     parser.add_argument("--deploy-root", type=Path, default=DEPLOY_ROOT)
     parser.add_argument(
         "--terraform-output",
@@ -578,9 +687,7 @@ def main() -> int:
 
     config = load_environment(args.environment)
     outputs = (
-        load_terraform_outputs(args.terraform_output)
-        if args.terraform_output
-        else None
+        load_terraform_outputs(args.terraform_output) if args.terraform_output else None
     )
     paths = write_generated_configs(config, args.deploy_root, outputs)
     console.info(f"Wrote {paths.tfvars}")

@@ -1,5 +1,0 @@
-workspace:
-  name: retail-demo-dev
-deployment:
-  publish_skip: false
-  unpublish_skip: true

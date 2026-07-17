@@ -25,6 +25,7 @@ MIN_PYTHON = (3, 11)
 # always shown if a step fails, so troubleshooting never loses information.
 VERBOSE = False
 
+
 def _emit(text: str = "") -> None:
     """Write a line to stdout."""
 
@@ -54,8 +55,6 @@ def _section(step: int, total: int, title: str) -> None:
     _divider("=")
     _emit(f"  Step {step} of {total}: {title}")
     _divider("=")
-
-
 
 
 @dataclass(frozen=True)
@@ -154,9 +153,7 @@ def detect_package_manager(system: str | None = None) -> PackageManager | None:
                 "apt-get",
                 {
                     "git": [["sudo", "apt-get", "install", "-y", "git"]],
-                    "terraform": [
-                        ["sudo", "apt-get", "install", "-y", "terraform"]
-                    ],
+                    "terraform": [["sudo", "apt-get", "install", "-y", "terraform"]],
                     "az": [["sudo", "apt-get", "install", "-y", "azure-cli"]],
                 },
             )
@@ -228,9 +225,7 @@ def run_command(
     _run_inherit(command, cwd, rendered, show_raw=True)
 
 
-def _run_inherit(
-    command: list[str], cwd: Path, rendered: str, show_raw: bool
-) -> None:
+def _run_inherit(command: list[str], cwd: Path, rendered: str, show_raw: bool) -> None:
     """Run a command with inherited stdio so output stays linear."""
     try:
         subprocess.run(command, cwd=cwd, check=True)
@@ -245,10 +240,8 @@ def _run_inherit(
         if not show_raw:
             _emit(f"    (command: {rendered})")
         raise SystemExit(
-            f"That step failed (exit code {exc.returncode}). "
-            f"Command: {rendered}"
+            f"That step failed (exit code {exc.returncode}). Command: {rendered}"
         ) from None
-
 
 
 def install_prerequisites(
@@ -300,7 +293,9 @@ def current_python_env() -> PythonEnv:
             "Python 3.11 or later is required. Activate a Python 3.11+ conda "
             "environment or virtual environment, then rerun this script."
         )
-    return PythonEnv(python=Path(sys.executable), description="current Python environment")
+    return PythonEnv(
+        python=Path(sys.executable), description="current Python environment"
+    )
 
 
 def _pip_flags() -> list[str]:
@@ -318,14 +313,18 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     _emit("Installing the Python packages the demo needs (this can take a minute).")
     flags = _pip_flags()
     run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "--upgrade", "pip"],
+        [
+            str(env.python),
+            "-m",
+            "pip",
+            "install",
+            *flags,
+            "--require-hashes",
+            "-r",
+            str(REPO_ROOT / "utility" / "requirements-deploy.txt"),
+        ],
         dry_run=dry_run,
-        label="Updating pip",
-    )
-    run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "-e", str(REPO_ROOT / "utility")],
-        dry_run=dry_run,
-        label="Installing the retail-setup tool",
+        label="Installing locked Python dependencies",
     )
     run_command(
         [
@@ -334,12 +333,12 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
             "pip",
             "install",
             *flags,
-            "azure-identity",
-            "azure-kusto-data",
-            "fabric-cicd",
+            "--no-deps",
+            "-e",
+            str(REPO_ROOT / "utility"),
         ],
         dry_run=dry_run,
-        label="Installing Azure and Fabric libraries",
+        label="Installing the retail-setup tool",
     )
 
 
@@ -368,6 +367,19 @@ def _extract_auth_mode(text: str) -> str | None:
     return match.group(1).strip().strip('"').strip("'")
 
 
+def workspace_environment_name(workspace_name: str) -> str:
+    """Return the normalized deployment environment for a workspace name."""
+
+    normalized = re.sub(r"[^a-z0-9]+", "-", workspace_name.strip().lower()).strip("-")
+    if normalized.startswith("retail-demo-"):
+        normalized = normalized.removeprefix("retail-demo-")
+    if not normalized:
+        raise ValueError(
+            "workspace name must contain at least one ASCII letter or number"
+        )
+    return normalized
+
+
 def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
     """Return (auth_mode, tenant_id) from the merged deploy config.
 
@@ -382,9 +394,7 @@ def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
 
     tenant_id = _extract_tenant_id(overlay_text) or _extract_tenant_id(base_text)
     auth_mode = (
-        _extract_auth_mode(overlay_text)
-        or _extract_auth_mode(base_text)
-        or "azure_cli"
+        _extract_auth_mode(overlay_text) or _extract_auth_mode(base_text) or "azure_cli"
     )
     return auth_mode, tenant_id
 
@@ -432,17 +442,25 @@ def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
 def run_retail_setup(
     env: PythonEnv,
     *,
-    deploy_env: str,
+    workspace_name: str,
     dry_run: bool,
     assume_yes: bool,
     deploy_requested: bool,
     recreate: bool = False,
 ) -> None:
+    deploy_env = workspace_environment_name(workspace_name)
     _section(3, 4, "Configuring the project")
     run_command(
-        [str(env.python), "-m", "retail_setup.cli.main", "configure", "--env", deploy_env],
+        [
+            str(env.python),
+            "-m",
+            "retail_setup.cli.main",
+            "configure",
+            "--workspace-name",
+            workspace_name,
+        ],
         dry_run=dry_run,
-        label=f"Configuring the project for '{deploy_env}'",
+        label=f"Configuring the project for workspace '{workspace_name}'",
         interactive=True,
     )
     run_command(
@@ -486,16 +504,21 @@ def run_retail_setup(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Guided retail-demo setup")
     parser.add_argument(
-        "--env",
-        default="dev",
+        "--workspace-name",
         help=(
-            "Deployment environment name. This selects deploy/config/environments/<env>.yml "
-            "and scopes generated files under deploy/.generated/<env>/."
+            "Fabric workspace name. Its normalized value identifies the local "
+            "deployment environment and isolated Terraform state."
         ),
     )
-    parser.add_argument("--dry-run", action="store_true", help="Print commands without running them.")
-    parser.add_argument("--yes", action="store_true", help="Accept setup prompts with defaults.")
-    parser.add_argument("--deploy", action="store_true", help="Run deploy after configure/render.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print commands without running them."
+    )
+    parser.add_argument(
+        "--yes", action="store_true", help="Accept setup prompts with defaults."
+    )
+    parser.add_argument(
+        "--deploy", action="store_true", help="Run deploy after configure/render."
+    )
     parser.add_argument(
         "--recreate",
         action="store_true",
@@ -516,6 +539,15 @@ def parse_args() -> argparse.Namespace:
 
 def _run_guided(args: argparse.Namespace) -> int:
     """Run the four guided setup steps (under the console when one is active)."""
+    workspace_name = args.workspace_name
+    if not workspace_name:
+        if args.yes or args.dry_run:
+            workspace_name = "retail-demo"
+        else:
+            workspace_name = (
+                input("Fabric workspace name [retail-demo]: ").strip() or "retail-demo"
+            )
+
     _banner(
         [
             "Retail Demo - Guided Setup",
@@ -527,7 +559,8 @@ def _run_guided(args: argparse.Namespace) -> int:
             "  4. Optionally deploy to Microsoft Fabric",
         ]
     )
-    _emit(f"Environment: {args.env}   (change with --env)")
+    _emit(f"Workspace:   {workspace_name}   (change with --workspace-name)")
+    _emit(f"Environment: {workspace_environment_name(workspace_name)}")
     _emit(f"Project:     {REPO_ROOT}")
     if not args.verbose:
         _emit("Tip: add --verbose to see the exact commands being run.")
@@ -552,7 +585,7 @@ def _run_guided(args: argparse.Namespace) -> int:
 
     run_retail_setup(
         env,
-        deploy_env=args.env,
+        workspace_name=workspace_name,
         dry_run=args.dry_run,
         assume_yes=args.yes,
         deploy_requested=args.deploy or args.recreate,

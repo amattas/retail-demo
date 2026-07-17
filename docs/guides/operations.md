@@ -85,7 +85,7 @@ rather than ingestion time.
 | Capacity unavailable | Confirm the capacity display name, active state, tenant, and operator access. |
 | Custom Spark pool provisioning fails | Reconfigure with the starter pool unless preview support is intentional. |
 | Rendered notebooks missing | Run `retail-setup render --env <env>`. |
-| Fabric publication fails | Inspect the failing item type and generated `deploy/fabric-cicd/parameter.yml`. |
+| Fabric publication fails | Inspect the failing item type and generated `deploy/.generated/<env>/fabric-cicd/parameter.yml`. |
 | KQL objects missing | Inspect and rerun the generated ordered `database.kql` against the intended database. |
 | Setup pipeline not started | Start `setup-pipeline` manually and retain its run ID. |
 | Setup pipeline failed | Resume from the first failed activity only after validating upstream tables. |
@@ -108,8 +108,9 @@ For a normal update:
 6. rerun only affected data workloads;
 7. compare row counts, timestamps, and bindings with the prior known-good run.
 
-The local Terraform state is not isolated per environment. Do not switch or run
-environments concurrently from one checkout without deliberate state handling.
+Each workspace environment has isolated Terraform state and backend data.
+Concurrent full publication still requires separate checkouts because artifact
+staging uses one `deploy/workspace/` tree.
 
 ## Reset and recreate
 
@@ -136,10 +137,6 @@ utilization. Do not promise fixed runtimes without a measured profile.
 
 ## Known reliability work
 
-- Fail-fast and replay safety:
-  [IMP-002](../design/requirements/modules/operations/backlog.md#imp-002)
-- Environment isolation:
-  [IMP-004](../design/requirements/modules/deployment/backlog.md#imp-004)
 - Live readiness and freshness:
   [IMP-013](../design/requirements/modules/operations/backlog.md#imp-013)
 - Active-path CI:

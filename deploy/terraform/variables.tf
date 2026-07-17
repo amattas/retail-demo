@@ -1,6 +1,6 @@
 variable "environment" {
   type        = string
-  description = "Deployment environment name, such as dev, test, or prod."
+  description = "Normalized deployment identity derived from the Fabric workspace name."
 }
 
 variable "tenant_id" {

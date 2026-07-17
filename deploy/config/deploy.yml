@@ -1,13 +1,10 @@
-tenant_id: 9d379b85-7b26-46a5-bbc8-2ce467f202b8
 subscription_id: null
 auth:
   mode: azure_cli
 workspace:
-  name: retail-demo
   description: Microsoft Fabric retail demo workspace
   existing_id: null
   capacity_id: null
-  capacity_name: amattas
   skip_capacity_state_validation: false
   role_assignments: []
 lakehouse:

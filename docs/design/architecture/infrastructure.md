@@ -87,16 +87,15 @@ identity.
 
 ## Local deployment state
 
-Merged configuration generates tracked Terraform and `fabric-cicd` inputs plus
-ignored live outputs and staged item folders. Local Terraform state remains in
-one checkout-level location and is not isolated per environment. Concurrent or
-interleaved dev/test/prod deployment from one checkout is therefore outside the
-current safe operating boundary.
+Each workspace name derives a local environment key. Its ignored environment
+overlay, Terraform input, backend state, Terraform data directory,
+`fabric-cicd` configuration, live outputs, and run journal stay under that
+key. Parallel Terraform operations therefore do not share state. Full
+publication still uses one ignored `deploy/workspace/` staging tree, so run
+concurrent full deploys from separate checkouts.
 
 ## Current constraints
 
-- Environment state and committed operator-specific defaults need stronger
-  isolation.
 - The default deploy inventory is broader than a GA-safe core profile.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.

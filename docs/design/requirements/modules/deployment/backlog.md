@@ -13,14 +13,6 @@
 - **Acceptance:** Request-contract tests cover both auth modes and a non-default
   KQL database, followed by a live smoke deployment.
 
-### IMP-004 - Isolate environments and remove operator-specific bindings {#imp-004}
-
-- **Priority / effort:** P2 / L
-- **Outcome:** Dev, test, and prod cannot share state or inherit committed
-  operator-specific tenant, capacity, workspace, or item identifiers.
-- **Acceptance:** Parallel plans use isolated state and `--skip-terraform`
-  rejects unresolved or placeholder outputs.
-
 ### IMP-012 - Introduce tiered deployment profiles and preview gating {#imp-012}
 
 - **Priority / effort:** P2 / M
@@ -28,6 +20,20 @@
   inventory with cost, runtime, capacity, preview, and manual-step boundaries.
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication.
+
+## Completed
+
+### IMP-004 - Isolate environments and remove operator-specific bindings {#imp-004}
+
+- **Priority / effort:** P2 / L
+- **Outcome:** Workspace names derive independent local environments. Committed
+  configuration contains no operator tenant, capacity, workspace, generated
+  binding, or target item identifiers.
+- **Acceptance evidence:** Terraform backend state and `TF_DATA_DIR` are scoped
+  under `deploy/.generated/<env>/`; target overlays and generated deployment
+  inputs are ignored; parallel-plan tests assert different state paths; and
+  `--skip-terraform` fails before commands run when outputs are missing,
+  placeholder, incomplete, or for another target.
 
 ## Settled — do not reopen
 

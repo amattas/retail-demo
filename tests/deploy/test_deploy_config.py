@@ -7,15 +7,57 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 from deploy.scripts import deploy_config
 
+ENVIRONMENT = "dev"
+WORKSPACE_NAME = "retail-demo-dev"
 
-def test_load_environment_merges_defaults_and_environment() -> None:
-    config = deploy_config.load_environment("dev")
 
-    assert config.environment == "dev"
-    assert config.workspace.name == "retail-demo-dev"
+def _load_config(tmp_path: Path) -> deploy_config.DeployConfig:
+    environments_root = tmp_path / "config" / "environments"
+    environments_root.mkdir(parents=True)
+    (environments_root / f"{ENVIRONMENT}.yml").write_text(
+        yaml.safe_dump(
+            {
+                "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "workspace": {"name": WORKSPACE_NAME},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return deploy_config.load_environment(
+        ENVIRONMENT, environments_root=environments_root
+    )
+
+
+def _resolved_outputs(config: deploy_config.DeployConfig) -> dict[str, str]:
+    return {
+        "deployment_environment": config.environment,
+        "tenant_id": config.tenant_id or "",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "workspace_name": config.workspace.name,
+        "lakehouse_id": "22222222-2222-4222-8222-222222222222",
+        "lakehouse_name": config.lakehouse.name,
+        "eventhouse_id": "33333333-3333-4333-8333-333333333333",
+        "eventhouse_name": config.eventhouse.name,
+        "kql_database_id": "44444444-4444-4444-8444-444444444444",
+        "kql_database_name": config.eventhouse.kql_database_name,
+    }
+
+
+def test_environment_name_is_derived_from_workspace_name() -> None:
+    assert (
+        deploy_config.environment_name_for_workspace("Retail Demo - Alice") == "alice"
+    )
+
+
+def test_load_environment_merges_defaults_and_environment(tmp_path: Path) -> None:
+    config = _load_config(tmp_path)
+
+    assert config.environment == ENVIRONMENT
+    assert config.workspace.name == WORKSPACE_NAME
     assert config.lakehouse.name == "retail_lakehouse"
     assert config.powerbi.semantic_model_name == "retail_model"
     assert config.notebooks.include == ["core"]
@@ -42,18 +84,31 @@ def test_load_environment_rejects_unknown_environment() -> None:
         deploy_config.load_environment("missing")
 
 
-def test_render_tfvars_omits_empty_optional_values() -> None:
-    config = deploy_config.load_environment("dev")
+def test_load_environment_rejects_workspace_name_mismatch(tmp_path: Path) -> None:
+    environments_root = tmp_path / "environments"
+    environments_root.mkdir()
+    (environments_root / "wrong-name.yml").write_text(
+        "workspace:\n  name: actual-name\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="does not match workspace"):
+        deploy_config.load_environment(
+            "wrong-name", environments_root=environments_root
+        )
+
+
+def test_render_tfvars_omits_empty_optional_values(tmp_path: Path) -> None:
+    config = _load_config(tmp_path)
     tfvars = deploy_config.render_tfvars(config)
 
-    assert 'workspace_name = "retail-demo-dev"' in tfvars
+    assert f'workspace_name = "{WORKSPACE_NAME}"' in tfvars
     assert 'lakehouse_name = "retail_lakehouse"' in tfvars
     assert "existing_workspace_id" not in tfvars
     assert "role_assignments = []" in tfvars
 
 
-def test_render_tfvars_spark_pool_toggle() -> None:
-    base = deploy_config.load_environment("dev")
+def test_render_tfvars_spark_pool_toggle(tmp_path: Path) -> None:
+    base = _load_config(tmp_path)
 
     # Build both states explicitly so the test does not depend on the user-set
     # use_custom_pool value committed in deploy.yml.
@@ -73,18 +128,28 @@ def test_render_tfvars_spark_pool_toggle() -> None:
     assert 'spark_custom_pool_name = "retail_setup_pool"' in tfvars
 
 
-def test_render_fabric_cicd_config_uses_environment_workspace() -> None:
-    config = deploy_config.load_environment("dev")
-    rendered = deploy_config.render_fabric_cicd_config(config)
+def test_render_fabric_cicd_config_uses_environment_workspace_id(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
+    rendered = deploy_config.render_fabric_cicd_config(
+        config,
+        {"workspace_id": "11111111-1111-4111-8111-111111111111"},
+    )
 
-    assert rendered["core"]["workspace"]["dev"] == "retail-demo-dev"
+    assert (
+        rendered["core"]["workspace_id"][ENVIRONMENT]
+        == "11111111-1111-4111-8111-111111111111"
+    )
     assert rendered["core"]["repository_directory"] == "../workspace"
-    assert rendered["publish"]["skip"]["dev"] is False
-    assert rendered["unpublish"]["skip"]["dev"] is True
+    assert rendered["publish"]["skip"][ENVIRONMENT] is False
+    assert rendered["unpublish"]["skip"][ENVIRONMENT] is True
 
 
-def test_render_parameter_file_uses_dynamic_item_references() -> None:
-    config = deploy_config.load_environment("dev")
+def test_render_parameter_file_uses_dynamic_item_references(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
     terraform_outputs = {
         "workspace_id": "11111111-1111-1111-1111-111111111111",
         "lakehouse_id": "22222222-2222-2222-2222-222222222222",
@@ -96,13 +161,15 @@ def test_render_parameter_file_uses_dynamic_item_references() -> None:
     rendered = deploy_config.render_parameter_file(config, terraform_outputs)
 
     find_values = [entry["find_value"] for entry in rendered["find_replace"]]
-    assert any("onelake\\.dfs\\.fabric\\.microsoft\\.com" in value for value in find_values)
-    assert rendered["find_replace"][0]["replace_value"]["dev"].endswith(
+    assert any(
+        "onelake\\.dfs\\.fabric\\.microsoft\\.com" in value for value in find_values
+    )
+    assert rendered["find_replace"][0]["replace_value"][ENVIRONMENT].endswith(
         "/22222222-2222-2222-2222-222222222222"
     )
     assert {
         "find_key": "$.properties.activities[*].typeProperties.workspaceId",
-        "replace_value": {"dev": "$workspace.$id"},
+        "replace_value": {ENVIRONMENT: "$workspace.$id"},
         "item_type": "DataPipeline",
     } in rendered["key_value_replace"]
     # The single hardcoded notebookId key_value_replace was replaced by one
@@ -112,16 +179,18 @@ def test_render_parameter_file_uses_dynamic_item_references() -> None:
         for entry in rendered["key_value_replace"]
     )
     notebook_replacements = {
-        entry["replace_value"]["dev"]
+        entry["replace_value"][ENVIRONMENT]
         for entry in rendered["find_replace"]
-        if isinstance(entry["replace_value"].get("dev"), str)
-        and entry["replace_value"]["dev"].startswith("$items.Notebook.")
+        if isinstance(entry["replace_value"].get(ENVIRONMENT), str)
+        and entry["replace_value"][ENVIRONMENT].startswith("$items.Notebook.")
     }
     assert "$items.Notebook.02-historical-data-load.$id" in notebook_replacements
 
 
-def test_render_parameter_file_remaps_data_agent_references() -> None:
-    config = deploy_config.load_environment("dev")
+def test_render_parameter_file_remaps_data_agent_references(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
     terraform_outputs = {
         "workspace_id": "11111111-1111-1111-1111-111111111111",
         "lakehouse_id": "22222222-2222-2222-2222-222222222222",
@@ -131,7 +200,7 @@ def test_render_parameter_file_remaps_data_agent_references() -> None:
     rendered = deploy_config.render_parameter_file(config, terraform_outputs)
 
     agent_rules = {
-        entry["find_value"]: entry["replace_value"]["dev"]
+        entry["find_value"]: entry["replace_value"][ENVIRONMENT]
         for entry in rendered["find_replace"]
         if entry.get("item_type") == "DataAgent"
     }
@@ -180,7 +249,7 @@ def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> Non
     }
 
 
-def test_committed_setup_pipeline_chains_ml_then_ontology() -> None:
+def test_committed_setup_pipeline_chains_ml_then_ontology(tmp_path: Path) -> None:
     """The committed setup pipeline must run data load -> ML notebooks -> ontology,
     with the ML and ontology notebook references mapped to deployed items."""
 
@@ -210,7 +279,7 @@ def test_committed_setup_pipeline_chains_ml_then_ontology() -> None:
     assert set(ml_names).issubset(ontology_deps)
 
     # The ML + ontology notebook GUIDs are mapped to deployed notebooks.
-    config = deploy_config.load_environment("dev")
+    config = _load_config(tmp_path)
     rendered = deploy_config.render_parameter_file(
         config,
         {
@@ -220,9 +289,9 @@ def test_committed_setup_pipeline_chains_ml_then_ontology() -> None:
         },
     )
     replacements = {
-        entry["find_value"]: entry["replace_value"]["dev"]
+        entry["find_value"]: entry["replace_value"][ENVIRONMENT]
         for entry in rendered["find_replace"]
-        if isinstance(entry["replace_value"].get("dev"), str)
+        if isinstance(entry["replace_value"].get(ENVIRONMENT), str)
     }
     assert (
         replacements[ontology["typeProperties"]["notebookId"]]
@@ -233,24 +302,75 @@ def test_committed_setup_pipeline_chains_ml_then_ontology() -> None:
         replacements[sample_ml["typeProperties"]["notebookId"]]
         == "$items.Notebook.06-ml-demand-forecast.$id"
     )
+
+
 def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
-    config = deploy_config.load_environment("dev")
-    terraform_outputs = {
-        "workspace_id": "11111111-1111-1111-1111-111111111111",
-        "lakehouse_id": "22222222-2222-2222-2222-222222222222",
-        "lakehouse_name": "retail_lakehouse",
-    }
+    config = _load_config(tmp_path)
+    terraform_outputs = _resolved_outputs(config)
 
     paths = deploy_config.write_generated_configs(config, tmp_path, terraform_outputs)
 
-    assert paths.tfvars == tmp_path / "terraform" / "environments" / "dev.tfvars"
-    assert paths.fabric_config == tmp_path / "fabric-cicd" / "config.yml"
-    assert paths.parameter == tmp_path / "fabric-cicd" / "parameter.yml"
+    generated_root = tmp_path / ".generated" / ENVIRONMENT
+    assert paths.tfvars == generated_root / "terraform.tfvars"
+    assert paths.fabric_config == generated_root / "fabric-cicd" / "config.yml"
+    assert paths.parameter == generated_root / "fabric-cicd" / "parameter.yml"
     assert paths.tfvars.read_text(encoding="utf-8").startswith(
-        'environment = "dev"'
+        f'environment = "{ENVIRONMENT}"'
     )
-    assert "core:" in paths.fabric_config.read_text(encoding="utf-8")
+    fabric_config = paths.fabric_config.read_text(encoding="utf-8")
+    assert "core:" in fabric_config
+    assert "repository_directory: ../../../workspace" in fabric_config
     assert "find_replace:" in paths.parameter.read_text(encoding="utf-8")
+
+
+def test_write_generated_configs_rejects_placeholder_outputs(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
+    outputs = _resolved_outputs(config)
+    outputs["workspace_id"] = "00000000-0000-0000-0000-000000000001"
+
+    with pytest.raises(ValueError, match="placeholder"):
+        deploy_config.write_generated_configs(config, tmp_path, outputs)
+
+
+def test_validate_terraform_outputs_rejects_wrong_workspace(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
+    outputs = _resolved_outputs(config)
+    outputs["workspace_name"] = "another-workspace"
+
+    with pytest.raises(ValueError, match="workspace_name"):
+        deploy_config.validate_terraform_outputs(config, outputs)
+
+
+def test_validate_terraform_outputs_rejects_wrong_tenant(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
+    outputs = _resolved_outputs(config)
+    outputs["tenant_id"] = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+
+    with pytest.raises(ValueError, match="tenant_id"):
+        deploy_config.validate_terraform_outputs(config, outputs)
+
+
+def test_validate_terraform_outputs_rejects_wrong_existing_workspace(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path)
+    config = replace(
+        config,
+        workspace=replace(
+            config.workspace,
+            existing_id="55555555-5555-4555-8555-555555555555",
+        ),
+    )
+    outputs = _resolved_outputs(config)
+
+    with pytest.raises(ValueError, match="workspace.existing_id"):
+        deploy_config.validate_terraform_outputs(config, outputs)
 
 
 def test_load_terraform_outputs_accepts_terraform_json_shape(tmp_path: Path) -> None:
