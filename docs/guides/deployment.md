@@ -11,10 +11,10 @@ Exact command order and failure behavior are owned by the
 !!! danger "Confirm the target"
 
     `--recreate` destroys the configured workspace and every item in it. The
-    current implementation waits 90 seconds after Terraform destroy rather than
-    polling Fabric until deletion completes. Use recreate only for a disposable
-    demo workspace after confirming the tenant, environment, workspace name,
-    and Terraform state.
+    deploy polls Fabric until the workspace name is absent and fails before
+    apply if deletion times out or pagination is incomplete. Use recreate only
+    for a disposable demo workspace after confirming the tenant, environment,
+    workspace name, and Terraform state.
 
 ## Deployment outcome
 
@@ -28,8 +28,15 @@ The current deploy plan:
 6. publishes supported items through `fabric-cicd`;
 7. builds and executes the ordered KQL database script;
 8. validates generated deployment files;
-9. attempts to deploy the workspace task flow;
-10. optionally offers to start `setup-pipeline`.
+9. deploys the workspace task flow as a required step when its source exists;
+10. optionally offers to start `setup-pipeline`; accepting makes the trigger
+    required for that run.
+
+Each live run atomically updates
+`deploy/.generated/<env>/deploy-run.json`. Inspect it for target names,
+required/optional classification, exact failed step, exit code, and final
+`SUCCEEDED`, `DEGRADED`, or `FAILED` status. Credential-like error text is
+redacted and raw subprocess output is not stored.
 
 Terraform creates or resolves the workspace and provisions the Lakehouse,
 Eventhouse, default KQL database, role assignments, and optional custom Spark

@@ -61,14 +61,17 @@ Known divergences:
   model;
 - live coverage is not equivalent for every historical fact.
 
-Watermark/replay correctness is tracked by `IMP-002`; cross-layer schema
+Watermark/replay behavior is fail-closed and contract-tested; cross-layer schema
 ownership is tracked by `IMP-005`.
 
 ## Streaming-to-Gold behavior
 
-`04-streaming-to-gold.ipynb` overwrites each of the ten Gold tables when its
-prerequisite Silver tables exist. Missing prerequisites cause the affected
-aggregate to be skipped rather than manufactured.
+`04-streaming-to-gold.ipynb` writes each of the ten Gold candidates to a
+run-scoped staging schema. All ten must exist and pass row-count/schema
+validation before promotion. The notebook captures each prior Delta version;
+an attempted promotion failure restores pre-existing targets and drops newly
+created targets in reverse order. Rollback continues after individual restore
+errors and preserves staging when manual recovery is required.
 
 ## Querysets
 

@@ -51,6 +51,7 @@ ENGINE_MODULES = [
     "generation/gold.py",
     "generation/invariants.py",
     "generation/engine.py",
+    "generation/publication.py",
     "generation/writer.py",
 ]
 
