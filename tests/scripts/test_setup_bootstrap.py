@@ -41,9 +41,24 @@ def test_setup_sh_mirrors_ps1_bootstrap_contract():
     assert script.is_file()
     assert 'CondaEnvName="retail-demo"' in content
     assert 'CondaPythonVersion="3.13"' in content
+    assert 'MiniforgeVersion="26.3.2-3"' in content
     assert 'VenvPath="$RepoRoot/.venv"' in content
     assert '"$python_exe" "$SetupPy" "$@"' in content
     assert "install_miniforge" in content
+    assert "releases/latest" not in content
+    assert "verify_sha256" in content
+    assert content.index('verify_sha256 "$installer"') < content.index(
+        'bash "$installer"'
+    )
+
+
+def test_setup_ps1_pins_miniforge_winget_install():
+    script = Path(__file__).resolve().parents[2] / "scripts" / "setup.ps1"
+    content = script.read_text(encoding="utf-8")
+
+    assert "$MiniforgeVersion = '26.3.2-3'" in content
+    assert "--version $MiniforgeVersion --source winget" in content
+    assert "--disable-interactivity --silent" in content
 
 
 def test_detect_package_manager_uses_brew_on_macos(monkeypatch):

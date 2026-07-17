@@ -29,6 +29,7 @@ RepoRoot="$(cd -- "$ScriptDir/.." && pwd)"
 SetupPy="$ScriptDir/setup.py"
 CondaEnvName="retail-demo"
 CondaPythonVersion="3.13"
+MiniforgeVersion="26.3.2-3"
 VenvPath="$RepoRoot/.venv"
 
 is_sourced() {
@@ -96,19 +97,43 @@ miniforge_installer_url() {
 
     case "$os_name:$arch" in
         Linux:x86_64|Linux:amd64)
-            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/download/$MiniforgeVersion/Miniforge3-$MiniforgeVersion-Linux-x86_64.sh"
             ;;
         Linux:aarch64|Linux:arm64)
-            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh"
+            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/download/$MiniforgeVersion/Miniforge3-$MiniforgeVersion-Linux-aarch64.sh"
             ;;
         Darwin:x86_64)
-            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-x86_64.sh"
+            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/download/$MiniforgeVersion/Miniforge3-$MiniforgeVersion-MacOSX-x86_64.sh"
             ;;
         Darwin:arm64)
-            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
+            printf '%s\n' "https://github.com/conda-forge/miniforge/releases/download/$MiniforgeVersion/Miniforge3-$MiniforgeVersion-MacOSX-arm64.sh"
             ;;
         *)
             fail "unsupported platform for automatic Miniforge install: $os_name $arch"
+            ;;
+    esac
+}
+
+miniforge_installer_sha256() {
+    local os_name arch
+    os_name="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os_name:$arch" in
+        Linux:x86_64|Linux:amd64)
+            printf '%s\n' "848194851a98903134187fbb4ab50efe87b003e0c0f808f97644b7524a62bf2c"
+            ;;
+        Linux:aarch64|Linux:arm64)
+            printf '%s\n' "2c113a69297e612b01ca0f320c22a3107a11f2ab9b573d79ac868a175945ce29"
+            ;;
+        Darwin:x86_64)
+            printf '%s\n' "39273e4c89a0a1af4538010615d44ae8f44e1af41007e02def593d20f316b003"
+            ;;
+        Darwin:arm64)
+            printf '%s\n' "59168f1e24d0a4ad9932021170809fca836cd240e183eeeb331d5bcfc0098168"
+            ;;
+        *)
+            fail "unsupported platform for Miniforge checksum: $os_name $arch"
             ;;
     esac
 }
@@ -126,6 +151,24 @@ download_file() {
         return
     fi
     fail "curl or wget is required to install Miniforge automatically"
+}
+
+verify_sha256() {
+    local path="$1"
+    local expected="$2"
+    local actual
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual="$(sha256sum "$path" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+        actual="$(shasum -a 256 "$path" | awk '{print $1}')"
+    else
+        fail "sha256sum or shasum is required to verify Miniforge"
+    fi
+
+    if [[ "$actual" != "$expected" ]]; then
+        fail "Miniforge checksum mismatch: expected $expected, got $actual"
+    fi
 }
 
 install_miniforge() {
@@ -147,6 +190,7 @@ install_miniforge() {
 
     printf 'Installing Miniforge into %s...\n' "$prefix" >&2
     download_file "$(miniforge_installer_url)" "$installer"
+    verify_sha256 "$installer" "$(miniforge_installer_sha256)"
     bash "$installer" -b -p "$prefix"
 
     if [[ ! -x "$conda" ]]; then

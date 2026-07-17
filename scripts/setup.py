@@ -313,14 +313,18 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     _emit("Installing the Python packages the demo needs (this can take a minute).")
     flags = _pip_flags()
     run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "--upgrade", "pip"],
+        [
+            str(env.python),
+            "-m",
+            "pip",
+            "install",
+            *flags,
+            "--require-hashes",
+            "-r",
+            str(REPO_ROOT / "utility" / "requirements-deploy.txt"),
+        ],
         dry_run=dry_run,
-        label="Updating pip",
-    )
-    run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "-e", str(REPO_ROOT / "utility")],
-        dry_run=dry_run,
-        label="Installing the retail-setup tool",
+        label="Installing locked Python dependencies",
     )
     run_command(
         [
@@ -329,12 +333,12 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
             "pip",
             "install",
             *flags,
-            "azure-identity",
-            "azure-kusto-data",
-            "fabric-cicd",
+            "--no-deps",
+            "-e",
+            str(REPO_ROOT / "utility"),
         ],
         dry_run=dry_run,
-        label="Installing Azure and Fabric libraries",
+        label="Installing the retail-setup tool",
     )
 
 

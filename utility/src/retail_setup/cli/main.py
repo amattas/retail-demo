@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -21,6 +22,7 @@ import typer
 import yaml
 from pydantic import ValidationError
 
+from retail_setup.cli import _deploy_journal
 from retail_setup.config.generation import GenerationConfig, load_generation_config
 from retail_setup.dictionaries.loader import (
     available_store_types,
@@ -42,9 +44,11 @@ _GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
 _DEFAULT_MONTHS = 3
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
-# capacity before the same name can be created again. 30s proved too short, so
-# we wait longer before terraform apply recreates everything.
-_RECREATE_WAIT_SECONDS = 90
+# capacity before the same name can be created again. Rather than a blind
+# fixed-duration sleep, the deploy polls Fabric for the workspace's absence,
+# bounded by this timeout, checking every `_DELETION_WAIT_INTERVAL_SECONDS`.
+_DELETION_WAIT_TIMEOUT_SECONDS = 180
+_DELETION_WAIT_INTERVAL_SECONDS = 10
 
 # The setup pipeline runs asynchronously in Fabric; the CLI only needs to start
 # it. Retry the start a few times so a single transient failure (e.g. a cold az
@@ -559,6 +563,27 @@ def _workspace_exists(repo_root: Path, workspace_name: str) -> bool:
     return any(str(item.get("displayName", "")) == workspace_name for item in data.get("value", []))
 
 
+def _wait_for_workspace_deletion(repo_root: Path, workspace_name: str, auth_mode: str) -> None:
+    """Poll Fabric until `workspace_name` is gone, or raise on timeout.
+
+    Reuses the deploy framework's shared credential helper so the operator's
+    configured `auth_mode` is always honored (never silently falling back to
+    Azure CLI when `azure_powershell` is selected). Replaces the old
+    fixed-duration sleep that used to follow a recreate destroy.
+    """
+    root = str(repo_root)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from deploy.scripts._workspace_wait import wait_for_workspace_absence
+
+    wait_for_workspace_absence(
+        workspace_name,
+        auth_mode=auth_mode,
+        timeout_seconds=_DELETION_WAIT_TIMEOUT_SECONDS,
+        poll_interval_seconds=_DELETION_WAIT_INTERVAL_SECONDS,
+    )
+
+
 def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
     """Pin the dictionary ref: explicit --ref, else HEAD SHA, else 'main' with a warning."""
     if ref:
@@ -634,12 +659,27 @@ def render(
     typer.echo(f"  - Run `retail-setup deploy --env {env}` to publish them automatically.")
 
 
+def _slugify(text: str) -> str:
+    """Turn a free-form description into a stable, file/JSON-safe step id."""
+    chars = [c.lower() if c.isalnum() else "-" for c in text]
+    slug = "".join(chars)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-") or "step"
+
+
 @dataclass
 class DeployStep:
-    """One subprocess step in the deploy plan.
+    """One step in the deploy plan: a subprocess command or a Python action.
 
     `output_file` (repo-root-relative) captures the step's stdout to a file
-    (used for `terraform output -json`) without shell redirection.
+    (used for `terraform output -json`) without shell redirection. `action`,
+    when set, replaces subprocess execution with a direct Python callable
+    (used for the post-destroy deletion-wait poll); `cmd` is still shown for
+    display. `required` controls whether the step's failure fails the whole
+    deploy (FAILED) or only degrades it (DEGRADED); `step_id` is a stable
+    identifier used by the durable deploy journal and defaults to a slug of
+    `description` when not given explicitly.
     """
 
     cmd: list[str] = field(default_factory=list)
@@ -662,6 +702,7 @@ def _deploy_plan(
     lakehouse_name: str = "retail_lakehouse",
     recreate: bool = False,
     auth_mode: str = "azure_cli",
+    workspace_name: str | None = None,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     py = sys.executable
@@ -679,6 +720,7 @@ def _deploy_plan(
         DeployStep(
             cmd=generate_config_command,
             description="Generate deployment configs",
+            step_id="generate-configs",
         )
     ]
     if not skip_terraform:
@@ -700,6 +742,11 @@ def _deploy_plan(
             ),
         ]
         if recreate:
+            ws_name = workspace_name or f"retail-demo-{env}"
+
+            def _deletion_wait_action(repo_root: Path) -> None:
+                _wait_for_workspace_deletion(repo_root, ws_name, auth_mode)
+
             steps += [
                 DeployStep(
                     cmd=[
@@ -715,10 +762,17 @@ def _deploy_plan(
                     process_environment=terraform_environment,
                 ),
                 DeployStep(
-                    cmd=[py, "-c", f"import time; time.sleep({_RECREATE_WAIT_SECONDS})"],
+                    cmd=[
+                        "python",
+                        "-c",
+                        f"wait_for_fabric_workspace_absence({ws_name!r})",
+                    ],
                     description=(
-                        f"Wait {_RECREATE_WAIT_SECONDS}s for Fabric to finalize workspace deletion"
+                        f"Wait for Fabric to release workspace {ws_name!r} "
+                        f"(up to {_DELETION_WAIT_TIMEOUT_SECONDS}s)"
                     ),
+                    step_id="deletion-wait",
+                    action=_deletion_wait_action,
                 ),
             ]
         steps += [
@@ -753,6 +807,7 @@ def _deploy_plan(
                     tf_output,
                 ],
                 description="Regenerate configs with Terraform outputs",
+                step_id="regenerate-configs",
             ),
         ]
     steps += [
@@ -772,6 +827,7 @@ def _deploy_plan(
                 lakehouse_name,
             ],
             description="Build deployment artifacts",
+            step_id="build-artifacts",
         ),
         DeployStep(
             cmd=[
@@ -786,6 +842,7 @@ def _deploy_plan(
                 auth_mode,
             ],
             description="Deploy Fabric items",
+            step_id="deploy-items",
         ),
         DeployStep(
             cmd=[
@@ -801,10 +858,12 @@ def _deploy_plan(
                 f"deploy/.generated/{env}/database.kql",
             ],
             description="Apply KQL database script",
+            step_id="apply-kql",
         ),
         DeployStep(
             cmd=[py, "-m", "deploy.scripts.validate_deployment", "--environment", env],
             description="Validate deployment",
+            step_id="validate-deployment",
         ),
     ]
     return steps
@@ -877,10 +936,38 @@ def _cleanup_destroy_step(env: str) -> DeployStep:
     )
 
 
-def _run_plan_plain(
-    repo_root: Path, env: str, plan: list[DeployStep], total: int, *, yes: bool
+def _journal_abort(
+    repo_root: Path,
+    journal: _deploy_journal.DeployJournal,
+    step_id: str,
+    *,
+    error: str,
+    exit_code: int | None = None,
 ) -> None:
-    """Execute the deploy plan linearly with clear command dividers."""
+    """Record a step as FAILED and persist the journal before an abort.
+
+    Used for every failure path (subprocess exit, missing executable, action
+    exception, user decline) so the durable journal always reflects the exact
+    step that failed, even if the process is later interrupted.
+    """
+    _deploy_journal.mark_failed(journal, step_id, exit_code=exit_code, error=error)
+    _deploy_journal.write(repo_root, journal)
+
+
+def _run_plan_plain(
+    repo_root: Path,
+    env: str,
+    plan: list[DeployStep],
+    total: int,
+    *,
+    yes: bool,
+    journal: _deploy_journal.DeployJournal,
+) -> None:
+    """Execute the deploy plan linearly with clear command dividers.
+
+    Journals each step's RUNNING/SUCCEEDED/FAILED transition (never the raw
+    command output) so a durable record survives even an interrupted process.
+    """
     _ = env
     for i, step in enumerate(plan, start=1):
         _echo_step(i, total, step)
@@ -888,6 +975,7 @@ def _run_plan_plain(
         if step.needs_confirmation and not yes:
             if not typer.confirm(f"Proceed with: {step.description}?"):
                 typer.echo("Aborted by user.")
+                _journal_abort(repo_root, journal, step.step_id, error="Aborted by user")
                 raise typer.Exit(code=1)
         _deploy_journal.mark_running(journal, step.step_id)
         _deploy_journal.write(repo_root, journal)
@@ -900,7 +988,9 @@ def _run_plan_plain(
             if terraform_data_dir and not Path(terraform_data_dir).is_absolute():
                 process_environment["TF_DATA_DIR"] = str((repo_root / terraform_data_dir).resolve())
         try:
-            if step.output_file:
+            if step.action is not None:
+                step.action(repo_root)
+            elif step.output_file:
                 out_path = repo_root / step.output_file
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 if process_environment is None:
@@ -935,14 +1025,37 @@ def _run_plan_plain(
                 err=True,
             )
             typer.echo(_missing_executable_message(executable), err=True)
+            _journal_abort(
+                repo_root, journal, step.step_id, error=f"executable not found: {executable}"
+            )
             raise typer.Exit(code=127) from None
-        if result.returncode != 0:
+        except Exception as exc:
+            # Action-based steps (e.g. the deletion-wait poll) call into the
+            # Azure/Fabric SDKs, which can raise varied exception types (auth
+            # failures, network errors, our own deletion timeout); any of them
+            # aborts the deploy, so they're handled the same way as a
+            # nonzero subprocess exit rather than left to crash with a
+            # traceback.
+            typer.echo(
+                f"Deploy failed at step {i}/{total}: {step.description}",
+                err=True,
+            )
+            typer.echo(str(exc), err=True)
+            _journal_abort(repo_root, journal, step.step_id, error=str(exc))
+            raise typer.Exit(code=1) from exc
+        if result is not None and result.returncode != 0:
             typer.echo(
                 f"Deploy failed at step {i}/{total} "
                 f"(exit {result.returncode}): {' '.join(step.cmd)}",
                 err=True,
             )
+            _deploy_journal.mark_failed(journal, step.step_id, exit_code=result.returncode)
+            _deploy_journal.write(repo_root, journal)
             raise typer.Exit(code=result.returncode)
+        _deploy_journal.mark_succeeded(
+            journal, step.step_id, exit_code=result.returncode if result is not None else 0
+        )
+        _deploy_journal.write(repo_root, journal)
 
 
 @app.command()
@@ -1006,8 +1119,8 @@ def deploy(
         typer.echo("!" * 70)
         typer.echo("  WARNING: --recreate will DESTROY the existing workspace and ALL items")
         typer.echo(
-            f"  in it, wait {_RECREATE_WAIT_SECONDS} seconds, then recreate "
-            "everything from scratch."
+            f"  in it, wait up to {_DELETION_WAIT_TIMEOUT_SECONDS} seconds for Fabric to "
+            "release the name, then recreate everything from scratch."
         )
         typer.echo("!" * 70)
     if dry_run:
@@ -1015,18 +1128,20 @@ def deploy(
         try:
             lakehouse = _lakehouse_name(repo_root, env)
             auth_mode = _auth_mode(repo_root, env)
+            ws_name = _workspace_name(repo_root, env)
         except (ImportError, typer.Exit, OSError, KeyError, yaml.YAMLError):
             lakehouse = "retail_lakehouse"
             auth_mode = "azure_cli"
+            ws_name = f"retail-demo-{env}"
             typer.echo("note: deploy config unavailable; plan shows default lakehouse name")
     else:
         lakehouse = _lakehouse_name(repo_root, env)
         auth_mode = _auth_mode(repo_root, env)
+        ws_name = _workspace_name(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.
         if not recreate and not skip_terraform and not yes:
-            ws_name = _workspace_name(repo_root, env)
             if _workspace_exists(repo_root, ws_name):
                 typer.echo("")
                 typer.echo(f"Workspace '{ws_name}' already exists from a previous deploy.")
@@ -1044,6 +1159,7 @@ def deploy(
         lakehouse_name=lakehouse,
         recreate=recreate,
         auth_mode=auth_mode,
+        workspace_name=ws_name,
     )
     total = len(plan)
 
@@ -1054,33 +1170,78 @@ def deploy(
             _echo_step(i, total, step)
         return
 
-    _run_plan_plain(repo_root, env, plan, total, yes=yes)
+    run_journal = _deploy_journal.start_run(
+        env,
+        targets={
+            "workspace_name": ws_name,
+            "lakehouse_name": lakehouse,
+            "auth_mode": auth_mode,
+            "recreate": str(recreate),
+        },
+    )
+    for step in plan:
+        _deploy_journal.add_step(
+            run_journal, step.step_id, step.description, required=step.required
+        )
+    _deploy_journal.write(repo_root, run_journal)
 
-    typer.echo("")
-    _hr("=")
-    typer.echo(f"  Deploy complete for environment '{env}'.")
-    _hr("=")
+    _run_plan_plain(repo_root, env, plan, total, yes=yes, journal=run_journal)
 
     # Wire up the workspace task flow automatically (the visual item graph that
-    # links the deployed items). Runs in both interactive and --yes modes.
+    # links the deployed items). Runs in both interactive and --yes modes, and
+    # (when the task flow exists) is required: a failure here aborts the
+    # deploy instead of leaving an unlinked workspace silently reported as
+    # complete.
     taskflow_path = repo_root / "fabric" / "taskflow" / "taskflow.json"
     if taskflow_path.is_file():
+        _deploy_journal.add_step(
+            run_journal, "task-flow-deploy", "Deploy workspace task flow", required=True
+        )
+        _deploy_journal.write(repo_root, run_journal)
         typer.echo("Wiring up the workspace task flow (the visual item graph)...")
-        _deploy_taskflow(repo_root, env, auth_mode=auth_mode)
+        _deploy_taskflow(repo_root, env, auth_mode=auth_mode, journal=run_journal)
 
-    if not yes:
+    _deploy_journal.add_step(
+        run_journal, "setup-pipeline-trigger", "Trigger the setup pipeline", required=False
+    )
+    if yes:
+        _deploy_journal.mark_skipped(
+            run_journal, "setup-pipeline-trigger", reason="--yes suppresses the prompt"
+        )
+        _deploy_journal.write(repo_root, run_journal)
+    else:
+        _deploy_journal.write(repo_root, run_journal)
         if typer.confirm(
             "Run the setup pipeline now (generate dimensions, facts, and gold, "
             "then train the ML models and build the ontology)?",
             default=False,
         ):
-            _run_setup_pipeline(repo_root, env, auth_mode=auth_mode)
+            # The operator explicitly requested this, so it becomes required
+            # for this run: exhausting the trigger retries now fails the
+            # deploy instead of quietly leaving the pipeline unstarted.
+            _deploy_journal.mark_required(run_journal, "setup-pipeline-trigger")
+            _run_setup_pipeline(repo_root, env, auth_mode=auth_mode, journal=run_journal)
             _print_ontology_relink_hint(repo_root, env, auth_mode=auth_mode)
         else:
+            _deploy_journal.mark_skipped(
+                run_journal, "setup-pipeline-trigger", reason="declined by operator"
+            )
+            _deploy_journal.write(repo_root, run_journal)
             typer.echo(
                 "Skipping. Run later with: "
                 "retail-setup deploy --env " + env + " (or trigger 'setup-pipeline' in Fabric)."
             )
+
+    _deploy_journal.write(repo_root, run_journal)
+    typer.echo("")
+    _hr("=")
+    typer.echo(f"  Deploy complete for environment '{env}'.")
+    if run_journal.status == "DEGRADED":
+        typer.echo(
+            "  Note: a non-critical step was skipped or failed; see "
+            f"{_deploy_journal.journal_path(repo_root, env)} for details."
+        )
+    _hr("=")
 
 
 def _deploy_taskflow(
@@ -1088,8 +1249,15 @@ def _deploy_taskflow(
     env: str,
     *,
     auth_mode: str = "azure_cli",
+    journal: _deploy_journal.DeployJournal | None = None,
 ) -> None:
-    """Deploy the workspace task flow to the target workspace."""
+    """Deploy the workspace task flow to the target workspace.
+
+    Required whenever it is invoked (the caller only invokes it when
+    ``fabric/taskflow/taskflow.json`` exists): a nonzero exit raises
+    `typer.Exit` with that code instead of just warning, so a broken task-flow
+    wiring never gets reported as a completed deploy.
+    """
 
     workspace = _workspace_name(repo_root, env)
     cmd = [
@@ -1103,6 +1271,9 @@ def _deploy_taskflow(
         auth_mode,
     ]
     typer.echo("    " + " ".join(cmd))
+    if journal is not None:
+        _deploy_journal.mark_running(journal, "task-flow-deploy")
+        _deploy_journal.write(repo_root, journal)
     result = subprocess.run(cmd, cwd=repo_root)
     if result.returncode != 0:
         typer.echo(
@@ -1111,6 +1282,18 @@ def _deploy_taskflow(
             f"--workspace {workspace!r} --auth-mode {auth_mode}.",
             err=True,
         )
+        if journal is not None:
+            _journal_abort(
+                repo_root,
+                journal,
+                "task-flow-deploy",
+                error=f"task flow deploy exited {result.returncode}",
+                exit_code=result.returncode,
+            )
+        raise typer.Exit(code=result.returncode)
+    if journal is not None:
+        _deploy_journal.mark_succeeded(journal, "task-flow-deploy", exit_code=result.returncode)
+        _deploy_journal.write(repo_root, journal)
 
 
 def _print_ontology_relink_hint(
@@ -1146,12 +1329,15 @@ def _run_setup_pipeline(
     env: str,
     *,
     auth_mode: str = "azure_cli",
+    journal: _deploy_journal.DeployJournal | None = None,
 ) -> None:
     """Start an on-demand run of the deployed setup pipeline.
 
     Prints a heads-up that generation can take a while (it runs asynchronously in
     Fabric) and retries the trigger a few times so a transient failure doesn't
-    leave the pipeline unstarted.
+    leave the pipeline unstarted. Only ever called once the operator has
+    requested it, which makes the trigger required for this run: exhausting
+    all retry attempts raises `typer.Exit` with the last nonzero exit code.
     """
 
     typer.echo("")
@@ -1175,9 +1361,18 @@ def _run_setup_pipeline(
         auth_mode,
     ]
     typer.echo("    " + " ".join(cmd))
+    if journal is not None:
+        _deploy_journal.mark_running(journal, "setup-pipeline-trigger")
+        _deploy_journal.write(repo_root, journal)
+    result = None
     for attempt in range(1, _PIPELINE_TRIGGER_ATTEMPTS + 1):
         result = subprocess.run(cmd, cwd=repo_root)
         if result.returncode == 0:
+            if journal is not None:
+                _deploy_journal.mark_succeeded(
+                    journal, "setup-pipeline-trigger", exit_code=result.returncode
+                )
+                _deploy_journal.write(repo_root, journal)
             return
         if attempt < _PIPELINE_TRIGGER_ATTEMPTS:
             typer.echo(
@@ -1191,6 +1386,15 @@ def _run_setup_pipeline(
         "in Fabric and run 'setup-pipeline' manually.",
         err=True,
     )
+    if journal is not None:
+        _journal_abort(
+            repo_root,
+            journal,
+            "setup-pipeline-trigger",
+            error=f"trigger exhausted {_PIPELINE_TRIGGER_ATTEMPTS} attempts",
+            exit_code=result.returncode if result is not None else None,
+        )
+    raise typer.Exit(code=result.returncode if result is not None else 1)
 
 
 if __name__ == "__main__":
