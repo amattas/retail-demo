@@ -16,18 +16,18 @@ The supported repository path is:
 | Location | Ownership |
 | --- | --- |
 | `deploy/config/deploy.yml` | Shared deployment defaults |
-| `deploy/config/environments/<env>.yml` | Environment overlay |
+| `deploy/config/environments/<env>.yml` | Ignored workspace target overlay |
 | `utility/config.yaml` | Ignored local generation configuration |
 | `utility/out/` | Rendered notebooks |
-| `deploy/terraform/environments/<env>.tfvars` | Generated, tracked Terraform input |
-| `deploy/fabric-cicd/config.yml` | Generated, tracked publication configuration |
-| `deploy/fabric-cicd/parameter.yml` | Generated, tracked binding rewrites |
-| `deploy/.generated/<env>/` | Ignored live Terraform outputs and combined KQL |
+| `deploy/.generated/<env>/terraform.tfvars` | Ignored Terraform input |
+| `deploy/.generated/<env>/terraform.tfstate` | Ignored isolated Terraform state |
+| `deploy/.generated/<env>/fabric-cicd/` | Ignored publication config and rewrites |
+| `deploy/.generated/<env>/` | Ignored live outputs, run journal, and combined KQL |
 | `deploy/workspace/` | Generated Fabric item staging |
 
-Environment selection must be explicit. Generated tracked files are reviewable
-templates, not authoritative target state. Ignored generated and local files
-are not durable sources of truth.
+The environment key is derived from the workspace name. Environment selection
+must be explicit for render and deploy. Local target and generated files are
+not durable sources of truth.
 
 ## Time and determinism
 

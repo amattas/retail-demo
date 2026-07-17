@@ -11,7 +11,7 @@ sequenceDiagram
     participant Deploy as deploy/scripts
     participant Fabric as Fabric workspace
 
-    User->>CLI: configure --env <env>
+    User->>CLI: configure --workspace-name <workspace>
     CLI->>Config: persist target and generation settings
     User->>CLI: render --env <env>
     CLI->>Render: render setup-01..04 and stream-events

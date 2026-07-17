@@ -20,31 +20,31 @@ Run the guided bootstrap:
 ```powershell
 git clone https://github.com/amattas/retail-demo.git
 Set-Location retail-demo
-.\scripts\setup.ps1 --env dev
+.\scripts\setup.ps1 --workspace-name retail-demo-alice
 ```
 
 ```bash
 git clone https://github.com/amattas/retail-demo.git
 cd retail-demo
-./scripts/setup.sh --env dev
+./scripts/setup.sh --workspace-name retail-demo-alice
 ```
 
 The bootstrap prepares Python, configures the target, renders notebooks, and
 offers to deploy. To deploy without the prompts:
 
 ```powershell
-.\scripts\setup.ps1 --env dev --deploy
+.\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
 ```
 
 For a manually managed Python environment:
 
 ```powershell
-python -m pip install -e .\utility
-python -m pip install azure-identity azure-kusto-data fabric-cicd
-retail-setup configure --env dev --months 3 --store-count 50 --seed 42
-retail-setup render --env dev
-retail-setup deploy --env dev --dry-run
-retail-setup deploy --env dev --yes
+python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
+python -m pip install --no-deps -e .\utility
+retail-setup configure --workspace-name retail-demo-alice --months 3 --store-count 50 --seed 42
+retail-setup render --env alice
+retail-setup deploy --env alice --dry-run
+retail-setup deploy --env alice --yes
 ```
 
 Rendering produces five workspace-specific notebooks in `utility\out\`:

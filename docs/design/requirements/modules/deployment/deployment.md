@@ -2,8 +2,9 @@
 
 ### REQ-DEPLOY-001 - Environment boundary
 
-Every deploy shall resolve one explicit environment and validate its tenant,
-workspace, resource identifiers, and isolated Terraform state before mutation.
+Every deploy shall resolve one explicit workspace-derived environment and
+validate its tenant, workspace, resource identifiers, and isolated Terraform
+state before mutation.
 
 ### REQ-DEPLOY-002 - Ordered publication
 

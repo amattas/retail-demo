@@ -1,6 +1,8 @@
 terraform {
   required_version = ">= 1.8, < 2.0"
 
+  backend "local" {}
+
   required_providers {
     fabric = {
       source  = "microsoft/fabric"

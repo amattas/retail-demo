@@ -6,16 +6,17 @@ engine, notebook templates, dictionaries, and tests.
 ## Workflow
 
 ```powershell
-python -m pip install -e .\utility
-python -m pip install azure-identity azure-kusto-data fabric-cicd
-retail-setup configure --env dev --months 3 --store-count 50 --seed 42
-retail-setup render --env dev
-retail-setup deploy --env dev --dry-run
-retail-setup deploy --env dev
+python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
+python -m pip install --no-deps -e .\utility
+retail-setup configure --workspace-name retail-demo-alice --months 3 --store-count 50 --seed 42
+retail-setup render --env alice
+retail-setup deploy --env alice --dry-run
+retail-setup deploy --env alice
 ```
 
-`configure` writes ignored local generation settings and target deployment
-configuration. `render` writes five notebooks to `utility\out\`:
+`configure` derives the environment key from the workspace name and writes
+ignored local generation and target configuration. `render` writes five
+notebooks to `utility\out\`:
 
 - `setup-01-seed-dictionaries.ipynb`
 - `setup-02-generate-dimensions.ipynb`

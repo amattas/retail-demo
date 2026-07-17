@@ -127,32 +127,28 @@ The deploy REST and KQL helpers then use `AzurePowerShellCredential`. The guided
 
 ## Configure an environment
 
-The repository includes `dev`, `test`, and `prod` environment overlays.
-Environment selection controls the workspace overlay and generated output
-paths, but the current local Terraform state is not isolated per environment.
-Do not run environments concurrently from one checkout.
+The workspace name defines the environment. `configure` normalizes the name to
+lowercase hyphenated text and omits a leading `retail-demo-` prefix. For
+example, workspace `retail-demo-alice` uses environment `alice`. Each workspace
+gets its own ignored target overlay, generated inputs, Terraform data
+directory, state, outputs, and run journal.
 
 Run:
 
 ```powershell
-retail-setup configure --env dev
-retail-setup render --env dev
+retail-setup configure --workspace-name retail-demo-alice
+retail-setup render --env alice
 ```
 
-Review the resulting target:
-
-```powershell
-git --no-pager diff -- `
-  deploy\config\deploy.yml `
-  deploy\config\environments\dev.yml
-```
+`configure` prints the derived environment key. Configure another workspace to
+create another local environment without replacing the first.
 
 Important configuration boundaries:
 
 | Path | Purpose | Tracked |
 | --- | --- | --- |
-| `deploy/config/deploy.yml` | Shared deployment defaults and target names | Yes |
-| `deploy/config/environments/<env>.yml` | Environment workspace overlay | Yes |
+| `deploy/config/deploy.yml` | Shared deployment defaults | Yes |
+| `deploy/config/environments/<env>.yml` | Workspace-specific target overlay | No |
 | `utility/config.yaml` | Local generation scale and seed | No |
 | `utility/out/` | Rendered workspace-specific notebooks | No |
 
@@ -170,13 +166,13 @@ resource and the F64-oriented defaults are intentional:
 - autoscale from 1 to 10 nodes
 - dynamic executor allocation enabled
 
-Change these values in `deploy/config/deploy.yml` only after checking capacity
-limits.
+Change these values in the workspace environment overlay only after checking
+capacity limits.
 
 ## Preview the plan
 
 ```powershell
-retail-setup deploy --env dev --dry-run
+retail-setup deploy --env alice --dry-run
 ```
 
 The preview prints the ordered commands and confirmation gates. It does not:
@@ -196,13 +192,13 @@ separate plan review before the confirmation.
 Interactive:
 
 ```powershell
-retail-setup deploy --env dev
+retail-setup deploy --env alice
 ```
 
 Pre-confirm the Terraform apply gate:
 
 ```powershell
-retail-setup deploy --env dev --yes
+retail-setup deploy --env alice --yes
 ```
 
 Without `--yes`, an existing workspace detected by display name produces a
@@ -220,16 +216,24 @@ Deployment writes or refreshes:
 
 | Path | Content | Git status |
 | --- | --- | --- |
-| `deploy/terraform/environments/<env>.tfvars` | Terraform input generated from merged YAML | Tracked |
-| `deploy/fabric-cicd/config.yml` | `fabric-cicd` environment and item scope | Tracked |
-| `deploy/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Tracked |
+| `deploy/.generated/<env>/terraform.tfvars` | Terraform input generated from merged YAML | Ignored |
+| `deploy/.generated/<env>/terraform.tfstate` | Environment-local Terraform state | Ignored |
+| `deploy/.generated/<env>/.terraform/` | Environment-local Terraform data directory | Ignored |
+| `deploy/.generated/<env>/fabric-cicd/config.yml` | `fabric-cicd` environment and item scope | Ignored |
+| `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Ignored |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live Fabric item identifiers | Ignored |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | Ignored |
 | `deploy/workspace/` | Staged Fabric item folders | Ignored except `.gitkeep` |
 
-The first three paths are generated but checked in as reviewable templates.
-Review their diffs before committing. Never commit credentials, tokens, or
-environment secrets.
+Terraform operations for different environments use different backend and data
+paths. Full publication still shares `deploy/workspace/` staging; use separate
+checkouts for concurrent full deploys. Never commit local target overlays,
+credentials, tokens, or generated bindings.
+
+If an older checkout left state at `deploy/terraform/terraform.tfstate`, deploy
+stops before Terraform. Verify which workspace owns that state, then move it to
+`deploy/.generated/<env>/terraform.tfstate`. Never copy one legacy state into
+multiple environments.
 
 ## Existing workspaces
 
@@ -245,12 +249,12 @@ Use `--skip-terraform` only when all required resources already exist and
 from an earlier deployment:
 
 ```powershell
-retail-setup deploy --env dev --skip-terraform
+retail-setup deploy --env alice --skip-terraform
 ```
 
-Downstream KQL and pipeline helpers read that output file. A first-time
-`--skip-terraform` run without valid outputs is not a supported resource
-discovery path.
+Before publication, the command verifies the captured environment, workspace
+and resource names, required Fabric IDs, and absence of placeholder IDs. A
+first-time or wrong-workspace `--skip-terraform` run fails before mutation.
 
 `--skip-terraform` cannot be combined with `--recreate`.
 
@@ -259,18 +263,18 @@ discovery path.
 Preview:
 
 ```powershell
-retail-setup deploy --env dev --recreate --dry-run
+retail-setup deploy --env alice --recreate --dry-run
 ```
 
 Execute:
 
 ```powershell
-retail-setup deploy --env dev --recreate
+retail-setup deploy --env alice --recreate
 ```
 
-The current sequence is Terraform destroy, a fixed 90-second wait, Terraform
-apply, and normal publication. Preserve run evidence and verify deletion before
-retrying if Fabric has not finalized the old workspace after the wait.
+The current sequence is Terraform destroy, bounded polling until the workspace
+name is absent, Terraform apply, and normal publication. Preserve run evidence
+before retrying if Fabric does not release the workspace within 180 seconds.
 
 Do not use `99-reset-lakehouse` as part of normal deployment. It is a manual,
 destructive data reset asset.
@@ -295,7 +299,7 @@ If you used `--yes`, trigger the pipeline manually in Fabric or run:
 
 ```powershell
 python -m deploy.scripts.run_pipeline `
-  --environment dev `
+  --environment alice `
   --pipeline setup-pipeline `
   --auth-mode azure_cli
 ```
@@ -309,7 +313,7 @@ ontology. After the pipeline succeeds, run:
 
 ```powershell
 python -m deploy.scripts.taskflow deploy `
-  --workspace retail-demo-dev `
+  --workspace retail-demo-alice `
   --auth-mode azure_cli
 ```
 
@@ -340,10 +344,9 @@ For normal source or configuration changes:
 6. rerun only the data or optional workloads affected by the change;
 7. validate live bindings and freshness.
 
-The current environment overlays share one local Terraform state location.
-Finish one environment and preserve its state/output evidence before switching
-to another. Environment isolation is tracked by
-[IMP-004](../design/requirements/modules/deployment/backlog.md#imp-004).
+Environment-local Terraform paths make switching between workspaces safe.
+Preserve each environment's ignored `.generated/<env>/` directory when its
+state and output evidence must survive cleanup.
 
 ## Troubleshooting
 
@@ -355,22 +358,18 @@ to another. Environment isolation is tracked by
 | Custom Spark pool fails | Reconfigure with `--no-custom-spark-pool` unless preview support and capacity sizing are intentional. |
 | Terraform executable missing | Install Terraform or use `--skip-terraform` only with valid prior outputs. |
 | Workspace already exists | Update in place, configure `workspace.existing_id`, or explicitly recreate a disposable target. |
-| Fabric item publish fails | Inspect the failing item type and generated `parameter.yml`; do not treat later steps as completed. |
+| Fabric item publish fails | Inspect the failing item type and generated `.generated/<env>/fabric-cicd/parameter.yml`; do not treat later steps as completed. |
 | KQL application fails | Inspect `deploy/.generated/<env>/database.kql`, target IDs, database name, and operator permissions; rerun the ordered script as one database script. |
 | Local validation passes but workspace is unusable | Perform the live checks in the operations guide; local validation is offline only. |
 | Setup pipeline did not start | Start `setup-pipeline` in Fabric or use `deploy.scripts.run_pipeline`. |
 | Ontology task-flow link is absent | Wait for ontology creation, then redeploy the task flow. |
 | Live rows are absent | Check notebook sink parameters, Query URI resolution, KQL permissions, connector errors, and ingestion timestamps. |
-| Deployment files appear modified | Expected generated tracked files include environment tfvars and `fabric-cicd` config/parameters; review before committing. |
+| `--skip-terraform` rejects outputs | Use outputs captured for the same environment and workspace; run the normal Terraform path to refresh missing or stale identities. |
 
 ## Current limitations
 
 - Authentication and target propagation:
   [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
-- Required-step failure and replay safety:
-  [IMP-002](../design/requirements/modules/operations/backlog.md#imp-002)
-- Environment and Terraform state isolation:
-  [IMP-004](../design/requirements/modules/deployment/backlog.md#imp-004)
 - Tiered GA-safe deployment profiles:
   [IMP-012](../design/requirements/modules/deployment/backlog.md#imp-012)
 - Live post-deploy readiness:

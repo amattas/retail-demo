@@ -16,19 +16,20 @@ prerequisite check still expects Azure CLI.
 
 ## `configure`
 
-`retail-setup configure --env <name>` writes:
+`retail-setup configure --workspace-name <name>` writes:
 
-- `deploy/config/deploy.yml`
-- `deploy/config/environments/<name>.yml`
+- ignored `deploy/config/environments/<env>.yml`
 - ignored `utility/config.yaml`
 
-The two deployment YAML files are tracked and can become modified by local
-configuration. They are reviewable inputs, not secret stores.
+The environment key is derived from the normalized workspace name. A leading
+`retail-demo-` prefix is omitted, so workspace `retail-demo-alice` maps to
+environment `alice`. Reconfiguring another workspace creates another local
+overlay instead of changing shared defaults.
 
 The active non-interactive inputs include:
 
 - tenant, workspace, capacity, Lakehouse, Eventhouse, and KQL database names;
-- authentication mode and environment;
+- authentication mode; the workspace name determines the environment;
 - store type: `supercenter`, `grocery`, `hardware`, or `luxury`;
 - history `months`, store count, and deterministic seed.
 
@@ -86,9 +87,10 @@ plan, deploys the task flow, and can start `setup-pipeline`.
 ML notebooks 06 through 14, and ontology creation.
 
 `--yes` pre-confirms Terraform apply but suppresses the interactive
-setup-pipeline prompt. `--skip-terraform` requires accurate prior Terraform
-outputs for downstream workspace and KQL identifiers. `--recreate` uses a
-fixed 90-second wait between destroy and apply.
+setup-pipeline prompt. `--skip-terraform` rejects missing, placeholder,
+incomplete, or wrong-workspace Terraform outputs before publication.
+`--recreate` polls for workspace-name release for up to 180 seconds between
+destroy and apply.
 
 ## Output behavior
 

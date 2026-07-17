@@ -78,8 +78,8 @@ capacity. The custom-pool resource uses Fabric provider preview support.
     ```
 
 Use a clean clone or review existing local deployment configuration before
-continuing. Configuration writes environment-specific values into tracked
-deployment files.
+continuing. Workspace-specific target values are stored in ignored local
+environment files.
 
 ## 3. Choose a setup path
 
@@ -90,13 +90,13 @@ Use this path for a first deployment.
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --env dev
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --env dev
+    ./scripts/setup.sh --workspace-name retail-demo-alice
     ```
 
 The wrapper:
@@ -114,20 +114,20 @@ To proceed directly to the deploy phase after configuration:
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --env dev --deploy
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --env dev --deploy
+    ./scripts/setup.sh --workspace-name retail-demo-alice --deploy
     ```
 
 Useful bootstrap flags:
 
 | Flag | Behavior |
 | --- | --- |
-| `--env <name>` | Selects an existing environment overlay such as `dev`, `test`, or `prod`. |
+| `--workspace-name <name>` | Names the Fabric workspace and derives its local environment key. |
 | `--deploy` | Runs deploy after configure and render. |
 | `--dry-run` | Previews setup-engine commands; the wrapper may still prepare or activate Python first. |
 | `--skip-prereqs` | Skips package-manager installation of Git, Terraform, and Azure CLI. |
@@ -163,14 +163,14 @@ Use this path when you want to run each command explicitly.
 Interactive configuration:
 
 ```powershell
-retail-setup configure --env dev
+retail-setup configure --workspace-name retail-demo-alice
 ```
 
 Review these choices:
 
 | Choice | Guidance |
 | --- | --- |
-| Environment | `dev`, `test`, and `prod` overlays are checked in. Use a dedicated environment and workspace name. |
+| Workspace/environment | Use a dedicated workspace. The normalized workspace name becomes its local environment key; `retail-demo-alice` becomes `alice`. |
 | Tenant | Use the Entra tenant that contains the Fabric capacity. |
 | Capacity | The capacity must be active and usable by the deploy operator. |
 | Lakehouse | Keep the default unless another checked-in binding requires a deliberate rename. |
@@ -188,9 +188,8 @@ Non-interactive starter-pool example:
 
     ```powershell
     retail-setup configure `
-      --env dev `
       --tenant-id 00000000-0000-0000-0000-000000000000 `
-      --workspace-name retail-demo-dev `
+      --workspace-name retail-demo-alice `
       --capacity-name my-fabric-capacity `
       --lakehouse-name retail_lakehouse `
       --eventhouse-name retail_eventhouse `
@@ -206,9 +205,8 @@ Non-interactive starter-pool example:
 
     ```bash
     retail-setup configure \
-      --env dev \
       --tenant-id 00000000-0000-0000-0000-000000000000 \
-      --workspace-name retail-demo-dev \
+      --workspace-name retail-demo-alice \
       --capacity-name my-fabric-capacity \
       --lakehouse-name retail_lakehouse \
       --eventhouse-name retail_eventhouse \
@@ -224,17 +222,17 @@ Configuration writes:
 
 | Path | Purpose | Git status |
 | --- | --- | --- |
-| `deploy/config/deploy.yml` | Shared target and deployment settings | Tracked |
-| `deploy/config/environments/<env>.yml` | Environment workspace overlay | Tracked |
+| `deploy/config/deploy.yml` | Shared deployment defaults | Tracked |
+| `deploy/config/environments/<env>.yml` | Workspace target overlay | Ignored |
 | `utility/config.yaml` | Local generation settings | Ignored |
 
-Review `git diff` after configuration. Do not add credentials or bearer tokens
-to any configuration file.
+`configure` prints the derived environment key. Keep the local overlay out of
+source control, and never add credentials or bearer tokens to configuration.
 
 ## 5. Render the notebooks
 
 ```powershell
-retail-setup render --env dev
+retail-setup render --env alice
 ```
 
 The command validates all substitutions before writing:
@@ -253,7 +251,7 @@ historical path. The stream notebook is optional and deployed separately.
 Always preview the command plan:
 
 ```powershell
-retail-setup deploy --env dev --dry-run
+retail-setup deploy --env alice --dry-run
 ```
 
 The dry run does not authenticate, contact Fabric, run Terraform, or prove that
@@ -263,13 +261,13 @@ notebook groups, auth mode, and KQL target in the printed plan.
 Run an interactive deployment:
 
 ```powershell
-retail-setup deploy --env dev
+retail-setup deploy --env alice
 ```
 
 Or pre-confirm the Terraform apply gate:
 
 ```powershell
-retail-setup deploy --env dev --yes
+retail-setup deploy --env alice --yes
 ```
 
 `--yes` does not start the setup pipeline automatically because it suppresses
@@ -304,7 +302,7 @@ deployment:
 
 ```powershell
 python -m deploy.scripts.run_pipeline `
-  --environment dev `
+  --environment alice `
   --pipeline setup-pipeline `
   --auth-mode azure_cli
 ```

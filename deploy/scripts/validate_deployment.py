@@ -39,12 +39,17 @@ def validate_generated_files(deploy_root: Path, environment: str) -> list[str]:
     """Return validation errors for generated deployment files."""
 
     errors: list[str] = []
-    load_environment(environment)
+    load_environment(
+        environment,
+        config_path=deploy_root / "config" / "deploy.yml",
+        environments_root=deploy_root / "config" / "environments",
+    )
 
-    parameter_path = deploy_root / "fabric-cicd" / "parameter.yml"
+    environment_root = deploy_root / ".generated" / environment
+    parameter_path = environment_root / "fabric-cicd" / "parameter.yml"
     required_files = [
-        deploy_root / "terraform" / "environments" / f"{environment}.tfvars",
-        deploy_root / "fabric-cicd" / "config.yml",
+        environment_root / "terraform.tfvars",
+        environment_root / "fabric-cicd" / "config.yml",
         parameter_path,
     ]
     for path in required_files:
@@ -86,7 +91,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Validate deployment framework output")
     parser.add_argument("--deploy-root", type=Path, default=DEPLOY_ROOT)
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", required=True)
     args = parser.parse_args()
 
     errors = validate_generated_files(args.deploy_root, args.environment)

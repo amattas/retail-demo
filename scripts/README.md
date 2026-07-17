@@ -7,9 +7,9 @@
 - `setup.py`: shared guided setup engine
 
 ```powershell
-.\scripts\setup.ps1 --env dev
-.\scripts\setup.ps1 --env dev --deploy
-.\scripts\setup.ps1 --env dev --dry-run
+.\scripts\setup.ps1 --workspace-name retail-demo-alice
+.\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
+.\scripts\setup.ps1 --workspace-name retail-demo-alice --dry-run
 ```
 
 The bootstrap prepares a Python environment, installs required dependencies,
@@ -24,7 +24,7 @@ Common flags:
 
 | Flag | Purpose |
 | --- | --- |
-| `--env <name>` | Select `dev`, `test`, `prod`, or another checked-in overlay. |
+| `--workspace-name <name>` | Name the Fabric workspace and its local deployment environment. |
 | `--deploy` | Continue from configure/render into deploy. |
 | `--dry-run` | Preview setup-engine commands after the wrapper prepares Python. |
 | `--skip-prereqs` | Skip package-manager prerequisite installation. |

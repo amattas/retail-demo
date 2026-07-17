@@ -37,11 +37,11 @@ def main() -> int:
     """Deploy staged Fabric items with fabric-cicd."""
 
     parser = argparse.ArgumentParser(description="Deploy Fabric items with fabric-cicd")
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", required=True)
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEPLOY_ROOT / "fabric-cicd" / "config.yml",
+        help="Generated fabric-cicd config path.",
     )
     parser.add_argument(
         "--auth-mode",
@@ -50,7 +50,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    deploy(args.config, args.environment, args.auth_mode)
+    config_path = args.config or (
+        DEPLOY_ROOT / ".generated" / args.environment / "fabric-cicd" / "config.yml"
+    )
+    deploy(config_path, args.environment, args.auth_mode)
     return 0
 
 

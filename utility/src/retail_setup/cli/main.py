@@ -8,8 +8,9 @@ generation values (validated via GenerationConfig, written to utility/config.yam
 from __future__ import annotations
 
 import json
-import subprocess
+import os
 import shutil
+import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
@@ -76,10 +77,11 @@ def _set_by_path(data: dict[str, Any], dotted: str, value: Any) -> None:
 
 def _update_yaml_file(path: Path, updates: dict[str, Any]) -> str:
     """Apply dotted-path updates to a YAML file; return the original text."""
-    original = path.read_text()
+    original = path.read_text() if path.is_file() else ""
     data = yaml.safe_load(original) or {}
     for dotted, value in updates.items():
         _set_by_path(data, dotted, value)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     return original
 
@@ -114,6 +116,17 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Config file must contain a YAML mapping: {path}")
     return data
+
+
+def _environment_name_for_workspace(repo_root: Path, workspace_name: str) -> str:
+    """Resolve the stable environment identity derived from a workspace name."""
+
+    root = str(repo_root)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from deploy.scripts.deploy_config import environment_name_for_workspace
+
+    return environment_name_for_workspace(workspace_name)
 
 
 def _config_default(base: dict[str, Any], overlay: dict[str, Any], dotted: str) -> Any:
@@ -237,12 +250,38 @@ def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
         raise typer.Exit(code=1)
 
 
+def _validate_reused_terraform_outputs(repo_root: Path, env: str) -> None:
+    """Validate prior Terraform identities before a skip-Terraform deploy."""
+
+    config = _load_deploy_environment(repo_root, env)
+    from deploy.scripts.deploy_config import (
+        load_terraform_outputs,
+        validate_terraform_outputs,
+    )
+
+    output_path = repo_root / "deploy" / ".generated" / env / "terraform-output.json"
+    outputs = load_terraform_outputs(output_path)
+    validate_terraform_outputs(config, outputs)
+
+
+def _validate_terraform_state_location(repo_root: Path, env: str) -> None:
+    """Fail closed when a pre-isolation Terraform state still needs migration."""
+
+    legacy_state = repo_root / "deploy" / "terraform" / "terraform.tfstate"
+    isolated_state = repo_root / "deploy" / ".generated" / env / "terraform.tfstate"
+    if legacy_state.is_file() and not isolated_state.is_file():
+        raise ValueError(
+            f"Legacy Terraform state found at {legacy_state}. Verify that it "
+            f"belongs to environment {env!r}, then move it to {isolated_state} "
+            "before deploying. Never copy one state into multiple environments."
+        )
+
+
 @app.command()
 def configure(
     repo_root: Path = typer.Option(
         _default_repo_root, "--repo-root", hidden=True, help="Repository root."
     ),
-    env: str = typer.Option("dev", "--env", help="Deployment environment name."),
     tenant_id: Optional[str] = typer.Option(None, "--tenant-id", help="Entra tenant ID."),
     workspace_name: Optional[str] = typer.Option(
         None, "--workspace-name", help="Fabric workspace name."
@@ -273,21 +312,14 @@ def configure(
     store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
 ) -> None:
-    """Configure deployment (deploy/config/) and generation (utility/config.yaml) settings."""
+    """Configure one workspace-scoped deployment and local generation settings."""
     repo_root = repo_root.resolve()
     deploy_yml = repo_root / "deploy" / "config" / "deploy.yml"
-    env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
-    for path in (deploy_yml, env_yml):
-        if not path.is_file():
-            typer.echo(
-                f"Config file not found: {path}\n"
-                f"Unknown environment {env!r}? Available: "
-                f"{sorted(p.stem for p in env_yml.parent.glob('*.yml')) if env_yml.parent.is_dir() else '[]'}"
-            )
-            raise typer.Exit(code=1)
+    if not deploy_yml.is_file():
+        typer.echo(f"Config file not found: {deploy_yml}")
+        raise typer.Exit(code=1)
 
     base_config = _load_yaml_mapping(deploy_yml)
-    env_config = _load_yaml_mapping(env_yml)
     gen_path = repo_root / "utility" / "config.yaml"
     existing_generation: dict[str, Any] = {}
     if gen_path.is_file():
@@ -317,15 +349,26 @@ def configure(
         typer.echo("  INPUT REQUIRED — review each value and press Enter to accept [default]")
         typer.echo("=" * 70)
 
+    workspace_name = _prompt_str(
+        "Fabric workspace name",
+        workspace_name,
+        default=_get_by_path(base_config, "workspace.name") or "retail-demo",
+    )
+    env = _environment_name_for_workspace(repo_root, workspace_name)
+    env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    env_config = _load_yaml_mapping(env_yml) if env_yml.is_file() else {}
+    existing_workspace = _get_by_path(env_config, "workspace.name")
+    if existing_workspace is not None and str(existing_workspace) != workspace_name:
+        typer.echo(
+            f"Workspace name {workspace_name!r} collides with existing environment "
+            f"{env!r} for workspace {existing_workspace!r}."
+        )
+        raise typer.Exit(code=1)
+
     tenant_id = _prompt_str(
         "Entra tenant ID",
         tenant_id,
         default=_config_default(base_config, env_config, "tenant_id"),
-    )
-    workspace_name = _prompt_str(
-        "Fabric workspace name",
-        workspace_name,
-        default=_config_default(base_config, env_config, "workspace.name"),
     )
     capacity_name = _prompt_str(
         "Fabric capacity name",
@@ -396,10 +439,12 @@ def configure(
         # Re-enter every generation value on the next loop iteration.
         store_type = months = store_count = seed = None
 
-    original_deploy = _update_yaml_file(
-        deploy_yml,
+    environment_existed = env_yml.is_file()
+    original_env = _update_yaml_file(
+        env_yml,
         {
             "tenant_id": tenant_id,
+            "workspace.name": workspace_name,
             "workspace.capacity_name": capacity_name,
             "lakehouse.name": lakehouse_name,
             "eventhouse.name": eventhouse_name,
@@ -407,14 +452,15 @@ def configure(
             "spark.use_custom_pool": use_custom_spark_pool,
         },
     )
-    original_env = _update_yaml_file(env_yml, {"workspace.name": workspace_name})
 
     try:
         _validate_deploy_config(repo_root, env)
     except Exception as exc:
-        deploy_yml.write_text(original_deploy)
-        env_yml.write_text(original_env)
-        typer.echo(f"Deploy config validation failed (original files restored):\n{exc}")
+        if environment_existed:
+            env_yml.write_text(original_env)
+        else:
+            env_yml.unlink(missing_ok=True)
+        typer.echo(f"Deploy config validation failed (environment restored):\n{exc}")
         raise typer.Exit(code=1)
 
     dumped = generation.model_dump(mode="json")
@@ -423,9 +469,9 @@ def configure(
         yaml.safe_dump({key: dumped[key] for key in _GENERATION_KEYS}, sort_keys=False)
     )
 
-    typer.echo(f"Wrote {deploy_yml}")
     typer.echo(f"Wrote {env_yml}")
     typer.echo(f"Wrote {gen_path}")
+    typer.echo(f"Environment: {env} (derived from workspace {workspace_name!r})")
 
 
 def _get_by_path(data: Any, dotted: str) -> Any:
@@ -539,7 +585,7 @@ def render(
     repo_root: Path = typer.Option(
         _default_repo_root, "--repo-root", hidden=True, help="Repository root."
     ),
-    env: str = typer.Option("dev", "--env", help="Deployment environment name."),
+    env: str = typer.Option(..., "--env", help="Workspace-derived deployment environment name."),
     ref: Optional[str] = typer.Option(
         None, "--ref", help="Git ref to pin dictionaries to (default: current HEAD)."
     ),
@@ -585,7 +631,7 @@ def render(
     typer.echo("Next steps:")
     typer.echo("  - Import the rendered notebooks into your Fabric workspace manually")
     typer.echo("    (Workspace > Import > Notebook), or")
-    typer.echo("  - Run `retail-setup deploy` to publish them automatically.")
+    typer.echo(f"  - Run `retail-setup deploy --env {env}` to publish them automatically.")
 
 
 @dataclass
@@ -600,6 +646,14 @@ class DeployStep:
     needs_confirmation: bool = False
     description: str = ""
     output_file: str | None = None
+    required: bool = True
+    step_id: str = ""
+    action: Callable[[Path], None] | None = None
+    process_environment: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.step_id:
+            self.step_id = _slugify(self.description)
 
 
 def _deploy_plan(
@@ -612,18 +666,37 @@ def _deploy_plan(
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     py = sys.executable
     tf_output = f"deploy/.generated/{env}/terraform-output.json"
+    generate_config_command = [
+        py,
+        "-m",
+        "deploy.scripts.generate_configs",
+        "--environment",
+        env,
+    ]
+    if skip_terraform:
+        generate_config_command.extend(["--terraform-output", tf_output])
     steps = [
         DeployStep(
-            cmd=[py, "-m", "deploy.scripts.generate_configs", "--environment", env],
+            cmd=generate_config_command,
             description="Generate deployment configs",
         )
     ]
     if not skip_terraform:
-        var_file = f"environments/{env}.tfvars"
+        generated_root = f"../.generated/{env}"
+        var_file = f"{generated_root}/terraform.tfvars"
+        terraform_environment = {"TF_DATA_DIR": f"deploy/.generated/{env}/.terraform"}
         steps += [
             DeployStep(
-                cmd=["terraform", "-chdir=deploy/terraform", "init"],
+                cmd=[
+                    "terraform",
+                    "-chdir=deploy/terraform",
+                    "init",
+                    "-reconfigure",
+                    f"-backend-config=path={generated_root}/terraform.tfstate",
+                ],
                 description="Terraform init",
+                step_id="terraform-init",
+                process_environment=terraform_environment,
             ),
         ]
         if recreate:
@@ -638,6 +711,8 @@ def _deploy_plan(
                     ],
                     needs_confirmation=True,
                     description="Terraform destroy (recreate - DESTROYS the workspace and all items)",
+                    step_id="terraform-destroy-recreate",
+                    process_environment=terraform_environment,
                 ),
                 DeployStep(
                     cmd=[py, "-c", f"import time; time.sleep({_RECREATE_WAIT_SECONDS})"],
@@ -657,11 +732,15 @@ def _deploy_plan(
                 ],
                 needs_confirmation=True,
                 description="Terraform apply (previews changes; auto-approved after you confirm)",
+                step_id="terraform-apply",
+                process_environment=terraform_environment,
             ),
             DeployStep(
                 cmd=["terraform", "-chdir=deploy/terraform", "output", "-json"],
                 description="Capture Terraform outputs",
                 output_file=tf_output,
+                step_id="terraform-output",
+                process_environment=terraform_environment,
             ),
             DeployStep(
                 cmd=[
@@ -701,6 +780,8 @@ def _deploy_plan(
                 "deploy.scripts.deploy_items",
                 "--environment",
                 env,
+                "--config",
+                f"deploy/.generated/{env}/fabric-cicd/config.yml",
                 "--auth-mode",
                 auth_mode,
             ],
@@ -782,7 +863,7 @@ def _is_terraform_apply(step: DeployStep) -> bool:
 
 def _cleanup_destroy_step(env: str) -> DeployStep:
     """A `terraform destroy` step used before recreate."""
-    var_file = f"environments/{env}.tfvars"
+    var_file = f"../.generated/{env}/terraform.tfvars"
     return DeployStep(
         cmd=[
             "terraform",
@@ -792,6 +873,7 @@ def _cleanup_destroy_step(env: str) -> DeployStep:
             f"-var-file={var_file}",
         ],
         description="Terraform destroy (remove existing workspace before recreate)",
+        process_environment={"TF_DATA_DIR": f"deploy/.generated/{env}/.terraform"},
     )
 
 
@@ -807,18 +889,45 @@ def _run_plan_plain(
             if not typer.confirm(f"Proceed with: {step.description}?"):
                 typer.echo("Aborted by user.")
                 raise typer.Exit(code=1)
+        _deploy_journal.mark_running(journal, step.step_id)
+        _deploy_journal.write(repo_root, journal)
+        result: subprocess.CompletedProcess[Any] | None = None
+        process_environment: dict[str, str] | None = None
+        if step.process_environment:
+            process_environment = os.environ.copy()
+            process_environment.update(step.process_environment)
+            terraform_data_dir = process_environment.get("TF_DATA_DIR")
+            if terraform_data_dir and not Path(terraform_data_dir).is_absolute():
+                process_environment["TF_DATA_DIR"] = str((repo_root / terraform_data_dir).resolve())
         try:
             if step.output_file:
                 out_path = repo_root / step.output_file
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                result = subprocess.run(step.cmd, cwd=repo_root, capture_output=True, text=True)
+                if process_environment is None:
+                    result = subprocess.run(
+                        step.cmd,
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+                else:
+                    result = subprocess.run(
+                        step.cmd,
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                        env=process_environment,
+                    )
                 if result.returncode == 0:
                     out_path.write_text(result.stdout)
                     typer.echo(f"Wrote output to {step.output_file}")
                 elif result.stderr:
                     typer.echo(result.stderr, err=True)
             else:
-                result = subprocess.run(step.cmd, cwd=repo_root)
+                if process_environment is None:
+                    result = subprocess.run(step.cmd, cwd=repo_root)
+                else:
+                    result = subprocess.run(step.cmd, cwd=repo_root, env=process_environment)
         except FileNotFoundError:
             executable = step.cmd[0] if step.cmd else "<unknown>"
             typer.echo(
@@ -841,7 +950,7 @@ def deploy(
     repo_root: Path = typer.Option(
         _default_repo_root, "--repo-root", hidden=True, help="Repository root."
     ),
-    env: str = typer.Option("dev", "--env", help="Deployment environment name."),
+    env: str = typer.Option(..., "--env", help="Workspace-derived deployment environment name."),
     skip_terraform: bool = typer.Option(
         False, "--skip-terraform", help="Skip the Terraform provisioning steps."
     ),
@@ -870,6 +979,28 @@ def deploy(
     if recreate and skip_terraform:
         typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
         raise typer.Exit(code=1)
+    if not skip_terraform and not dry_run:
+        try:
+            _validate_terraform_state_location(repo_root, env)
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=1) from exc
+    if skip_terraform and not dry_run:
+        try:
+            _validate_reused_terraform_outputs(repo_root, env)
+        except (
+            FileNotFoundError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            typer.echo(
+                "--skip-terraform requires complete Terraform outputs for the "
+                f"configured workspace: {exc}",
+                err=True,
+            )
+            raise typer.Exit(code=1) from exc
     if recreate and not dry_run:
         typer.echo("")
         typer.echo("!" * 70)

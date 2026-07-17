@@ -62,7 +62,9 @@ def test_install_prerequisites_dry_run_records_commands(monkeypatch):
         "testpm",
         {"terraform": [["testpm", "install", "terraform"]]},
     )
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
 
     setup.install_prerequisites(
         ["terraform"],
@@ -99,6 +101,25 @@ def test_pip_flags_quiet_by_default_and_loud_when_verbose(monkeypatch):
     assert setup._pip_flags() == []
 
 
+def test_install_python_dependencies_uses_reviewed_lock(monkeypatch):
+    commands = []
+    env = setup.PythonEnv(Path("python"), "test")
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
+
+    setup.install_python_dependencies(env, dry_run=True)
+
+    assert len(commands) == 2
+    assert "--require-hashes" in commands[0]
+    assert commands[0][-2:] == [
+        "-r",
+        str(setup.REPO_ROOT / "utility" / "requirements-deploy.txt"),
+    ]
+    assert "--no-deps" in commands[1]
+    assert commands[1][-2:] == ["-e", str(setup.REPO_ROOT / "utility")]
+
+
 def test_run_command_label_hides_raw_command_on_success(monkeypatch, capsys):
     monkeypatch.setattr(setup, "VERBOSE", False)
     monkeypatch.setattr(setup.subprocess, "run", lambda command, **kwargs: None)
@@ -133,19 +154,28 @@ def test_run_command_label_reveals_command_on_failure(monkeypatch, capsys):
 def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
     monkeypatch.setattr(setup, "prompt_yes_no", lambda *_, **__: False)
 
     setup.run_retail_setup(
         env,
-        deploy_env="qa",
+        workspace_name="retail-demo-qa",
         dry_run=True,
         assume_yes=False,
         deploy_requested=False,
     )
 
     assert commands == [
-        ["python", "-m", "retail_setup.cli.main", "configure", "--env", "qa"],
+        [
+            "python",
+            "-m",
+            "retail_setup.cli.main",
+            "configure",
+            "--workspace-name",
+            "retail-demo-qa",
+        ],
         ["python", "-m", "retail_setup.cli.main", "render", "--env", "qa"],
     ]
 
@@ -153,12 +183,14 @@ def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
 def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
     monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
 
     setup.run_retail_setup(
         env,
-        deploy_env="qa",
+        workspace_name="retail-demo-qa",
         dry_run=True,
         assume_yes=True,
         deploy_requested=True,
@@ -178,12 +210,14 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
 def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
     commands = []
     env = setup.PythonEnv(Path("python"), "test")
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
     monkeypatch.setattr(setup, "ensure_azure_login", lambda *_, **__: None)
 
     setup.run_retail_setup(
         env,
-        deploy_env="qa",
+        workspace_name="retail-demo-qa",
         dry_run=True,
         assume_yes=True,
         deploy_requested=True,
@@ -193,6 +227,11 @@ def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
     deploy_cmd = commands[-1]
     assert "--recreate" in deploy_cmd
     assert deploy_cmd.index("--recreate") < deploy_cmd.index("--yes")
+
+
+def test_workspace_environment_name_uses_workspace_suffix():
+    assert setup.workspace_environment_name("Retail Demo - Alice") == "alice"
+    assert setup.workspace_environment_name("Customer Showcase") == "customer-showcase"
 
     text = "tenant_id: 11111111-1111-1111-1111-111111111111\nauth:\n  mode: azure_cli\n"
 
@@ -209,7 +248,9 @@ def test_ensure_azure_login_always_runs_az_login(monkeypatch):
     commands = []
     monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
     monkeypatch.setattr(setup, "_resolve_az", lambda: "C:/az.cmd")
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
 
     setup.ensure_azure_login("dev", dry_run=False)
 
@@ -218,19 +259,29 @@ def test_ensure_azure_login_always_runs_az_login(monkeypatch):
 
 def test_ensure_azure_login_uses_powershell_for_az_powershell(monkeypatch):
     commands = []
-    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_powershell", "TENANT"))
-    monkeypatch.setattr(setup.shutil, "which", lambda command: "pwsh" if command == "pwsh" else None)
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "read_deploy_auth", lambda _: ("azure_powershell", "TENANT")
+    )
+    monkeypatch.setattr(
+        setup.shutil, "which", lambda command: "pwsh" if command == "pwsh" else None
+    )
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
 
     setup.ensure_azure_login("dev", dry_run=False)
 
-    assert commands == [["pwsh", "-NoProfile", "-Command", "Connect-AzAccount -Tenant TENANT"]]
+    assert commands == [
+        ["pwsh", "-NoProfile", "-Command", "Connect-AzAccount -Tenant TENANT"]
+    ]
 
 
 def test_ensure_azure_login_noop_when_no_tenant(monkeypatch):
     commands = []
     monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", None))
-    monkeypatch.setattr(setup, "run_command", lambda command, **_: commands.append(command))
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
 
     setup.ensure_azure_login("dev", dry_run=False)
 

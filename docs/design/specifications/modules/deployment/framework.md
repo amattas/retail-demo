@@ -28,26 +28,48 @@ Terraform then prints its change preview and proceeds with `-auto-approve`.
 | --- | --- |
 | `--dry-run` | Prints the command plan without authentication, subprocess execution, or live target validation. |
 | `--yes` | Pre-confirms gated Terraform steps and suppresses the post-deploy setup-pipeline prompt. |
-| `--skip-terraform` | Omits Terraform steps; downstream helpers still require accurate prior outputs. |
-| `--recreate` | Runs destroy, waits 90 seconds, then applies and publishes. |
+| `--skip-terraform` | Omits Terraform only after captured outputs match the selected environment, workspace, resource names, and non-placeholder IDs. |
+| `--recreate` | Runs destroy, polls Fabric until the workspace name is absent (bounded at 180 seconds), then applies and publishes. |
 
 `--recreate` and `--skip-terraform` are mutually exclusive. A normal
 interactive run detects an existing workspace by display name and offers
 update-in-place or recreate. `--yes` skips that prompt.
 
+## Workspace-scoped environments
+
+`configure` derives one environment key from the Fabric workspace name. It
+lowercases the name, converts punctuation and spaces to hyphens, and omits a
+leading `retail-demo-` prefix. For example, `retail-demo-alice` becomes
+`alice`.
+
+Each key owns one ignored target overlay and one ignored generated directory.
+The overlay contains operator-specific tenant, capacity, workspace, and
+optional existing-item identifiers. The tracked `deploy.yml` contains shared
+defaults only. After Terraform, `fabric-cicd` targets the validated workspace
+ID rather than resolving a potentially duplicate display name.
+
 ## Generated files
 
 | Path | Role | Tracked |
 | --- | --- | --- |
-| `deploy/terraform/environments/<env>.tfvars` | Terraform input rendered from merged YAML | Yes |
-| `deploy/fabric-cicd/config.yml` | Publication environment and item scope | Yes |
-| `deploy/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Yes |
+| `deploy/config/environments/<env>.yml` | Workspace-specific target overlay | No |
+| `deploy/.generated/<env>/terraform.tfvars` | Terraform input rendered from merged YAML | No |
+| `deploy/.generated/<env>/terraform.tfstate` | Local Terraform backend state | No |
+| `deploy/.generated/<env>/.terraform/` | Terraform backend and provider data | No |
+| `deploy/.generated/<env>/fabric-cicd/config.yml` | Publication environment and item scope | No |
+| `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | No |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live identifiers | No |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | No |
 | `deploy/workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
 
-Tracked generated files are reviewable templates and may change during local
-configure/deploy. They do not replace live target verification.
+Terraform receives an environment-specific `TF_DATA_DIR` and local backend
+path. Parallel Terraform operations therefore cannot select or mutate another
+workspace's state. Full publication still shares `deploy/workspace/` staging,
+so concurrent full deploy runs require separate checkouts.
+
+A legacy `deploy/terraform/terraform.tfstate` with no environment-local state
+fails preflight. The operator must verify its workspace ownership and move it
+to exactly one `deploy/.generated/<env>/terraform.tfstate` path.
 
 ## Current notebook groups
 

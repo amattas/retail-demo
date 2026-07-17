@@ -21,9 +21,9 @@
     manager (winget on Windows) unless --skip-prereqs is passed.
 
     All arguments are forwarded to scripts/setup.py, for example:
-        ./scripts/setup.ps1 --env dev
-        ./scripts/setup.ps1 --env dev --deploy
-        ./scripts/setup.ps1 --env dev --dry-run
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice --deploy
+        ./scripts/setup.ps1 --workspace-name retail-demo-alice --dry-run
 
 .NOTES
     The environment that is active when the script starts is captured up front

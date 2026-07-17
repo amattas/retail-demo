@@ -18,6 +18,71 @@ from retail_setup.cli.main import (
 runner = CliRunner()
 
 
+def _seed_deploy_config(root: Path, env: str = "dev") -> None:
+    """Write a minimal deploy config so CLI tests don't touch the real repo."""
+    base = root / "deploy" / "config"
+    (base / "environments").mkdir(parents=True)
+    (base / "deploy.yml").write_text(
+        yaml.safe_dump(
+            {
+                "auth": {"mode": "azure_cli"},
+                "workspace": {"description": "Retail demo"},
+                "lakehouse": {
+                    "name": "retail_lakehouse",
+                    "enable_schemas": True,
+                },
+                "eventhouse": {
+                    "name": "retail_eventhouse",
+                    "kql_database_name": "retail_eventhouse",
+                    "kql_scripts": [],
+                },
+                "notebooks": {"include": ["core"]},
+                "powerbi": {
+                    "semantic_model_name": "retail_model",
+                    "report_name": "retail_model",
+                },
+                "deployment": {
+                    "item_types_in_scope": ["Lakehouse", "Notebook"],
+                    "publish_skip": False,
+                    "unpublish_skip": True,
+                },
+            },
+            sort_keys=False,
+        )
+    )
+    (base / "environments" / f"{env}.yml").write_text(
+        yaml.safe_dump(
+            {
+                "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "workspace": {"name": f"retail-demo-{env}"},
+            }
+        )
+    )
+    output_root = root / "deploy" / ".generated" / env
+    output_root.mkdir(parents=True)
+    (output_root / "terraform-output.json").write_text(
+        json.dumps(
+            {
+                "deployment_environment": env,
+                "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "workspace_id": "11111111-1111-4111-8111-111111111111",
+                "workspace_name": f"retail-demo-{env}",
+                "lakehouse_id": "22222222-2222-4222-8222-222222222222",
+                "lakehouse_name": "retail_lakehouse",
+                "eventhouse_id": "33333333-3333-4333-8333-333333333333",
+                "eventhouse_name": "retail_eventhouse",
+                "kql_database_id": "44444444-4444-4444-8444-444444444444",
+                "kql_database_name": "retail_eventhouse",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _always_ok(*_args, **_kwargs) -> SimpleNamespace:
+    return SimpleNamespace(returncode=0)
+
+
 def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     calls = []
     monkeypatch.setattr("subprocess.run", lambda *a, **k: calls.append(a))
@@ -62,9 +127,89 @@ def test_dry_run_falls_back_when_auth_config_is_unavailable(monkeypatch):
 
 def test_skip_terraform_drops_terraform_steps():
     plan = _deploy_plan("dev", skip_terraform=True)
+    assert not any(step.cmd and step.cmd[0] == "terraform" for step in plan)
+    generate = plan[0].cmd
+    assert "--terraform-output" in generate
+    assert "deploy/.generated/dev/terraform-output.json" in generate
     flat = " ".join(" ".join(map(str, step.cmd)) for step in plan)
-    assert "terraform" not in flat
     assert "generate_configs" in flat and "deploy_items" in flat
+
+
+def test_skip_terraform_rejects_missing_outputs_before_commands(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
+    (tmp_path / "deploy" / ".generated" / "dev" / "terraform-output.json").unlink()
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--skip-terraform",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "--skip-terraform requires complete Terraform outputs" in result.output
+    assert calls == []
+
+
+def test_skip_terraform_rejects_placeholder_outputs(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
+    output_path = tmp_path / "deploy" / ".generated" / "dev" / "terraform-output.json"
+    outputs = json.loads(output_path.read_text(encoding="utf-8"))
+    outputs["workspace_id"] = "00000000-0000-0000-0000-000000000001"
+    output_path.write_text(json.dumps(outputs), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--skip-terraform",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "placeholder" in result.output
+    assert calls == []
+
+
+def test_deploy_rejects_unmigrated_legacy_terraform_state(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
+    legacy_state = tmp_path / "deploy" / "terraform" / "terraform.tfstate"
+    legacy_state.parent.mkdir(parents=True)
+    legacy_state.write_text("{}\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "Legacy Terraform state found" in result.output
+    assert "deploy/.generated" in result.output.replace("\\", "/")
+    assert calls == []
 
 
 def test_plan_propagates_selected_auth_mode():
@@ -115,7 +260,27 @@ def test_plan_orders_steps_and_gates_apply():
     assert apply_idx < build_idx < deploy_idx
 
 
-def test_recreate_inserts_destroy_and_sleep_before_apply():
+def test_plan_isolates_terraform_state_and_data_directory():
+    dev_plan = _deploy_plan("demo-east", skip_terraform=False)
+    west_plan = _deploy_plan("demo-west", skip_terraform=False)
+    dev_terraform = [step for step in dev_plan if step.cmd and step.cmd[0] == "terraform"]
+    west_terraform = [step for step in west_plan if step.cmd and step.cmd[0] == "terraform"]
+
+    dev_init = next(step for step in dev_terraform if "init" in step.cmd)
+    west_init = next(step for step in west_terraform if "init" in step.cmd)
+    assert "-backend-config=path=../.generated/demo-east/terraform.tfstate" in dev_init.cmd
+    assert "-backend-config=path=../.generated/demo-west/terraform.tfstate" in west_init.cmd
+    assert all(
+        step.process_environment["TF_DATA_DIR"] == "deploy/.generated/demo-east/.terraform"
+        for step in dev_terraform
+    )
+    assert all(
+        step.process_environment["TF_DATA_DIR"] == "deploy/.generated/demo-west/.terraform"
+        for step in west_terraform
+    )
+
+
+def test_recreate_inserts_destroy_and_deletion_wait_before_apply():
     plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     init_idx = next(i for i, c in enumerate(cmds) if "terraform" in c and "init" in c)
@@ -154,7 +319,8 @@ def test_cleanup_destroy_step_targets_environment():
     step = _cleanup_destroy_step("prod")
     assert step.cmd[:3] == ["terraform", "-chdir=deploy/terraform", "destroy"]
     assert "-auto-approve" in step.cmd
-    assert "-var-file=environments/prod.tfvars" in step.cmd
+    assert "-var-file=../.generated/prod/terraform.tfvars" in step.cmd
+    assert step.process_environment["TF_DATA_DIR"] == "deploy/.generated/prod/.terraform"
 
 
 def test_recreate_rejects_skip_terraform(monkeypatch):

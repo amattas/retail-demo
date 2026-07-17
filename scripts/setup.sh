@@ -18,9 +18,9 @@
 # manager unless --skip-prereqs is passed.
 #
 # All arguments are forwarded to scripts/setup.py, for example:
-#   ./scripts/setup.sh --env dev
-#   ./scripts/setup.sh --env dev --deploy
-#   ./scripts/setup.sh --env dev --dry-run
+#   ./scripts/setup.sh --workspace-name retail-demo-alice
+#   ./scripts/setup.sh --workspace-name retail-demo-alice --deploy
+#   ./scripts/setup.sh --workspace-name retail-demo-alice --dry-run
 
 set -Eeuo pipefail
 

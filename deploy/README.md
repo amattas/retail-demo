@@ -7,8 +7,9 @@ offline validation.
 Use the high-level CLI for normal operation:
 
 ```powershell
-retail-setup deploy --env dev --dry-run
-retail-setup deploy --env dev
+retail-setup configure --workspace-name retail-demo-alice
+retail-setup deploy --env alice --dry-run
+retail-setup deploy --env alice
 ```
 
 The user-facing [deployment guide](../docs/guides/deployment.md) covers
@@ -77,15 +78,19 @@ workspace items.
 
 | Path | Purpose | Tracked |
 | --- | --- | --- |
-| `terraform/environments/<env>.tfvars` | Generated Terraform input | Yes |
-| `fabric-cicd/config.yml` | Generated publication configuration | Yes |
-| `fabric-cicd/parameter.yml` | Generated environment and binding rewrites | Yes |
+| `config/environments/<env>.yml` | Local workspace target overlay | No |
+| `.generated/<env>/terraform.tfvars` | Generated Terraform input | No |
+| `.generated/<env>/terraform.tfstate` | Isolated local Terraform state | No |
+| `.generated/<env>/fabric-cicd/config.yml` | Publication configuration | No |
+| `.generated/<env>/fabric-cicd/parameter.yml` | Binding rewrites | No |
 | `.generated/<env>/terraform-output.json` | Captured live item identifiers | No |
 | `.generated/<env>/database.kql` | Combined ordered KQL script | No |
 | `workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
 
-The tracked generated files are reviewable templates and can become modified
-during configure/deploy. Generated state and local Terraform state are ignored.
+The environment key is derived from the normalized workspace name. The
+`retail-demo-` prefix is omitted, so workspace `retail-demo-alice` uses
+environment `alice`. Target overlays, generated bindings, state, and live
+identifiers are local-only and isolated by that key.
 
 ## Command modes
 
@@ -93,8 +98,8 @@ during configure/deploy. Generated state and local Terraform state are ignored.
 | --- | --- |
 | `--dry-run` | Prints the plan only; it does not authenticate or prove live readiness. |
 | `--yes` | Pre-confirms Terraform apply and suppresses the post-deploy setup-pipeline prompt. |
-| `--skip-terraform` | Skips provisioning; requires accurate prior Terraform outputs for downstream IDs. |
-| `--recreate` | Destroys the workspace, waits 90 seconds, and rebuilds it. |
+| `--skip-terraform` | Skips provisioning only after prior outputs match the configured environment, workspace, resource names, and non-placeholder IDs. |
+| `--recreate` | Destroys the workspace, polls for name release for up to 180 seconds, and rebuilds it. |
 
 `--recreate` and `--skip-terraform` cannot be combined.
 
