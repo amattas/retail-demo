@@ -104,6 +104,7 @@ Avoid using these as headline proof points without the stated qualification:
   [event contract](../design/specifications/modules/streaming/event-contract.md#truck-lifecycle);
   do not present it as live-validated until a Fabric smoke run has been
   recorded.
-- Marketing attribution and ROAS: [IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)
+- Marketing attribution and ROAS are implemented and contract-tested; do not
+  present them as live-validated until a Fabric smoke run has been recorded.
 - Unresolved/current-state KPIs: [IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)
 - Ungated ML output: [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)

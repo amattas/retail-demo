@@ -189,6 +189,7 @@ def test_silver_replay_uses_complete_dedupe_key_contract() -> None:
         "online_order_created": ["order_id_ext"],
         "online_order_picked": ["order_id_ext", "status"],
         "online_order_shipped": ["order_id_ext", "status"],
+        "marketing_attribution": ["attribution_id"],
     }
 
     watermark = _function(tree, "get_watermark")

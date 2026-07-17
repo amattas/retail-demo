@@ -9,7 +9,7 @@ The demo supports several retail stories, but their current maturity differs.
 | Customer presence and in-store movement | Entry, BLE, and zone-change events | Implemented synthetic scenario |
 | Omnichannel fulfillment | Online-order headers, lines, picked, and shipped events | Implemented with documented live/history differences |
 | Supply-chain dwell | Paired truck lifecycle, Eventhouse SLA function, Silver/Gold dwell, queryset and rule | Cross-layer contract tested; live Fabric validation pending |
-| Marketing attribution and promotion ROI | Impressions, promotions, receipts, and payments | Limited until `IMP-007` |
+| Marketing attribution and promotion ROI | Seven-day last-touch journeys, reconciled promotions/payments, campaign ROAS, and purchase-level audit | Implemented and contract-tested; live Fabric validation pending |
 | Machine-learning insights | Forecast, churn, segmentation, stockout, delivery, pricing notebooks | Optional; trust gates in `IMP-008` |
 | Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Optional and capability-gated |
 

@@ -4,11 +4,11 @@ This directory contains the `retail_model` Power BI Project.
 
 ## Active semantic model
 
-The model is Direct Lake over the Lakehouse and has 38 active tables:
+The model is Direct Lake over the Lakehouse and has 40 active tables:
 
 - seven dimensions
-- eighteen facts
-- nine Gold aggregates
+- nineteen facts
+- ten Gold aggregates
 - four ML outputs: `churn_predictions`, `customer_segments`,
   `demand_forecast`, and `stockout_risk`
 

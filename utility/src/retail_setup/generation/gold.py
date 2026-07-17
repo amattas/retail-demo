@@ -32,6 +32,7 @@ GOLD_TABLES: list[str] = [
     "online_sales_daily",
     "zone_dwell_minute",
     "marketing_cost_daily",
+    "campaign_performance_daily",
     "tender_mix_daily",
 ]
 
@@ -41,10 +42,70 @@ def _money(col: str):
     return F.col(col).cast("double")
 
 
+def generate_campaign_performance(
+    fact_marketing: DataFrame,
+    fact_marketing_attribution: DataFrame,
+) -> DataFrame:
+    """Aggregate campaign spend and reconciled conversions by touch day."""
+
+    campaign_spend = (
+        fact_marketing.withColumn("day", F.to_date("event_ts"))
+        .groupBy("campaign_id", "channel", "day")
+        .agg(
+            F.countDistinct("impression_id_ext").alias("impressions"),
+            F.sum("cost_cents").cast("long").alias("spend_cents"),
+        )
+    )
+    campaign_conversions = (
+        fact_marketing_attribution.filter(
+            F.col("attribution_status") == "ATTRIBUTED"
+        )
+        .withColumn("day", F.to_date("touch_ts"))
+        .groupBy("campaign_id", "channel", "day")
+        .agg(
+            F.countDistinct("attribution_id").alias("conversions"),
+            F.sum("attributed_revenue_cents")
+            .cast("long")
+            .alias("attributed_revenue_cents"),
+            F.sum("discount_cents").cast("long").alias("discount_cents"),
+            F.sum("tax_cents").cast("long").alias("tax_cents"),
+            F.sum("payment_cents").cast("long").alias("payment_cents"),
+        )
+    )
+    return (
+        campaign_spend.join(
+            campaign_conversions, ["campaign_id", "channel", "day"], "left"
+        )
+        .fillna(
+            0,
+            subset=[
+                "conversions",
+                "attributed_revenue_cents",
+                "discount_cents",
+                "tax_cents",
+                "payment_cents",
+            ],
+        )
+        .withColumn(
+            "conversion_rate",
+            F.when(F.col("impressions") == 0, F.lit(0.0)).otherwise(
+                F.col("conversions") / F.col("impressions")
+            ),
+        )
+        .withColumn(
+            "roas",
+            F.when(F.col("spend_cents") == 0, F.lit(0.0)).otherwise(
+                F.col("attributed_revenue_cents") / F.col("spend_cents")
+            ),
+        )
+        .select(*column_names("campaign_performance_daily"))
+    )
+
+
 def generate_gold(
     spark: SparkSession, tables: dict[str, DataFrame]
 ) -> dict[str, DataFrame]:
-    """Build the 9 Gold aggregate frames from the generated fact tables."""
+    """Build the 10 Gold aggregate frames from the generated fact tables."""
     gold: dict[str, DataFrame] = {}
 
     # Sales by minute per store
@@ -164,6 +225,10 @@ def generate_gold(
             F.sum(_money("cost")).alias("cost"),
         )
         .select(*column_names("marketing_cost_daily"))
+    )
+
+    gold["campaign_performance_daily"] = generate_campaign_performance(
+        tables["fact_marketing"], tables["fact_marketing_attribution"]
     )
 
     # Tender mix daily

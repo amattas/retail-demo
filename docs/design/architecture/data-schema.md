@@ -54,7 +54,8 @@ The KQL scripts define five core and three pricing materialized views.
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
-`fact_marketing`, `fact_promotions`, `fact_promo_lines`,
+`fact_marketing`, `fact_marketing_attribution`, `fact_promotions`,
+`fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, `fact_stockouts`.
@@ -72,15 +73,16 @@ model.
 
 `sales_minute_store`, `top_products_15m`, `inventory_position_current`,
 `dc_inventory_position_current`, `truck_dwell_daily`, `online_sales_daily`,
-`zone_dwell_minute`, `marketing_cost_daily`, `tender_mix_daily`.
+`zone_dwell_minute`, `marketing_cost_daily`, `campaign_performance_daily`,
+`tender_mix_daily`.
 
 ## Semantic model
 
-The Direct Lake model has 38 active tables:
+The Direct Lake model has 40 active tables:
 
 - 7 dimensions
-- 18 facts
-- 9 Gold aggregates
+- 19 facts
+- 10 Gold aggregates
 - 4 ML outputs: `churn_predictions`, `customer_segments`, `demand_forecast`,
   `stockout_risk`
 
@@ -88,9 +90,9 @@ The Direct Lake model has 38 active tables:
 flowchart LR
     Events[18 live event types] --> KQL[Eventhouse tables]
     KQL --> Projection[Optional live projection]
-    Generation[Historical generator] --> Silver[7 dimensions + 18 facts]
+    Generation[Historical generator] --> Silver[7 dimensions + 19 facts]
     Projection --> Silver
-    Silver --> Gold[9 aggregates]
+    Silver --> Gold[10 aggregates]
     Silver --> Model[38-table Direct Lake model]
     Gold --> Model
     ML[4 active ML outputs] --> Model

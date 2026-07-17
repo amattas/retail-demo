@@ -66,7 +66,7 @@ ownership is tracked by `IMP-005`.
 
 ## Streaming-to-Gold behavior
 
-`04-streaming-to-gold.ipynb` overwrites each of the nine Gold tables when its
+`04-streaming-to-gold.ipynb` overwrites each of the ten Gold tables when its
 prerequisite Silver tables exist. Missing prerequisites cause the affected
 aggregate to be skipped rather than manufactured.
 
