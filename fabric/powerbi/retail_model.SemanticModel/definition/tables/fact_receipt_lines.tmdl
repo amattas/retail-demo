@@ -164,9 +164,11 @@ table fact_receipt_lines
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Raw event date carried for lineage only. Receipt lines inherit date context via the active Receipt-Lines-to-Receipts relationship, so this technical column is hidden to avoid duplicate/ambiguous date slicers.
 	column event_date
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: 2545fc5f-7a82-428a-be86-63f077dd2334
 		sourceLineageTag: event_date
 		summarizeBy: none
