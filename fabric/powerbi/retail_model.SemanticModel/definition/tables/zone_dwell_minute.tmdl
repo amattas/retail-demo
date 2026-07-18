@@ -6,7 +6,8 @@ table zone_dwell_minute
 		formatString: #,0
 		lineageTag: 01a1a1c8-0001-0001-0001-000000000001
 
-	measure 'Avg Zone Dwell' = AVERAGE('zone_dwell_minute'[Average Dwell])
+	/// Customer-weighted average zone dwell minutes (weights each site-minute row by its customer count so busy zones dominate, rather than averaging per-row averages).
+	measure 'Avg Zone Dwell' = DIVIDE(SUMX('zone_dwell_minute', 'zone_dwell_minute'[Average Dwell] * 'zone_dwell_minute'[Customers]), [Zone Customers], 0)
 		formatString: #,0.0
 		lineageTag: 01a1a1c8-0001-0001-0001-000000000002
 
@@ -49,12 +50,12 @@ table zone_dwell_minute
 		dataType: double
 		lineageTag: 3e664904-d5dc-47c4-9316-6313e996935b
 		sourceLineageTag: avg_dwell
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: avg_dwell
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 

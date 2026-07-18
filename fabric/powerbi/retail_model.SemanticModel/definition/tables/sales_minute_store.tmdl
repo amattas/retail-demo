@@ -10,7 +10,7 @@ table sales_minute_store
 		formatString: #,0
 		lineageTag: 01a1a1c1-0001-0001-0001-000000000002
 
-	measure 'Avg Store Basket' = AVERAGE('sales_minute_store'[Average Basket])
+	measure 'Avg Store Basket' = DIVIDE([Total Store Sales], [Total Store Receipts], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1c1-0001-0001-0001-000000000003
 
@@ -69,12 +69,12 @@ table sales_minute_store
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: c508e7f5-582e-463b-980f-2f0f662cc9b0
 		sourceLineageTag: avg_basket
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: avg_basket
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 

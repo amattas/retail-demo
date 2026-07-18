@@ -85,12 +85,12 @@ table online_sales_daily
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 793db82f-f43e-4840-88d5-e9395c64a96a
 		sourceLineageTag: avg_order_value
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: avg_order_value
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
