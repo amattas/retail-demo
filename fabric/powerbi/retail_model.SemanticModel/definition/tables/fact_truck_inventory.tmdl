@@ -87,11 +87,12 @@ table fact_truck_inventory
 		dataType: int64
 		formatString: 0
 		lineageTag: ef937be0-d5d2-4b63-83b1-6a38f25c4bc9
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_truck_inventory = entity
 		mode: directLake

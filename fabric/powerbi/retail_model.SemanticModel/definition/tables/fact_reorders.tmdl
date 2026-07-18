@@ -119,11 +119,12 @@ table fact_reorders
 		dataType: int64
 		formatString: 0
 		lineageTag: 2b449ce3-7b50-4e3e-9974-b39bb336b0b3
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_reorders = entity
 		mode: directLake

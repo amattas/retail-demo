@@ -22,7 +22,10 @@
   `Avg Zone Dwell`, and `Avg Truck Dwell Minutes` recompute from base totals
   (weighted by receipts/customers/trucks) instead of naively averaging stored
   per-row averages, and the stored `avg_*` columns no longer auto-sum
-  (`tests/scripts/test_kpi_aggregation_weighting.py`). State folding and
+  (`tests/scripts/test_kpi_aggregation_weighting.py`). The pandas
+  `__index_level_0__` write artifact exposed and summable on 11 fact tables is
+  now hidden and non-summable
+  (`tests/scripts/test_semantic_model_technical_fields.py`). State folding and
   date-relationship/grain reconciliation for the visible key columns remain
   open.
 

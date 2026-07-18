@@ -68,11 +68,12 @@ table fact_stockouts
 		dataType: int64
 		formatString: 0
 		lineageTag: 1cfbef48-7ab8-4c5d-8969-183c8eb05a7d
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_stockouts = entity
 		mode: directLake

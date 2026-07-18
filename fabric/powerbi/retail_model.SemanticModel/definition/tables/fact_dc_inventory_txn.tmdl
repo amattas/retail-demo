@@ -74,11 +74,12 @@ table fact_dc_inventory_txn
 		dataType: int64
 		formatString: 0
 		lineageTag: 61a0bb77-d928-4266-8fca-1d1ef9ef4c50
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_dc_inventory_txn = entity
 		mode: directLake

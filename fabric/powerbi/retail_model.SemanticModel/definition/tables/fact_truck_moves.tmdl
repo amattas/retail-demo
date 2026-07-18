@@ -87,11 +87,12 @@ table fact_truck_moves
 		dataType: int64
 		formatString: 0
 		lineageTag: 442f04c0-247c-4c09-abe5-459a292e17ad
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_truck_moves = entity
 		mode: directLake

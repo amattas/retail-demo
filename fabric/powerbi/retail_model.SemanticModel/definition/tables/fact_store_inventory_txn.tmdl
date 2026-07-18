@@ -84,11 +84,12 @@ table fact_store_inventory_txn
 		dataType: int64
 		formatString: 0
 		lineageTag: 8ec48b5d-e930-43ca-900a-3ffce43b7a6f
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_store_inventory_txn = entity
 		mode: directLake

@@ -191,11 +191,12 @@ table fact_online_order_lines
 		dataType: int64
 		formatString: 0
 		lineageTag: cf8ce641-935d-42f3-abb6-40101e6c746e
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_online_order_lines = entity
 		mode: directLake
