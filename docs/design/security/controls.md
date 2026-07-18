@@ -16,7 +16,7 @@ Security controls use the states defined by
 | `SEC-008` | `accepted` | Retain deployment, pipeline, watermark, ingestion, model, and alert evidence with actionable failure signals. | Fabric monitoring surfaces; `setup_run_log`; `ag._watermarks` | Post-deploy readiness and freshness checks. |
 | `SEC-009` | `accepted` | Isolate environments and require explicit confirmation and target validation for destructive operations. | Environment files; deploy dry-run and recreate flows | Separate state tests and wrong-target negative tests. |
 | `SEC-010` | `verified` | Publish only reviewed current Markdown from `docs/` and documentation captured in immutable SemVer tags; exclude temporary plans and generated source artifacts. | `zensical.toml`; `.github/workflows/docs.yml`; `scripts/docs_versioning.py` | Successful Docs workflow run, `gh-pages` branch inspection, and live `/latest/` plus `versions.json` inspection. |
-| `SEC-011` | `proposed` | Fail closed for required writes and preserve failed payloads or replay evidence before advancing progress. | `IMP-002` | Injected-failure tests for streaming, transforms, and deployment. |
+| `SEC-011` | `verified` | Fail closed for required writes and preserve failed payloads or replay evidence before advancing progress. | Replay-safe Eventhouse/Silver progress; staged Silver/Gold promotion with Delta rollback; required deploy-step journal and exit status | Injected deployment, publication, rollback, cleanup, pagination, checkpoint, and watermark tests. |
 
 ## Minimum deployment baseline
 

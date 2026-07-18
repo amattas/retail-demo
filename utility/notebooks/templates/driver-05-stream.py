@@ -35,6 +35,7 @@ source_rows_per_second = 5     # rate-source rows/sec. Each row emits ONE scenar
 sink = "eventhouse"            # "eventhouse" | "delta"
 run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (test/smoke)
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
+stream_id = ""                 # blank = persist a UUID beside the checkpoint
 
 # Eventhouse (Kusto) sink — the default. Writes each event straight to its KQL
 # event table with the Fabric Spark connector. Leave `kusto_uri` blank and it is
@@ -66,6 +67,62 @@ spark.conf.set("spark.sql.session.timeZone", "UTC")  # ingest_timestamp depends 
 
 if not delta_landing_table:
     delta_landing_table = f"{LAKEHOUSE_NAME}.cusn_landing.events"
+
+# A logical stream keeps one stable identity across notebook and Spark retries.
+# Deleting the checkpoint root also deletes this metadata and starts a fresh ID
+# namespace, preventing business-key collisions between intentional resets.
+import re
+import uuid
+
+from notebookutils import mssparkutils
+
+_STREAM_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def _validate_stream_id(value):
+    value = str(value).strip()
+    if not _STREAM_ID_PATTERN.fullmatch(value):
+        raise ValueError(
+            "stream_id must be 1-64 characters using letters, numbers, '.', '_', or '-'"
+        )
+    return value
+
+
+def _resolve_stream_id(root, requested):
+    metadata_dir = f"{root.rstrip('/')}/_metadata"
+    identity_path = f"{metadata_dir}/stream_id"
+    requested = str(requested).strip()
+
+    if mssparkutils.fs.exists(identity_path):
+        persisted = _validate_stream_id(mssparkutils.fs.head(identity_path, 128).strip())
+        if requested and requested != persisted:
+            raise ValueError(
+                f"stream_id {requested!r} does not match checkpoint identity "
+                f"{persisted!r}; use the persisted value or reset {root!r}"
+            )
+        return persisted
+
+    candidate = _validate_stream_id(requested or uuid.uuid4().hex)
+    mssparkutils.fs.mkdirs(metadata_dir)
+    try:
+        created = mssparkutils.fs.put(identity_path, candidate, False)
+    except Exception:
+        if not mssparkutils.fs.exists(identity_path):
+            raise
+        created = False
+    if not created:
+        persisted = _validate_stream_id(mssparkutils.fs.head(identity_path, 128).strip())
+        if requested and persisted != requested:
+            raise ValueError(
+                f"stream_id {requested!r} lost a checkpoint identity race to "
+                f"{persisted!r}; restart with the persisted value"
+            )
+        return persisted
+    return candidate
+
+
+STREAM_ID = _resolve_stream_id(checkpoint_path, stream_id)
+print(f"stream identity: {STREAM_ID}")
 
 # %%
 # Dimension ID ranges — read from the Silver dims that setup-02 wrote, so events
@@ -193,17 +250,25 @@ def _str(value):
     return value if value is not None else F.lit(None).cast("string")
 
 
-def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=None):
-    """A conditional event: struct(key, value=envelope JSON) when `cond`, else null."""
+def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=None,
+         correlation=None):
+    """A conditional event: struct(key, value=envelope JSON) when `cond`, else null.
+
+    ``correlation`` is IMP-007's ``attribution_journey_id``: pass it (a column
+    expression) only for touch/purchase/promotion/payment events that belong to
+    a deterministic attributed journey; every other event leaves it NULL, same
+    as the pre-existing ``session``/``parent`` optional linkage columns.
+    """
     et = event_type if not isinstance(event_type, str) else F.lit(event_type)
     value = F.to_json(F.struct(
         et.alias("event_type"),
         payload.alias("payload"),
-        F.concat(F.lit("TRC-"), F.abs(F.xxhash64(trace_seed, et)).cast("string")).alias("trace_id"),
+        F.concat(F.lit("TRC-"),
+                 F.abs(F.xxhash64(F.lit(STREAM_ID), trace_seed, et)).cast("string")).alias("trace_id"),
         _iso(ts).alias("ingest_timestamp"),
         F.lit("1.0").alias("schema_version"),
         F.lit(event_source).alias("source"),
-        F.lit(None).cast("string").alias("correlation_id"),
+        _str(correlation).alias("correlation_id"),
         pkey.alias("partition_key"),
         _str(session).alias("session_id"),
         _str(parent).alias("parent_event_id"),
@@ -218,13 +283,21 @@ rate = spark.readStream.format("rate").option("rowsPerSecond", int(source_rows_p
 
 v = F.col("value")
 ts = F.col("timestamp")
+stream_prefix = F.lit(f"{STREAM_ID}-")
 # scenario is applied AFTER the select below, so it must reference the renamed
 # column `v` (not the source `value`).
-scenario = (F.when(_u(F.col("v"), "scenario") < 0.55, "shopping")
-            .when(_u(F.col("v"), "scenario") < 0.70, "inventory")
-            .when(_u(F.col("v"), "scenario") < 0.80, "online")
-            .when(_u(F.col("v"), "scenario") < 0.90, "logistics")
-            .when(_u(F.col("v"), "scenario") < 0.96, "marketing")
+# store_attributed/online_attributed are deterministic IMP-007 live mirrors:
+# a small, fixed share of purchase rows carries a full 2-touch marketing
+# journey (see the attribution block below), additive to — not carved out of
+# — the background "marketing" (organic ad_impression) scenario, so organic
+# marketing/shopping/online traffic keeps flowing unattributed.
+scenario = (F.when(_u(F.col("v"), "scenario") < 0.50, "shopping")
+            .when(_u(F.col("v"), "scenario") < 0.53, "store_attributed")
+            .when(_u(F.col("v"), "scenario") < 0.68, "inventory")
+            .when(_u(F.col("v"), "scenario") < 0.76, "online")
+            .when(_u(F.col("v"), "scenario") < 0.78, "online_attributed")
+            .when(_u(F.col("v"), "scenario") < 0.88, "logistics")
+            .when(_u(F.col("v"), "scenario") < 0.94, "marketing")
             .otherwise("store_ops"))
 
 from pyspark.sql.functions import broadcast as _bcast  # noqa: E402
@@ -234,10 +307,10 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("store_id", _id(F.col("v"), "store", STORE_COUNT))
       .withColumn("customer_id", _id(F.col("v"), "cust", CUSTOMER_COUNT))
       .withColumn("dc_id", _id(F.col("v"), "dc", DC_COUNT))
-      .withColumn("receipt_id", F.concat(F.lit("RCP-"), F.col("v").cast("string")))
-      .withColumn("order_id", F.concat(F.lit("ONL-"), F.col("v").cast("string")))
-      .withColumn("shipment_id", F.concat(F.lit("SHP-"), F.col("v").cast("string")))
-      .withColumn("session_id", F.concat(F.lit("SES-"), F.col("v").cast("string")))
+      .withColumn("receipt_id", F.concat(F.lit("RCP-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("order_id", F.concat(F.lit("ONL-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
+      .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
       .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
       .withColumn("tender", _pick(F.col("v"), "tender", TENDERS))
@@ -284,25 +357,29 @@ b = (b0
          F.array(*[F.lit(t[1]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
          .otherwise(F.element_at(
              F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
-     .withColumn("promo_disc", F.round(F.col("subtotal") * F.col("_ppct") / F.lit(100.0), 2))
      .withColumn("promo_type", F.when(
          F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(F.lit("PERCENTAGE")))
      .withColumn("pkey", F.concat(F.lit("store_"), F.col("store_id").cast("string"))))
 
-shop = F.col("scenario") == "shopping"
+shop = F.col("scenario").isin("shopping", "store_attributed")
 store_pkey = F.col("pkey")
 
 
 def _line(idx):
     lk = F.concat(F.col("v"), F.lit(f"-{idx}"))
+    # Line 1 is the only promotable line: its extended_price is NET of any
+    # discount (discount before tax) and it carries promo_code when a promo
+    # applies; line 2 is never discounted (unit_price/extended_price unchanged).
+    ext_price = l1_net_ext if idx == 1 else F.col(f"l{idx}_ext")
+    line_promo_code = F.when(has_promo, F.col("promo_code")) if idx == 1 else F.lit(None).cast("string")
     payload = F.struct(
         F.col("receipt_id"),
         F.lit(idx).cast("long").alias("line_number"),
         F.col(f"l{idx}_pid").alias("product_id"),
         F.col(f"l{idx}_qty").alias("quantity"),
         F.col(f"l{idx}_unit").alias("unit_price"),
-        F.col(f"l{idx}_ext").alias("extended_price"),
-        F.lit(None).cast("string").alias("promo_code"),
+        ext_price.alias("extended_price"),
+        line_promo_code.alias("promo_code"),
     )
     return slot(shop, "receipt_line_added", payload, F.col("ts"), store_pkey, lk,
                 session=F.col("session_id"), parent=F.col("receipt_id"))
@@ -322,10 +399,115 @@ def _ping(idx):
 
 
 inv = F.col("scenario") == "inventory"
-onl = F.col("scenario") == "online"
+onl = F.col("scenario").isin("online", "online_attributed")
 log = F.col("scenario") == "logistics"
 mkt = F.col("scenario") == "marketing"
 ops = F.col("scenario") == "store_ops"
+store_attr = F.col("scenario") == "store_attributed"
+online_attr = F.col("scenario") == "online_attributed"
+attr = store_attr | online_attr
+
+# --- IMP-007 (live mirror): promo discount applied to the promoted line
+# (line 1) BEFORE tax, so the store's net subtotal/tax/total reflect the
+# discount — same "discount before tax" contract as receipts.py. Applies to
+# every store purchase (normal "shopping" and "store_attributed" alike); a
+# non-promoted row has discount_cents == 0. Online orders never discount
+# here (gross == net, discount_cents == 0), per requirement.
+has_promo = _u(F.col("v"), "haspromo") < F.lit(0.3)
+l1_ext_cents = F.round(F.col("l1_ext") * F.lit(100)).cast("long")
+l2_ext_cents = F.round(F.col("l2_ext") * F.lit(100)).cast("long")
+gross_subtotal_cents = l1_ext_cents + l2_ext_cents
+store_discount_cents = F.when(
+    has_promo,
+    F.floor(l1_ext_cents * F.col("_ppct") / F.lit(100.0) + F.lit(0.5)).cast("long"),
+).otherwise(F.lit(0).cast("long"))
+l1_net_cents = l1_ext_cents - store_discount_cents
+l1_net_ext = F.round(l1_net_cents.cast("double") / F.lit(100.0), 2)
+# net subtotal = gross subtotal - discount (promoted line net + untouched line 2)
+store_subtotal_cents = gross_subtotal_cents - store_discount_cents
+store_tax_cents = F.round(
+    (l1_net_cents.cast("double") * _taxmult(F.col("l1_taxa"))
+     + l2_ext_cents.cast("double") * _taxmult(F.col("l2_taxa")))
+    * F.col("store_bps") / F.lit(10000.0)
+).cast("long")
+store_total_cents = store_subtotal_cents + store_tax_cents
+store_subtotal = F.round(store_subtotal_cents.cast("double") / F.lit(100.0), 2)
+store_tax = F.round(store_tax_cents.cast("double") / F.lit(100.0), 2)
+store_total = F.round(store_total_cents.cast("double") / F.lit(100.0), 2)
+
+# Online: no promotion in the live feed, so gross == net and discount is 0;
+# the *_cents fields are just the existing dollar fields expressed in cents.
+online_gross_subtotal_cents = F.round(F.col("subtotal") * F.lit(100)).cast("long")
+online_discount_cents = F.lit(0).cast("long")
+online_subtotal_cents = online_gross_subtotal_cents
+online_tax_cents = F.round(F.col("tax") * F.lit(100)).cast("long")
+online_total_cents = F.round(F.col("total") * F.lit(100)).cast("long")
+
+# --- IMP-007 (live mirror): deterministic 2-touch attribution journey. One
+# journey id per purchase row; the two touches share journey/customer/
+# campaign/session and differ only in impression/creative/timestamp. Both
+# touches land strictly BEFORE purchase_ts (== `ts`, the rate source's
+# current timestamp) and within the 7-day attribution window, so no future
+# timestamps are ever produced.
+journey_id = F.concat(F.lit("JRNLIVE"), stream_prefix, F.col("v").cast("string"))
+attr_campaign_id = F.concat(
+    F.lit("CMP-"), (_h(F.col("v"), "attrcamp", 20) + F.lit(1)).cast("string"))
+attr_creative_id = F.concat(
+    F.lit("CRVLIVE"), stream_prefix, (_h(F.col("v"), "attrcrv", 50) + F.lit(1)).cast("string"))
+attr_channel = _pick(F.col("v"), "attrchan", CHANNELS)
+attr_device = _pick(F.col("v"), "attrdev", DEVICES)
+attr_customer_ad_id = F.concat(
+    F.lit("AD"), F.lpad(F.col("customer_id").cast("string"), 8, "0"))
+# session shared by the two touches: the shopping session for a store
+# journey, the order id (the online "session") for an online journey.
+attr_session = F.when(online_attr, F.col("order_id")).otherwise(F.col("session_id"))
+ATTR_OLDER_OFFSET_MIN_S = 3 * 86400  # 3 days before purchase
+ATTR_OLDER_OFFSET_MAX_S = 7 * 86400  # 7 days before purchase (window edge)
+ATTR_NEWER_OFFSET_MIN_S = 60  # 1 minute before purchase
+ATTR_NEWER_OFFSET_MAX_S = 2 * 86400  # 2 days before purchase
+attr_older_offset = (
+    F.lit(ATTR_OLDER_OFFSET_MIN_S)
+    + _u(F.col("v"), "attrolder") * F.lit(ATTR_OLDER_OFFSET_MAX_S - ATTR_OLDER_OFFSET_MIN_S)
+).cast("long")
+attr_newer_offset = (
+    F.lit(ATTR_NEWER_OFFSET_MIN_S)
+    + _u(F.col("v"), "attrnewer") * F.lit(ATTR_NEWER_OFFSET_MAX_S - ATTR_NEWER_OFFSET_MIN_S)
+).cast("long")
+attr_touch_ts_older = F.timestamp_seconds(F.unix_timestamp(F.col("ts")) - attr_older_offset)
+attr_touch_ts_newer = F.timestamp_seconds(F.unix_timestamp(F.col("ts")) - attr_newer_offset)
+attr_impression_id_older = F.concat(
+    F.lit("IMPLIVE"), stream_prefix, F.col("v").cast("string"), F.lit("-OLDER"))
+attr_impression_id_newer = F.concat(
+    F.lit("IMPLIVE"), stream_prefix, F.col("v").cast("string"), F.lit("-NEWER"))
+# The NEWER touch is the one carried as the purchase's own impression_id
+# (last-touch semantics — same convention as attribution.py).
+attr_purchase_impression_id = attr_impression_id_newer
+attr_correlation_store = F.when(store_attr, journey_id).otherwise(F.lit(None).cast("string"))
+attr_correlation_online = F.when(online_attr, journey_id).otherwise(F.lit(None).cast("string"))
+attr_receipt_campaign_id = F.when(store_attr, attr_campaign_id).otherwise(F.lit(None).cast("string"))
+attr_receipt_impression_id = F.when(
+    store_attr, attr_purchase_impression_id).otherwise(F.lit(None).cast("string"))
+attr_order_campaign_id = F.when(online_attr, attr_campaign_id).otherwise(F.lit(None).cast("string"))
+attr_order_impression_id = F.when(
+    online_attr, attr_purchase_impression_id).otherwise(F.lit(None).cast("string"))
+
+
+def _attr_touch(which, touch_ts, impression_id):
+    """One of the journey's two ad_impression touches (older | newer)."""
+    key = F.concat(F.col("v"), F.lit(f"-attr{which}"))
+    payload = F.struct(
+        attr_channel.alias("channel"),
+        attr_campaign_id.alias("campaign_id"),
+        F.concat(attr_creative_id, F.lit(f"-{which.upper()}")).alias("creative_id"),
+        attr_customer_ad_id.alias("customer_ad_id"),
+        impression_id.alias("impression_id"),
+        F.round(_u(key, "attrcost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
+        attr_device.alias("device_type"),
+        F.col("customer_id"),
+    )
+    return slot(attr, "ad_impression", payload, touch_ts, F.concat(F.lit("camp_"), attr_campaign_id),
+                key, session=attr_session, correlation=journey_id)
+
 
 # online derived fields
 node_type = F.when(_pick(F.col("v"), "omode", FULFILL) == "SHIP_FROM_DC", "DC").otherwise("STORE")
@@ -380,29 +562,40 @@ events_arr = F.array(
     ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
     slot(shop, "receipt_created", F.struct(
         F.col("store_id"), F.col("customer_id"), F.col("receipt_id"),
-        F.col("subtotal"), F.col("tax"), F.col("total"),
+        # existing real-valued fields (kept for compatibility): now NET of any
+        # line-1 promo discount, computed before tax (discount-before-tax).
+        store_subtotal.alias("subtotal"), store_tax.alias("tax"), store_total.alias("total"),
         F.col("tender").alias("tender_type"), F.lit(2).cast("long").alias("item_count"),
-        F.lit(None).cast("string").alias("campaign_id"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
+        attr_receipt_campaign_id.alias("campaign_id"),
+        attr_receipt_impression_id.alias("impression_id"),
+        gross_subtotal_cents.alias("gross_subtotal_cents"),
+        store_discount_cents.alias("discount_cents"),
+        store_subtotal_cents.alias("subtotal_cents"),
+        store_tax_cents.alias("tax_cents"),
+        store_total_cents.alias("total_cents"),
+    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
+        correlation=attr_correlation_store),
     _line(1), _line(2),
     slot(shop, "payment_processed", F.struct(
         F.col("receipt_id"), F.lit(None).cast("string").alias("order_id"),
-        F.col("tender").alias("payment_method"), F.col("total").alias("amount"),
-        (F.round(F.col("total") * F.lit(100))).cast("long").alias("amount_cents"),
-        F.concat(F.lit("TXN-"), F.col("v").cast("string")).alias("transaction_id"),
+        F.col("tender").alias("payment_method"), store_total.alias("amount"),
+        store_total_cents.alias("amount_cents"),
+        F.concat(F.lit("TXN-"), stream_prefix, F.col("v").cast("string")).alias("transaction_id"),
         _iso(F.col("ts")).alias("processing_time"),
         (_h(F.col("v"), "ptime", 3000) + F.lit(200)).cast("int").alias("processing_time_ms"),
         F.lit("APPROVED").alias("status"), F.lit(None).cast("string").alias("decline_reason"),
         F.col("store_id"), F.col("customer_id"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"), parent=F.col("receipt_id")),
-    slot(shop & (_u(F.col("v"), "haspromo") < 0.3), "promotion_applied", F.struct(
+    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"), parent=F.col("receipt_id"),
+        correlation=attr_correlation_store),
+    slot(shop & has_promo, "promotion_applied", F.struct(
         F.col("receipt_id"), F.col("promo_code"),
-        F.col("promo_disc").alias("discount_amount"),
-        (F.round(F.col("promo_disc") * F.lit(100))).cast("long").alias("discount_cents"),
+        F.round(store_discount_cents.cast("double") / F.lit(100.0), 2).alias("discount_amount"),
+        store_discount_cents.alias("discount_cents"),
         F.col("promo_type").alias("discount_type"), F.lit(1).cast("long").alias("product_count"),
         F.array(F.col("l1_pid")).alias("product_ids"),
         F.col("store_id"), F.col("customer_id"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
+    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
+        correlation=attr_correlation_store),
 
     # --- inventory ---
     slot(inv, "inventory_updated", F.struct(
@@ -450,10 +643,18 @@ events_arr = F.array(
         F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
         F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
         F.concat(F.lit("AD"), _id(F.col("v"), "adcust", CUSTOMER_COUNT).cast("string")).alias("customer_ad_id"),
-        F.concat(F.lit("IMP-"), F.col("v").cast("string")).alias("impression_id"),
+        F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
         F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
         _pick(F.col("v"), "dev", DEVICES).alias("device_type"),
+        _id(F.col("v"), "adcust", CUSTOMER_COUNT).alias("customer_id"),
     ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
+
+    # --- IMP-007 (live mirror): the journey's two linked touches, emitted
+    # only for store_attributed/online_attributed rows (`attr`). Exactly one
+    # older + one newer touch per attributed purchase; both share journey,
+    # customer, campaign and session, and differ in impression/creative/ts.
+    _attr_touch("older", attr_touch_ts_older, attr_impression_id_older),
+    _attr_touch("newer", attr_touch_ts_newer, attr_impression_id_newer),
 
     # --- online order (created -> picked -> shipped share order_id) ---
     slot(onl, "online_order_created", F.struct(
@@ -462,19 +663,42 @@ events_arr = F.array(
         node_type.alias("node_type"), node_id.alias("node_id"),
         F.lit(2).cast("long").alias("item_count"),
         F.col("subtotal"), F.col("tax"), F.col("total"), F.col("tender").alias("tender_type"),
-    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"), session=F.col("order_id")),
+        attr_order_campaign_id.alias("campaign_id"),
+        attr_order_impression_id.alias("impression_id"),
+        online_gross_subtotal_cents.alias("gross_subtotal_cents"),
+        online_discount_cents.alias("discount_cents"),
+        online_subtotal_cents.alias("subtotal_cents"),
+        online_tax_cents.alias("tax_cents"),
+        online_total_cents.alias("total_cents"),
+    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"), session=F.col("order_id"),
+        correlation=attr_correlation_online),
+    slot(onl, "payment_processed", F.struct(
+        F.lit(None).cast("string").alias("receipt_id"), F.col("order_id"),
+        F.col("tender").alias("payment_method"), F.col("total").alias("amount"),
+        online_total_cents.alias("amount_cents"),
+        F.concat(F.lit("TXN-ONL-"), stream_prefix, F.col("v").cast("string")).alias("transaction_id"),
+        _iso(F.col("ts")).alias("processing_time"),
+        (_h(F.col("v"), "online_ptime", 3000) + F.lit(200)).cast("int").alias("processing_time_ms"),
+        F.lit("APPROVED").alias("status"), F.lit(None).cast("string").alias("decline_reason"),
+        F.when(node_type == "STORE", node_id).otherwise(F.lit(None).cast("long")).alias("store_id"),
+        F.col("customer_id"),
+    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
+        session=F.col("order_id"), parent=F.col("order_id"),
+        correlation=attr_correlation_online),
     slot(onl, "online_order_picked", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
         _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("picked_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
-        session=F.col("order_id"), parent=F.col("order_id")),
+        session=F.col("order_id"), parent=F.col("order_id"),
+        correlation=attr_correlation_online),
     slot(onl, "online_order_shipped", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
         _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("shipped_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
-        session=F.col("order_id"), parent=F.col("order_id")),
+        session=F.col("order_id"), parent=F.col("order_id"),
+        correlation=attr_correlation_online),
 )
 
 events = (b.select(F.explode(events_arr).alias("e"))
@@ -513,7 +737,7 @@ ENVELOPE = [
 # Per event type: (kusto_column, json_payload_field, datatype). Generated from the
 # KQL ingestion mappings; keep in sync if those change.
 EVENT_PAYLOADS = {
-    "receipt_created": [("store_id", "store_id", "long"), ("customer_id", "customer_id", "long"), ("receipt_id", "receipt_id", "string"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("item_count", "item_count", "long")],
+    "receipt_created": [("store_id", "store_id", "long"), ("customer_id", "customer_id", "long"), ("receipt_id", "receipt_id", "string"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("item_count", "item_count", "long"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "receipt_line_added": [("receipt_id", "receipt_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string")],
     "payment_processed": [("receipt_id", "receipt_id", "string"), ("order_id", "order_id", "string"), ("payment_method", "payment_method", "string"), ("amount", "amount", "real"), ("amount_cents", "amount_cents", "long"), ("transaction_id", "transaction_id", "string"), ("processing_time", "processing_time", "datetime"), ("processing_time_ms", "processing_time_ms", "int"), ("status", "status", "string"), ("decline_reason", "decline_reason", "string"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
     "inventory_updated": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("quantity_delta", "quantity_delta", "long"), ("reason", "reason", "string"), ("payload_source", "source", "string")],
@@ -526,9 +750,9 @@ EVENT_PAYLOADS = {
     "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
     "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
     "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
-    "ad_impression": [("channel", "channel", "string"), ("campaign_id", "campaign_id", "string"), ("creative_id", "creative_id", "string"), ("customer_ad_id", "customer_ad_id", "string"), ("impression_id", "impression_id", "string"), ("cost", "cost", "real"), ("device_type", "device_type", "string")],
+    "ad_impression": [("channel", "channel", "string"), ("campaign_id", "campaign_id", "string"), ("creative_id", "creative_id", "string"), ("customer_ad_id", "customer_ad_id", "string"), ("impression_id", "impression_id", "string"), ("cost", "cost", "real"), ("device_type", "device_type", "string"), ("customer_id", "customer_id", "long")],
     "promotion_applied": [("receipt_id", "receipt_id", "string"), ("promo_code", "promo_code", "string"), ("discount_amount", "discount_amount", "real"), ("discount_cents", "discount_cents", "long"), ("discount_type", "discount_type", "string"), ("product_count", "product_count", "long"), ("product_ids", "product_ids", "dynamic"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
-    "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string")],
+    "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
 }
@@ -539,7 +763,7 @@ KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
 # (30s-2min). At this demo's low volume that cuts end-to-end latency from minutes
 # to seconds — the dominant cause of the live feed looking "exceptionally slow".
 # (Trade-off: more, smaller extents, acceptable for a demo.)
-_INGESTION_PROPERTIES = json.dumps({"flushImmediately": True})
+
 # The per-event_type writes each target a different table, so run them concurrently
 # to overlap the blob-stage + ingest round-trips; sequential writes serialize ~18
 # blocking calls per micro-batch and fall behind the trigger.
@@ -572,8 +796,21 @@ def _kusto_columns(event_type):
     return cols
 
 
-def _write_event_table(batch_df, event_type, token):
+def _kusto_write_metadata(event_type, batch_id):
+    """Return deterministic connector metadata for an idempotent table batch."""
+    identity = f"retail-demo:{STREAM_ID}:{event_type}:{int(batch_id)}"
+    ingestion_properties = json.dumps({
+        "flushImmediately": True,
+        "ingestByTags": [identity],
+        "ingestIfNotExists": [identity],
+    })
+    request_id = str(uuid.uuid5(uuid.NAMESPACE_URL, identity))
+    return ingestion_properties, request_id
+
+
+def _write_event_table(batch_df, event_type, batch_id, token):
     """Map one event_type subset to its KQL columns and append it to its table."""
+    ingestion_properties, request_id = _kusto_write_metadata(event_type, batch_id)
     mapped = (batch_df.where(F.col("event_type") == event_type)
               .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
               .select("e.*")
@@ -584,7 +821,10 @@ def _write_event_table(batch_df, event_type, token):
         .option("kustoTable", event_type)
         .option("accessToken", token)
         .option("tableCreateOptions", "FailIfNotExist")
-        .option("sparkIngestionProperties", _INGESTION_PROPERTIES)
+        .option("writeMode", "Transactional")
+        .option("requestId", request_id)
+        .option("ensureNoDuplicatedBlobs", "true")
+        .option("sparkIngestionPropertiesJson", ingestion_properties)
         .mode("Append").save())
 
 
@@ -595,8 +835,9 @@ def write_to_eventhouse(batch_df, batch_id):
     bounded thread pool — this overlaps the blob-stage + ingest round-trips so a
     micro-batch finishes inside the trigger window instead of serializing ~18
     blocking calls (the old behaviour fell behind and looked "exceptionally slow").
-    Per-table failures are caught and logged instead of failing the whole batch;
-    run `.show ingestion failures` in the KQL database to see dropped rows.
+    Per-table errors are collected so every worker can finish, then raised to
+    prevent Spark from committing the checkpoint. Deterministic Kusto ingestion
+    tags make already-completed sibling writes idempotent when the batch replays.
     """
     import concurrent.futures as cf
 
@@ -606,26 +847,32 @@ def write_to_eventhouse(batch_df, batch_id):
         present = [et for et in seen if et in EVENT_PAYLOADS]
         unmapped = [et for et in seen if et not in EVENT_PAYLOADS]
         if unmapped:
-            print(f"  skipping unmapped event_types: {unmapped}")
+            raise ValueError(f"unmapped event_types in batch {batch_id}: {unmapped}")
         if not present:
             return
         token = notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
 
         def _task(event_type):
             try:
-                _write_event_table(batch_df, event_type, token)
+                _write_event_table(batch_df, event_type, batch_id, token)
                 return (event_type, None)
-            except Exception as exc:  # noqa: BLE001 - surface per-table, don't fail the batch
+            except Exception as exc:  # noqa: BLE001 - collect, then fail the batch below
                 return (event_type, exc)
 
         with cf.ThreadPoolExecutor(max_workers=min(_WRITE_PARALLELISM, len(present))) as pool:
             results = list(pool.map(_task, present))
 
         failed = [(et, err) for et, err in results if err is not None]
-        print(f"batch {batch_id}: wrote {len(results) - len(failed)}/{len(results)} event tables"
-              + ("" if not failed else
-                 "; FAILED: " + ", ".join(f"{et} ({type(err).__name__}: {err})"
-                                          for et, err in failed)))
+        succeeded = len(results) - len(failed)
+        print(f"batch {batch_id}: wrote {succeeded}/{len(results)} event tables")
+        if failed:
+            detail = ", ".join(
+                f"{event_type} ({type(error).__name__}: {error})"
+                for event_type, error in failed
+            )
+            raise RuntimeError(
+                f"batch {batch_id} failed required Eventhouse writes: {detail}"
+            )
     finally:
         batch_df.unpersist()
 

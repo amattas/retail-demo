@@ -55,14 +55,28 @@ The unified operator surface is open work in `IMP-013`.
 - Distinguish required, optional, degraded, and manual-fallback results.
 - Preserve failed payloads or durable replay evidence.
 
-Current code does not satisfy every rule; see `IMP-002`.
+Eventhouse micro-batches fail without checkpoint advancement, Silver replays
+merge by stable keys before watermark advancement, and setup attempts append
+durable status history. Historical and streaming publication stage and validate
+all candidate tables before promotion; partial promotion invokes compensating
+Delta restore/drop rollback. Deployment required-step outcomes persist in
+`deploy/.generated/<env>/deploy-run.json`.
 
 ## Recovery
 
 ### Setup pipeline failed
 
-Resume from the first failed activity only after confirming upstream tables are
-valid. Retain the original run ID and compare row counts/freshness after rerun.
+Inspect `setup_run_log` for the terminal state:
+
+- `FAILED`: staging/validation failed before final tables changed;
+- `ROLLED_BACK`: promotion failed and prior targets were restored;
+- `ROLLBACK_FAILED`: one or more targets could not be restored; preserve staging
+  and repair from the logged target/version evidence;
+- `COMPLETED_CLEANUP_FAILED` or `ROLLED_BACK_CLEANUP_FAILED`: final data is
+  promoted or restored correctly, but logged staging artifacts require cleanup.
+
+Resume only after confirming the terminal state. Use a new run ID; duplicate run
+IDs are rejected.
 
 ### KQL application failed
 
@@ -73,8 +87,9 @@ without recording the resulting state.
 ### Streaming stopped or stale
 
 Check notebook errors, KQL permissions, resolved Query URI, ingestion failures,
- checkpoint path, Eventhouse shortcuts, and Silver watermarks. A partial
-Eventhouse batch may have advanced its checkpoint under current behavior.
+checkpoint path, persisted stream ID, Eventhouse shortcuts, and Silver
+watermarks. Restart with the same checkpoint root so the failed micro-batch
+retains its event identities and ingestion tags.
 
 ### Ontology/task-flow binding missing
 
@@ -92,8 +107,9 @@ or gate the dependent report surface; do not create placeholder business data.
 target validation and confirmation. `99-reset-lakehouse` is manual and is not
 orchestrated by normal pipelines.
 
-Current recreate behavior uses a fixed wait; resource deletion/status polling is
-required by the operations backlog.
+Recreate polls for workspace-name absence after destroy. A timeout or repeated
+pagination marker fails the deploy before apply; do not bypass it with a fixed
+sleep.
 
 ## Capacity
 

@@ -172,7 +172,7 @@ Review these choices:
 | Tenant | Use the Entra tenant that contains the Fabric capacity. |
 | Capacity | The capacity must be active and usable by the deploy operator. |
 | Lakehouse | Keep the default unless another checked-in binding requires a deliberate rename. |
-| Eventhouse and KQL database | Keep the names aligned until the target-propagation work in `IMP-001` is complete. |
+| Eventhouse and KQL database | Use the same name. The supported topology uses the default KQL database created with the Eventhouse. |
 | Spark pool | Prefer the starter pool unless the F64-oriented preview custom pool is intentional. |
 | Store type | `supercenter`, `grocery`, `hardware`, or `luxury`. |
 | History | `--months` defines a range ending yesterday. |
@@ -285,8 +285,8 @@ Choose one path.
 In the Fabric workspace, run setup notebooks 01 through 04 in order. This is
 the smallest supported path and creates:
 
-- Silver schema `ag`: seven dimensions, eighteen fact tables, and run metadata;
-- Gold schema `au`: nine aggregate tables.
+- Silver schema `ag`: seven dimensions, nineteen fact tables, and run metadata;
+- Gold schema `au`: ten aggregate tables.
 
 ### Full setup pipeline
 

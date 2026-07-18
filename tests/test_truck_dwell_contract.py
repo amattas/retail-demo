@@ -93,7 +93,7 @@ def test_generated_stream_notebook_contains_lifecycle_timing_contract() -> None:
     source = _notebook_source(STREAM_NOTEBOOK)
     assert "TRUCK_LATE_DWELL_MINUTES = 120" in source
     assert '_iso(truck_departure_ts).alias("departure_time")' in source
-    assert "), truck_departure_ts," in source
+    assert re.search(r"\),\s*truck_departure_ts,", source)
 
 
 def test_silver_joins_one_completed_lifecycle_on_authoritative_keys() -> None:

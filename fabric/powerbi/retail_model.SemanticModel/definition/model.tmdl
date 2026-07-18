@@ -51,3 +51,5 @@ ref table churn_predictions
 ref table customer_segments
 ref table demand_forecast
 ref table stockout_risk
+ref table fact_marketing_attribution
+ref table campaign_performance_daily

@@ -46,8 +46,8 @@ The following surfaces are not part of these reproducible core journeys:
 - Recent inventory and stockout events are signals, not unresolved
   current-state KPIs
   ([IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)).
-- Marketing attribution remains limited
-  ([IMP-007](../design/requirements/modules/streaming/backlog.md#imp-007)).
+- Marketing attribution and ROAS are contract-tested but remain outside the
+  core presenter path until a live Fabric journey is recorded.
 - Truck dwell is implemented but remains outside these core journeys until a
   bounded live run returns recent `fn_truck_sla()` rows.
 

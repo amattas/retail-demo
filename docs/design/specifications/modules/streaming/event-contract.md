@@ -51,8 +51,8 @@ Payload fields are event-specific and mapped by `EVENT_PAYLOADS`.
 18. `online_order_shipped`
 
 KQL defines an additional `unknown_event` catch-all table. It is not a
-nineteenth generated business event. The current notebook skips unmapped event
-types instead of writing them to `unknown_event`.
+nineteenth generated business event. The current notebook rejects unmapped
+event types before committing the micro-batch checkpoint.
 
 ## Eventhouse writes
 
@@ -76,14 +76,25 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
 - Bounded runs use a 2-second processing trigger.
 - Checkpoints are sink-specific under
   `Files/setup/stream/checkpoint/<sink>`.
+- A logical stream ID is stored under the checkpoint root. Notebook restarts
+  reuse it; deleting the checkpoint root creates a new event-ID namespace.
 
-## Current failure behavior
+## Duplicate and failure behavior
 
-Per-table Eventhouse exceptions are caught, logged, and returned as a partial
-batch result. The micro-batch can therefore complete and advance its checkpoint
-after a failed required table write. This is a known integrity defect, not the
-desired contract; see
-[IMP-002](../../../requirements/modules/operations/backlog.md#imp-002).
+- Generated business IDs and `trace_id` include the persisted stream ID.
+- Eventhouse writes use the connector's transactional mode, deterministic
+  request IDs, duplicate-blob protection, and matching ingest-by/check tags for
+  each stream, event type, and Spark micro-batch.
+- Unmapped event types and any required table-write failure raise from
+  `foreachBatch`, so Spark does not commit that batch's checkpoint.
+- Silver transforms remove exact duplicate candidates, reject conflicting rows
+  with the same identity, and use Delta `MERGE` before advancing watermarks.
+- Gold tables are rebuilt with overwrite semantics from duplicate-safe Silver
+  inputs, so reruns do not accumulate aggregate rows.
+
+These controls make expected retries idempotent and are covered by injected
+failure/replay contracts. Live workspace readiness and freshness remain
+[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Cross-layer ownership
 
@@ -113,9 +124,37 @@ notebook, KQL table/function contract, Silver join, Gold aggregation, queryset,
 dashboard template, and 90-minute rule. A live Fabric smoke run remains the
 deployment verification gate.
 
+## Marketing attribution
+
+Attributed store and online scenarios emit two `ad_impression` touches and one
+purchase journey without introducing another event type. The existing envelope
+`correlation_id` carries `attribution_journey_id` through impressions,
+receipt/order creation, promotion, payment, and online status events.
+
+The contract is deterministic last-touch within an inclusive seven-day window,
+ordered by touch timestamp and impression ID. Silver writes one
+`fact_marketing_attribution` row after purchase, promotion, and approved
+payment reconcile; attributed rows additionally require a valid selected
+touch, while purchases without a journey are marked
+`UNATTRIBUTED_NO_JOURNEY`.
+
+Money remains integer cents:
+
+```text
+gross_subtotal_cents - discount_cents = net_subtotal_cents
+net_subtotal_cents + tax_cents = total_cents
+approved payment_cents = total_cents
+attributed_revenue_cents = net_subtotal_cents
+```
+
+Eventhouse exposes the same logic through `fn_marketing_attribution()` and
+`fn_campaign_performance()`. Gold publishes `campaign_performance_daily`, and
+the Direct Lake model exposes both the audit fact and campaign KPIs. Contract
+tests cover batch determinism, live payload/KQL mappings, Silver/Gold wiring,
+semantic measures, and all cent equations. A live Fabric smoke run remains the
+deployment verification gate.
+
 ## Known scenario defects
 
-- Campaign/purchase linkage and promotion financial reconciliation are not yet
-  trustworthy (`IMP-007`).
 - One shared event/table manifest and fixture suite are still required
   (`IMP-005`).

@@ -73,7 +73,7 @@ Silver and Gold.
 
 - The deploy plan currently mixes core, ML, ontology, reset, and stream groups.
 - Dashboard and rule assets are not yet guaranteed first-class deployable items.
-- The semantic model is Direct Lake and has 38 active tables, including four ML
+- The semantic model is Direct Lake and has 40 active tables, including four ML
   outputs.
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.

@@ -121,9 +121,9 @@ Use destructive operations only after:
 - confirming which data and items will be removed;
 - receiving explicit operator confirmation.
 
-`retail-setup deploy --recreate` destroys the workspace, waits 90 seconds, and
-then rebuilds it. If Fabric deletion is still in progress, stop and verify the
-resource state rather than repeatedly applying.
+`retail-setup deploy --recreate` destroys the workspace, exhausts paginated
+workspace listings until the target name is absent, and only then rebuilds it.
+A bounded timeout fails before apply.
 
 `99-reset-lakehouse` is a manual destructive asset. It is not part of the
 normal pipeline.

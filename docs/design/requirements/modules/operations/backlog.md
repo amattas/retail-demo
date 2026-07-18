@@ -2,14 +2,6 @@
 
 ## Open
 
-### IMP-002 - Make required execution fail-fast, atomic, and replay-safe {#imp-002}
-
-- **Priority / effort:** P1 / L
-- **Outcome:** Required write, transform, publish, and trigger failures cannot
-  advance progress, replace healthy data, or return success.
-- **Acceptance:** Injected failures preserve replay evidence and leave
-  checkpoints, watermarks, published tables, and final status correct.
-
 ### IMP-013 - Prove runtime readiness and publish freshness lineage {#imp-013}
 
 - **Priority / effort:** P2 / L
@@ -38,3 +30,10 @@
 - Prefer Fabric-native monitoring where it provides the required signal.
 - Run history and failures are evidence, not disposable console output.
 - Destructive recovery must validate the live target and preserve audit context.
+- Required deployment steps, task-flow publication, and an explicitly requested
+  setup-pipeline trigger fail the deploy and persist an atomic run journal.
+- Setup-03 is the single Silver publication boundary; historical Silver and
+  Gold candidates stage and validate before promotion, with compensating Delta
+  restore/drop rollback on partial failure.
+- Streaming Gold stages all ten outputs before promotion and restores prior
+  Delta versions if an attempted promotion fails.

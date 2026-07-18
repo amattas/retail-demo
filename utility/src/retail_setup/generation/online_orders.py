@@ -279,15 +279,25 @@ def generate_online_orders(
         lines.filter(live)
         .groupBy("order_id_ext")
         .agg(F.sum("ext_cents").alias("subtotal_cents"),
+             F.sum("discount_cents").alias("discount_cents"),
              F.sum("line_tax_cents").alias("tax_cents"))
     )
     headers_base = (
         orders.join(sums, "order_id_ext", "left")
         .withColumn("subtotal_cents",
                     F.coalesce(F.col("subtotal_cents"), F.lit(0)).cast("long"))
+        .withColumn("discount_cents",
+                    F.coalesce(F.col("discount_cents"), F.lit(0)).cast("long"))
         .withColumn("tax_cents", F.coalesce(F.col("tax_cents"), F.lit(0)).cast("long"))
         .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
         .withColumn("payment_method", F.col("tender_type"))
+        # IMP-007: subtotal_cents stays net (existing behavior); gross recovers
+        # the pre-discount total. Attribution fields default NULL; enriched for
+        # the ~5% of orders selected for attribution (attribution.py).
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
+        .withColumn("campaign_id", F.lit(None).cast("string"))
+        .withColumn("impression_id_ext", F.lit(None).cast("string"))
     )
     fact_online_order_headers = headers_base.select(
         "order_id_ext", "customer_id", "subtotal_cents", "tax_cents", "total_cents",
@@ -295,6 +305,8 @@ def generate_online_orders(
         _fmt(F.col("tax_cents")).alias("tax_amount"),
         _fmt(F.col("total_cents")).alias("total_amount"),
         "payment_method", "event_ts", "event_date",
+        "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
+        "campaign_id", "impression_id_ext",
     ).select(*column_names("fact_online_order_headers"))
 
     # --- payments: one per NON-cancelled order; receipt_id_ext/store_id NULL

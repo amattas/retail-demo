@@ -5,7 +5,7 @@
 `utility/src/retail_setup/generation/schemas.py` is the authoritative base
 Lakehouse table/column/type contract. `engine.py` owns orchestration,
 `invariants.py` owns cross-table validation, `writer.py` owns publication, and
-`gold.py` owns the nine aggregate outputs.
+`gold.py` owns the ten aggregate outputs.
 
 ## Base Silver output
 
@@ -18,16 +18,28 @@ Lakehouse table/column/type contract. `engine.py` owns orchestration,
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
-`fact_marketing`, `fact_promotions`, `fact_promo_lines`,
+`fact_marketing`, `fact_marketing_attribution`, `fact_promotions`,
+`fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, and `fact_stockouts`.
 
 ### Operational output
 
-`setup_run_log` records table-level setup output. Its current writer behavior
-overwrites rather than appends a durable multi-run history; that gap is tracked
-by `IMP-002`.
+`setup_run_log` appends a unique setup-attempt record, table-level completion
+records, and a final completion or failure record. Reusing an existing `run_id`
+is rejected so retries cannot create ambiguous duplicate history.
+
+Setup-02 generates and validates dimensions without publishing them. Setup-03
+regenerates the same deterministic dimensions with all facts and is the single
+Silver publication boundary. `write_all` stages every candidate under a
+run-scoped `<schema>_stage` schema, validates schema and row counts, captures
+existing Delta versions, then promotes. An attempted promotion failure restores
+pre-existing targets and drops newly created targets in reverse order.
+
+Terminal publication states distinguish data recovery from staging cleanup:
+`COMPLETED`, `FAILED`, `ROLLED_BACK`, `ROLLBACK_FAILED`,
+`COMPLETED_CLEANUP_FAILED`, and `ROLLED_BACK_CLEANUP_FAILED`.
 
 ## Gold output
 
@@ -39,6 +51,7 @@ by `IMP-002`.
 - `online_sales_daily`
 - `zone_dwell_minute`
 - `marketing_cost_daily`
+- `campaign_performance_daily`
 - `tender_mix_daily`
 
 ML output tables are not part of this base contract.
@@ -46,8 +59,9 @@ ML output tables are not part of this base contract.
 ## Generation order
 
 The engine creates dimensions and date context before dependent facts, then
-builds sales, returns, online orders, payments, promotions, marketing, store
-activity, sensors, inventory, replenishment, stockouts, trucks, and Gold output.
+builds sales, returns, online orders, payments, promotions, marketing,
+deterministic attribution, store activity, sensors, inventory, replenishment,
+stockouts, trucks, and Gold output.
 Reusable intermediate data is cached where repeated calculations would
 otherwise recompute it.
 
@@ -59,6 +73,8 @@ Current invariant checks include:
 - non-null event dates;
 - online-order header/line integrity;
 - pricing, tax, and promotion consistency;
+- seven-day last-touch uniqueness and impression/purchase linkage;
+- attributed revenue, discount, tax, total, and payment reconciliation;
 - stockout location exclusivity;
 - truck timing and inventory relationships.
 

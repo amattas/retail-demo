@@ -44,12 +44,14 @@ ENGINE_MODULES = [
     "generation/online_orders.py",
     "generation/promotions.py",
     "generation/marketing.py",
+    "generation/attribution.py",
     "generation/sensors.py",
     "generation/inventory_balances.py",
     "generation/inventory.py",
     "generation/gold.py",
     "generation/invariants.py",
     "generation/engine.py",
+    "generation/publication.py",
     "generation/writer.py",
 ]
 
@@ -63,6 +65,7 @@ ENGINE_ALIASES = [
     "online_orders",
     "promotions",
     "marketing",
+    "attribution",
     "store_activity",
     "sensors",
     "inventory",
