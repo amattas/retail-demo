@@ -9,6 +9,14 @@
   weighting, labels, and technical-field visibility agree across KQL and DAX.
 - **Acceptance:** Automated query/model tests prove labels, slicers, state, and
   source grain.
+- **Progress:** Status normalization and one technical-field-visibility defect
+  are resolved and guarded: the payment-anomaly KQL function filtered on
+  lowercase `"declined"` (never matched the uppercase source enum), now fixed to
+  `"DECLINED"`; the orphan raw `event_date` column on `fact_payments` (no
+  `dim_date` relationship, duplicates `Event Timestamp`) is now hidden.
+  `tests/scripts/test_kpi_status_semantics.py` pins canonical UPPERCASE status
+  literals across KQL and DAX and the visibility fix. State folding, date
+  relationships, grain, and weighting reconciliation remain open.
 
 ### ENH-002 - Make dynamic pricing the flagship closed-loop action story {#enh-002}
 
