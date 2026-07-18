@@ -6,9 +6,9 @@ Status enumerations (payment ``status``, ``attribution_status``, pricing
 ``utility/src/retail_setup/generation/receipts.py`` and ``online_orders.py``).
 Any KQL function/materialized view or DAX measure that compares against a
 lowercase literal silently matches nothing, so these tests pin the casing
-contract on both layers. They also assert that the orphan ``event_date``
-technical column on ``fact_payments`` stays hidden to avoid ambiguous date
-slicers.
+contract on both layers. They also assert that orphan ``event_date``
+technical columns (raw date columns that are not dim_date relationship keys)
+stay hidden to avoid ambiguous date slicers.
 """
 
 from __future__ import annotations
@@ -98,3 +98,53 @@ def test_orphan_payment_event_date_is_hidden() -> None:
     assert "isHidden" in block.group("body"), (
         "fact_payments.event_date must be hidden (isHidden)."
     )
+
+
+def _dim_date_relationship_keys() -> set[tuple[str, str]]:
+    """(table, column display name) pairs that are legitimate dim_date keys."""
+    text = (SEMANTIC_DEFINITION / "relationships.tmdl").read_text(encoding="utf-8")
+    keys: set[tuple[str, str]] = set()
+    for block in re.split(r"(?=^relationship )", text, flags=re.MULTILINE):
+        to_match = re.search(r"^\ttoColumn: (.+)$", block, re.MULTILINE)
+        from_match = re.search(r"^\tfromColumn: (.+)$", block, re.MULTILINE)
+        if not to_match or not from_match:
+            continue
+        if not to_match.group(1).strip().startswith("dim_date."):
+            continue
+        table, _, column = from_match.group(1).strip().partition(".")
+        keys.add((table.strip("'"), column.strip("'")))
+    return keys
+
+
+def _event_date_columns() -> list[tuple[str, str, str]]:
+    """(table, column display name, column body) for every event_date column."""
+    found: list[tuple[str, str, str]] = []
+    for path in sorted(TABLES_DIR.glob("*.tmdl")):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r"\tcolumn '?(?P<name>[^'\n]+?)'?\n(?P<body>(?:\t\t.+\n)+)", text
+        ):
+            body = match.group("body")
+            if re.search(r"^\t\tsourceColumn: event_date$", body, re.MULTILINE):
+                found.append((path.stem, match.group("name"), body))
+    return found
+
+
+def test_orphan_event_date_columns_are_hidden() -> None:
+    # Any fact-table column sourced from raw ``event_date`` that is NOT used as
+    # a dim_date relationship key duplicates the event timestamp and produces an
+    # ambiguous date slicer, so it must be hidden. Relationship-key date columns
+    # (e.g. fact_receipts.'Event Date') stay visible.
+    relationship_keys = _dim_date_relationship_keys()
+    columns = _event_date_columns()
+    assert columns, "Expected at least one event_date column to guard."
+    offenders = [
+        f"{table}.{name}"
+        for table, name, body in columns
+        if (table, name) not in relationship_keys and "isHidden" not in body
+    ]
+    assert not offenders, (
+        "Orphan raw event_date columns (not dim_date relationship keys) must be "
+        f"hidden to avoid ambiguous date slicers; offenders: {offenders}"
+    )
+
