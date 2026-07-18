@@ -108,11 +108,12 @@ table fact_marketing
 		dataType: int64
 		formatString: 0
 		lineageTag: e8f39bc7-f231-4825-a5b9-1ee4050cf223
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_marketing = entity
 		mode: directLake

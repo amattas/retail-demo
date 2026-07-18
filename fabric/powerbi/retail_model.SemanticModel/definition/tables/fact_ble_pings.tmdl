@@ -76,11 +76,12 @@ table fact_ble_pings
 		dataType: int64
 		formatString: 0
 		lineageTag: 1618bcbd-d798-4e0b-8373-9f0c35f8b84c
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_ble_pings = entity
 		mode: directLake
