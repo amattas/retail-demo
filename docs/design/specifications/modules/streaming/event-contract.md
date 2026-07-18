@@ -92,9 +92,9 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
 - Gold tables are rebuilt with overwrite semantics from duplicate-safe Silver
   inputs, so reruns do not accumulate aggregate rows.
 
-These controls make expected retries idempotent. A live injected-failure run
-remains part of [IMP-002](../../../requirements/modules/operations/backlog.md#imp-002)
-verification.
+These controls make expected retries idempotent and are covered by injected
+failure/replay contracts. Live workspace readiness and freshness remain
+[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Cross-layer ownership
 

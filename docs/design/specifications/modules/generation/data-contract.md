@@ -30,6 +30,17 @@ Lakehouse table/column/type contract. `engine.py` owns orchestration,
 records, and a final completion or failure record. Reusing an existing `run_id`
 is rejected so retries cannot create ambiguous duplicate history.
 
+Setup-02 generates and validates dimensions without publishing them. Setup-03
+regenerates the same deterministic dimensions with all facts and is the single
+Silver publication boundary. `write_all` stages every candidate under a
+run-scoped `<schema>_stage` schema, validates schema and row counts, captures
+existing Delta versions, then promotes. An attempted promotion failure restores
+pre-existing targets and drops newly created targets in reverse order.
+
+Terminal publication states distinguish data recovery from staging cleanup:
+`COMPLETED`, `FAILED`, `ROLLED_BACK`, `ROLLBACK_FAILED`,
+`COMPLETED_CLEANUP_FAILED`, and `ROLLED_BACK_CLEANUP_FAILED`.
+
 ## Gold output
 
 - `sales_minute_store`

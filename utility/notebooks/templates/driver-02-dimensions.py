@@ -58,7 +58,7 @@ spark.conf.set("spark.advise.divisionExprConvertRule.enable", "true")
 # %% [engine]
 
 # %% [markdown]
-# ## Generate and write dimensions
+# ## Generate and validate dimensions
 
 # %%
 from datetime import date
@@ -81,10 +81,13 @@ dims = generate_dimensions(spark, dicts, cfg)
 dims["dim_date"] = generate_dim_date(
     spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5))
 
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {LAKEHOUSE_NAME}.{SILVER_DB}")
 for name, df in dims.items():
-    write_to_lakehouse(df, LAKEHOUSE_NAME, SILVER_DB, name)
-    # Count the written table, not df: df.count() would recompute the dimension
-    # generation; the persisted Delta table answers count() from metadata.
-    n = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{name}").count()
-    print(f"wrote {LAKEHOUSE_NAME}.{SILVER_DB}.{name}: {n:,} rows")
+    n = df.count()
+    if n == 0:
+        raise RuntimeError(f"{name} generated no rows")
+    print(f"validated {name}: {n:,} rows")
+
+print(
+    "Dimension validation complete. setup-03 regenerates the same deterministic "
+    "dimensions and atomically publishes the complete Silver generation."
+)

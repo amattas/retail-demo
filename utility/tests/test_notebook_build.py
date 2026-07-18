@@ -102,3 +102,16 @@ def test_stream_template_emits_declared_eventhouse_event_types():
     assert stream_events == declared_events
     assert declared_events <= kql_tables
     assert "unknown_event" in kql_tables - declared_events
+
+
+def test_setup03_is_the_single_silver_publication_boundary():
+    dimensions = (
+        UTILITY / "notebooks" / "templates" / "driver-02-dimensions.py"
+    ).read_text()
+    facts = (
+        UTILITY / "notebooks" / "templates" / "driver-03-facts.py"
+    ).read_text()
+
+    assert "write_to_lakehouse(df" not in dimensions
+    assert "Dimension validation complete" in dimensions
+    assert "write_all(result.tables, {}, cfg, run_id" in facts

@@ -60,6 +60,7 @@ ID rather than resolving a potentially duplicate display name.
 | `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | No |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live identifiers | No |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | No |
+| `deploy/.generated/<env>/deploy-run.json` | Atomic step/status journal for the latest deploy run | No |
 | `deploy/workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
 
 Terraform receives an environment-specific `TF_DATA_DIR` and local backend
@@ -156,15 +157,21 @@ that is not a stable public source-control item contract.
 
 ## Failure semantics
 
-- Required plan commands fail the main plan.
-- Task-flow deployment currently reports an error and continues.
-- Setup-pipeline trigger retries, then prints a manual fallback.
-- Recreate currently uses a fixed wait after destroy.
+- Required plan commands and task-flow deployment fail the main plan.
+- The setup-pipeline trigger is optional until the operator requests it; once
+  requested, retry exhaustion fails the run.
+- `--yes` records the setup-pipeline trigger as `SKIPPED`.
+- Recreate polls every visible Fabric workspace page and fails closed on timeout
+  or malformed pagination before Terraform apply.
+- `deploy-run.json` records `PENDING`, `RUNNING`, `SUCCEEDED`, `SKIPPED`, and
+  `FAILED` step states plus overall `RUNNING`, `SUCCEEDED`, `DEGRADED`, or
+  `FAILED`. It stores no raw command output, environment variables, or tokens
+  and redacts credential-like exception text.
 - Local deployment validation checks generated files only; it does not query
   live item, binding, run, or data readiness.
 
-The required fail-fast, replay-safe, and deletion-polling behavior is owned by
-[IMP-002](../../../requirements/modules/operations/backlog.md#imp-002).
+Live item, binding, and data-readiness proof remains
+[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Evidence
 
