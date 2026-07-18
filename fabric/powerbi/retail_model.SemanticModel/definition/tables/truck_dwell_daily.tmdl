@@ -9,7 +9,8 @@ table truck_dwell_daily
 		lineageTag: 01a1a1c7-0001-0001-0001-000000000001
 
 	/// Average truck dwell minutes.
-	measure 'Avg Truck Dwell Minutes' = AVERAGE('truck_dwell_daily'[Average Dwell Minutes])
+	/// Truck-weighted average dwell minutes (weights each site-day row by its truck count so high-volume sites dominate, rather than averaging per-row averages).
+	measure 'Avg Truck Dwell Minutes' = DIVIDE(SUMX('truck_dwell_daily', 'truck_dwell_daily'[Average Dwell Minutes] * 'truck_dwell_daily'[Trucks]), [Total Trucks], 0)
 		formatString: #,0.0
 		displayFolder: Logistics\Dwell
 		lineageTag: 01a1a1c7-0001-0001-0001-000000000002
@@ -53,12 +54,12 @@ table truck_dwell_daily
 		dataType: double
 		lineageTag: d8e13419-3a71-47f4-baea-c166a92a46db
 		sourceLineageTag: avg_dwell_min
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: avg_dwell_min
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 

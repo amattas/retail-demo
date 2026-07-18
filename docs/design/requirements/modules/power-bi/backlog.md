@@ -17,9 +17,14 @@
   relationship) is now hidden to remove duplicate/ambiguous date slicers.
   `tests/scripts/test_kpi_status_semantics.py` pins canonical UPPERCASE status
   literals across KQL and DAX and generically asserts that any `event_date`
-  column that is not a `dim_date` relationship key stays hidden. State folding,
-  date-relationship/grain reconciliation for the visible key columns, and
-  weighting remain open.
+  column that is not a `dim_date` relationship key stays hidden. Roll-up
+  "average" KPIs are now volume-weighted: `Avg Store Basket`,
+  `Avg Zone Dwell`, and `Avg Truck Dwell Minutes` recompute from base totals
+  (weighted by receipts/customers/trucks) instead of naively averaging stored
+  per-row averages, and the stored `avg_*` columns no longer auto-sum
+  (`tests/scripts/test_kpi_aggregation_weighting.py`). State folding and
+  date-relationship/grain reconciliation for the visible key columns remain
+  open.
 
 ### ENH-002 - Make dynamic pricing the flagship closed-loop action story {#enh-002}
 
