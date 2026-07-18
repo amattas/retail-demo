@@ -30,12 +30,12 @@ table fact_dc_inventory_txn
 		formatString: 0
 		lineageTag: 7dde12d4-b2ad-4285-8593-6084695d1c99
 		sourceLineageTag: dc_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: dc_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Balance
 		dataType: int64
@@ -54,12 +54,12 @@ table fact_dc_inventory_txn
 		formatString: 0
 		lineageTag: a7168582-c6e8-4b62-89e2-de93b91dc4c9
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Source
 		dataType: string

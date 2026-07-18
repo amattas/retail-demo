@@ -7,12 +7,12 @@ table fact_truck_inventory
 		formatString: 0
 		lineageTag: abe4d6b6-e6c5-457a-8b6d-7dd3c383dcfb
 		sourceLineageTag: truck_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: truck_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Shipment ID'
 		dataType: string
@@ -30,12 +30,12 @@ table fact_truck_inventory
 		formatString: 0
 		lineageTag: 648fcce8-4a56-44b5-91b4-ffba8a16f659
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Quantity
 		dataType: int64
@@ -65,12 +65,12 @@ table fact_truck_inventory
 		formatString: 0
 		lineageTag: 360d161e-5905-4982-bef4-21af95d6251f
 		sourceLineageTag: location_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: location_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Location Type'
 		dataType: string

@@ -60,12 +60,12 @@ table fact_foot_traffic
 		formatString: 0
 		lineageTag: 569af1b5-d33d-496c-b590-76158423c9ce
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Sensor ID'
 		dataType: string

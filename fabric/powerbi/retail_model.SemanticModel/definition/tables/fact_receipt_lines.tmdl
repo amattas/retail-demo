@@ -66,12 +66,12 @@ table fact_receipt_lines
 		formatString: 0
 		lineageTag: 160f5195-0ef4-431a-9e58-e0dda60336f2
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Line Number'
 		dataType: int64

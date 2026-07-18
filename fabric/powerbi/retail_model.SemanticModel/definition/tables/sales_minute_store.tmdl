@@ -19,12 +19,12 @@ table sales_minute_store
 		formatString: 0
 		lineageTag: 4523c24b-1eb5-4e76-a360-a309c8aa50aa
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Timestamp
 		dataType: dateTime

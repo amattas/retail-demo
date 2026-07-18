@@ -55,12 +55,12 @@ table fact_online_order_headers
 		formatString: 0
 		lineageTag: c6cd591e-21eb-4a48-82fe-be8ca75c1e34
 		sourceLineageTag: customer_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: customer_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Subtotal Cents'
 		dataType: int64

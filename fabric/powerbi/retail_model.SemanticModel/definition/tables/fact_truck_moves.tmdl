@@ -41,36 +41,36 @@ table fact_truck_moves
 		formatString: 0
 		lineageTag: 8cc6a6be-bcbb-4e57-a42e-383babd8c30c
 		sourceLineageTag: dc_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: dc_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Truck ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: f91cf596-0f96-4834-b402-c55cbabbad71
 		sourceLineageTag: truck_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: truck_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Store ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 54d28e85-f677-4d6c-a288-e1e48f68932e
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column actual_unload_duration
 		dataType: double

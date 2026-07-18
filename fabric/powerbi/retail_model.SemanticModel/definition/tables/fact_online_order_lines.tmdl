@@ -99,12 +99,12 @@ table fact_online_order_lines
 		formatString: 0
 		lineageTag: 7a040420-92ea-4167-a7e8-35029e01d4dd
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Extended Price'
 		dataType: string
@@ -180,12 +180,12 @@ table fact_online_order_lines
 		formatString: 0
 		lineageTag: 46f9dba7-f1fe-421f-b5d6-5753941c2834
 		sourceLineageTag: node_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: node_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column __index_level_0__
 		dataType: int64
