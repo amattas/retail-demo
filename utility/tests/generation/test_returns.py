@@ -7,7 +7,7 @@ from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
 from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
-from retail_setup.generation.returns import generate_returns
+from retail_setup.generation.returns import build_return_headers, generate_returns
 from retail_setup.generation.schemas import column_names
 
 
@@ -59,13 +59,28 @@ def test_return_rate_and_dec26_spike(setup):
     cfg, sales, rets = setup
     by_day_sales = {r["event_date"]: r["count"] for r in
                     sales["fact_receipts"].groupBy("event_date").count().collect()}
-    by_day_rets = {r["event_date"]: r["count"] for r in
-                   rets["fact_receipts"].groupBy("event_date").count().collect()}
-    total_rate = sum(by_day_rets.values()) / sum(by_day_sales.values())
+    total_rets = rets["fact_receipts"].count()
+    total_rate = total_rets / sum(by_day_sales.values())
     assert 0.02 < total_rate < 0.10  # 5% nominal incl. one 6x day, 10% cap
+
+    # The Dec-26 spike is keyed on the *originating sale* day (returns post
+    # 1..N days later, so a by-return-date view would smear the spike). Measure
+    # it against the sale day via the return-header helper, which retains the
+    # originating sale date.
+    hdr = build_return_headers(sales, cfg)
+    by_sale_day = {r["orig_event_date"]: r["count"] for r in
+                   hdr.groupBy("orig_event_date").count().collect()}
     dec26 = date(2025, 12, 26)
-    other = [by_day_rets.get(d, 0) / by_day_sales[d] for d in by_day_sales if d != dec26]
-    assert by_day_rets.get(dec26, 0) / by_day_sales[dec26] > 2 * (sum(other) / len(other))
+    other = [by_sale_day.get(d, 0) / by_day_sales[d] for d in by_day_sales if d != dec26]
+    assert by_sale_day.get(dec26, 0) / by_day_sales[dec26] > 2 * (sum(other) / len(other))
+
+
+def test_returns_posted_strictly_after_sale(setup):
+    cfg, sales, _ = setup
+    hdr = build_return_headers(sales, cfg)
+    # No return may post on or before its originating sale's day (IMP-010).
+    assert hdr.filter(F.col("event_date") <= F.col("orig_event_date")).count() == 0
+    assert hdr.filter(F.col("event_date") > F.lit(cfg.end_date)).count() == 0
 
 
 def test_return_payment_negative_approved(setup):

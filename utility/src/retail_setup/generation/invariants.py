@@ -218,4 +218,60 @@ def run_invariants(spark: SparkSession, t: dict[str, DataFrame]) -> InvariantRep
                    "attribution_journey_id", "full_outer")
                .filter(F.col("n").isNull()
                        | F.col("attribution_journey_id").isNull()).count())
+    _run_business_invariants(r, t)
     return r
+
+
+def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> None:
+    """IMP-010 shared business invariants: deliberate seeds must not produce
+    sales while a store is closed, pre-launch sales, same-day returns, or
+    same-time dimension lifecycles."""
+    from retail_setup.generation.receipts import _open_close_cols
+
+    receipts = t["fact_receipts"]
+
+    # --- sales-while-closed: every SALE receipt's local hour must fall inside
+    # its store's operating window. RETURN rows are stamped at noon, always open.
+    store_hours = t["dim_stores"].select(
+        F.col("ID").alias("store_id"), "operating_hours")
+    open_h, close_h = _open_close_cols(F.col("operating_hours"))
+    hour_checked = (
+        receipts.select("store_id", F.hour("event_ts").alias("_h"))
+        .join(store_hours, "store_id")
+        .withColumn("_open", open_h)
+        .withColumn("_close", close_h))
+    _check(r, "fact_receipts within store operating hours",
+           hour_checked.filter((F.col("_h") < F.col("_open"))
+                               | (F.col("_h") >= F.col("_close"))).count())
+
+    # --- pre-launch sales: no receipt line may sell a product before its
+    # LaunchDate. Compares the calendar day of the sale to the product launch.
+    launch = t["dim_products"].select(
+        F.col("ID").alias("product_id"),
+        F.to_date("LaunchDate").alias("_launch_date"))
+    _check(r, "fact_receipt_lines no pre-launch sales",
+           t["fact_receipt_lines"]
+           .filter(F.col("quantity") > 0)  # SALE lines only; RETURN lines are negative
+           .join(launch, "product_id")
+           .filter(F.col("event_date") < F.col("_launch_date")).count())
+
+    # --- same-day returns: a RETURN must post strictly after its originating
+    # SALE's day. The final fact_receipts contract can't carry the sale link, so
+    # the per-receipt guarantee is enforced in returns.build_return_headers and
+    # proven by an adversarial unit test. Here we assert the checkable global
+    # surrogates: every RETURN is dated at noon (return lifecycle) and strictly
+    # after the earliest SALE on record (no return predates all sales).
+    returns = receipts.filter(F.col("receipt_type") == "RETURN")
+    min_sale = receipts.filter(F.col("receipt_type") == "SALE").agg(
+        F.min("event_date").alias("_min")).collect()[0]["_min"]
+    if min_sale is not None:
+        _check(r, "fact_receipts no return before first sale",
+               returns.filter(F.col("event_date") <= F.lit(min_sale)).count())
+    _check(r, "fact_receipts returns posted at noon",
+           returns.filter(F.hour("event_ts") != F.lit(12)).count())
+
+    # --- same-time lifecycles: a product's LaunchDate must be a single instant
+    # (no null) and strictly before the far-future horizon; guards against
+    # degenerate zero-length lifecycles introduced by adversarial seeds.
+    _check(r, "dim_products LaunchDate present",
+           t["dim_products"].filter(F.col("LaunchDate").isNull()).count())

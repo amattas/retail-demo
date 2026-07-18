@@ -238,7 +238,7 @@ def build_all(output_dir: Path) -> dict[str, str]:
         needs_engine = name not in NO_ENGINE
         nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None)
         payload = notebook_json(nb)
-        (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8")
+        (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8", newline="\n")
         built[name] = payload
     return built
 
