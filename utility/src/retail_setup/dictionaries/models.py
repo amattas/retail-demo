@@ -120,6 +120,16 @@ class StoreTypeProfile(BaseModel):
             raise ValueError("weight values must be non-negative")
         return v
 
+    @field_validator("hourly_weights", "daily_weights", "monthly_weights")
+    @classmethod
+    def _weights_have_effect(cls, v: list[float]) -> list[float]:
+        # An all-zero weight vector is a declared-but-unused control: it can't be
+        # normalized and would silently suppress all traffic. Reject it so profile
+        # controls provably drive generation (IMP-010 validated profile controls).
+        if sum(v) <= 0:
+            raise ValueError("weight values must not all be zero")
+        return v
+
     @field_validator("hourly_weights")
     @classmethod
     def _24(cls, v: list[float]) -> list[float]:
@@ -139,4 +149,15 @@ class StoreTypeProfile(BaseModel):
     def _12(cls, v: list[float]) -> list[float]:
         if len(v) != 12:
             raise ValueError("monthly_weights must have 12 entries")
+        return v
+
+    @field_validator("department_weights")
+    @classmethod
+    def _departments_have_effect(cls, v: dict[str, float]) -> dict[str, float]:
+        # Every declared department must carry positive weight: a zero/negative
+        # weight is an unused control that silently excludes a department from
+        # every basket (IMP-010 validated profile controls).
+        bad = sorted(k for k, w in v.items() if w <= 0)
+        if bad:
+            raise ValueError(f"department_weights must be positive; got <=0 for {bad}")
         return v

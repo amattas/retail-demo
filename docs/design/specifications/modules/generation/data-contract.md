@@ -76,9 +76,15 @@ Current invariant checks include:
 - seven-day last-touch uniqueness and impression/purchase linkage;
 - attributed revenue, discount, tax, total, and payment reconciliation;
 - stockout location exclusivity;
-- truck timing and inventory relationships.
+- truck timing and inventory relationships;
+- sales only within each store's operating hours;
+- no receipt line sold before its product's launch date;
+- returns posted strictly after the originating sale (never same-day);
+- product lifecycle dates present (no degenerate lifecycles).
 
-Shared live/batch calendar and lifecycle invariants remain open in `IMP-010`.
+Shared live/batch business invariants — operating hours, product launch
+eligibility, return timing, lifecycle presence, and validated profile controls —
+are enforced in generation and checked by `IMP-010`.
 
 ## Naming compatibility
 

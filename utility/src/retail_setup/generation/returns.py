@@ -1,13 +1,15 @@
 """Returns fact group, Spark-native (unioned into the receipts contract).
 
 Semantics (datagen utils_mixin): sample ~``cfg.return_rate`` of SALE receipts
-per day — Dec 26 spikes 6x, capped at 10% of the day's receipts. The return
-header gets a new ``receipt_id_ext`` with the same 25-char layout as sales
-(``RET`` + yyyyMMddHHmm + store4 + seq6), ``receipt_type='RETURN'``, noon
-``event_ts`` on the same day, NULL ``customer_id``, CREDIT_CARD tender, and
-negated cents. Lines mirror the original receipt's lines with negative
-quantity / ext_cents (``promo_code='RETURN'``); each return gets one negative,
-APPROVED payment — refunds don't decline.
+per day — Dec 26 spikes 6x, capped at 10% of the day's receipts. Each return
+posts 1..``RETURN_WINDOW_DAYS`` days *after* its originating sale (IMP-010: no
+same-day returns), clamped to ``cfg.end_date``. The return header gets a new
+``receipt_id_ext`` with the same 25-char layout as sales (``RET`` +
+yyyyMMddHHmm + store4 + seq6), ``receipt_type='RETURN'``, noon ``event_ts`` on
+the return day, NULL ``customer_id``, CREDIT_CARD tender, and negated cents.
+Lines mirror the original receipt's lines with negative quantity / ext_cents
+(``promo_code='RETURN'``); each return gets one negative, APPROVED payment —
+refunds don't decline.
 
 All randomness comes from `runtime.seeded_draws` keyed on the original
 receipt id, so output is deterministic for a (config, seed) pair.
@@ -26,15 +28,22 @@ from retail_setup.generation.schemas import column_names
 _PROC_MS_LO = 1500
 _PROC_MS_HI = 4000
 
+# Returns post 1..RETURN_WINDOW_DAYS days after the originating sale.
+RETURN_WINDOW_DAYS = 14
 
-def generate_returns(
-    spark: SparkSession,
+
+def build_return_headers(
     sales_group: dict[str, DataFrame],
-    dims: dict[str, DataFrame],
     cfg: GenerationConfig,
-) -> dict[str, DataFrame]:
-    """Generate RETURN fact_receipts / fact_receipt_lines / fact_payments."""
+) -> DataFrame:
+    """Sample SALE receipts for return and date each strictly after its sale.
 
+    Returns the RETURN header DataFrame, which retains ``orig_receipt_id_ext``
+    and ``orig_event_date`` (the originating sale day) alongside the return
+    ``event_date``/``event_ts``. Exposing the originating sale day lets callers
+    and tests verify the IMP-010 no-same-day-returns guarantee, which the final
+    ``fact_receipts`` contract can't carry. Deterministic per (config, seed).
+    """
     d = seeded_draws(cfg.seed)
 
     sales = sales_group["fact_receipts"].filter(F.col("receipt_type") == "SALE")
@@ -46,6 +55,7 @@ def generate_returns(
     # which equals exactly 2x the nominal rate, so the spike contract is a
     # coin flip on hash noise. Ranking pins other days at/below nominal and
     # lands Dec 26 on the cap, keeping output deterministic per (config, seed).
+    # The spike is keyed on the *sale* day; returns then land 1..N days later.
     day_rate = F.least(
         F.lit(0.10),
         F.lit(cfg.return_rate)
@@ -65,12 +75,23 @@ def generate_returns(
         .drop("_n_keep", "_ret_rank")
     )
 
+    # --- date the return strictly after the sale: 1..RETURN_WINDOW_DAYS days
+    # later, clamped to the history end. Sales whose window can't clear their
+    # own day (only sales on end_date) are dropped so no same-day return posts.
+    ret_delay = (F.lit(1) + F.floor(
+        d.u(["orig_receipt_id_ext"], "return_delay") * F.lit(RETURN_WINDOW_DAYS))
+    ).cast("int")
+
     # --- header: new RET id (RET(3)+yyyyMMddHHmm(12)+store4+seq6 = 25 chars,
-    # unique because seq is a row_number per (store_id, event_date) at noon)
+    # unique because seq is a row_number per (store_id, return day) at noon)
     seq_w = Window.partitionBy("store_id", "event_date").orderBy("orig_receipt_id_ext")
-    header = (
+    return (
         sampled
         .withColumnRenamed("receipt_id_ext", "orig_receipt_id_ext")
+        .withColumnRenamed("event_date", "orig_event_date")
+        .withColumn("event_date", F.least(
+            F.lit(cfg.end_date), F.date_add("orig_event_date", ret_delay)))
+        .filter(F.col("event_date") > F.col("orig_event_date"))
         .withColumn("event_ts", F.to_timestamp(
             F.concat(F.col("event_date").cast("string"), F.lit(" 12:00:00"))))
         .withColumn("seq", F.row_number().over(seq_w))
@@ -95,6 +116,19 @@ def generate_returns(
         .withColumn("campaign_id", F.lit(None).cast("string"))
         .withColumn("impression_id_ext", F.lit(None).cast("string"))
     )
+
+
+def generate_returns(
+    spark: SparkSession,
+    sales_group: dict[str, DataFrame],
+    dims: dict[str, DataFrame],
+    cfg: GenerationConfig,
+) -> dict[str, DataFrame]:
+    """Generate RETURN fact_receipts / fact_receipt_lines / fact_payments."""
+
+    d = seeded_draws(cfg.seed)
+
+    header = build_return_headers(sales_group, cfg)
 
     fact_receipts = header.select(
         "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
