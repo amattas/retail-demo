@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.3", "pandas>=2.0", "numpy>=1.26"]
+deploy = ["azure-identity>=1.25.3,<2", "azure-kusto-data>=6.0.4,<7", "fabric-cicd>=1.2.0,<2"]
 spark = ["pyspark>=3.5.2,<4.3"]  # local testing; Fabric provides Spark at runtime
 
 [project.scripts]

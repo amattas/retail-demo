@@ -14,3 +14,8 @@ updates:
     directory: /utility
     schedule:
       interval: weekly
+
+  - package-ecosystem: terraform
+    directory: /deploy/terraform
+    schedule:
+      interval: weekly

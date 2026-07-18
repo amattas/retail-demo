@@ -74,8 +74,8 @@ Install the Python dependencies manually when you are not using the guided
 bootstrap:
 
 ```powershell
-python -m pip install -e .\utility
-python -m pip install azure-identity azure-kusto-data fabric-cicd
+python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
+python -m pip install --no-deps -e .\utility
 ```
 
 ### Fabric target

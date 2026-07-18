@@ -22,7 +22,7 @@ Usage:
         --workspace-id <guid> --lakehouse-id <guid>
 
 Requirements:
-    pip install azure-identity requests
+    pip install --require-hashes -r utility/requirements-deploy.txt
 """
 
 from __future__ import annotations
@@ -71,7 +71,10 @@ def get_credential():
     try:
         from azure.identity import InteractiveBrowserCredential
     except ImportError:
-        print("ERROR: azure-identity not installed. Run: pip install azure-identity")
+        print(
+            "ERROR: deployment dependencies are not installed. Run: "
+            "pip install --require-hashes -r utility/requirements-deploy.txt"
+        )
         sys.exit(1)
 
     import tempfile

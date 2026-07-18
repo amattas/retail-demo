@@ -12,7 +12,7 @@ Security controls use the states defined by
 | `SEC-004` | `accepted` | Classify customer-like data as synthetic-but-sensitive. | `SECURITY.md`; `fabric/powerbi/retail_model.SemanticModel/definition/tables/dim_customers.tmdl` | Model, report, ontology, and agent field inventory. |
 | `SEC-005` | `proposed` | Make broad-use models and agents aggregated, field-restricted, or RLS-gated by default. | `IMP-011` | Role-based semantic-model and agent queries. |
 | `SEC-006` | `proposed` | Give every data agent an owner, purpose, allowed-use instructions, and approved question set. | `fabric/data-agents/`; `IMP-011` | Export and inspect deployed agent configuration. |
-| `SEC-007` | `accepted` | Pin privileged actions, plugins, providers, and dependency sets to reviewed immutable versions. | `.github/workflows/docs.yml`; `requirements-docs.txt`; `IMP-003` | Repository-wide workflow and dependency audit. |
+| `SEC-007` | `verified` | Pin privileged actions, plugins, providers, and dependency sets to reviewed immutable versions. | Full-SHA workflow actions with no runtime plugin marketplaces; hash-locked Python requirements; exact Fabric provider plus `.terraform.lock.hcl`; pinned Miniforge installers | `tests/scripts/test_workflow_references.py`; `tests/scripts/test_supply_chain.py`; native pip and Terraform lock validation. |
 | `SEC-008` | `accepted` | Retain deployment, pipeline, watermark, ingestion, model, and alert evidence with actionable failure signals. | Fabric monitoring surfaces; `setup_run_log`; `ag._watermarks` | Post-deploy readiness and freshness checks. |
 | `SEC-009` | `accepted` | Isolate environments and require explicit confirmation and target validation for destructive operations. | Environment files; deploy dry-run and recreate flows | Separate state tests and wrong-target negative tests. |
 | `SEC-010` | `verified` | Publish only reviewed current Markdown from `docs/` and documentation captured in immutable SemVer tags; exclude temporary plans and generated source artifacts. | `zensical.toml`; `.github/workflows/docs.yml`; `scripts/docs_versioning.py` | Successful Docs workflow run, `gh-pages` branch inspection, and live `/latest/` plus `versions.json` inspection. |
@@ -28,3 +28,29 @@ Before a shared or customer-facing demo:
 4. Restrict customer-like detail from broad-use models and agents.
 5. Confirm monitoring and failure notifications are available.
 6. Validate that reset and recreate actions target the intended environment.
+
+## Supply-chain lock maintenance
+
+Change the owning input (`requirements-*.in`, `utility/pyproject.toml`, or
+`deploy/terraform/providers.tf`) before regenerating its reviewed lock:
+
+```powershell
+python -m pip install uv==0.11.29
+python -m uv pip compile requirements-docs.in --universal --generate-hashes --output-file requirements-docs.txt
+python -m uv pip compile requirements-test.in --universal --generate-hashes --output-file requirements-test.txt
+python -m uv pip compile utility/pyproject.toml --extra deploy --universal --generate-hashes --output-file utility/requirements-deploy.txt
+python -m uv pip compile utility/pyproject.toml --extra dev --extra deploy --universal --generate-hashes --output-file utility/requirements-ci.txt
+```
+
+After changing the Fabric provider version, regenerate all supported platform
+checksums:
+
+```powershell
+terraform -chdir=deploy/terraform providers lock `
+  -platform=linux_amd64 -platform=linux_arm64 `
+  -platform=windows_amd64 -platform=windows_arm64 `
+  -platform=darwin_amd64 -platform=darwin_arm64
+```
+
+Miniforge version changes require updating every platform URL and SHA-256 value
+in `scripts/setup.sh` plus the exact winget version in `scripts/setup.ps1`.
