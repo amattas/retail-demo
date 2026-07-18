@@ -1,6 +1,8 @@
 """Thin write layer. Notebooks call write_to_lakehouse; tests use write_table
 with a format/location override (no delta-spark dependency locally)."""
 
+from pathlib import Path
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
@@ -50,9 +52,7 @@ def write_all(
 
     def _write(df: DataFrame, db: str, name: str) -> None:
         if lakehouse is not None:
-            df.write.format("delta").mode("overwrite").saveAsTable(
-                f"{lakehouse}.{db}.{name}"
-            )
+            df.write.format("delta").mode("overwrite").saveAsTable(f"{lakehouse}.{db}.{name}")
         else:
             df.write.format(fmt).mode("overwrite").save(f"{base_path}/{db}/{name}")
 
@@ -65,24 +65,77 @@ def write_all(
             return spark.table(f"{lakehouse}.{db}.{name}").count()
         return spark.read.format(fmt).load(f"{base_path}/{db}/{name}").count()
 
-    written: list[tuple[str, int]] = []
-    for name, df in tables.items():
-        _write(df, cfg.silver_db, name)
-        written.append((name, _count(cfg.silver_db, name)))
-    for name, df in gold.items():
-        _write(df, cfg.gold_db, name)
-        written.append((name, _count(cfg.gold_db, name)))
+    log_name = "setup_run_log"
+    log_table = f"{lakehouse}.{cfg.silver_db}.{log_name}" if lakehouse is not None else None
+    log_path = f"{base_path}/{cfg.silver_db}/{log_name}" if base_path is not None else None
 
-    log_rows = [
-        (run_id, cfg.store_type, cfg.seed, cfg.start_date, cfg.end_date,
-         name, count)
-        for name, count in written
-    ]
-    log_df = spark.createDataFrame(
-        log_rows,
-        "run_id string, store_type string, seed long, start_date date, "
-        "end_date date, table_name string, row_count long",
-    ).withColumn("generated_at", F.current_timestamp())
-    _write(log_df, cfg.silver_db, "setup_run_log")
+    def _log_exists() -> bool:
+        if log_table is not None:
+            return spark.catalog.tableExists(log_table)
+        return Path(str(log_path)).exists()
+
+    def _read_log() -> DataFrame:
+        if log_table is not None:
+            return spark.table(log_table)
+        return spark.read.format(fmt).load(str(log_path))
+
+    def _append_log(
+        table_name: str,
+        row_count: int | None,
+        status: str,
+        error: str | None = None,
+    ) -> None:
+        row = [
+            (
+                run_id,
+                cfg.store_type,
+                cfg.seed,
+                cfg.start_date,
+                cfg.end_date,
+                table_name,
+                row_count,
+                status,
+                error,
+            )
+        ]
+        log_df = spark.createDataFrame(
+            row,
+            "run_id string, store_type string, seed long, start_date date, "
+            "end_date date, table_name string, row_count long, status string, "
+            "error string",
+        ).withColumn("generated_at", F.current_timestamp())
+        writer = log_df.write.format("delta" if log_table is not None else fmt)
+        writer = writer.mode("append").option("mergeSchema", "true")
+        if log_table is not None:
+            writer.saveAsTable(log_table)
+        else:
+            writer.save(str(log_path))
+
+    if _log_exists() and _read_log().filter(F.col("run_id") == run_id).limit(1).count():
+        raise ValueError(f"setup run_id already exists: {run_id!r}")
+
+    _append_log("__run__", None, "STARTED")
+
+    written: list[tuple[str, int]] = []
+    for db, frames in ((cfg.silver_db, tables), (cfg.gold_db, gold)):
+        for name, df in frames.items():
+            try:
+                _write(df, db, name)
+                count = _count(db, name)
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"[:1000]
+                try:
+                    _append_log(name, None, "FAILED", error)
+                    _append_log("__run__", None, "FAILED", error)
+                except Exception as log_exc:
+                    raise RuntimeError(
+                        f"writing {name!r} failed and setup_run_log could not "
+                        f"record the failure: {log_exc}"
+                    ) from exc
+                raise
+            written.append((name, count))
+            _append_log(name, count, "COMPLETED")
+
+    _append_log("__run__", len(written), "COMPLETED")
 
     return [name for name, _ in written]

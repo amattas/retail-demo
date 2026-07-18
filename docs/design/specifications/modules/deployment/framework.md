@@ -134,7 +134,10 @@ Generated `parameter.yml` rules rewrite:
 execute it against the resolved KQL database with the Kusto Python SDK.
 
 The required target is the configured KQL database, not a hard-coded default.
-Authentication and target propagation defects are tracked by
+The current topology uses the default database created with the Eventhouse and
+therefore requires the same display name. The normal Azure CLI path resolves
+the workspace and database IDs from Terraform output. Azure PowerShell and
+renamed-target verification are tracked by
 [IMP-001](../../../requirements/modules/deployment/backlog.md#imp-001).
 
 ## Task flow and ontology timing

@@ -55,7 +55,10 @@ The unified operator surface is open work in `IMP-013`.
 - Distinguish required, optional, degraded, and manual-fallback results.
 - Preserve failed payloads or durable replay evidence.
 
-Current code does not satisfy every rule; see `IMP-002`.
+Eventhouse micro-batches now fail without checkpoint advancement, Silver
+replays merge by stable keys before watermark advancement, and setup attempts
+append durable status history. Cross-table setup promotion and deployment
+final-status handling remain under `IMP-002`.
 
 ## Recovery
 
@@ -73,8 +76,9 @@ without recording the resulting state.
 ### Streaming stopped or stale
 
 Check notebook errors, KQL permissions, resolved Query URI, ingestion failures,
- checkpoint path, Eventhouse shortcuts, and Silver watermarks. A partial
-Eventhouse batch may have advanced its checkpoint under current behavior.
+checkpoint path, persisted stream ID, Eventhouse shortcuts, and Silver
+watermarks. Restart with the same checkpoint root so the failed micro-batch
+retains its event identities and ingestion tags.
 
 ### Ontology/task-flow binding missing
 

@@ -5,6 +5,9 @@
 ### IMP-002 - Make required execution fail-fast, atomic, and replay-safe {#imp-002}
 
 - **Priority / effort:** P1 / L
+- **Current boundary:** Eventhouse micro-batches fail closed with stable replay
+  identity, Silver streaming uses key-based idempotent merges before watermark
+  advancement, and setup run history is append-only.
 - **Outcome:** Required write, transform, publish, and trigger failures cannot
   advance progress, replace healthy data, or return success.
 - **Acceptance:** Injected failures preserve replay evidence and leave

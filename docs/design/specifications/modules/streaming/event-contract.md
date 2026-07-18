@@ -76,14 +76,25 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
 - Bounded runs use a 2-second processing trigger.
 - Checkpoints are sink-specific under
   `Files/setup/stream/checkpoint/<sink>`.
+- A logical stream ID is stored under the checkpoint root. Notebook restarts
+  reuse it; deleting the checkpoint root creates a new event-ID namespace.
 
-## Current failure behavior
+## Duplicate and failure behavior
 
-Per-table Eventhouse exceptions are caught, logged, and returned as a partial
-batch result. The micro-batch can therefore complete and advance its checkpoint
-after a failed required table write. This is a known integrity defect, not the
-desired contract; see
-[IMP-002](../../../requirements/modules/operations/backlog.md#imp-002).
+- Generated business IDs and `trace_id` include the persisted stream ID.
+- Eventhouse writes use the connector's transactional mode, deterministic
+  request IDs, duplicate-blob protection, and matching ingest-by/check tags for
+  each stream, event type, and Spark micro-batch.
+- Unmapped event types and any required table-write failure raise from
+  `foreachBatch`, so Spark does not commit that batch's checkpoint.
+- Silver transforms remove exact duplicate candidates, reject conflicting rows
+  with the same identity, and use Delta `MERGE` before advancing watermarks.
+- Gold tables are rebuilt with overwrite semantics from duplicate-safe Silver
+  inputs, so reruns do not accumulate aggregate rows.
+
+These controls make expected retries idempotent. A live injected-failure run
+remains part of [IMP-002](../../../requirements/modules/operations/backlog.md#imp-002)
+verification.
 
 ## Cross-layer ownership
 
