@@ -52,6 +52,11 @@ def spark():
         SparkSession.builder.master("local[2]")
         .appName("retail-setup-tests")
         .config("spark.sql.shuffle.partitions", "4")
+        # Disable broadcast joins: the constrained local driver heap cannot build
+        # and broadcast some intermediate tables in the generation DAG (CI hit
+        # "Not enough memory to build and broadcast the table"). Forcing sort-merge
+        # joins yields identical results with a smaller memory footprint.
+        .config("spark.sql.autoBroadcastJoinThreshold", "-1")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.local.dir", tmpdir)
