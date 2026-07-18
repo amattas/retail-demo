@@ -9,16 +9,161 @@
 // HELPER FUNCTIONS
 // ============================================================================
 
+// One row per correlated store or online purchase. The function derives the
+// latest impression deterministically (timestamp, then impression id), then
+// reconciles promotion, receipt/order, and approved payment cents.
+.create-or-alter function with (folder = "marketing") fn_marketing_attribution()
+{
+    let touches =
+        ad_impression
+        | where isnotempty(correlation_id)
+        | extend attribution_journey_id = correlation_id,
+                 touch_ts = ingest_timestamp,
+                 touch_rank = strcat(
+                     format_datetime(ingest_timestamp, "yyyy-MM-ddTHH:mm:ss.fffffffZ"),
+                     "|",
+                     impression_id
+                 )
+        | summarize arg_max(touch_rank, *) by attribution_journey_id
+        | project attribution_journey_id, touch_ts, impression_id,
+                  campaign_id, creative_id, channel, customer_ad_id,
+                  touch_customer_id = customer_id;
+    let store_purchases =
+        receipt_created
+        | where isnotempty(correlation_id)
+        | summarize arg_max(ingest_timestamp, *) by correlation_id
+        | project attribution_journey_id = correlation_id,
+                  purchase_type = "STORE",
+                  receipt_id,
+                  order_id = "",
+                  purchase_ts = ingest_timestamp,
+                  customer_id,
+                  store_id,
+                  gross_subtotal_cents,
+                  discount_cents,
+                  subtotal_cents,
+                  tax_cents,
+                  total_cents;
+    let online_purchases =
+        online_order_created
+        | where isnotempty(correlation_id)
+        | summarize arg_max(ingest_timestamp, *) by correlation_id
+        | project attribution_journey_id = correlation_id,
+                  purchase_type = "ONLINE",
+                  receipt_id = "",
+                  order_id,
+                  purchase_ts = ingest_timestamp,
+                  customer_id,
+                  store_id = iif(node_type == "STORE", node_id, long(null)),
+                  gross_subtotal_cents,
+                  discount_cents,
+                  subtotal_cents,
+                  tax_cents,
+                  total_cents;
+    let payments =
+        payment_processed
+        | where isnotempty(correlation_id)
+        | summarize arg_max(ingest_timestamp, *) by attribution_journey_id = correlation_id
+        | project attribution_journey_id,
+                  payment_status = status,
+                  payment_cents = amount_cents;
+    let promotions =
+        promotion_applied
+        | where isnotempty(correlation_id)
+        | summarize arg_max(ingest_timestamp, *) by trace_id
+        | summarize promotion_discount_cents = sum(discount_cents)
+            by attribution_journey_id = correlation_id;
+    union store_purchases, online_purchases
+    | join kind=leftouter touches on attribution_journey_id
+    | join kind=leftouter payments on attribution_journey_id
+    | join kind=leftouter promotions on attribution_journey_id
+    | extend lag_seconds = datetime_diff("second", purchase_ts, touch_ts),
+             promotion_discount_cents = coalesce(promotion_discount_cents, 0L)
+    | extend window_valid = isnotnull(touch_ts)
+                            and lag_seconds between (0 .. 604800),
+             payment_reconciled = payment_status == "APPROVED"
+                                  and payment_cents == total_cents,
+             promotion_reconciled = promotion_discount_cents == discount_cents,
+             money_reconciled = gross_subtotal_cents - discount_cents == subtotal_cents
+                                and subtotal_cents + tax_cents == total_cents
+    | extend attribution_status = case(
+                 not(window_valid), "OUTSIDE_WINDOW",
+                 not(payment_reconciled), "RECONCILIATION_FAILED",
+                 not(promotion_reconciled), "PROMOTION_MISMATCH",
+                 not(money_reconciled), "MONEY_MISMATCH",
+                 "ATTRIBUTED"
+             )
+    | extend attribution_id = strcat(
+                 "ATTR-",
+                 purchase_type,
+                 "-",
+                 iff(isnotempty(receipt_id), receipt_id, order_id)
+             ),
+             attribution_model = "LAST_TOUCH_7D",
+             attribution_window_days = 7,
+             attributed_revenue_cents = iff(
+                 attribution_status == "ATTRIBUTED", subtotal_cents, 0L
+             )
+    | project attribution_id, attribution_journey_id, attribution_status,
+              attribution_model, attribution_window_days,
+              impression_id, campaign_id, creative_id, channel,
+              customer_ad_id, customer_id, touch_customer_id,
+              touch_ts, purchase_ts, lag_seconds, purchase_type,
+              receipt_id, order_id, store_id,
+              gross_subtotal_cents, discount_cents, subtotal_cents,
+              tax_cents, total_cents, payment_cents,
+              attributed_revenue_cents
+}
+
 .create-or-alter function with (folder = "helpers") fn_attribution_window(target_campaign_id:string, windowHours:int)
 {
-    // Example: join ad_impression to receipt_created within window
-    let impressions = ad_impression | where campaign_id == target_campaign_id;
-    impressions
-    | join kind=leftouter (
-        receipt_created
-        | project receipt_trace_id = trace_id, receipt_ts = ingest_timestamp, store_id, total
-    ) on $left.trace_id == $right.receipt_trace_id
-    | where receipt_ts between (ingest_timestamp .. (ingest_timestamp + windowHours * 1h))
+    fn_marketing_attribution()
+    | where campaign_id == target_campaign_id
+    | where lag_seconds <= windowHours * 3600
+}
+
+.create-or-alter function with (folder = "marketing") fn_campaign_performance(lookback:timespan)
+{
+    let attributed =
+        fn_marketing_attribution()
+        | where purchase_ts > ago(lookback)
+        | where attribution_status == "ATTRIBUTED";
+    let converted_impressions =
+        attributed
+        | project impression_id;
+    let spend =
+        ad_impression
+        | where ingest_timestamp > ago(lookback)
+                or impression_id in (converted_impressions)
+        | summarize arg_max(ingest_timestamp, *) by impression_id
+        | summarize impressions = dcount(impression_id),
+                    spend_cents = sum(tolong(round(cost * 100.0)))
+            by campaign_id, channel, day = startofday(ingest_timestamp);
+    let conversions =
+        attributed
+        | summarize conversions = dcount(attribution_id),
+                    attributed_revenue_cents = sum(attributed_revenue_cents),
+                    discount_cents = sum(discount_cents),
+                    tax_cents = sum(tax_cents),
+                    payment_cents = sum(payment_cents)
+            by campaign_id, channel, day = startofday(touch_ts);
+    spend
+    | join kind=leftouter conversions on campaign_id, channel, day
+    | extend conversions = coalesce(conversions, 0L),
+             attributed_revenue_cents = coalesce(attributed_revenue_cents, 0L),
+             discount_cents = coalesce(discount_cents, 0L),
+             tax_cents = coalesce(tax_cents, 0L),
+             payment_cents = coalesce(payment_cents, 0L)
+    | extend conversion_rate = iif(
+                 impressions == 0, 0.0, todouble(conversions) / impressions
+             ),
+             roas = iif(
+                 spend_cents == 0, 0.0,
+                 todouble(attributed_revenue_cents) / spend_cents
+             )
+    | project campaign_id, channel, day, impressions, spend_cents,
+              conversions, attributed_revenue_cents, discount_cents,
+              tax_cents, payment_cents, conversion_rate, roas
 }
 
 // ============================================================================

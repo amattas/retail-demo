@@ -233,3 +233,20 @@ relationship 'Store Operations to Date'
 	fromColumn: fact_store_ops.'Event Date'
 	toColumn: dim_date.Date
 
+relationship 'Marketing Attribution to Customers'
+	fromColumn: fact_marketing_attribution.'Customer ID'
+	toColumn: dim_customers.ID
+
+relationship 'Marketing Attribution to Stores'
+	isActive: false
+	fromColumn: fact_marketing_attribution.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Marketing Attribution to Date'
+	fromColumn: fact_marketing_attribution.'Event Date'
+	toColumn: dim_date.Date
+
+relationship 'Campaign Performance Daily to Date'
+	fromColumn: campaign_performance_daily.Day
+	toColumn: dim_date.Date
+

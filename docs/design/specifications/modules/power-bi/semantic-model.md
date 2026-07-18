@@ -14,8 +14,8 @@ Lakehouse.
 `definition/model.tmdl` currently contains 38 active table references:
 
 - 7 dimensions
-- 18 facts
-- 9 Gold aggregates
+- 19 facts
+- 10 Gold aggregates
 - 4 ML tables
 
 The four active ML tables are `churn_predictions`, `customer_segments`,

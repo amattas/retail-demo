@@ -86,6 +86,14 @@ def generate_returns(
         .withColumn("subtotal_cents", -F.col("subtotal_cents"))
         .withColumn("tax_cents", -F.col("tax_cents"))
         .withColumn("total_cents", -F.col("total_cents"))
+        # IMP-007: negate the original discount alongside subtotal/tax so
+        # gross - discount = net continues to hold for the return row.
+        # Returns are never attribution candidates (SALE-only per contract).
+        .withColumn("discount_cents", -F.col("discount_cents"))
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
+        .withColumn("campaign_id", F.lit(None).cast("string"))
+        .withColumn("impression_id_ext", F.lit(None).cast("string"))
     )
 
     fact_receipts = header.select(
@@ -97,6 +105,8 @@ def generate_returns(
         _fmt(F.col("total_cents")).alias("total_amount"), "payment_method",
         # Legacy semantic-model column mirrors subtotal_amount (TMDL contract).
         _fmt(F.col("subtotal_cents")).alias("Subtotal"),
+        "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
+        "campaign_id", "impression_id_ext",
     ).select(*column_names("fact_receipts"))
 
     # --- lines: mirror the original receipt's lines, negated

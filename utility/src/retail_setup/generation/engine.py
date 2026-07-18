@@ -8,6 +8,7 @@ from pyspark.sql import DataFrame, SparkSession
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
 from retail_setup.generation import (
+    attribution,
     dims as dims_mod,
     inventory,
     marketing,
@@ -66,6 +67,17 @@ def generate_all(
     promos, promo_lines = promotions.generate_promotions(spark, sales)
     t["fact_promotions"], t["fact_promo_lines"] = promos, promo_lines
     t["fact_marketing"] = marketing.generate_marketing(spark, t, cfg)
+    # IMP-007: deterministic last-touch marketing attribution over the
+    # purchase streams built above. Must run after fact_receipts,
+    # fact_online_order_headers, fact_payments, fact_promotions, and the
+    # background fact_marketing all exist in `t`.
+    attr = attribution.generate_attribution(spark, t, cfg)
+    t["fact_receipts"] = attr["fact_receipts"]
+    t["fact_online_order_headers"] = attr["fact_online_order_headers"]
+    t["fact_payments"] = attr["fact_payments"]
+    t["fact_promotions"] = attr["fact_promotions"]
+    t["fact_marketing"] = attr["fact_marketing"]
+    t["fact_marketing_attribution"] = attr["fact_marketing_attribution"]
     t["fact_store_ops"] = store_activity.generate_store_ops(spark, t, cfg)
     t["fact_foot_traffic"] = store_activity.generate_foot_traffic(
         spark, sales["fact_receipts"], t, cfg)

@@ -106,6 +106,9 @@ def generate_promotions(
             F.concat(F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"),
                      F.col("promo_code")),
         )
+        # IMP-007: NULL unless the underlying receipt was selected for
+        # attribution; enriched in attribution.py.
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
         .select(*column_names("fact_promotions"))
     )
 

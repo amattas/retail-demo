@@ -1,0 +1,363 @@
+table fact_marketing_attribution
+	lineageTag: 1ed91da8-9ba5-4a61-b85f-99a3f3b782c2
+	sourceLineageTag: [ag].[fact_marketing_attribution]
+
+	/// Attributed revenue, recomputed from cents (zero on non-ATTRIBUTED rows).
+	measure 'Attributed Revenue' = DIVIDE(SUM('fact_marketing_attribution'[Attributed Revenue Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing Attribution\Revenue
+		lineageTag: 13ad4029-c730-4d88-b3c5-6c48f7a66b0c
+
+	/// Count of purchases with attribution status ATTRIBUTED.
+	measure 'Attributed Purchases' = CALCULATE(COUNTROWS('fact_marketing_attribution'), 'fact_marketing_attribution'[Attribution Status] = "ATTRIBUTED")
+		formatString: #,0
+		displayFolder: Marketing Attribution\Volume
+		lineageTag: 117dc6a3-623d-4d6a-b4b7-8f3e19036244
+
+	/// Count of purchases with any non-ATTRIBUTED status (e.g. no matching journey).
+	measure 'Unattributed Purchases' = CALCULATE(COUNTROWS('fact_marketing_attribution'), 'fact_marketing_attribution'[Attribution Status] <> "ATTRIBUTED")
+		formatString: #,0
+		displayFolder: Marketing Attribution\Volume
+		lineageTag: c95e7486-abb3-446c-b883-41ca183ddb58
+
+	/// Share of purchases that were successfully attributed to a marketing touch.
+	measure 'Attribution Rate %' = DIVIDE([Attributed Purchases], [Attributed Purchases] + [Unattributed Purchases], 0)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Marketing Attribution\Volume
+		lineageTag: 5c8e3899-fe61-44ad-a9bd-06084c8321e0
+
+	/// Total discount amount across all purchase records, recomputed from cents.
+	measure 'Attribution Discount Amount' = DIVIDE(SUM('fact_marketing_attribution'[Discount Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing Attribution\Revenue
+		lineageTag: 549af1d6-69c0-4f5c-8e22-700865f9a667
+
+	/// Tax collected on ATTRIBUTED purchases, recomputed from cents.
+	measure 'Attributed Tax' = DIVIDE(CALCULATE(SUM('fact_marketing_attribution'[Tax Cents]), 'fact_marketing_attribution'[Attribution Status] = "ATTRIBUTED"), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing Attribution\Revenue
+		lineageTag: 9dd022ef-eb1d-4b65-b2d3-305d68442335
+
+	/// Payments collected on ATTRIBUTED purchases, recomputed from cents.
+	measure 'Attributed Payments' = DIVIDE(CALCULATE(SUM('fact_marketing_attribution'[Payment Cents]), 'fact_marketing_attribution'[Attribution Status] = "ATTRIBUTED"), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing Attribution\Revenue
+		lineageTag: 77537516-418e-467f-8097-6ebac0f628b3
+
+	/// Payment vs. total reconciliation variance across all purchase records (payment minus total), recomputed from cents.
+	measure 'Payment Reconciliation Variance' = DIVIDE(SUM('fact_marketing_attribution'[Payment Cents]) - SUM('fact_marketing_attribution'[Total Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Marketing Attribution\Reconciliation
+		lineageTag: da67290a-8cf2-4c7c-b95e-9d5f53a5991f
+
+	/// Average lag between the last qualifying marketing touch and the purchase, in hours.
+	measure 'Average Last-Touch Lag Hours' = DIVIDE(AVERAGE('fact_marketing_attribution'[Lag Seconds]), 3600, 0)
+		formatString: #,0.0
+		displayFolder: Marketing Attribution\Timing
+		lineageTag: d7b8d509-b06e-42f7-8f8c-a213fe03a96a
+
+	column 'Attribution ID'
+		dataType: string
+		lineageTag: 21250241-b44a-4328-9fc1-76e702f4a89d
+		sourceLineageTag: attribution_id
+		summarizeBy: none
+		sourceColumn: attribution_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attribution Journey ID'
+		dataType: string
+		lineageTag: 47b5cedf-bd72-4b6c-90ec-7e72ff26e5c8
+		sourceLineageTag: attribution_journey_id
+		summarizeBy: none
+		sourceColumn: attribution_journey_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attribution Status'
+		dataType: string
+		lineageTag: 7ca75f4b-3306-4dba-b4bd-8b8ac346c428
+		sourceLineageTag: attribution_status
+		summarizeBy: none
+		sourceColumn: attribution_status
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attribution Model'
+		dataType: string
+		lineageTag: 4d10e560-46b3-4efd-be5b-1fe289104ef7
+		sourceLineageTag: attribution_model
+		summarizeBy: none
+		sourceColumn: attribution_model
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attribution Window Days'
+		dataType: int64
+		formatString: 0
+		lineageTag: 2748d3af-d595-4c5b-a309-9fa93ac1e246
+		sourceLineageTag: attribution_window_days
+		summarizeBy: none
+		sourceColumn: attribution_window_days
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Impression ID'
+		dataType: string
+		lineageTag: 3c5aff8e-b6d9-40af-b244-a3b4cb8cb46b
+		sourceLineageTag: impression_id_ext
+		summarizeBy: none
+		sourceColumn: impression_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Campaign ID'
+		dataType: string
+		lineageTag: e184aa60-0263-494c-b046-6f7225e1a158
+		sourceLineageTag: campaign_id
+		summarizeBy: none
+		sourceColumn: campaign_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Creative ID'
+		dataType: string
+		lineageTag: 3f352ea8-6293-4255-a9af-01005496ea7b
+		sourceLineageTag: creative_id
+		summarizeBy: none
+		sourceColumn: creative_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Channel
+		dataType: string
+		lineageTag: b8187552-d38b-4900-abe5-bdb1934e0828
+		sourceLineageTag: channel
+		summarizeBy: none
+		sourceColumn: channel
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Customer Ad ID'
+		dataType: string
+		lineageTag: fb6bac1a-aebb-4229-ae4e-de204abf2383
+		sourceLineageTag: customer_ad_id
+		summarizeBy: none
+		sourceColumn: customer_ad_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Customer ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: a35cd889-b393-4e80-9a27-c5886ef06007
+		sourceLineageTag: customer_id
+		summarizeBy: sum
+		sourceColumn: customer_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Touch Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 37b8dabf-2c0f-43bd-91d0-cce5a558c7e0
+		sourceLineageTag: touch_ts
+		summarizeBy: none
+		sourceColumn: touch_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Purchase Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b2b382f6-339a-4846-9e28-20a67adb3926
+		sourceLineageTag: purchase_ts
+		summarizeBy: none
+		sourceColumn: purchase_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Lag Seconds'
+		dataType: int64
+		formatString: 0
+		lineageTag: 08aacc2f-78dc-476c-85e0-6b88957d1a16
+		sourceLineageTag: lag_seconds
+		summarizeBy: sum
+		sourceColumn: lag_seconds
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Purchase Type'
+		dataType: string
+		lineageTag: cb96971b-2c48-486e-8715-915d349ecd71
+		sourceLineageTag: purchase_type
+		summarizeBy: none
+		sourceColumn: purchase_type
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Receipt ID'
+		dataType: string
+		lineageTag: 13f513bc-9b64-412c-82a3-6350e6a3d89f
+		sourceLineageTag: receipt_id_ext
+		summarizeBy: none
+		sourceColumn: receipt_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Order ID'
+		dataType: string
+		lineageTag: 2f266c3d-bf33-4708-87ab-2a386c9b7d08
+		sourceLineageTag: order_id_ext
+		summarizeBy: none
+		sourceColumn: order_id_ext
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 954032f6-1f8f-44d1-86c2-fe59dce6e0de
+		sourceLineageTag: store_id
+		summarizeBy: sum
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Gross Subtotal Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: e6b50b46-e6af-4935-adb0-40976b6881ed
+		sourceLineageTag: gross_subtotal_cents
+		summarizeBy: sum
+		sourceColumn: gross_subtotal_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Discount Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: e1d743d0-c2ac-4f5a-820c-635e2e4b383c
+		sourceLineageTag: discount_cents
+		summarizeBy: sum
+		sourceColumn: discount_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Net Subtotal Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 0d6735c3-b37d-4b50-9eba-8331ca5b652b
+		sourceLineageTag: net_subtotal_cents
+		summarizeBy: sum
+		sourceColumn: net_subtotal_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Tax Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 371ad1af-a8ea-4c12-bbad-6083a05cfc3a
+		sourceLineageTag: tax_cents
+		summarizeBy: sum
+		sourceColumn: tax_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Total Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 59a8be5f-1a27-469f-ac80-6255c46e9fec
+		sourceLineageTag: total_cents
+		summarizeBy: sum
+		sourceColumn: total_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Payment Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 0a25f880-5b7b-41bd-a42b-877c697a24cc
+		sourceLineageTag: payment_cents
+		summarizeBy: sum
+		sourceColumn: payment_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attributed Revenue Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 27864edb-5530-4c17-b54b-ee62e057bd2b
+		sourceLineageTag: attributed_revenue_cents
+		summarizeBy: sum
+		sourceColumn: attributed_revenue_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Date portion of the purchase event, matched to dim_date[Date] (Direct Lake requires matching column types, so this date column relates to dim_date[Date] instead of the timestamp).
+	column 'Event Date'
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 13b2c9a1-7598-412f-a14f-ba2ce9b01262
+		sourceLineageTag: event_date
+		summarizeBy: none
+		sourceColumn: event_date
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_marketing_attribution = entity
+		mode: directLake
+		source
+			entityName: fact_marketing_attribution
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'

@@ -463,6 +463,14 @@ def generate_receipts_group(
         .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
         .withColumn("receipt_type", F.lit("SALE"))
         .withColumn("payment_method", F.col("tender_type"))
+        # IMP-007: discount is applied before tax, so subtotal_cents (kept as
+        # the existing net subtotal) plus discount_cents recovers the
+        # pre-discount gross subtotal. attribution fields default NULL here;
+        # attribution.py enriches the ~5% of receipts selected for attribution.
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
+        .withColumn("campaign_id", F.lit(None).cast("string"))
+        .withColumn("impression_id_ext", F.lit(None).cast("string"))
         .select(
             "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
             "customer_id", "receipt_type", "tender_type", "subtotal_cents",
@@ -473,6 +481,8 @@ def generate_receipts_group(
             # Legacy semantic-model column (sourceColumn: Subtotal); same value
             # as subtotal_amount per the TMDL contract.
             _fmt(F.col("subtotal_cents")).alias("Subtotal"),
+            "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
+            "campaign_id", "impression_id_ext",
         ).select(*column_names("fact_receipts"))
     )
 

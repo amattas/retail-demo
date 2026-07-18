@@ -28,8 +28,8 @@ serves analytics through KQL, Power BI, ontology, and data-agent surfaces.
 | Real-time analytics queries and templates | `fabric/querysets/`, `fabric/dashboards/`, `fabric/rules/` |
 | Ontology and agents | ontology notebook and `fabric/data-agents/` |
 
-The base historical contract contains seven dimensions, eighteen fact tables,
-and nine Gold aggregates. The live driver emits eighteen typed event types.
+The base historical contract contains seven dimensions, nineteen fact tables,
+and ten Gold aggregates. The live driver emits eighteen typed event types.
 Optional ML, ontology, dashboard, rule, and agent surfaces have separate
 deployment and support gates.
 

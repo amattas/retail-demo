@@ -287,8 +287,8 @@ Choose one path.
 In the Fabric workspace, run setup notebooks 01 through 04 in order. This is
 the smallest supported path and creates:
 
-- Silver schema `ag`: seven dimensions, eighteen fact tables, and run metadata;
-- Gold schema `au`: nine aggregate tables.
+- Silver schema `ag`: seven dimensions, nineteen fact tables, and run metadata;
+- Gold schema `au`: ten aggregate tables.
 
 ### Full setup pipeline
 

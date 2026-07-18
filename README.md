@@ -55,8 +55,8 @@ pipeline. Run setup notebooks 01-04 or trigger `setup-pipeline` after deploy.
 
 ## What is deployed
 
-- Lakehouse Silver (`ag`): seven dimensions and eighteen facts
-- Lakehouse Gold (`au`): nine aggregate tables
+- Lakehouse Silver (`ag`): seven dimensions and nineteen facts
+- Lakehouse Gold (`au`): ten aggregate tables
 - Eventhouse/KQL: eighteen typed business event tables plus query assets
 - ML and AI: four active Power BI ML outputs, ontology, and two Data Agents
 - Power BI: a 38-table Direct Lake semantic model and report

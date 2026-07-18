@@ -128,4 +128,94 @@ def run_invariants(spark: SparkSession, t: dict[str, DataFrame]) -> InvariantRep
            prod.filter(~((F.col("Cost") > 0)
                          & (F.col("Cost") < F.col("SalePrice"))
                          & (F.col("SalePrice") <= F.col("MSRP")))).count())
+
+    # --- IMP-007 marketing attribution -------------------------------------
+    # gross - discount = net holds for every SALE receipt / online order,
+    # attributed or not (discount is always applied before tax).
+    _check(r, "fact_receipts gross - discount = net subtotal",
+           receipts.filter(
+               F.col("gross_subtotal_cents") - F.col("discount_cents")
+               != F.col("subtotal_cents")).count())
+    _check(r, "fact_online_order_headers gross - discount = net subtotal",
+           oh.filter(
+               F.col("gross_subtotal_cents") - F.col("discount_cents")
+               != F.col("subtotal_cents")).count())
+
+    if "fact_marketing_attribution" in t:
+        fma = t["fact_marketing_attribution"]
+        _check(r, "fact_marketing_attribution.attribution_id unique",
+               r.row_counts["fact_marketing_attribution"]
+               - fma.select("attribution_id").distinct().count())
+        _check(r, "fact_marketing_attribution xor purchase keys",
+               fma.filter(F.col("receipt_id_ext").isNotNull()
+                          == F.col("order_id_ext").isNotNull()).count())
+        _check(r, "fact_marketing_attribution purchase_type matches xor key",
+               fma.filter(
+                   ((F.col("purchase_type") == "STORE")
+                    != F.col("receipt_id_ext").isNotNull())
+                   | ((F.col("purchase_type") == "ONLINE")
+                      != F.col("order_id_ext").isNotNull())).count())
+        # one journey per purchase, one purchase per journey: distinct
+        # non-NULL attribution_journey_id count must equal ATTRIBUTED row count.
+        attributed = fma.filter(F.col("attribution_status") == "ATTRIBUTED")
+        _check(r, "fact_marketing_attribution one journey per purchase",
+               attributed.count()
+               - attributed.select("attribution_journey_id").distinct().count())
+        _check(r, "fact_marketing_attribution journey_id set iff ATTRIBUTED",
+               fma.filter(
+                   (F.col("attribution_status") == "ATTRIBUTED")
+                   != F.col("attribution_journey_id").isNotNull()).count())
+        _check(r, "fact_marketing_attribution -> fact_receipts FK",
+               fma.filter(F.col("receipt_id_ext").isNotNull())
+               .select("receipt_id_ext")
+               .join(receipts.select("receipt_id_ext"), "receipt_id_ext", "left_anti")
+               .count())
+        _check(r, "fact_marketing_attribution -> online headers FK",
+               fma.filter(F.col("order_id_ext").isNotNull())
+               .select("order_id_ext")
+               .join(oh.select("order_id_ext"), "order_id_ext", "left_anti")
+               .count())
+        # financial reconciliation: gross-discount=net, net+tax=total, and for
+        # any row that reached a payment decision (not RECONCILIATION_FAILED)
+        # the recorded payment equals the purchase total.
+        _check(r, "fact_marketing_attribution gross - discount = net",
+               fma.filter(F.col("gross_subtotal_cents") - F.col("discount_cents")
+                          != F.col("net_subtotal_cents")).count())
+        _check(r, "fact_marketing_attribution net + tax = total",
+               fma.filter(F.col("net_subtotal_cents") + F.col("tax_cents")
+                          != F.col("total_cents")).count())
+        _check(r, "fact_marketing_attribution approved payment = total",
+               fma.filter(F.col("attribution_status").isin(
+                   "ATTRIBUTED", "UNATTRIBUTED_NO_JOURNEY"))
+               .filter(F.col("payment_cents") != F.col("total_cents")).count())
+        _check(r, "fact_marketing_attribution attributed_revenue matches status",
+               fma.filter(
+                   ((F.col("attribution_status") == "ATTRIBUTED")
+                    & (F.col("attributed_revenue_cents") != F.col("net_subtotal_cents")))
+                   | ((F.col("attribution_status") != "ATTRIBUTED")
+                      & (F.col("attributed_revenue_cents") != 0))).count())
+        # window/tie correctness: every ATTRIBUTED row's last touch must be
+        # inside the inclusive 7-day window, with a non-negative lag.
+        _check(r, "fact_marketing_attribution touch within 7-day window",
+               attributed.filter(
+                   F.col("touch_ts").isNull()
+                   | (F.col("lag_seconds") < 0)
+                   | (F.col("lag_seconds") > F.col("attribution_window_days") * 86400)
+               ).count())
+
+        # fact_marketing: each journey's touches are exactly the two rows
+        # created for it (older + newer), never orphaned or duplicated.
+        mk = t["fact_marketing"]
+        journey_touch_counts = (
+            mk.filter(F.col("attribution_journey_id").isNotNull())
+            .groupBy("attribution_journey_id")
+            .agg(F.count("*").alias("n")))
+        _check(r, "fact_marketing journeys have exactly 2 touches",
+               journey_touch_counts.filter(F.col("n") != 2).count())
+        _check(r, "fact_marketing journeys <-> attributed purchases 1:1",
+               journey_touch_counts.join(
+                   attributed.select("attribution_journey_id"),
+                   "attribution_journey_id", "full_outer")
+               .filter(F.col("n").isNull()
+                       | F.col("attribution_journey_id").isNull()).count())
     return r

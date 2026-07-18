@@ -202,5 +202,10 @@ def generate_marketing(
     ).withColumn(
         "__index_level_0__",
         legacy_index("impression_id_ext"),
+    ).withColumn(
+        # IMP-007: NULL for organic/background impressions. attribution.py
+        # unions in the two synthetic per-journey touches, which carry a
+        # non-NULL attribution_journey_id.
+        "attribution_journey_id", F.lit(None).cast("string"),
     )
     return out.select(*column_names("fact_marketing"))

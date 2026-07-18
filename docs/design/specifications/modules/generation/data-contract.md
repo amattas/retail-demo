@@ -5,7 +5,7 @@
 `utility/src/retail_setup/generation/schemas.py` is the authoritative base
 Lakehouse table/column/type contract. `engine.py` owns orchestration,
 `invariants.py` owns cross-table validation, `writer.py` owns publication, and
-`gold.py` owns the nine aggregate outputs.
+`gold.py` owns the ten aggregate outputs.
 
 ## Base Silver output
 
@@ -18,7 +18,8 @@ Lakehouse table/column/type contract. `engine.py` owns orchestration,
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
-`fact_marketing`, `fact_promotions`, `fact_promo_lines`,
+`fact_marketing`, `fact_marketing_attribution`, `fact_promotions`,
+`fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, and `fact_stockouts`.
@@ -39,6 +40,7 @@ is rejected so retries cannot create ambiguous duplicate history.
 - `online_sales_daily`
 - `zone_dwell_minute`
 - `marketing_cost_daily`
+- `campaign_performance_daily`
 - `tender_mix_daily`
 
 ML output tables are not part of this base contract.
@@ -46,8 +48,9 @@ ML output tables are not part of this base contract.
 ## Generation order
 
 The engine creates dimensions and date context before dependent facts, then
-builds sales, returns, online orders, payments, promotions, marketing, store
-activity, sensors, inventory, replenishment, stockouts, trucks, and Gold output.
+builds sales, returns, online orders, payments, promotions, marketing,
+deterministic attribution, store activity, sensors, inventory, replenishment,
+stockouts, trucks, and Gold output.
 Reusable intermediate data is cached where repeated calculations would
 otherwise recompute it.
 
@@ -59,6 +62,8 @@ Current invariant checks include:
 - non-null event dates;
 - online-order header/line integrity;
 - pricing, tax, and promotion consistency;
+- seven-day last-touch uniqueness and impression/purchase linkage;
+- attributed revenue, discount, tax, total, and payment reconciliation;
 - stockout location exclusivity;
 - truck timing and inventory relationships.
 

@@ -1,0 +1,190 @@
+table campaign_performance_daily
+	lineageTag: 7d488d7d-c3f2-4225-aa21-598ced6cae84
+	sourceLineageTag: [au].[campaign_performance_daily]
+
+	/// Total campaign spend, recomputed from cents.
+	measure 'Campaign Spend' = DIVIDE(SUM('campaign_performance_daily'[Spend Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Campaign Performance\Spend
+		lineageTag: 2bf946cc-6650-486b-a4c6-fbb17039efdd
+
+	/// Total campaign impressions.
+	measure 'Campaign Impressions' = SUM('campaign_performance_daily'[Impressions])
+		formatString: #,0
+		displayFolder: Campaign Performance\Reach
+		lineageTag: 8f0fb83f-f454-4be7-ad97-cf440a73db48
+
+	/// Total campaign conversions.
+	measure 'Campaign Conversions' = SUM('campaign_performance_daily'[Conversions])
+		formatString: #,0
+		displayFolder: Campaign Performance\Conversions
+		lineageTag: 18e1d027-ca59-4508-9c24-31c29f3072e1
+
+	/// Total attributed revenue driven by campaigns, recomputed from cents.
+	measure 'Campaign Attributed Revenue' = DIVIDE(SUM('campaign_performance_daily'[Attributed Revenue Cents]), 100, 0)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Campaign Performance\Revenue
+		lineageTag: 4e5d5657-4b1e-4edd-9530-4000208df673
+
+	/// Conversions per impression, recomputed from summed counts rather than averaging the stored daily rate.
+	measure 'Campaign Conversion Rate' = DIVIDE([Campaign Conversions], [Campaign Impressions], 0)
+		formatString: 0.00%;-0.00%;0.00%
+		displayFolder: Campaign Performance\Efficiency
+		lineageTag: a0efeb81-311d-4881-b58a-cc6a865fa165
+
+	/// Return on ad spend, recomputed from summed attributed revenue and spend cents rather than averaging the stored daily ratio.
+	measure 'Campaign ROAS' = DIVIDE([Campaign Attributed Revenue], [Campaign Spend], 0)
+		formatString: #,0.00
+		displayFolder: Campaign Performance\Efficiency
+		lineageTag: a1ff8e1a-9d8d-4594-b3bb-c28a3feb4b4f
+
+	column 'Campaign ID'
+		dataType: string
+		lineageTag: d25a952c-2960-4af2-af48-7ce69d0efaeb
+		sourceLineageTag: campaign_id
+		summarizeBy: none
+		sourceColumn: campaign_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Channel
+		dataType: string
+		lineageTag: af89f92d-514f-4f7d-ba96-60035a977293
+		sourceLineageTag: channel
+		summarizeBy: none
+		sourceColumn: channel
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Day
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a74cf83d-48b6-40f5-9931-87d2d1b3a638
+		sourceLineageTag: day
+		summarizeBy: none
+		sourceColumn: day
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Impressions
+		dataType: int64
+		formatString: 0
+		lineageTag: 16607ac5-31de-44b5-a7db-e98e20293e65
+		sourceLineageTag: impressions
+		summarizeBy: sum
+		sourceColumn: impressions
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Spend Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: b41c090f-5ac2-46a0-a2f8-6a09e4af1196
+		sourceLineageTag: spend_cents
+		summarizeBy: sum
+		sourceColumn: spend_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Conversions
+		dataType: int64
+		formatString: 0
+		lineageTag: 74a46382-066b-4f6c-9e23-d760670cd474
+		sourceLineageTag: conversions
+		summarizeBy: sum
+		sourceColumn: conversions
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Attributed Revenue Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 7467e76c-83e1-4955-9be8-515aab627cf6
+		sourceLineageTag: attributed_revenue_cents
+		summarizeBy: sum
+		sourceColumn: attributed_revenue_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Discount Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: bc863f3e-f46c-4cc3-b865-9592621b4ca4
+		sourceLineageTag: discount_cents
+		summarizeBy: sum
+		sourceColumn: discount_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Tax Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 8488c25b-628a-4da0-a609-a559a1ac25a5
+		sourceLineageTag: tax_cents
+		summarizeBy: sum
+		sourceColumn: tax_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Payment Cents'
+		dataType: int64
+		formatString: 0
+		lineageTag: 08d3525e-a1db-43a8-a13a-d3b891baa51f
+		sourceLineageTag: payment_cents
+		summarizeBy: sum
+		sourceColumn: payment_cents
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Stored daily conversion rate from the source table; prefer the recomputed [Campaign Conversion Rate] measure for aggregation across days.
+	column 'Conversion Rate (Stored)'
+		dataType: double
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 374ff2be-1ec3-454f-aa26-2ae31c1adb23
+		sourceLineageTag: conversion_rate
+		summarizeBy: none
+		sourceColumn: conversion_rate
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Stored daily ROAS from the source table; prefer the recomputed [Campaign ROAS] measure for aggregation across days.
+	column 'ROAS (Stored)'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c412000b-b2bc-437d-84a5-ab17e18167c2
+		sourceLineageTag: roas
+		summarizeBy: none
+		sourceColumn: roas
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition campaign_performance_daily = entity
+		mode: directLake
+		source
+			entityName: campaign_performance_daily
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

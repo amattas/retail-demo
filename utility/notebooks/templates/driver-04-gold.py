@@ -58,7 +58,7 @@ spark.conf.set("spark.advise.divisionExprConvertRule.enable", "true")
 # %% [engine]
 
 # %% [markdown]
-# ## Read persisted facts, build the nine gold tables, write
+# ## Read persisted facts, build the ten gold tables, write
 
 # %%
 # Gold derives from what was actually persisted by setup-03 — read the
