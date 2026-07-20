@@ -139,5 +139,3 @@ utilization. Do not promise fixed runtimes without a measured profile.
 
 - Live readiness and freshness:
   [IMP-013](../design/requirements/modules/operations/backlog.md#imp-013)
-- Active-path CI:
-  [IMP-014](../design/requirements/modules/operations/backlog.md#imp-014)
