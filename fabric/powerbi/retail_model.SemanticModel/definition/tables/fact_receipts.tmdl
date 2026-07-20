@@ -382,6 +382,7 @@ table fact_receipts
 	column 'Event Date'
 		dataType: dateTime
 		formatString: Short Date
+		isHidden
 		lineageTag: a1a1a1a1-0000-0000-0000-000000000011
 		sourceLineageTag: event_date
 		summarizeBy: none

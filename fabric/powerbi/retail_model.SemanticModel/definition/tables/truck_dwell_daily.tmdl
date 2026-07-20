@@ -41,6 +41,7 @@ table truck_dwell_daily
 	column Day
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: 4bd080fb-437b-41f8-83ce-beb768501d61
 		sourceLineageTag: day
 		summarizeBy: none

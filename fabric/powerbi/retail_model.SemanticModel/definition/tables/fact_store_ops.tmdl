@@ -52,6 +52,7 @@ table fact_store_ops
 	column 'Event Date'
 		dataType: dateTime
 		formatString: Short Date
+		isHidden
 		lineageTag: 2e9a1a12-9c75-4a39-b918-4a8048b725f0
 		sourceLineageTag: event_date
 		summarizeBy: none

@@ -348,6 +348,7 @@ table fact_marketing_attribution
 	column 'Event Date'
 		dataType: dateTime
 		formatString: Short Date
+		isHidden
 		lineageTag: 13b2c9a1-7598-412f-a14f-ba2ce9b01262
 		sourceLineageTag: event_date
 		summarizeBy: none

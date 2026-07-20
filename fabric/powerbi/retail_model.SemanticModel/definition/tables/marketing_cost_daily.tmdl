@@ -46,6 +46,7 @@ table marketing_cost_daily
 	column Day
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: 601e19ab-304b-46d4-a357-76f8461372b8
 		sourceLineageTag: day
 		summarizeBy: none
