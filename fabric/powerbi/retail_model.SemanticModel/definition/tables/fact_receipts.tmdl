@@ -340,12 +340,12 @@ table fact_receipts
 		formatString: 0
 		lineageTag: aa658e70-f275-4c6d-91c8-63d908c09403
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Tax Cents'
 		dataType: int64

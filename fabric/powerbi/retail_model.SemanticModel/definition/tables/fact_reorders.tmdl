@@ -37,36 +37,36 @@ table fact_reorders
 		formatString: 0
 		lineageTag: 9ba003b4-5818-4fdf-a7cb-e746a618a80f
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'DC ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: e8cc3010-af1a-40d5-b05e-2ae21f44ae39
 		sourceLineageTag: dc_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: dc_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: b38c131f-e4a2-4baa-b46c-144a36a860fa
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Current Quantity'
 		dataType: int64

@@ -16,12 +16,12 @@ table zone_dwell_minute
 		formatString: 0
 		lineageTag: cbd46151-4680-4fd3-9a7c-0e95183412ff
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Zone
 		dataType: string

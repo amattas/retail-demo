@@ -52,12 +52,12 @@ table fact_ble_pings
 		formatString: 0
 		lineageTag: b00319bf-5301-4ba3-951d-d5092ca7d125
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Customer ID'
 		dataType: double

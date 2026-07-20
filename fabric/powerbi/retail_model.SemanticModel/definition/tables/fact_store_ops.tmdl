@@ -30,12 +30,12 @@ table fact_store_ops
 		formatString: 0
 		lineageTag: 7e3719b4-06ee-4594-87db-11bf9f3ce04c
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Operation Type'
 		dataType: string

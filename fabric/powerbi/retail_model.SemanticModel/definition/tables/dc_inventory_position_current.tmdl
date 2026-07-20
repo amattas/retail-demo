@@ -25,24 +25,24 @@ table dc_inventory_position_current
 		formatString: 0
 		lineageTag: 847804d1-5b60-4232-a3c8-4daa440a4ceb
 		sourceLineageTag: dc_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: dc_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Product ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: 637a2bb9-88bd-4b52-a68d-f453131dd46e
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'On Hand'
 		dataType: int64

@@ -25,9 +25,14 @@
   (`tests/scripts/test_kpi_aggregation_weighting.py`). The pandas
   `__index_level_0__` write artifact exposed and summable on 11 fact tables is
   now hidden and non-summable
-  (`tests/scripts/test_semantic_model_technical_fields.py`). State folding and
-  date-relationship/grain reconciliation for the visible key columns remain
-  open.
+  (`tests/scripts/test_semantic_model_technical_fields.py`). Surrogate key
+  columns (`*_id`) across 19 tables now default to `summarizeBy: none` so a
+  bare drag-and-drop cannot produce a meaningless key total
+  (`tests/scripts/test_semantic_model_grain.py`). State folding was verified as
+  a non-issue: every current-state/ML table is written `mode("overwrite")` as a
+  single snapshot (no accumulating generations to fold). Date-relationship/grain
+  reconciliation for the visible `Event Date` key columns and label alignment
+  remain open.
 
 ### ENH-002 - Make dynamic pricing the flagship closed-loop action story {#enh-002}
 

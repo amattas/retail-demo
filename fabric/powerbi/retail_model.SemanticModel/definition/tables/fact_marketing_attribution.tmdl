@@ -172,12 +172,12 @@ table fact_marketing_attribution
 		formatString: 0
 		lineageTag: a35cd889-b393-4e80-9a27-c5886ef06007
 		sourceLineageTag: customer_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: customer_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Touch Timestamp'
 		dataType: dateTime
@@ -253,12 +253,12 @@ table fact_marketing_attribution
 		formatString: 0
 		lineageTag: 954032f6-1f8f-44d1-86c2-fe59dce6e0de
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Gross Subtotal Cents'
 		dataType: int64

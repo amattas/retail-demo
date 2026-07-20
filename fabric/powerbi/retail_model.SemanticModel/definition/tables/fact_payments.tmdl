@@ -144,24 +144,24 @@ table fact_payments
 		formatString: 0
 		lineageTag: d21b659a-0979-44b0-ad34-53109ed5050d
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Customer ID'
 		dataType: int64
 		formatString: 0
 		lineageTag: ae5fe31f-a97a-4799-93fb-98b992cf414d
 		sourceLineageTag: customer_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: customer_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Event Timestamp'
 		dataType: dateTime
