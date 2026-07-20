@@ -1,18 +1,11 @@
 # Security backlog
 
-## Open
-
-### IMP-011 - Add a default privacy, governance, and AI safety baseline {#imp-011}
-
-- **Priority / effort:** P2 / M
-- **Outcome:** Customer-like detail is classified and restricted; agents have
-  instructions; ownership, retention, and responsible-ML notes are explicit.
-- **Acceptance:** Broad-use users and agents cannot retrieve row-level
-  identity-like fields without an intentional privileged path.
-
 ## Settled — do not reopen
 
-- Synthetic identity-like data is sensitive demo data, not "no-risk" data.
+- Row-level RLS, field masking, and mandatory agent-governance metadata for
+  generated customer-like records are outside the default release scope. The
+  demo uses synthetic data only and relies on Fabric workspace and item
+  permissions for access control.
 - Secrets are supplied through identity, secret stores, environment variables,
   or ignored local files.
 - Workflow actions use reviewed commit SHAs and no workflow installs runtime

@@ -28,10 +28,10 @@ artifacts, not sources of truth.
 
 ## Data handling
 
-The repository generates synthetic data. Customer-like names, addresses, phone
-numbers, device identifiers, loyalty identifiers, and advertising identifiers
-must still be treated as sensitive demo data when exposed through reports,
-semantic models, ontologies, or data agents.
+The repository generates synthetic data for demonstration only. Do not load
+production customer data into the demo. Standard Fabric workspace and item
+permissions are the access boundary; field-level privacy controls for generated
+records are outside the default release scope.
 
 Never commit secrets. Use Azure sign-in, GitHub Actions secrets, environment
 variables, Key Vault, or ignored local configuration.

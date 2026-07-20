@@ -40,21 +40,21 @@ Do not replace bearer values with literal mask text in outgoing requests.
 
 ## Data classification
 
-The data is synthetic. Customer-like fields such as names, addresses, phone,
-loyalty IDs, BLE IDs, and advertising IDs are still classified as
-synthetic-but-sensitive.
+The supported dataset is generated synthetic data for demonstration only. Do
+not load production customer data into the demo.
 
-Default broad-use surfaces should hide, hash, aggregate, or RLS-gate those
-fields.
+Fabric workspace and item permissions are the default access boundary. The
+release does not require field masking, hashing, aggregation, or RLS for
+generated customer-like records.
 
-## Current model and agent gaps
+## Model and agent scope
 
-- No checked-in semantic-model RLS roles were found.
-- Data Agent datasource instructions and user descriptions are unset.
-- The current model exposes customer-like fields.
-
-These are current-state facts, not approved exceptions. Remediation is tracked
-by `IMP-011`.
+- The semantic model may expose generated customer-like fields to authorized
+  workspace consumers.
+- Checked-in semantic-model RLS roles are not required.
+- Data Agent datasource instructions and user descriptions may remain unset in
+  the default release. Persona-specific behavior remains optional under
+  `ENH-003`.
 
 ## Documentation publication boundary
 
@@ -66,6 +66,5 @@ comes only from reviewed files in `docs/`.
 
 - request-level tests for bearer headers and target IDs;
 - secret scanning of source and generated output;
-- role-based semantic-model, KQL, ontology, and agent queries;
-- review of exported deployed permissions and agent instructions;
+- review of deployed workspace and item permissions;
 - Zensical output inspection for publication boundary.

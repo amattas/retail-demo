@@ -17,9 +17,10 @@ The ontology shall represent business entities and relationships. Eventhouse
 tables shall bind as time-series context on those entities rather than become
 duplicate event entities.
 
-### REQ-MLAI-004 - Governed agents
+### REQ-MLAI-004 - Governed agents (retired)
 
-Every agent shall define its owner, persona, approved data sources, allowed
-questions, prohibited detail, and fallback behavior.
+Mandatory owner, persona, approved-question, prohibited-detail, and fallback
+metadata are outside the default demo release. Persona-specific agent
+experiences remain optional under `ENH-003`.
 
 See [the model-contract specification](../../../specifications/modules/ml-ai/model-contracts.md).

@@ -34,7 +34,8 @@ store and online sales in the semantic model.
 ### Customer journey
 
 Use synthetic entry, BLE, and zone-change data to discuss store flow and dwell.
-State clearly that identifiers are synthetic-but-sensitive.
+State clearly that identifiers are generated synthetic demo data, not real
+customer records.
 
 ## Optional enhancement journeys
 
