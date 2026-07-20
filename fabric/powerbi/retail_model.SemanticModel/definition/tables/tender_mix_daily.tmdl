@@ -13,6 +13,7 @@ table tender_mix_daily
 	column Day
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: 4387d025-d6ea-4ec9-a05d-b596eee6282c
 		sourceLineageTag: day
 		summarizeBy: none

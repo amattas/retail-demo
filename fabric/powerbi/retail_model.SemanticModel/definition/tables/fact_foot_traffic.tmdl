@@ -82,6 +82,7 @@ table fact_foot_traffic
 	column 'Event Date'
 		dataType: dateTime
 		formatString: Short Date
+		isHidden
 		lineageTag: 347e7b41-cd79-4e79-8f79-45413192743d
 		sourceLineageTag: event_date
 		summarizeBy: none

@@ -17,6 +17,7 @@ table online_sales_daily
 	column Day
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: cee9ed17-cbb5-4d0c-adcc-3409673e03cf
 		sourceLineageTag: day
 		summarizeBy: none

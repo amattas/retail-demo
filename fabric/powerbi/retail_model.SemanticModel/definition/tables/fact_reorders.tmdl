@@ -21,7 +21,7 @@ table fact_reorders
 		lineageTag: c1080001-0000-0000-0000-000000000002
 
 	/// High-priority reorder quantity for exception management.
-	measure 'High Priority Reorder Quantity' = CALCULATE([Total Reorder Quantity], 'fact_reorders'[Priority] IN {"High", "Critical"})
+	measure 'High Priority Reorder Quantity' = CALCULATE([Total Reorder Quantity], 'fact_reorders'[Priority] IN {"HIGH", "URGENT"})
 		formatString: #,0
 		displayFolder: Replenishment\Exceptions
 		lineageTag: c1080001-0000-0000-0000-000000000003

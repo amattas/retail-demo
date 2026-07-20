@@ -63,6 +63,7 @@ table campaign_performance_daily
 	column Day
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: a74cf83d-48b6-40f5-9931-87d2d1b3a638
 		sourceLineageTag: day
 		summarizeBy: none
