@@ -15,6 +15,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Classify runtime-dependent tests without maintaining module lists."""
+    for item in items:
+        test_path = Path(item.path).resolve()
+        if "spark" in item.fixturenames:
+            item.add_marker(pytest.mark.spark)
+        if test_path.name == "test_e2e_local.py":
+            item.add_marker(pytest.mark.e2e)
+
 
 @pytest.fixture(scope="session")
 def spark():
@@ -65,4 +74,5 @@ def spark():
         .getOrCreate()
     )
     yield session
+    session.catalog.clearCache()
     session.stop()

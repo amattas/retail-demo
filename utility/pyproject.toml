@@ -30,3 +30,7 @@ src = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "spark: requires a local Spark runtime",
+    "e2e: exercises the complete local generation and publication path",
+]

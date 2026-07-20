@@ -54,5 +54,17 @@ python -m pytest -q
 python scripts\build_notebooks.py --check
 ```
 
+CI discovers test groups through markers rather than file lists:
+
+```powershell
+python -m pytest -q -m "not spark"
+python scripts\run_ci_shards.py --shard-index 0 --shard-count 1
+python -m pytest -q -m e2e
+```
+
+The shard runner discovers Spark-backed tests from fixture usage, caps each
+fresh process at eight tests to prevent cumulative JVM cache exhaustion, and
+balances those batches across four parallel CI shards.
+
 After changing generation modules used by setup notebooks, rebuild the committed
 notebooks with `python scripts\build_notebooks.py`.

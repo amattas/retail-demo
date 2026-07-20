@@ -27,3 +27,6 @@ ignore = ["E402", "E501", "N806", "N818"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["retail_datagen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

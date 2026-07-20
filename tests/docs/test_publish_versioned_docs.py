@@ -1,4 +1,4 @@
-"""Tests for versioned documentation publication."""
+"""Contract tests for versioned documentation publication."""
 
 from __future__ import annotations
 

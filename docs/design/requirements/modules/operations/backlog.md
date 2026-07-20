@@ -17,6 +17,16 @@
   regressions are discoverable before merge.
 - **Acceptance:** Active-path gates exceed retired-path coverage and use
   discovery/markers rather than hand-maintained file lists.
+- **Progress:** The test workflow now discovers 211 non-Spark utility tests,
+  114 Spark tests, one local E2E test, repository contracts, and documentation
+  contracts without maintained test-file lists. Fixture-driven markers place
+  pure-Python generation tests on Windows; Spark tests run in bounded,
+  process-isolated batches balanced across four Ubuntu shards. Notebook drift,
+  ruff, KQL/deploy/semantic-model contracts, docs builds, Windows execution,
+  and a stable aggregate release gate are required jobs.
+- **Remaining verification:** Record one successful hosted GitHub Actions run
+  across Ubuntu, Windows, all Spark shards, E2E, and documentation before
+  marking the requirement verified.
 
 ### ENH-008 - Use more platform-native monitoring and governance {#enh-008}
 
