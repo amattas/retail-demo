@@ -73,6 +73,25 @@ def test_render_tfvars_spark_pool_toggle() -> None:
     assert 'spark_custom_pool_name = "retail_setup_pool"' in tfvars
 
 
+def test_render_tfvars_clickstream_toggle() -> None:
+    base = deploy_config.load_environment("dev")
+
+    disabled = replace(base, clickstream=replace(base.clickstream, enabled=False))
+    enabled = replace(base, clickstream=replace(base.clickstream, enabled=True))
+
+    # Off: emit only the toggle, no resource names.
+    off_tfvars = deploy_config.render_tfvars(disabled)
+    assert "clickstream_enabled = false" in off_tfvars
+    assert "clickstream_eventhouse_name" not in off_tfvars
+
+    tfvars = deploy_config.render_tfvars(enabled)
+    assert "clickstream_enabled = true" in tfvars
+    assert 'clickstream_eventhouse_name = "clickstream_eventhouse"' in tfvars
+    assert 'clickstream_kql_database_name = "clickstream"' in tfvars
+    assert 'clickstream_eventstream_name = "clickstream_eventstream"' in tfvars
+    assert 'clickstream_table_name = "clickstream_events"' in tfvars
+
+
 def test_render_fabric_cicd_config_uses_environment_workspace() -> None:
     config = deploy_config.load_environment("dev")
     rendered = deploy_config.render_fabric_cicd_config(config)

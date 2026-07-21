@@ -16,9 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.2", "pandas>=2.0", "numpy>=1.26"]
 spark = ["pyspark>=3.5.2,<4.2"]  # local testing; Fabric provides Spark at runtime
+clickstream = ["azure-eventhub>=5.11"]  # push generator events to the Eventstream custom endpoint
 
 [project.scripts]
 retail-setup = "retail_setup.cli.main:app"
+retail-clickstream = "retail_setup.clickstream.generator:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/retail_setup"]

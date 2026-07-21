@@ -62,6 +62,22 @@ class EventhouseConfig:
 
 
 @dataclass(frozen=True)
+class ClickstreamConfig:
+    """Clickstream real-time path (Eventhouse + KQL database + Eventstream).
+
+    Opt-in via ``enabled``. When enabled the deploy creates a dedicated
+    Eventhouse, a KQL database with the ``clickstream_events`` table, and an
+    Eventstream whose custom endpoint the Python clickstream generator pushes to.
+    """
+
+    enabled: bool
+    eventhouse_name: str
+    kql_database_name: str
+    eventstream_name: str
+    table_name: str
+
+
+@dataclass(frozen=True)
 class NotebooksConfig:
     """Notebook artifact staging configuration."""
 
@@ -117,6 +133,7 @@ class DeployConfig:
     workspace: WorkspaceConfig
     lakehouse: LakehouseConfig
     eventhouse: EventhouseConfig
+    clickstream: ClickstreamConfig
     notebooks: NotebooksConfig
     powerbi: PowerBIConfig
     spark: SparkConfig
@@ -186,6 +203,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     workspace = data.get("workspace", {})
     lakehouse = data.get("lakehouse", {})
     eventhouse = data.get("eventhouse", {})
+    clickstream = data.get("clickstream", {})
     notebooks = data.get("notebooks", {})
     powerbi = data.get("powerbi", {})
     spark = data.get("spark", {})
@@ -226,6 +244,17 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
                     eventhouse.get("kql_scripts"), "eventhouse.kql_scripts"
                 )
             ],
+        ),
+        clickstream=ClickstreamConfig(
+            enabled=bool(clickstream.get("enabled", False)),
+            eventhouse_name=str(
+                clickstream.get("eventhouse_name", "clickstream_eventhouse")
+            ),
+            kql_database_name=str(clickstream.get("kql_database_name", "clickstream")),
+            eventstream_name=str(
+                clickstream.get("eventstream_name", "clickstream_eventstream")
+            ),
+            table_name=str(clickstream.get("table_name", "clickstream_events")),
         ),
         notebooks=NotebooksConfig(
             include=[
@@ -310,6 +339,15 @@ def render_tfvars(config: DeployConfig) -> str:
         values["spark_node_size"] = config.spark.node_size
         values["spark_min_node_count"] = config.spark.min_node_count
         values["spark_max_node_count"] = config.spark.max_node_count
+
+    # Clickstream resources are opt-in; only emit their names when enabled so a
+    # disabled environment's tfvars stays minimal.
+    values["clickstream_enabled"] = config.clickstream.enabled
+    if config.clickstream.enabled:
+        values["clickstream_eventhouse_name"] = config.clickstream.eventhouse_name
+        values["clickstream_kql_database_name"] = config.clickstream.kql_database_name
+        values["clickstream_eventstream_name"] = config.clickstream.eventstream_name
+        values["clickstream_table_name"] = config.clickstream.table_name
 
     optional_values = {
         "tenant_id": config.tenant_id,

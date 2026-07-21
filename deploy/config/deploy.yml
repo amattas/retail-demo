@@ -24,6 +24,12 @@ eventhouse:
   - 04-create-materialized-views.kql
   - 06-ml-anomaly-detection.kql
   - 07-pricing-approval-tables.kql
+clickstream:
+  enabled: false
+  eventhouse_name: clickstream_eventhouse
+  kql_database_name: clickstream
+  eventstream_name: clickstream_eventstream
+  table_name: clickstream_events
 spark:
   use_custom_pool: true
   custom_pool_name: retail_setup_pool

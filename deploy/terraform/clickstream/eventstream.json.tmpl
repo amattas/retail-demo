@@ -1,0 +1,47 @@
+{
+  "sources": [
+    {
+      "name": "clickstream-custom-endpoint",
+      "type": "CustomEndpoint",
+      "properties": {}
+    }
+  ],
+  "destinations": [
+    {
+      "name": "clickstream-eventhouse",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "ProcessedIngestion",
+        "workspaceId": "{{ .WorkspaceId }}",
+        "itemId": "{{ .KqlDatabaseItemId }}",
+        "databaseName": "{{ .DatabaseName }}",
+        "tableName": "{{ .TableName }}",
+        "inputSerialization": {
+          "type": "Json",
+          "properties": {
+            "encoding": "UTF8"
+          }
+        }
+      },
+      "inputNodes": [
+        {
+          "name": "clickstream-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "name": "clickstream-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "clickstream-custom-endpoint"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.1"
+}

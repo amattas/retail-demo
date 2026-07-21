@@ -1,0 +1,6 @@
+// Clickstream event table (schema contract for the clickstream Eventstream
+// ProcessedIngestion destination). Columns are matched by name against the
+// event JSON: event_id, customer_id, event_timestamp, event_type, detail.
+// customer_id maps to dim_customers.ID (long); detail carries page_url,
+// product_id, and search_terms as a dynamic object.
+.create-merge table {{ .TableName }} (event_id:string, customer_id:long, event_timestamp:datetime, event_type:string, detail:dynamic)

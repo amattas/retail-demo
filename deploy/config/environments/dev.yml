@@ -1,5 +1,7 @@
 workspace:
   name: retail-demo-dev
+clickstream:
+  enabled: true
 deployment:
   publish_skip: false
   unpublish_skip: true

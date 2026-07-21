@@ -42,3 +42,33 @@ output "spark_custom_pool_id" {
   value       = var.spark_custom_pool_enabled ? fabric_spark_custom_pool.setup[0].id : null
   description = "Custom Spark pool item ID when the custom pool is enabled."
 }
+
+output "clickstream_eventhouse_id" {
+  value       = var.clickstream_enabled ? fabric_eventhouse.clickstream[0].id : null
+  description = "Clickstream Eventhouse item ID (null when clickstream is disabled)."
+}
+
+output "clickstream_eventhouse_name" {
+  value       = var.clickstream_enabled ? fabric_eventhouse.clickstream[0].display_name : null
+  description = "Clickstream Eventhouse display name (null when clickstream is disabled)."
+}
+
+output "clickstream_kql_database_id" {
+  value       = var.clickstream_enabled ? fabric_kql_database.clickstream[0].id : null
+  description = "Clickstream KQL database item ID (null when clickstream is disabled)."
+}
+
+output "clickstream_kql_database_name" {
+  value       = var.clickstream_enabled ? fabric_kql_database.clickstream[0].display_name : null
+  description = "Clickstream KQL database display name (null when clickstream is disabled)."
+}
+
+output "clickstream_eventstream_id" {
+  value       = var.clickstream_enabled ? fabric_eventstream.clickstream[0].id : null
+  description = "Clickstream Eventstream item ID (null when clickstream is disabled)."
+}
+
+output "clickstream_eventstream_name" {
+  value       = var.clickstream_enabled ? fabric_eventstream.clickstream[0].display_name : null
+  description = "Clickstream Eventstream display name (null when clickstream is disabled)."
+}

@@ -92,6 +92,43 @@ variable "eventhouse_minimum_consumption_units" {
   description = "Optional Eventhouse minimum consumption units."
 }
 
+variable "clickstream_enabled" {
+  type        = bool
+  default     = false
+  description = "Create the clickstream real-time path (Eventhouse, KQL database + table, and Eventstream). When false, none of the clickstream resources are created."
+}
+
+variable "clickstream_eventhouse_name" {
+  type        = string
+  default     = "clickstream_eventhouse"
+  description = "Display name for the clickstream Eventhouse."
+}
+
+variable "clickstream_eventhouse_minimum_consumption_units" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional minimum consumption units for the clickstream Eventhouse."
+}
+
+variable "clickstream_kql_database_name" {
+  type        = string
+  default     = "clickstream"
+  description = "Display name for the clickstream KQL database that holds the clickstream_events table."
+}
+
+variable "clickstream_eventstream_name" {
+  type        = string
+  default     = "clickstream_eventstream"
+  description = "Display name for the clickstream Eventstream."
+}
+
+variable "clickstream_table_name" {
+  type        = string
+  default     = "clickstream_events"
+  description = "KQL table that receives clickstream events. Columns are matched by name against the event JSON (event_id, customer_id, event_timestamp, event_type, detail)."
+}
+
 variable "spark_custom_pool_enabled" {
   type        = bool
   default     = false
