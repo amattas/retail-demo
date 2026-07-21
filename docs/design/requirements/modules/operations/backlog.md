@@ -10,14 +10,6 @@
 - **Acceptance:** A successful deployment validates required items, bindings,
   KQL objects, schedules, pipeline execution, and freshness signals.
 
-### IMP-014 - Center CI and contract testing on the supported path {#imp-014}
-
-- **Priority / effort:** P2 / L
-- **Outcome:** Utility, deploy, KQL, notebook, semantic-model, docs, and Windows
-  regressions are discoverable before merge.
-- **Acceptance:** Active-path gates exceed retired-path coverage and use
-  discovery/markers rather than hand-maintained file lists.
-
 ### ENH-008 - Use more platform-native monitoring and governance {#enh-008}
 
 - **Priority / effort:** Idea / M
@@ -29,6 +21,9 @@
 
 - Prefer Fabric-native monitoring where it provides the required signal.
 - Run history and failures are evidence, not disposable console output.
+- Active-path tests use discovery and fixture-driven markers. Spark tests run
+  in bounded process-isolated shards, while Windows, E2E, documentation,
+  notebook drift, and repository contracts feed one required release gate.
 - Destructive recovery must validate the live target and preserve audit context.
 - Required deployment steps, task-flow publication, and an explicitly requested
   setup-pipeline trigger fail the deploy and persist an atomic run journal.

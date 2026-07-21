@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   utility-tests:
     runs-on: ubuntu-latest
@@ -22,6 +26,52 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: utility/requirements-ci.txt
+
+      - name: Install locked test dependencies
+        working-directory: utility
+        run: |
+          python -m pip install --require-hashes -r requirements-ci.txt
+          python -m pip install --no-deps -e .
+
+      - name: Lint utility code
+        working-directory: utility
+        run: python -m ruff check src tests scripts
+
+      - name: Run fast utility tests
+        working-directory: utility
+        run: python -m pytest -q -m "not spark"
+
+      - name: Notebook drift check
+        working-directory: utility
+        run: python scripts/build_notebooks.py --check
+
+      - name: Run deploy, KQL, and semantic-model contracts
+        run: python -m pytest -q --ignore=tests/docs
+        env:
+          PYTHONPATH: .
+
+  spark-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: utility/requirements-ci.txt
 
       - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
         with:
@@ -34,24 +84,76 @@ jobs:
           python -m pip install --require-hashes -r requirements-ci.txt
           python -m pip install --no-deps -e .
 
-      - name: Run tests
+      - name: Run discovered Spark shard
+        working-directory: utility
+        run: >-
+          python scripts/run_ci_shards.py
+          --shard-index ${{ matrix.shard }}
+          --shard-count 4
+          --max-tests-per-process 8
+
+  spark-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: utility/requirements-ci.txt
+
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install locked test dependencies
         working-directory: utility
         run: |
-          pytest -q tests --ignore=tests/generation --ignore=tests/test_e2e_local.py
-          pytest -q tests/generation/test_runtime.py tests/generation/test_spark_fixture.py tests/generation/test_schema_contract.py tests/generation/test_pricing.py tests/generation/test_writer.py
-          pytest -q tests/generation/test_dims.py tests/generation/test_receipts.py tests/generation/test_returns.py tests/generation/test_online_orders.py tests/generation/test_promotions.py
-          pytest -q tests/generation/test_inventory.py tests/generation/test_store_activity.py tests/generation/test_sensors.py tests/generation/test_marketing.py
-          pytest -q tests/generation/test_engine.py
-          pytest -q tests/generation/test_gold.py
-          pytest -q tests/test_e2e_local.py
+          python -m pip install --require-hashes -r requirements-ci.txt
+          python -m pip install --no-deps -e .
+
+      - name: Run local E2E test
+        working-directory: utility
+        run: python -m pytest -q -m e2e
+
+  windows-tests:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: utility/requirements-ci.txt
+
+      - name: Install locked test dependencies
+        working-directory: utility
+        run: |
+          python -m pip install --require-hashes -r requirements-ci.txt
+          python -m pip install --no-deps -e .
+
+      - name: Run Windows utility tests
+        working-directory: utility
+        run: python -m pytest -q -m "not spark"
 
       - name: Notebook drift check
         working-directory: utility
         run: python scripts/build_notebooks.py --check
 
-      - name: Repository contract tests
-        run: |
-          python -m pytest tests/deploy tests/scripts/test_workflow_references.py tests/scripts/test_supply_chain.py tests/scripts/test_setup_bootstrap.py -q
+      - name: Run Windows repository contracts
+        run: python -m pytest -q --ignore=tests/docs
         env:
           PYTHONPATH: .
 
@@ -68,14 +170,18 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements-docs.txt
+            requirements-test.txt
 
       - name: Install documentation tools
         run: |
           python -m pip install --disable-pip-version-check --require-hashes -r requirements-docs.txt
           python -m pip install --disable-pip-version-check --require-hashes -r requirements-test.txt
 
-      - name: Test version selection
-        run: python -m pytest tests/scripts/test_publish_versioned_docs.py -q
+      - name: Run documentation tests
+        run: python -m pytest tests/docs -q
 
       - name: Build current and versioned documentation
         run: |
@@ -83,3 +189,34 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           python -m zensical build --clean
           python scripts/publish_versioned_docs.py --branch docs-version-ci
+
+  release-gate:
+    if: always()
+    needs:
+      - utility-tests
+      - spark-tests
+      - spark-e2e
+      - windows-tests
+      - docs-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require successful test jobs
+        env:
+          UTILITY_RESULT: ${{ needs.utility-tests.result }}
+          SPARK_RESULT: ${{ needs.spark-tests.result }}
+          E2E_RESULT: ${{ needs.spark-e2e.result }}
+          WINDOWS_RESULT: ${{ needs.windows-tests.result }}
+          DOCS_RESULT: ${{ needs.docs-tests.result }}
+        run: |
+          for result in \
+            "$UTILITY_RESULT" \
+            "$SPARK_RESULT" \
+            "$E2E_RESULT" \
+            "$WINDOWS_RESULT" \
+            "$DOCS_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "Required test job finished with status: $result"
+              exit 1
+            fi
+          done

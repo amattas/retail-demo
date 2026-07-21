@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import yaml
@@ -8,7 +9,7 @@ from retail_setup.cli.main import app
 runner = CliRunner()
 
 
-def _seed(root: Path):
+def _seed(root: Path) -> None:
     (root / "deploy/config/environments").mkdir(parents=True)
     (root / "deploy/config/deploy.yml").write_text(
         yaml.safe_dump({"lakehouse": {"name": "lh_x"}}))
@@ -17,9 +18,9 @@ def _seed(root: Path):
     (root / "utility/config.yaml").write_text(yaml.safe_dump({
         "store_type": "grocery", "start_date": "2025-01-01",
         "end_date": "2025-02-28", "store_count": 5, "seed": 3}))
-    # point the render at the real committed notebooks via a symlink
+    # Copy committed inputs because Windows CI does not grant symlink privileges.
     real = Path(__file__).resolve().parents[1] / "notebooks"
-    (root / "utility" / "notebooks").symlink_to(real)
+    shutil.copytree(real, root / "utility" / "notebooks")
 
 
 def test_render_writes_rendered_notebooks(tmp_path):

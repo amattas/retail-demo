@@ -39,9 +39,8 @@ must not claim that ML definitions are excluded while these references remain.
 - Some operational facts have incomplete date/current-state semantics.
 - Technical identifiers, cents, and helper columns require visibility and
   summarization review.
-- Customer-like fields are exposed and no checked-in RLS roles were found.
 
-These gaps are owned by `IMP-008`, `IMP-009`, and `IMP-011`.
+These gaps are owned by `IMP-008` and `IMP-009`.
 
 ## Deployment and validation
 

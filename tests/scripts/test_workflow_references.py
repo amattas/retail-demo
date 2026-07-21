@@ -11,6 +11,16 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
+def _load_workflow(name: str) -> dict:
+    return yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
+
+
+def _run_commands(job: dict) -> str:
+    return "\n".join(
+        str(step["run"]) for step in job["steps"] if "run" in step
+    )
+
+
 def _action_references(value: object) -> Iterator[object]:
     if isinstance(value, dict):
         for key, nested_value in value.items():
@@ -110,3 +120,79 @@ def test_workflow_action_references_are_immutable() -> None:
     assert not mutable, (
         f"Workflow action references must use full commit SHAs: {mutable}"
     )
+
+
+def test_tests_workflow_uses_discovery_and_markers() -> None:
+    jobs = _load_workflow("tests.yml")["jobs"]
+    utility_commands = _run_commands(jobs["utility-tests"])
+    spark_commands = _run_commands(jobs["spark-tests"])
+    e2e_commands = _run_commands(jobs["spark-e2e"])
+    windows_commands = _run_commands(jobs["windows-tests"])
+    docs_commands = _run_commands(jobs["docs-tests"])
+    all_commands = "\n".join(
+        (
+            utility_commands,
+            spark_commands,
+            e2e_commands,
+            windows_commands,
+            docs_commands,
+        )
+    )
+
+    assert 'python -m pytest -q -m "not spark"' in utility_commands
+    assert "python -m ruff check src tests scripts" in utility_commands
+    assert "python -m pytest -q --ignore=tests/docs" in utility_commands
+    assert "python scripts/run_ci_shards.py" in spark_commands
+    assert "--shard-index ${{ matrix.shard }}" in spark_commands
+    assert "--max-tests-per-process 8" in spark_commands
+    assert "python -m pytest -q -m e2e" in e2e_commands
+    assert 'python -m pytest -q -m "not spark"' in windows_commands
+    assert "python -m pytest -q --ignore=tests/docs" in windows_commands
+    assert "python -m pytest tests/docs -q" in docs_commands
+    assert re.search(r"test_[A-Za-z0-9_]+\.py", all_commands) is None
+
+
+def test_tests_workflow_covers_supported_surfaces_and_windows() -> None:
+    jobs = _load_workflow("tests.yml")["jobs"]
+    utility_step_names = {
+        step.get("name") for step in jobs["utility-tests"]["steps"]
+    }
+    spark_step_names = {
+        step.get("name") for step in jobs["spark-tests"]["steps"]
+    }
+    e2e_step_names = {
+        step.get("name") for step in jobs["spark-e2e"]["steps"]
+    }
+    windows_step_names = {
+        step.get("name") for step in jobs["windows-tests"]["steps"]
+    }
+    docs_step_names = {
+        step.get("name") for step in jobs["docs-tests"]["steps"]
+    }
+
+    assert jobs["windows-tests"]["runs-on"] == "windows-latest"
+    assert {
+        "Lint utility code",
+        "Run fast utility tests",
+        "Notebook drift check",
+        "Run deploy, KQL, and semantic-model contracts",
+    } <= utility_step_names
+    assert jobs["spark-tests"]["strategy"]["matrix"]["shard"] == [0, 1, 2, 3]
+    assert {"Run discovered Spark shard"} <= spark_step_names
+    assert {"Run local E2E test"} <= e2e_step_names
+    assert {
+        "Run Windows utility tests",
+        "Notebook drift check",
+        "Run Windows repository contracts",
+    } <= windows_step_names
+    assert {
+        "Run documentation tests",
+        "Build current and versioned documentation",
+    } <= docs_step_names
+    assert set(jobs["release-gate"]["needs"]) == {
+        "utility-tests",
+        "spark-tests",
+        "spark-e2e",
+        "windows-tests",
+        "docs-tests",
+    }

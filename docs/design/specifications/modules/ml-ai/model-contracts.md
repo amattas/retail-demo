@@ -56,8 +56,9 @@ Deployment rewrites:
 - ontology `artifactId`
 
 Current datasource files leave `dataSourceInstructions` and `userDescription`
-unset. Agent ownership, persona, approved questions, and prohibited detail are
-required by `REQ-MLAI-004` and tracked by `IMP-011`/`ENH-003`.
+unset. Mandatory per-agent governance metadata is outside the default release.
+Persona-specific instructions and approved-question packs remain optional under
+`ENH-003`.
 
 ## Preview and support boundary
 

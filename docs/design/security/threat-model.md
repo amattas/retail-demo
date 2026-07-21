@@ -10,8 +10,8 @@ evidence is tracked in
 - Microsoft Entra ID is the identity plane for Fabric access.
 - Operators authenticate with Azure CLI or Azure PowerShell.
 - GitHub Actions builds documentation and may run other privileged automation.
-- The data is synthetic, but identity-like fields can still create disclosure,
-  misuse, and governance risk.
+- The supported dataset is generated synthetic data. Loading production
+  customer data is outside the demo boundary.
 - Preview Fabric features are not assumed to exist in every tenant.
 - Generated files, local configuration, and deployment output are not trusted
   as durable sources of truth.
@@ -42,9 +42,9 @@ flowchart LR
 
 | ID | Threat | Impact | Required controls | Residual risk |
 | --- | --- | --- | --- | --- |
-| `THREAT-001` | Over-privileged workspace or model access exposes row-level customer-like data. | Unintended disclosure and misleading claims that synthetic data needs no governance. | `SEC-001`, `SEC-002`, `SEC-004`, `SEC-005` | The current model includes identity-like fields and has no checked-in RLS role. |
+| `THREAT-001` | Retired: workspace or model access exposes row-level generated customer-like data. | The records are synthetic and demo-only. | `SEC-001`, `SEC-002` | Row-level privacy controls for generated demo records are outside the release scope. |
 | `THREAT-002` | Credentials or bearer tokens are committed, logged, masked incorrectly, or sent to the wrong endpoint. | Unauthorized Fabric or Azure access and failed deployment. | `SEC-001`, `SEC-003`, `SEC-009` | Bearer propagation is contract-tested; Azure PowerShell and renamed-target smoke verification remain under `IMP-001`. |
-| `THREAT-003` | A data agent or ontology answers beyond its intended persona or retrieves sensitive detail. | Excessive data disclosure and unsafe AI-generated guidance. | `SEC-004`, `SEC-005`, `SEC-006` | Agent instructions and least-privilege defaults are not yet complete. |
+| `THREAT-003` | Retired: a data agent or ontology answers beyond its intended persona or retrieves generated row-level detail. | The records are synthetic and demo-only. | — | Mandatory persona and prohibited-detail controls are outside the default release; richer agent experiences remain optional under `ENH-003`. |
 | `THREAT-004` | Mutable workflow actions, plugins, or dependencies execute with privileged tokens. | Supply-chain compromise or unreviewed behavior changes. | `SEC-007` | Repository-executed references and dependency sets are immutable and contract-tested; package registries, OS package managers, and hosted runner images remain external trust roots. |
 | `THREAT-005` | Security-relevant activity, deployment state, or data freshness is not centrally observable. | Incidents and stale demo output can go undetected. | `SEC-008` | Monitoring is partly procedural and fragmented across Fabric surfaces. |
 | `THREAT-006` | Environment misbinding or an unsafe reset targets the wrong tenant, workspace, or state. | Cross-environment modification or destructive data loss. | `SEC-001`, `SEC-009` | Terraform state isolation and live target validation remain open work. |

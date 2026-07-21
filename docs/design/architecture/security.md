@@ -51,9 +51,10 @@ flowchart LR
 
 ## Data handling
 
-All records are synthetic, but the model includes identity-like customer
-fields. Treat names, addresses, phone, loyalty, BLE, and advertising identifiers
-as synthetic-but-sensitive.
+All records are generated synthetic data for demonstration only. Production
+customer data is outside the supported boundary. Fabric workspace and item
+permissions control access; row-level privacy controls for generated records
+are not part of the default release.
 
 ## Current controls
 
@@ -63,11 +64,11 @@ as synthetic-but-sensitive.
 - KQL application is centralized.
 - Direct streaming requires pre-existing tables through `FailIfNotExist`.
 - Canonical public documentation is built only from reviewed `docs/` content.
+- The default semantic model and agents may expose generated row-level detail
+  to authorized workspace consumers.
 
 ## Current gaps
 
-- No checked-in semantic-model RLS roles were found.
-- Data Agent instructions and user descriptions are unset.
 - Deployment token/target handling has open defects.
 - Environment isolation and live readiness are incomplete.
 - Required live writes can currently fail without failing the micro-batch.
