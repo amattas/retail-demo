@@ -147,3 +147,17 @@ resource "fabric_spark_custom_pool" "realtime" {
     max_executors = max(var.spark_realtime_max_node_count - 1, 1)
   }
 }
+
+# Fabric Environment that binds the secondary realtime pool so notebooks can
+# attach to it (a notebook cannot select a bare custom pool directly; it attaches
+# to the workspace default pool or to an Environment). The provider can only
+# create the Environment item — binding the custom pool to the Environment's
+# Spark compute and publishing it are not supported by fabric_environment, so
+# deploy.scripts.configure_environment performs the bind + publish via the Fabric
+# REST API after apply (same post-apply pattern as apply_kql).
+resource "fabric_environment" "realtime" {
+  count        = var.spark_realtime_pool_enabled ? 1 : 0
+  workspace_id = local.workspace_id
+  display_name = var.spark_realtime_environment_name
+  description  = "Spark environment bound to ${var.spark_realtime_pool_name} for real-time driver notebooks (e.g. clickstream-generator). Pool binding and publish are applied post-apply by deploy.scripts.configure_environment."
+}

@@ -107,7 +107,10 @@ class SparkConfig:
     non-default custom pool for lightweight real-time workloads (e.g. the
     clickstream-generator notebook). It is not registered as the workspace
     default pool and defaults to 1-6 Small nodes to fit an F8 capacity, whose
-    Spark node-count ceiling is 6.
+    Spark node-count ceiling is 6. A Fabric Environment
+    (``realtime_environment_name``) is created and bound to the pool so notebooks
+    can attach to it (the pool binding + publish happen post-apply in
+    ``deploy.scripts.configure_environment``).
     """
 
     use_custom_pool: bool
@@ -120,6 +123,7 @@ class SparkConfig:
     realtime_node_size: str = "Small"
     realtime_min_node_count: int = 1
     realtime_max_node_count: int = 6
+    realtime_environment_name: str = "retail_realtime"
 
 
 @dataclass(frozen=True)
@@ -297,6 +301,9 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             realtime_node_size=str(spark.get("realtime_node_size", "Small")),
             realtime_min_node_count=int(spark.get("realtime_min_node_count", 1)),
             realtime_max_node_count=int(spark.get("realtime_max_node_count", 6)),
+            realtime_environment_name=str(
+                spark.get("realtime_environment_name", "retail_realtime")
+            ),
         ),
         deployment=DeploymentConfig(
             item_types_in_scope=[
@@ -366,6 +373,9 @@ def render_tfvars(config: DeployConfig) -> str:
         values["spark_realtime_node_size"] = config.spark.realtime_node_size
         values["spark_realtime_min_node_count"] = config.spark.realtime_min_node_count
         values["spark_realtime_max_node_count"] = config.spark.realtime_max_node_count
+        values["spark_realtime_environment_name"] = (
+            config.spark.realtime_environment_name
+        )
 
     # Clickstream resources are opt-in; only emit their names when enabled so a
     # disabled environment's tfvars stays minimal.

@@ -722,6 +722,18 @@ def _deploy_plan(
             description="Apply KQL database script",
         ),
         DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.configure_environment",
+                "--environment",
+                env,
+                "--auth-mode",
+                auth_mode,
+            ],
+            description="Bind real-time Spark pool to its Fabric Environment",
+        ),
+        DeployStep(
             cmd=[py, "-m", "deploy.scripts.validate_deployment", "--environment", env],
             description="Validate deployment",
         ),

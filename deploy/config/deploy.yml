@@ -41,6 +41,7 @@ spark:
   realtime_node_size: Small
   realtime_min_node_count: 1
   realtime_max_node_count: 6
+  realtime_environment_name: retail_realtime
 notebooks:
   include:
   - core

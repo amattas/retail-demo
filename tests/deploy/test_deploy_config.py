@@ -94,6 +94,7 @@ def test_render_tfvars_realtime_pool_toggle() -> None:
     assert 'spark_realtime_node_size = "Small"' in tfvars
     assert "spark_realtime_min_node_count = 1" in tfvars
     assert "spark_realtime_max_node_count = 6" in tfvars
+    assert 'spark_realtime_environment_name = "retail_realtime"' in tfvars
 
 
 def test_render_tfvars_clickstream_toggle() -> None:

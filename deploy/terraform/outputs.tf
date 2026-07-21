@@ -53,6 +53,16 @@ output "spark_realtime_pool_name" {
   description = "Secondary real-time Spark pool name to select in notebook compute settings (null when disabled)."
 }
 
+output "spark_realtime_environment_id" {
+  value       = var.spark_realtime_pool_enabled ? fabric_environment.realtime[0].id : null
+  description = "Fabric Environment item ID bound to the real-time pool (null when disabled). Consumed by deploy.scripts.configure_environment."
+}
+
+output "spark_realtime_environment_name" {
+  value       = var.spark_realtime_pool_enabled ? fabric_environment.realtime[0].display_name : null
+  description = "Fabric Environment display name to select in the notebook's environment picker (null when disabled)."
+}
+
 output "clickstream_eventhouse_id" {
   value       = var.clickstream_enabled ? fabric_eventhouse.clickstream[0].id : null
   description = "Clickstream Eventhouse item ID (null when clickstream is disabled)."

@@ -198,3 +198,9 @@ variable "spark_realtime_max_node_count" {
   default     = 6
   description = "Secondary real-time Spark pool autoscale maximum node count. Defaults to 6, the Spark node-count ceiling on an F8 capacity."
 }
+
+variable "spark_realtime_environment_name" {
+  type        = string
+  default     = "retail_realtime"
+  description = "Display name of the Fabric Environment bound to the secondary real-time Spark pool. Notebooks attach to this Environment to run on that pool."
+}
