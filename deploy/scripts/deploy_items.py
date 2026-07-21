@@ -10,7 +10,13 @@ from deploy.scripts._auth import AUTH_MODES, build_credential
 from deploy.scripts.deploy_config import DEPLOY_ROOT
 
 
-def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
+def deploy(
+    config_path: Path,
+    environment: str,
+    auth_mode: str,
+    *,
+    tenant_id: str | None = None,
+) -> None:
     """Run fabric-cicd configuration deployment with quiet, consistent output.
 
     fabric-cicd logs verbose ``[info] HH:MM:SS - ####`` banners at INFO. Raise
@@ -27,7 +33,7 @@ def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
     console.info(f"Publishing Fabric items (environment '{environment}')...")
     deploy_with_config(
         config_file_path=str(config_path.resolve()),
-        token_credential=build_credential(auth_mode),
+        token_credential=build_credential(auth_mode, tenant_id=tenant_id),
         environment=environment,
     )
     console.info("Published Fabric items.")
@@ -48,12 +54,21 @@ def main() -> int:
         choices=AUTH_MODES,
         default="azure_cli",
     )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
+    )
     args = parser.parse_args()
 
     config_path = args.config or (
         DEPLOY_ROOT / ".generated" / args.environment / "fabric-cicd" / "config.yml"
     )
-    deploy(config_path, args.environment, args.auth_mode)
+    deploy(
+        config_path,
+        args.environment,
+        args.auth_mode,
+        tenant_id=args.tenant_id,
+    )
     return 0
 
 

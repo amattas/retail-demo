@@ -62,6 +62,7 @@ def export_pipelines(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> list[Path]:
     """Export all DataPipeline items from a workspace into item folders."""
 
@@ -71,6 +72,7 @@ def export_pipelines(
         output_dir,
         credential,
         auth_mode=auth_mode,
+        tenant_id=tenant_id,
     )
 
 
@@ -92,12 +94,17 @@ def main() -> int:
         default="azure_cli",
         help="Operator credential used for Fabric REST requests.",
     )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
+    )
     args = parser.parse_args()
 
     written = export_pipelines(
         args.workspace_name,
         args.output_dir,
         auth_mode=args.auth_mode,
+        tenant_id=args.tenant_id,
     )
     print(f"Exported {len(written)} pipeline(s) to {args.output_dir}")
     for item in written:

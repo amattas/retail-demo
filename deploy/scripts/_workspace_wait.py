@@ -119,6 +119,7 @@ def wait_for_workspace_absence(
     workspace_name: str,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
     credential: TokenCredential | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS,
@@ -134,7 +135,7 @@ def wait_for_workspace_absence(
     name is still present after `timeout_seconds`.
     """
 
-    credential = credential or build_credential(auth_mode)
+    credential = credential or build_credential(auth_mode, tenant_id=tenant_id)
     http_get = http_get or _default_http_get
     target = workspace_name.casefold()
     deadline = clock() + timeout_seconds
