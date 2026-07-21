@@ -106,5 +106,4 @@ Avoid using these as headline proof points without the stated qualification:
   recorded.
 - Marketing attribution and ROAS are implemented and contract-tested; do not
   present them as live-validated until a Fabric smoke run has been recorded.
-- Unresolved/current-state KPIs: [IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)
 - Ungated ML output: [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)

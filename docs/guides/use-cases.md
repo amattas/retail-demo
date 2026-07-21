@@ -5,7 +5,7 @@ The demo supports several retail stories, but their current maturity differs.
 | Use case | Current evidence | Status |
 | --- | --- | --- |
 | Real-time POS and product performance | Receipt, line, payment events; KQL aggregates; Direct Lake report | Implemented core story |
-| Inventory signals and replenishment | Inventory, stockout, and reorder events/tables | Implemented signals; current-state semantics need `IMP-009` |
+| Inventory signals and replenishment | Inventory, stockout, and reorder events/tables | Implemented with normalized, contract-tested current-state semantics |
 | Customer presence and in-store movement | Entry, BLE, and zone-change events | Implemented synthetic scenario |
 | Omnichannel fulfillment | Online-order headers, lines, picked, and shipped events | Implemented with documented live/history differences |
 | Supply-chain dwell | Paired truck lifecycle, Eventhouse SLA function, Silver/Gold dwell, queryset and rule | Cross-layer contract tested; live Fabric validation pending |
