@@ -2,7 +2,7 @@
   "properties": {
     "activities": [
       {
-        "name": "setup-01-seed-dictionaries",
+        "name": "06-ml-demand-forecast",
         "type": "TridentNotebook",
         "dependsOn": [],
         "policy": {
@@ -13,16 +13,82 @@
           "secureInput": false
         },
         "typeProperties": {
-          "notebookId": "a146ba9e-1091-540d-9b9f-a6ee12bc92c1",
+          "notebookId": "ab4e4a25-6c9d-5c0d-bda1-793aaf424fcb",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       },
       {
-        "name": "setup-02-generate-dimensions",
+        "name": "08-ml-customer-segmentation",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "7ea256b6-89e3-5a2e-ae5d-279edac07282",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "09-ml-churn-prediction",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "396ca6c7-1f86-5c3e-b97d-2418c088272c",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "12-ml-stockout-prediction",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "f80a33a2-9699-54ef-837b-1de5c06847ab",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "15-validate-required-ml-contract",
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-01-seed-dictionaries",
+            "activity": "06-ml-demand-forecast",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "08-ml-customer-segmentation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "09-ml-churn-prediction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "12-ml-stockout-prediction",
             "dependencyConditions": [
               "Succeeded"
             ]
@@ -36,53 +102,7 @@
           "secureInput": false
         },
         "typeProperties": {
-          "notebookId": "03c1e0e3-31bb-5dae-8651-06f90376c4c5",
-          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
-        }
-      },
-      {
-        "name": "setup-03-generate-facts",
-        "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "setup-02-generate-dimensions",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
-          "secureOutput": false,
-          "secureInput": false
-        },
-        "typeProperties": {
-          "notebookId": "1090f89e-10ce-59a1-81fb-6a3870af12b5",
-          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
-        }
-      },
-      {
-        "name": "setup-04-build-gold",
-        "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "setup-03-generate-facts",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
-          "secureOutput": false,
-          "secureInput": false
-        },
-        "typeProperties": {
-          "notebookId": "977a4952-337e-567c-ba6c-37cc9abaaba4",
+          "notebookId": "ab3cf75a-3995-562d-b2bd-3b86ac047a98",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       }

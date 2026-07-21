@@ -26,6 +26,23 @@ table demand_forecast
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000104
 
+	/// Source-data timestamp that anchors the current recursive forecast.
+	measure 'Forecast Data As Of' = MAX('demand_forecast'[Generated At])
+		formatString: General Date
+		displayFolder: ML\Demand Forecast\Metadata
+		lineageTag: c5e6e000-0000-0000-0004-000000000105
+
+	/// Age in hours of the latest forecast output in the current filter context.
+	measure 'Forecast Freshness (Hours)' = DATEDIFF(MAX('demand_forecast'[Generated At]), UTCNOW(), HOUR)
+		formatString: #,0
+		displayFolder: ML\Demand Forecast\Metadata
+		lineageTag: c5e6e000-0000-0000-0004-000000000107
+
+	/// Important interpretation boundary for this model output.
+	measure 'Forecast Limitation' = "Point forecasts are estimates; intervals are empirical, not causal guarantees. MAPE is a unit ratio and may exceed 100%."
+		displayFolder: ML\Demand Forecast\Metadata
+		lineageTag: c5e6e000-0000-0000-0004-000000000106
+
 	column 'Store ID'
 		dataType: int64
 		formatString: 0
@@ -96,13 +113,56 @@ table demand_forecast
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Source As Of'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0004-00000000000c
+		sourceLineageTag: source_as_of
+		summarizeBy: none
+		sourceColumn: source_as_of
+
+		annotation SummarizationSetBy = Automatic
+
 	column 'Generated At'
 		dataType: dateTime
+		isHidden
 		formatString: General Date
 		lineageTag: c5e6e000-0000-0000-0004-000000000008
 		sourceLineageTag: generated_at
 		summarizeBy: none
 		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Forecast Horizon Days'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0004-000000000009
+		sourceLineageTag: forecast_horizon_days
+		summarizeBy: none
+		sourceColumn: forecast_horizon_days
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Model Run ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0004-00000000000a
+		sourceLineageTag: model_run_id
+		summarizeBy: none
+		sourceColumn: model_run_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Schema Version'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0004-00000000000b
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
 
 		annotation SummarizationSetBy = Automatic
 
@@ -112,4 +172,3 @@ table demand_forecast
 			entityName: demand_forecast
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

@@ -2,8 +2,8 @@ table stockout_risk
 	lineageTag: c5e6e000-0000-0000-0003-000000000000
 	sourceLineageTag: [au].[stockout_risk]
 
-	/// Distinct store/product combinations flagged by the stockout model.
-	measure 'Stockout Risk SKU Count' = DISTINCTCOUNT('stockout_risk'[Product ID])
+	/// Distinct store/product/horizon positions scored by the stockout model.
+	measure 'Stockout Risk SKU Count' = COUNTROWS(SUMMARIZE('stockout_risk', 'stockout_risk'[Store ID], 'stockout_risk'[Product ID], 'stockout_risk'[Forecast Horizon Days]))
 		formatString: #,0
 		displayFolder: ML\Stockout Risk
 		lineageTag: c5e6e000-0000-0000-0003-000000000101
@@ -15,7 +15,7 @@ table stockout_risk
 		lineageTag: c5e6e000-0000-0000-0003-000000000102
 
 	/// Positions classified as high stockout risk by the model.
-	measure 'High Risk SKUs' = CALCULATE(DISTINCTCOUNT('stockout_risk'[Product ID]), 'stockout_risk'[Risk Level] = "HIGH")
+	measure 'High Risk SKUs' = CALCULATE(COUNTROWS(SUMMARIZE('stockout_risk', 'stockout_risk'[Store ID], 'stockout_risk'[Product ID], 'stockout_risk'[Forecast Horizon Days])), 'stockout_risk'[Risk Level] = "HIGH")
 		formatString: #,0
 		displayFolder: ML\Stockout Risk
 		lineageTag: c5e6e000-0000-0000-0003-000000000103
@@ -31,6 +31,23 @@ table stockout_risk
 		formatString: #,0.00
 		displayFolder: ML\Stockout Risk
 		lineageTag: c5e6e000-0000-0000-0003-000000000105
+
+	/// Inventory snapshot timestamp used to build each current risk score.
+	measure 'Stockout Inventory As Of' = MAX('stockout_risk'[Inventory As Of])
+		formatString: General Date
+		displayFolder: ML\Stockout Risk\Metadata
+		lineageTag: c5e6e000-0000-0000-0003-000000000106
+
+	/// Age in hours of the latest inventory snapshot in the current filter context.
+	measure 'Stockout Freshness (Hours)' = DATEDIFF(MAX('stockout_risk'[Inventory As Of]), UTCNOW(), HOUR)
+		formatString: #,0
+		displayFolder: ML\Stockout Risk\Metadata
+		lineageTag: c5e6e000-0000-0000-0003-000000000108
+
+	/// Important interpretation boundary for current stockout classifications.
+	measure 'Stockout Limitation' = "Scores describe the current store/product/horizon snapshot and depend on observed inventory and demand history; they do not guarantee a future stockout."
+		displayFolder: ML\Stockout Risk\Metadata
+		lineageTag: c5e6e000-0000-0000-0003-000000000107
 
 	column 'Store ID'
 		dataType: int64
@@ -49,6 +66,17 @@ table stockout_risk
 		sourceLineageTag: product_id
 		summarizeBy: none
 		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Inventory As Of'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0003-00000000000e
+		sourceLineageTag: inventory_as_of
+		summarizeBy: none
+		sourceColumn: inventory_as_of
 
 		annotation SummarizationSetBy = Automatic
 
@@ -143,6 +171,7 @@ table stockout_risk
 
 	column 'Predicted At'
 		dataType: dateTime
+		isHidden
 		formatString: General Date
 		lineageTag: c5e6e000-0000-0000-0003-00000000000c
 		sourceLineageTag: predicted_at
@@ -151,8 +180,20 @@ table stockout_risk
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Generated At'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0003-000000000011
+		sourceLineageTag: generated_at
+		summarizeBy: none
+		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+
 	column 'Forecast Horizon Days'
 		dataType: int64
+		isHidden
 		formatString: 0
 		lineageTag: c5e6e000-0000-0000-0003-00000000000d
 		sourceLineageTag: forecast_horizon_days
@@ -188,10 +229,29 @@ table stockout_risk
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Model Run ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0003-00000000000f
+		sourceLineageTag: model_run_id
+		summarizeBy: none
+		sourceColumn: model_run_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Schema Version'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0003-000000000010
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
+
+		annotation SummarizationSetBy = Automatic
+
 	partition stockout_risk = entity
 		mode: directLake
 		source
 			entityName: stockout_risk
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

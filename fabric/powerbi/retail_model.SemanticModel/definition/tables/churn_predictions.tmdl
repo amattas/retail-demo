@@ -21,10 +21,27 @@ table churn_predictions
 		lineageTag: c5e6e000-0000-0000-0002-000000000103
 
 	/// Customers classified as high churn risk by the model.
-	measure 'High Risk Customers' = CALCULATE(DISTINCTCOUNT('churn_predictions'[Customer ID]), 'churn_predictions'[Risk Category] = "High")
+	measure 'High Risk Customers' = CALCULATE(DISTINCTCOUNT('churn_predictions'[Customer ID]), 'churn_predictions'[Risk Category] IN {"High", "Very High"})
 		formatString: #,0
 		displayFolder: ML\Churn
 		lineageTag: c5e6e000-0000-0000-0002-000000000104
+
+	/// Source-data timestamp used for the current inference snapshot.
+	measure 'Churn Data As Of' = MAX('churn_predictions'[Prediction Date])
+		formatString: General Date
+		displayFolder: ML\Churn\Metadata
+		lineageTag: c5e6e000-0000-0000-0002-000000000105
+
+	/// Age in hours of the latest churn inference output in the current filter context.
+	measure 'Churn Freshness (Hours)' = DATEDIFF(MAX('churn_predictions'[Prediction Date]), UTCNOW(), HOUR)
+		formatString: #,0
+		displayFolder: ML\Churn\Metadata
+		lineageTag: c5e6e000-0000-0000-0002-000000000107
+
+	/// Important interpretation boundary for churn scores.
+	measure 'Churn Limitation' = "Probabilities are calibrated model estimates for the configured future window; the current inference table intentionally contains no actual outcome label."
+		displayFolder: ML\Churn\Metadata
+		lineageTag: c5e6e000-0000-0000-0002-000000000106
 
 	column 'Customer ID'
 		dataType: int64
@@ -65,8 +82,10 @@ table churn_predictions
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Deprecated compatibility projection; inference outcomes are intentionally unavailable.
 	column 'Is Churned Actual'
 		dataType: int64
+		isHidden
 		formatString: 0
 		lineageTag: c5e6e000-0000-0000-0002-000000000005
 		sourceLineageTag: is_churned_actual
@@ -77,6 +96,7 @@ table churn_predictions
 
 	column 'Prediction Date'
 		dataType: dateTime
+		isHidden
 		formatString: General Date
 		lineageTag: c5e6e000-0000-0000-0002-000000000006
 		sourceLineageTag: prediction_date
@@ -85,8 +105,20 @@ table churn_predictions
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Generated At'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0002-00000000000b
+		sourceLineageTag: generated_at
+		summarizeBy: none
+		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+
 	column 'Model Version'
 		dataType: string
+		isHidden
 		lineageTag: c5e6e000-0000-0000-0002-000000000007
 		sourceLineageTag: model_version
 		summarizeBy: none
@@ -96,11 +128,32 @@ table churn_predictions
 
 	column 'Churn Window Days'
 		dataType: int64
+		isHidden
 		formatString: 0
 		lineageTag: c5e6e000-0000-0000-0002-000000000008
 		sourceLineageTag: churn_window_days
 		summarizeBy: none
 		sourceColumn: churn_window_days
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Model Run ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0002-000000000009
+		sourceLineageTag: model_run_id
+		summarizeBy: none
+		sourceColumn: model_run_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Schema Version'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0002-00000000000a
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
 
 		annotation SummarizationSetBy = Automatic
 
@@ -110,4 +163,3 @@ table churn_predictions
 			entityName: churn_predictions
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-
