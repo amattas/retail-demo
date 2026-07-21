@@ -87,6 +87,7 @@ not current defaults.
 
 ## KPI semantics
 
-Prominent state, time, and grain issues are tracked by `IMP-009`, including
-pending pricing state, unresolved stockouts, status casing, date relationships,
-network grain, and technical-field visibility.
+Current-state tables are overwrite snapshots. KQL and DAX use producer-aligned
+status labels, shared date slicing, source-correct grain, volume-weighted
+rollups, and hidden non-aggregatable technical fields. Repository contract
+tests guard those semantics.

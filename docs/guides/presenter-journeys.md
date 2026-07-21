@@ -43,9 +43,6 @@ The following surfaces are not part of these reproducible core journeys:
   ([IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)).
 - Pricing actions and writeback remain optional
   ([ENH-002](../design/requirements/modules/power-bi/backlog.md#enh-002)).
-- Recent inventory and stockout events are signals, not unresolved
-  current-state KPIs
-  ([IMP-009](../design/requirements/modules/power-bi/backlog.md#imp-009)).
 - Marketing attribution and ROAS are contract-tested but remain outside the
   core presenter path until a live Fabric journey is recorded.
 - Truck dwell is implemented but remains outside these core journeys until a

@@ -36,11 +36,8 @@ must not claim that ML definitions are excluded while these references remain.
 ## Current contract gaps
 
 - The base generator contract does not own the four active ML tables.
-- Some operational facts have incomplete date/current-state semantics.
-- Technical identifiers, cents, and helper columns require visibility and
-  summarization review.
 
-These gaps are owned by `IMP-008` and `IMP-009`.
+This gap is owned by `IMP-008`.
 
 ## Deployment and validation
 

@@ -27,23 +27,11 @@
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication.
 
-## Completed
-
-### IMP-004 - Isolate environments and remove operator-specific bindings {#imp-004}
-
-- **Priority / effort:** P2 / L
-- **Outcome:** Workspace names derive independent local environments. Committed
-  configuration contains no operator tenant, capacity, workspace, generated
-  binding, or target item identifiers.
-- **Acceptance evidence:** Terraform backend state and `TF_DATA_DIR` are scoped
-  under `deploy/.generated/<env>/`; target overlays and generated deployment
-  inputs are ignored; parallel-plan tests assert different state paths; and
-  `--skip-terraform` fails before commands run when outputs are missing,
-  placeholder, incomplete, or for another target.
-
 ## Settled — do not reopen
 
 - `retail-setup deploy` is the supported orchestrator.
+- Each environment owns separate Terraform state, Terraform data, generated
+  target inputs, bindings, outputs, and deployment journal.
 - Terraform provisions resources; `fabric-cicd` publishes supported items; KQL
   scripts remain ordered source.
 - The supported Eventhouse topology uses its automatically created default KQL
