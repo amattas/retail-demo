@@ -74,10 +74,16 @@ TEMPLATE_FOR = {
     "setup-03-generate-facts": "driver-03-facts.py",
     "setup-04-build-gold": "driver-04-gold.py",
     "stream-events": "driver-05-stream.py",
+    "clickstream-generator": "driver-06-clickstream.py",
 }
 
 # Notebooks that do NOT embed the batch engine cell (self-contained logic).
-NO_ENGINE = {"setup-01-seed-dictionaries", "stream-events"}
+NO_ENGINE = {"setup-01-seed-dictionaries", "stream-events", "clickstream-generator"}
+
+# The single self-contained module inlined into the clickstream notebook's
+# ``# %% [clickstream]`` cell (it has no retail_setup imports, so it drops in as
+# one flat cell). Kept as a source-of-truth reference rather than duplicated.
+CLICKSTREAM_MODULE = "clickstream/generator.py"
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 
@@ -141,6 +147,42 @@ def build_engine_source() -> str:
     return engine
 
 
+def build_clickstream_source() -> str:
+    """Inline the clickstream generator module for the notebook's cell.
+
+    The module is self-contained (stdlib + a lazily imported azure-eventhub), so
+    it drops in verbatim. Package imports are stripped defensively and the result
+    is compiled to guarantee it is valid standalone python at build time.
+    """
+    source = (SRC / CLICKSTREAM_MODULE).read_text(encoding="utf-8")
+    source = strip_package_imports(source)
+    # Drop `from __future__ import annotations`: unnecessary on the Fabric 3.11
+    # runtime (PEP 604 / PEP 585 annotations already evaluate) and it must be the
+    # first statement of a compilation unit, which it is not once inlined as a
+    # notebook cell alongside other cells.
+    source = re.sub(
+        r"^from __future__ import annotations\n", "", source, count=1, flags=re.MULTILINE
+    )
+    # Inlined module code runs as notebook-cell top-level, where __name__ ==
+    # "__main__". A `if __name__ == "__main__":` guard would therefore execute the
+    # argparse CLI entrypoint — and Fabric/Jupyter injects `-f <connection_file>`
+    # into sys.argv, so parse_args() fails with "unrecognized arguments: -f ...".
+    # Drop the guard block; the notebook drives the generator programmatically.
+    source = re.sub(
+        r"\n+if __name__ == \"__main__\":.*\Z", "\n", source, flags=re.DOTALL
+    )
+    header = (
+        "# CLICKSTREAM GENERATOR SOURCE (generated — do not edit)\n"
+        f"# Built by scripts/build_notebooks.py from utility/src/retail_setup/{CLICKSTREAM_MODULE}.\n"
+    )
+    body = header + source.strip("\n")
+    compile(body, "<clickstream>", "exec")
+    for line in body.split("\n"):
+        if re.match(r"^\s*(from|import)\s", line):
+            assert "retail_setup" not in line, f"unstripped package import: {line!r}"
+    return body
+
+
 def parse_template(text: str) -> list[tuple[str, str]]:
     """Split a cell-marker python file into (cell_type, source) pairs."""
     cells: list[tuple[str, list[str]]] = []
@@ -152,6 +194,9 @@ def parse_template(text: str) -> list[tuple[str, str]]:
             cells.append(current)
         elif stripped == "# %% [engine]":
             current = ("engine", [])
+            cells.append(current)
+        elif stripped == "# %% [clickstream]":
+            current = ("clickstream", [])
             cells.append(current)
         elif stripped == "# %% [parameters]":
             current = ("parameters", [])
@@ -178,13 +223,23 @@ def _source_lines(source: str) -> list[str]:
     return [line + "\n" for line in lines[:-1]] + [lines[-1]]
 
 
-def render_notebook(template_path: Path, engine_source: str | None) -> dict:
+def render_notebook(
+    template_path: Path,
+    engine_source: str | None,
+    clickstream_source: str | None = None,
+) -> dict:
     cells = []
     for index, (kind, body) in enumerate(parse_template(template_path.read_text(encoding="utf-8"))):
         if kind == "engine":
             if engine_source is None:
                 raise ValueError(f"{template_path.name} has an engine cell but no engine source")
             kind, body = "code", engine_source
+        elif kind == "clickstream":
+            if clickstream_source is None:
+                raise ValueError(
+                    f"{template_path.name} has a clickstream cell but no clickstream source"
+                )
+            kind, body = "code", clickstream_source
         metadata: dict = {}
         if kind == "parameters":
             # Fabric parameters cell: a code cell tagged so the pipeline can override it.
@@ -229,11 +284,16 @@ def notebook_json(nb: dict) -> str:
 
 def build_all(output_dir: Path) -> dict[str, str]:
     engine_source = build_engine_source()
+    clickstream_source = build_clickstream_source()
     output_dir.mkdir(parents=True, exist_ok=True)
     built: dict[str, str] = {}
     for name, template in TEMPLATE_FOR.items():
         needs_engine = name not in NO_ENGINE
-        nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None)
+        nb = render_notebook(
+            TEMPLATES / template,
+            engine_source if needs_engine else None,
+            clickstream_source,
+        )
         payload = notebook_json(nb)
         (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8")
         built[name] = payload

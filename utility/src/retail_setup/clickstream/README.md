@@ -64,6 +64,57 @@ Useful flags: `--rate <events/sec>` (overrides `--daily-target`),
 per-customer order; events are still batched per partition, so throughput is
 unaffected).
 
+## Run inside Fabric (notebook)
+
+The same generator ships as a Fabric notebook, **clickstream-generator**, so it
+can run inside the workspace without a local machine. It inlines this module and
+pushes to the Eventstream custom endpoint via `azure-eventhub` — the identical
+integration an external application uses, so the Eventstream stays in the
+architecture (no direct Eventhouse write).
+
+- **Source:** `utility/notebooks/templates/driver-06-clickstream.py`
+  → built into `utility/notebooks/clickstream-generator.ipynb` by
+  `python scripts/build_notebooks.py` (the `# %% [clickstream]` cell inlines
+  `generator.py`; run `--check` in CI to guard drift).
+- **Deploy:** rendered by `retail-setup render` and staged into the **Streaming**
+  workspace folder by the deploy's `stream` notebook group (part of
+  `retail-setup deploy`, alongside `stream-events`). It is a manual long-running
+  driver, not part of the ordered setup pipeline.
+- **Run:** open the notebook in Fabric and **Run All** — no secret to paste. The
+  notebook auto-resolves the custom-endpoint connection string from the Fabric
+  REST API using its own identity: it looks up `eventstream_name`
+  (`clickstream_eventstream` by default) in the current workspace, finds the
+  `CustomEndpoint` source, and reads its `primaryConnectionString` (with
+  `EntityPath` embedded). `customer_id` / `product_id` ranges are read from the
+  Silver `dim_customers` / `dim_products` when present, else fall back to the
+  `customer_count` / `product_count` parameters. Tune `rate`,
+  `duration_seconds`, `max_events`, `batch_size`, and `partition_by_customer`
+  per run. Set the `connection_string` parameter only to override the target
+  (e.g. a different stream); it bypasses auto-resolution.
+- **Compute (small capacities):** the deploy creates a secondary, non-default
+  Spark pool `retail_realtime_pool` (1–6 Small nodes) **and** a Fabric
+  Environment `retail_realtime` bound to it (see the `spark` block in
+  `deploy/config/deploy.yml`). They exist because the workspace default pool
+  `retail_setup_pool` is sized for F64 (max 10 nodes) and is rejected on an F8
+  capacity, whose Spark node-count ceiling is 6 — so setup-pool sessions fail
+  with `SparkSettingsInvalidNodeCount`. A notebook can't attach to a bare custom
+  pool, so select the **Environment** `retail_realtime` in the notebook's
+  environment picker before **Run All**; it routes the session onto the 6-node
+  pool without changing the workspace default. The generator is pure-Python and
+  needs only a single node.
+
+  The pool and Environment item are provisioned by Terraform
+  (`spark_realtime_*` variables), but the `fabric_environment` resource can't
+  bind the pool or publish Spark settings — `deploy.scripts.configure_environment`
+  does the bind + publish via the Fabric REST API after `terraform apply` (a
+  step in `retail-setup deploy`).
+
+The auto-resolution uses these Fabric REST endpoints under the notebook
+identity: `GET /v1/workspaces/{ws}/eventstreams`,
+`.../eventstreams/{id}/topology`, and
+`.../eventstreams/{id}/sources/{sourceId}/connection`. The identity running the
+notebook needs read access to the Eventstream (contributor on the workspace).
+
 ## Infrastructure (Terraform)
 
 The real-time path is provisioned by `deploy/terraform/clickstream.tf`

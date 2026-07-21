@@ -103,12 +103,15 @@ SETUP_NOTEBOOKS = [
     "setup-04-build-gold",
 ]
 
-# The live streaming generator. Rendered alongside the setup notebooks (shares
+# The live streaming generators. Rendered alongside the setup notebooks (shares
 # the same {{TOKEN}} substitution) but staged separately under "Streaming" and
-# deliberately NOT added to the setup pipeline — it runs continuously and is
-# started/stopped manually.
+# deliberately NOT added to the setup pipeline — they run continuously and are
+# started/stopped manually. ``stream-events`` writes to the Eventhouse via the
+# Spark Kusto connector; ``clickstream-generator`` pushes to the
+# ``clickstream_eventstream`` custom endpoint (external-app integration).
 STREAM_NOTEBOOKS = [
     "stream-events",
+    "clickstream-generator",
 ]
 
 # The one Data Pipeline that orchestrates the setup notebooks. It publishes into
@@ -225,10 +228,11 @@ def stage_stream_notebooks(
 ) -> list[Path]:
     """Stage the rendered streaming-generator notebook(s) as Fabric `.Notebook` items.
 
-    Like the setup notebooks, ``stream-events`` is rendered to
-    ``utility/out/`` by ``retail-setup render`` before staging. It is the live
-    driver, so it publishes into the "Streaming" folder and is never added to the
-    setup pipeline — it is started/stopped manually.
+    Like the setup notebooks, the streaming generators (``stream-events`` and
+    ``clickstream-generator``) are rendered to ``utility/out/`` by
+    ``retail-setup render`` before staging. They are live drivers, so they
+    publish into the "Streaming" folder and are never added to the setup
+    pipeline — they are started/stopped manually.
     """
 
     rendered_dir = repo_root / "utility" / "out"
@@ -478,10 +482,11 @@ def build_workspace(
             )
         )
 
-    # The live streaming generator notebook publishes into a separate "Streaming"
-    # folder. Opt-in via the "stream" group so a default deploy is unaffected. The
-    # notebook writes events straight to the Eventhouse KQL tables via the Spark
-    # connector (no Eventstream).
+    # The live streaming generator notebooks publish into a separate "Streaming"
+    # folder. Opt-in via the "stream" group so a default deploy is unaffected.
+    # ``stream-events`` writes events straight to the Eventhouse KQL tables via
+    # the Spark connector; ``clickstream-generator`` pushes to the
+    # ``clickstream_eventstream`` custom endpoint (external-app integration).
     if "stream" in notebook_groups:
         streaming_dir = output_dir / STREAMING_FOLDER
         staged_items.extend(

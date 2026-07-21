@@ -68,6 +68,34 @@ def test_stream_notebook_code_compiles():
     assert any("parameters" in c["metadata"].get("tags", []) for c in nb["cells"])
 
 
+def test_clickstream_notebook_code_compiles():
+    nb = json.loads((UTILITY / "notebooks" / "clickstream-generator.ipynb").read_text())
+    # Strip Jupyter/Fabric magics (e.g. `%pip install ...`) which are not valid
+    # standalone python; the rest of the code must compile as one module.
+    code_lines = []
+    for c in nb["cells"]:
+        if c["cell_type"] != "code":
+            continue
+        for line in "".join(c["source"]).split("\n"):
+            if line.lstrip().startswith("%"):
+                continue
+            code_lines.append(line)
+    compile("\n".join(code_lines), "<clickstream-generator>", "exec")
+    src = "".join("".join(c["source"]) for c in nb["cells"])
+    # The generator module is inlined and the notebook pushes to the Eventstream
+    # custom endpoint (external-app integration), not the Spark Kusto connector.
+    assert "class GeneratorConfig" in src
+    assert "class EventHubSink" in src
+    assert "azure-eventhub" in src
+    assert "com.microsoft.kusto" not in src
+    # connection string is auto-resolved from the Fabric REST API, not pasted
+    assert "resolve_connection_string" in src
+    assert "api.fabric.microsoft.com" in src
+    assert "primaryConnectionString" in src
+    # a Fabric parameters cell is tagged so the pipeline can override it
+    assert any("parameters" in c["metadata"].get("tags", []) for c in nb["cells"])
+
+
 def test_stream_template_emits_declared_eventhouse_event_types():
     template = (UTILITY / "notebooks" / "templates" / "driver-05-stream.py").read_text()
     stream_tree = ast.parse(template)

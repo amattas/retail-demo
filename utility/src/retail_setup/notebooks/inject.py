@@ -24,6 +24,10 @@ NOTEBOOKS = [
     # ("stream" group) and is NOT part of the ordered setup pipeline. It has no
     # number prefix because it is the only notebook in the streaming path.
     "stream-events",
+    # The live clickstream generator. Also self-contained; it inlines the
+    # retail_setup.clickstream generator and pushes events to the Eventstream
+    # custom endpoint (external-app integration). Staged in the "stream" group.
+    "clickstream-generator",
 ]
 _NOTEBOOK_DIR = Path(__file__).resolve().parents[3] / "notebooks"
 
