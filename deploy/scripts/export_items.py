@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts._auth import AUTH_MODES, build_credential
+from deploy.scripts.fabric_runtime import paginated_get
 
 if TYPE_CHECKING:
     import requests
@@ -53,6 +54,7 @@ def build_session(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> requests.Session:
     """Create an authenticated requests session for the Fabric REST API.
 
@@ -62,7 +64,7 @@ def build_session(
 
     import requests
 
-    credential = credential or build_credential(auth_mode)
+    credential = credential or build_credential(auth_mode, tenant_id=tenant_id)
     token = _token(FABRIC_SCOPE, credential)
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {token}"
@@ -72,10 +74,8 @@ def build_session(
 def find_workspace_id(session: requests.Session, workspace_name: str) -> str:
     """Resolve a workspace display name to its id (case-insensitive)."""
 
-    response = session.get(f"{FABRIC_API}/workspaces")
-    response.raise_for_status()
     target = workspace_name.casefold()
-    for workspace in response.json().get("value", []):
+    for workspace in paginated_get(session, f"{FABRIC_API}/workspaces"):
         if str(workspace.get("displayName", "")).casefold() == target:
             return str(workspace["id"])
     raise ValueError(f"Workspace not found: {workspace_name!r}")
@@ -86,12 +86,12 @@ def list_items(
 ) -> list[dict[str, Any]]:
     """List items of a given type in a workspace, sorted by display name."""
 
-    response = session.get(
-        f"{FABRIC_API}/workspaces/{workspace_id}/items", params={"type": item_type}
-    )
-    response.raise_for_status()
     return sorted(
-        response.json().get("value", []),
+        paginated_get(
+            session,
+            f"{FABRIC_API}/workspaces/{workspace_id}/items",
+            params={"type": item_type},
+        ),
         key=lambda item: str(item.get("displayName", "")),
     )
 
@@ -164,10 +164,15 @@ def export_items(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> list[Path]:
     """Export all items of ``item_type`` from a workspace into item folders."""
 
-    session = build_session(credential, auth_mode=auth_mode)
+    session = build_session(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     workspace_id = find_workspace_id(session, workspace_name)
     written: list[Path] = []
     for item in list_items(session, workspace_id, item_type):
@@ -201,6 +206,10 @@ def main() -> int:
         default="azure_cli",
         help="Operator credential used for Fabric REST requests.",
     )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
+    )
     args = parser.parse_args()
 
     written = export_items(
@@ -208,6 +217,7 @@ def main() -> int:
         args.item_type,
         args.output_dir,
         auth_mode=args.auth_mode,
+        tenant_id=args.tenant_id,
     )
     print(f"Exported {len(written)} {args.item_type} item(s) to {args.output_dir}")
     for item in written:

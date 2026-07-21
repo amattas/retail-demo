@@ -2,14 +2,7 @@
 
 ## Open
 
-### IMP-015 - Derive docs, asset inventory, and onboarding from one manifest {#imp-015}
-
-- **Priority / effort:** P2 / L
-- **Outcome:** One machine-readable inventory drives or validates CLI examples,
-  schemas, deploy groups, profiles, prerequisites, support status, and item
-  descriptions.
-- **Acceptance:** Public onboarding, deployment output, workspace inventory, and
-  model documentation agree and pass docs-contract tests.
+_No open implementation items._
 
 ## Settled — do not reopen
 

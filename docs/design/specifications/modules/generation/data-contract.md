@@ -56,6 +56,14 @@ Terminal publication states distinguish data recovery from staging cleanup:
 
 ML output tables are not part of this base contract.
 
+The source-derived live-route check compares this inventory with declared
+event paths. Seven dimensions, `fact_promo_lines`,
+`fact_online_order_lines`, `fact_truck_inventory`,
+`fact_dc_inventory_txn`, and `dc_inventory_position_current` are the named
+historical-only boundary. The manifest records those targets and rationale;
+`schemas.py` continues to own their fields, types, nullability behavior, and
+mixed-case compatibility.
+
 ## Generation order
 
 The engine creates dimensions and date context before dependent facts, then
@@ -121,3 +129,5 @@ Fabric-native contract.
 - `utility/tests/generation/test_gold.py`
 - module-specific generation tests
 - `utility/tests/test_notebook_build.py`
+- `utility/tests/contracts/test_live_data_contract.py`
+- `python scripts/check_data_contracts.py`

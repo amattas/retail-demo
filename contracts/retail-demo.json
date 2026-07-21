@@ -1,0 +1,5407 @@
+{
+  "metadata": {
+    "id": "solution.retail-demo",
+    "name": "Microsoft Fabric Retail Demo",
+    "owner": "owner.core",
+    "support_status": "core",
+    "description": "Cross-domain metadata for the Fabric-native retail demo.",
+    "sources": [
+      {
+        "path": "docs/design/specifications/core/solution-manifest.md"
+      }
+    ]
+  },
+  "version": "1.3.0",
+  "prerequisites": [
+    {
+      "id": "prerequisite.fabric-access",
+      "name": "Microsoft Fabric access",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "A Fabric tenant, capacity, and permissions for the target workspace.",
+      "sources": [
+        {
+          "path": "README.md"
+        }
+      ],
+      "kind": "service",
+      "requirement": null,
+      "check_command": [],
+      "bootstrap_required": true
+    },
+    {
+      "id": "prerequisite.git",
+      "name": "Git",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Version control client used to obtain and manage the repository.",
+      "sources": [
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "prerequisites"
+          }
+        }
+      ],
+      "kind": "tool",
+      "requirement": null,
+      "check_command": [
+        "git",
+        "--version"
+      ],
+      "bootstrap_required": true
+    },
+    {
+      "id": "prerequisite.python",
+      "name": "Python",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Python runtime for bootstrap and the retail-setup utility.",
+      "sources": [
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "MIN_PYTHON"
+          }
+        },
+        {
+          "path": "utility/pyproject.toml",
+          "selector": {
+            "kind": "toml_path",
+            "value": "project.requires-python"
+          }
+        }
+      ],
+      "kind": "tool",
+      "requirement": ">=3.11",
+      "check_command": [
+        "python",
+        "--version"
+      ],
+      "bootstrap_required": true
+    },
+    {
+      "id": "prerequisite.terraform",
+      "name": "Terraform",
+      "owner": "owner.deployment",
+      "support_status": "core",
+      "description": "Infrastructure client used by the supported deployment workflow.",
+      "sources": [
+        {
+          "path": "deploy/terraform/providers.tf",
+          "selector": {
+            "kind": "text",
+            "value": "required_version = \">= 1.8, < 2.0\""
+          }
+        },
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "prerequisites"
+          }
+        }
+      ],
+      "kind": "tool",
+      "requirement": ">=1.8,<2.0",
+      "check_command": [
+        "terraform",
+        "version"
+      ],
+      "bootstrap_required": true
+    },
+    {
+      "id": "prerequisite.azure-cli",
+      "name": "Azure CLI",
+      "owner": "owner.deployment",
+      "support_status": "core",
+      "description": "Default identity client and the identity client installed by guided bootstrap.",
+      "sources": [
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "prerequisites"
+          }
+        }
+      ],
+      "kind": "tool",
+      "requirement": null,
+      "check_command": [
+        "az",
+        "version"
+      ],
+      "bootstrap_required": true
+    },
+    {
+      "id": "prerequisite.odbc-driver",
+      "name": "SQL Server ODBC driver",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "ODBC Driver 17 or 18 for SQL Server enables Lakehouse SQL freshness evidence.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "ODBC Driver 18 for SQL Server"
+          }
+        }
+      ],
+      "kind": "driver",
+      "requirement": "17 or 18",
+      "check_command": [],
+      "bootstrap_required": false
+    },
+    {
+      "id": "prerequisite.azure-powershell",
+      "name": "Azure PowerShell",
+      "owner": "owner.deployment",
+      "support_status": "optional",
+      "description": "Optional local identity fallback when Azure CLI credentials are unavailable.",
+      "sources": [
+        {
+          "path": "deploy/scripts/_auth.py",
+          "selector": {
+            "kind": "text",
+            "value": "AzurePowerShellCredential"
+          }
+        }
+      ],
+      "kind": "tool",
+      "requirement": null,
+      "check_command": [],
+      "bootstrap_required": false
+    }
+  ],
+  "commands": [
+    {
+      "id": "command.bootstrap",
+      "name": "Guided bootstrap",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Prepare dependencies, configure, render, and optionally deploy.",
+      "sources": [
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "main"
+          }
+        }
+      ],
+      "argv": [
+        "python",
+        "scripts/setup.py"
+      ],
+      "examples": [
+        [
+          "python",
+          "scripts/setup.py"
+        ]
+      ]
+    },
+    {
+      "id": "command.configure",
+      "name": "Configure",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Create target and generation configuration for one workspace environment.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/cli/main.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "configure"
+          }
+        }
+      ],
+      "argv": [
+        "retail-setup",
+        "configure"
+      ],
+      "examples": [
+        [
+          "retail-setup",
+          "configure",
+          "--workspace-name",
+          "retail-demo-dev",
+          "--profile",
+          "core"
+        ]
+      ]
+    },
+    {
+      "id": "command.render",
+      "name": "Render",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Render workspace-specific setup and streaming notebooks.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/cli/main.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "render"
+          }
+        }
+      ],
+      "argv": [
+        "retail-setup",
+        "render"
+      ],
+      "examples": [
+        [
+          "retail-setup",
+          "render",
+          "--env",
+          "dev"
+        ]
+      ]
+    },
+    {
+      "id": "command.deploy",
+      "name": "Deploy",
+      "owner": "owner.deployment",
+      "support_status": "core",
+      "description": "Run the supported target-aware Fabric deployment workflow.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/cli/main.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "deploy"
+          }
+        }
+      ],
+      "argv": [
+        "retail-setup",
+        "deploy"
+      ],
+      "examples": [
+        [
+          "retail-setup",
+          "deploy",
+          "--env",
+          "dev",
+          "--dry-run"
+        ]
+      ]
+    },
+    {
+      "id": "command.verify",
+      "name": "Verify readiness",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Evaluate the fixed local/live readiness taxonomy for a resolved deployment profile.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/cli/main.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "verify"
+          }
+        }
+      ],
+      "argv": [
+        "retail-setup",
+        "verify"
+      ],
+      "examples": [
+        [
+          "retail-setup",
+          "verify",
+          "--env",
+          "dev"
+        ]
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset.bootstrap",
+      "name": "Guided bootstrap",
+      "owner": "owner.setup",
+      "support_status": "core",
+      "description": "Dependency-free wrappers and Python setup engine.",
+      "sources": [
+        {
+          "path": "scripts/setup.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "main"
+          }
+        },
+        {
+          "path": "scripts/setup.ps1"
+        },
+        {
+          "path": "scripts/setup.sh"
+        }
+      ],
+      "kind": "bootstrap",
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.deployment-scope",
+      "name": "Deployment scope",
+      "owner": "owner.deployment",
+      "support_status": "core",
+      "description": "Current configured Fabric item scope and artifact staging groups.",
+      "sources": [
+        {
+          "path": "deploy/config/deploy.yml"
+        },
+        {
+          "path": "deploy/scripts/build_artifacts.py"
+        }
+      ],
+      "kind": "deployment",
+      "inventories": [
+        {
+          "id": "inventory.deployment.item-types",
+          "description": "Fabric item types currently in deployment scope.",
+          "derivation": "yaml_sequence",
+          "source": {
+            "path": "deploy/config/deploy.yml",
+            "selector": {
+              "kind": "yaml_path",
+              "value": "deployment.item_types_in_scope"
+            }
+          }
+        },
+        {
+          "id": "inventory.deployment.notebook-groups",
+          "description": "Notebook group names accepted by artifact staging.",
+          "derivation": "python_dict_keys",
+          "source": {
+            "path": "deploy/scripts/build_artifacts.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "NOTEBOOK_GROUPS"
+            }
+          }
+        },
+        {
+          "id": "inventory.deployment.grouped-notebooks",
+          "description": "Notebook files assigned directly to artifact staging groups.",
+          "derivation": "python_dict_values",
+          "source": {
+            "path": "deploy/scripts/build_artifacts.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "NOTEBOOK_GROUPS"
+            }
+          }
+        },
+        {
+          "id": "inventory.deployment.setup-notebooks",
+          "description": "Rendered setup notebook names staged by the setup group.",
+          "derivation": "python_sequence",
+          "source": {
+            "path": "deploy/scripts/build_artifacts.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "SETUP_NOTEBOOKS"
+            }
+          }
+        },
+        {
+          "id": "inventory.deployment.stream-notebooks",
+          "description": "Rendered streaming notebook names staged by the stream group.",
+          "derivation": "python_sequence",
+          "source": {
+            "path": "deploy/scripts/build_artifacts.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "STREAM_NOTEBOOKS"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.lakehouse",
+      "name": "Lakehouse",
+      "owner": "owner.generation",
+      "support_status": "core",
+      "description": "Historical generation and Lakehouse transformation sources.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/generation/schemas.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "TABLES"
+          }
+        },
+        {
+          "path": "fabric/lakehouse",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.ipynb"
+          }
+        }
+      ],
+      "kind": "lakehouse",
+      "inventories": [
+        {
+          "id": "inventory.assets.lakehouse-notebooks",
+          "description": "Source-controlled Lakehouse notebooks.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/lakehouse",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.ipynb"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.eventhouse",
+      "name": "Eventhouse",
+      "owner": "owner.analytics",
+      "support_status": "optional",
+      "description": "KQL database scripts for the optional live analytics path.",
+      "sources": [
+        {
+          "path": "fabric/kql_database/01-create-tables.kql",
+          "selector": {
+            "kind": "kql_create_merge_tables"
+          }
+        },
+        {
+          "path": "fabric/kql_database/02-create-ingestion-mappings.kql",
+          "selector": {
+            "kind": "kql_ingestion_mapping_tables"
+          }
+        },
+        {
+          "path": "deploy/config/deploy.yml",
+          "selector": {
+            "kind": "yaml_path",
+            "value": "eventhouse.kql_scripts"
+          }
+        }
+      ],
+      "kind": "eventhouse",
+      "inventories": [
+        {
+          "id": "inventory.eventhouse.configured-kql-scripts",
+          "description": "KQL scripts selected by shared deployment configuration.",
+          "derivation": "yaml_sequence",
+          "source": {
+            "path": "deploy/config/deploy.yml",
+            "selector": {
+              "kind": "yaml_path",
+              "value": "eventhouse.kql_scripts"
+            }
+          }
+        },
+        {
+          "id": "inventory.eventhouse.source-kql-scripts",
+          "description": "Source-controlled Eventhouse KQL scripts.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/kql_database",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.kql"
+            }
+          }
+        }
+      ],
+      "inventory_rules": [
+        {
+          "id": "rule.eventhouse.configured-scripts-exist",
+          "description": "Configured KQL scripts must match source-controlled KQL scripts.",
+          "left_inventory_id": "inventory.eventhouse.configured-kql-scripts",
+          "right_inventory_id": "inventory.eventhouse.source-kql-scripts",
+          "relation": "equal"
+        }
+      ]
+    },
+    {
+      "id": "asset.stream-events",
+      "name": "Streaming event driver",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Rendered Spark Structured Streaming driver for live synthetic events.",
+      "sources": [
+        {
+          "path": "utility/notebooks/templates/driver-05-stream.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "EVENT_PAYLOADS"
+          }
+        }
+      ],
+      "kind": "streaming-notebook",
+      "depends_on": [
+        "asset.lakehouse",
+        "asset.eventhouse"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.semantic-model",
+      "name": "Retail semantic model",
+      "owner": "owner.power-bi",
+      "support_status": "optional",
+      "description": "Active Direct Lake semantic model published only after the required ML contract gate succeeds.",
+      "sources": [
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_ref_tables"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/tables",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.tmdl"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/.platform"
+        }
+      ],
+      "kind": "semantic-model",
+      "depends_on": [
+        "asset.lakehouse",
+        "asset.ml-notebooks"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.report",
+      "name": "Retail report",
+      "owner": "owner.power-bi",
+      "support_status": "optional",
+      "description": "Source-controlled Power BI report published only after required ML validation succeeds.",
+      "sources": [
+        {
+          "path": "fabric/powerbi/retail_model.Report/.platform"
+        }
+      ],
+      "kind": "report",
+      "depends_on": [
+        "asset.semantic-model"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.data-pipelines",
+      "name": "Data pipelines",
+      "owner": "owner.deployment",
+      "support_status": "optional",
+      "description": "Source-controlled Fabric data pipeline definitions.",
+      "sources": [
+        {
+          "path": "fabric/pipelines",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.DataPipeline"
+          }
+        }
+      ],
+      "kind": "data-pipelines",
+      "depends_on": [
+        "asset.lakehouse"
+      ],
+      "inventories": [
+        {
+          "id": "inventory.assets.data-pipelines",
+          "description": "Source-controlled Data Pipeline item directories.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/pipelines",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.DataPipeline"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.kql-queryset",
+      "name": "Retail KQL queryset",
+      "owner": "owner.analytics",
+      "support_status": "optional",
+      "description": "Curated KQL queries staged as one Fabric queryset.",
+      "sources": [
+        {
+          "path": "fabric/querysets",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.kql"
+          }
+        }
+      ],
+      "kind": "kql-queryset",
+      "depends_on": [
+        "asset.eventhouse"
+      ],
+      "inventories": [
+        {
+          "id": "inventory.assets.queryset-tabs",
+          "description": "Source-controlled KQL files staged as queryset tabs.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/querysets",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.kql"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.dashboard-templates",
+      "name": "Real-time dashboard templates",
+      "owner": "owner.analytics",
+      "support_status": "manual",
+      "description": "Dashboard templates retained as manual source assets.",
+      "sources": [
+        {
+          "path": "fabric/dashboards",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.json"
+          }
+        }
+      ],
+      "kind": "dashboard-templates",
+      "depends_on": [
+        "asset.eventhouse"
+      ],
+      "inventories": [
+        {
+          "id": "inventory.assets.dashboard-templates",
+          "description": "Source-controlled dashboard template JSON files.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/dashboards",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.json"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.activator-rules",
+      "name": "Activator rule definitions",
+      "owner": "owner.analytics",
+      "support_status": "manual",
+      "description": "Manual rule definitions that are not a first-class staged item.",
+      "sources": [
+        {
+          "path": "fabric/rules/definitions.kql"
+        }
+      ],
+      "kind": "rule-definitions",
+      "depends_on": [
+        "asset.eventhouse"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.task-flow",
+      "name": "Workspace task flow",
+      "owner": "owner.deployment",
+      "support_status": "preview",
+      "description": "Source-controlled task flow deployed through an undocumented metadata endpoint.",
+      "sources": [
+        {
+          "path": "fabric/taskflow/taskflow.json"
+        }
+      ],
+      "kind": "task-flow",
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.ml-notebooks",
+      "name": "ML notebook suite",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Tiered required, optional, and experimental ML notebooks with executable output contracts.",
+      "sources": [
+        {
+          "path": "deploy/scripts/build_artifacts.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "ML_EXPERIMENTS"
+          }
+        },
+        {
+          "path": "fabric/lakehouse",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*-ml-*.ipynb"
+          }
+        }
+      ],
+      "kind": "ml-notebooks",
+      "depends_on": [
+        "asset.lakehouse"
+      ],
+      "inventories": [
+        {
+          "id": "inventory.assets.ml-experiments",
+          "description": "MLflow experiment shells staged with the ML group.",
+          "derivation": "python_sequence",
+          "source": {
+            "path": "deploy/scripts/build_artifacts.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "ML_EXPERIMENTS"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.ontology",
+      "name": "Retail ontology",
+      "owner": "owner.ml-ai",
+      "support_status": "preview",
+      "description": "Ontology creation notebook for supported source entities.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/30-create-ontology.ipynb"
+        }
+      ],
+      "kind": "ontology",
+      "depends_on": [
+        "asset.lakehouse",
+        "asset.eventhouse",
+        "asset.ml-notebooks"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.data-agents",
+      "name": "Retail Data Agents",
+      "owner": "owner.ml-ai",
+      "support_status": "preview",
+      "description": "Source-controlled semantic-model and ontology Data Agent definitions.",
+      "sources": [
+        {
+          "path": "fabric/data-agents",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.DataAgent"
+          }
+        }
+      ],
+      "kind": "data-agents",
+      "depends_on": [
+        "asset.semantic-model",
+        "asset.ontology"
+      ],
+      "inventories": [
+        {
+          "id": "inventory.assets.data-agents",
+          "description": "Source-controlled Data Agent item directories.",
+          "derivation": "directory_glob",
+          "source": {
+            "path": "fabric/data-agents",
+            "selector": {
+              "kind": "directory_glob",
+              "value": "*.DataAgent"
+            }
+          }
+        }
+      ],
+      "inventory_rules": []
+    },
+    {
+      "id": "asset.custom-spark-pool",
+      "name": "Custom Spark pool",
+      "owner": "owner.deployment",
+      "support_status": "preview",
+      "description": "Optional workspace custom Spark pool defined by Terraform and selected only by full-demo.",
+      "sources": [
+        {
+          "path": "deploy/terraform/main.tf",
+          "selector": {
+            "kind": "text",
+            "value": "resource \"fabric_spark_custom_pool\" \"setup\""
+          }
+        },
+        {
+          "path": "deploy/config/deploy.yml",
+          "selector": {
+            "kind": "yaml_path",
+            "value": "spark.custom_pool_name"
+          }
+        }
+      ],
+      "kind": "custom-spark-pool",
+      "depends_on": [
+        "asset.lakehouse"
+      ],
+      "inventories": [],
+      "inventory_rules": []
+    }
+  ],
+  "profiles": [
+    {
+      "id": "profile.core",
+      "name": "Core",
+      "owner": "owner.deployment",
+      "support_status": "core",
+      "description": "Default GA-safe historical deployment with no preview, live, ML, reporting, or destructive surfaces.",
+      "sources": [
+        {
+          "path": "deploy/config/deploy.yml",
+          "selector": {
+            "kind": "yaml_path",
+            "value": "deployment.profile"
+          }
+        },
+        {
+          "path": "deploy/scripts/build_artifacts.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "NOTEBOOK_GROUPS"
+          }
+        }
+      ],
+      "implementation": "executable",
+      "deployment_name": "core",
+      "default": true,
+      "available_group_inventory_id": "inventory.deployment.notebook-groups",
+      "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
+      "group_refs": [
+        "setup"
+      ],
+      "asset_refs": [
+        "asset.lakehouse"
+      ],
+      "pipeline_refs": [],
+      "post_deploy_pipeline_ref": null,
+      "required_acknowledgements": [],
+      "blockers": [],
+      "boundaries": {
+        "runtime": "Publishes the four historical setup notebooks; the operator runs them in order after deployment.",
+        "capacity": "Uses the workspace starter pool and does not provision Eventhouse or a custom Spark pool.",
+        "cost": "Limits automatic deployment to the workspace, Lakehouse, and historical setup notebooks; Fabric usage still incurs tenant-specific charges.",
+        "manual": "Historical notebook execution and validation remain operator actions; no schedule or live stream is enabled.",
+        "preview": "No known preview or undocumented deployment surface is selected."
+      },
+      "reporting_gate_pipeline_ref": null,
+      "post_reporting_pipeline_refs": [],
+      "publication": {
+        "infrastructure_item_count": 5,
+        "reporting_item_count": 0,
+        "infrastructure_folders": [
+          "Setup"
+        ],
+        "reporting_folders": []
+      }
+    },
+    {
+      "id": "profile.standard",
+      "name": "Standard",
+      "owner": "owner.deployment",
+      "support_status": "optional",
+      "description": "Supported historical and real-time path with required ML and fail-closed Reporting publication.",
+      "sources": [
+        {
+          "path": "deploy/config/deploy.yml",
+          "selector": {
+            "kind": "yaml_path",
+            "value": "deployment.profile"
+          }
+        },
+        {
+          "path": "deploy/scripts/build_artifacts.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "NOTEBOOK_GROUPS"
+          }
+        },
+        {
+          "path": "fabric/pipelines",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.DataPipeline"
+          }
+        }
+      ],
+      "implementation": "executable",
+      "deployment_name": "standard",
+      "default": false,
+      "available_group_inventory_id": "inventory.deployment.notebook-groups",
+      "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
+      "group_refs": [
+        "setup",
+        "core",
+        "stream",
+        "ml-required"
+      ],
+      "asset_refs": [
+        "asset.lakehouse",
+        "asset.eventhouse",
+        "asset.stream-events",
+        "asset.data-pipelines",
+        "asset.kql-queryset",
+        "asset.ml-notebooks",
+        "asset.semantic-model",
+        "asset.report"
+      ],
+      "pipeline_refs": [
+        "daily-maintenance.DataPipeline",
+        "historical-data-load.DataPipeline",
+        "ml-required.DataPipeline",
+        "setup-pipeline.DataPipeline",
+        "streaming-data-load.DataPipeline"
+      ],
+      "post_deploy_pipeline_ref": "setup-pipeline.DataPipeline",
+      "required_acknowledgements": [],
+      "blockers": [],
+      "boundaries": {
+        "runtime": "Publishes infrastructure first, waits for setup and required ML validation, then publishes Reporting; no schedule or live stream is enabled.",
+        "capacity": "Requires a Fabric capacity that supports Lakehouse, Eventhouse, KQL, Spark, pipelines, and Power BI; it uses the starter Spark pool.",
+        "cost": "Eventhouse, streaming, Spark, ML, and reporting can consume more capacity than core; actual charges depend on the tenant and run duration.",
+        "manual": "The stream notebook remains operator-controlled; required setup and ML gates run synchronously during deployment.",
+        "preview": "Ontology, Data Agents, custom Spark pool, and task-flow metadata deployment are excluded."
+      },
+      "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
+      "post_reporting_pipeline_refs": [],
+      "publication": {
+        "infrastructure_item_count": 26,
+        "reporting_item_count": 2,
+        "infrastructure_folders": [
+          "Setup",
+          "Notebooks",
+          "Streaming",
+          "ML",
+          "Pipelines"
+        ],
+        "reporting_folders": [
+          "Reporting"
+        ]
+      }
+    },
+    {
+      "id": "profile.full-demo",
+      "name": "Full demo",
+      "owner": "owner.deployment",
+      "support_status": "preview",
+      "description": "All advanced and preview demo surfaces, with optional and experimental ML isolated from the required Reporting gate.",
+      "sources": [
+        {
+          "path": "deploy/config/deploy.yml",
+          "selector": {
+            "kind": "yaml_path",
+            "value": "deployment.profile"
+          }
+        },
+        {
+          "path": "deploy/scripts/build_artifacts.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "NOTEBOOK_GROUPS"
+          }
+        },
+        {
+          "path": "fabric/pipelines",
+          "selector": {
+            "kind": "directory_glob",
+            "value": "*.DataPipeline"
+          }
+        }
+      ],
+      "implementation": "executable",
+      "deployment_name": "full-demo",
+      "default": false,
+      "available_group_inventory_id": "inventory.deployment.notebook-groups",
+      "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
+      "group_refs": [
+        "setup",
+        "core",
+        "stream",
+        "ml-required",
+        "ml-optional",
+        "ml-experimental",
+        "ontology",
+        "utility"
+      ],
+      "asset_refs": [
+        "asset.lakehouse",
+        "asset.eventhouse",
+        "asset.stream-events",
+        "asset.semantic-model",
+        "asset.report",
+        "asset.data-pipelines",
+        "asset.kql-queryset",
+        "asset.dashboard-templates",
+        "asset.activator-rules",
+        "asset.task-flow",
+        "asset.ml-notebooks",
+        "asset.ontology",
+        "asset.data-agents",
+        "asset.custom-spark-pool"
+      ],
+      "pipeline_refs": [
+        "daily-maintenance.DataPipeline",
+        "historical-data-load.DataPipeline",
+        "ml-experimental.DataPipeline",
+        "ml-optional.DataPipeline",
+        "ml-required.DataPipeline",
+        "setup-pipeline.DataPipeline",
+        "streaming-data-load.DataPipeline"
+      ],
+      "post_deploy_pipeline_ref": "setup-pipeline.DataPipeline",
+      "required_acknowledgements": [
+        {
+          "id": "ack.full-demo.preview-surfaces",
+          "kind": "preview",
+          "description": "The operator verified that the tenant permits Ontology and Data Agent preview surfaces."
+        },
+        {
+          "id": "ack.full-demo.custom-pool-capacity",
+          "kind": "capacity",
+          "description": "The operator reviewed the configured custom Spark pool against the target capacity."
+        },
+        {
+          "id": "ack.full-demo.task-flow-api",
+          "kind": "preview",
+          "description": "The operator accepts that task-flow deployment uses an undocumented metadata endpoint."
+        },
+        {
+          "id": "ack.full-demo.manual-assets",
+          "kind": "manual",
+          "description": "The operator accepts that dashboard templates, rule definitions, stream execution, and final bindings require manual work."
+        }
+      ],
+      "blockers": [],
+      "boundaries": {
+        "runtime": "Publishes infrastructure, waits for setup and required ML validation, publishes Reporting, then runs isolated optional and experimental ML pipelines.",
+        "capacity": "Requires operator-reviewed capacity for concurrent Eventhouse, Spark, custom-pool, Power BI, ontology, and agent workloads.",
+        "cost": "Selects every non-destructive demo surface and therefore has the broadest potential Fabric consumption; no numeric estimate is asserted.",
+        "manual": "Dashboard and Activator sources are not auto-published, the stream is manually controlled, and preview bindings may need operator repair.",
+        "preview": "Ontology, Data Agents, custom Spark pool, and undocumented task-flow metadata behavior require explicit acknowledgements."
+      },
+      "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
+      "post_reporting_pipeline_refs": [
+        "ml-optional.DataPipeline",
+        "ml-experimental.DataPipeline"
+      ],
+      "publication": {
+        "infrastructure_item_count": 40,
+        "reporting_item_count": 2,
+        "infrastructure_folders": [
+          "Setup",
+          "Notebooks",
+          "Streaming",
+          "ML",
+          "Pipelines"
+        ],
+        "reporting_folders": [
+          "Reporting"
+        ]
+      }
+    }
+  ],
+  "readiness_expectations": [
+    {
+      "id": "target.identities",
+      "name": "Target Identities",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Configured target names and Terraform identities agree.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"target.identities\""
+          }
+        }
+      ],
+      "category": "target",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.core",
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "items.required",
+      "name": "Items Required",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "All required profile-selected Fabric items exist.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"items.required\""
+          }
+        }
+      ],
+      "category": "inventory",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.core",
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "items.manual",
+      "name": "Items Manual",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Manual or preview profile-selected Fabric items are inventoried.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"items.manual\""
+          }
+        }
+      ],
+      "category": "inventory",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.notebooks",
+      "name": "Bindings Notebooks",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Notebook bindings target the configured Lakehouse and Eventhouse.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.notebooks\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.core",
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.pipelines",
+      "name": "Bindings Pipelines",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Pipeline bindings target configured profile assets.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.pipelines\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.semantic_model",
+      "name": "Bindings Semantic Model",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The semantic model binds to the configured Lakehouse.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.semantic_model\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.report",
+      "name": "Bindings Report",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The report binds to the selected semantic model.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.report\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.queryset",
+      "name": "Bindings Queryset",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The KQL queryset binds to the configured KQL database.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.queryset\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "bindings.data_agents",
+      "name": "Bindings Data Agents",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Preview Data Agent bindings target selected data sources.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"bindings.data_agents\""
+          }
+        }
+      ],
+      "category": "binding",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "taskflow.bindings",
+      "name": "Taskflow Bindings",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The workspace task flow has the exact selected nodes and edges.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"taskflow.bindings\""
+          }
+        }
+      ],
+      "category": "taskflow",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "kql.tables",
+      "name": "Kql Tables",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Live KQL tables exactly match selected KQL source scripts.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"kql.tables\""
+          }
+        }
+      ],
+      "category": "kql",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "kql.functions",
+      "name": "Kql Functions",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Live KQL functions exactly match selected KQL source scripts.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"kql.functions\""
+          }
+        }
+      ],
+      "category": "kql",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "kql.materialized_views",
+      "name": "Kql Materialized Views",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Live KQL materialized views exactly match selected KQL source scripts.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"kql.materialized_views\""
+          }
+        }
+      ],
+      "category": "kql",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "kql.mappings",
+      "name": "Kql Mappings",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Live KQL mappings exactly match selected KQL source scripts.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"kql.mappings\""
+          }
+        }
+      ],
+      "category": "kql",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "schedules.pipelines",
+      "name": "Schedules Pipelines",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Live pipeline schedules match repository definitions.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"schedules.pipelines\""
+          }
+        }
+      ],
+      "category": "schedule",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "pipelines.post_deploy",
+      "name": "Pipelines Post Deploy",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The required post-deploy pipeline completed successfully.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"pipelines.post_deploy\""
+          }
+        }
+      ],
+      "category": "pipeline",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "pipelines.reporting_gate",
+      "name": "Pipelines Reporting Gate",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The required ML Reporting gate completed successfully.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"pipelines.reporting_gate\""
+          }
+        }
+      ],
+      "category": "pipeline",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "pipelines.post_reporting",
+      "name": "Pipelines Post Reporting",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Optional and experimental post-Reporting pipelines completed successfully.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"pipelines.post_reporting\""
+          }
+        }
+      ],
+      "category": "pipeline",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.setup_run_log",
+      "name": "Freshness Setup Run Log",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "The latest setup run is complete and within its freshness bound.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.setup_run_log\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.core",
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.watermarks",
+      "name": "Freshness Watermarks",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Streaming watermark evidence is within its freshness bound.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.watermarks\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.eventhouse_ingestion",
+      "name": "Freshness Eventhouse Ingestion",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Eventhouse ingestion evidence is within its freshness bound.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.eventhouse_ingestion\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.checkpoint",
+      "name": "Freshness Checkpoint",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Streaming checkpoint evidence is within its freshness bound.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.checkpoint\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.models.required",
+      "name": "Freshness Models Required",
+      "owner": "owner.operations",
+      "support_status": "core",
+      "description": "Required ML outputs have current row-level lineage.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.models.required\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": true,
+      "profile_refs": [
+        "profile.standard",
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.models.optional",
+      "name": "Freshness Models Optional",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Optional ML outputs have current row-level lineage.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.models.optional\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.models.experimental",
+      "name": "Freshness Models Experimental",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Experimental ML outputs have current row-level lineage.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.models.experimental\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.alerts",
+      "name": "Freshness Alerts",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Manual alert evidence is within its freshness bound.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.alerts\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.full-demo"
+      ]
+    }
+  ],
+  "data_contracts": [
+    {
+      "id": "data-contract.events",
+      "name": "Live event contract",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Declaration linking Eventhouse DDL, JSON mappings, and direct-writer payload metadata.",
+      "sources": [
+        {
+          "path": "fabric/kql_database/01-create-tables.kql",
+          "selector": {
+            "kind": "kql_create_merge_tables"
+          }
+        },
+        {
+          "path": "fabric/kql_database/02-create-ingestion-mappings.kql",
+          "selector": {
+            "kind": "kql_ingestion_mapping_tables"
+          }
+        },
+        {
+          "path": "utility/notebooks/templates/driver-05-stream.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "EVENT_PAYLOADS"
+          }
+        },
+        {
+          "path": "utility/notebooks/templates/driver-05-stream.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "ENVELOPE"
+          }
+        }
+      ],
+      "kind": "event",
+      "inventories": [
+        {
+          "id": "inventory.events.kql-tables",
+          "description": "Eventhouse tables derived from KQL DDL.",
+          "derivation": "kql_create_merge_tables",
+          "source": {
+            "path": "fabric/kql_database/01-create-tables.kql",
+            "selector": {
+              "kind": "kql_create_merge_tables"
+            }
+          }
+        },
+        {
+          "id": "inventory.events.kql-mappings",
+          "description": "Mapped event tables derived from KQL ingestion mappings.",
+          "derivation": "kql_ingestion_mapping_tables",
+          "source": {
+            "path": "fabric/kql_database/02-create-ingestion-mappings.kql",
+            "selector": {
+              "kind": "kql_ingestion_mapping_tables"
+            }
+          }
+        },
+        {
+          "id": "inventory.events.driver-payloads",
+          "description": "Generated business event types derived from EVENT_PAYLOADS.",
+          "derivation": "python_dict_keys",
+          "source": {
+            "path": "utility/notebooks/templates/driver-05-stream.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "EVENT_PAYLOADS"
+            }
+          }
+        }
+      ],
+      "inventory_rules": [
+        {
+          "id": "rule.events.ddl-mappings-agree",
+          "description": "KQL DDL and ingestion mappings must declare the same tables.",
+          "left_inventory_id": "inventory.events.kql-tables",
+          "right_inventory_id": "inventory.events.kql-mappings",
+          "relation": "equal"
+        }
+      ],
+      "source_agreements": [
+        {
+          "id": "agreement.events.fields-and-types",
+          "kind": "event_schema",
+          "description": "DDL, mappings, envelope, and payload fields and types must agree.",
+          "sources": [
+            {
+              "path": "fabric/kql_database/01-create-tables.kql",
+              "selector": {
+                "kind": "kql_create_merge_tables"
+              }
+            },
+            {
+              "path": "fabric/kql_database/02-create-ingestion-mappings.kql",
+              "selector": {
+                "kind": "kql_ingestion_mapping_tables"
+              }
+            },
+            {
+              "path": "utility/notebooks/templates/driver-05-stream.py",
+              "selector": {
+                "kind": "python_symbol",
+                "value": "EVENT_PAYLOADS"
+              }
+            },
+            {
+              "path": "utility/notebooks/templates/driver-05-stream.py",
+              "selector": {
+                "kind": "python_symbol",
+                "value": "ENVELOPE"
+              }
+            }
+          ]
+        }
+      ],
+      "envelope": {
+        "id": "envelope.live-event-v1",
+        "source": {
+          "path": "utility/notebooks/templates/driver-05-stream.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "ENVELOPE"
+          }
+        }
+      },
+      "events": [
+        {
+          "id": "event.receipt-created",
+          "event_type": "receipt_created",
+          "business_keys": [
+            "receipt_id"
+          ],
+          "dedupe_keys": [
+            "receipt_id_ext"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time is the sale occurrence time."
+          }
+        },
+        {
+          "id": "event.receipt-line-added",
+          "event_type": "receipt_line_added",
+          "business_keys": [
+            "receipt_id",
+            "line_number"
+          ],
+          "dedupe_keys": [
+            "receipt_id_ext",
+            "line_num"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time orders receipt lines."
+          }
+        },
+        {
+          "id": "event.payment-processed",
+          "event_type": "payment_processed",
+          "business_keys": [
+            "transaction_id"
+          ],
+          "dedupe_keys": [
+            "transaction_id"
+          ],
+          "event_time": {
+            "field": "processing_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Payment processing time is primary; envelope time is the fallback."
+          }
+        },
+        {
+          "id": "event.inventory-updated",
+          "event_type": "inventory_updated",
+          "business_keys": [
+            "store_id",
+            "product_id",
+            "ingest_timestamp"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time identifies the inventory adjustment instant."
+          }
+        },
+        {
+          "id": "event.stockout-detected",
+          "event_type": "stockout_detected",
+          "business_keys": [
+            "store_id",
+            "product_id",
+            "detection_time"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "detection_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Detection time is primary; envelope time is the fallback."
+          }
+        },
+        {
+          "id": "event.reorder-triggered",
+          "event_type": "reorder_triggered",
+          "business_keys": [
+            "store_id",
+            "product_id",
+            "ingest_timestamp"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time identifies the reorder decision instant."
+          }
+        },
+        {
+          "id": "event.customer-entered",
+          "event_type": "customer_entered",
+          "business_keys": [
+            "store_id",
+            "sensor_id",
+            "ingest_timestamp"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time is the sensor observation time."
+          }
+        },
+        {
+          "id": "event.customer-zone-changed",
+          "event_type": "customer_zone_changed",
+          "business_keys": [
+            "store_id",
+            "customer_ble_id",
+            "timestamp"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "timestamp",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Payload transition time is primary; envelope time is the fallback."
+          }
+        },
+        {
+          "id": "event.ble-ping-detected",
+          "event_type": "ble_ping_detected",
+          "business_keys": [
+            "store_id",
+            "beacon_id",
+            "customer_ble_id",
+            "ingest_timestamp"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time is the BLE observation time."
+          }
+        },
+        {
+          "id": "event.truck-arrived",
+          "event_type": "truck_arrived",
+          "business_keys": [
+            "truck_id",
+            "dc_id",
+            "store_id",
+            "shipment_id"
+          ],
+          "dedupe_keys": [
+            "truck_id",
+            "dc_id",
+            "store_id",
+            "shipment_id"
+          ],
+          "event_time": {
+            "field": "arrival_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Arrival time starts the truck lifecycle."
+          }
+        },
+        {
+          "id": "event.truck-departed",
+          "event_type": "truck_departed",
+          "business_keys": [
+            "truck_id",
+            "dc_id",
+            "store_id",
+            "shipment_id"
+          ],
+          "dedupe_keys": [
+            "truck_id",
+            "dc_id",
+            "store_id",
+            "shipment_id"
+          ],
+          "event_time": {
+            "field": "departure_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Departure time completes the truck lifecycle."
+          }
+        },
+        {
+          "id": "event.store-opened",
+          "event_type": "store_opened",
+          "business_keys": [
+            "store_id",
+            "operation_time",
+            "operation_type"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "operation_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Operation time records when the store opened."
+          }
+        },
+        {
+          "id": "event.store-closed",
+          "event_type": "store_closed",
+          "business_keys": [
+            "store_id",
+            "operation_time",
+            "operation_type"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "operation_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Operation time records when the store closed."
+          }
+        },
+        {
+          "id": "event.ad-impression",
+          "event_type": "ad_impression",
+          "business_keys": [
+            "impression_id"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time is the marketing touch time."
+          }
+        },
+        {
+          "id": "event.promotion-applied",
+          "event_type": "promotion_applied",
+          "business_keys": [
+            "receipt_id",
+            "promo_code"
+          ],
+          "dedupe_keys": [
+            "trace_id"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time orders promotion application."
+          }
+        },
+        {
+          "id": "event.online-order-created",
+          "event_type": "online_order_created",
+          "business_keys": [
+            "order_id"
+          ],
+          "dedupe_keys": [
+            "order_id_ext"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time is the online order creation time."
+          }
+        },
+        {
+          "id": "event.online-order-picked",
+          "event_type": "online_order_picked",
+          "business_keys": [
+            "order_id",
+            "picked_time"
+          ],
+          "dedupe_keys": [
+            "order_id_ext",
+            "status"
+          ],
+          "event_time": {
+            "field": "picked_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Picked time is primary; envelope time is the fallback."
+          }
+        },
+        {
+          "id": "event.online-order-shipped",
+          "event_type": "online_order_shipped",
+          "business_keys": [
+            "order_id",
+            "shipped_time"
+          ],
+          "dedupe_keys": [
+            "order_id_ext",
+            "status"
+          ],
+          "event_time": {
+            "field": "shipped_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Shipped time is primary; envelope time is the fallback."
+          }
+        }
+      ],
+      "fixture_sources": [
+        {
+          "path": "contracts/fixtures/event-scenarios.json"
+        }
+      ]
+    },
+    {
+      "id": "data-contract.historical",
+      "name": "Historical Lakehouse contract",
+      "owner": "owner.generation",
+      "support_status": "core",
+      "description": "Declaration pointing to generated historical table schemas.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/generation/schemas.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "TABLES"
+          }
+        }
+      ],
+      "kind": "historical",
+      "inventories": [
+        {
+          "id": "inventory.historical.tables",
+          "description": "Historical table names derived from schemas.py.",
+          "derivation": "python_dict_keys",
+          "source": {
+            "path": "utility/src/retail_setup/generation/schemas.py",
+            "selector": {
+              "kind": "python_symbol",
+              "value": "TABLES"
+            }
+          }
+        }
+      ],
+      "inventory_rules": [],
+      "source_agreements": []
+    },
+    {
+      "id": "data-contract.semantic-model",
+      "name": "Active semantic model contract",
+      "owner": "owner.power-bi",
+      "support_status": "core",
+      "description": "Declaration pointing to active tables referenced by model.tmdl.",
+      "sources": [
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_ref_tables"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "kind": "semantic_model",
+      "inventories": [
+        {
+          "id": "inventory.semantic-model.tables",
+          "description": "Active semantic-model tables derived from model.tmdl references.",
+          "derivation": "tmdl_ref_tables",
+          "source": {
+            "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+            "selector": {
+              "kind": "tmdl_ref_tables"
+            }
+          }
+        }
+      ],
+      "inventory_rules": [],
+      "source_agreements": []
+    }
+  ],
+  "event_paths": [
+    {
+      "id": "event-path.receipt-created",
+      "name": "Receipt created to reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed receipt creation flows through Eventhouse and Silver to sales and tender reporting.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.receipt-created"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "receipt_created"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_receipts"
+        },
+        {
+          "layer": "gold",
+          "name": "sales_minute_store"
+        },
+        {
+          "layer": "gold",
+          "name": "tender_mix_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_receipts"
+        },
+        {
+          "layer": "semantic",
+          "name": "sales_minute_store"
+        },
+        {
+          "layer": "semantic",
+          "name": "tender_mix_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.receipt-line-added",
+      "name": "Receipt line to product reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed receipt lines flow to the receipt-line fact and top-product aggregate.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.receipt-line-added"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "receipt_line_added"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_receipt_lines"
+        },
+        {
+          "layer": "gold",
+          "name": "top_products_15m"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_receipt_lines"
+        },
+        {
+          "layer": "semantic",
+          "name": "top_products_15m"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.payment-processed",
+      "name": "Payment to payment reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed payments flow to the active payment fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.payment-processed"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "payment_processed"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_payments"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_payments"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.inventory-updated",
+      "name": "Inventory update to store position",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Store inventory adjustments feed the current store inventory aggregate.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.inventory-updated"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "inventory_updated"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_store_inventory_txn"
+        },
+        {
+          "layer": "gold",
+          "name": "inventory_position_current"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_store_inventory_txn"
+        },
+        {
+          "layer": "semantic",
+          "name": "inventory_position_current"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.stockout-detected",
+      "name": "Stockout to stockout reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed stockout detections flow to the active stockout fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.stockout-detected"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "stockout_detected"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_stockouts"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_stockouts"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.reorder-triggered",
+      "name": "Reorder to replenishment reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed reorder decisions flow to the active reorder fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.reorder-triggered"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "reorder_triggered"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_reorders"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_reorders"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.customer-entered",
+      "name": "Customer entry to traffic reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Customer entry observations feed foot traffic and zone dwell reporting.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.customer-entered"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "customer_entered"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_foot_traffic"
+        },
+        {
+          "layer": "gold",
+          "name": "zone_dwell_minute"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_foot_traffic"
+        },
+        {
+          "layer": "semantic",
+          "name": "zone_dwell_minute"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.customer-zone-changed",
+      "name": "Customer zone transition to reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed zone transitions flow to the active customer-zone fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.customer-zone-changed"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "customer_zone_changed"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_customer_zone_changes"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_customer_zone_changes"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.ble-ping-detected",
+      "name": "BLE ping to sensor reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed BLE observations flow to the active BLE ping fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.ble-ping-detected"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "ble_ping_detected"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_ble_pings"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_ble_pings"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.truck-arrived",
+      "name": "Truck arrival lifecycle route",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Truck arrival joins its departure before truck dwell reaches reporting.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.truck-arrived"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "truck_arrived"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_truck_moves"
+        },
+        {
+          "layer": "gold",
+          "name": "truck_dwell_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_truck_moves"
+        },
+        {
+          "layer": "semantic",
+          "name": "truck_dwell_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "paired-lifecycle-to-silver"
+    },
+    {
+      "id": "event-path.truck-departed",
+      "name": "Truck departure lifecycle route",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Truck departure joins its arrival before truck dwell reaches reporting.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.truck-departed"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "truck_departed"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_truck_moves"
+        },
+        {
+          "layer": "gold",
+          "name": "truck_dwell_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_truck_moves"
+        },
+        {
+          "layer": "semantic",
+          "name": "truck_dwell_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "paired-lifecycle-to-silver"
+    },
+    {
+      "id": "event-path.store-opened",
+      "name": "Store open to operations reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Store-open operations flow to the active store-operations fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.store-opened"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "store_opened"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_store_ops"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_store_ops"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.store-closed",
+      "name": "Store close to operations reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Store-close operations flow to the active store-operations fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.store-closed"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "store_closed"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_store_ops"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_store_ops"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.ad-impression",
+      "name": "Ad impression to campaign reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed ad impressions feed marketing cost and the derived attribution route.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.ad-impression"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "ad_impression"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_marketing"
+        },
+        {
+          "layer": "gold",
+          "name": "marketing_cost_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_marketing"
+        },
+        {
+          "layer": "semantic",
+          "name": "marketing_cost_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.promotion-applied",
+      "name": "Promotion to promotion reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed applied promotions flow to the active promotion fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.promotion-applied"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "promotion_applied"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_promotions"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_promotions"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.online-order-created",
+      "name": "Online order creation to sales reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Created online orders feed order headers and daily online sales.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.online-order-created"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "online_order_created"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_online_order_headers"
+        },
+        {
+          "layer": "gold",
+          "name": "online_sales_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_online_order_headers"
+        },
+        {
+          "layer": "semantic",
+          "name": "online_sales_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.online-order-picked",
+      "name": "Online order picked operational status",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Picked status stops at the intentionally streaming-only status table.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.lakehouse",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.online-order-picked"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "online_order_picked"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_online_order_status"
+        }
+      ],
+      "terminal_exception_id": "exception.streaming.online-order-status",
+      "mode": "direct-spark-kusto-to-streaming-only-silver"
+    },
+    {
+      "id": "event-path.online-order-shipped",
+      "name": "Online order shipped operational status",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Shipped status stops at the intentionally streaming-only status table.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.lakehouse",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.online-order-shipped"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "online_order_shipped"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_online_order_status"
+        }
+      ],
+      "terminal_exception_id": "exception.streaming.online-order-status",
+      "mode": "direct-spark-kusto-to-streaming-only-silver"
+    },
+    {
+      "id": "event-path.marketing-attribution",
+      "name": "Derived last-touch marketing attribution",
+      "owner": "owner.analytics",
+      "support_status": "optional",
+      "description": "Five reconciled event routes derive attribution and campaign performance without a nineteenth event.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.eventhouse",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "derived",
+      "event_ids": [
+        "event.ad-impression",
+        "event.receipt-created",
+        "event.online-order-created",
+        "event.payment-processed",
+        "event.promotion-applied"
+      ],
+      "targets": [
+        {
+          "layer": "silver",
+          "name": "fact_marketing_attribution"
+        },
+        {
+          "layer": "gold",
+          "name": "campaign_performance_daily"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_marketing_attribution"
+        },
+        {
+          "layer": "semantic",
+          "name": "campaign_performance_daily"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "derived-last-touch-7d"
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "exception.events.unknown-catch-all",
+      "name": "KQL unknown-event catch-all",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "KQL intentionally has a catch-all table that is not a generated business event.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/streaming/event-contract.md"
+        },
+        {
+          "path": "fabric/kql_database/01-create-tables.kql",
+          "selector": {
+            "kind": "kql_create_merge_tables"
+          }
+        }
+      ],
+      "kind": "operational-catch-all",
+      "rationale": "Queued raw JSON needs a bounded investigation table, while the direct typed writer must reject unmapped events before checkpoint commit.",
+      "verification_owner": "owner.streaming",
+      "event_ids": [],
+      "target_names": [
+        "unknown_event"
+      ],
+      "tracking_issue": null,
+      "inventory_comparison": {
+        "left_inventory_id": "inventory.events.kql-tables",
+        "right_inventory_id": "inventory.events.driver-payloads",
+        "relation": "left_superset",
+        "require_difference": true
+      }
+    },
+    {
+      "id": "exception.streaming.online-order-status",
+      "name": "Streaming-only online order status",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Picked and shipped events intentionally stop at a streaming-only Silver status table.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "utility/src/retail_setup/generation/schemas.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "TABLES"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "kind": "streaming-only",
+      "rationale": "The active transform records operational PICKED/SHIPPED state, but no historical schema or semantic table currently owns that status grain.",
+      "verification_owner": "owner.streaming",
+      "event_ids": [
+        "event.online-order-picked",
+        "event.online-order-shipped"
+      ],
+      "target_names": [
+        "fact_online_order_status"
+      ],
+      "tracking_issue": null,
+      "inventory_comparison": null
+    },
+    {
+      "id": "exception.historical.no-live-event-route",
+      "name": "Historical-only Lakehouse targets",
+      "owner": "owner.generation",
+      "support_status": "core",
+      "description": "Source-derived historical targets without an emitted-event path remain batch-owned.",
+      "sources": [
+        {
+          "path": "utility/src/retail_setup/generation/schemas.py",
+          "selector": {
+            "kind": "python_symbol",
+            "value": "TABLES"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/04-streaming-to-gold.ipynb",
+          "selector": {
+            "kind": "notebook_gold_contract"
+          }
+        }
+      ],
+      "kind": "historical-only",
+      "rationale": "Dimensions and batch-only facts have no emitted payload, and DC inventory reporting depends on the historical DC inventory fact.",
+      "verification_owner": "owner.generation",
+      "event_ids": [],
+      "target_names": [
+        "dim_geographies",
+        "dim_stores",
+        "dim_distribution_centers",
+        "dim_trucks",
+        "dim_customers",
+        "dim_products",
+        "dim_date",
+        "fact_promo_lines",
+        "fact_online_order_lines",
+        "fact_truck_inventory",
+        "fact_dc_inventory_txn",
+        "dc_inventory_position_current"
+      ],
+      "tracking_issue": null,
+      "inventory_comparison": null
+    },
+    {
+      "id": "exception.semantic-model.ml-outputs",
+      "name": "Semantic-model ML outputs",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "The active model intentionally includes ML outputs outside the historical base contract.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_ref_tables"
+          }
+        }
+      ],
+      "kind": "inventory-difference",
+      "rationale": "Four contract-validated required ML outputs intentionally extend the base historical generator schema.",
+      "verification_owner": "owner.ml-ai",
+      "event_ids": [],
+      "target_names": [
+        "churn_predictions",
+        "customer_segments",
+        "demand_forecast",
+        "stockout_risk"
+      ],
+      "tracking_issue": "IMP-008",
+      "inventory_comparison": {
+        "left_inventory_id": "inventory.semantic-model.tables",
+        "right_inventory_id": "inventory.historical.tables",
+        "relation": "left_superset",
+        "require_difference": true
+      }
+    }
+  ],
+  "ml_contracts": [
+    {
+      "id": "ml-contract.demand-forecast",
+      "name": "Demand Forecast",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Demand Forecast required support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/06-ml-demand-forecast.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "required",
+      "producer": {
+        "path": "fabric/lakehouse/06-ml-demand-forecast.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
+      "source_tables": [
+        "fact_receipt_lines",
+        "fact_receipts"
+      ],
+      "output": {
+        "table": "demand_forecast",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "forecast_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "predicted_units",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "lower_bound",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "upper_bound",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "mape",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "source_as_of",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "forecast_horizon_days",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "product_id",
+          "forecast_date"
+        ],
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "source_as_of",
+          "model_run_id",
+          "schema_version"
+        ],
+        "probability_columns": [],
+        "forecast_horizon_column": "forecast_horizon_days"
+      },
+      "reporting_required": true,
+      "intended_use": "Capacity and replenishment planning from store/product daily unit forecasts.",
+      "limitations": [
+        "Forecasts are model estimates rather than guaranteed demand.",
+        "Intervals are empirical residual bands and do not express causal uncertainty.",
+        "MAPE is a unit ratio and can exceed 1.0 when absolute percentage error exceeds 100%.",
+        "Evaluation eligibility is frozen at the training cutoff; production inference selects a separate current cohort."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks",
+        "asset.semantic-model"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ]
+    },
+    {
+      "id": "ml-contract.customer-segments",
+      "name": "Customer Segments",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Customer Segments required support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/08-ml-customer-segmentation.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "required",
+      "producer": {
+        "path": "fabric/lakehouse/08-ml-customer-segmentation.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
+      "source_tables": [
+        "fact_receipts"
+      ],
+      "output": {
+        "table": "customer_segments",
+        "fields": [
+          {
+            "name": "customer_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "cluster_id",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "segment_label",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "recency_days",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "frequency",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "monetary_value",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "avg_order_value",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "first_purchase_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "last_purchase_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "segmented_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "customer_id"
+        ],
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "segmented_at",
+          "model_run_id",
+          "schema_version"
+        ],
+        "probability_columns": []
+      },
+      "reporting_required": true,
+      "intended_use": "Descriptive customer grouping for aggregate RFM analysis.",
+      "limitations": [
+        "Cluster labels are descriptive and may change between runs.",
+        "Segments must not be used as protected-class or eligibility decisions."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks",
+        "asset.semantic-model"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ]
+    },
+    {
+      "id": "ml-contract.churn-predictions",
+      "name": "Churn Predictions",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Churn Predictions required support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/09-ml-churn-prediction.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "required",
+      "producer": {
+        "path": "fabric/lakehouse/09-ml-churn-prediction.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
+      "source_tables": [
+        "fact_receipts",
+        "dim_customers"
+      ],
+      "output": {
+        "table": "churn_predictions",
+        "fields": [
+          {
+            "name": "customer_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "churn_probability",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "churn_prediction",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "risk_category",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "is_churned_actual",
+            "data_type": "int",
+            "nullable": true
+          },
+          {
+            "name": "prediction_date",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "model_version",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "churn_window_days",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "customer_id"
+        ],
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "prediction_date",
+          "model_run_id",
+          "model_version",
+          "schema_version"
+        ],
+        "probability_columns": [
+          "churn_probability"
+        ]
+      },
+      "reporting_required": true,
+      "intended_use": "Prioritize customers for retention analysis within the declared churn horizon.",
+      "limitations": [
+        "Current inference intentionally has no actual outcome label; deprecated is_churned_actual is always null for backward compatibility.",
+        "Scores are calibrated estimates and require later outcome monitoring.",
+        "Training, calibration, and test partition on label availability with a 90-day forward-label embargo."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks",
+        "asset.semantic-model"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ]
+    },
+    {
+      "id": "ml-contract.stockout-risk",
+      "name": "Stockout Risk",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Stockout Risk required support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/12-ml-stockout-prediction.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "required",
+      "producer": {
+        "path": "fabric/lakehouse/12-ml-stockout-prediction.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
+      "source_tables": [
+        "fact_store_inventory_txn",
+        "fact_receipt_lines",
+        "fact_receipts",
+        "dim_products"
+      ],
+      "output": {
+        "table": "stockout_risk",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "inventory_as_of",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "current_inventory",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "demand_velocity_daily",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "days_of_inventory",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "demand_trend",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "stockout_probability",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "stockout_predicted",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "risk",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "ranking",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "risk_level",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "predicted_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "forecast_horizon_days",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "Department",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Category",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Subcategory",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "product_id",
+          "forecast_horizon_days"
+        ],
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "inventory_as_of",
+          "predicted_at",
+          "model_run_id",
+          "schema_version"
+        ],
+        "probability_columns": [
+          "stockout_probability"
+        ]
+      },
+      "reporting_required": true,
+      "intended_use": "Rank current store/product positions for inventory review by horizon.",
+      "limitations": [
+        "Scores depend on the captured inventory snapshot and observed demand history.",
+        "A high score is not a guaranteed future stockout.",
+        "Training, calibration, and test partition on label availability with a three-day forward-label embargo."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks",
+        "asset.semantic-model"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ]
+    },
+    {
+      "id": "ml-contract.product-associations",
+      "name": "Product Associations",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Product Associations optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_receipts",
+        "fact_receipt_lines"
+      ],
+      "output": {
+        "table": "product_associations",
+        "fields": [
+          {
+            "name": "antecedent",
+            "data_type": "array<long>",
+            "nullable": false
+          },
+          {
+            "name": "consequent",
+            "data_type": "array<long>",
+            "nullable": false
+          },
+          {
+            "name": "support",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "confidence",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "lift",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "antecedent",
+          "consequent"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Explore co-purchased product sets from qualifying baskets.",
+      "limitations": [
+        "Association does not imply causation.",
+        "Sparse baskets can yield no promoted output rows."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.product-recommendations",
+      "name": "Product Recommendations",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Product Recommendations optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_receipts",
+        "fact_receipt_lines"
+      ],
+      "output": {
+        "table": "product_recommendations",
+        "fields": [
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "recommended_product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "support",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "confidence",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "lift",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "product_id",
+          "recommended_product_id"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Provide deduplicated product-pair recommendations from association rules.",
+      "limitations": [
+        "Recommendations inherit observational association-rule bias.",
+        "Metrics are not calibrated purchase probabilities.",
+        "Each recommendation is a singleton-pair rule whose support, confidence, and lift come from that same rule."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.journey-patterns",
+      "name": "Journey Patterns",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Journey Patterns optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_customer_zone_changes",
+        "dim_customers",
+        "fact_receipts"
+      ],
+      "output": {
+        "table": "journey_patterns",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "rank",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "path_string",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "path_length",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "occurrence_count",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "total_sessions",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "sessions_with_purchase",
+            "data_type": "long",
+            "nullable": true
+          },
+          {
+            "name": "conversion_rate",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "avg_session_duration_minutes",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "avg_basket_cents",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "total_revenue_cents",
+            "data_type": "long",
+            "nullable": true
+          },
+          {
+            "name": "analysis_period_days",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "path_string",
+          "path_length"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Describe common in-store zone paths and identity-safe conversion aggregates.",
+      "limitations": [
+        "Receipt conversion is present only when identity mapping is unambiguous.",
+        "Paths are descriptive and not causal."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.zone-transitions",
+      "name": "Zone Transitions",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Zone Transitions optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_customer_zone_changes",
+        "dim_customers",
+        "fact_receipts"
+      ],
+      "output": {
+        "table": "zone_transitions",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "from_zone",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "to_zone",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "transition_count",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "transition_probability",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "from_zone",
+          "to_zone"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": [
+          "transition_probability"
+        ]
+      },
+      "reporting_required": false,
+      "intended_use": "Describe observed next-zone transition shares.",
+      "limitations": [
+        "Transition shares are empirical frequencies, not individual forecasts."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.zone-dwell-stats",
+      "name": "Zone Dwell Stats",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Zone Dwell Stats optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/11-ml-journey-analysis.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_customer_zone_changes",
+        "dim_customers",
+        "fact_receipts"
+      ],
+      "output": {
+        "table": "zone_dwell_stats",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "zone",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "avg_dwell_seconds",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "median_dwell_seconds",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "min_dwell_seconds",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "max_dwell_seconds",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "visit_count",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "zone"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Summarize observed zone dwell distributions.",
+      "limitations": [
+        "Outlier filtering excludes extremely long observed dwell intervals."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.dwell-predictions",
+      "name": "Dwell Predictions",
+      "owner": "owner.ml-ai",
+      "support_status": "optional",
+      "description": "Dwell Predictions optional support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/13-ml-delivery-prediction.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "optional",
+      "producer": {
+        "path": "fabric/lakehouse/13-ml-delivery-prediction.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "truck_arrived",
+        "truck_departed",
+        "dim_trucks",
+        "dim_stores",
+        "dim_distribution_centers"
+      ],
+      "output": {
+        "table": "dwell_predictions",
+        "fields": [
+          {
+            "name": "shipment_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "arrived_ts",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "location_type",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "arrival_hour",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "arrival_day_of_week",
+            "data_type": "int",
+            "nullable": false
+          },
+          {
+            "name": "predicted_dwell_minutes",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "lower_bound_minutes",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "upper_bound_minutes",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "interval_coverage_target",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "prediction_status",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "prediction_timestamp",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "shipment_id"
+        ],
+        "as_of_column": "arrived_ts",
+        "lineage_columns": [
+          "model_run_id"
+        ],
+        "probability_columns": [
+          "interval_coverage_target"
+        ]
+      },
+      "reporting_required": false,
+      "intended_use": "Estimate dwell for open arrived shipments using arrival-known features.",
+      "limitations": [
+        "Training labels come from matched cusn Bronze arrivals and departures; inference uses unmatched arrivals and arrival-known fields only.",
+        "Inference excludes actual duration, departure time, and error fields.",
+        "Intervals are empirical and the output is promoted only for operational review.",
+        "Missing lifecycle sources or no inference-ready open arrivals fail before replacing prior output."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.price-elasticity",
+      "name": "Price Elasticity",
+      "owner": "owner.ml-ai",
+      "support_status": "experimental",
+      "description": "Price Elasticity experimental support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "experimental",
+      "producer": {
+        "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_receipts",
+        "fact_receipt_lines",
+        "dim_products",
+        "fact_promotions",
+        "fact_promo_lines"
+      ],
+      "output": {
+        "table": "price_elasticity",
+        "fields": [
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "product_name",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "product_category",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "elasticity_coefficient",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_category",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "confidence_interval_lower",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "confidence_interval_upper",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "standard_error",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "r_squared",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "n_observations",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "sxx",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "sse",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "avg_price",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "regular_price",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "avg_daily_quantity",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "elasticity_evidence_status",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "analysis_design",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "product_id"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Explore observational price-demand sensitivity with evidence diagnostics.",
+      "limitations": [
+        "Observational OLS estimates are not causal price effects.",
+        "Invalid or insufficient evidence remains explicit and nullable."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.promotion-lift",
+      "name": "Promotion Lift",
+      "owner": "owner.ml-ai",
+      "support_status": "experimental",
+      "description": "Promotion Lift experimental support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "experimental",
+      "producer": {
+        "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "fact_receipts",
+        "fact_receipt_lines",
+        "dim_products",
+        "fact_promotions",
+        "fact_promo_lines"
+      ],
+      "output": {
+        "table": "promotion_lift",
+        "fields": [
+          {
+            "name": "store_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "promo_code",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "promo_episode_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "product_name",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "product_category",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "discount_type",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "avg_discount",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "avg_discount_pct",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "promo_start_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "promo_end_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "promoted_receipts_product",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "promoted_line_count",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "baseline_calendar_days",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "promo_calendar_days",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "post_calendar_days",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "baseline_daily_quantity",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "promo_daily_quantity",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "post_daily_quantity",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "total_promoted_quantity",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "total_promoted_revenue",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "observed_promo_lift_pct",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "observed_post_period_change_pct",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "observed_net_change_pct",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "observed_lift_category",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "analysis_design",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "computed_at",
+            "data_type": "timestamp",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "store_id",
+          "promo_code",
+          "promo_episode_id",
+          "product_id",
+          "discount_type"
+        ],
+        "as_of_column": "computed_at",
+        "lineage_columns": [],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Compare descriptive before/during/after promotion-period outcomes by store and episode.",
+      "limitations": [
+        "Observed period changes are not causal lift or ROI.",
+        "Zero-sales calendar days remain in denominators only inside each store's observed receipt range.",
+        "Episodes without complete observed baseline and post windows are excluded."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.pricing-constraints",
+      "name": "Pricing Constraints",
+      "owner": "owner.ml-ai",
+      "support_status": "experimental",
+      "description": "Pricing Constraints experimental support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/14-ml-dynamic-pricing.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "experimental",
+      "producer": {
+        "path": "fabric/lakehouse/14-ml-dynamic-pricing.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "dim_products",
+        "fact_store_inventory_txn",
+        "fact_receipt_lines",
+        "price_elasticity"
+      ],
+      "output": {
+        "table": "pricing_constraints",
+        "fields": [
+          {
+            "name": "constraint_name",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "constraint_value",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "description",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "effective_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "constraint_name"
+        ],
+        "as_of_column": "effective_at",
+        "lineage_columns": [
+          "schema_version"
+        ],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Expose the rule constraints applied by experimental pricing.",
+      "limitations": [
+        "Constraints are demo configuration and require operator review."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    },
+    {
+      "id": "ml-contract.pricing-recommendations",
+      "name": "Pricing Recommendations",
+      "owner": "owner.ml-ai",
+      "support_status": "experimental",
+      "description": "Pricing Recommendations experimental support-tier producer and physical output contract.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/14-ml-dynamic-pricing.ipynb",
+          "selector": {
+            "kind": "notebook_ml_contract"
+          }
+        },
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ],
+      "implementation": "executable",
+      "tier": "experimental",
+      "producer": {
+        "path": "fabric/lakehouse/14-ml-dynamic-pricing.ipynb",
+        "selector": {
+          "kind": "notebook_ml_contract"
+        }
+      },
+      "validator": null,
+      "source_tables": [
+        "dim_products",
+        "fact_store_inventory_txn",
+        "fact_receipt_lines",
+        "price_elasticity"
+      ],
+      "output": {
+        "table": "pricing_recommendations",
+        "fields": [
+          {
+            "name": "product_id",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "ProductName",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "Department",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Category",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "Subcategory",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "cost",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "msrp",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "current_price",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "recommended_price",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "change_pct",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "reason_codes",
+            "data_type": "array<string>",
+            "nullable": false
+          },
+          {
+            "name": "markdown_factor",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "total_inventory",
+            "data_type": "long",
+            "nullable": false
+          },
+          {
+            "name": "days_since_last_receipt",
+            "data_type": "int",
+            "nullable": true
+          },
+          {
+            "name": "avg_daily_sales",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "days_of_inventory",
+            "data_type": "double",
+            "nullable": false
+          },
+          {
+            "name": "hit_min_margin",
+            "data_type": "boolean",
+            "nullable": false
+          },
+          {
+            "name": "hit_max_price",
+            "data_type": "boolean",
+            "nullable": false
+          },
+          {
+            "name": "violates_max_change",
+            "data_type": "boolean",
+            "nullable": false
+          },
+          {
+            "name": "elasticity_coefficient",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_category",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_ci_lower",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_ci_upper",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_standard_error",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_r_squared",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "n_observations",
+            "data_type": "long",
+            "nullable": true
+          },
+          {
+            "name": "upstream_evidence_status",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "elasticity_analysis_design",
+            "data_type": "string",
+            "nullable": true
+          },
+          {
+            "name": "elasticity_evidence_valid",
+            "data_type": "boolean",
+            "nullable": false
+          },
+          {
+            "name": "elasticity_validation_status",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "projection_basis",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "projected_revenue_impact_30d",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "model_type",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "ml_confidence",
+            "data_type": "double",
+            "nullable": true
+          },
+          {
+            "name": "recommendation_date",
+            "data_type": "date",
+            "nullable": false
+          },
+          {
+            "name": "recommendation_ts",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "effective_price_change_ts",
+            "data_type": "timestamp",
+            "nullable": true
+          },
+          {
+            "name": "experimental_status",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
+          }
+        ],
+        "grain": [
+          "product_id"
+        ],
+        "as_of_column": "recommendation_ts",
+        "lineage_columns": [
+          "schema_version"
+        ],
+        "probability_columns": []
+      },
+      "reporting_required": false,
+      "intended_use": "Explore constrained product-level pricing recommendations with upstream evidence.",
+      "limitations": [
+        "Recommendations are experimental and are never required by Reporting.",
+        "No calibrated confidence model exists; ml_confidence is intentionally nullable.",
+        "Missing elasticity uses a non-null NO_ELASTICITY_ESTIMATE evidence sentinel.",
+        "Cooldown state advances only when a constrained price change is accepted.",
+        "Quantity scenarios apply the log-log power response and are not causal forecasts."
+      ],
+      "asset_ids": [
+        "asset.ml-notebooks"
+      ],
+      "data_contract_ids": [
+        "data-contract.historical"
+      ]
+    }
+  ],
+  "source_owners": [
+    {
+      "id": "owner.core",
+      "name": "Core conventions",
+      "description": "Cross-cutting support, naming, and configuration boundaries.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/core/conventions.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.setup",
+      "name": "Setup",
+      "description": "Bootstrap, configure, and render behavior.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/setup/cli.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.deployment",
+      "name": "Deployment",
+      "description": "Target resolution, staging, publication, and deployment scope.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/deployment/framework.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.generation",
+      "name": "Historical generation",
+      "description": "Historical Lakehouse generation and physical schema contract.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/generation/data-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.streaming",
+      "name": "Live streaming",
+      "description": "Event envelope, payload, and direct Eventhouse write contract.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/streaming/event-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.analytics",
+      "name": "Fabric analytics",
+      "description": "Eventhouse, Lakehouse transforms, queries, dashboards, and rules.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/analytics/fabric-analytics.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.power-bi",
+      "name": "Power BI",
+      "description": "Active semantic model and report.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/power-bi/semantic-model.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.ml-ai",
+      "name": "ML and AI",
+      "description": "ML notebooks, ontology, and Data Agents.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.documentation",
+      "name": "Documentation",
+      "description": "Canonical documentation structure and reconciliation.",
+      "sources": [
+        {
+          "path": "docs/design/specifications/modules/documentation/site.md"
+        }
+      ]
+    },
+    {
+      "id": "owner.operations",
+      "name": "Operations and readiness",
+      "description": "Owns deployment evidence, readiness checks, and operator guidance.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py"
+        },
+        {
+          "path": "docs/guides/operations.md"
+        }
+      ]
+    }
+  ]
+}

@@ -17,4 +17,5 @@ or template assets.
 
 The historical setup notebooks are rendered from `utility/`, not authored in
 this directory. See the [architecture overview](../docs/design/architecture/overview.md)
-and [deployment specification](../docs/design/specifications/modules/deployment/framework.md).
+the [workspace inventory](../docs/guides/workspace-inventory.md), and
+[deployment specification](../docs/design/specifications/modules/deployment/framework.md).

@@ -22,7 +22,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-StepStatus = Literal["PENDING", "RUNNING", "SUCCEEDED", "SKIPPED", "FAILED"]
+StepStatus = Literal[
+    "PENDING",
+    "RUNNING",
+    "SUCCEEDED",
+    "DEGRADED",
+    "SKIPPED",
+    "FAILED",
+]
 RunStatus = Literal["RUNNING", "SUCCEEDED", "DEGRADED", "FAILED"]
 StepClassification = Literal["required", "optional"]
 
@@ -47,6 +54,16 @@ _SECRET_KV_RE = re.compile(
     r"(\s*[:=]\s*)"
     r"(['\"]?)"
     r"([^\s&'\",;]+)"
+    r"\3"
+)
+
+# Tenant IDs are not authentication secrets, but deploy journals deliberately
+# omit them so local run history does not persist tenant identifiers.
+_TENANT_KV_RE = re.compile(
+    r"(?i)\b(tenant[-_]?id)"
+    r"(\s*[:=]\s*)"
+    r"(['\"]?)"
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
     r"\3"
 )
 
@@ -76,6 +93,7 @@ def _redact(message: str | None) -> str | None:
     flat = _BEARER_RE.sub("Bearer [REDACTED]", flat)
     flat = _JWT_RE.sub("[REDACTED]", flat)
     flat = _SECRET_KV_RE.sub(_redact_kv, flat)
+    flat = _TENANT_KV_RE.sub(_redact_kv, flat)
     return flat[:_MAX_ERROR_LENGTH]
 
 
@@ -91,6 +109,7 @@ class JournalStep:
     ended_at: str | None = None
     exit_code: int | None = None
     error: str | None = None
+    evidence_path: str | None = None
 
 
 @dataclass
@@ -103,6 +122,7 @@ class DeployJournal:
     started_at: str
     updated_at: str
     targets: dict[str, str] = field(default_factory=dict)
+    manifest: dict[str, object] = field(default_factory=dict)
     steps: list[JournalStep] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
@@ -113,6 +133,7 @@ class DeployJournal:
             "started_at": self.started_at,
             "updated_at": self.updated_at,
             "targets": dict(self.targets),
+            "manifest": dict(self.manifest),
             "steps": [asdict(step) for step in self.steps],
         }
 
@@ -122,7 +143,12 @@ def journal_path(repo_root: Path, env: str) -> Path:
     return repo_root / "deploy" / ".generated" / env / "deploy-run.json"
 
 
-def start_run(env: str, targets: dict[str, str]) -> DeployJournal:
+def start_run(
+    env: str,
+    targets: dict[str, str],
+    *,
+    manifest: dict[str, object] | None = None,
+) -> DeployJournal:
     """Begin a new run with a unique id; `targets` must hold no secrets."""
     now = _utc_now()
     return DeployJournal(
@@ -132,16 +158,25 @@ def start_run(env: str, targets: dict[str, str]) -> DeployJournal:
         started_at=now,
         updated_at=now,
         targets=dict(targets),
+        manifest=dict(manifest or {}),
     )
 
 
-def add_step(journal: DeployJournal, step_id: str, description: str, *, required: bool) -> None:
+def add_step(
+    journal: DeployJournal,
+    step_id: str,
+    description: str,
+    *,
+    required: bool,
+    evidence_path: str | None = None,
+) -> None:
     """Register a step as PENDING before it runs."""
     journal.steps.append(
         JournalStep(
             step_id=step_id,
             description=description,
             classification="required" if required else "optional",
+            evidence_path=evidence_path,
         )
     )
 
@@ -168,6 +203,22 @@ def mark_succeeded(journal: DeployJournal, step_id: str, *, exit_code: int = 0) 
     step = _find_step(journal, step_id)
     step.status = "SUCCEEDED"
     step.exit_code = exit_code
+    step.ended_at = _utc_now()
+
+
+def mark_degraded(
+    journal: DeployJournal,
+    step_id: str,
+    *,
+    exit_code: int = 3,
+    reason: str | None = None,
+) -> None:
+    """Record a completed verification whose optional evidence is degraded."""
+
+    step = _find_step(journal, step_id)
+    step.status = "DEGRADED"
+    step.exit_code = exit_code
+    step.error = _redact(reason)
     step.ended_at = _utc_now()
 
 
@@ -203,7 +254,11 @@ def compute_status(journal: DeployJournal) -> RunStatus:
         return "FAILED"
     if any(s.status in ("PENDING", "RUNNING") for s in journal.steps):
         return "RUNNING"
-    if any(s.status == "FAILED" and s.classification == "optional" for s in journal.steps):
+    if any(
+        s.status == "DEGRADED"
+        or (s.status == "FAILED" and s.classification == "optional")
+        for s in journal.steps
+    ):
         return "DEGRADED"
     return "SUCCEEDED"
 

@@ -13,6 +13,8 @@ import pytest
 
 from deploy.scripts import _workspace_wait
 
+TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
 
 class _FakeToken:
     token = "unused-in-tests"  # noqa: S105 - not a real credential
@@ -117,16 +119,43 @@ def test_wait_for_workspace_absence_is_case_insensitive(monkeypatch) -> None:
         )
 
 
+def test_wait_for_workspace_absence_uses_bearer_header() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get(url, *, headers, params, timeout):
+        captured.update(
+            url=url,
+            headers=headers,
+            params=params,
+            timeout=timeout,
+        )
+        return _FakeResponse([])
+
+    _workspace_wait.wait_for_workspace_absence(
+        "retail-demo-dev",
+        credential=_FakeCredential(),
+        timeout_seconds=1,
+        poll_interval_seconds=1,
+        sleep=lambda _s: None,
+        clock=lambda: 0.0,
+        http_get=fake_get,
+    )
+
+    assert captured["headers"] == {
+        "Authorization": "Bearer unused-in-tests"
+    }
+
+
 def test_wait_for_workspace_absence_builds_credential_for_selected_auth_mode(
     monkeypatch,
 ) -> None:
     """The polling helper must honor `auth_mode`, never silently using a
     different login (e.g. Azure CLI when `azure_powershell` is configured)."""
 
-    seen_modes = []
+    seen: list[tuple[str, str | None]] = []
 
     def fake_build_credential(auth_mode: str, **_kwargs):
-        seen_modes.append(auth_mode)
+        seen.append((auth_mode, _kwargs.get("tenant_id")))
         return _FakeCredential()
 
     monkeypatch.setattr(_workspace_wait, "build_credential", fake_build_credential)
@@ -137,13 +166,14 @@ def test_wait_for_workspace_absence_builds_credential_for_selected_auth_mode(
     _workspace_wait.wait_for_workspace_absence(
         "retail-demo-dev",
         auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
         timeout_seconds=5,
         poll_interval_seconds=1,
         sleep=lambda _s: None,
         clock=lambda: 0.0,
     )
 
-    assert seen_modes == ["azure_powershell"]
+    assert seen == [("azure_powershell", TENANT_ID)]
 
 
 def test_wait_for_workspace_absence_rejects_unsupported_auth_mode() -> None:

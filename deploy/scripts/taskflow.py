@@ -18,8 +18,8 @@ Because those GUIDs are workspace-specific, ``export_taskflow`` resolves each GU
 to the artifact's display name (a portable form), and ``deploy_taskflow`` resolves
 the names back to the **target** workspace's GUIDs before saving.
 
-Auth uses the Azure CLI login: the metadata cluster needs a Power BI token and
-item listing needs a Fabric token.
+Auth uses the configured operator login: the metadata cluster needs a Power BI
+token and item listing needs a Fabric token.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
 from deploy.scripts._auth import AUTH_MODES, build_credential
+from deploy.scripts.fabric_runtime import paginated_get
 
 if TYPE_CHECKING:
     import requests
@@ -62,16 +63,22 @@ ARTIFACT_TO_ITEM_TYPE = {
     "Report": "Report",
     "dataset": "SemanticModel",
 }
+TERRAFORM_ITEM_OUTPUTS = {
+    "Lakehouse": "lakehouse_id",
+    "Eventhouse": "eventhouse_id",
+    "KQLDatabase": "kql_database_id",
+}
 
 
 def _credential(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> TokenCredential:
     """Return an injected credential or construct the configured operator login."""
 
-    return credential or build_credential(auth_mode)
+    return credential or build_credential(auth_mode, tenant_id=tenant_id)
 
 
 def _token(scope: str, credential: TokenCredential) -> str:
@@ -85,7 +92,7 @@ def _token(scope: str, credential: TokenCredential) -> str:
         lambda: credential.get_token(scope).token,
         retry_on=(ClientAuthenticationError,),
         on_retry=lambda n, exc: console.warn(
-            f"Azure CLI token attempt {n} failed ({type(exc).__name__}); retrying..."
+            f"Operator token attempt {n} failed ({type(exc).__name__}); retrying..."
         ),
     )
 
@@ -109,10 +116,8 @@ def resolve_cluster(pbi_session: requests.Session) -> str:
 def find_workspace_id(fabric_session: requests.Session, workspace_name: str) -> str:
     """Resolve a workspace display name to its id (case-insensitive)."""
 
-    response = fabric_session.get(f"{FABRIC_API}/workspaces")
-    response.raise_for_status()
     target = workspace_name.casefold()
-    for workspace in response.json().get("value", []):
+    for workspace in paginated_get(fabric_session, f"{FABRIC_API}/workspaces"):
         if str(workspace.get("displayName", "")).casefold() == target:
             return str(workspace["id"])
     raise ValueError(f"Workspace not found: {workspace_name!r}")
@@ -123,9 +128,10 @@ def list_workspace_items(
 ) -> list[dict[str, Any]]:
     """List all items in a workspace."""
 
-    response = fabric_session.get(f"{FABRIC_API}/workspaces/{workspace_id}/items")
-    response.raise_for_status()
-    return response.json().get("value", [])
+    return paginated_get(
+        fabric_session,
+        f"{FABRIC_API}/workspaces/{workspace_id}/items",
+    )
 
 
 def get_taskflow(
@@ -237,16 +243,19 @@ def to_portable(
 
 
 def to_workspace(
-    portable: dict[str, Any], name_type_to_guid: dict[tuple[str, str], str]
+    portable: dict[str, Any],
+    name_type_to_guid: dict[tuple[str, str], str],
+    item_type_to_guid: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Resolve portable item names to target GUIDs. Returns (task_flow, unresolved).
+    """Resolve portable items to target GUIDs. Returns (task_flow, unresolved).
 
-    Items that can't be resolved to a target-workspace GUID are dropped from
-    their task (the server rejects references to non-existent artifacts) and
-    reported in the returned ``unresolved`` list.
+    Terraform-owned item types use their supplied IDs without a name lookup.
+    Other items resolve by type and display name. Unresolved items are dropped
+    because the server rejects references to non-existent artifacts.
     """
 
     resolved = json.loads(json.dumps(portable))
+    item_type_to_guid = item_type_to_guid or {}
     unresolved: list[str] = []
     for task in resolved.get("tasks", []):
         kept_items: list[dict[str, Any]] = []
@@ -254,7 +263,9 @@ def to_workspace(
             artifact_type = str(item.get("artifactType", ""))
             name = item.get("artifactName")
             item_type = ARTIFACT_TO_ITEM_TYPE.get(artifact_type, artifact_type)
-            guid = name_type_to_guid.get((item_type, name)) if name else None
+            guid = item_type_to_guid.get(item_type)
+            if not guid and name:
+                guid = name_type_to_guid.get((item_type, name))
             if guid:
                 item["artifactUniqueId"] = f"{artifact_type}:{guid}"
                 item["artifactObjectId"] = guid
@@ -266,16 +277,96 @@ def to_workspace(
     return resolved, unresolved
 
 
+def filter_portable_items(
+    portable: dict[str, Any],
+    allowed_artifacts: set[tuple[str, str]],
+) -> dict[str, Any]:
+    """Keep only task-flow item references selected by the deployment profile."""
+
+    filtered = json.loads(json.dumps(portable))
+    for task in filtered.get("tasks", []):
+        task["items"] = [
+            item
+            for item in task.get("items", [])
+            if (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            in allowed_artifacts
+        ]
+    return filtered
+
+
+def profile_taskflow_artifacts(
+    repo_root: Path,
+    config: Any,
+) -> set[tuple[str, str]]:
+    """Return exact portable task-flow references selected by a profile."""
+
+    from deploy.scripts.build_artifacts import ML_EXPERIMENT_GROUPS
+    from deploy.scripts.deploy_config import ONTOLOGY_ITEM_NAME
+    from deploy.scripts.profile_preflight import selected_notebook_names
+
+    profile = config.profile
+    allowed = {
+        ("SynapseNotebook", name)
+        for name in selected_notebook_names(profile)
+    }
+    allowed.update(
+        ("Pipeline", Path(pipeline_ref).stem)
+        for pipeline_ref in profile.pipeline_refs
+    )
+    if profile.selects("asset.lakehouse"):
+        allowed.update(
+            {
+                ("Lakehouse", config.lakehouse.name),
+                ("SqlAnalyticsEndpoint", config.lakehouse.name),
+            }
+        )
+    if profile.provisions_eventhouse:
+        allowed.update(
+            {
+                ("KustoEventHouse", config.eventhouse.name),
+                ("KustoDatabase", config.eventhouse.kql_database_name),
+            }
+        )
+    if profile.selects("asset.semantic-model"):
+        allowed.add(("dataset", config.powerbi.semantic_model_name))
+    if profile.selects("asset.report"):
+        allowed.add(("Report", config.powerbi.report_name))
+    if profile.selects("asset.ml-notebooks"):
+        allowed.update(
+            ("MLExperiment", name)
+            for group in profile.notebook_groups
+            for name in ML_EXPERIMENT_GROUPS.get(group, ())
+        )
+    if profile.selects("asset.ontology"):
+        allowed.add(("Ontology", ONTOLOGY_ITEM_NAME))
+    if profile.selects("asset.data-agents"):
+        allowed.update(
+            ("LLMPlugin", path.stem)
+            for path in (repo_root / "fabric" / "data-agents").glob("*.DataAgent")
+        )
+    if profile.selects("asset.kql-queryset"):
+        allowed.add(("KQLQueryset", "retail_querysets"))
+    return allowed
+
+
 def export_taskflow(
     workspace: str,
     output_path: Path = DEFAULT_TASKFLOW_PATH,
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> Path:
     """Export a workspace task flow to a portable JSON file (artifacts by name)."""
 
-    credential = _credential(credential, auth_mode=auth_mode)
+    credential = _credential(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
     workspace_id = (
@@ -302,11 +393,20 @@ def deploy_taskflow(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
+    item_type_to_guid: dict[str, str] | None = None,
+    allowed_artifacts: set[tuple[str, str]] | None = None,
 ) -> list[str]:
     """Deploy a portable task flow to a workspace. Returns unresolved references."""
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
-    credential = _credential(credential, auth_mode=auth_mode)
+    if allowed_artifacts is not None:
+        portable = filter_portable_items(portable, allowed_artifacts)
+    credential = _credential(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
     workspace_id = (
@@ -318,7 +418,16 @@ def deploy_taskflow(
     name_type_to_guid = {
         (str(i["type"]), str(i.get("displayName", ""))): str(i["id"]) for i in items
     }
-    task_flow, unresolved = to_workspace(portable, name_type_to_guid)
+    task_flow, unresolved = to_workspace(
+        portable,
+        name_type_to_guid,
+        item_type_to_guid,
+    )
+    if unresolved:
+        raise ValueError(
+            "Selected task-flow references are unresolved: "
+            + ", ".join(sorted(unresolved))
+        )
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
@@ -333,37 +442,128 @@ def _looks_like_guid(value: str) -> bool:
     return len(value) == 36 and value.count("-") == 4
 
 
+def terraform_taskflow_targets(
+    output_path: Path,
+    *,
+    config: Any | None = None,
+) -> tuple[str, dict[str, str]]:
+    """Load the workspace and Terraform-owned item IDs for task-flow deployment."""
+
+    from deploy.scripts.deploy_config import (
+        load_terraform_outputs,
+        validate_terraform_outputs,
+    )
+
+    outputs = load_terraform_outputs(output_path)
+    if config is not None:
+        validate_terraform_outputs(config, outputs)
+    workspace_id = outputs.get("workspace_id")
+    if not workspace_id:
+        raise ValueError(f"workspace_id missing from {output_path}")
+
+    item_ids: dict[str, str] = {}
+    for item_type, output_name in TERRAFORM_ITEM_OUTPUTS.items():
+        item_id = outputs.get(output_name)
+        if not item_id:
+            raise ValueError(f"{output_name} missing from {output_path}")
+        item_ids[item_type] = str(item_id)
+    return str(workspace_id), item_ids
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Export or deploy a Fabric Task Flow")
     parser.add_argument("action", choices=["export", "deploy"])
-    parser.add_argument("--workspace", required=True, help="Workspace name or id.")
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--workspace", help="Workspace name or id (manual mode).")
+    target.add_argument(
+        "--terraform-output",
+        type=Path,
+        help=(
+            "Terraform output JSON providing the workspace and Terraform-owned "
+            "item IDs."
+        ),
+    )
     parser.add_argument("--path", type=Path, default=DEFAULT_TASKFLOW_PATH)
+    parser.add_argument(
+        "--environment",
+        help="Configured environment required for profile-aware task-flow deploy.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="Expected executable deployment profile.",
+    )
     parser.add_argument(
         "--auth-mode",
         choices=AUTH_MODES,
-        default="azure_cli",
+        default=None,
         help="Operator credential used for Power BI and Fabric requests.",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
     )
     args = parser.parse_args()
 
     if args.action == "export":
+        workspace = args.workspace
+        if args.terraform_output:
+            workspace, _item_ids = terraform_taskflow_targets(
+                args.terraform_output
+            )
+        if workspace is None:
+            raise ValueError("A workspace name, ID, or Terraform output is required")
         out = export_taskflow(
-            args.workspace,
+            workspace,
             args.path,
-            auth_mode=args.auth_mode,
+            auth_mode=args.auth_mode or "azure_cli",
+            tenant_id=args.tenant_id,
         )
         console.info(f"Exported task flow to {out}")
     else:
-        unresolved = deploy_taskflow(
-            args.workspace,
+        if not args.environment or not args.profile:
+            raise ValueError(
+                "task-flow deploy requires --environment and --profile; "
+                "unscoped legacy deployment is unsupported"
+            )
+        from deploy.scripts.deploy_config import load_environment
+
+        config = load_environment(args.environment)
+        if config.deployment.profile != args.profile:
+            raise ValueError(
+                f"--profile {args.profile!r} does not match configured profile "
+                f"{config.deployment.profile!r}"
+            )
+        if not config.profile.deploys_task_flow:
+            raise ValueError(
+                f"profile {args.profile!r} does not select task-flow deployment"
+            )
+        configured_tenant = getattr(config, "tenant_id", None)
+        if (
+            args.tenant_id
+            and configured_tenant
+            and args.tenant_id.casefold() != configured_tenant.casefold()
+        ):
+            raise ValueError("--tenant-id does not match the configured tenant")
+        auth_mode = args.auth_mode or getattr(config, "auth_mode", "azure_cli")
+        tenant_id = args.tenant_id or configured_tenant
+        workspace = args.workspace
+        item_type_to_guid = None
+        if args.terraform_output:
+            workspace, item_type_to_guid = terraform_taskflow_targets(
+                args.terraform_output,
+                config=config,
+            )
+        if workspace is None:
+            raise ValueError("A workspace name, ID, or Terraform output is required")
+        deploy_taskflow(
+            workspace,
             args.path,
-            auth_mode=args.auth_mode,
+            auth_mode=auth_mode,
+            tenant_id=tenant_id,
+            item_type_to_guid=item_type_to_guid,
+            allowed_artifacts=profile_taskflow_artifacts(REPO_ROOT, config),
         )
         console.info("Deployed task flow.")
-        if unresolved:
-            console.warn("Unresolved references (left unbound):")
-            for ref in unresolved:
-                console.detail(ref)
     return 0
 
 

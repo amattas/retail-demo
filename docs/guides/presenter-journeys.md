@@ -39,8 +39,9 @@ The following surfaces are not part of these reproducible core journeys:
   ([ENH-001](../design/requirements/modules/analytics/backlog.md#enh-001)).
 - Ontology and agent experiences require their capability, source, and access
   gates; the journeys do not depend on conversational answers.
-- ML output remains optional until its trust gates pass
-  ([IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)).
+- Core journeys exclude ML. Reporting profiles fail closed on the required ML
+  contract, but a fresh live validation run remains
+  [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008).
 - Pricing actions and writeback remain optional
   ([ENH-002](../design/requirements/modules/power-bi/backlog.md#enh-002)).
 - Marketing attribution and ROAS are contract-tested but remain outside the

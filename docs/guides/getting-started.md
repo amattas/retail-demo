@@ -16,20 +16,16 @@ recovery, use the [deployment guide](deployment.md).
 
 ## What the supported path creates
 
-The default deployment currently includes more than the minimum historical
-demo:
+The default `core` profile creates the smallest supported path: a Fabric
+workspace, schema-enabled Lakehouse, Lakehouse shell, and four rendered
+historical setup notebooks. The operator runs setup 01 through 04 in order.
 
-- a Fabric workspace, schema-enabled Lakehouse, Eventhouse, and default KQL
-  database;
-- rendered setup and streaming notebooks;
-- data pipelines, KQL scripts, querysets, a Direct Lake semantic model, and a
-  report;
-- ML notebooks, ontology creation, Data Agent sources, and a manual reset
-  notebook.
-
-Setup notebooks 01 through 04 create the core historical data. Live streaming,
-ML, ontology, agents, dashboards, and rules have separate readiness or manual
-steps.
+`standard` is the supported opt-in Eventhouse, streaming, pipeline, required
+ML, Direct Lake semantic-model, and report path. `full-demo` adds acknowledged
+preview and manual surfaces. No profile deploys the reset notebook or starts
+the long-running stream automatically. Choose with `--profile`; see the
+[canonical workspace and profile inventory](workspace-inventory.md) before
+selecting an opt-in profile.
 
 ## 1. Check prerequisites
 
@@ -46,20 +42,19 @@ The Windows and macOS/Linux wrappers can prepare Python and offer to install
 Git, Terraform, and Azure CLI with a detected package manager. Install them
 manually when the package manager cannot provide a supported package.
 
-The lower-level deploy framework also supports Azure PowerShell authentication.
-The guided bootstrap still checks for Azure CLI, so use the
+The lower-level deploy framework supports Azure PowerShell authentication for
+Python Fabric clients, not for the Terraform provider. Use validated
+`--skip-terraform` outputs or configure a provider-supported credential. The
+guided bootstrap still checks for Azure CLI, so use the
 [manual deployment path](deployment.md#authentication) for an Azure
 PowerShell-only workstation.
 
 ### Capacity and Spark choice
 
-The committed configuration enables a custom Spark pool sized for an F64
-capacity. The custom-pool resource uses Fabric provider preview support.
-
-- Choose the starter pool for the broadest compatibility.
-- Choose the custom pool only when the target capacity and tenant support it.
-- Start with a small history window and store count, then scale after measuring
-  the setup run.
+The committed default disables the custom Spark pool. `core` and `standard`
+use the workspace starter pool. Only `full-demo` selects the source-defined
+custom pool and requires an explicit capacity acknowledgement. Start with a
+small history window and store count, then scale after measuring the setup run.
 
 ## 2. Clone the repository
 
@@ -90,37 +85,41 @@ Use this path for a first deployment.
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --workspace-name retail-demo-alice
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice --profile core
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --workspace-name retail-demo-alice
+    ./scripts/setup.sh --workspace-name retail-demo-alice --profile core
     ```
 
 The wrapper:
 
 1. uses or creates a Python environment;
 2. checks Git, Terraform, and Azure CLI;
-3. installs `retail-setup`, `azure-identity`, `azure-kusto-data`, and
-   `fabric-cicd`;
+3. installs `retail-setup`, `azure-identity`, `azure-kusto-data`,
+   `fabric-cicd`, and `pyodbc`;
 4. runs interactive configuration;
 5. renders five workspace-specific notebooks;
 6. offers to deploy.
+
+Install Microsoft ODBC Driver 17 or 18 for SQL Server separately before live
+readiness verification. It is an operating-system prerequisite and is not
+installed by the Python dependency set.
 
 To proceed directly to the deploy phase after configuration:
 
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice --profile core --deploy
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --workspace-name retail-demo-alice --deploy
+    ./scripts/setup.sh --workspace-name retail-demo-alice --profile core --deploy
     ```
 
 Useful bootstrap flags:
@@ -128,6 +127,7 @@ Useful bootstrap flags:
 | Flag | Behavior |
 | --- | --- |
 | `--workspace-name <name>` | Names the Fabric workspace and derives its local environment key. |
+| `--profile <name>` | Selects `core`, `standard`, or `full-demo`; defaults to `core`. |
 | `--deploy` | Runs deploy after configure and render. |
 | `--dry-run` | Previews setup-engine commands; the wrapper may still prepare or activate Python first. |
 | `--skip-prereqs` | Skips package-manager installation of Git, Terraform, and Azure CLI. |
@@ -161,7 +161,7 @@ Use this path when you want to run each command explicitly.
 Interactive configuration:
 
 ```powershell
-retail-setup configure --workspace-name retail-demo-alice
+retail-setup configure --workspace-name retail-demo-alice --profile core
 ```
 
 Review these choices:
@@ -173,7 +173,7 @@ Review these choices:
 | Capacity | The capacity must be active and usable by the deploy operator. |
 | Lakehouse | Keep the default unless another checked-in binding requires a deliberate rename. |
 | Eventhouse and KQL database | Use the same name. The supported topology uses the default KQL database created with the Eventhouse. |
-| Spark pool | Prefer the starter pool unless the F64-oriented preview custom pool is intentional. |
+| Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` selects the acknowledged custom pool. |
 | Store type | `supercenter`, `grocery`, `hardware`, or `luxury`. |
 | History | `--months` defines a range ending yesterday. |
 | Store count and seed | Control scale and deterministic reproduction. |
@@ -188,11 +188,11 @@ Non-interactive starter-pool example:
     retail-setup configure `
       --tenant-id 00000000-0000-0000-0000-000000000000 `
       --workspace-name retail-demo-alice `
+      --profile core `
       --capacity-name my-fabric-capacity `
       --lakehouse-name retail_lakehouse `
       --eventhouse-name retail_eventhouse `
       --kql-database-name retail_eventhouse `
-      --no-custom-spark-pool `
       --store-type supercenter `
       --months 1 `
       --store-count 10 `
@@ -205,11 +205,11 @@ Non-interactive starter-pool example:
     retail-setup configure \
       --tenant-id 00000000-0000-0000-0000-000000000000 \
       --workspace-name retail-demo-alice \
+      --profile core \
       --capacity-name my-fabric-capacity \
       --lakehouse-name retail_lakehouse \
       --eventhouse-name retail_eventhouse \
       --kql-database-name retail_eventhouse \
-      --no-custom-spark-pool \
       --store-type supercenter \
       --months 1 \
       --store-count 10 \
@@ -252,9 +252,11 @@ Always preview the command plan:
 retail-setup deploy --env alice --dry-run
 ```
 
-The dry run does not authenticate, contact Fabric, run Terraform, or prove that
-the target exists. Confirm the environment, workspace, Terraform variable file,
-notebook groups, auth mode, and KQL target in the printed plan.
+The dry run validates existing configuration and the Terraform authentication
+boundary, but does not authenticate, contact Fabric, run Terraform, or prove
+that the target exists. With `--skip-terraform`, it also validates the captured
+outputs. Confirm the environment, workspace, Terraform variable file, notebook
+groups, auth mode, and KQL target in the printed plan.
 
 Run an interactive deployment:
 
@@ -268,9 +270,10 @@ Or pre-confirm the Terraform apply gate:
 retail-setup deploy --env alice --yes
 ```
 
-`--yes` does not start the setup pipeline automatically because it suppresses
-the post-deploy prompt. Run the pipeline or the core notebooks in the next
-step.
+For `core`, `--yes` only pre-confirms the Terraform apply gate; setup remains
+an operator-run notebook sequence. For Reporting profiles, deployment still
+runs and waits for the required setup and ML gates. `--yes` never bypasses
+those gates.
 
 See [Deployment](deployment.md) before using `--skip-terraform`, `--recreate`,
 an existing workspace, Azure PowerShell authentication, or repeated
@@ -288,45 +291,46 @@ the smallest supported path and creates:
 - Silver schema `ag`: seven dimensions, nineteen fact tables, and run metadata;
 - Gold schema `au`: ten aggregate tables.
 
-### Full setup pipeline
+### Reporting profiles
 
-Run `setup-pipeline` from the Fabric workspace when you also want the checked-in
-ML notebooks and ontology creation. The pipeline is asynchronous and can take
-from several minutes to more than an hour depending on history, store count,
-capacity, and Spark configuration.
+`retail-setup deploy` automatically waits for `setup-pipeline` and
+`ml-required` when `standard` or `full-demo` is selected. The required ML
+validator must succeed before the semantic model and report publish. Use at
+least 12 months of configured history. Ontology remains a separate
+preview/manual step.
 
-You can also trigger it from the repository after a successful Terraform
-deployment:
+You can retry setup deliberately from the repository:
 
 ```powershell
 python -m deploy.scripts.run_pipeline `
   --environment alice `
   --pipeline setup-pipeline `
-  --auth-mode azure_cli
+  --auth-mode azure_cli `
+  --wait
 ```
 
-Monitor the Fabric run history. A successful trigger is not proof that every
-activity completed.
+Monitor the exact Fabric run and retain its run ID.
 
-## 8. Validate the core workspace
+## 8. Validate the selected workspace
 
 Before using the demo:
 
-1. Confirm `retail_lakehouse` and `retail_eventhouse` exist in the intended
-   workspace.
+1. Confirm the profile-selected inventory exists in the intended workspace.
+   `core` includes a Lakehouse but excludes Eventhouse, KQL, ML, and Reporting.
 2. Confirm setup notebooks or `setup-pipeline` completed successfully.
 3. Confirm the `ag` and `au` schemas and expected tables are populated.
 4. Inspect `setup_run_log` and retain the successful run identifier.
-5. Confirm the KQL database contains the numbered tables, functions, and
-   materialized views.
-6. Confirm the semantic model is bound to the intended Lakehouse before opening
-   the report.
+5. For `standard` or `full-demo`, confirm the KQL database contains the selected
+   tables, functions, mappings, and materialized views.
+6. For a Reporting profile, confirm the semantic model is bound to the intended
+   Lakehouse before opening the report.
 7. Skip ML, ontology, agent, dashboard, or rule surfaces that have not passed
    their separate readiness checks.
 
 Local `validate_deployment.py` output validates generated files, not live
-workspace usability. Use the [operations guide](operations.md) for live
-readiness and recovery.
+workspace usability. Run `retail-setup verify --env alice` after the
+selected workloads, and use the [operations guide](operations.md) for evidence
+and recovery.
 
 ## 9. Start an optional bounded stream
 
@@ -360,6 +364,8 @@ shortcuts, source tables, and watermarks are ready.
 ## Next steps
 
 - [Deployment](deployment.md): update, recreate, or troubleshoot the workspace.
+- [Workspace and profile inventory](workspace-inventory.md): check exact
+  counts, folders, support, and manual boundaries.
 - [Deployed walkthrough](deployed-walkthrough.md): tour the deployed assets.
 - [Presenter demo](demo-script.md): prepare a defensible presentation.
 - [Operations](operations.md): monitor freshness and recover failures.

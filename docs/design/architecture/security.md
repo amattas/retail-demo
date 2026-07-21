@@ -43,7 +43,10 @@ flowchart LR
 
 ## Identities
 
-- Deploy-time operations use an Azure CLI or Azure PowerShell operator identity.
+- Python deploy-time operations use an Azure CLI or Azure PowerShell operator
+  identity. Terraform uses Azure CLI or an explicitly configured
+  provider-supported service-principal, OIDC, or managed-identity credential;
+  it cannot consume an Azure PowerShell session.
 - KQL schema application runs from the local deploy process.
 - The streaming notebook uses its Fabric runtime identity and needs ingestion
   rights on the target KQL database.
@@ -70,7 +73,8 @@ are not part of the default release.
 ## Current gaps
 
 - Deployment token/target handling has open defects.
-- Environment isolation and live readiness are incomplete.
+- Live readiness controls are implemented locally; actual target execution and
+  evidence remain outstanding.
 - Required live writes can currently fail without failing the micro-batch.
 
 See [access control](../specifications/modules/security/access-control.md) and

@@ -26,12 +26,30 @@ FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 FABRIC_API = "https://api.fabric.microsoft.com/v1"
 
 
-def collect_kql_scripts(source_dir: Path = KQL_SOURCE_DIR) -> list[Path]:
+def collect_kql_scripts(
+    source_dir: Path = KQL_SOURCE_DIR,
+    script_names: tuple[str, ...] | list[str] | None = None,
+) -> list[Path]:
     """Collect ordered KQL scripts from the source directory."""
 
     if not source_dir.exists():
         raise FileNotFoundError(f"KQL source directory not found: {source_dir}")
-    scripts = sorted(source_dir.glob("*.kql"))
+    if script_names is None:
+        scripts = sorted(source_dir.glob("*.kql"))
+    else:
+        if len(script_names) != len(set(script_names)):
+            raise ValueError("KQL script selection contains duplicates")
+        invalid = [
+            name
+            for name in script_names
+            if Path(name).name != name or not name.endswith(".kql")
+        ]
+        if invalid:
+            raise ValueError(f"Invalid KQL script names: {invalid}")
+        scripts = [source_dir / name for name in script_names]
+        missing = [path.name for path in scripts if not path.is_file()]
+        if missing:
+            raise FileNotFoundError(f"Selected KQL scripts not found: {missing}")
     if not scripts:
         raise ValueError(f"No KQL scripts found in {source_dir}")
     return scripts
@@ -57,10 +75,11 @@ def _credential(
     credential: TokenCredential | None = None,
     *,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> TokenCredential:
     """Return an injected credential or construct the configured operator login."""
 
-    return credential or build_credential(auth_mode)
+    return credential or build_credential(auth_mode, tenant_id=tenant_id)
 
 
 def resolve_kql_database(
@@ -160,11 +179,16 @@ def apply_to_database(
     kql_database_id: str,
     kql_database_name: str | None = None,
     auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
     credential: TokenCredential | None = None,
 ) -> int:
     """Resolve the KQL database and apply the combined script. Returns row count."""
 
-    credential = _credential(credential, auth_mode=auth_mode)
+    credential = _credential(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     query_uri, resolved_name = resolve_kql_database(
         workspace_id, kql_database_id, credential
     )
@@ -217,6 +241,10 @@ def main() -> int:
         help="Read workspace/database ids from deploy/.generated/<env>/terraform-output.json.",
     )
     parser.add_argument(
+        "--profile",
+        help="Expected executable profile; must match --environment configuration.",
+    )
+    parser.add_argument(
         "--workspace-id", help="Fabric workspace id (overrides --environment)."
     )
     parser.add_argument(
@@ -229,12 +257,47 @@ def main() -> int:
     parser.add_argument(
         "--auth-mode",
         choices=AUTH_MODES,
-        default="azure_cli",
+        default=None,
         help="Operator credential used for Fabric and Kusto requests.",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
     )
     args = parser.parse_args()
 
-    script = build_database_script(collect_kql_scripts(args.source_dir))
+    selected_scripts = None
+    config = None
+    if args.environment:
+        from deploy.scripts.deploy_config import load_environment
+
+        config = load_environment(args.environment)
+        if args.profile and args.profile != config.deployment.profile:
+            raise SystemExit(
+                f"--profile {args.profile!r} does not match configured profile "
+                f"{config.deployment.profile!r}"
+            )
+        selected_scripts = config.profile.kql_scripts
+    elif args.profile:
+        from retail_setup.contracts import load_repository_manifest, resolve_profile
+
+        manifest, validation = load_repository_manifest(REPO_ROOT)
+        selected_scripts = resolve_profile(
+            manifest,
+            validation,
+            args.profile,
+        ).kql_scripts
+    if args.execute and not args.environment and not args.profile:
+        raise SystemExit(
+            "--execute requires --environment or --profile so KQL selection "
+            "cannot bypass the deployment inventory"
+        )
+    if args.execute and not selected_scripts:
+        raise SystemExit("selected deployment profile does not include Eventhouse KQL")
+
+    script = build_database_script(
+        collect_kql_scripts(args.source_dir, selected_scripts)
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(script, encoding="utf-8")
     console.info(f"Wrote combined KQL script to {args.output}")
@@ -245,11 +308,39 @@ def main() -> int:
     workspace_id = args.workspace_id
     kql_database_id = args.kql_database_id
     kql_database_name = args.kql_database_name
-    if (not workspace_id or not kql_database_id) and args.environment:
+    tenant_id = args.tenant_id
+    if args.environment:
+        from deploy.scripts.deploy_config import validate_terraform_outputs
+
+        assert config is not None
         outputs = _terraform_outputs(args.environment)
-        workspace_id = workspace_id or outputs.get("workspace_id")
-        kql_database_id = kql_database_id or outputs.get("kql_database_id")
-        kql_database_name = kql_database_name or outputs.get("kql_database_name")
+        validate_terraform_outputs(config, outputs)
+        expected_targets = {
+            "--workspace-id": (workspace_id, outputs.get("workspace_id")),
+            "--kql-database-id": (
+                kql_database_id,
+                outputs.get("kql_database_id"),
+            ),
+            "--kql-database-name": (
+                kql_database_name,
+                outputs.get("kql_database_name"),
+            ),
+            "--tenant-id": (tenant_id, config.tenant_id),
+        }
+        mismatches = [
+            option
+            for option, (provided, expected) in expected_targets.items()
+            if provided is not None and str(provided) != str(expected)
+        ]
+        if mismatches:
+            raise SystemExit(
+                "Explicit target option does not match the configured "
+                f"environment: {', '.join(mismatches)}"
+            )
+        workspace_id = outputs.get("workspace_id")
+        kql_database_id = outputs.get("kql_database_id")
+        kql_database_name = outputs.get("kql_database_name")
+        tenant_id = config.tenant_id
     if not workspace_id or not kql_database_id:
         raise SystemExit(
             "--execute requires --workspace-id and --kql-database-id, or "
@@ -261,7 +352,11 @@ def main() -> int:
         workspace_id=str(workspace_id),
         kql_database_id=str(kql_database_id),
         kql_database_name=kql_database_name and str(kql_database_name),
-        auth_mode=args.auth_mode,
+        auth_mode=(
+            args.auth_mode
+            or (config.auth_mode if config is not None else "azure_cli")
+        ),
+        tenant_id=tenant_id and str(tenant_id),
     )
     return 0
 

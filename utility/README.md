@@ -8,7 +8,7 @@ engine, notebook templates, dictionaries, and tests.
 ```powershell
 python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
 python -m pip install --no-deps -e .\utility
-retail-setup configure --workspace-name retail-demo-alice --months 3 --store-count 50 --seed 42
+retail-setup configure --workspace-name retail-demo-alice --profile core --months 3 --store-count 50 --seed 42
 retail-setup render --env alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice
@@ -37,6 +37,8 @@ notebook is optional and runs separately.
   [event contract](../docs/design/specifications/modules/streaming/event-contract.md)
 - Supported operator path:
   [getting started](../docs/guides/getting-started.md)
+- Canonical assets, profiles, folders, and support:
+  [workspace inventory](../docs/guides/workspace-inventory.md)
 - Deployment modes and recovery:
   [deployment guide](../docs/guides/deployment.md)
 

@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from retail_setup.contracts import (
+    ResolvedProfile,
+    load_repository_manifest,
+    resolve_profile,
+)
 
 from deploy.scripts import _output as console
 
@@ -30,12 +35,15 @@ DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
 DATA_AGENT_ONTOLOGY_ID = "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd"
 ONTOLOGY_ITEM_NAME = "RetailOntology_AutoGen"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
-_OUTPUT_ID_KEYS = (
+_BASE_OUTPUT_ID_KEYS = (
     "workspace_id",
     "lakehouse_id",
+)
+_EVENTHOUSE_OUTPUT_ID_KEYS = (
     "eventhouse_id",
     "kql_database_id",
 )
+_AUTH_MODES = {"azure_cli", "azure_powershell"}
 
 
 def environment_name_for_workspace(workspace_name: str) -> str:
@@ -76,6 +84,7 @@ class LakehouseConfig:
 class EventhouseConfig:
     """Fabric Eventhouse and KQL database deployment configuration."""
 
+    enabled: bool
     name: str
     minimum_consumption_units: str | None
     kql_database_name: str
@@ -120,6 +129,8 @@ class SparkConfig:
 class DeploymentConfig:
     """fabric-cicd deployment behavior."""
 
+    profile: str
+    available_item_types: list[str]
     item_types_in_scope: list[str]
     publish_skip: bool
     unpublish_skip: bool
@@ -142,6 +153,7 @@ class DeployConfig:
     powerbi: PowerBIConfig
     spark: SparkConfig
     deployment: DeploymentConfig
+    profile: ResolvedProfile
 
 
 @dataclass(frozen=True)
@@ -218,6 +230,10 @@ def load_environment(
         uuid.UUID(config.tenant_id)
     except ValueError as exc:
         raise ValueError("tenant_id must be a valid UUID") from exc
+    if config.auth_mode not in _AUTH_MODES:
+        raise ValueError(
+            "auth.mode must be 'azure_cli' or 'azure_powershell'"
+        )
     if config.workspace.existing_id is not None:
         try:
             uuid.UUID(config.workspace.existing_id)
@@ -240,6 +256,40 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     spark = data.get("spark", {})
     deployment = data.get("deployment", {})
     auth = data.get("auth", {})
+    if "include" in notebooks:
+        raise ValueError(
+            "notebooks.include is no longer supported; select deployment.profile "
+            "(core, standard, or full-demo)"
+        )
+
+    available_item_types = [
+        str(item)
+        for item in _as_list(
+            deployment.get("item_types_in_scope"),
+            "deployment.item_types_in_scope",
+        )
+    ]
+    configured_kql_scripts = [
+        str(item)
+        for item in _as_list(
+            eventhouse.get("kql_scripts"),
+            "eventhouse.kql_scripts",
+        )
+    ]
+    manifest, validation = load_repository_manifest(REPO_ROOT)
+    profile = resolve_profile(
+        manifest,
+        validation,
+        str(deployment.get("profile", "core")),
+        available_item_types=available_item_types,
+        configured_kql_scripts=configured_kql_scripts,
+    )
+    legacy_custom_pool = bool(spark.get("use_custom_pool", False))
+    if legacy_custom_pool and not profile.uses_custom_pool:
+        raise ValueError(
+            "spark.use_custom_pool is profile-controlled; select "
+            "deployment.profile: full-demo instead of using the legacy override"
+        )
 
     return DeployConfig(
         environment=str(data["environment"]),
@@ -264,23 +314,16 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             enable_schemas=bool(lakehouse.get("enable_schemas", True)),
         ),
         eventhouse=EventhouseConfig(
+            enabled=profile.provisions_eventhouse,
             name=str(eventhouse["name"]),
             minimum_consumption_units=_optional_string(
                 eventhouse.get("minimum_consumption_units")
             ),
             kql_database_name=str(eventhouse["kql_database_name"]),
-            kql_scripts=[
-                str(item)
-                for item in _as_list(
-                    eventhouse.get("kql_scripts"), "eventhouse.kql_scripts"
-                )
-            ],
+            kql_scripts=list(profile.kql_scripts),
         ),
         notebooks=NotebooksConfig(
-            include=[
-                str(item)
-                for item in _as_list(notebooks.get("include"), "notebooks.include")
-            ],
+            include=list(profile.notebook_groups),
             default_lakehouse_name=str(
                 notebooks.get("default_lakehouse_name", lakehouse["name"])
             ),
@@ -294,20 +337,16 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             refresh_after_deploy=bool(powerbi.get("refresh_after_deploy", False)),
         ),
         spark=SparkConfig(
-            use_custom_pool=bool(spark.get("use_custom_pool", False)),
+            use_custom_pool=profile.uses_custom_pool,
             custom_pool_name=str(spark.get("custom_pool_name", "retail_setup_pool")),
             node_size=str(spark.get("node_size", "Medium")),
             min_node_count=int(spark.get("min_node_count", 1)),
             max_node_count=int(spark.get("max_node_count", 10)),
         ),
         deployment=DeploymentConfig(
-            item_types_in_scope=[
-                str(item)
-                for item in _as_list(
-                    deployment.get("item_types_in_scope"),
-                    "deployment.item_types_in_scope",
-                )
-            ],
+            profile=profile.deployment_name,
+            available_item_types=available_item_types,
+            item_types_in_scope=list(profile.item_types_in_scope),
             publish_skip=bool(deployment.get("publish_skip", False)),
             unpublish_skip=bool(deployment.get("unpublish_skip", True)),
             orphan_exclude_regex=_optional_string(
@@ -320,6 +359,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
                 )
             ],
         ),
+        profile=profile,
     )
 
 
@@ -338,8 +378,18 @@ def _hcl_value(value: Any) -> str:
 def render_tfvars(config: DeployConfig) -> str:
     """Render Terraform variable values for an environment."""
 
+    if config.spark.use_custom_pool != config.profile.uses_custom_pool:
+        raise ValueError(
+            "spark.use_custom_pool must be derived from deployment.profile"
+        )
+    if config.eventhouse.enabled != config.profile.provisions_eventhouse:
+        raise ValueError(
+            "eventhouse.enabled must be derived from deployment.profile"
+        )
+
     values: dict[str, Any] = {
         "environment": config.environment,
+        "deployment_profile": config.deployment.profile,
         "workspace_name": config.workspace.name,
         "workspace_description": config.workspace.description,
         "skip_capacity_state_validation": (
@@ -348,9 +398,12 @@ def render_tfvars(config: DeployConfig) -> str:
         "role_assignments": config.workspace.role_assignments,
         "lakehouse_name": config.lakehouse.name,
         "lakehouse_enable_schemas": config.lakehouse.enable_schemas,
-        "eventhouse_name": config.eventhouse.name,
+        "eventhouse_enabled": config.eventhouse.enabled,
         "spark_custom_pool_enabled": config.spark.use_custom_pool,
+        "fabric_use_cli": config.auth_mode == "azure_cli",
     }
+    if config.eventhouse.enabled:
+        values["eventhouse_name"] = config.eventhouse.name
 
     # Pool sizing only matters when the custom pool is enabled; emit it then so
     # the default (starter-pool) tfvars stays minimal.
@@ -368,6 +421,8 @@ def render_tfvars(config: DeployConfig) -> str:
         "capacity_name": config.workspace.capacity_name,
         "eventhouse_minimum_consumption_units": (
             config.eventhouse.minimum_consumption_units
+            if config.eventhouse.enabled
+            else None
         ),
     }
     values.update(
@@ -410,7 +465,10 @@ def render_fabric_cicd_config(
     return rendered
 
 
-def collect_pipeline_notebook_refs(repo_root: Path = REPO_ROOT) -> dict[str, str]:
+def collect_pipeline_notebook_refs(
+    repo_root: Path = REPO_ROOT,
+    pipeline_refs: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, str]:
     """Map each pipeline ``notebookId`` GUID to its notebook display name.
 
     Scans ``fabric/pipelines/*.DataPipeline/pipeline-content.json``. The activity
@@ -423,9 +481,10 @@ def collect_pipeline_notebook_refs(repo_root: Path = REPO_ROOT) -> dict[str, str
     refs: dict[str, str] = {}
     if not pipelines_dir.is_dir():
         return refs
-    for content_path in sorted(
-        pipelines_dir.glob("*.DataPipeline/pipeline-content.json")
-    ):
+    selected = set(pipeline_refs) if pipeline_refs is not None else None
+    for content_path in sorted(pipelines_dir.glob("*.DataPipeline/pipeline-content.json")):
+        if selected is not None and content_path.parent.name not in selected:
+            continue
         content = json.loads(content_path.read_text(encoding="utf-8"))
         for activity in content.get("properties", {}).get("activities", []):
             if activity.get("type") != "TridentNotebook":
@@ -451,7 +510,12 @@ def render_parameter_file(
     )
 
     parameters: dict[str, Any] = {
-        "find_replace": [
+        "find_replace": [],
+        "key_value_replace": [],
+    }
+    if config.profile.selects("asset.semantic-model"):
+        parameters["find_replace"].extend(
+            [
             {
                 "find_value": (
                     r"(https://onelake\.dfs\.fabric\.microsoft\.com/"
@@ -473,21 +537,24 @@ def render_parameter_file(
                 "replace_value": {config.environment: f"DirectLake - {lakehouse_name}"},
                 "item_type": "SemanticModel",
             },
-        ],
-        "key_value_replace": [
+            ]
+        )
+    if config.profile.pipeline_refs:
+        parameters["key_value_replace"].append(
             {
                 "find_key": "$.properties.activities[*].typeProperties.workspaceId",
                 "replace_value": {config.environment: "$workspace.$id"},
                 "item_type": "DataPipeline",
-            },
-        ],
-    }
+            }
+        )
 
     # Each pipeline activity references its notebook by the source workspace's
     # notebookId GUID. Map every GUID to $items.Notebook.<name>.$id (resolved by
     # fabric-cicd to the deployed notebook) via a string find_replace, since a
     # single key_value_replace cannot map each activity to a different value.
-    for notebook_id, notebook_name in collect_pipeline_notebook_refs().items():
+    for notebook_id, notebook_name in collect_pipeline_notebook_refs(
+        pipeline_refs=config.profile.pipeline_refs
+    ).items():
         parameters["find_replace"].append(
             {
                 "find_value": notebook_id,
@@ -499,7 +566,7 @@ def render_parameter_file(
         )
 
     kql_database_id = terraform_outputs.get("kql_database_id")
-    if kql_database_id:
+    if config.profile.provisions_eventhouse and kql_database_id:
         parameters["find_replace"].append(
             {
                 "find_value": "FABRIC_KQL_DATABASE_RESOURCE_ID",
@@ -509,7 +576,7 @@ def render_parameter_file(
         )
 
     connection_id = config.powerbi.semantic_model_connection_id
-    if connection_id:
+    if connection_id and config.profile.selects("asset.semantic-model"):
         parameters["semantic_model_binding"] = {
             "models": [
                 {
@@ -523,8 +590,9 @@ def render_parameter_file(
     # artifacts by GUID. Remap them to target workspace items so agents bind in
     # the deployed workspace. The ontology item is created by 30-create-ontology,
     # so this replacement resolves once the ontology exists and deploy is rerun.
-    parameters["find_replace"].extend(
-        [
+    if config.profile.selects("asset.data-agents"):
+        parameters["find_replace"].extend(
+            [
             {
                 "find_value": DATA_AGENT_SOURCE_WORKSPACE_ID,
                 "replace_value": {config.environment: "$workspace.$id"},
@@ -546,8 +614,8 @@ def render_parameter_file(
                 },
                 "item_type": "DataAgent",
             },
-        ]
-    )
+            ]
+        )
 
     return parameters
 
@@ -580,21 +648,36 @@ def validate_terraform_outputs(
 
     expected_values = {
         "deployment_environment": config.environment,
+        "deployment_profile": config.deployment.profile,
         "tenant_id": config.tenant_id,
         "workspace_name": config.workspace.name,
         "lakehouse_name": config.lakehouse.name,
-        "eventhouse_name": config.eventhouse.name,
-        "kql_database_name": config.eventhouse.kql_database_name,
     }
+    if config.eventhouse.enabled:
+        expected_values.update(
+            {
+                "eventhouse_name": config.eventhouse.name,
+                "kql_database_name": config.eventhouse.kql_database_name,
+            }
+        )
     for key, expected in expected_values.items():
         actual = _require_output(terraform_outputs, key)
         if actual != expected:
+            if key == "tenant_id":
+                raise ValueError(
+                    "Terraform output tenant_id does not match the configured tenant"
+                )
             raise ValueError(
                 f"Terraform output {key} targets {actual!r}; expected {expected!r}"
             )
 
     parsed_ids: dict[str, uuid.UUID] = {}
-    for key in _OUTPUT_ID_KEYS:
+    required_id_keys = list(_BASE_OUTPUT_ID_KEYS)
+    if config.eventhouse.enabled:
+        required_id_keys.extend(_EVENTHOUSE_OUTPUT_ID_KEYS)
+    if config.profile.uses_custom_pool:
+        required_id_keys.append("spark_custom_pool_id")
+    for key in required_id_keys:
         value = _require_output(terraform_outputs, key)
         try:
             parsed = uuid.UUID(value)
@@ -658,12 +741,14 @@ def write_generated_configs(
 def _synthetic_outputs(config: DeployConfig) -> dict[str, str]:
     """Provide stable placeholder-like GUIDs for offline config generation."""
 
-    return {
+    outputs = {
         "workspace_id": "00000000-0000-0000-0000-000000000001",
         "lakehouse_id": "00000000-0000-0000-0000-000000000002",
         "lakehouse_name": config.lakehouse.name,
-        "kql_database_id": "00000000-0000-0000-0000-000000000003",
     }
+    if config.eventhouse.enabled:
+        outputs["kql_database_id"] = "00000000-0000-0000-0000-000000000003"
+    return outputs
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:

@@ -15,15 +15,28 @@ from retail_setup.cli.main import (
     _deploy_taskflow,
     _deploy_plan,
     _validate_azure_cli_tenant,
+    _validate_terraform_auth_boundary,
     _DELETION_WAIT_TIMEOUT_SECONDS,
     _PIPELINE_TRIGGER_ATTEMPTS,
     _run_setup_pipeline,
 )
+from retail_setup.contracts import load_repository_manifest, resolve_profile
 
 runner = CliRunner()
+TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+_MANIFEST, _VALIDATION = load_repository_manifest(REPO_ROOT)
 
 
-def _seed_deploy_config(root: Path, env: str = "dev") -> None:
+def _profile(name: str):
+    return resolve_profile(_MANIFEST, _VALIDATION, name)
+
+
+def _seed_deploy_config(
+    root: Path,
+    env: str = "dev",
+    profile: str = "core",
+) -> None:
     """Write a minimal deploy config so CLI tests don't touch the real repo."""
     base = root / "deploy" / "config"
     (base / "environments").mkdir(parents=True)
@@ -39,15 +52,32 @@ def _seed_deploy_config(root: Path, env: str = "dev") -> None:
                 "eventhouse": {
                     "name": "retail_eventhouse",
                     "kql_database_name": "retail_eventhouse",
-                    "kql_scripts": [],
+                    "kql_scripts": [
+                        "01-create-tables.kql",
+                        "02-create-ingestion-mappings.kql",
+                        "03-create-functions.kql",
+                        "04-create-materialized-views.kql",
+                        "06-ml-anomaly-detection.kql",
+                        "07-pricing-approval-tables.kql",
+                    ],
                 },
-                "notebooks": {"include": ["core"]},
+                "notebooks": {"default_lakehouse_name": "retail_lakehouse"},
                 "powerbi": {
                     "semantic_model_name": "retail_model",
                     "report_name": "retail_model",
                 },
                 "deployment": {
-                    "item_types_in_scope": ["Lakehouse", "Notebook"],
+                    "profile": "core",
+                    "item_types_in_scope": [
+                        "Lakehouse",
+                        "Notebook",
+                        "SemanticModel",
+                        "Report",
+                        "KQLQueryset",
+                        "DataPipeline",
+                        "MLExperiment",
+                        "DataAgent",
+                    ],
                     "publish_skip": False,
                     "unpublish_skip": True,
                 },
@@ -60,6 +90,7 @@ def _seed_deploy_config(root: Path, env: str = "dev") -> None:
             {
                 "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "workspace": {"name": f"retail-demo-{env}"},
+                "deployment": {"profile": profile},
             }
         )
     )
@@ -69,6 +100,7 @@ def _seed_deploy_config(root: Path, env: str = "dev") -> None:
         json.dumps(
             {
                 "deployment_environment": env,
+                "deployment_profile": profile,
                 "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "workspace_id": "11111111-1111-4111-8111-111111111111",
                 "workspace_name": f"retail-demo-{env}",
@@ -78,6 +110,15 @@ def _seed_deploy_config(root: Path, env: str = "dev") -> None:
                 "eventhouse_name": "retail_eventhouse",
                 "kql_database_id": "44444444-4444-4444-8444-444444444444",
                 "kql_database_name": "retail_eventhouse",
+                **(
+                    {
+                        "spark_custom_pool_id": (
+                            "55555555-5555-4555-8555-555555555555"
+                        )
+                    }
+                    if profile == "full-demo"
+                    else {}
+                ),
             }
         ),
         encoding="utf-8",
@@ -96,44 +137,181 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert calls == []
     out = result.output
     assert "generate_configs" in out and "terraform" in out
-    assert "build_artifacts" in out and "core setup ml ontology reset stream" in out.replace(
-        "'", ""
+    assert "build_artifacts" in out and "--profile core" in out
+    assert "asset.lakehouse" in out
+    assert f"Manifest: {_MANIFEST.version}" in out
+    assert "Expected staged items: 5 infrastructure + 0 Reporting = 5 total" in out
+    assert "Profile support: core" in out
+    assert "reset" not in out
+    assert "deploy_items" in out and "apply_kql" not in out
+    assert "validate_deployment" in out
+
+
+def test_dry_run_uses_azure_powershell_for_python_clients_when_terraform_skips(
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path)
+    base_path = tmp_path / "deploy" / "config" / "deploy.yml"
+    base = yaml.safe_load(base_path.read_text(encoding="utf-8"))
+    base["auth"]["mode"] = "azure_powershell"
+    base_path.write_text(yaml.safe_dump(base), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--skip-terraform",
+            "--dry-run",
+        ],
     )
-    assert "deploy_items" in out and "apply_kql" in out and "validate_deployment" in out
-
-
-def test_dry_run_uses_configured_auth_mode(monkeypatch):
-    assert hasattr(cli, "_auth_mode")
-    monkeypatch.setattr(
-        cli,
-        "_auth_mode",
-        lambda *_args: "azure_powershell",
-    )
-
-    result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
 
     assert result.exit_code == 0, result.output
     assert "--auth-mode azure_powershell" in result.output
+    assert "terraform apply" not in result.output
 
 
-def test_dry_run_falls_back_when_auth_config_is_unavailable(monkeypatch):
-    assert hasattr(cli, "_auth_mode")
+@pytest.mark.parametrize(
+    "terraform_args",
+    [[], ["--recreate"]],
+    ids=["apply", "destroy-before-recreate"],
+)
+def test_azure_powershell_rejects_terraform_before_any_command(
+    monkeypatch,
+    tmp_path,
+    terraform_args,
+):
+    _seed_deploy_config(tmp_path)
+    base_path = tmp_path / "deploy" / "config" / "deploy.yml"
+    base = yaml.safe_load(base_path.read_text(encoding="utf-8"))
+    base["auth"]["mode"] = "azure_powershell"
+    base_path.write_text(yaml.safe_dump(base), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
 
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--dry-run",
+            *terraform_args,
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "cannot authorize the Fabric Terraform provider" in result.output
+    assert "Python Fabric clients" in result.output
+    assert calls == []
+
+
+def test_terraform_auth_accepts_one_provider_credential_and_binds_tenant():
+    config = SimpleNamespace(
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+    )
+    provider_environment = {
+        "FABRIC_TENANT_ID": TENANT_ID,
+        "FABRIC_CLIENT_ID": "provider-client",
+        "FABRIC_CLIENT_SECRET": "provider-secret",
+    }
+
+    _validate_terraform_auth_boundary(
+        config,
+        skip_terraform=False,
+        environment=provider_environment,
+    )
+
+    provider_environment["FABRIC_TENANT_ID"] = (
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    )
+    with pytest.raises(ValueError, match="configured deployment tenant"):
+        _validate_terraform_auth_boundary(
+            config,
+            skip_terraform=False,
+            environment=provider_environment,
+        )
+
+
+def test_dry_run_threads_configured_targets_without_printing_tenant(tmp_path):
+    _seed_deploy_config(tmp_path)
+    env_path = tmp_path / "deploy" / "config" / "environments" / "dev.yml"
+    overlay = yaml.safe_load(env_path.read_text(encoding="utf-8"))
+    overlay["eventhouse"] = {
+        "name": "renamed_eventhouse",
+        "kql_database_name": "renamed_eventhouse",
+    }
+    env_path.write_text(yaml.safe_dump(overlay), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "--kql-database-name renamed_eventhouse" in result.output
+    assert "--tenant-id [REDACTED]" in result.output
+    assert TENANT_ID not in result.output
+
+
+def test_dry_run_rejects_config_load_errors_instead_of_falling_back(monkeypatch):
     def unavailable(*_args):
         raise OSError("deploy config unavailable")
 
-    monkeypatch.setattr(cli, "_auth_mode", unavailable)
+    monkeypatch.setattr(cli, "_load_deploy_environment", unavailable)
 
     result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
 
-    assert result.exit_code == 0, result.output
-    assert "--auth-mode azure_cli" in result.output
+    assert result.exit_code == 1
+    assert "Invalid deployment config for dry-run" in result.output
+    assert "default core profile" not in result.output
+
+
+def test_dry_run_rejects_malformed_existing_environment_config(tmp_path):
+    _seed_deploy_config(tmp_path)
+    environment_path = (
+        tmp_path / "deploy" / "config" / "environments" / "dev.yml"
+    )
+    environment_path.write_text("deployment: [\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Invalid deployment config for dry-run" in result.output
+    assert "default core profile" not in result.output
 
 
 def test_skip_terraform_drops_terraform_steps():
     plan = _deploy_plan("dev", skip_terraform=True)
     assert not any(step.cmd and step.cmd[0] == "terraform" for step in plan)
-    generate = plan[0].cmd
+    generate = next(
+        step.cmd
+        for step in plan
+        if "deploy.scripts.generate_configs" in step.cmd
+    )
     assert "--terraform-output" in generate
     assert "deploy/.generated/dev/terraform-output.json" in generate
     flat = " ".join(" ".join(map(str, step.cmd)) for step in plan)
@@ -225,6 +403,10 @@ def test_plan_propagates_selected_auth_mode():
         "dev",
         skip_terraform=True,
         auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+        kql_database_name="renamed_eventhouse",
+        profile=_profile("standard"),
+        repo_root=REPO_ROOT,
     )
     authenticated = [
         step.cmd
@@ -234,35 +416,47 @@ def test_plan_propagates_selected_auth_mode():
         )
     ]
 
-    assert len(authenticated) == 2
+    assert len(authenticated) == 3
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in authenticated
     )
+    assert all(
+        command[command.index("--tenant-id") + 1] == TENANT_ID
+        for command in authenticated
+    )
+    build = next(
+        step.cmd
+        for step in plan
+        if "deploy.scripts.build_artifacts" in step.cmd
+    )
+    assert build[build.index("--kql-database-name") + 1] == "renamed_eventhouse"
 
 
-def test_plan_builds_ontology_and_reset_notebook_groups():
-    plan = _deploy_plan("dev", skip_terraform=False)
+def test_plan_uses_exact_profile_and_never_stages_reset_group():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=False,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+    )
     build = next(s for s in plan if "build_artifacts" in " ".join(map(str, s.cmd)))
     cmd = build.cmd
-    groups_idx = cmd.index("--notebook-groups")
-    lakehouse_idx = cmd.index("--lakehouse-name")
-    groups = cmd[groups_idx + 1 : lakehouse_idx]
-    # The deploy stages every notebook group needed to link the full task flow:
-    # ontology (30-create-ontology) and reset (99-reset-lakehouse) join the core
-    # pipeline, setup notebooks, ML notebooks, and the streaming generator.
-    assert set(groups) == {"core", "setup", "ml", "ontology", "reset", "stream"}
+    assert cmd[cmd.index("--profile") + 1] == "full-demo"
+    assert "--notebook-groups" not in cmd
+    assert "reset" not in cmd
 
 
 def test_plan_orders_steps_and_gates_apply():
     plan = _deploy_plan("dev", skip_terraform=False)
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     apply_idx = next(i for i, c in enumerate(cmds) if "apply" in c and "terraform" in c)
+    preflight_idx = next(i for i, c in enumerate(cmds) if "profile_preflight" in c)
     assert plan[apply_idx].needs_confirmation
     # The redundant `terraform plan` step was removed; apply previews + confirms.
     assert not any(" plan " in f" {c} " for c in cmds)
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
-    assert apply_idx < build_idx < deploy_idx
+    assert preflight_idx < apply_idx < build_idx < deploy_idx
 
 
 def test_plan_isolates_terraform_state_and_data_directory():
@@ -288,11 +482,12 @@ def test_plan_isolates_terraform_state_and_data_directory():
 def test_recreate_inserts_destroy_and_deletion_wait_before_apply():
     plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
     step_ids = [s.step_id for s in plan]
+    preflight_idx = step_ids.index("profile-preflight")
     init_idx = step_ids.index("terraform-init")
     destroy_idx = step_ids.index("terraform-destroy-recreate")
     wait_idx = step_ids.index("deletion-wait")
     apply_idx = step_ids.index("terraform-apply")
-    assert init_idx < destroy_idx < wait_idx < apply_idx
+    assert preflight_idx < init_idx < destroy_idx < wait_idx < apply_idx
     assert plan[destroy_idx].needs_confirmation
     wait_step = plan[wait_idx]
     assert wait_step.action is not None
@@ -307,7 +502,9 @@ def test_deletion_wait_action_calls_helper_with_workspace_and_auth_mode(monkeypa
     monkeypatch.setattr(
         cli,
         "_wait_for_workspace_deletion",
-        lambda repo_root, ws, auth: calls.append((repo_root, ws, auth)),
+        lambda repo_root, ws, auth, tenant: calls.append(
+            (repo_root, ws, auth, tenant)
+        ),
     )
     plan = _deploy_plan(
         "dev",
@@ -315,10 +512,13 @@ def test_deletion_wait_action_calls_helper_with_workspace_and_auth_mode(monkeypa
         recreate=True,
         auth_mode="azure_powershell",
         workspace_name="retail-demo-dev",
+        tenant_id=TENANT_ID,
     )
     wait_step = next(s for s in plan if s.step_id == "deletion-wait")
     wait_step.action(Path("/repo"))
-    assert calls == [(Path("/repo"), "retail-demo-dev", "azure_powershell")]
+    assert calls == [
+        (Path("/repo"), "retail-demo-dev", "azure_powershell", TENANT_ID)
+    ]
 
 
 def test_deletion_wait_dry_run_shows_step_but_makes_no_request(monkeypatch, tmp_path):
@@ -498,7 +698,12 @@ def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys)
         return SimpleNamespace(returncode=1 if attempts["n"] == 1 else 0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
-    _run_setup_pipeline(Path("."), "dev", auth_mode="azure_powershell")
+    _run_setup_pipeline(
+        Path("."),
+        "dev",
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+    )
 
     out = capsys.readouterr().out
     assert "can take a while" in out
@@ -506,19 +711,182 @@ def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys)
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in commands
     )
+    assert all(
+        command[command.index("--tenant-id") + 1] == TENANT_ID
+        for command in commands
+    )
+
+
+def test_verify_cli_is_read_only_unless_pipeline_flag_is_explicit(
+    monkeypatch,
+    tmp_path,
+):
+    commands = []
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, cwd=None: commands.append(cmd)
+        or SimpleNamespace(returncode=0),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "verify",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+        ],
+    )
+    explicit = runner.invoke(
+        app,
+        [
+            "verify",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--run-pipeline",
+        ],
+    )
+
+    assert result.exit_code == explicit.exit_code == 0
+    assert "--run-pipeline" not in commands[0]
+    assert "--run-pipeline" in commands[1]
+    assert "deploy.scripts.verify_readiness" in commands[0]
+
+
+def test_verify_cli_propagates_degraded_exit(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=3),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "verify",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+        ],
+    )
+
+    assert result.exit_code == 3
+
+
+def test_deploy_records_degraded_readiness_without_claiming_success(
+    monkeypatch,
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="standard")
+    commands = []
+    monkeypatch.setattr(
+        "retail_setup.cli.main._validate_azure_cli_tenant",
+        lambda *_: None,
+    )
+
+    def fake_run(cmd, cwd=None, **_kwargs):
+        commands.append(cmd)
+        if "deploy.scripts.verify_readiness" in cmd:
+            return SimpleNamespace(returncode=3)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "readiness is degraded" in result.output
+    journal = json.loads(
+        _deploy_journal.journal_path(tmp_path, "dev").read_text()
+    )
+    readiness = next(
+        step for step in journal["steps"] if step["step_id"] == "verify-readiness"
+    )
+    assert readiness["status"] == "DEGRADED"
+    assert journal["status"] == "DEGRADED"
+    automatic_verify = next(
+        command
+        for command in commands
+        if "deploy.scripts.verify_readiness" in command
+    )
+    assert "--run-pipeline" not in automatic_verify
+
+
+def test_deploy_fails_when_required_readiness_evidence_fails(
+    monkeypatch,
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="standard")
+    monkeypatch.setattr(
+        "retail_setup.cli.main._validate_azure_cli_tenant",
+        lambda *_: None,
+    )
+
+    def fake_run(cmd, cwd=None, **_kwargs):
+        return SimpleNamespace(
+            returncode=1 if "deploy.scripts.verify_readiness" in cmd else 0
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
+    )
+
+    assert result.exit_code == 1
+    journal = json.loads(
+        _deploy_journal.journal_path(tmp_path, "dev").read_text()
+    )
+    readiness = next(
+        step for step in journal["steps"] if step["step_id"] == "verify-readiness"
+    )
+    assert readiness["status"] == "FAILED"
+    assert journal["status"] == "FAILED"
 
 
 def test_deploy_taskflow_passes_selected_auth_mode(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(cli, "_workspace_name", lambda *_args: "retail-demo-dev")
     monkeypatch.setattr(
         "subprocess.run",
         lambda cmd, cwd=None: calls.append(cmd) or SimpleNamespace(returncode=0),
     )
 
-    _deploy_taskflow(tmp_path, "dev", auth_mode="azure_powershell")
+    _deploy_taskflow(
+        tmp_path,
+        "dev",
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+    )
 
     assert calls[0][calls[0].index("--auth-mode") + 1] == "azure_powershell"
+    assert calls[0][calls[0].index("--tenant-id") + 1] == TENANT_ID
+    assert calls[0][calls[0].index("--terraform-output") + 1] == (
+        "deploy/.generated/dev/terraform-output.json"
+    )
+    assert "--workspace" not in calls[0]
 
 
 def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
@@ -554,7 +922,88 @@ def test_ontology_relink_hint_names_workspace_and_command(tmp_path, capsys):
 
     out = capsys.readouterr().out
     assert "RetailOntology_AutoGen" in out
-    assert "deploy.scripts.taskflow deploy --workspace retail-demo-dev" in out
+    assert "retail-setup post-ontology --env dev" in out
+    assert "--acknowledge ack.full-demo.ontology-created" in out
+    assert "intentionally not published yet" in out
+
+
+def test_post_ontology_plan_requires_acknowledgement_and_orders_publication(
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
+
+    missing = runner.invoke(
+        app,
+        [
+            "post-ontology",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--dry-run",
+        ],
+    )
+    assert missing.exit_code == 1
+    assert "ack.full-demo.ontology-created" in missing.output
+
+    result = runner.invoke(
+        app,
+        [
+            "post-ontology",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--acknowledge",
+            "ack.full-demo.ontology-created",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output.index("post-ontology Data Agents") < result.output.index(
+        "fully resolved workspace task flow"
+    )
+    assert "--environment dev --profile full-demo" in result.output
+    assert "--defer-post-ontology" not in result.output
+
+
+def test_post_ontology_validates_live_ontology_before_mutation(
+    monkeypatch,
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
+    calls = []
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
+    monkeypatch.setattr(
+        cli,
+        "_validate_live_ontology",
+        lambda *_args: (_ for _ in ()).throw(
+            ValueError("ontology is not available")
+        ),
+    )
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *args, **kwargs: calls.append(args),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "post-ontology",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--acknowledge",
+            "ack.full-demo.ontology-created",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "live preflight failed" in result.output
+    assert "ontology is not available" in result.output
+    assert calls == []
 
 
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch, tmp_path):
@@ -608,20 +1057,30 @@ def test_active_azure_cli_tenant_uses_resolved_az_path(monkeypatch):
     assert calls[0][0] == "C:/az.cmd"
 
 
-def test_azure_cli_tenant_preflight_rejects_mismatched_tenant(monkeypatch):
-    monkeypatch.setattr(
-        "retail_setup.cli.main._load_deploy_environment",
-        lambda *_: SimpleNamespace(auth_mode="azure_cli", tenant_id="expected-tenant"),
-    )
+def test_azure_cli_tenant_preflight_rejects_mismatched_tenant(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
     monkeypatch.setattr(
         "retail_setup.cli.main._active_azure_cli_tenant",
         lambda: "active-tenant",
     )
 
-    result = runner.invoke(app, ["deploy", "--env", "dev", "--yes"])
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
+    )
     assert result.exit_code == 1, result.output
     assert "Azure CLI tenant does not match deploy config tenant_id" in result.output
-    assert "az login --tenant expected-tenant" in result.output
+    assert "az login --tenant <configured-tenant>" in result.output
+    assert TENANT_ID not in result.output
+    assert "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" not in result.output
     assert "terraform" not in result.output
 
 
@@ -687,7 +1146,14 @@ def test_journal_shape_has_required_fields_and_no_secrets(tmp_path):
         "error",
     }
     dumped = json.dumps(data).lower()
-    for forbidden in ("token", "authorization", "bearer", "secret", "password"):
+    for forbidden in (
+        "token",
+        "authorization",
+        "bearer",
+        "secret",
+        "password",
+        TENANT_ID,
+    ):
         assert forbidden not in dumped
 
 
@@ -702,6 +1168,22 @@ def test_journal_error_is_redacted_and_truncated(tmp_path):
     error = data["steps"][0]["error"]
     assert len(error) <= 300
     assert error.startswith("boom")
+
+
+def test_journal_error_redacts_tenant_identifier(tmp_path):
+    journal = _deploy_journal.start_run("dev", targets={})
+    _deploy_journal.add_step(journal, "step-a", "Do a thing", required=True)
+    _deploy_journal.mark_failed(
+        journal,
+        "step-a",
+        exit_code=1,
+        error=f"credential failed for tenant_id={TENANT_ID}",
+    )
+    _deploy_journal.write(tmp_path, journal)
+
+    raw = _deploy_journal.journal_path(tmp_path, "dev").read_text()
+    assert TENANT_ID not in raw
+    assert "tenant_id=[REDACTED]" in raw
 
 
 # --- Secret redaction: bearer tokens, JWT-like values, named assignments ------
@@ -824,6 +1306,25 @@ def test_compute_status_pending_step_stays_running():
     assert _deploy_journal.compute_status(journal) == "RUNNING"
 
 
+def test_compute_status_degraded_verification_is_degraded():
+    journal = _deploy_journal.start_run("dev", targets={})
+    _deploy_journal.add_step(
+        journal,
+        "verify-readiness",
+        "Verify live readiness",
+        required=True,
+        evidence_path="deploy/.generated/dev/readiness-report.json",
+    )
+    _deploy_journal.mark_degraded(
+        journal,
+        "verify-readiness",
+        reason="optional evidence stale",
+    )
+
+    assert _deploy_journal.compute_status(journal) == "DEGRADED"
+    assert journal.steps[0].evidence_path.endswith("readiness-report.json")
+
+
 def test_mark_required_promotes_optional_step_to_required():
     journal = _deploy_journal.start_run("dev", targets={})
     _deploy_journal.add_step(journal, "pipeline", "Trigger the setup pipeline", required=False)
@@ -837,13 +1338,19 @@ def test_mark_required_promotes_optional_step_to_required():
 # --- Task-flow and setup-pipeline: required-once-requested, skip behavior -----
 
 
-def test_taskflow_failure_is_required_and_raises_nonzero(monkeypatch, tmp_path):
-    _seed_deploy_config(tmp_path)
+def test_initial_full_deploy_defers_taskflow_until_post_ontology(
+    monkeypatch,
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
     (tmp_path / "fabric" / "taskflow").mkdir(parents=True)
     (tmp_path / "fabric" / "taskflow" / "taskflow.json").write_text("{}")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
 
+    commands = []
+
     def fake_run(cmd, cwd=None):
+        commands.append(cmd)
         if "deploy.scripts.taskflow" in cmd:
             return SimpleNamespace(returncode=3)
         return SimpleNamespace(returncode=0)
@@ -853,18 +1360,26 @@ def test_taskflow_failure_is_required_and_raises_nonzero(monkeypatch, tmp_path):
         app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes", "--skip-terraform"]
     )
 
-    assert result.exit_code == 3, result.output
-    assert "Deploy complete" not in result.output  # banner must not appear on failure
+    assert result.exit_code == 0, result.output
+    assert "Deploy complete" in result.output
+    assert not any("deploy.scripts.taskflow" in command for command in commands)
+    readiness = next(
+        command
+        for command in commands
+        if "deploy.scripts.verify_readiness" in command
+    )
+    assert "--defer-post-ontology" in readiness
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
-    assert journal["status"] == "FAILED"
-    taskflow_step = next(s for s in journal["steps"] if s["step_id"] == "task-flow-deploy")
-    assert taskflow_step["classification"] == "required"
-    assert taskflow_step["status"] == "FAILED"
-    assert taskflow_step["exit_code"] == 3
+    assert journal["status"] == "SUCCEEDED"
+    assert not any(
+        step["step_id"] == "task-flow-deploy" for step in journal["steps"]
+    )
 
 
-def test_requested_setup_pipeline_failure_is_required_and_raises_nonzero(monkeypatch, tmp_path):
-    _seed_deploy_config(tmp_path)
+def test_setup_pipeline_failure_is_required_and_raises_nonzero(
+    monkeypatch, tmp_path
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
     monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
 
@@ -876,41 +1391,82 @@ def test_requested_setup_pipeline_failure_is_required_and_raises_nonzero(monkeyp
     monkeypatch.setattr("subprocess.run", fake_run)
     result = runner.invoke(
         app,
-        ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform"],
-        input="y\n",  # accept the setup-pipeline prompt
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--skip-terraform",
+        ],
     )
 
     assert result.exit_code == 5, result.output
     assert "Deploy complete" not in result.output
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
     assert journal["status"] == "FAILED"
-    pipeline_step = next(s for s in journal["steps"] if s["step_id"] == "setup-pipeline-trigger")
-    assert pipeline_step["classification"] == "required"  # promoted once requested
+    pipeline_step = next(
+        s for s in journal["steps"] if s["step_id"] == "setup-pipeline-gate"
+    )
+    assert pipeline_step["classification"] == "required"
     assert pipeline_step["status"] == "FAILED"
+    assert "Reporting was not published" in pipeline_step["error"]
 
 
-def test_declined_setup_pipeline_is_skipped_and_deploy_still_succeeds(monkeypatch, tmp_path):
-    _seed_deploy_config(tmp_path)
+def test_required_ml_failure_leaves_reporting_unpublished(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
-    monkeypatch.setattr("subprocess.run", _always_ok)
+    commands = []
+
+    def fake_run(cmd, cwd=None):
+        commands.append(cmd)
+        if (
+            "deploy.scripts.run_pipeline" in cmd
+            and "--pipeline" in cmd
+            and cmd[cmd.index("--pipeline") + 1] == "ml-required"
+        ):
+            return SimpleNamespace(returncode=5)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
 
     result = runner.invoke(
         app,
         ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform"],
-        input="n\n",  # decline the setup-pipeline prompt
     )
 
-    assert result.exit_code == 0, result.output
-    assert "Deploy complete" in result.output
+    assert result.exit_code == 5, result.output
+    assert "Deploy complete" not in result.output
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
-    assert journal["status"] == "SUCCEEDED"
-    pipeline_step = next(s for s in journal["steps"] if s["step_id"] == "setup-pipeline-trigger")
-    assert pipeline_step["classification"] == "optional"
-    assert pipeline_step["status"] == "SKIPPED"
+    assert journal["status"] == "FAILED"
+    gate = next(
+        s
+        for s in journal["steps"]
+        if s["step_id"] == "required-ml-reporting-gate"
+    )
+    assert gate["status"] == "FAILED"
+    assert "Reporting was not published" in gate["error"]
+    reporting = next(
+        s for s in journal["steps"] if s["step_id"] == "build-reporting"
+    )
+    assert reporting["status"] == "PENDING"
+    publish_reporting = next(
+        s for s in journal["steps"] if s["step_id"] == "deploy-reporting"
+    )
+    assert publish_reporting["status"] == "PENDING"
+    assert not any(
+        "deploy.scripts.build_artifacts" in command
+        and "--publication-phase" in command
+        and command[command.index("--publication-phase") + 1] == "reporting"
+        for command in commands
+    )
+    assert sum(
+        "deploy.scripts.deploy_items" in command for command in commands
+    ) == 1
 
 
-def test_yes_flag_skips_setup_pipeline_without_failing(monkeypatch, tmp_path):
-    _seed_deploy_config(tmp_path)
+def test_yes_flag_runs_required_gates_without_prompt(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
     monkeypatch.setattr("subprocess.run", _always_ok)
 
@@ -921,14 +1477,109 @@ def test_yes_flag_skips_setup_pipeline_without_failing(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert "Deploy complete" in result.output
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
-    pipeline_step = next(s for s in journal["steps"] if s["step_id"] == "setup-pipeline-trigger")
-    assert pipeline_step["status"] == "SKIPPED"  # --yes never fails the run
+    setup_gate = next(
+        s for s in journal["steps"] if s["step_id"] == "setup-pipeline-gate"
+    )
+    required_gate = next(
+        s
+        for s in journal["steps"]
+        if s["step_id"] == "required-ml-reporting-gate"
+    )
+    assert setup_gate["status"] == "SUCCEEDED"
+    assert required_gate["status"] == "SUCCEEDED"
     assert journal["status"] == "SUCCEEDED"
+    profile = _profile("full-demo")
+    assert journal["targets"]["profile"] == "full-demo"
+    assert journal["targets"]["asset_ids"] == ",".join(profile.asset_ids)
+    assert journal["targets"]["pipeline_refs"] == ",".join(profile.pipeline_refs)
+    assert journal["targets"]["kql_scripts"] == ",".join(profile.kql_scripts)
+    assert journal["targets"]["acknowledgements"] == ""
+    assert journal["manifest"]["version"] == profile.manifest_version
+    assert journal["manifest"]["hash"] == profile.manifest_hash
+    assert journal["manifest"]["profile_support_status"] == "preview"
+    assert journal["manifest"]["expected_item_counts"] == {
+        "infrastructure": 40,
+        "reporting": 2,
+        "all": 42,
+    }
+    assert journal["manifest"]["asset_boundaries"]["preview"] == list(
+        profile.preview_asset_ids
+    )
+    assert journal["manifest"]["asset_boundaries"]["manual"] == list(
+        profile.manual_asset_ids
+    )
+    build = next(
+        step for step in journal["steps"] if step["step_id"] == "build-infrastructure"
+    )
+    assert build["evidence_path"].endswith("artifact-inventory-infrastructure.json")
+    readiness = next(
+        step for step in journal["steps"] if step["step_id"] == "verify-readiness"
+    )
+    assert readiness["classification"] == "required"
+    assert readiness["status"] == "SUCCEEDED"
+    assert readiness["evidence_path"] == (
+        "deploy/.generated/dev/readiness-report.json"
+    )
+    assert TENANT_ID not in json.dumps(journal)
+
+
+def test_optional_ml_failure_does_not_block_published_reporting(
+    monkeypatch, tmp_path
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
+    monkeypatch.setattr(
+        "retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None
+    )
+
+    def fake_run(cmd, cwd=None):
+        if (
+            "deploy.scripts.run_pipeline" in cmd
+            and "--pipeline" in cmd
+            and cmd[cmd.index("--pipeline") + 1] == "ml-optional"
+        ):
+            return SimpleNamespace(returncode=7)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
+    reporting = next(
+        s for s in journal["steps"] if s["step_id"] == "deploy-reporting"
+    )
+    optional = next(
+        s
+        for s in journal["steps"]
+        if s["step_id"] == "post-reporting-ml-optional"
+    )
+    experimental = next(
+        s
+        for s in journal["steps"]
+        if s["step_id"] == "post-reporting-ml-experimental"
+    )
+    assert reporting["status"] == "SUCCEEDED"
+    assert optional["status"] == "FAILED"
+    assert optional["classification"] == "optional"
+    assert experimental["status"] == "SUCCEEDED"
+    assert journal["status"] == "DEGRADED"
 
 
 def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_path):
     """The 'Deploy complete' banner never prints before required work finishes."""
-    _seed_deploy_config(tmp_path)
+    _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
 
     def fake_run(cmd, cwd=None, **kwargs):
@@ -945,7 +1596,9 @@ def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_
     assert "Deploy complete" not in result.output
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
     assert journal["status"] == "FAILED"
-    build_step = next(s for s in journal["steps"] if s["step_id"] == "build-artifacts")
+    build_step = next(
+        s for s in journal["steps"] if s["step_id"] == "build-infrastructure"
+    )
     assert build_step["status"] == "FAILED"
     # Steps after the failed one were never reached (still PENDING).
     kql_step = next(s for s in journal["steps"] if s["step_id"] == "apply-kql")

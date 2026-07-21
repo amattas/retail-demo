@@ -87,7 +87,7 @@ flowchart LR
 
 ## Operational state
 
-Execution and freshness evidence is currently distributed across:
+Source evidence remains distributed across:
 
 - `setup_run_log`
 - `ag._watermarks`
@@ -95,4 +95,6 @@ Execution and freshness evidence is currently distributed across:
 - Eventhouse ingestion state
 - ML model output metadata where present
 
-The target unified view is tracked by `IMP-013`.
+`retail-setup verify` now queries these sources through one bounded, redacted
+report. `IMP-013` remains open for actual live Fabric execution and freshness
+evidence.

@@ -13,6 +13,7 @@ AUTH_MODES = ("azure_cli", "azure_powershell")
 def build_credential(
     auth_mode: str,
     *,
+    tenant_id: str | None = None,
     process_timeout: int = 120,
 ) -> TokenCredential:
     """Build the operator credential selected by deployment configuration."""
@@ -20,11 +21,17 @@ def build_credential(
     if auth_mode == "azure_cli":
         from azure.identity import AzureCliCredential
 
-        return AzureCliCredential(process_timeout=process_timeout)
+        return AzureCliCredential(
+            tenant_id=tenant_id,
+            process_timeout=process_timeout,
+        )
     if auth_mode == "azure_powershell":
         from azure.identity import AzurePowerShellCredential
 
-        return AzurePowerShellCredential(process_timeout=process_timeout)
+        return AzurePowerShellCredential(
+            tenant_id=tenant_id,
+            process_timeout=process_timeout,
+        )
     raise ValueError(
         f"Unsupported auth mode {auth_mode!r}. Use 'azure_cli' or 'azure_powershell'."
     )

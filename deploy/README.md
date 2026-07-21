@@ -7,9 +7,10 @@ offline validation.
 Use the high-level CLI for normal operation:
 
 ```powershell
-retail-setup configure --workspace-name retail-demo-alice
+retail-setup configure --workspace-name retail-demo-alice --profile core
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice
+retail-setup verify --env alice
 ```
 
 The user-facing [deployment guide](../docs/guides/deployment.md) covers
@@ -18,16 +19,17 @@ recreate, post-deploy work, and troubleshooting.
 
 ## Ordered deploy plan
 
-1. Generate environment-specific Terraform and `fabric-cicd` inputs.
-2. Run Terraform init/apply unless `--skip-terraform` is selected.
-3. Capture Terraform outputs and regenerate binding parameters.
-4. Stage `core`, `setup`, `ml`, `ontology`, `reset`, and `stream` notebook
-   groups plus other supported Fabric items.
-5. Publish through `fabric-cicd`.
-6. Build and execute the ordered KQL database script.
-7. Validate generated files and placeholder rewrites.
-8. Attempt task-flow deployment.
-9. In interactive mode, offer to start the asynchronous `setup-pipeline`.
+1. Run profile/source preflight.
+2. Generate inputs and apply Terraform unless `--skip-terraform` is selected.
+3. Stage and publish selected infrastructure without Reporting.
+4. Build and execute the ordered KQL database script.
+5. For Reporting profiles, wait for setup and required ML validation.
+6. Stage and publish Reporting only after terminal success.
+7. Run selected post-Reporting ML and validate publication.
+8. For standard/full-demo, run read-only live readiness verification; the
+   initial full-demo pass defers ontology-dependent checks.
+9. After ontology creation, use the acknowledged post-ontology command to
+   publish Data Agents, task flow, and complete readiness.
 
 The CLI confirmation occurs before Terraform apply. Apply then prints the
 change preview and proceeds with `-auto-approve`; there is no separate
@@ -46,6 +48,13 @@ Supported values are `azure_cli` and `azure_powershell`. The selected operator
 credential is propagated to Fabric REST, KQL, task-flow, item publication, and
 pipeline helpers. Azure CLI mode validates that the active tenant matches the
 configured `tenant_id`.
+
+Azure PowerShell authenticates only the Python clients. It is not a Fabric
+Terraform provider credential. Normal apply/destroy therefore requires
+exactly one provider-supported service-principal, OIDC, or managed-identity
+credential; otherwise use `--skip-terraform` with validated prior outputs.
+Terraform is tenant-bound and its Azure CLI fallback is disabled in Azure
+PowerShell mode.
 
 The guided `scripts/setup.*` path currently checks for Azure CLI even when a
 manual deployment later selects Azure PowerShell.
@@ -71,8 +80,9 @@ Terraform provisions or resolves:
 - MLExperiment
 - DataAgent
 
-Dashboard templates and rule definitions are not yet guaranteed publishable
-workspace items.
+Dashboard templates and rule definitions are explicitly manual source assets,
+not guaranteed publishable workspace items. See the canonical
+[workspace and profile inventory](../docs/guides/workspace-inventory.md).
 
 ## Generated paths
 
@@ -85,6 +95,9 @@ workspace items.
 | `.generated/<env>/fabric-cicd/parameter.yml` | Binding rewrites | No |
 | `.generated/<env>/terraform-output.json` | Captured live item identifiers | No |
 | `.generated/<env>/database.kql` | Combined ordered KQL script | No |
+| `.generated/<env>/deploy-run.json` | Atomic deployment step journal | No |
+| `.generated/<env>/artifact-inventory-<phase>.json` | Manifest/version/profile-aware staged item evidence | No |
+| `.generated/<env>/readiness-report.json` | Atomic redacted live readiness and freshness evidence | No |
 | `workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
 
 The environment key is derived from the normalized workspace name. The
@@ -96,8 +109,8 @@ identifiers are local-only and isolated by that key.
 
 | Mode | Behavior |
 | --- | --- |
-| `--dry-run` | Prints the plan only; it does not authenticate or prove live readiness. |
-| `--yes` | Pre-confirms Terraform apply and suppresses the post-deploy setup-pipeline prompt. |
+| `--dry-run` | Validates existing configuration and the authentication boundary, then prints the plan without live access; with `--skip-terraform`, validates captured outputs too. |
+| `--yes` | Pre-confirms interactive gates; required setup/ML pipeline gates still run. |
 | `--skip-terraform` | Skips provisioning only after prior outputs match the configured environment, workspace, resource names, and non-placeholder IDs. |
 | `--recreate` | Destroys the workspace, polls for name release for up to 180 seconds, and rebuilds it. |
 
@@ -106,16 +119,26 @@ identifiers are local-only and isolated by that key.
 ## Post-deploy behavior
 
 - `validate_deployment.py` is offline validation, not a live workspace test.
-- `setup-pipeline` runs setup 01-04, ML notebooks 06-14, and ontology creation.
-- Ontology creation occurs after the initial task-flow deployment. Re-run:
+- Standard/full-demo deployment runs `retail-setup verify --env <env>` in
+  read-only mode and links the report from the deploy journal. Required
+  failed/unknown checks fail deployment; optional gaps degrade it.
+- `retail-setup verify --env <env> --run-pipeline` is a separate explicit
+  operator action that starts only the profile-required post-publish pipeline.
+- `setup-pipeline` runs setup 01-04. Reporting profiles then wait for the exact
+  `ml-required` run and its validator before publishing the semantic model and
+  report. A failed upgrade performs no Reporting publication or replacement;
+  the prior report remains compatible because required ML schemas retain their
+  legacy physical bindings.
+- Full-demo runs optional and experimental ML only after Reporting.
+- Ontology creation is a separate preview/manual step. Initial publication
+  omits Data Agents and task flow. After creating the ontology, run:
 
   ```powershell
-  python -m deploy.scripts.taskflow deploy `
-    --workspace <workspace> `
-    --auth-mode azure_cli
+  retail-setup post-ontology --env <env> `
+    --acknowledge ack.full-demo.ontology-created
   ```
 
-  after the pipeline succeeds.
+  to validate the ontology, publish deferred items, and verify full readiness.
 - KQL application uses the selected local operator identity.
 - Secrets must come from identity, environment variables, a secret store, or
   ignored local files.

@@ -4,7 +4,7 @@
       "id": "d7ce0e1e-fc0d-4749-a3a8-aec7c850017d",
       "type": "get data",
       "name": "Load Historical Data",
-      "description": "Ingest batch and real-time data into a single location within your Fabric workspace.",
+      "description": "Run setup and historical ingestion assets that build the base Lakehouse contract.",
       "items": [
         {
           "artifactUniqueId": "SynapseNotebook:90009e22-24ab-4750-b2f6-b72cf6db2741",
@@ -25,7 +25,7 @@
       "id": "32712835-c4fe-4073-aed8-195eceb57619",
       "type": "store data",
       "name": "Lakehouse",
-      "description": "",
+      "description": "Historical generation and Lakehouse transformation sources.",
       "items": [
         {
           "artifactUniqueId": "Lakehouse:fc9ed7b6-6723-4116-8bf1-278135865270",
@@ -46,7 +46,7 @@
       "id": "17a0dbf9-0c1d-4be1-bcda-d7664e21336a",
       "type": "get data",
       "name": "Get Real-Time Data",
-      "description": "",
+      "description": "Stream typed synthetic events directly to the optional Eventhouse KQL database.",
       "items": [
         {
           "artifactUniqueId": "KustoEventHouse:c35327d5-3ac8-4922-8d69-493391c05984",
@@ -73,13 +73,19 @@
       "id": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
       "type": "prepare data",
       "name": "Transform Historical Data",
-      "description": "",
+      "description": "Run the ordered setup and historical Lakehouse transformation pipelines.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
           "artifactType": "Pipeline",
           "artifactObjectId": "abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
           "artifactName": "historical-data-load"
+        },
+        {
+          "artifactUniqueId": "Pipeline:a53bf4eb-07ce-57ab-a1c7-255184982d62",
+          "artifactType": "Pipeline",
+          "artifactObjectId": null,
+          "artifactName": "setup-pipeline"
         }
       ],
       "loc": "120 -80"
@@ -88,7 +94,7 @@
       "id": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
       "type": "prepare data",
       "name": "Transform Real-Time Data",
-      "description": "Clean, transform, extract, and load your data for analysis and modeling tasks.",
+      "description": "Project selected Eventhouse data through Silver and Gold transformations.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
@@ -135,13 +141,14 @@
           "artifactName": "99-reset-lakehouse"
         }
       ],
-      "loc": "460 -280"
+      "loc": "460 -280",
+      "description": "Maintain Lakehouse tables; the destructive reset notebook remains a manual action."
     },
     {
       "id": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "type": "store data",
       "name": "Semantic Model",
-      "description": "",
+      "description": "Serve the 40-table Direct Lake model only after required ML validation succeeds.",
       "items": [
         {
           "artifactUniqueId": "3:4416500",
@@ -156,7 +163,7 @@
       "id": "2b579fce-56a9-4b47-8602-22a334c8f273",
       "type": "distribute data",
       "name": "Data Agents",
-      "description": "Propose hypotheses, train models, and explore your data to make decisions and predictions.",
+      "description": "Preview Data Agents grounded in the semantic model or operator-created ontology.",
       "items": [
         {
           "artifactUniqueId": "LLMPlugin:b791fcbd-1b88-4126-9f46-d95eac202634",
@@ -176,8 +183,8 @@
     {
       "id": "333311ac-9b2e-4cfc-898c-cb63347b6988",
       "type": "analyze and train data",
-      "name": "Analyze and train Models",
-      "description": "Propose hypotheses, train models, and explore your data to make decisions and predictions.",
+      "name": "Required ML Reporting Gate",
+      "description": "The four required producers and contract validator must complete before Reporting can publish.",
       "items": [
         {
           "artifactUniqueId": "MLExperiment:a4ad20b8-552e-4b80-9c98-e1ce47fa278c",
@@ -198,12 +205,6 @@
           "artifactName": "06-ml-demand-forecast"
         },
         {
-          "artifactUniqueId": "SynapseNotebook:e1aaa8df-b835-4f32-8240-f75d0d1889db",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": "07-ml-market-basket"
-        },
-        {
           "artifactUniqueId": "SynapseNotebook:875f69ea-f370-4702-b5f0-efc73e0a2ae0",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
@@ -220,6 +221,45 @@
           "artifactType": "MLExperiment",
           "artifactObjectId": null,
           "artifactName": "customer_segmentation"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:e5f45d40-53c2-4a12-a9b5-c303f8c7347d",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "12-ml-stockout-prediction"
+        },
+        {
+          "artifactUniqueId": "MLExperiment:864058c9-4a96-4476-9f9b-534a2e72ae30",
+          "artifactType": "MLExperiment",
+          "artifactObjectId": null,
+          "artifactName": "stockout_prediction"
+        },
+        {
+          "artifactUniqueId": "Pipeline:cfd2a126-1137-52b3-9107-ee358f4056af",
+          "artifactType": "Pipeline",
+          "artifactObjectId": null,
+          "artifactName": "ml-required"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:ab3cf75a-3995-562d-b2bd-3b86ac047a98",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "15-validate-required-ml-contract"
+        }
+      ],
+      "loc": "460 320"
+    },
+    {
+      "id": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
+      "type": "analyze and train data",
+      "name": "Post-Reporting Extended ML",
+      "description": "Optional and experimental models run after Reporting; their failures do not block the required report.",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:e1aaa8df-b835-4f32-8240-f75d0d1889db",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "07-ml-market-basket"
         },
         {
           "artifactUniqueId": "MLExperiment:33805d04-7b88-4d31-ab18-3c690778a4de",
@@ -246,12 +286,6 @@
           "artifactName": "11-ml-journey-analysis"
         },
         {
-          "artifactUniqueId": "SynapseNotebook:e5f45d40-53c2-4a12-a9b5-c303f8c7347d",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": "12-ml-stockout-prediction"
-        },
-        {
           "artifactUniqueId": "SynapseNotebook:72ac6599-7069-4679-8670-c0d74cb3ec6d",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
@@ -276,31 +310,31 @@
           "artifactName": "14-ml-dynamic-pricing"
         },
         {
-          "artifactUniqueId": "MLExperiment:864058c9-4a96-4476-9f9b-534a2e72ae30",
-          "artifactType": "MLExperiment",
-          "artifactObjectId": null,
-          "artifactName": "stockout_prediction"
-        },
-        {
           "artifactUniqueId": "MLExperiment:ca01314e-0157-4758-adea-9aed779c3aa8",
           "artifactType": "MLExperiment",
           "artifactObjectId": null,
           "artifactName": "dynamic_pricing"
         },
         {
-          "artifactUniqueId": "Pipeline:28d204d9-0bb5-4756-b52e-0da700fe8bc8",
+          "artifactUniqueId": "Pipeline:75a0e799-eacd-5d99-a54e-cfa8527dbfdf",
           "artifactType": "Pipeline",
-          "artifactObjectId": "28d204d9-0bb5-4756-b52e-0da700fe8bc8",
-          "artifactName": "machine-learning"
+          "artifactObjectId": null,
+          "artifactName": "ml-optional"
+        },
+        {
+          "artifactUniqueId": "Pipeline:57a3de65-3a61-5b1f-afb8-f3084dfd32ae",
+          "artifactType": "Pipeline",
+          "artifactObjectId": null,
+          "artifactName": "ml-experimental"
         }
       ],
-      "loc": "460 320"
+      "loc": "1140 300"
     },
     {
       "id": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
       "type": "distribute data",
       "name": "Serve Ontologies",
-      "description": "Package your items for distribution as customized, easy-to-use apps.",
+      "description": "Create the preview ontology through a separate operator-run notebook; it is not part of setup-pipeline.",
       "items": [
         {
           "artifactUniqueId": "Ontology:ab4766aa-2ebf-4b76-86b6-7efe733d918d",
@@ -356,9 +390,16 @@
     },
     {
       "id": "-6",
-      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "source": "333311ac-9b2e-4cfc-898c-cb63347b6988",
       "target": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-13",
+      "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "target": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
+      "fromPort": "bottom",
       "toPort": "left"
     },
     {
@@ -367,13 +408,6 @@
       "target": "333311ac-9b2e-4cfc-898c-cb63347b6988",
       "fromPort": "bottom",
       "toPort": "top"
-    },
-    {
-      "id": "-9",
-      "source": "333311ac-9b2e-4cfc-898c-cb63347b6988",
-      "target": "32712835-c4fe-4073-aed8-195eceb57619",
-      "fromPort": "top",
-      "toPort": "bottom"
     },
     {
       "id": "-10",
@@ -399,5 +433,5 @@
   ],
   "id": "adf6a8f1-8129-4a69-a7f7-80c21c32edf6",
   "name": "Retail Demo",
-  "description": ""
+  "description": "Source-controlled task flow deployed through an undocumented metadata endpoint."
 }

@@ -12,6 +12,9 @@ import pytest
 
 from deploy.scripts import export_items, export_pipelines
 
+TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+ACCESS_TOKEN = "request-contract-token"  # noqa: S105 - synthetic test token
+
 
 def _b64(payload: object) -> str:
     text = payload if isinstance(payload, str) else json.dumps(payload)
@@ -21,9 +24,52 @@ def _b64(payload: object) -> str:
 def test_export_clients_accept_selected_auth_mode() -> None:
     assert "auth_mode" in inspect.signature(export_items.build_session).parameters
     assert "auth_mode" in inspect.signature(export_items.export_items).parameters
+    assert "tenant_id" in inspect.signature(export_items.build_session).parameters
+    assert "tenant_id" in inspect.signature(export_items.export_items).parameters
     assert (
         "auth_mode" in inspect.signature(export_pipelines.export_pipelines).parameters
     )
+    assert (
+        "tenant_id" in inspect.signature(export_pipelines.export_pipelines).parameters
+    )
+
+
+def test_build_session_uses_bearer_header_and_configured_tenant(
+    monkeypatch,
+) -> None:
+    calls: dict[str, object] = {}
+    credential = object()
+
+    def fake_build_credential(
+        auth_mode: str,
+        *,
+        tenant_id: str | None,
+    ) -> object:
+        calls["auth_mode"] = auth_mode
+        calls["tenant_id"] = tenant_id
+        return credential
+
+    monkeypatch.setattr(export_items, "build_credential", fake_build_credential)
+    monkeypatch.setattr(
+        export_items,
+        "_token",
+        lambda scope, provided: (
+            calls.update(scope=scope, credential=provided) or ACCESS_TOKEN
+        ),
+    )
+
+    session = export_items.build_session(
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+    )
+
+    assert session.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
+    assert calls == {
+        "auth_mode": "azure_powershell",
+        "tenant_id": TENANT_ID,
+        "scope": export_items.FABRIC_SCOPE,
+        "credential": credential,
+    }
 
 
 @pytest.mark.parametrize(
@@ -48,6 +94,8 @@ def test_export_main_passes_selected_auth_mode(
         str(tmp_path),
         "--auth-mode",
         "azure_powershell",
+        "--tenant-id",
+        TENANT_ID,
     ]
     if module is export_items:
         argv.extend(["--item-type", "DataAgent"])
@@ -65,6 +113,7 @@ def test_export_main_passes_selected_auth_mode(
 
     assert result == 0
     assert calls["auth_mode"] == "azure_powershell"
+    assert calls["tenant_id"] == TENANT_ID
 
 
 def test_write_item_writes_nested_parts_for_data_agent(tmp_path: Path) -> None:

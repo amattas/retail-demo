@@ -2,7 +2,8 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "SemanticModel",
-    "displayName": "retail_model"
+    "displayName": "retail_model",
+    "description": "Active Direct Lake semantic model published only after the required ML contract gate succeeds."
   },
   "config": {
     "version": "2.0",

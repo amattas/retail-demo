@@ -1,25 +1,87 @@
 # ML, ontology, and agent contracts
 
-## Setup-pipeline sequence
+## Pipeline sequence
 
-The current `setup-pipeline` executes:
+The deployment separates data setup, required Reporting dependencies, and
+extended ML:
 
-1. setup notebooks 01 through 04;
-2. ML notebooks 06 through 14;
-3. `30-create-ontology`.
+1. `setup-pipeline` runs setup notebooks 01 through 04.
+2. `ml-required` runs demand forecast, customer segmentation, churn, and
+   stockout producers in parallel.
+3. `15-validate-required-ml-contract` runs only after all four producers
+   succeed.
+4. Reporting can publish only after that exact pipeline run reaches terminal
+   `Completed`.
+5. `full-demo` runs `ml-optional` and `ml-experimental` after Reporting.
 
-The pipeline activities are chained on success. This is broader than the older
-README description of setup notebooks only.
+Optional or experimental failure cannot block required Reporting. Ontology
+creation is a separate manual/preview boundary. The task-flow metadata mirrors
+the runtime order as `Required ML Reporting Gate` -> `Semantic Model` ->
+`Post-Reporting Extended ML`.
 
-## ML notebooks
+## ML contracts
 
 The repository includes demand forecast, market-basket, customer segmentation,
 churn, promotion effectiveness, journey, stockout, delivery, and dynamic
 pricing notebooks.
 
-These notebooks have different maturity and output contracts. Presence in the
-setup pipeline does not make every output a required or verified base table.
-Methodology and contract work is tracked by `IMP-008` and `ENH-007`.
+`contracts/retail-demo.json` records typed support tiers and one contract for
+each of their 14 outputs:
+
+| Tier | Outputs |
+| --- | --- |
+| Required | `demand_forecast`, `customer_segments`, `churn_predictions`, `stockout_risk` |
+| Optional promoted | `product_associations`, `product_recommendations`, `journey_patterns`, `zone_transitions`, `zone_dwell_stats`, `dwell_predictions` |
+| Experimental | `price_elasticity`, `promotion_lift`, `pricing_constraints`, `pricing_recommendations` |
+
+Every contract identifies its producer and source tables, exact output schema
+and grain, as-of and lineage fields, intended use, and limitations. Producer
+notebooks declare the same schema and validate types and non-null constraints
+immediately before writing that exact physical target. Required contracts
+additionally reference the active TMDL projection and the runtime validator.
+This checked agreement prevents the manifest from becoming an independent,
+unvalidated physical schema.
+
+For all four required outputs, `generated_at` is the true Gold publication
+timestamp and `model_run_id` identifies that generation. Source/business
+cutoffs remain separate lineage: `source_as_of` for demand, `segmented_at` for
+segments, `prediction_date` for churn, and `predicted_at` plus
+`inventory_as_of` for stockout. Readiness orders and ages `generated_at` from
+the same row as a nonblank run ID; it never treats a business as-of date as a
+generation timestamp.
+
+The runtime validator creates no tables. It rejects missing/empty required
+outputs, incompatible columns or types, null/duplicate grain keys, invalid
+probabilities or bounds, NaN or infinity in any floating output, missing
+as-of/lineage, and incomplete forecast horizons. Repository validation parses
+the validator's required grain, as-of, lineage, probability, and horizon rules
+and compares them exactly with the manifest.
+
+Demand evaluation freezes store/product eligibility at the training cutoff;
+current production inference selects its cohort independently. Churn and
+stockout partition on label-availability dates and purge 90-day and three-day
+forward-label horizons, respectively.
+
+Churn retains hidden nullable `is_churned_actual` solely as a deprecated
+compatibility projection and always writes it as null. All formerly exposed
+required columns remain present, so a failed required-ML gate can leave the
+previous Reporting artifact query-compatible while Reporting publication stays
+blocked.
+
+Optional and experimental corrections are also contract-bound:
+
+- recommendation support, confidence, and lift come from one singleton-pair
+  market-basket rule;
+- promotion prices use net extended cents per unit and comparisons include only
+  episodes with complete baseline and post windows inside each store's observed
+  receipt range;
+- delivery training uses matched `cusn` Bronze lifecycle events, partitions on
+  departure-time label availability with a purge, and scores only unmatched
+  arrivals with arrival-known features; missing sources or no inference-ready
+  arrivals fail before replacing prior output;
+- pricing uses a non-null no-estimate evidence sentinel, advances cooldown state
+  only for accepted price changes, and applies the log-log quantity response
+  `(new_price / old_price) ** elasticity - 1`.
 
 ## Semantic-model dependency
 
@@ -30,8 +92,11 @@ The active semantic model currently references four ML output tables:
 - `demand_forecast`
 - `stockout_risk`
 
-A default setup that publishes the active report therefore needs either those
-tables or an explicit gating/empty-state design.
+`core` does not publish ML or Reporting. `standard` and `full-demo` use the
+required runtime gate; a skipped, failed, cancelled, deduplicated, or unknown
+run status performs no Reporting publication and records a journal failure.
+On an upgrade, an already deployed report is left in place rather than replaced
+with an artifact built against an unvalidated schema.
 
 ## Ontology
 
@@ -43,13 +108,15 @@ tables or an explicit gating/empty-state design.
 - prefers update-in-place for an existing ontology;
 - falls back to delete/recreate with polling and retry behavior when needed.
 
-The ontology is created after ML in `setup-pipeline`, so task-flow and
-ontology-agent bindings may require a post-pipeline rebind.
+Ontology creation is not part of the required ML pipeline. Run it deliberately
+after its preview/capacity boundaries are accepted, then use the acknowledged
+`post-ontology` command to publish Data Agents and task flow.
 
 ## Data Agents
 
 Source-controlled Data Agent definitions reference authoring-workspace GUIDs.
-Deployment rewrites:
+They are not staged during initial `full-demo` publication. After ontology
+creation is validated, the post-ontology phase rewrites:
 
 - `workspaceId`
 - semantic-model `artifactId`

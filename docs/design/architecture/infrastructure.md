@@ -11,7 +11,7 @@ flowchart TB
         Stage[Artifact staging]
         Publish[fabric-cicd]
         KQL[Ordered KQL application]
-        TaskFlow[Task-flow deploy]
+        PostOntology[Post-ontology agent/task-flow deploy]
     end
 
     subgraph Workspace[Fabric workspace]
@@ -32,7 +32,7 @@ flowchart TB
     CLI --> TF --> Workspace
     CLI --> Stage --> Publish --> Workspace
     CLI --> KQL --> KDB
-    CLI --> TaskFlow --> Workspace
+    CLI --> PostOntology --> Workspace
     Workspace --> LH
     Workspace --> EH --> KDB
     Workspace --> Setup
@@ -63,23 +63,26 @@ identity.
 | `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
 | `Reporting` | Semantic model and report |
 | `ML` | ML experiment shells |
-| `Data Agents` | Semantic-model and ontology agents |
+| `Data Agents` | Semantic-model and ontology agents, post-ontology only |
 
 ## Pipeline topology
 
 | Pipeline | Actual scope | Schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04, ML 06-14, ontology | On demand |
+| `setup-pipeline` | Setup 01-04 | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
-| `daily-maintenance` | Delta maintenance | Daily schedule enabled |
-| `machine-learning` | ML 06-14 | On demand |
+| `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |
+| `ml-required` | Four required producers, then contract validator | On demand; terminal Reporting gate |
+| `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
+| `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
 
 ## External dependencies
 
 - Microsoft Fabric tenant and capacity
 - Terraform 1.8 or later, below 2.0
-- Azure CLI for guided setup; Azure CLI or Azure PowerShell for direct deploy
+- Azure CLI for guided setup and Terraform, or Azure PowerShell for Python
+  clients with validated `--skip-terraform` outputs/provider credentials
 - `fabric-cicd`
 - `azure-identity`
 - `azure-kusto-data`
@@ -96,10 +99,13 @@ concurrent full deploys from separate checkouts.
 
 ## Current constraints
 
-- The default deploy inventory is broader than a GA-safe core profile.
+- The default `core` inventory is preview-free; `full-demo` is the explicitly
+  acknowledged preview/manual boundary.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
-- Local validation does not yet prove live workspace readiness.
+- Offline validation does not prove live workspace readiness. The separate
+  profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
+  surfaces; actual workspace evidence remains external.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).

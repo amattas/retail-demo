@@ -5,10 +5,18 @@
 ### IMP-005 - Enforce one live data contract across Eventhouse, Lakehouse, and Power BI {#imp-005}
 
 - **Priority / effort:** P2 / L
-- **Outcome:** One manifest owns event fields, types, nullability, business
-  keys, timestamps, target tables, and downstream coverage.
+- **Outcome:** One manifest owns stable event/path metadata, keys, timestamps,
+  targets, and downstream coverage while validation derives physical fields,
+  types, and nullability from authoritative sources.
 - **Acceptance:** Fixture tests prove every payload-to-model path and document
   intentional streaming-only or historical-only exceptions.
+- **Repository status:** Complete. The manifest declares 18 emitted events, 19
+  paths (including derived attribution), and four owned exceptions. Validation
+  derives physical fields/types/nullability from authoritative sources; eight
+  scenarios and a 23-event fixture set cover the acceptance matrix.
+- **Open external boundary:** Capture a live Fabric staging run through
+  Eventhouse, optional Silver/Gold projection, and Direct Lake. The
+  non-mutating repository gate is `python scripts/check_data_contracts.py`.
 
 ## Settled — do not reopen
 

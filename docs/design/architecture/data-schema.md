@@ -50,7 +50,7 @@ The KQL scripts define five core and three pricing materialized views.
 `dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`,
 `dim_customers`, `dim_products`, `dim_date`.
 
-### Facts (18)
+### Facts (19)
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
@@ -93,7 +93,7 @@ flowchart LR
     Generation[Historical generator] --> Silver[7 dimensions + 19 facts]
     Projection --> Silver
     Silver --> Gold[10 aggregates]
-    Silver --> Model[38-table Direct Lake model]
+    Silver --> Model[40-table Direct Lake model]
     Gold --> Model
     ML[4 active ML outputs] --> Model
 ```

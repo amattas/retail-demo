@@ -12,8 +12,8 @@ The model is Direct Lake over the Lakehouse and has 40 active tables:
 - four ML outputs: `churn_predictions`, `customer_segments`,
   `demand_forecast`, and `stockout_risk`
 
-It is not a hybrid KQL/DirectQuery model. Additional ML definitions outside the
-active model are future or experimental assets.
+It is not a hybrid KQL/DirectQuery model. The six optional and four
+experimental ML outputs are intentionally outside the active model.
 
 ## Report
 
