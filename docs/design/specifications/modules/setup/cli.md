@@ -9,14 +9,26 @@
 
 The shell wrappers converge on the Python guided setup.
 
+Before dependencies are installed, `scripts/solution_manifest.py` reads the
+manifest version/hash, prerequisites, canonical examples, and profile
+names/default/publication expectations. `scripts/setup.py` derives its tool
+checks, profile choices, and profile default from that projection and validates
+its Python minimum against the manifest and utility package constraint.
+
 The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
-editable utility plus `azure-identity`, `azure-kusto-data`, and `fabric-cicd`.
-The lower-level deploy framework supports Azure PowerShell, but the guided
-prerequisite check still expects Azure CLI.
+editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`, and
+`pyodbc`.
+The lower-level deploy framework supports Azure PowerShell for Python Fabric
+clients only. Terraform still requires Azure CLI or a separately configured
+provider credential; alternatively, reuse validated outputs with
+`--skip-terraform`. The guided prerequisite check expects Azure CLI.
+Live Lakehouse freshness checks also require Microsoft ODBC Driver 17 or 18
+for SQL Server; the Python dependency set cannot install this operating-system
+driver.
 
 ## `configure`
 
-`retail-setup configure --workspace-name <name>` writes:
+`retail-setup configure --workspace-name <name> --profile <profile>` writes:
 
 - ignored `deploy/config/environments/<env>.yml`
 - ignored `utility/config.yaml`
@@ -35,7 +47,11 @@ The active non-interactive inputs include:
 
 The CLI derives `start_date` and `end_date` from `months` with an end date of
 yesterday. The configuration model still accepts explicit dates for backward
-compatibility, but public examples use `--months`.
+compatibility, but public examples use `--months`. `core` defaults to three
+months. Profiles with required ML/Reporting default to 18 months and reject
+windows shorter than 540 days because the required churn feature window,
+90-day forward labels, and purged train/calibration/test partitions cannot be
+trained coherently on shorter history.
 
 ## `render`
 
@@ -81,23 +97,45 @@ Common flags:
 `--recreate` and `--skip-terraform` cannot be combined. A non-dry-run deploy
 loads the environment, validates the current Azure CLI tenant where applicable,
 detects an existing workspace for interactive reset, executes the deployment
-plan, deploys the task flow, and can start `setup-pipeline`.
+plan, and deploys the task flow where selected.
 
-`setup-pipeline` runs asynchronously and currently includes setup notebooks,
-ML notebooks 06 through 14, and ontology creation.
+`setup-pipeline` includes only setup notebooks 01 through 04. For profiles that
+publish Reporting, deploy then runs `ml-required` with terminal polling. Its
+four producers feed `15-validate-required-ml-contract`; only exact-run success
+allows a second publication phase to stage the semantic model and report.
+`full-demo` runs `ml-optional` and `ml-experimental` afterward.
 
-`--yes` pre-confirms Terraform apply but suppresses the interactive
-setup-pipeline prompt. `--skip-terraform` rejects missing, placeholder,
+`--yes` pre-confirms Terraform apply but does not skip required pipeline gates.
+`--skip-terraform` rejects missing, placeholder,
 incomplete, or wrong-workspace Terraform outputs before publication.
 `--recreate` polls for workspace-name release for up to 180 seconds between
 destroy and apply.
 
+For standard and full-demo, deployment finishes with a read-only live
+readiness verification. It never triggers an additional pipeline. Required
+failed/unknown evidence fails deployment, while optional failed/unknown
+evidence records a degraded run.
+
+## `verify`
+
+`retail-setup verify --env <name>` queries profile-selected live items,
+definitions, task flow, KQL objects, schedules, pipeline jobs, and freshness
+signals. It writes
+`deploy/.generated/<env>/readiness-report.json` atomically and returns `0` for
+success, `1` for required failure/unknown, `2` for usage, or `3` for optional
+degradation.
+
+The default is read-only. `--run-pipeline` is the only mutating verifier flag;
+it explicitly starts and waits for the profile-required post-publish pipeline.
+It is rejected for profiles without that pipeline and does not start streaming
+or other workloads.
+
 ## Output behavior
 
 CLI output is linear plain text with ASCII separators. Required command
-failures propagate from the plan. Task-flow and setup-pipeline fallback behavior
-is documented in the [deployment specification](../deployment/framework.md) and
-[operations runbook](../operations/runbook.md).
+failures propagate from the plan. Task-flow and pipeline gate/failure behavior
+is documented in the [deployment specification](../deployment/framework.md)
+and [operations runbook](../operations/runbook.md).
 
 ## Evidence
 

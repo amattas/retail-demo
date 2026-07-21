@@ -52,7 +52,8 @@ Payload fields are event-specific and mapped by `EVENT_PAYLOADS`.
 
 KQL defines an additional `unknown_event` catch-all table. It is not a
 nineteenth generated business event. The current notebook rejects unmapped
-event types before committing the micro-batch checkpoint.
+event types before committing the micro-batch checkpoint. The catch-all is an
+operational queued-ingestion boundary, not an active direct-writer DLQ.
 
 ## Eventhouse writes
 
@@ -93,7 +94,8 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
   inputs, so reruns do not accumulate aggregate rows.
 
 These controls make expected retries idempotent and are covered by injected
-failure/replay contracts. Live workspace readiness and freshness remain
+failure/replay contracts. The readiness adapter checks live ingestion and
+checkpoint tags; actual workspace evidence remains
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Cross-layer ownership
@@ -106,6 +108,12 @@ Silver mappings are separately implemented in
 `fabric/lakehouse/03-streaming-to-silver.ipynb`. Their current divergence from
 the historical contract is documented in
 [Fabric analytics](../analytics/fabric-analytics.md).
+
+`contracts/retail-demo.json` declares one stable path ID per emitted event and
+one derived attribution path. It stores keys, UTC event-time semantics,
+targets, terminals, and named exceptions, but never copies physical field or
+type inventories. `python scripts/check_data_contracts.py` derives those
+inventories from the driver, KQL, `schemas.py`, notebooks, and active TMDL.
 
 ## Truck lifecycle
 
@@ -154,7 +162,15 @@ tests cover batch determinism, live payload/KQL mappings, Silver/Gold wiring,
 semantic measures, and all cent equations. A live Fabric smoke run remains the
 deployment verification gate.
 
-## Known scenario defects
+## Contract evidence and live boundary
 
-- One shared event/table manifest and fixture suite are still required
-  (`IMP-005`).
+Eight fixture scenarios cover all 18 emitted types plus nullable and
+unknown-event variants. The parameterized matrix validates the nine-field
+envelope, KQL DDL/mappings, UTC values, business/dedupe keys, Silver/Gold
+routes, and either an active semantic terminal or the named streaming-only
+exception.
+
+Repository acceptance for `IMP-005` is complete. A live Fabric staging run
+through Eventhouse, the optional Silver/Gold projection, and Direct Lake
+remains the external evidence boundary; the static check does not claim that
+tenant-level execution.

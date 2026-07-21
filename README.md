@@ -12,8 +12,8 @@ Prerequisites:
 - Git
 - Python 3.11 or later
 - Terraform 1.8 or later, below 2.0
-- Azure CLI for the guided bootstrap; Azure CLI or Azure PowerShell for the
-  lower-level deployment framework
+- Azure CLI for the guided bootstrap and Terraform; Azure PowerShell is
+  supported for Python deployment clients, not as a Terraform credential
 
 Run the guided bootstrap:
 
@@ -41,7 +41,7 @@ For a manually managed Python environment:
 ```powershell
 python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
 python -m pip install --no-deps -e .\utility
-retail-setup configure --workspace-name retail-demo-alice --months 3 --store-count 50 --seed 42
+retail-setup configure --workspace-name retail-demo-alice --profile core --months 3 --store-count 50 --seed 42
 retail-setup render --env alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice --yes
@@ -50,16 +50,31 @@ retail-setup deploy --env alice --yes
 Rendering produces five workspace-specific notebooks in `utility\out\`:
 setup 01 through 04 and `stream-events.ipynb`.
 
-`--yes` pre-confirms the Terraform apply gate but does not start the setup
-pipeline. Run setup notebooks 01-04 or trigger `setup-pipeline` after deploy.
+For the default `core` profile, `--yes` pre-confirms the Terraform apply gate
+but does not run data setup. Run setup notebooks 01-04 after deploy. Reporting
+profiles run setup and required ML gates automatically; `--yes` does not skip
+them.
+
+After the selected workloads run, verify live items, bindings, pipeline
+evidence, and freshness:
+
+```powershell
+retail-setup verify --env alice
+```
+
+The Python deploy requirements include `pyodbc`; live Lakehouse checks also
+require Microsoft ODBC Driver 17 or 18 for SQL Server. Standard/full-demo
+deployment runs this verifier read-only. Use `--run-pipeline` only as an
+explicit operator request to start the profile-required post-publish pipeline.
 
 ## What is deployed
 
 - Lakehouse Silver (`ag`): seven dimensions and nineteen facts
 - Lakehouse Gold (`au`): ten aggregate tables
-- Eventhouse/KQL: eighteen typed business event tables plus query assets
+- Eventhouse/KQL: eighteen emitted business-event tables plus the
+  `unknown_event` catch-all and query assets
 - ML and AI: four active Power BI ML outputs, ontology, and two Data Agents
-- Power BI: a 38-table Direct Lake semantic model and report
+- Power BI: a 40-table Direct Lake semantic model and report
 
 The setup notebooks generate historical data directly in Fabric. The optional
 stream notebook writes typed events directly to Eventhouse through the Spark
@@ -68,6 +83,7 @@ Kusto connector.
 ## Documentation
 
 - [Getting started](docs/guides/getting-started.md)
+- [Workspace and profile inventory](docs/guides/workspace-inventory.md)
 - [Deployment](docs/guides/deployment.md)
 - [Demo script](docs/guides/demo-script.md)
 - [Operations](docs/guides/operations.md)

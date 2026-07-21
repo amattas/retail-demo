@@ -8,6 +8,7 @@ serves analytics through KQL, Power BI, ontology, and data-agent surfaces.
 ## Start here
 
 - [Set up a workspace](guides/getting-started.md)
+- [Choose a profile and inspect its inventory](guides/workspace-inventory.md)
 - [Deploy and update a workspace](guides/deployment.md)
 - [Tour a deployed workspace](guides/deployed-walkthrough.md)
 - [Present the demo](guides/demo-script.md)
@@ -29,9 +30,10 @@ serves analytics through KQL, Power BI, ontology, and data-agent surfaces.
 | Ontology and agents | ontology notebook and `fabric/data-agents/` |
 
 The base historical contract contains seven dimensions, nineteen fact tables,
-and ten Gold aggregates. The live driver emits eighteen typed event types.
-Optional ML, ontology, dashboard, rule, and agent surfaces have separate
-deployment and support gates.
+and ten Gold aggregates. The live driver emits eighteen business event types;
+KQL adds the non-emitted `unknown_event` catch-all. The active semantic model
+contains 40 tables. Optional ML, ontology, dashboard, rule, and agent surfaces
+have separate deployment and support gates.
 
 ## Documentation model
 

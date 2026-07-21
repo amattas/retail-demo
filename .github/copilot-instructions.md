@@ -21,7 +21,7 @@ The system has three stages that most tasks touch:
    Fabric workspace. `apply_kql.py` runs KQL scripts and needs `azure-kusto-data`.
 3. **`fabric/` — deployed assets.** `kql_database/` (Eventhouse event tables,
    functions, materialized views), `lakehouse/` (PySpark Bronze→Silver→Gold
-   notebooks + ML), `pipelines/`, `powerbi/` (38-table DirectLake semantic model),
+   notebooks + ML), `pipelines/`, `powerbi/` (40-table DirectLake semantic model),
    plus `dashboards/`, `data-agents/`, `querysets/`, `rules/`, `taskflow/`.
 
 **Data flow:** setup notebooks write the base historical contract directly to

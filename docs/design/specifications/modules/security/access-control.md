@@ -6,6 +6,7 @@
 | --- | --- |
 | Interactive deploy | Azure CLI or Azure PowerShell operator |
 | Fabric REST and item deployment | Operator-derived token/credential |
+| Fabric Terraform provider | Azure CLI or explicit service-principal, OIDC, or managed identity; never Azure PowerShell session state |
 | KQL schema application | Local deploy process with Eventhouse permissions |
 | Streaming notebook | Fabric notebook runtime identity |
 | Report/KQL/agent consumption | Assigned Fabric/Power BI consumer identity |

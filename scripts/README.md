@@ -17,8 +17,10 @@ runs `retail-setup configure` and `render`, authenticates to the configured
 tenant, and optionally deploys.
 
 The guided prerequisite check installs or requires Git, Terraform, and Azure
-CLI. The lower-level framework also supports Azure PowerShell when
-`auth.mode: azure_powershell` is configured.
+CLI. The lower-level framework supports Azure PowerShell for Python Fabric
+clients when `auth.mode: azure_powershell` is configured. Terraform requires
+validated `--skip-terraform` outputs or a separate provider-supported
+credential because it cannot consume Azure PowerShell session state.
 
 Common flags:
 

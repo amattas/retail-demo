@@ -106,4 +106,7 @@ Avoid using these as headline proof points without the stated qualification:
   recorded.
 - Marketing attribution and ROAS are implemented and contract-tested; do not
   present them as live-validated until a Fabric smoke run has been recorded.
-- Ungated ML output: [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008)
+- Required ML publication is fail-closed locally, but do not present it as
+  live-validated until the fresh-workspace
+  [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008) run is
+  recorded.

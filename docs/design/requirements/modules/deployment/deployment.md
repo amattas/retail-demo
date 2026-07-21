@@ -14,8 +14,12 @@ post-deploy work.
 
 ### REQ-DEPLOY-003 - Authentication modes
 
-Azure CLI and Azure PowerShell authentication modes shall target the configured
-tenant and pass real bearer credentials to every required Fabric operation.
+Azure CLI and Azure PowerShell Python-client authentication modes shall target
+the configured tenant and pass real bearer credentials to every required
+Fabric API operation. Azure PowerShell session state shall never be presented
+as a Fabric Terraform provider credential. Apply/destroy shall require a
+provider-supported credential; otherwise deployment shall require validated
+outputs with `--skip-terraform`.
 
 ### REQ-DEPLOY-004 - Honest result
 

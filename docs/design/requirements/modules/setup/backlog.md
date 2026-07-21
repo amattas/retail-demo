@@ -5,7 +5,7 @@
 ### ENH-005 - Publish persona-led demo journeys, presets, and prompt packs {#enh-005}
 
 - **Priority / effort:** Idea / M
-- **Outcome:** `lite`, `standard`, and `full-demo` presets have known runtimes,
+- **Outcome:** `core`, `standard`, and `full-demo` presets have known runtimes,
   expected assets, presenter controls, and persona-specific questions.
 - **Acceptance:** A presenter can choose a preset and reproduce its documented
   "wow moment" without inventing setup steps.

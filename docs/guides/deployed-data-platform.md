@@ -21,7 +21,9 @@ notebooks are grouped into repeatable operations:
 
 - `historical-data-load` creates the durable historical foundation.
 - `streaming-data-load` runs Silver transformation before Gold aggregation.
-- `machine-learning` groups the optional model-training notebooks.
+- `ml-required` runs the four Reporting producers and contract validator.
+- `ml-optional` and `ml-experimental` isolate full-demo extensions after
+  Reporting.
 
 === "Streaming transforms"
 
@@ -34,8 +36,9 @@ notebooks are grouped into repeatable operations:
 
     ![Machine-learning pipeline](../assets/screenshots/pipeline-machine-learning.png)
 
-    *The ML pipeline groups demand, churn, market-basket, promotion, and
-    pricing notebooks into a managed execution surface.*
+    *This legacy screenshot shows the former combined canvas. Current
+    deployments separate required, optional, and experimental ML pipelines so
+    extended-model failures cannot block Reporting.*
 
 The pipeline canvas shows orchestration order. Use the **Run** history and
 activity output, not the presence of a green dependency arrow, as execution

@@ -7,12 +7,27 @@ on:
       - '*.*.*'
       - 'v*.*.*'
     paths:
+      - 'README.md'
+      - 'contracts/retail-demo.json'
+      - 'deploy/README.md'
+      - 'deploy/config/deploy.yml'
+      - 'deploy/scripts/**'
+      - 'deploy/terraform/providers.tf'
       - 'docs/**'
+      - 'fabric/**'
+      - 'scripts/setup.py'
+      - 'scripts/solution_manifest.py'
       - 'scripts/docs_versioning.py'
       - 'scripts/publish_versioned_docs.py'
+      - 'tests/docs/**'
+      - 'utility/README.md'
+      - 'utility/pyproject.toml'
+      - 'utility/src/retail_setup/**'
       - 'zensical.toml'
       - 'requirements-docs.in'
       - 'requirements-docs.txt'
+      - 'requirements-test.in'
+      - 'requirements-test.txt'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -38,6 +53,9 @@ jobs:
       - name: Install documentation tools
         run: |
           python -m pip install --disable-pip-version-check --require-hashes -r requirements-docs.txt
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements-test.txt
+      - name: Validate documentation contracts
+        run: python -m pytest tests/docs -q
       - name: Configure Git author
         run: |
           git config user.name "github-actions[bot]"
