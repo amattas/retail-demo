@@ -43,6 +43,16 @@ output "spark_custom_pool_id" {
   description = "Custom Spark pool item ID when the custom pool is enabled."
 }
 
+output "spark_realtime_pool_id" {
+  value       = var.spark_realtime_pool_enabled ? fabric_spark_custom_pool.realtime[0].id : null
+  description = "Secondary real-time Spark pool item ID when enabled (null otherwise)."
+}
+
+output "spark_realtime_pool_name" {
+  value       = var.spark_realtime_pool_enabled ? fabric_spark_custom_pool.realtime[0].name : null
+  description = "Secondary real-time Spark pool name to select in notebook compute settings (null when disabled)."
+}
+
 output "clickstream_eventhouse_id" {
   value       = var.clickstream_enabled ? fabric_eventhouse.clickstream[0].id : null
   description = "Clickstream Eventhouse item ID (null when clickstream is disabled)."

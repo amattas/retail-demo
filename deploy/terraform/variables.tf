@@ -163,3 +163,38 @@ variable "spark_max_node_count" {
   default     = 10
   description = "Custom Spark pool autoscale maximum node count. The F64 default of 10 Medium (8 vCore) nodes = 80 vCores, inside an F64's 128 base Spark vCores (no bursting)."
 }
+
+variable "spark_realtime_pool_enabled" {
+  type        = bool
+  default     = false
+  description = "Create a secondary, non-default custom Spark pool for lightweight real-time workloads (e.g. the clickstream-generator notebook). Not set as the workspace default pool."
+}
+
+variable "spark_realtime_pool_name" {
+  type        = string
+  default     = "retail_realtime_pool"
+  description = "Display name for the secondary real-time Spark pool."
+}
+
+variable "spark_realtime_node_size" {
+  type        = string
+  default     = "Small"
+  description = "Secondary real-time Spark pool node size (MemoryOptimized family). One of: Small, Medium, Large, XLarge, XXLarge."
+
+  validation {
+    condition     = contains(["Small", "Medium", "Large", "XLarge", "XXLarge"], var.spark_realtime_node_size)
+    error_message = "spark_realtime_node_size must be one of: Small, Medium, Large, XLarge, XXLarge."
+  }
+}
+
+variable "spark_realtime_min_node_count" {
+  type        = number
+  default     = 1
+  description = "Secondary real-time Spark pool autoscale minimum node count."
+}
+
+variable "spark_realtime_max_node_count" {
+  type        = number
+  default     = 6
+  description = "Secondary real-time Spark pool autoscale maximum node count. Defaults to 6, the Spark node-count ceiling on an F8 capacity."
+}

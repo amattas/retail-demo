@@ -119,3 +119,31 @@ resource "fabric_spark_workspace_settings" "main" {
     }
   }
 }
+
+# Secondary, non-default custom Spark pool for lightweight real-time workloads
+# (e.g. the standalone clickstream-generator notebook). Sized to fit smaller
+# capacities: on an F8 the Spark node-count ceiling is 6, so this pool defaults
+# to 1-6 Small (4 vCore) nodes = 24 vCores max. It is deliberately NOT registered
+# as the workspace default_pool, so interactive notebook runs must select it from
+# the notebook's compute/pool dropdown. Creating it does not change the default
+# pool used by the setup pipeline.
+resource "fabric_spark_custom_pool" "realtime" {
+  count        = var.spark_realtime_pool_enabled ? 1 : 0
+  workspace_id = local.workspace_id
+  name         = var.spark_realtime_pool_name
+  node_family  = "MemoryOptimized"
+  node_size    = var.spark_realtime_node_size
+  type         = "Workspace"
+
+  auto_scale = {
+    enabled        = true
+    min_node_count = var.spark_realtime_min_node_count
+    max_node_count = var.spark_realtime_max_node_count
+  }
+
+  dynamic_executor_allocation = {
+    enabled       = true
+    min_executors = 1
+    max_executors = max(var.spark_realtime_max_node_count - 1, 1)
+  }
+}

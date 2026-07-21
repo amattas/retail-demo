@@ -102,6 +102,12 @@ class SparkConfig:
     When ``use_custom_pool`` is true the deploy creates a workspace custom Spark
     pool and makes it the workspace default pool so the setup pipeline notebooks
     run on it. Defaults are tuned for an F64 capacity (128 base Spark vCores).
+
+    When ``realtime_pool_enabled`` is true the deploy also creates a secondary,
+    non-default custom pool for lightweight real-time workloads (e.g. the
+    clickstream-generator notebook). It is not registered as the workspace
+    default pool and defaults to 1-6 Small nodes to fit an F8 capacity, whose
+    Spark node-count ceiling is 6.
     """
 
     use_custom_pool: bool
@@ -109,6 +115,11 @@ class SparkConfig:
     node_size: str
     min_node_count: int
     max_node_count: int
+    realtime_pool_enabled: bool = False
+    realtime_pool_name: str = "retail_realtime_pool"
+    realtime_node_size: str = "Small"
+    realtime_min_node_count: int = 1
+    realtime_max_node_count: int = 6
 
 
 @dataclass(frozen=True)
@@ -279,6 +290,13 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             node_size=str(spark.get("node_size", "Medium")),
             min_node_count=int(spark.get("min_node_count", 1)),
             max_node_count=int(spark.get("max_node_count", 10)),
+            realtime_pool_enabled=bool(spark.get("realtime_pool_enabled", False)),
+            realtime_pool_name=str(
+                spark.get("realtime_pool_name", "retail_realtime_pool")
+            ),
+            realtime_node_size=str(spark.get("realtime_node_size", "Small")),
+            realtime_min_node_count=int(spark.get("realtime_min_node_count", 1)),
+            realtime_max_node_count=int(spark.get("realtime_max_node_count", 6)),
         ),
         deployment=DeploymentConfig(
             item_types_in_scope=[
@@ -339,6 +357,15 @@ def render_tfvars(config: DeployConfig) -> str:
         values["spark_node_size"] = config.spark.node_size
         values["spark_min_node_count"] = config.spark.min_node_count
         values["spark_max_node_count"] = config.spark.max_node_count
+
+    # Secondary, non-default real-time pool is independently opt-in; emit its
+    # sizing only when enabled so unrelated environments stay minimal.
+    values["spark_realtime_pool_enabled"] = config.spark.realtime_pool_enabled
+    if config.spark.realtime_pool_enabled:
+        values["spark_realtime_pool_name"] = config.spark.realtime_pool_name
+        values["spark_realtime_node_size"] = config.spark.realtime_node_size
+        values["spark_realtime_min_node_count"] = config.spark.realtime_min_node_count
+        values["spark_realtime_max_node_count"] = config.spark.realtime_max_node_count
 
     # Clickstream resources are opt-in; only emit their names when enabled so a
     # disabled environment's tfvars stays minimal.

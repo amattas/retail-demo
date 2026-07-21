@@ -10,7 +10,8 @@ terraform {
 }
 
 provider "fabric" {
-  # fabric_spark_custom_pool is a preview resource; enable preview mode only when
-  # the custom pool is requested. Provider config can reference input variables.
-  preview = var.spark_custom_pool_enabled
+  # fabric_spark_custom_pool is a preview resource; enable preview mode when
+  # either custom pool (setup or realtime) is requested. Provider config can
+  # reference input variables.
+  preview = var.spark_custom_pool_enabled || var.spark_realtime_pool_enabled
 }

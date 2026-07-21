@@ -73,6 +73,29 @@ def test_render_tfvars_spark_pool_toggle() -> None:
     assert 'spark_custom_pool_name = "retail_setup_pool"' in tfvars
 
 
+def test_render_tfvars_realtime_pool_toggle() -> None:
+    base = deploy_config.load_environment("dev")
+
+    disabled = replace(
+        base, spark=replace(base.spark, realtime_pool_enabled=False)
+    )
+    enabled = replace(
+        base, spark=replace(base.spark, realtime_pool_enabled=True)
+    )
+
+    # Off: emit only the toggle, no secondary-pool sizing.
+    off_tfvars = deploy_config.render_tfvars(disabled)
+    assert "spark_realtime_pool_enabled = false" in off_tfvars
+    assert "spark_realtime_node_size" not in off_tfvars
+
+    tfvars = deploy_config.render_tfvars(enabled)
+    assert "spark_realtime_pool_enabled = true" in tfvars
+    assert 'spark_realtime_pool_name = "retail_realtime_pool"' in tfvars
+    assert 'spark_realtime_node_size = "Small"' in tfvars
+    assert "spark_realtime_min_node_count = 1" in tfvars
+    assert "spark_realtime_max_node_count = 6" in tfvars
+
+
 def test_render_tfvars_clickstream_toggle() -> None:
     base = deploy_config.load_environment("dev")
 
