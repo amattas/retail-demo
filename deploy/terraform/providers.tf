@@ -12,6 +12,9 @@ terraform {
 }
 
 provider "fabric" {
+  tenant_id = var.tenant_id
+  use_cli   = var.fabric_use_cli
+
   # fabric_spark_custom_pool is a preview resource; enable preview mode only when
   # the custom pool is requested. Provider config can reference input variables.
   preview = var.spark_custom_pool_enabled

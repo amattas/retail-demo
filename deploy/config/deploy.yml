@@ -22,14 +22,12 @@ eventhouse:
   - 06-ml-anomaly-detection.kql
   - 07-pricing-approval-tables.kql
 spark:
-  use_custom_pool: true
+  use_custom_pool: false
   custom_pool_name: retail_setup_pool
   node_size: Medium
   min_node_count: 1
   max_node_count: 10
 notebooks:
-  include:
-  - core
   default_lakehouse_name: retail_lakehouse
 powerbi:
   semantic_model_name: retail_model
@@ -37,6 +35,7 @@ powerbi:
   semantic_model_connection_id: null
   refresh_after_deploy: false
 deployment:
+  profile: core
   item_types_in_scope:
   - Lakehouse
   - Notebook

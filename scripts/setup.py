@@ -8,6 +8,7 @@ before project dependencies are installed.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import platform
 import re
 import shutil
@@ -18,7 +19,52 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_URL = "https://github.com/amattas/retail-demo/blob/main/README.md"
+
+
+def _load_manifest_reader():
+    path = REPO_ROOT / "scripts" / "solution_manifest.py"
+    spec = importlib.util.spec_from_file_location(
+        "_retail_demo_solution_manifest",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load solution manifest reader: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.load_solution_manifest
+
+
+load_solution_manifest = _load_manifest_reader()
+
+BOOTSTRAP_MANIFEST = load_solution_manifest(
+    REPO_ROOT / "contracts" / "retail-demo.json"
+)
+
+
+def _minimum_python() -> tuple[int, int]:
+    requirement = next(
+        prerequisite.requirement
+        for prerequisite in BOOTSTRAP_MANIFEST.prerequisites
+        if prerequisite.id == "prerequisite.python"
+    )
+    match = re.fullmatch(r">=(\d+)\.(\d+)", requirement or "")
+    if match is None:
+        raise RuntimeError("manifest Python requirement must use >=MAJOR.MINOR")
+    return int(match.group(1)), int(match.group(2))
+
+
 MIN_PYTHON = (3, 11)
+if MIN_PYTHON != _minimum_python():
+    raise RuntimeError("scripts/setup.py Python constraint differs from the manifest")
+PROFILE_CHOICES = tuple(
+    profile.deployment_name for profile in BOOTSTRAP_MANIFEST.profiles
+)
+DEFAULT_PROFILE = next(
+    profile.deployment_name
+    for profile in BOOTSTRAP_MANIFEST.profiles
+    if profile.default
+)
 
 # Set from --verbose in main(). When False, routine commands print a short,
 # plain-language progress line instead of the raw command. The raw command is
@@ -182,9 +228,13 @@ def prerequisites() -> dict[str, str]:
     """Command-line tools the setup flow needs, with plain-language reasons."""
 
     return {
-        "git": "Git - to work with the project files",
-        "terraform": "Terraform - to create the Microsoft Fabric resources",
-        "az": "Azure CLI - to sign in to Azure / Fabric",
+        prerequisite.check_command[0]: (
+            f"{prerequisite.name} - {prerequisite.description}"
+        )
+        for prerequisite in BOOTSTRAP_MANIFEST.prerequisites
+        if prerequisite.bootstrap_required
+        and prerequisite.check_command
+        and prerequisite.id != "prerequisite.python"
     }
 
 
@@ -289,8 +339,10 @@ def current_python_env() -> PythonEnv:
     """Use the Python interpreter that launched this setup script."""
 
     if sys.version_info < MIN_PYTHON:
+        minimum = ".".join(map(str, MIN_PYTHON))
         raise SystemExit(
-            "Python 3.11 or later is required. Activate a Python 3.11+ conda "
+            f"Python {minimum} or later is required. Activate a Python "
+            f"{minimum}+ conda "
             "environment or virtual environment, then rerun this script."
         )
     return PythonEnv(
@@ -443,6 +495,7 @@ def run_retail_setup(
     env: PythonEnv,
     *,
     workspace_name: str,
+    profile: str,
     dry_run: bool,
     assume_yes: bool,
     deploy_requested: bool,
@@ -458,6 +511,8 @@ def run_retail_setup(
             "configure",
             "--workspace-name",
             workspace_name,
+            "--profile",
+            profile,
         ],
         dry_run=dry_run,
         label=f"Configuring the project for workspace '{workspace_name}'",
@@ -511,6 +566,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--profile",
+        choices=PROFILE_CHOICES,
+        default=DEFAULT_PROFILE,
+        help=(
+            "Deployment profile selected during configure "
+            f"(default: {DEFAULT_PROFILE})."
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="Print commands without running them."
     )
     parser.add_argument(
@@ -561,6 +625,8 @@ def _run_guided(args: argparse.Namespace) -> int:
     )
     _emit(f"Workspace:   {workspace_name}   (change with --workspace-name)")
     _emit(f"Environment: {workspace_environment_name(workspace_name)}")
+    _emit(f"Profile:     {args.profile}")
+    _emit(f"Manifest:    {BOOTSTRAP_MANIFEST.version}")
     _emit(f"Project:     {REPO_ROOT}")
     if not args.verbose:
         _emit("Tip: add --verbose to see the exact commands being run.")
@@ -586,6 +652,7 @@ def _run_guided(args: argparse.Namespace) -> int:
     run_retail_setup(
         env,
         workspace_name=workspace_name,
+        profile=args.profile,
         dry_run=args.dry_run,
         assume_yes=args.yes,
         deploy_requested=args.deploy or args.recreate,

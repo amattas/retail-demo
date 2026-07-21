@@ -3,11 +3,28 @@ variable "environment" {
   description = "Normalized deployment identity derived from the Fabric workspace name."
 }
 
+variable "deployment_profile" {
+  type        = string
+  default     = "core"
+  description = "Executable manifest profile selected for this environment."
+
+  validation {
+    condition     = contains(["core", "standard", "full-demo"], var.deployment_profile)
+    error_message = "deployment_profile must be core, standard, or full-demo."
+  }
+}
+
 variable "tenant_id" {
   type        = string
   default     = null
   nullable    = true
-  description = "Microsoft Entra tenant ID. Authentication is supplied outside Terraform."
+  description = "Microsoft Entra tenant ID bound explicitly to the Fabric provider."
+}
+
+variable "fabric_use_cli" {
+  type        = bool
+  default     = true
+  description = "Allow the Fabric provider to use Azure CLI. False for Azure PowerShell mode, which requires separate provider-supported credentials."
 }
 
 variable "subscription_id" {
@@ -83,6 +100,12 @@ variable "eventhouse_name" {
   type        = string
   default     = "retail_eventhouse"
   description = "Fabric Eventhouse display name."
+}
+
+variable "eventhouse_enabled" {
+  type        = bool
+  default     = false
+  description = "Provision the Eventhouse and its default KQL database for profiles that select real-time assets."
 }
 
 variable "eventhouse_minimum_consumption_units" {

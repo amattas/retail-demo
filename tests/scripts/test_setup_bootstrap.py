@@ -19,6 +19,18 @@ def _load_setup_module():
 setup = _load_setup_module()
 
 
+def test_setup_default_profile_comes_from_manifest(monkeypatch):
+    declared_default = next(
+        profile.deployment_name
+        for profile in setup.BOOTSTRAP_MANIFEST.profiles
+        if profile.default
+    )
+    monkeypatch.setattr(sys, "argv", ["setup.py"])
+
+    assert setup.DEFAULT_PROFILE == declared_default
+    assert setup.parse_args().profile == declared_default
+
+
 def test_detect_package_manager_prefers_winget_on_windows(monkeypatch):
     monkeypatch.setattr(setup, "_command_exists", lambda command: command == "winget")
 
@@ -177,6 +189,7 @@ def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
     setup.run_retail_setup(
         env,
         workspace_name="retail-demo-qa",
+        profile="core",
         dry_run=True,
         assume_yes=False,
         deploy_requested=False,
@@ -190,6 +203,8 @@ def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
             "configure",
             "--workspace-name",
             "retail-demo-qa",
+            "--profile",
+            "core",
         ],
         ["python", "-m", "retail_setup.cli.main", "render", "--env", "qa"],
     ]
@@ -206,6 +221,7 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
     setup.run_retail_setup(
         env,
         workspace_name="retail-demo-qa",
+        profile="core",
         dry_run=True,
         assume_yes=True,
         deploy_requested=True,
@@ -233,6 +249,7 @@ def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
     setup.run_retail_setup(
         env,
         workspace_name="retail-demo-qa",
+        profile="core",
         dry_run=True,
         assume_yes=True,
         deploy_requested=True,

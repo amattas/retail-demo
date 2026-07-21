@@ -15,7 +15,10 @@ ENVIRONMENT = "dev"
 WORKSPACE_NAME = "retail-demo-dev"
 
 
-def _load_config(tmp_path: Path) -> deploy_config.DeployConfig:
+def _load_config(
+    tmp_path: Path,
+    profile: str = "core",
+) -> deploy_config.DeployConfig:
     environments_root = tmp_path / "config" / "environments"
     environments_root.mkdir(parents=True)
     (environments_root / f"{ENVIRONMENT}.yml").write_text(
@@ -23,6 +26,7 @@ def _load_config(tmp_path: Path) -> deploy_config.DeployConfig:
             {
                 "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "workspace": {"name": WORKSPACE_NAME},
+                "deployment": {"profile": profile},
             }
         ),
         encoding="utf-8",
@@ -35,6 +39,7 @@ def _load_config(tmp_path: Path) -> deploy_config.DeployConfig:
 def _resolved_outputs(config: deploy_config.DeployConfig) -> dict[str, str]:
     return {
         "deployment_environment": config.environment,
+        "deployment_profile": config.deployment.profile,
         "tenant_id": config.tenant_id or "",
         "workspace_id": "11111111-1111-4111-8111-111111111111",
         "workspace_name": config.workspace.name,
@@ -60,22 +65,15 @@ def test_load_environment_merges_defaults_and_environment(tmp_path: Path) -> Non
     assert config.workspace.name == WORKSPACE_NAME
     assert config.lakehouse.name == "retail_lakehouse"
     assert config.powerbi.semantic_model_name == "retail_model"
-    assert config.notebooks.include == ["core"]
-    # Custom Spark pool sizing defaults are F64-tuned. The use_custom_pool toggle
-    # is user-set via `configure` (written into deploy.yml), so assert its type
-    # rather than a specific value — a user enabling the pool must not break this.
-    assert isinstance(config.spark.use_custom_pool, bool)
+    assert config.deployment.profile == "core"
+    assert config.notebooks.include == ["setup"]
+    assert config.eventhouse.enabled is False
+    assert config.spark.use_custom_pool is False
     assert config.spark.node_size == "Medium"
     assert config.spark.max_node_count == 10
     assert config.deployment.item_types_in_scope == [
         "Lakehouse",
         "Notebook",
-        "SemanticModel",
-        "Report",
-        "KQLQueryset",
-        "DataPipeline",
-        "MLExperiment",
-        "DataAgent",
     ]
 
 
@@ -102,18 +100,20 @@ def test_render_tfvars_omits_empty_optional_values(tmp_path: Path) -> None:
     tfvars = deploy_config.render_tfvars(config)
 
     assert f'workspace_name = "{WORKSPACE_NAME}"' in tfvars
+    assert 'tenant_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"' in tfvars
+    assert "fabric_use_cli = true" in tfvars
     assert 'lakehouse_name = "retail_lakehouse"' in tfvars
     assert "existing_workspace_id" not in tfvars
     assert "role_assignments = []" in tfvars
 
+    powershell_config = replace(config, auth_mode="azure_powershell")
+    powershell_tfvars = deploy_config.render_tfvars(powershell_config)
+    assert "fabric_use_cli = false" in powershell_tfvars
+
 
 def test_render_tfvars_spark_pool_toggle(tmp_path: Path) -> None:
-    base = _load_config(tmp_path)
-
-    # Build both states explicitly so the test does not depend on the user-set
-    # use_custom_pool value committed in deploy.yml.
-    disabled = replace(base, spark=replace(base.spark, use_custom_pool=False))
-    enabled = replace(base, spark=replace(base.spark, use_custom_pool=True))
+    disabled = _load_config(tmp_path / "core", "core")
+    enabled = _load_config(tmp_path / "full", "full-demo")
 
     # Off: emit only the toggle, no sizing noise.
     off_tfvars = deploy_config.render_tfvars(disabled)
@@ -126,12 +126,17 @@ def test_render_tfvars_spark_pool_toggle(tmp_path: Path) -> None:
     assert "spark_min_node_count = 1" in tfvars
     assert "spark_max_node_count = 10" in tfvars
     assert 'spark_custom_pool_name = "retail_setup_pool"' in tfvars
+    assert "eventhouse_enabled = true" in tfvars
+
+    invalid = replace(disabled, spark=replace(disabled.spark, use_custom_pool=True))
+    with pytest.raises(ValueError, match="deployment.profile"):
+        deploy_config.render_tfvars(invalid)
 
 
 def test_render_fabric_cicd_config_uses_environment_workspace_id(
     tmp_path: Path,
 ) -> None:
-    config = _load_config(tmp_path)
+    config = _load_config(tmp_path, "standard")
     rendered = deploy_config.render_fabric_cicd_config(
         config,
         {"workspace_id": "11111111-1111-4111-8111-111111111111"},
@@ -149,7 +154,7 @@ def test_render_fabric_cicd_config_uses_environment_workspace_id(
 def test_render_parameter_file_uses_dynamic_item_references(
     tmp_path: Path,
 ) -> None:
-    config = _load_config(tmp_path)
+    config = _load_config(tmp_path, "full-demo")
     terraform_outputs = {
         "workspace_id": "11111111-1111-1111-1111-111111111111",
         "lakehouse_id": "22222222-2222-2222-2222-222222222222",
@@ -190,7 +195,7 @@ def test_render_parameter_file_uses_dynamic_item_references(
 def test_render_parameter_file_remaps_data_agent_references(
     tmp_path: Path,
 ) -> None:
-    config = _load_config(tmp_path)
+    config = _load_config(tmp_path, "full-demo")
     terraform_outputs = {
         "workspace_id": "11111111-1111-1111-1111-111111111111",
         "lakehouse_id": "22222222-2222-2222-2222-222222222222",
@@ -249,37 +254,65 @@ def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> Non
     }
 
 
-def test_committed_setup_pipeline_chains_ml_then_ontology(tmp_path: Path) -> None:
-    """The committed setup pipeline must run data load -> ML notebooks -> ontology,
-    with the ML and ontology notebook references mapped to deployed items."""
+def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
+    tmp_path: Path,
+) -> None:
+    """Required validation is isolated from post-Reporting ML tiers."""
 
     repo_root = Path(__file__).resolve().parents[2]
-    content = json.loads(
-        (
-            repo_root
-            / "fabric"
-            / "pipelines"
-            / "setup-pipeline.DataPipeline"
-            / "pipeline-content.json"
-        ).read_text(encoding="utf-8")
+    pipeline_root = repo_root / "fabric" / "pipelines"
+
+    def activities(name: str) -> dict[str, dict]:
+        content = json.loads(
+            (
+                pipeline_root / f"{name}.DataPipeline" / "pipeline-content.json"
+            ).read_text(encoding="utf-8")
+        )
+        return {
+            activity["name"]: activity
+            for activity in content["properties"]["activities"]
+        }
+
+    setup = activities("setup-pipeline")
+    assert tuple(setup) == (
+        "setup-01-seed-dictionaries",
+        "setup-02-generate-dimensions",
+        "setup-03-generate-facts",
+        "setup-04-build-gold",
     )
-    activities = {a["name"]: a for a in content["properties"]["activities"]}
 
-    # ML notebooks run after gold is built; every ML activity (directly or via an
-    # intra-ML dependency) follows setup-04-build-gold.
-    ml_names = [n for n in activities if "-ml-" in n]
-    assert ml_names, "expected inlined ML notebooks in the setup pipeline"
-    for name in ml_names:
-        assert activities[name]["type"] == "TridentNotebook"
+    required = activities("ml-required")
+    required_producers = {
+        "06-ml-demand-forecast",
+        "08-ml-customer-segmentation",
+        "09-ml-churn-prediction",
+        "12-ml-stockout-prediction",
+    }
+    validator = required["15-validate-required-ml-contract"]
+    assert {
+        dependency["activity"] for dependency in validator["dependsOn"]
+    } == required_producers
+    assert all(
+        dependency["dependencyConditions"] == ["Succeeded"]
+        for dependency in validator["dependsOn"]
+    )
 
-    # Ontology runs only after every ML notebook completes (it reads gold + ML).
-    ontology = activities["30-create-ontology"]
-    assert ontology["type"] == "TridentNotebook"
-    ontology_deps = {d["activity"] for d in ontology["dependsOn"]}
-    assert set(ml_names).issubset(ontology_deps)
+    optional = set(activities("ml-optional"))
+    experimental = set(activities("ml-experimental"))
+    assert optional == {
+        "07-ml-market-basket",
+        "11-ml-journey-analysis",
+        "13-ml-delivery-prediction",
+    }
+    assert experimental == {
+        "10-ml-promotion-effectiveness",
+        "14-ml-dynamic-pricing",
+    }
+    assert not (required_producers & optional)
+    assert not (required_producers & experimental)
 
-    # The ML + ontology notebook GUIDs are mapped to deployed notebooks.
-    config = _load_config(tmp_path)
+    # Every tier notebook GUID is mapped to its deployed notebook.
+    config = _load_config(tmp_path, "full-demo")
     rendered = deploy_config.render_parameter_file(
         config,
         {
@@ -293,11 +326,12 @@ def test_committed_setup_pipeline_chains_ml_then_ontology(tmp_path: Path) -> Non
         for entry in rendered["find_replace"]
         if isinstance(entry["replace_value"].get(ENVIRONMENT), str)
     }
+    validator_id = validator["typeProperties"]["notebookId"]
     assert (
-        replacements[ontology["typeProperties"]["notebookId"]]
-        == "$items.Notebook.30-create-ontology.$id"
+        replacements[validator_id]
+        == "$items.Notebook.15-validate-required-ml-contract.$id"
     )
-    sample_ml = activities["06-ml-demand-forecast"]
+    sample_ml = required["06-ml-demand-forecast"]
     assert (
         replacements[sample_ml["typeProperties"]["notebookId"]]
         == "$items.Notebook.06-ml-demand-forecast.$id"
@@ -350,10 +384,13 @@ def test_validate_terraform_outputs_rejects_wrong_tenant(
 ) -> None:
     config = _load_config(tmp_path)
     outputs = _resolved_outputs(config)
-    outputs["tenant_id"] = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    wrong_tenant = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    outputs["tenant_id"] = wrong_tenant
 
-    with pytest.raises(ValueError, match="tenant_id"):
+    with pytest.raises(ValueError, match="tenant_id") as exc_info:
         deploy_config.validate_terraform_outputs(config, outputs)
+    assert wrong_tenant not in str(exc_info.value)
+    assert str(config.tenant_id) not in str(exc_info.value)
 
 
 def test_validate_terraform_outputs_rejects_wrong_existing_workspace(
@@ -371,6 +408,21 @@ def test_validate_terraform_outputs_rejects_wrong_existing_workspace(
 
     with pytest.raises(ValueError, match="workspace.existing_id"):
         deploy_config.validate_terraform_outputs(config, outputs)
+
+
+def test_full_profile_outputs_require_custom_pool_identity(
+    tmp_path: Path,
+) -> None:
+    config = _load_config(tmp_path, "full-demo")
+    outputs = _resolved_outputs(config)
+
+    with pytest.raises(ValueError, match="spark_custom_pool_id"):
+        deploy_config.validate_terraform_outputs(config, outputs)
+
+    outputs["spark_custom_pool_id"] = (
+        "55555555-5555-4555-8555-555555555555"
+    )
+    deploy_config.validate_terraform_outputs(config, outputs)
 
 
 def test_load_terraform_outputs_accepts_terraform_json_shape(tmp_path: Path) -> None:

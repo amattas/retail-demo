@@ -3,6 +3,11 @@ output "deployment_environment" {
   description = "Workspace-derived deployment environment identity."
 }
 
+output "deployment_profile" {
+  value       = var.deployment_profile
+  description = "Executable manifest deployment profile."
+}
+
 output "tenant_id" {
   value       = var.tenant_id
   description = "Microsoft Entra tenant associated with this deployment state."
@@ -29,22 +34,22 @@ output "lakehouse_name" {
 }
 
 output "eventhouse_id" {
-  value       = fabric_eventhouse.main.id
+  value       = var.eventhouse_enabled ? fabric_eventhouse.main[0].id : null
   description = "Retail Eventhouse item ID."
 }
 
 output "eventhouse_name" {
-  value       = fabric_eventhouse.main.display_name
+  value       = var.eventhouse_enabled ? fabric_eventhouse.main[0].display_name : null
   description = "Retail Eventhouse display name."
 }
 
 output "kql_database_id" {
-  value       = tolist(fabric_eventhouse.main.properties.database_ids)[0]
+  value       = var.eventhouse_enabled ? tolist(fabric_eventhouse.main[0].properties.database_ids)[0] : null
   description = "Retail KQL Database item ID (the Eventhouse's default database)."
 }
 
 output "kql_database_name" {
-  value       = fabric_eventhouse.main.display_name
+  value       = var.eventhouse_enabled ? fabric_eventhouse.main[0].display_name : null
   description = "Retail KQL Database display name (matches the Eventhouse name)."
 }
 
