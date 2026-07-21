@@ -60,7 +60,9 @@ Eventstream → the custom endpoint source → **Event Hub** tab →
 
 Useful flags: `--rate <events/sec>` (overrides `--daily-target`),
 `--batch-size`, `--max-events`, `--duration`, `--partition-by-customer`
-(uses `customer_id` as the partition key to preserve per-customer order).
+(routes each `customer_id` to a fixed Event Hub partition to preserve
+per-customer order; events are still batched per partition, so throughput is
+unaffected).
 
 ## Infrastructure (Terraform)
 
@@ -84,3 +86,46 @@ Terraform in `deploy/terraform`. Enablement and item names come from
 
 10M/day sits comfortably within the Eventstream **Low** throughput tier; raise
 the tier in the portal if you drive substantially higher rates.
+
+## Troubleshooting
+
+**The generator reports success but no rows appear in the Eventhouse.** The
+generator only writes to the Event Hub-compatible custom endpoint; it cannot
+observe the downstream Eventstream. If the **Eventhouse destination node is
+paused**, events are accepted and **buffered** at the endpoint but never
+ingested — so sends "succeed" while the table stays empty. The destination
+typically pauses when the **Fabric capacity is paused** (for example, an
+overnight auto-pause).
+
+Check the node status and resume it (source *and* destination must be
+`Running`):
+
+```powershell
+$t = az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv
+$ws = "<workspace-id>"; $es = "<eventstream-id>"
+$topo = Invoke-RestMethod -Uri "https://api.fabric.microsoft.com/v1/workspaces/$ws/eventstreams/$es/topology" -Headers @{Authorization="Bearer $t"}
+$topo.sources + $topo.destinations | ForEach-Object { "$($_.name): $($_.status)" }
+
+# Resume the paused destination (WhenLastStopped replays buffered events):
+$dest = "<destination-node-id>"
+Invoke-WebRequest -Method Post -Headers @{Authorization="Bearer $t"; "Content-Type"="application/json"} `
+  -Uri "https://api.fabric.microsoft.com/v1/workspaces/$ws/eventstreams/$es/destinations/$dest/resume" `
+  -Body '{"startType":"WhenLastStopped"}'
+```
+
+Resuming with `WhenLastStopped` replays the buffered events, so nothing sent
+during the pause is lost (within the endpoint's retention window). Also confirm
+the capacity is active before deploying or streaming
+(`az fabric capacity resume ...`).
+
+**The Eventstream "Test result" preview shows "No data to preview."** That pane
+is a *live* sampler of events flowing through the stream at that moment — it is
+not a view of the destination table. Run the generator while the preview is open
+and click **Refresh**, or query the Eventhouse directly
+(`clickstream_events | count`).
+
+**An "Information"-level schema-mismatch notice on the destination.** Expected
+before any data has flowed: the source schema has not been sampled yet, so the
+editor cannot confirm the columns match. `ProcessedIngestion` maps by column
+name, and the generator's fields already match `clickstream_events`, so no
+mapper operator is required. The notice clears once events flow.

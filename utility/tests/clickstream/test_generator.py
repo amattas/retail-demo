@@ -194,3 +194,92 @@ def test_main_requires_connection_string_when_not_dry_run(monkeypatch) -> None:
     monkeypatch.delenv("CLICKSTREAM_EVENTHUB_CONNECTION_STRING", raising=False)
     rc = gen.main(["--max-events", "1"])
     assert rc == 2
+
+
+def test_partition_index_is_deterministic_and_bounded() -> None:
+    for num in (1, 2, 4, 16):
+        for cid in range(1, 200):
+            idx = gen.partition_index(cid, num)
+            assert 0 <= idx < num
+            # Same customer always maps to the same partition.
+            assert idx == gen.partition_index(cid, num)
+
+
+def test_partition_index_single_partition() -> None:
+    assert gen.partition_index(12345, 1) == 0
+    assert gen.partition_index(0, 0) == 0
+
+
+def test_group_by_partition_covers_all_events() -> None:
+    events = [{"customer_id": i} for i in range(1, 101)]
+    groups = gen.group_by_partition(events, 4)
+    assert sum(len(v) for v in groups.values()) == 100
+    assert set(groups) <= {0, 1, 2, 3}
+
+
+class _FakeBatch:
+    def __init__(self, partition_id=None, max_events=1000) -> None:
+        self.partition_id = partition_id
+        self.events: list[object] = []
+        self._max = max_events
+
+    def add(self, data: object) -> None:
+        if len(self.events) >= self._max:
+            raise ValueError("batch full")
+        self.events.append(data)
+
+    def __len__(self) -> int:
+        return len(self.events)
+
+
+class _FakeProducer:
+    def __init__(self, partition_ids, max_events=1000) -> None:
+        self._ids = list(partition_ids)
+        self._max = max_events
+        self.sent: list[_FakeBatch] = []
+
+    def get_partition_ids(self):
+        return list(self._ids)
+
+    def create_batch(self, partition_id=None, partition_key=None):
+        return _FakeBatch(partition_id=partition_id, max_events=self._max)
+
+    def send_batch(self, batch: _FakeBatch) -> None:
+        self.sent.append(batch)
+
+
+def _sink_with_fake_producer(producer, partition_by_customer: bool):
+    sink = gen.EventHubSink.__new__(gen.EventHubSink)
+    sink._EventData = lambda payload: payload  # identity, no azure dependency
+    sink._producer = producer
+    sink._partition_by_customer = partition_by_customer
+    sink._cached_partition_ids = None
+    return sink
+
+
+def test_partitioned_send_batches_by_partition_not_customer() -> None:
+    producer = _FakeProducer(partition_ids=["0", "1", "2", "3"])
+    sink = _sink_with_fake_producer(producer, partition_by_customer=True)
+    # 500 distinct customers: the old per-customer-key path produced ~500 sends;
+    # grouping by partition id must yield at most one send per partition.
+    events = [
+        {"customer_id": i, "event_type": "page_view", "detail": {}}
+        for i in range(1, 501)
+    ]
+    sink.send(events)
+
+    assert len(producer.sent) <= 4
+    # Every customer's events land on their deterministic partition.
+    for batch in producer.sent:
+        for payload in batch.events:
+            cid = json.loads(payload)["customer_id"]
+            assert gen.partition_index(cid, 4) == int(batch.partition_id)
+
+
+def test_partitioned_send_single_partition() -> None:
+    producer = _FakeProducer(partition_ids=["0"])
+    sink = _sink_with_fake_producer(producer, partition_by_customer=True)
+    events = [{"customer_id": i, "detail": {}} for i in range(1, 51)]
+    sink.send(events)
+    assert len(producer.sent) == 1
+    assert len(producer.sent[0]) == 50

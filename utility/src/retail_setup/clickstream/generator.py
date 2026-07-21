@@ -55,6 +55,7 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 EVENT_TYPES: tuple[str, ...] = ("page_view", "product_view", "cart_add", "search")
 
@@ -275,6 +276,34 @@ class StdoutSink(EventSink):
         self._stream.flush()
 
 
+def partition_index(customer_id: int, num_partitions: int) -> int:
+    """Map a ``customer_id`` to a partition index in ``0..num_partitions-1``.
+
+    The mapping is deterministic, so every event for a given customer targets the
+    same partition and per-customer order is preserved. Grouping by this index
+    (rather than by a per-customer partition key) lets many customers share a
+    single ``EventDataBatch``, which is essential for throughput: an Event Hub
+    batch may only carry one partition key, so per-customer keys degrade sends to
+    roughly one event per network round-trip.
+    """
+
+    if num_partitions <= 1:
+        return 0
+    return customer_id % num_partitions
+
+
+def group_by_partition(
+    events: Sequence[dict[str, object]], num_partitions: int
+) -> dict[int, list[dict[str, object]]]:
+    """Group ``events`` by their target partition index (see ``partition_index``)."""
+
+    groups: dict[int, list[dict[str, object]]] = {}
+    for event in events:
+        idx = partition_index(cast(int, event["customer_id"]), num_partitions)
+        groups.setdefault(idx, []).append(event)
+    return groups
+
+
 class EventHubSink(EventSink):
     """Event Hub-compatible sink for a Fabric Eventstream custom endpoint.
 
@@ -301,13 +330,16 @@ class EventHubSink(EventSink):
             ) from exc
 
         self._EventData = EventData
-        kwargs = {}
-        if eventhub_name:
-            kwargs["eventhub_name"] = eventhub_name
         self._producer = EventHubProducerClient.from_connection_string(
-            connection_string, **kwargs
+            connection_string, eventhub_name=eventhub_name
         )
         self._partition_by_customer = partition_by_customer
+        self._cached_partition_ids: list[str] | None = None
+
+    def _partition_ids(self) -> list[str]:
+        if self._cached_partition_ids is None:
+            self._cached_partition_ids = list(self._producer.get_partition_ids())
+        return self._cached_partition_ids
 
     def send(self, events: Sequence[dict[str, object]]) -> None:
         if not events:
@@ -332,20 +364,22 @@ class EventHubSink(EventSink):
             self._producer.send_batch(batch)
 
     def _send_partitioned(self, events: Sequence[dict[str, object]]) -> None:
-        # Group by partition key so all events for a customer keep order.
-        by_key: dict[str, list[dict[str, object]]] = {}
-        for event in events:
-            key = str(event["customer_id"])
-            by_key.setdefault(key, []).append(event)
-        for key, group in by_key.items():
-            batch = self._producer.create_batch(partition_key=key)
+        # Route each customer to a fixed partition so per-customer order is
+        # preserved, but batch every customer that maps to the same partition
+        # together. An Event Hub batch may only carry one partition *key*, so
+        # keying by customer_id would degrade to ~one event per send; targeting a
+        # bounded set of partition *ids* keeps sends batched and fast.
+        ids = self._partition_ids()
+        for idx, group in group_by_partition(events, len(ids)).items():
+            partition_id = ids[idx]
+            batch = self._producer.create_batch(partition_id=partition_id)
             for event in group:
                 data = self._EventData(json.dumps(event))
                 try:
                     batch.add(data)
                 except ValueError:
                     self._producer.send_batch(batch)
-                    batch = self._producer.create_batch(partition_key=key)
+                    batch = self._producer.create_batch(partition_id=partition_id)
                     batch.add(data)
             if len(batch) > 0:
                 self._producer.send_batch(batch)
@@ -535,7 +569,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--partition-by-customer",
         action="store_true",
-        help="Use customer_id as the Event Hub partition key (preserves per-customer order).",
+        help=(
+            "Route each customer to a fixed Event Hub partition (preserves "
+            "per-customer order). Events are still batched per partition, so "
+            "throughput is unaffected."
+        ),
     )
     parser.add_argument(
         "--dry-run",
