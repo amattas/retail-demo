@@ -21,14 +21,15 @@ DEFAULT_CONFIG_PATH = CONFIG_ROOT / "deploy.yml"
 
 # Source-workspace GUIDs embedded in the committed Data Agent datasource configs
 # (fabric/data-agents/*.DataAgent). They are exported from the authoring
-# workspace and must be remapped to the target workspace at publish time via
-# generated parameter.yml rules. The semantic-model GUID resolves to the deployed
-# SemanticModel; the ontology GUID resolves to the stable runtime-created
-# RetailOntology_AutoGen item once the ontology notebook has run.
+# workspace. The source-workspace and semantic-model GUIDs are remapped to the
+# deployed workspace/SemanticModel at publish time via generated parameter.yml
+# rules. The ontology GUID is intentionally NOT remapped: its target item
+# (RetailOntology_AutoGen) is created by the post-deploy setup pipeline and does
+# not exist while items publish, so it is left literal and rebound out-of-band
+# (see render_parameter_file).
 DATA_AGENT_SOURCE_WORKSPACE_ID = "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
 DATA_AGENT_SEMANTIC_MODEL_ID = "07e6f51e-aaac-4594-bf50-94db9c1daf89"
 DATA_AGENT_ONTOLOGY_ID = "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd"
-ONTOLOGY_ITEM_NAME = "RetailOntology_AutoGen"
 ENVIRONMENTS_ROOT = CONFIG_ROOT / "environments"
 _OUTPUT_ID_KEYS = (
     "workspace_id",
@@ -520,9 +521,17 @@ def render_parameter_file(
         }
 
     # Data Agent datasource configs reference the source workspace and source
-    # artifacts by GUID. Remap them to target workspace items so agents bind in
-    # the deployed workspace. The ontology item is created by 30-create-ontology,
-    # so this replacement resolves once the ontology exists and deploy is rerun.
+    # artifacts by GUID. Remap the source workspace to the deployed workspace and
+    # the semantic-model GUID to the deployed SemanticModel so those agents bind.
+    #
+    # The ontology GUID is deliberately left as-is (NOT remapped to
+    # "$items.Ontology.<name>.$id"): the RetailOntology_AutoGen item is created by
+    # the post-deploy setup pipeline (30-create-ontology), so it does not exist
+    # while fabric-cicd publishes items. Emitting a $items.Ontology remap makes
+    # fabric-cicd fail the entire publish ("Item type 'Ontology' is invalid or not
+    # found in deployed items"). Leaving the GUID literal lets the deploy succeed;
+    # the ontology data agent is rebound to the deployed ontology out-of-band once
+    # the pipeline has created it.
     parameters["find_replace"].extend(
         [
             {
@@ -536,13 +545,6 @@ def render_parameter_file(
                     config.environment: (
                         f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
                     )
-                },
-                "item_type": "DataAgent",
-            },
-            {
-                "find_value": DATA_AGENT_ONTOLOGY_ID,
-                "replace_value": {
-                    config.environment: f"$items.Ontology.{ONTOLOGY_ITEM_NAME}.$id"
                 },
                 "item_type": "DataAgent",
             },

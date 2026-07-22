@@ -210,9 +210,14 @@ def test_render_parameter_file_remaps_data_agent_references(
         agent_rules[deploy_config.DATA_AGENT_SEMANTIC_MODEL_ID]
         == f"$items.SemanticModel.{config.powerbi.semantic_model_name}.$id"
     )
-    assert (
-        agent_rules[deploy_config.DATA_AGENT_ONTOLOGY_ID]
-        == f"$items.Ontology.{deploy_config.ONTOLOGY_ITEM_NAME}.$id"
+    # The ontology GUID is intentionally left unmapped: its target item
+    # (RetailOntology_AutoGen) is created by the post-deploy setup pipeline and
+    # does not exist while fabric-cicd publishes items, so a $items.Ontology
+    # remap would fail the whole publish. It is rebound out-of-band afterwards.
+    assert deploy_config.DATA_AGENT_ONTOLOGY_ID not in agent_rules
+    assert not any(
+        isinstance(value, str) and value.startswith("$items.Ontology")
+        for value in agent_rules.values()
     )
 
 
