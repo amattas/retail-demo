@@ -828,6 +828,11 @@ def _deploy_plan(
         ]
     steps += [
         DeployStep(
+            cmd=[py, "-m", "retail_setup.cli.main", "render", "--env", env],
+            description="Render setup notebooks",
+            step_id="render-notebooks",
+        ),
+        DeployStep(
             cmd=[
                 py,
                 "-m",
@@ -930,6 +935,58 @@ def _missing_executable_message(executable: str) -> str:
             "already exist."
         )
     return f"Required executable not found: {executable}\nInstall it and ensure it is on PATH."
+
+
+def _check_deploy_dependencies() -> None:
+    """Fail fast when the deploy-only Python packages are not installed.
+
+    The deploy sub-steps import fabric-cicd and the Azure SDKs in the same
+    interpreter that runs this command (``sys.executable``). When retail-setup is
+    installed without its ``deploy`` extra, those imports fail deep inside a
+    sub-step (for example ``deploy_items`` at step 7/9) with a raw
+    ``ModuleNotFoundError``. Check up front and print an actionable install hint
+    instead of failing partway through a deploy.
+    """
+    import importlib.util
+
+    required = {
+        "fabric_cicd": "fabric-cicd",
+        "azure.identity": "azure-identity",
+        "azure.kusto.data": "azure-kusto-data",
+    }
+    missing: list[str] = []
+    for module, distribution in required.items():
+        try:
+            found = importlib.util.find_spec(module) is not None
+        except ModuleNotFoundError:
+            # A missing parent package (e.g. no ``azure`` namespace at all)
+            # surfaces here rather than as ``None``; treat it as missing too.
+            found = False
+        if not found:
+            missing.append(distribution)
+    if not missing:
+        return
+
+    typer.echo(
+        "Deploy needs Python packages that aren't installed in this environment:",
+        err=True,
+    )
+    for distribution in missing:
+        typer.echo(f"  - {distribution}", err=True)
+    typer.echo("", err=True)
+    typer.echo(
+        "Install the deploy dependencies into this interpreter, then re-run deploy:",
+        err=True,
+    )
+    typer.echo(
+        f"  {sys.executable} -m pip install -r utility/requirements-deploy.txt",
+        err=True,
+    )
+    typer.echo(
+        "  (or, for an editable dev install:  pip install -e utility[deploy])",
+        err=True,
+    )
+    raise typer.Exit(code=1)
 
 
 def _is_terraform_apply(step: DeployStep) -> bool:
@@ -1108,6 +1165,8 @@ def deploy(
     if recreate and skip_terraform:
         typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
         raise typer.Exit(code=1)
+    if not dry_run:
+        _check_deploy_dependencies()
     if not skip_terraform and not dry_run:
         try:
             _validate_terraform_state_location(repo_root, env)

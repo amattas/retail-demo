@@ -22,6 +22,22 @@ from retail_setup.cli.main import (
 
 runner = CliRunner()
 
+# The real deploy-dependency preflight, captured before the autouse stub below
+# replaces it, so the dedicated tests can exercise the genuine logic.
+_REAL_CHECK_DEPLOY_DEPENDENCIES = cli._check_deploy_dependencies
+
+
+@pytest.fixture(autouse=True)
+def _stub_deploy_dependency_check(monkeypatch):
+    """Neutralize the deploy dependency preflight for command tests.
+
+    These tests mock ``subprocess.run``, so the deploy-only Python packages
+    (fabric-cicd, the Azure SDKs) need not be installed to exercise deploy
+    behavior. Stub the in-process preflight to a no-op; the preflight's own
+    logic is covered directly by the dedicated tests below.
+    """
+    monkeypatch.setattr(cli, "_check_deploy_dependencies", lambda: None)
+
 
 def _seed_deploy_config(root: Path, env: str = "dev") -> None:
     """Write a minimal deploy config so CLI tests don't touch the real repo."""
@@ -86,6 +102,74 @@ def _seed_deploy_config(root: Path, env: str = "dev") -> None:
 
 def _always_ok(*_args, **_kwargs) -> SimpleNamespace:
     return SimpleNamespace(returncode=0)
+
+
+def test_check_deploy_dependencies_passes_when_all_present(monkeypatch):
+    monkeypatch.setattr("importlib.util.find_spec", lambda name, *a, **k: object())
+    # Must not raise when every deploy package resolves.
+    _REAL_CHECK_DEPLOY_DEPENDENCIES()
+
+
+def test_check_deploy_dependencies_reports_missing(monkeypatch, capsys):
+    def fake_find_spec(name, *_args, **_kwargs):
+        if name == "fabric_cicd":
+            return None
+        # Simulate a completely absent `azure` namespace (find_spec raises when
+        # a parent package is missing, not just returns None).
+        raise ModuleNotFoundError(name)
+
+    monkeypatch.setattr("importlib.util.find_spec", fake_find_spec)
+
+    with pytest.raises(typer.Exit) as excinfo:
+        _REAL_CHECK_DEPLOY_DEPENDENCIES()
+
+    assert excinfo.value.exit_code == 1
+    err = capsys.readouterr().err
+    assert "fabric-cicd" in err
+    assert "azure-identity" in err
+    assert "azure-kusto-data" in err
+    assert "requirements-deploy.txt" in err
+
+
+def test_deploy_aborts_before_running_steps_when_dependencies_missing(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
+    ran = {"subprocess": False}
+
+    def boom():
+        typer.echo("Deploy needs Python packages that aren't installed", err=True)
+        raise typer.Exit(code=1)
+
+    def track_run(*_args, **_kwargs):
+        ran["subprocess"] = True
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(cli, "_check_deploy_dependencies", boom)
+    monkeypatch.setattr("subprocess.run", track_run)
+
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes"]
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "aren't installed" in result.output
+    # The preflight runs first, so no deploy step (and no subprocess) executes.
+    assert ran["subprocess"] is False
+
+
+def test_deploy_dry_run_skips_dependency_check(monkeypatch):
+    checked = {"called": False}
+
+    def track_check():
+        checked["called"] = True
+
+    monkeypatch.setattr(cli, "_check_deploy_dependencies", track_check)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: None)
+
+    result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    # A dry run only prints the plan; it must not require deploy packages.
+    assert checked["called"] is False
 
 
 def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
@@ -251,6 +335,18 @@ def test_plan_builds_ontology_and_reset_notebook_groups():
     # ontology (30-create-ontology) and reset (99-reset-lakehouse) join the core
     # pipeline, setup notebooks, ML notebooks, and the streaming generator.
     assert set(groups) == {"core", "setup", "ml", "ontology", "reset", "stream"}
+
+
+def test_plan_renders_notebooks_before_building_artifacts():
+    plan = _deploy_plan("dev", skip_terraform=False)
+    cmds = [" ".join(map(str, s.cmd)) for s in plan]
+    render_idx = next(i for i, c in enumerate(cmds) if "retail_setup.cli.main render" in c)
+    build_idx = next(i for i, c in enumerate(cmds) if "deploy.scripts.build_artifacts" in c)
+    # Render must refresh utility/out/ before build_artifacts stages it, so a
+    # stale pre-rendered notebook (e.g. a GOLD_SOURCE_TABLES that drifted from
+    # the engine) can never be deployed.
+    assert render_idx < build_idx
+    assert "render --env dev" in cmds[render_idx]
 
 
 def test_plan_orders_steps_and_gates_apply():
