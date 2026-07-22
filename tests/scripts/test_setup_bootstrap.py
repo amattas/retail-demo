@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -270,6 +271,54 @@ def test_ensure_azure_login_always_runs_az_login(monkeypatch):
     setup.ensure_azure_login("dev", dry_run=False)
 
     assert commands == [["C:/az.cmd", "login", "--tenant", "TENANT"]]
+
+
+def test_ensure_azure_login_refreshes_path_when_az_missing(monkeypatch):
+    commands = []
+    calls = {"resolve": 0, "refreshed": False}
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+
+    def fake_resolve_az():
+        # Missing on the first look (stale PATH), found after a refresh.
+        calls["resolve"] += 1
+        return None if calls["resolve"] == 1 else "C:/az.cmd"
+
+    def fake_refresh():
+        calls["refreshed"] = True
+
+    monkeypatch.setattr(setup, "_resolve_az", fake_resolve_az)
+    monkeypatch.setattr(setup, "_refresh_process_path", fake_refresh)
+    monkeypatch.setattr(
+        setup, "run_command", lambda command, **_: commands.append(command)
+    )
+
+    setup.ensure_azure_login("dev", dry_run=False)
+
+    assert calls["refreshed"] is True
+    assert commands == [["C:/az.cmd", "login", "--tenant", "TENANT"]]
+
+
+def test_refresh_process_path_appends_known_dirs_without_duplicates(monkeypatch):
+    monkeypatch.setattr(setup.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(setup, "_known_tool_dirs", lambda: ["/opt/az/bin", "/usr/bin"])
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    setup._refresh_process_path()
+
+    entries = os.environ["PATH"].split(os.pathsep)
+    assert "/opt/az/bin" in entries
+    # An install directory already on PATH is not duplicated.
+    assert entries.count("/usr/bin") == 1
+
+
+def test_refresh_process_path_noop_when_nothing_to_add(monkeypatch):
+    monkeypatch.setattr(setup.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(setup, "_known_tool_dirs", lambda: [])
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    setup._refresh_process_path()
+
+    assert os.environ["PATH"] == "/usr/bin"
 
 
 def test_ensure_azure_login_uses_powershell_for_az_powershell(monkeypatch):

@@ -8,6 +8,7 @@ before project dependencies are installed.
 from __future__ import annotations
 
 import argparse
+import os
 import platform
 import re
 import shutil
@@ -285,6 +286,101 @@ def install_prerequisites(
             )
 
 
+def _windows_persistent_path_entries() -> list[str]:
+    """Read the persistent PATH from the Windows registry (machine + user).
+
+    OS installers update these registry values, but an already-running process
+    keeps the PATH it started with. Reading them back lets setup pick up a tool
+    that was just installed without opening a new shell.
+    """
+
+    try:
+        import winreg
+    except ImportError:  # not Windows
+        return []
+
+    entries: list[str] = []
+    scopes = (
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
+        (winreg.HKEY_CURRENT_USER, "Environment"),
+    )
+    for root, subkey in scopes:
+        try:
+            with winreg.OpenKey(root, subkey) as key:
+                raw, _ = winreg.QueryValueEx(key, "Path")
+        except OSError:
+            continue
+        if not raw:
+            continue
+        expanded = os.path.expandvars(str(raw))
+        entries.extend(part for part in expanded.split(os.pathsep) if part)
+    return entries
+
+
+def _known_tool_dirs() -> list[str]:
+    """Return common install directories for the CLI tools setup installs.
+
+    Package managers do not always add a freshly installed tool to a location
+    already on PATH (most importantly the Azure CLI on Windows). Include the
+    well-known install directories so ``shutil.which`` can find them within the
+    same run.
+    """
+
+    system = platform.system().lower()
+    candidates: list[Path] = []
+    if system == "windows":
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        program_files_x86 = os.environ.get(
+            "ProgramFiles(x86)", r"C:\Program Files (x86)"
+        )
+        candidates += [
+            Path(program_files) / "Microsoft SDKs" / "Azure" / "CLI2" / "wbin",
+            Path(program_files_x86) / "Microsoft SDKs" / "Azure" / "CLI2" / "wbin",
+        ]
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            # winget drops shim executables (terraform, etc.) here.
+            candidates.append(Path(local_app_data) / "Microsoft" / "WinGet" / "Links")
+    else:
+        candidates += [Path("/usr/local/bin"), Path("/opt/homebrew/bin"), Path("/usr/bin")]
+    return [str(path) for path in candidates if path.is_dir()]
+
+
+def _refresh_process_path() -> None:
+    """Make tools installed during this run resolvable in the current process.
+
+    OS package managers update the persistent (registry / profile) PATH, but the
+    already-running setup process keeps the PATH it started with, so a tool
+    installed moments ago (e.g. ``az``) is not yet discoverable via
+    ``shutil.which``. Merge the persistent PATH and known install directories
+    into ``os.environ['PATH']`` so the rest of this run - and every child
+    process it spawns (configure, render, deploy) - can find them.
+    """
+
+    additions: list[str] = []
+    if platform.system().lower() == "windows":
+        additions.extend(_windows_persistent_path_entries())
+    additions.extend(_known_tool_dirs())
+    if not additions:
+        return
+
+    current = os.environ.get("PATH", "")
+    entries = current.split(os.pathsep) if current else []
+    seen = {os.path.normcase(entry) for entry in entries}
+    for addition in additions:
+        if not addition:
+            continue
+        key = os.path.normcase(addition)
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append(addition)
+    os.environ["PATH"] = os.pathsep.join(entries)
+
+
 def current_python_env() -> PythonEnv:
     """Use the Python interpreter that launched this setup script."""
 
@@ -431,6 +527,11 @@ def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
 
     az = _resolve_az()
     if az is None:
+        # A tool installed earlier in this run may not be on the process PATH
+        # yet; refresh from the persistent environment and try once more.
+        _refresh_process_path()
+        az = _resolve_az()
+    if az is None:
         raise SystemExit(
             "Azure CLI (az) is required for deploy but was not found on PATH. "
             "Install Azure CLI, or set deploy config auth.mode to azure_powershell."
@@ -576,6 +677,11 @@ def _run_guided(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             assume_yes=args.yes,
         )
+        if not args.dry_run:
+            # Tools just installed by the OS package manager updated the
+            # persistent PATH but not this process; refresh so later steps
+            # (e.g. `az login`) and child processes can find them.
+            _refresh_process_path()
     else:
         _section(1, total, "Checking the required tools (skipped)")
 
