@@ -600,25 +600,53 @@ def _wait_for_workspace_deletion(repo_root: Path, workspace_name: str, auth_mode
     )
 
 
-def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
-    """Pin the dictionary ref: explicit --ref, else HEAD SHA, else 'main' with a warning."""
-    if ref:
-        return ref
+def _git_text(repo_root: Path, args: list[str]) -> str | None:
+    """Run a git command in repo_root, returning stripped stdout or None on failure."""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
+            ["git", *args], cwd=repo_root, capture_output=True, text=True, check=True
         )
-        return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
+    """Pin the dictionary ref to something the setup notebooks can fetch.
+
+    setup-01 downloads dictionaries from raw.githubusercontent at this ref, so it
+    must exist on the remote. Prefer an explicit --ref; else the HEAD SHA when it
+    is pushed; else the pushed upstream commit (warning the operator to push);
+    else 'main'. This keeps deploy's automatic render from pinning to an unpushed
+    commit, which would 404 the dictionary fetch in Fabric.
+    """
+    if ref:
+        return ref
+    head = _git_text(repo_root, ["rev-parse", "HEAD"])
+    if head is None:
         typer.echo(
             "warning: could not resolve git HEAD; using dictionary ref 'main'",
             err=True,
         )
         return "main"
+    # HEAD is fetchable from GitHub only if it already exists on a remote branch.
+    if _git_text(repo_root, ["branch", "-r", "--contains", head]):
+        return head
+    upstream = _git_text(repo_root, ["rev-parse", "@{u}"])
+    if upstream:
+        typer.echo(
+            f"warning: HEAD ({head[:7]}) is not pushed; pinning the dictionary ref to the "
+            f"pushed upstream commit ({upstream[:7]}). Push your branch so the setup "
+            "notebooks fetch dictionaries from your latest commit.",
+            err=True,
+        )
+        return upstream
+    typer.echo(
+        f"warning: HEAD ({head[:7]}) is not pushed and has no upstream; using dictionary "
+        "ref 'main'. Push your branch so the setup notebooks fetch matching dictionaries.",
+        err=True,
+    )
+    return "main"
 
 
 @app.command()
