@@ -149,6 +149,20 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
         assert expected in source
 
 
+def test_kql_functions_avoid_invalid_kusto_literals_and_formats() -> None:
+    """Guard the two Kusto-invalid constructs that broke the KQL deploy step.
+
+    KQL integer literals are already ``long`` (there is no ``0L`` suffix), and
+    ``format_datetime`` only accepts documented delimiters (space, - / : , . _
+    [ ]); a literal ``T``/``Z`` in an ISO-style format string makes Kusto fail
+    to parse the format string.
+    """
+    source = KQL_FUNCTIONS.read_text(encoding="utf-8")
+    assert "0L" not in source
+    for fmt in re.findall(r'format_datetime\([^,]+,\s*"([^"]*)"', source):
+        assert not (set("TZ") & set(fmt)), f"invalid format_datetime literal: {fmt!r}"
+
+
 def test_querysets_use_reconciled_attribution_functions() -> None:
     funnel = ROOT / "fabric" / "querysets" / "q_campaign_conversion_funnel.kql"
     cost = ROOT / "fabric" / "querysets" / "q_marketing_cost_24h.kql"
