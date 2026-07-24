@@ -55,6 +55,10 @@ def _main() -> None:
 # generation keys the user supplies via `configure`; derived defaults
 # (dc_count, customer_count, ...) are intentionally not persisted.
 _GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
+_PROFILE_CONTROLLED_ENV_OVERRIDES = (
+    "spark.use_custom_pool",
+    "notebooks.include",
+)
 _DEFAULT_MONTHS = 3
 _DEFAULT_ML_MONTHS = 18
 _MIN_REQUIRED_ML_HISTORY_DAYS = 540
@@ -98,12 +102,43 @@ def _set_by_path(data: dict[str, Any], dotted: str, value: Any) -> None:
     node[keys[-1]] = value
 
 
-def _update_yaml_file(path: Path, updates: dict[str, Any]) -> str:
-    """Apply dotted-path updates to a YAML file; return the original text."""
+def _remove_by_path(data: dict[str, Any], dotted: str) -> None:
+    """Remove a dotted path and prune empty parent mappings."""
+
+    keys = dotted.split(".")
+    node = data
+    parents: list[tuple[dict[str, Any], str]] = []
+    for key in keys[:-1]:
+        child = node.get(key)
+        if not isinstance(child, dict):
+            return
+        parents.append((node, key))
+        node = child
+    if keys[-1] not in node:
+        return
+    del node[keys[-1]]
+    for parent, key in reversed(parents):
+        child = parent.get(key)
+        if isinstance(child, dict) and not child:
+            del parent[key]
+        else:
+            break
+
+
+def _update_yaml_file(
+    path: Path,
+    updates: dict[str, Any],
+    *,
+    removals: tuple[str, ...] = (),
+) -> str:
+    """Apply dotted-path updates and removals; return the original text."""
+
     original = path.read_text() if path.is_file() else ""
     data = yaml.safe_load(original) or {}
     for dotted, value in updates.items():
         _set_by_path(data, dotted, value)
+    for dotted in removals:
+        _remove_by_path(data, dotted)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     return original
@@ -700,6 +735,7 @@ def configure(
             "eventhouse.kql_database_name": kql_database_name,
             "deployment.profile": profile,
         },
+        removals=_PROFILE_CONTROLLED_ENV_OVERRIDES,
     )
 
     try:

@@ -123,6 +123,57 @@ def test_configure_writes_both_configs(tmp_path):
     assert "Estimated records" in result.output
 
 
+def test_configure_migrates_legacy_profile_controlled_overrides(tmp_path):
+    _seed_deploy_config(tmp_path)
+    env_path = tmp_path / "deploy/config/environments/retail-demo.yml"
+    env = yaml.safe_load(env_path.read_text())
+    env["spark"] = {"use_custom_pool": True}
+    env["notebooks"] = {
+        "include": ["core", "stream"],
+        "default_lakehouse_name": "retail_lakehouse",
+    }
+    env_path.write_text(yaml.safe_dump(env, sort_keys=False))
+
+    result = runner.invoke(
+        app,
+        [
+            "configure",
+            "--repo-root",
+            str(tmp_path),
+            "--tenant-id",
+            "11111111-1111-1111-1111-111111111111",
+            "--workspace-name",
+            "retail-demo",
+            "--capacity-name",
+            "F64",
+            "--lakehouse-name",
+            "retail_lakehouse",
+            "--eventhouse-name",
+            "retail_eventhouse",
+            "--kql-database-name",
+            "retail_eventhouse",
+            "--profile",
+            "core",
+            "--store-type",
+            "grocery",
+            "--months",
+            "3",
+            "--store-count",
+            "10",
+            "--seed",
+            "9",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    migrated = yaml.safe_load(env_path.read_text())
+    assert "spark" not in migrated
+    assert migrated["notebooks"] == {
+        "default_lakehouse_name": "retail_lakehouse"
+    }
+    assert migrated["deployment"]["profile"] == "core"
+
+
 def test_configure_prompts_show_defaults_and_store_types(tmp_path):
     _seed_deploy_config(tmp_path)
     result = runner.invoke(

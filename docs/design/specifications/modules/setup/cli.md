@@ -38,6 +38,11 @@ The environment key is derived from the normalized workspace name. A leading
 environment `alice`. Reconfiguring another workspace creates another local
 overlay instead of changing shared defaults.
 
+Reconfiguring an existing environment removes the legacy
+`spark.use_custom_pool` and `notebooks.include` overlay keys. Deployment
+profiles now own both selections; unrelated Spark and notebook settings remain
+unchanged.
+
 The active non-interactive inputs include:
 
 - tenant, workspace, capacity, Lakehouse, Eventhouse, and KQL database names;
