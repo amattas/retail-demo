@@ -1,0 +1,3298 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/operations/security/">
+      
+      
+        <link rel="prev" href="../monitoring/">
+      
+      
+        <link rel="next" href="../../setup/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Microsoft Fabric Security & Access Control Guide - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#microsoft-fabric-security-access-control-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Microsoft Fabric Security &amp; Access Control Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../architecture/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/schema-mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../datagen/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/store-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Table of Contents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace-roles-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Workspace Roles &amp; Permissions
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workspace Roles &amp; Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fabric-workspace-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fabric Workspace Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-roles-by-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Required Roles by Task
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assigning-workspace-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assigning Workspace Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-source-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Source Permissions
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Source Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#azure-data-lake-storage-gen2-adls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Azure Data Lake Storage Gen2 (ADLS)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventhouse-kql-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Eventhouse (KQL Database)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-principal-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Service Principal Setup
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Service Principal Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-service-principal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Service Principal
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-client-secret" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Client Secret
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assign-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assign Permissions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-in-cicd-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use in CI/CD Pipelines
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#row-level-security-rls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Row-Level Security (RLS)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Row-Level Security (RLS)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#define-rls-roles-in-semantic-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Define RLS Roles in Semantic Model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assign-users-to-rls-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assign Users to RLS Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-rls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Test RLS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Security Best Practices
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principle-of-least-privilege" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Principle of Least Privilege
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-use-azure-ad-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Use Azure AD Groups
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-service-principal-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Service Principal Hygiene
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Network Security
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-data-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Data Encryption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-auditing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Auditing &amp; Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-sensitive-data-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Sensitive Data Protection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-credential-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        8. Credential Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-access-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting Access Issues
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting Access Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-when-accessing-adls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Permission denied" when accessing ADLS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-does-not-exist-when-accessing-eventhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Table does not exist" when accessing Eventhouse
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forbidden-when-running-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Forbidden" when running pipeline
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#users-cannot-see-reportsdashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Users cannot see reports/dashboards
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-principal-authentication-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Service principal authentication fails
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Related Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-permission-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick Reference: Permission Matrix
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Table of Contents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace-roles-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Workspace Roles &amp; Permissions
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workspace Roles &amp; Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fabric-workspace-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fabric Workspace Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-roles-by-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Required Roles by Task
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assigning-workspace-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assigning Workspace Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-source-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Source Permissions
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Source Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#azure-data-lake-storage-gen2-adls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Azure Data Lake Storage Gen2 (ADLS)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventhouse-kql-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Eventhouse (KQL Database)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-principal-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Service Principal Setup
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Service Principal Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-service-principal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Service Principal
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-client-secret" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Client Secret
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assign-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assign Permissions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-in-cicd-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use in CI/CD Pipelines
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#row-level-security-rls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Row-Level Security (RLS)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Row-Level Security (RLS)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#define-rls-roles-in-semantic-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Define RLS Roles in Semantic Model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assign-users-to-rls-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Assign Users to RLS Roles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-rls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Test RLS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Security Best Practices
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principle-of-least-privilege" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Principle of Least Privilege
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-use-azure-ad-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Use Azure AD Groups
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-service-principal-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Service Principal Hygiene
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Network Security
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-data-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Data Encryption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-auditing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Auditing &amp; Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-sensitive-data-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Sensitive Data Protection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-credential-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        8. Credential Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-access-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting Access Issues
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting Access Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-when-accessing-adls" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Permission denied" when accessing ADLS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-does-not-exist-when-accessing-eventhouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Table does not exist" when accessing Eventhouse
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forbidden-when-running-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        "Forbidden" when running pipeline
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#users-cannot-see-reportsdashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Users cannot see reports/dashboards
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-principal-authentication-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Service principal authentication fails
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Related Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-permission-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick Reference: Permission Matrix
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="microsoft-fabric-security-access-control-guide">Microsoft Fabric Security &amp; Access Control Guide</h1>
+<p>This guide covers security configuration, workspace roles, and permissions required for the Retail Demo medallion architecture.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#workspace-roles--permissions">Workspace Roles &amp; Permissions</a></li>
+<li><a href="#data-source-permissions">Data Source Permissions</a></li>
+<li><a href="#service-principal-setup">Service Principal Setup</a></li>
+<li><a href="#row-level-security-rls">Row-Level Security (RLS)</a></li>
+<li><a href="#security-best-practices">Security Best Practices</a></li>
+<li><a href="#troubleshooting-access-issues">Troubleshooting Access Issues</a></li>
+</ol>
+<hr />
+<h2 id="workspace-roles-permissions">Workspace Roles &amp; Permissions</h2>
+<h3 id="fabric-workspace-roles">Fabric Workspace Roles</h3>
+<p>Microsoft Fabric workspaces support four roles with different permission levels:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Permissions</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Full control: manage workspace, assign roles, delete items</td>
+<td>Workspace owners, DevOps automation</td>
+</tr>
+<tr>
+<td><strong>Member</strong></td>
+<td>Create/edit/delete items, publish reports</td>
+<td>Developers, data engineers</td>
+</tr>
+<tr>
+<td><strong>Contributor</strong></td>
+<td>Create/edit items, run notebooks/pipelines</td>
+<td>Data analysts, notebook developers</td>
+</tr>
+<tr>
+<td><strong>Viewer</strong></td>
+<td>Read-only access to reports and datasets</td>
+<td>Business users, report consumers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="required-roles-by-task">Required Roles by Task</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Minimum Role</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Deploy Bronze shortcuts notebook</td>
+<td><strong>Contributor</strong></td>
+<td>Needs to create/edit notebooks</td>
+</tr>
+<tr>
+<td>Run Bronze → Silver pipeline</td>
+<td><strong>Contributor</strong></td>
+<td>Execute notebooks via pipeline</td>
+</tr>
+<tr>
+<td>Create semantic models</td>
+<td><strong>Member</strong></td>
+<td>Publish Power BI datasets</td>
+</tr>
+<tr>
+<td>View dashboards</td>
+<td><strong>Viewer</strong></td>
+<td>Read-only access sufficient</td>
+</tr>
+<tr>
+<td>Manage workspace settings</td>
+<td><strong>Admin</strong></td>
+<td>Assign roles, configure capacity</td>
+</tr>
+<tr>
+<td>Deploy via CI/CD</td>
+<td><strong>Member</strong> or service principal</td>
+<td>Automated deployment</td>
+</tr>
+</tbody>
+</table>
+<h3 id="assigning-workspace-roles">Assigning Workspace Roles</h3>
+<p><strong>Via Fabric Portal:</strong>
+1. Navigate to workspace settings (gear icon)
+2. Select <strong>Access</strong>
+3. Click <strong>Add people or groups</strong>
+4. Enter user email or Azure AD group
+5. Select role (Admin/Member/Contributor/Viewer)
+6. Click <strong>Add</strong></p>
+<p><strong>Via PowerShell:</strong>
+<div class="highlight"><pre><span></span><code><span class="c"># Add user to workspace</span>
+<span class="nb">Add-PowerBIWorkspaceUser</span> <span class="p">`</span>
+    <span class="n">-Scope</span> <span class="n">Organization</span> <span class="p">`</span>
+    <span class="n">-Id</span> <span class="p">&lt;</span><span class="n">workspace-id</span><span class="p">&gt;</span> <span class="p">`</span>
+    <span class="n">-UserPrincipalName</span> <span class="n">user</span><span class="nv">@domain</span><span class="p">.</span><span class="n">com</span> <span class="p">`</span>
+    <span class="n">-AccessRight</span> <span class="n">Contributor</span>
+</code></pre></div></p>
+<hr />
+<h2 id="data-source-permissions">Data Source Permissions</h2>
+<h3 id="azure-data-lake-storage-gen2-adls">Azure Data Lake Storage Gen2 (ADLS)</h3>
+<p>Bronze layer shortcuts require read access to ADLS parquet files.</p>
+<p><strong>Required Permissions:</strong>
+- <strong>Storage Blob Data Reader</strong> role on storage account or container
+- Network access if storage firewall enabled</p>
+<p><strong>Assign RBAC via Azure Portal:</strong>
+1. Navigate to storage account → <strong>Access Control (IAM)</strong>
+2. Click <strong>Add role assignment</strong>
+3. Select <strong>Storage Blob Data Reader</strong>
+4. Assign to:
+   - Fabric workspace service principal (for automated access)
+   - Individual users (for interactive development)
+5. Click <strong>Save</strong></p>
+<p><strong>Assign RBAC via Azure CLI:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># For individual user</span>
+az<span class="w"> </span>role<span class="w"> </span>assignment<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--role<span class="w"> </span><span class="s2">&quot;Storage Blob Data Reader&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--assignee<span class="w"> </span>user@domain.com<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scope<span class="w"> </span>/subscriptions/&lt;sub-id&gt;/resourceGroups/&lt;rg&gt;/providers/Microsoft.Storage/storageAccounts/&lt;account&gt;
+
+<span class="c1"># For service principal</span>
+az<span class="w"> </span>role<span class="w"> </span>assignment<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--role<span class="w"> </span><span class="s2">&quot;Storage Blob Data Reader&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--assignee<span class="w"> </span>&lt;service-principal-object-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scope<span class="w"> </span>/subscriptions/&lt;sub-id&gt;/resourceGroups/&lt;rg&gt;/providers/Microsoft.Storage/storageAccounts/&lt;account&gt;
+</code></pre></div></p>
+<p><strong>Firewall Configuration:</strong>
+- If ADLS has network restrictions, add Fabric workspace IP ranges
+- Or enable "Allow Azure services on the trusted services list"</p>
+<h3 id="eventhouse-kql-database">Eventhouse (KQL Database)</h3>
+<p>Bronze layer streaming shortcuts require read access to Eventhouse tables.</p>
+<p><strong>Required Permissions:</strong>
+- <strong>Database User</strong> role on KQL database for the <code>stream-events</code> notebook identity that writes events directly
+- <strong>Database Viewer</strong> role (read-only, recommended for shortcuts)</p>
+<p><strong>Assign via Fabric Portal:</strong>
+1. Open Eventhouse item
+2. Navigate to <strong>Manage</strong> → <strong>Permissions</strong>
+3. Click <strong>Add</strong>
+4. Select user or service principal
+5. Choose <strong>Viewer</strong> role
+6. Click <strong>Add</strong></p>
+<p><strong>Assign via KQL:</strong>
+<div class="highlight"><pre><span></span><code><span class="c">// Grant viewer access</span>
+<span class="err">.</span><span class="n">add</span><span class="w"> </span><span class="n">database</span><span class="w"> </span><span class="n">retail_eventhouse</span><span class="w"> </span><span class="n">viewers</span><span class="w"> </span><span class="p">(</span><span class="s">&#39;aaduser=user@domain.com&#39;</span><span class="p">)</span>
+
+<span class="c">// Grant user access (includes write)</span>
+<span class="err">.</span><span class="n">add</span><span class="w"> </span><span class="n">database</span><span class="w"> </span><span class="n">retail_eventhouse</span><span class="w"> </span><span class="n">users</span><span class="w"> </span><span class="p">(</span><span class="s">&#39;aaduser=user@domain.com&#39;</span><span class="p">)</span>
+
+<span class="c">// Grant to service principal</span>
+<span class="err">.</span><span class="n">add</span><span class="w"> </span><span class="n">database</span><span class="w"> </span><span class="n">retail_eventhouse</span><span class="w"> </span><span class="n">viewers</span><span class="w"> </span><span class="p">(</span><span class="s">&#39;aadapp=&lt;app-id&gt;&#39;</span><span class="p">)</span>
+</code></pre></div></p>
+<hr />
+<h2 id="service-principal-setup">Service Principal Setup</h2>
+<p>For automated CI/CD deployments and pipeline execution, use Azure AD service principals instead of user accounts.</p>
+<h3 id="create-service-principal">Create Service Principal</h3>
+<p><strong>Via Azure Portal:</strong>
+1. Navigate to <strong>Azure Active Directory</strong> → <strong>App registrations</strong>
+2. Click <strong>New registration</strong>
+3. Enter name: <code>retail-demo-fabric-automation</code>
+4. Select supported account types
+5. Click <strong>Register</strong>
+6. Note <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong></p>
+<p><strong>Via Azure CLI:</strong>
+<div class="highlight"><pre><span></span><code>az<span class="w"> </span>ad<span class="w"> </span>sp<span class="w"> </span>create-for-rbac<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--name<span class="w"> </span>retail-demo-fabric-automation<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--role<span class="w"> </span>Contributor<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scopes<span class="w"> </span>/subscriptions/&lt;sub-id&gt;/resourceGroups/&lt;rg&gt;
+</code></pre></div></p>
+<h3 id="create-client-secret">Create Client Secret</h3>
+<ol>
+<li>Navigate to app registration → <strong>Certificates &amp; secrets</strong></li>
+<li>Click <strong>New client secret</strong></li>
+<li>Enter description: <code>Fabric deployment key</code></li>
+<li>Select expiration (1 year recommended)</li>
+<li>Click <strong>Add</strong></li>
+<li><strong>Copy secret value immediately</strong> (won't be shown again)</li>
+</ol>
+<h3 id="assign-permissions">Assign Permissions</h3>
+<p>Assign the service principal to:
+- <strong>Fabric workspace</strong>: Member role (for deployment)
+- <strong>ADLS storage account</strong>: Storage Blob Data Reader</p>
+<h3 id="use-in-cicd-pipelines">Use in CI/CD Pipelines</h3>
+<p><strong>GitHub Actions example:</strong>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Login to Azure</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">azure/login@v1</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">creds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.AZURE_CREDENTIALS }}</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy Fabric artifacts</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no"># Use Azure CLI or Fabric REST API</span>
+<span class="w">    </span><span class="no">az fabric pipeline create ...</span>
+</code></pre></div></p>
+<p><strong>Azure DevOps example:</strong>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AzureCLI@2</span>
+<span class="w">  </span><span class="nt">inputs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">azureSubscription</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;retail-demo-service-connection&#39;</span>
+<span class="w">    </span><span class="nt">scriptType</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;bash&#39;</span>
+<span class="w">    </span><span class="nt">scriptLocation</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;inlineScript&#39;</span>
+<span class="w">    </span><span class="nt">inlineScript</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no"># Deploy using service principal auth</span>
+<span class="w">      </span><span class="no">az fabric pipeline create ...</span>
+</code></pre></div></p>
+<hr />
+<h2 id="row-level-security-rls">Row-Level Security (RLS)</h2>
+<p>Implement RLS in the semantic model to restrict data access by store, region, or customer segment.</p>
+<h3 id="define-rls-roles-in-semantic-model">Define RLS Roles in Semantic Model</h3>
+<p>:::note
+The examples below are illustrative. The shipped <code>dim_stores</code> table has no <code>manager_email</code> column — to filter by user you would add a manager-mapping table (or column) to the model first. Region lives in <code>dim_geographies[Region]</code>, related to stores via <code>dim_stores[GeographyID]</code>.
+:::</p>
+<p><strong>Example: Store-level access</strong> (requires adding a <code>manager_email</code> mapping to <code>dim_stores</code>)
+<div class="highlight"><pre><span></span><code><span class="c1">// In model.tmdl or via Power BI Desktop</span>
+role: StoreManagers
+<span class="w">  </span>tablePermission:
+<span class="w">    </span><span class="nb">table</span>: dim_stores
+<span class="w">    </span>filterExpression:
+<span class="w">      </span><span class="na">dim_stores[manager_email]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">USERPRINCIPALNAME</span><span class="p">()</span>
+</code></pre></div></p>
+<p><strong>Example: Region-level access</strong> (filters propagate to facts via dim_stores → dim_geographies)
+<div class="highlight"><pre><span></span><code>role: RegionalManagers
+<span class="w">  </span>tablePermission:
+<span class="w">    </span><span class="nb">table</span>: dim_geographies
+<span class="w">    </span>filterExpression:
+<span class="w">      </span><span class="na">dim_geographies[Region]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;West&quot;</span>
+</code></pre></div></p>
+<h3 id="assign-users-to-rls-roles">Assign Users to RLS Roles</h3>
+<p><strong>Via Power BI Service:</strong>
+1. Navigate to semantic model settings
+2. Select <strong>Security</strong> → <strong>Row-level security</strong>
+3. Select role (e.g., <code>StoreManagers</code>)
+4. Click <strong>Add members</strong>
+5. Enter user emails or Azure AD groups
+6. Click <strong>Add</strong></p>
+<h3 id="test-rls">Test RLS</h3>
+<p><strong>Via Power BI Desktop:</strong>
+1. Open report
+2. Click <strong>Modeling</strong> → <strong>View As</strong>
+3. Select roles to test
+4. Verify data is filtered correctly</p>
+<p><strong>Via Power BI Service:</strong>
+- Use "View as role" feature in semantic model settings</p>
+<hr />
+<h2 id="security-best-practices">Security Best Practices</h2>
+<h3 id="1-principle-of-least-privilege">1. Principle of Least Privilege</h3>
+<ul>
+<li>Grant minimum permissions required for each role</li>
+<li>Use Viewer role for report consumers</li>
+<li>Restrict Admin role to workspace owners only</li>
+</ul>
+<h3 id="2-use-azure-ad-groups">2. Use Azure AD Groups</h3>
+<ul>
+<li>Create AD groups for each role (e.g., <code>retail-demo-developers</code>, <code>retail-demo-viewers</code>)</li>
+<li>Assign groups to workspace roles instead of individual users</li>
+<li>Simplifies permission management and auditing</li>
+</ul>
+<h3 id="3-service-principal-hygiene">3. Service Principal Hygiene</h3>
+<ul>
+<li>Rotate client secrets annually</li>
+<li>Use separate service principals for dev/staging/prod</li>
+<li>Store secrets in Azure Key Vault, not in code</li>
+<li>Audit service principal usage regularly</li>
+</ul>
+<h3 id="4-network-security">4. Network Security</h3>
+<ul>
+<li>Enable ADLS firewall and allow only Fabric IP ranges</li>
+<li>Restrict Fabric workspace to specific Azure AD tenants</li>
+</ul>
+<h3 id="5-data-encryption">5. Data Encryption</h3>
+<ul>
+<li>ADLS uses encryption at rest by default (Microsoft-managed keys)</li>
+<li>Enable customer-managed keys (CMK) for additional control</li>
+<li>Fabric data in lakehouse is encrypted automatically</li>
+</ul>
+<h3 id="6-auditing-monitoring">6. Auditing &amp; Monitoring</h3>
+<ul>
+<li>Enable Azure AD audit logs for workspace access changes</li>
+<li>Monitor ADLS access logs for unusual activity</li>
+<li>Use Fabric monitoring to track pipeline execution and data access</li>
+<li>Set up alerts for permission changes or failed authentications</li>
+</ul>
+<h3 id="7-sensitive-data-protection">7. Sensitive Data Protection</h3>
+<ul>
+<li>Avoid storing PII in plain text (use hashing or encryption)</li>
+<li>Implement RLS for customer or employee data</li>
+<li>Use dynamic data masking in Eventhouse for sensitive fields</li>
+<li>Comply with GDPR, CCPA, or other privacy regulations</li>
+</ul>
+<h3 id="8-credential-management">8. Credential Management</h3>
+<ul>
+<li><strong>Never</strong> hardcode connection strings in notebooks</li>
+<li>Use environment variables for configuration</li>
+<li>Store secrets in Azure Key Vault</li>
+<li>Reference Key Vault from Fabric workspace settings</li>
+</ul>
+<hr />
+<h2 id="troubleshooting-access-issues">Troubleshooting Access Issues</h2>
+<h3 id="permission-denied-when-accessing-adls">"Permission denied" when accessing ADLS</h3>
+<p><strong>Symptoms:</strong>
+- Bronze shortcut creation fails with "Access denied"
+- Notebook errors: "AnalysisException: Permission denied"</p>
+<p><strong>Causes:</strong>
+- Missing <strong>Storage Blob Data Reader</strong> role
+- ADLS firewall blocking Fabric IP ranges
+- Workspace managed identity not enabled</p>
+<p><strong>Solutions:</strong>
+1. Verify RBAC assignment on storage account
+2. Check ADLS firewall settings → Allow Azure services
+3. Enable managed identity for Fabric workspace
+4. Test access using Azure Storage Explorer with same credentials</p>
+<h3 id="table-does-not-exist-when-accessing-eventhouse">"Table does not exist" when accessing Eventhouse</h3>
+<p><strong>Symptoms:</strong>
+- Bronze shortcut shows empty or fails to load
+- Error: "Table 'cusn.receipt_created' not found"</p>
+<p><strong>Causes:</strong>
+- Missing <strong>Database Viewer</strong> role on Eventhouse
+- Eventhouse shortcut not created (manual step required)
+- Network connectivity issues</p>
+<p><strong>Solutions:</strong>
+1. Verify Eventhouse permissions via KQL: <code>.show database retail_eventhouse principals</code>
+2. Manually create Eventhouse shortcuts via Fabric Portal
+3. Test connectivity: Run query in Eventhouse KQL Queryset
+4. Check Eventhouse cluster is running (not paused)</p>
+<h3 id="forbidden-when-running-pipeline">"Forbidden" when running pipeline</h3>
+<p><strong>Symptoms:</strong>
+- Pipeline fails with 403 Forbidden error
+- Activity execution denied</p>
+<p><strong>Causes:</strong>
+- Insufficient workspace role (Viewer cannot execute)
+- Pipeline tries to access external resource without permission
+- Managed identity not configured</p>
+<p><strong>Solutions:</strong>
+1. Verify user has <strong>Contributor</strong> or <strong>Member</strong> role
+2. Check pipeline activity permissions (e.g., notebook execution)
+3. Enable managed identity if pipeline accesses external services
+4. Review pipeline activity logs for specific error details</p>
+<h3 id="users-cannot-see-reportsdashboards">Users cannot see reports/dashboards</h3>
+<p><strong>Symptoms:</strong>
+- Report not visible in workspace
+- Error: "You don't have permission to view this report"</p>
+<p><strong>Causes:</strong>
+- User not assigned to workspace
+- Report not published or shared
+- RLS filtering all data for user</p>
+<p><strong>Solutions:</strong>
+1. Assign user to workspace with <strong>Viewer</strong> role minimum
+2. Verify report is published (not in draft mode)
+3. Check RLS rules aren't overly restrictive
+4. Test with admin account to isolate RLS vs permissions</p>
+<h3 id="service-principal-authentication-fails">Service principal authentication fails</h3>
+<p><strong>Symptoms:</strong>
+- CI/CD pipeline fails with "Authentication failed"
+- Error: "AADSTS7000215: Invalid client secret"</p>
+<p><strong>Causes:</strong>
+- Client secret expired
+- Incorrect tenant ID or app ID
+- Service principal not assigned to workspace</p>
+<p><strong>Solutions:</strong>
+1. Verify client secret expiration date in Azure AD
+2. Generate new client secret if expired
+3. Confirm tenant ID, app ID, and secret are correct
+4. Assign service principal to Fabric workspace
+5. Wait 10-15 minutes for permission propagation</p>
+<hr />
+<h2 id="related-documentation">Related Documentation</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/fabric/get-started/roles-workspaces">Microsoft Fabric Workspace Roles</a></li>
+<li><a href="https://learn.microsoft.com/azure/storage/blobs/assign-azure-role-data-access">Azure RBAC for Storage</a></li>
+<li><a href="https://learn.microsoft.com/power-bi/admin/service-admin-rls">Power BI Row-Level Security</a></li>
+</ul>
+<hr />
+<h2 id="quick-reference-permission-matrix">Quick Reference: Permission Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Role</th>
+<th>Permissions</th>
+<th>Assignment Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fabric Workspace</strong></td>
+<td>Viewer</td>
+<td>Read reports</td>
+<td>Workspace → Access</td>
+</tr>
+<tr>
+<td><strong>Fabric Workspace</strong></td>
+<td>Contributor</td>
+<td>Run notebooks</td>
+<td>Workspace → Access</td>
+</tr>
+<tr>
+<td><strong>Fabric Workspace</strong></td>
+<td>Member</td>
+<td>Create/publish items</td>
+<td>Workspace → Access</td>
+</tr>
+<tr>
+<td><strong>Fabric Workspace</strong></td>
+<td>Admin</td>
+<td>Full control</td>
+<td>Workspace → Access</td>
+</tr>
+<tr>
+<td><strong>ADLS Container</strong></td>
+<td>Storage Blob Data Reader</td>
+<td>Read parquet files</td>
+<td>Azure Portal → IAM</td>
+</tr>
+<tr>
+<td><strong>Eventhouse</strong></td>
+<td>Viewer</td>
+<td>Read tables</td>
+<td>Eventhouse → Permissions</td>
+</tr>
+<tr>
+<td><strong>Semantic Model</strong></td>
+<td>RLS Role</td>
+<td>Row-filtered data</td>
+<td>Power BI → Security</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>

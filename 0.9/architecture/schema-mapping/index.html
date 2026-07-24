@@ -1,0 +1,3158 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/architecture/schema-mapping/">
+      
+      
+        <link rel="prev" href="../data-schema/">
+      
+      
+        <link rel="next" href="../streaming-implementation-status/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Schema Mapping: Batch Parquet ↔ Streaming Events - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#schema-mapping-batch-parquet-streaming-events" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Schema Mapping: Batch Parquet ↔ Streaming Events
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overview
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Architecture Context
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#critical-design-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Critical Design Decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-mapping-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Complete Mapping Table
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detailed-schema-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detailed Schema Mappings
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed Schema Mappings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fact_receipts-receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. fact_receipts ↔ receipt_created
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. fact_receipts ↔ receipt_created">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-schema-filesfact_receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Batch Schema (<code>Files/fact_receipts</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnreceipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.receipt_created</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_receipt_created</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-fact_receipt_lines-receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. fact_receipt_lines ↔ receipt_line_added
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. fact_receipt_lines ↔ receipt_line_added">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnreceipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.receipt_line_added</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_receipt_line_added</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-fact_payments-payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. fact_payments ↔ payment_processed
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. fact_payments ↔ payment_processed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnpayment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.payment_processed</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_payment_processed</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-other-mappings-of-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Other Mappings of Note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#general-transformation-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        General Transformation Patterns
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Transformation Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pattern-1-timestamp-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 1: Timestamp Mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-2-external-id-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 2: External ID Mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-3-cents-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 3: Cents Calculation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-4-field-name-normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 4: Field Name Normalization
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-5-default-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 5: Default Values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-in-silver-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Implementation in Silver Layer
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation in Silver Layer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#merge-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Merge Strategy
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-new-streaming-combinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Adding New Streaming Combinations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-evolution-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Schema Evolution Guidance
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Evolution Guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-batch-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When Batch Schema Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-streaming-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When Streaming Schema Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-to-avoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking Changes to Avoid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Related Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../datagen/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/store-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../datagen/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overview
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Architecture Context
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#critical-design-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Critical Design Decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-mapping-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Complete Mapping Table
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detailed-schema-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detailed Schema Mappings
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detailed Schema Mappings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fact_receipts-receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. fact_receipts ↔ receipt_created
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. fact_receipts ↔ receipt_created">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-schema-filesfact_receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Batch Schema (<code>Files/fact_receipts</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnreceipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.receipt_created</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_receipt_created</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-fact_receipt_lines-receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. fact_receipt_lines ↔ receipt_line_added
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. fact_receipt_lines ↔ receipt_line_added">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnreceipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.receipt_line_added</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_receipt_line_added</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-fact_payments-payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. fact_payments ↔ payment_processed
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. fact_payments ↔ payment_processed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streaming-schema-cusnpayment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Schema (<code>cusn.payment_processed</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#field-mapping-streaming-silver-from-transform_payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Field Mapping (Streaming → Silver, from <code>transform_payment_processed</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-other-mappings-of-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Other Mappings of Note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#general-transformation-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        General Transformation Patterns
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Transformation Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pattern-1-timestamp-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 1: Timestamp Mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-2-external-id-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 2: External ID Mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-3-cents-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 3: Cents Calculation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-4-field-name-normalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 4: Field Name Normalization
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-5-default-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pattern 5: Default Values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-in-silver-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Implementation in Silver Layer
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation in Silver Layer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#merge-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Merge Strategy
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-new-streaming-combinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Adding New Streaming Combinations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-evolution-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Schema Evolution Guidance
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Evolution Guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-batch-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When Batch Schema Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-streaming-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When Streaming Schema Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-to-avoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Breaking Changes to Avoid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Related Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="schema-mapping-batch-parquet-streaming-events">Schema Mapping: Batch Parquet ↔ Streaming Events</h1>
+<h2 id="overview">Overview</h2>
+<p>This document maps batch parquet fact tables to their corresponding streaming event tables, documenting schema differences and the transformation logic used in the Silver layer (<code>ag</code> schema).</p>
+<h2 id="architecture-context">Architecture Context</h2>
+<ul>
+<li><strong>Batch Parquet</strong> (<code>Files/fact_*</code>): Historical data from the data generator, uploaded to ADLSv2 and surfaced via Lakehouse <code>Files/</code> shortcuts</li>
+<li><strong>Streaming Events</strong> (<code>cusn.receipt_created</code>, etc.): Real-time events from Eventhouse, surfaced via <code>Tables/cusn/</code> shortcuts</li>
+<li><strong>Silver</strong> (<code>ag.fact_*</code>): Batch data is loaded once by <code>02-historical-data-load.ipynb</code>; streaming events are then appended incrementally by <code>03-streaming-to-silver.ipynb</code></li>
+</ul>
+<h2 id="critical-design-decision">Critical Design Decision</h2>
+<p><strong>No Overlap</strong>: The data generator ensures batch historical and streaming real-time data never overlap in time, so appending streaming events without deduplication is safe. Incremental processing uses per-table watermarks stored in <code>ag._watermarks</code> (keyed on <code>ingest_timestamp</code>), so events are not processed twice.</p>
+<hr />
+<h2 id="complete-mapping-table">Complete Mapping Table</h2>
+<p>All streaming integrations below are implemented in <code>03-streaming-to-silver.ipynb</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Batch Parquet Table</th>
+<th>Streaming Event Table(s)</th>
+<th>Silver Target</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fact_receipts</code></td>
+<td><code>receipt_created</code></td>
+<td><code>ag.fact_receipts</code></td>
+<td>Field mapping required</td>
+</tr>
+<tr>
+<td><code>fact_receipt_lines</code></td>
+<td><code>receipt_line_added</code></td>
+<td><code>ag.fact_receipt_lines</code></td>
+<td>Field mapping required</td>
+</tr>
+<tr>
+<td><code>fact_payments</code></td>
+<td><code>payment_processed</code></td>
+<td><code>ag.fact_payments</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_store_inventory_txn</code></td>
+<td><code>inventory_updated</code></td>
+<td><code>ag.fact_store_inventory_txn</code></td>
+<td>All <code>inventory_updated</code> events land here</td>
+</tr>
+<tr>
+<td><code>fact_dc_inventory_txn</code></td>
+<td><em>(none currently)</em></td>
+<td><code>ag.fact_dc_inventory_txn</code></td>
+<td>Batch only; streaming <code>inventory_updated</code> is not split by location</td>
+</tr>
+<tr>
+<td><code>fact_stockouts</code></td>
+<td><code>stockout_detected</code></td>
+<td><code>ag.fact_stockouts</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_reorders</code></td>
+<td><code>reorder_triggered</code></td>
+<td><code>ag.fact_reorders</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_foot_traffic</code></td>
+<td><code>customer_entered</code></td>
+<td><code>ag.fact_foot_traffic</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_customer_zone_changes</code></td>
+<td><code>customer_zone_changed</code></td>
+<td><code>ag.fact_customer_zone_changes</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_ble_pings</code></td>
+<td><code>ble_ping_detected</code></td>
+<td><code>ag.fact_ble_pings</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_truck_moves</code></td>
+<td><code>truck_arrived</code>, <code>truck_departed</code></td>
+<td><code>ag.fact_truck_moves</code></td>
+<td>Both event types appended with <code>status</code> literal</td>
+</tr>
+<tr>
+<td><code>fact_store_ops</code></td>
+<td><code>store_opened</code>, <code>store_closed</code></td>
+<td><code>ag.fact_store_ops</code></td>
+<td><code>operation_type</code> set to OPENED/CLOSED</td>
+</tr>
+<tr>
+<td><code>fact_marketing</code></td>
+<td><code>ad_impression</code></td>
+<td><code>ag.fact_marketing</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_promotions</code></td>
+<td><code>promotion_applied</code></td>
+<td><code>ag.fact_promotions</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_online_order_headers</code></td>
+<td><code>online_order_created</code></td>
+<td><code>ag.fact_online_order_headers</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>fact_online_order_lines</code></td>
+<td><code>online_order_picked</code>, <code>online_order_shipped</code></td>
+<td><code>ag.fact_online_order_status</code></td>
+<td>Status events land in a separate table, not <code>fact_online_order_lines</code></td>
+</tr>
+<tr>
+<td><code>fact_truck_inventory</code></td>
+<td><em>(none)</em></td>
+<td><code>ag.fact_truck_inventory</code></td>
+<td>Batch only (no streaming equivalent)</td>
+</tr>
+<tr>
+<td><code>fact_promo_lines</code></td>
+<td><em>(none)</em></td>
+<td><code>ag.fact_promo_lines</code></td>
+<td>Batch only (no streaming equivalent)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="detailed-schema-mappings">Detailed Schema Mappings</h2>
+<h3 id="1-fact_receipts-receipt_created">1. fact_receipts ↔ receipt_created</h3>
+<h4 id="batch-schema-filesfact_receipts">Batch Schema (<code>Files/fact_receipts</code>)</h4>
+<div class="highlight"><pre><span></span><code>event_ts: TIMESTAMP
+receipt_id_ext: VARCHAR
+payment_method: VARCHAR
+discount_amount: DECIMAL
+tax_amount: DECIMAL
+tax_cents: BIGINT
+subtotal: DECIMAL
+subtotal_cents: BIGINT
+total_amount: DECIMAL
+total_cents: BIGINT
+receipt_type: VARCHAR
+customer_id: BIGINT
+store_id: BIGINT
+return_for_receipt_id_ext: VARCHAR (nullable)
+</code></pre></div>
+<h4 id="streaming-schema-cusnreceipt_created">Streaming Schema (<code>cusn.receipt_created</code>)</h4>
+<div class="highlight"><pre><span></span><code>ingest_timestamp: datetime
+receipt_id: string
+tender_type: string
+tax: real
+subtotal: real
+total: real
+item_count: long
+campaign_id: string (nullable)
+customer_id: long
+store_id: long
+</code></pre></div>
+<h4 id="field-mapping-streaming-silver-from-transform_receipt_created">Field Mapping (Streaming → Silver, from <code>transform_receipt_created</code>)</h4>
+<div class="highlight"><pre><span></span><code><span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_ts&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">to_date</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_date&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;receipt_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_id_ext&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;tender_type&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;payment_method&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;discount_amount&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;tax&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;tax_amount&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;tax&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;tax_cents&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;subtotal&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;subtotal&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;total_amount&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;total_cents&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="s2">&quot;SALE&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_type&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;subtotal&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;subtotal_cents&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;customer_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;store_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;return_for_receipt_id_ext&quot;</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><strong>Key Differences</strong>:
+- Streaming lacks <code>*_cents</code> fields → calculated with <code>F.round(amount * 100)</code>
+- Streaming lacks <code>discount_amount</code> → defaults to 0.0
+- Streaming lacks <code>receipt_type</code> → defaults to "SALE"
+- Streaming uses <code>tender_type</code> → mapped to <code>payment_method</code>
+- Streaming uses <code>receipt_id</code> → mapped to <code>receipt_id_ext</code>
+- An <code>event_date</code> column is derived for <code>dim_date</code> relationships</p>
+<hr />
+<h3 id="2-fact_receipt_lines-receipt_line_added">2. fact_receipt_lines ↔ receipt_line_added</h3>
+<h4 id="streaming-schema-cusnreceipt_line_added">Streaming Schema (<code>cusn.receipt_line_added</code>)</h4>
+<div class="highlight"><pre><span></span><code>ingest_timestamp: datetime
+receipt_id: string
+line_number: long
+product_id: long
+quantity: long
+unit_price: real
+extended_price: real
+promo_code: string (nullable)
+</code></pre></div>
+<h4 id="field-mapping-streaming-silver-from-transform_receipt_line_added">Field Mapping (Streaming → Silver, from <code>transform_receipt_line_added</code>)</h4>
+<div class="highlight"><pre><span></span><code><span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;receipt_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_id_ext&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_ts&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">to_date</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_date&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;line_number&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;int&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;line_num&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;quantity&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;int&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;unit_price&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;extended_price&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;ext_price&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;unit_price&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;unit_cents&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;extended_price&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;ext_cents&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;promo_code&quot;</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><strong>Key Differences</strong>:
+- Streaming uses <code>line_number</code> → mapped to <code>line_num</code>
+- Streaming uses <code>extended_price</code> → mapped to <code>ext_price</code>
+- Streaming uses <code>receipt_id</code> → mapped to <code>receipt_id_ext</code>
+- <code>*_cents</code> fields calculated from decimal amounts</p>
+<p><strong>Critical Note</strong>:
+- Only <code>receipt_id_ext</code> (string) is used for linkage; there is no numeric <code>receipt_id</code> FK in Silver</p>
+<hr />
+<h3 id="3-fact_payments-payment_processed">3. fact_payments ↔ payment_processed</h3>
+<h4 id="streaming-schema-cusnpayment_processed">Streaming Schema (<code>cusn.payment_processed</code>)</h4>
+<div class="highlight"><pre><span></span><code>ingest_timestamp: datetime
+receipt_id: string (nullable)
+order_id: string (nullable)
+payment_method: string
+amount: real
+amount_cents: long
+transaction_id: string
+processing_time: datetime
+processing_time_ms: int
+status: string
+decline_reason: string (nullable)
+store_id: long (nullable)
+customer_id: long
+</code></pre></div>
+<h4 id="field-mapping-streaming-silver-from-transform_payment_processed">Field Mapping (Streaming → Silver, from <code>transform_payment_processed</code>)</h4>
+<div class="highlight"><pre><span></span><code><span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_ts&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">to_date</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_date&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;transaction_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;payment_id&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;receipt_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_id_ext&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;order_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;order_id_ext&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;payment_method&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;amount&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;amount_cents&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;transaction_id&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;processing_time_ms&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;status&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;decline_reason&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;store_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">),</span>
+    <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;customer_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;long&quot;</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<hr />
+<h3 id="4-other-mappings-of-note">4. Other Mappings of Note</h3>
+<ul>
+<li><strong><code>inventory_updated</code></strong>: <code>reason</code> → <code>txn_type</code>, <code>quantity_delta</code> → <code>quantity</code>; <code>balance</code> is left null (calculated downstream). All events currently land in <code>ag.fact_store_inventory_txn</code> (no store/DC split in the streaming path).</li>
+<li><strong><code>truck_arrived</code> / <code>truck_departed</code></strong>: <code>arrival_time</code> → <code>eta</code>, <code>departure_time</code> → <code>etd</code>; a <code>status</code> literal (<code>ARRIVED</code>/<code>DEPARTED</code>) distinguishes the two event types in <code>ag.fact_truck_moves</code>.</li>
+<li><strong><code>customer_entered</code></strong>: <code>dwell_time</code> → <code>dwell_seconds</code>, <code>customer_count</code> → <code>count</code>; <code>customer_id</code> left null.</li>
+<li><strong><code>ad_impression</code></strong>: <code>impression_id</code> → <code>impression_id_ext</code>, <code>device_type</code> → <code>device</code>; <code>cost_cents</code> computed.</li>
+<li><strong><code>promotion_applied</code></strong>: <code>receipt_id</code> → <code>receipt_id_ext</code>; <code>product_ids</code> (dynamic) cast to string.</li>
+<li><strong><code>online_order_created</code></strong>: <code>order_id</code> → <code>order_id_ext</code>, <code>tender_type</code> → <code>payment_method</code>, <code>subtotal</code>/<code>tax</code>/<code>total</code> → <code>*_amount</code> plus computed <code>*_cents</code>.</li>
+<li><strong><code>online_order_picked</code> / <code>online_order_shipped</code></strong>: appended to <code>ag.fact_online_order_status</code> with a <code>status</code> literal (<code>PICKED</code>/<code>SHIPPED</code>); not merged into <code>fact_online_order_lines</code>.</li>
+</ul>
+<hr />
+<h2 id="general-transformation-patterns">General Transformation Patterns</h2>
+<h3 id="pattern-1-timestamp-mapping">Pattern 1: Timestamp Mapping</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Batch uses: event_ts</span>
+<span class="c1"># Streaming uses: ingest_timestamp</span>
+<span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_ts&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="pattern-2-external-id-mapping">Pattern 2: External ID Mapping</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Batch uses: receipt_id_ext, order_id_ext</span>
+<span class="c1"># Streaming uses: receipt_id, order_id</span>
+<span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;receipt_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_id_ext&quot;</span><span class="p">)</span>
+<span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;order_id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;order_id_ext&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="pattern-3-cents-calculation">Pattern 3: Cents Calculation</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Batch has both: amount + amount_cents</span>
+<span class="c1"># Streaming (mostly) has only: amount</span>
+<span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;amount&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;bigint&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;amount_cents&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="pattern-4-field-name-normalization">Pattern 4: Field Name Normalization</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Streaming field → Batch field</span>
+<span class="s2">&quot;extended_price&quot;</span> <span class="err">→</span> <span class="s2">&quot;ext_price&quot;</span>
+<span class="s2">&quot;line_number&quot;</span> <span class="err">→</span> <span class="s2">&quot;line_num&quot;</span>
+<span class="s2">&quot;tender_type&quot;</span> <span class="err">→</span> <span class="s2">&quot;payment_method&quot;</span>
+<span class="s2">&quot;device_type&quot;</span> <span class="err">→</span> <span class="s2">&quot;device&quot;</span>
+<span class="s2">&quot;quantity_delta&quot;</span> <span class="err">→</span> <span class="s2">&quot;quantity&quot;</span>
+</code></pre></div>
+<h3 id="pattern-5-default-values">Pattern 5: Default Values</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Fields present in batch but not streaming</span>
+<span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;discount_amount&quot;</span><span class="p">)</span>
+<span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="s2">&quot;SALE&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;receipt_type&quot;</span><span class="p">)</span>
+<span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;return_for_receipt_id_ext&quot;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="implementation-in-silver-layer">Implementation in Silver Layer</h2>
+<p><strong>Notebook</strong>: <code>fabric/lakehouse/03-streaming-to-silver.ipynb</code></p>
+<p>Each event type is processed by <code>process_events(source_table, target_table, transform_fn)</code>, which:</p>
+<ol>
+<li>Reads the Eventhouse shortcut (<code>cusn.&lt;event_table&gt;</code>)</li>
+<li>Filters to rows newer than the stored watermark (<code>ag._watermarks</code>)</li>
+<li>Applies the transform function to map streaming fields to the Silver schema</li>
+<li>Appends to <code>ag.&lt;fact_table&gt;</code> with <code>mergeSchema=true</code></li>
+<li>Advances the watermark to the max <code>ingest_timestamp</code> processed</li>
+</ol>
+<h3 id="merge-strategy">Merge Strategy</h3>
+<ul>
+<li><strong>Method</strong>: Incremental append with watermarks (no deduplication)</li>
+<li><strong>Justification</strong>: Data generator ensures no temporal overlap between batch history and streaming</li>
+<li><strong>Production note</strong>: Would add dedup on <code>(trace_id, event_ts)</code> if overlap were possible</li>
+</ul>
+<hr />
+<h2 id="adding-new-streaming-combinations">Adding New Streaming Combinations</h2>
+<p>To add streaming support for a new event type:</p>
+<ol>
+<li><strong>Verify Event Schema</strong>: Check <code>fabric/kql_database/01-create-tables.kql</code> and the event payload definition in <code>utility/notebooks/templates/driver-05-stream.py</code></li>
+<li><strong>Create Transform Function</strong>: Add to <code>03-streaming-to-silver.ipynb</code>
+   <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transform_</span><span class="p">{</span><span class="n">event_name</span><span class="p">}(</span><span class="n">df</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+        <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ingest_timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;event_ts&quot;</span><span class="p">),</span>
+        <span class="c1"># Map remaining streaming fields to Silver column names</span>
+    <span class="p">)</span>
+</code></pre></div></li>
+<li><strong>Register the Mapping</strong>: <code>process_events("{event_name}", "{fact_table}", transform_{event_name})</code></li>
+<li><strong>Test</strong>: Verify schema alignment and row counts</li>
+</ol>
+<hr />
+<h2 id="schema-evolution-guidance">Schema Evolution Guidance</h2>
+<h3 id="when-batch-schema-changes">When Batch Schema Changes</h3>
+<ol>
+<li>Update the Lakehouse table contract in <code>utility/src/retail_setup/generation/schemas.py</code></li>
+<li>Regenerate parquet files with new schema</li>
+<li>Upload to ADLSv2 (overwrite or new partition)</li>
+<li>Bronze shortcuts automatically reflect new schema</li>
+<li>Update Silver transform functions if field names changed</li>
+</ol>
+<h3 id="when-streaming-schema-changes">When Streaming Schema Changes</h3>
+<ol>
+<li>Update the event payload definitions in <code>utility/notebooks/templates/driver-05-stream.py</code></li>
+<li>Update KQL event table definitions in <code>fabric/kql_database/01-create-tables.kql</code> and mappings in <code>02-create-ingestion-mappings.kql</code></li>
+<li>Eventhouse shortcuts automatically reflect new schema</li>
+<li>Update transform functions in <code>03-streaming-to-silver.ipynb</code> for affected mappings</li>
+</ol>
+<h3 id="breaking-changes-to-avoid">Breaking Changes to Avoid</h3>
+<ul>
+<li>❌ Removing required fields from batch schema</li>
+<li>❌ Changing field types incompatibly (VARCHAR → BIGINT)</li>
+<li>❌ Removing <code>*_cents</code> fields (used in downstream Gold aggregations)</li>
+<li>❌ Changing external ID field names without updating transforms</li>
+</ul>
+<hr />
+<h2 id="related-documentation">Related Documentation</h2>
+<ul>
+<li><a href=".././">Architecture</a></li>
+<li><a href=".././streaming-implementation-status/">Streaming Implementation Status</a></li>
+<li><a href="https://github.com/amattas/retail-demo/blob/main/utility/src/retail_setup/generation/schemas.py">Table Contract Reference</a></li>
+<li><a href="https://github.com/amattas/retail-demo/blob/main/fabric/kql_database/01-create-tables.kql">KQL Event Schemas</a></li>
+<li><a href="https://github.com/amattas/retail-demo/blob/main/fabric/lakehouse/03-streaming-to-silver.ipynb">Silver Transformation Notebook</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>

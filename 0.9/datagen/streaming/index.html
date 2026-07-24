@@ -1,0 +1,3976 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/datagen/streaming/">
+      
+      
+        <link rel="prev" href="../streaming-workflow/">
+      
+      
+        <link rel="next" href="../upload-data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Real-Time Event Streaming System - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#real-time-event-streaming-system" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Real-Time Event Streaming System
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../architecture/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/schema-mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🚀 Quick Start
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📋 System Architecture
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 System Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Core Components
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Flow
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🎯 Event Types
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Event Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Customer Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketing-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnichannel-online-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Omnichannel / Online Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-envelope-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📦 Event Envelope Format
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ⚙️ Configuration
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚙️ Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-configuration-configjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Basic Configuration (config.json)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Parameters
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔧 Advanced Usage
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-event-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Custom Event Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-hooks-and-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Hooks and Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Health Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resilience-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🛡️ Resilience Features
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛡️ Resilience Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#circuit-breaker-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Circuit Breaker Pattern
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retry Logic
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dead-letter-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dead Letter Queue
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Buffer Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graceful-shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Graceful Shutdown
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📊 Performance Characteristics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Performance Characteristics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Throughput
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Latency
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Resource Usage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#realistic-event-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔍 Realistic Event Patterns
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Realistic Event Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#time-based-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Time-based Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store-based-variation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store-based Variation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-correlations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Correlations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seasonal-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Seasonal Effects
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🧪 Testing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧪 Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unit Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integration Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Manual Testing
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🚨 Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Common Issues
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debug-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Debug Mode
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📈 Monitoring and Metrics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📈 Monitoring and Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Key Metrics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Health Checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔐 Security Considerations
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Privacy
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#azure-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Azure Integration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Audit Logging
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🎯 Production Deployment
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Production Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#legacy-azure-event-hub-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Legacy Azure Event Hub Setup
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Monitoring Setup
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scaling-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scaling Considerations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📚 API Reference
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📚 API Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eventstreamer-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventStreamer Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventStreamer Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Context Manager
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventfactory-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventFactory Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventFactory Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#azureeventhubclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AzureEventHubClient Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AzureEventHubClient Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🚀 Quick Start
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📋 System Architecture
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 System Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Core Components
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Flow
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🎯 Event Types
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Event Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Customer Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketing-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnichannel-online-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Omnichannel / Online Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-envelope-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📦 Event Envelope Format
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ⚙️ Configuration
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚙️ Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-configuration-configjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Basic Configuration (config.json)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Parameters
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔧 Advanced Usage
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-event-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Custom Event Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-hooks-and-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Hooks and Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Health Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resilience-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🛡️ Resilience Features
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛡️ Resilience Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#circuit-breaker-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Circuit Breaker Pattern
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retry Logic
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dead-letter-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dead Letter Queue
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Buffer Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graceful-shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Graceful Shutdown
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📊 Performance Characteristics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Performance Characteristics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Throughput
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Latency
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Resource Usage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#realistic-event-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔍 Realistic Event Patterns
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Realistic Event Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#time-based-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Time-based Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store-based-variation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store-based Variation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-correlations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Correlations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seasonal-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Seasonal Effects
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🧪 Testing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧪 Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unit Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integration Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Manual Testing
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🚨 Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Common Issues
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debug-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Debug Mode
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📈 Monitoring and Metrics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📈 Monitoring and Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Key Metrics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Health Checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🔐 Security Considerations
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Privacy
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#azure-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Azure Integration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Audit Logging
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        🎯 Production Deployment
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Production Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#legacy-azure-event-hub-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Legacy Azure Event Hub Setup
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Monitoring Setup
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scaling-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scaling Considerations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        📚 API Reference
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📚 API Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eventstreamer-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventStreamer Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventStreamer Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Context Manager
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventfactory-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventFactory Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventFactory Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#azureeventhubclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AzureEventHubClient Class
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AzureEventHubClient Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Methods
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="real-time-event-streaming-system">Real-Time Event Streaming System</h1>
+<p>The deprecated local retail data generator includes a real-time event streaming system. It is retained as legacy reference material; the current Fabric live path uses <code>stream-events.ipynb</code> to write directly to Eventhouse/KQL with the Fabric Spark connector for Kusto.</p>
+<h2 id="quick-start">🚀 Quick Start</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.config.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetailConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.streaming</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventStreamer</span>
+
+<span class="c1"># Load configuration</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">RetailConfig</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create and initialize streamer</span>
+<span class="n">streamer</span> <span class="o">=</span> <span class="n">EventStreamer</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">azure_connection_string</span><span class="o">=</span><span class="s2">&quot;your_connection_string&quot;</span><span class="p">)</span>
+
+<span class="c1"># Stream events for 5 minutes</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream_events</span><span class="p">():</span>
+    <span class="k">async</span> <span class="k">with</span> <span class="n">streamer</span><span class="o">.</span><span class="n">streaming_session</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">5</span><span class="p">)):</span>
+        <span class="c1"># Streaming runs in background</span>
+        <span class="n">stats</span> <span class="o">=</span> <span class="k">await</span> <span class="n">streamer</span><span class="o">.</span><span class="n">get_statistics</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;events_generated&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> events&quot;</span><span class="p">)</span>
+
+<span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">stream_events</span><span class="p">())</span>
+</code></pre></div>
+<h2 id="system-architecture">📋 System Architecture</h2>
+<h3 id="core-components">Core Components</h3>
+<ol>
+<li><strong>EventStreamer</strong> - Main orchestration engine</li>
+<li><strong>EventFactory</strong> - Generates realistic retail events</li>
+<li><strong>AzureEventHubClient</strong> - legacy Azure integration with resilience</li>
+<li><strong>Event Schemas</strong> - Type-safe event definitions</li>
+</ol>
+<h3 id="event-flow">Event Flow</h3>
+<div class="highlight"><pre><span></span><code>EventFactory → EventBuffer → BatchProcessor → Legacy streaming target
+     ↓              ↓             ↓              ↓
+  Statistics → DeadLetterQueue → CircuitBreaker → Monitoring
+</code></pre></div>
+<h2 id="event-types">🎯 Event Types</h2>
+<p>The system generates these retail event types:</p>
+<h3 id="transaction-events">Transaction Events</h3>
+<ul>
+<li><code>receipt_created</code> - New customer purchases</li>
+<li><code>receipt_line_added</code> - Individual items scanned</li>
+<li><code>payment_processed</code> - Payment completion</li>
+</ul>
+<h3 id="inventory-events">Inventory Events</h3>
+<ul>
+<li><code>inventory_updated</code> - Stock level changes</li>
+<li><code>stockout_detected</code> - Out-of-stock conditions</li>
+<li><code>reorder_triggered</code> - Automatic reordering</li>
+</ul>
+<h3 id="customer-events">Customer Events</h3>
+<ul>
+<li><code>customer_entered</code> - Foot traffic entry</li>
+<li><code>customer_zone_changed</code> - Movement between store zones</li>
+<li><code>ble_ping_detected</code> - Bluetooth beacon interactions</li>
+</ul>
+<h3 id="operational-events">Operational Events</h3>
+<ul>
+<li><code>truck_arrived</code> - Delivery events</li>
+<li><code>truck_departed</code> - Shipment completion</li>
+<li><code>store_opened</code> - Daily operations start</li>
+<li><code>store_closed</code> - Daily operations end</li>
+</ul>
+<h3 id="marketing-events">Marketing Events</h3>
+<ul>
+<li><code>ad_impression</code> - Marketing campaign exposures</li>
+<li><code>promotion_applied</code> - Discount code usage</li>
+</ul>
+<h3 id="omnichannel-online-events">Omnichannel / Online Events</h3>
+<ul>
+<li><code>online_order_created</code> - New online orders (ship-from-store, ship-from-DC, BOPIS)</li>
+<li><code>online_order_picked</code> - Order picked at the fulfillment node</li>
+<li><code>online_order_shipped</code> - Order shipped/handed off</li>
+</ul>
+<p>That is 18 event types in total; see <code>streaming/schemas.py</code> (<code>EventType</code>) for the authoritative list.</p>
+<h2 id="event-envelope-format">📦 Event Envelope Format</h2>
+<p>All events use a standardized envelope:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;event_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* event-specific data */</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;trace_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TR_1704067200_00001&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ingest_timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-01T12:00:00.000Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-datagen&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;correlation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional_correlation_id&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;partition_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;store_123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;session_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional_session_id&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;parent_event_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;optional_parent_event_id&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>correlation_id</code>, <code>partition_key</code>, <code>session_id</code>, and <code>parent_event_id</code> are optional and may be null.</p>
+<h2 id="configuration">⚙️ Configuration</h2>
+<h3 id="basic-configuration-configjson">Basic Configuration (config.json)</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;realtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;emit_interval_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;burst&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;azure_connection_string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Endpoint=sb://...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max_batch_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;batch_timeout_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;retry_attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;backoff_multiplier&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;circuit_breaker_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;monitoring_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max_buffer_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;enable_dead_letter_queue&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;hub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="configuration-parameters">Configuration Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>emit_interval_ms</code></td>
+<td>Time between event bursts</td>
+<td>500</td>
+</tr>
+<tr>
+<td><code>burst</code></td>
+<td>Events per burst</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>max_batch_size</code></td>
+<td>Events per Azure batch</td>
+<td>256</td>
+</tr>
+<tr>
+<td><code>batch_timeout_ms</code></td>
+<td>Max batch wait time</td>
+<td>1000</td>
+</tr>
+<tr>
+<td><code>retry_attempts</code></td>
+<td>Retry count for failures</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>circuit_breaker_enabled</code></td>
+<td>Enable failure protection</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>monitoring_interval</code></td>
+<td>Stats update frequency</td>
+<td>30</td>
+</tr>
+</tbody>
+</table>
+<h2 id="advanced-usage">🔧 Advanced Usage</h2>
+<h3 id="custom-event-generation">Custom Event Generation</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">retail_datagen.streaming</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventFactory</span><span class="p">,</span> <span class="n">EventType</span>
+
+<span class="n">factory</span> <span class="o">=</span> <span class="n">EventFactory</span><span class="p">(</span><span class="n">stores</span><span class="p">,</span> <span class="n">customers</span><span class="p">,</span> <span class="n">products</span><span class="p">,</span> <span class="n">dcs</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># Generate specific event types</span>
+<span class="n">receipt_event</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">generate_event</span><span class="p">(</span><span class="n">EventType</span><span class="o">.</span><span class="n">RECEIPT_CREATED</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">)</span>
+
+<span class="c1"># Generate mixed events with custom weights</span>
+<span class="n">event_weights</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">EventType</span><span class="o">.</span><span class="n">RECEIPT_CREATED</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">,</span>
+    <span class="n">EventType</span><span class="o">.</span><span class="n">CUSTOMER_ENTERED</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">,</span>
+    <span class="n">EventType</span><span class="o">.</span><span class="n">INVENTORY_UPDATED</span><span class="p">:</span> <span class="mf">0.3</span>
+<span class="p">}</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">generate_mixed_events</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">event_weights</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="event-hooks-and-monitoring">Event Hooks and Monitoring</h3>
+<div class="highlight"><pre><span></span><code><span class="n">streamer</span> <span class="o">=</span> <span class="n">EventStreamer</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+<span class="c1"># Add event hooks</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_high_value_receipts</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">event_type</span> <span class="o">==</span> <span class="n">EventType</span><span class="o">.</span><span class="n">RECEIPT_CREATED</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;total&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;High-value receipt: $</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">log_batch_stats</span><span class="p">(</span><span class="n">events</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sent batch of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">events</span><span class="p">)</span><span class="si">}</span><span class="s2"> events&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">handle_errors</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error in </span><span class="si">{</span><span class="n">context</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">streamer</span><span class="o">.</span><span class="n">add_event_generated_hook</span><span class="p">(</span><span class="n">log_high_value_receipts</span><span class="p">)</span>
+<span class="n">streamer</span><span class="o">.</span><span class="n">add_batch_sent_hook</span><span class="p">(</span><span class="n">log_batch_stats</span><span class="p">)</span>
+<span class="n">streamer</span><span class="o">.</span><span class="n">add_error_hook</span><span class="p">(</span><span class="n">handle_errors</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="health-monitoring">Health Monitoring</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Get real-time statistics</span>
+<span class="n">stats</span> <span class="o">=</span> <span class="k">await</span> <span class="n">streamer</span><span class="o">.</span><span class="n">get_statistics</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Events/sec: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;events_per_second&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Success rate: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;events_sent_successfully&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;events_generated&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get health status</span>
+<span class="n">health</span> <span class="o">=</span> <span class="k">await</span> <span class="n">streamer</span><span class="o">.</span><span class="n">get_health_status</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;System healthy: </span><span class="si">{</span><span class="n">health</span><span class="p">[</span><span class="s1">&#39;overall_healthy&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Azure connection: </span><span class="si">{</span><span class="n">health</span><span class="p">[</span><span class="s1">&#39;components&#39;</span><span class="p">][</span><span class="s1">&#39;azure_event_hub&#39;</span><span class="p">][</span><span class="s1">&#39;healthy&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="resilience-features">🛡️ Resilience Features</h2>
+<h3 id="circuit-breaker-pattern">Circuit Breaker Pattern</h3>
+<p>Automatically opens circuit after 5 consecutive failures, preventing cascade failures.</p>
+<h3 id="retry-logic">Retry Logic</h3>
+<p>Exponential backoff with configurable retry attempts for transient failures.</p>
+<h3 id="dead-letter-queue">Dead Letter Queue</h3>
+<p>Failed events are queued for later processing or analysis.</p>
+<h3 id="buffer-management">Buffer Management</h3>
+<p>Internal buffering prevents data loss during temporary outages.</p>
+<h3 id="graceful-shutdown">Graceful Shutdown</h3>
+<p>Proper cleanup ensures no events are lost during shutdown.</p>
+<h2 id="performance-characteristics">📊 Performance Characteristics</h2>
+<h3 id="throughput">Throughput</h3>
+<ul>
+<li><strong>Target</strong>: 1000+ events/second</li>
+<li><strong>Burst capacity</strong>: 10,000 events/burst</li>
+<li><strong>Azure batching</strong>: Up to 256 events/batch</li>
+</ul>
+<h3 id="latency">Latency</h3>
+<ul>
+<li><strong>Event generation</strong>: &lt;1ms per event</li>
+<li><strong>Azure delivery</strong>: 100-500ms (network dependent)</li>
+<li><strong>End-to-end</strong>: &lt;1 second typical</li>
+</ul>
+<h3 id="resource-usage">Resource Usage</h3>
+<ul>
+<li><strong>Memory</strong>: ~50MB base + 1KB per buffered event</li>
+<li><strong>CPU</strong>: 5-10% of single core at 1000 events/sec</li>
+<li><strong>Network</strong>: ~100KB/sec at 1000 events/sec</li>
+</ul>
+<h2 id="realistic-event-patterns">🔍 Realistic Event Patterns</h2>
+<h3 id="time-based-distribution">Time-based Distribution</h3>
+<ul>
+<li><strong>Business hours</strong>: Peak activity 9 AM - 8 PM</li>
+<li><strong>Off-hours</strong>: Minimal activity with maintenance events</li>
+<li><strong>Weekends</strong>: Reduced but consistent activity</li>
+</ul>
+<h3 id="store-based-variation">Store-based Variation</h3>
+<ul>
+<li><strong>Large stores</strong>: More frequent, higher-value transactions</li>
+<li><strong>Small stores</strong>: Fewer, smaller transactions</li>
+<li><strong>Geographic factors</strong>: Regional shopping patterns</li>
+</ul>
+<h3 id="event-correlations">Event Correlations</h3>
+<ul>
+<li>Receipt creation triggers inventory updates</li>
+<li>Low inventory triggers reorder events</li>
+<li>Customer entry correlates with BLE pings</li>
+<li>Marketing impressions lead to promotional purchases</li>
+</ul>
+<h3 id="seasonal-effects">Seasonal Effects</h3>
+<ul>
+<li>Holiday shopping spikes</li>
+<li>Weather-related patterns</li>
+<li>Promotional calendar alignment</li>
+</ul>
+<h2 id="testing">🧪 Testing</h2>
+<h3 id="unit-tests">Unit Tests</h3>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/unit/streaming/
+</code></pre></div>
+<h3 id="integration-tests">Integration Tests</h3>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/integration/streaming/
+</code></pre></div>
+<h3 id="manual-testing">Manual Testing</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Test the Azure connection via the running server</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/test
+
+<span class="c1"># Or use a mock connection string (mock:// prefix) in config for offline testing</span>
+</code></pre></div>
+<h2 id="troubleshooting">🚨 Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<p><strong>Connection Failures</strong>
+- Verify Azure connection string
+- Check network connectivity
+- Validate legacy target name</p>
+<p><strong>High Memory Usage</strong>
+- Reduce <code>max_buffer_size</code>
+- Increase <code>batch_timeout_ms</code>
+- Check for buffer flush failures</p>
+<p><strong>Low Throughput</strong>
+- Decrease <code>emit_interval_ms</code>
+- Increase <code>burst</code> size
+- Optimize <code>max_batch_size</code></p>
+<p><strong>Event Delivery Failures</strong>
+- Check legacy target quotas
+- Verify authentication
+- Monitor circuit breaker state</p>
+<h3 id="debug-mode">Debug Mode</h3>
+<p>Enable debug logging for detailed troubleshooting:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+<span class="c1"># Now run streaming system</span>
+</code></pre></div>
+<h2 id="monitoring-and-metrics">📈 Monitoring and Metrics</h2>
+<h3 id="key-metrics">Key Metrics</h3>
+<ul>
+<li><code>events_generated</code> - Total events created</li>
+<li><code>events_sent_successfully</code> - Events delivered to Azure</li>
+<li><code>events_failed</code> - Failed delivery attempts</li>
+<li><code>events_per_second</code> - Current throughput</li>
+<li><code>batches_sent</code> - Azure batches delivered</li>
+<li><code>connection_failures</code> - Azure connectivity issues</li>
+</ul>
+<h3 id="health-checks">Health Checks</h3>
+<ul>
+<li>Legacy target connectivity</li>
+<li>Circuit breaker state</li>
+<li>Buffer utilization</li>
+<li>Error rates</li>
+<li>Resource usage</li>
+</ul>
+<h2 id="security-considerations">🔐 Security Considerations</h2>
+<h3 id="data-privacy">Data Privacy</h3>
+<ul>
+<li>All generated data is synthetic</li>
+<li>No real customer information</li>
+<li>GDPR/CCPA compliant by design</li>
+</ul>
+<h3 id="azure-integration">Azure Integration</h3>
+<ul>
+<li>Connection string encryption recommended</li>
+<li>Network security group restrictions</li>
+<li>Azure Active Directory integration supported</li>
+</ul>
+<h3 id="audit-logging">Audit Logging</h3>
+<ul>
+<li>All events include trace IDs</li>
+<li>Comprehensive error logging</li>
+<li>Security event monitoring</li>
+</ul>
+<h2 id="production-deployment">🎯 Production Deployment</h2>
+<h3 id="legacy-azure-event-hub-setup">Legacy Azure Event Hub Setup</h3>
+<ol>
+<li>Create an Event Hub namespace for legacy testing, if needed</li>
+<li>Create retail-events hub</li>
+<li>Configure access policies</li>
+<li>Set up monitoring alerts</li>
+</ol>
+<h3 id="configuration-management">Configuration Management</h3>
+<ul>
+<li>Store connection strings securely</li>
+<li>Use environment variables</li>
+<li>Implement configuration validation</li>
+</ul>
+<h3 id="monitoring-setup">Monitoring Setup</h3>
+<ul>
+<li>Azure Monitor integration</li>
+<li>Custom metric dashboards</li>
+<li>Alert rules for failures</li>
+</ul>
+<h3 id="scaling-considerations">Scaling Considerations</h3>
+<ul>
+<li>Multiple streamer instances</li>
+<li>Legacy target partition strategy</li>
+<li>Load balancing across regions</li>
+</ul>
+<h2 id="api-reference">📚 API Reference</h2>
+<h3 id="eventstreamer-class">EventStreamer Class</h3>
+<h4 id="methods">Methods</h4>
+<ul>
+<li><code>initialize()</code> - Initialize streaming components</li>
+<li><code>start(duration)</code> - Begin streaming</li>
+<li><code>stop()</code> - Graceful shutdown</li>
+<li><code>get_statistics()</code> - Current metrics</li>
+<li><code>get_health_status()</code> - Health information</li>
+</ul>
+<h4 id="context-manager">Context Manager</h4>
+<div class="highlight"><pre><span></span><code><span class="k">async</span> <span class="k">with</span> <span class="n">streamer</span><span class="o">.</span><span class="n">streaming_session</span><span class="p">(</span><span class="n">duration</span><span class="p">):</span>
+    <span class="c1"># Streaming active</span>
+    <span class="k">pass</span>
+<span class="c1"># Automatically cleaned up</span>
+</code></pre></div>
+<h3 id="eventfactory-class">EventFactory Class</h3>
+<h4 id="methods_1">Methods</h4>
+<ul>
+<li><code>generate_event(type, timestamp)</code> - Single event</li>
+<li><code>generate_mixed_events(count, timestamp, weights)</code> - Mixed batch</li>
+<li><code>should_generate_event(type, timestamp)</code> - Pattern check</li>
+</ul>
+<h3 id="azureeventhubclient-class">AzureEventHubClient Class</h3>
+<h4 id="methods_2">Methods</h4>
+<ul>
+<li><code>connect()</code> - Establish connection</li>
+<li><code>disconnect()</code> - Close connection</li>
+<li><code>send_events(events)</code> - Batch send</li>
+<li><code>health_check()</code> - Connection status</li>
+<li><code>get_statistics()</code> - Client metrics</li>
+</ul>
+<p>For complete API documentation, see the inline docstrings and type hints in the source code.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>

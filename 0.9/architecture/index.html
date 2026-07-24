@@ -1,0 +1,2661 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/architecture/">
+      
+      
+        <link rel="prev" href="../roadmap/">
+      
+      
+        <link rel="next" href="./data-schema/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Architecture - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="././" class="md-nav__link md-nav__link--active">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./schema-mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../datagen/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/store-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/streaming-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datagen/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overview
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Flows
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Flows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#real-time-path-hot-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Real-Time Path (Hot Path)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-path-warmcold-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Batch Path (Warm/Cold Path)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ontology-path-business-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ontology Path (Business Map)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Components
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-generator-utility" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data generator (<code>utility/</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fabric-kql-database-fabrickql_database" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fabric KQL Database (<code>fabric/kql_database/</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fabric-lakehouse-fabriclakehouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fabric Lakehouse (<code>fabric/lakehouse/</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Schema
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#latency-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Latency Targets
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deployment
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bronze-layer-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Bronze Layer Architecture
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bronze Layer Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-naming-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Schema Naming Convention
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shortcut-locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Shortcut Locations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Sources
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adlsv2-parquet-batch-historical-data-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ADLSv2 Parquet (Batch Historical Data) → Files/
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventhouse-real-time-streaming-data-tablescusn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Eventhouse (Real-Time Streaming Data) → Tables/cusn/
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#total-bronze-shortcuts-42" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Total Bronze Shortcuts: 42
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Flow
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-access-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Access Patterns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Implementation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="architecture">Architecture</h1>
+<h2 id="overview">Overview</h2>
+<p>This solution demonstrates Microsoft Fabric Real-Time Intelligence using synthetic retail data. It combines streaming analytics (KQL/Eventhouse) with batch processing (Lakehouse/PySpark) to provide both real-time and historical insights.</p>
+<pre class="mermaid"><code>flowchart LR
+    Stream[stream-events notebook&lt;br/&gt;Spark Structured Streaming]
+    Eventhouse[(Eventhouse / KQL&lt;br/&gt;18 event tables)]
+    MV[Materialized views&lt;br/&gt;live KPIs]
+    Dash[Real-Time dashboards]
+    Bronze[Lakehouse cusn shortcuts&lt;br/&gt;optional live Bronze]
+    Silver[(Lakehouse Silver ag&lt;br/&gt;dimensions + facts)]
+    Gold[(Lakehouse Gold au&lt;br/&gt;aggregates + ML outputs)]
+    Semantic[Power BI semantic model&lt;br/&gt;DirectLake]
+    Ontology[Retail ontology&lt;br/&gt;business entities]
+
+    Stream --&gt; Eventhouse
+    Eventhouse --&gt; MV --&gt; Dash
+    Eventhouse --&gt; Bronze --&gt; Silver --&gt; Gold --&gt; Semantic
+    Silver --&gt; Semantic
+    Silver --&gt; Ontology
+    Gold --&gt; Ontology
+    Eventhouse --&gt;|KustoTable TimeSeries bindings| Ontology</code></pre>
+<hr />
+<h2 id="data-flows">Data Flows</h2>
+<h3 id="real-time-path-hot-path">Real-Time Path (Hot Path)</h3>
+<p><strong>Latency target: &lt; 2 seconds</strong></p>
+<ol>
+<li><strong><code>stream-events</code> notebook</strong> generates synthetic retail events (receipts, inventory, foot traffic)</li>
+<li><strong>Spark Structured Streaming</strong> processes micro-batches with <code>foreachBatch</code></li>
+<li><strong>Fabric Spark connector for Kusto</strong> appends each <code>event_type</code> subset to its typed KQL table</li>
+<li><strong>Eventhouse</strong> stores events with materialized views for pre-aggregated KPIs</li>
+<li><strong>Real-Time Dashboards</strong> query materialized views</li>
+<li><strong>Retail ontology</strong> binds selected Eventhouse tables as TimeSeries sources on
+   the same business entities used for Lakehouse history.</li>
+</ol>
+<h3 id="batch-path-warmcold-path">Batch Path (Warm/Cold Path)</h3>
+<p><strong>Latency target: &lt; 15 minutes</strong></p>
+<ol>
+<li><strong>Lakehouse Bronze</strong> exposes the data via shortcuts: Eventhouse event tables (<code>Tables/cusn/</code>) and ADLS Gen2 historical parquet (<code>Files/</code>)</li>
+<li><strong>PySpark Notebooks</strong> transform:</li>
+<li>Bronze → Silver (<code>ag</code> schema): field mapping, type casting, watermark-based incremental loads</li>
+<li>Silver → Gold (<code>au</code> schema): aggregations, business metrics</li>
+<li><strong>Semantic Model</strong> provides unified view for Power BI</li>
+</ol>
+<h3 id="ontology-path-business-map">Ontology Path (Business Map)</h3>
+<p>The Fabric ontology is a business relationship map, not a graph of event-log
+rows. <code>30-create-ontology.ipynb</code> creates stable business entities such as
+<code>Receipt</code>, <code>Payment</code>, <code>Store</code>, <code>Product</code>, and <code>Customer</code>.</p>
+<p>Each entity keeps its Lakehouse <code>NonTimeSeries</code> binding for historical Silver or
+Gold data. Where an Eventhouse table contains the same business key, the entity
+also receives one or more Eventhouse <code>KustoTable</code> TimeSeries bindings. Examples:</p>
+<ul>
+<li><code>Receipt</code>: <code>ag.fact_receipts</code> plus <code>receipt_created</code> and <code>receipt_line_added</code>.</li>
+<li><code>Payment</code>: <code>ag.fact_payments</code> plus <code>payment_processed</code>.</li>
+<li><code>Store</code>: <code>ag.dim_stores</code> plus receipt, payment, promotion, inventory,
+  customer, truck, and store-operation event tables.</li>
+<li><code>Product</code>: <code>ag.dim_products</code> plus receipt-line, inventory, stockout, and
+  reorder event tables.</li>
+</ul>
+<p>Business relationships also receive Eventhouse contextualizations where the live
+event table carries both keys, such as <code>ReceiptPlacedByCustomer</code> via
+<code>receipt_created</code> and <code>PaymentForReceipt</code> via <code>payment_processed</code>.</p>
+<pre class="mermaid"><code>erDiagram
+    STORE ||--o{ RECEIPT : "ReceiptAtStore"
+    CUSTOMER ||--o{ RECEIPT : "ReceiptPlacedByCustomer"
+    RECEIPT ||--o{ PRODUCT : "ReceiptContainsProduct"
+    RECEIPT ||--o{ PAYMENT : "PaymentForReceipt"
+    ONLINE_ORDER ||--o{ PAYMENT : "PaymentForOnlineOrder"
+    CUSTOMER ||--o{ ONLINE_ORDER : "OnlineOrderPlacedByCustomer"
+    RECEIPT ||--o{ PROMOTION : "PromotionAppliedToReceipt"
+    STORE ||--o{ PROMOTION : "PromotionAtStore"
+    CUSTOMER ||--o{ PROMOTION : "PromotionByCustomer"
+    GEOGRAPHY ||--o{ STORE : "StoreLocatedInGeography"
+    GEOGRAPHY ||--o{ CUSTOMER : "CustomerLocatedInGeography"
+    GEOGRAPHY ||--o{ DISTRIBUTION_CENTER : "DistributionCenterLocatedInGeography"
+    DISTRIBUTION_CENTER ||--o{ TRUCK : "TruckAssignedToDistributionCenter"
+    STORE ||--o{ PRODUCT : "StoreHasStockoutRiskForProduct"
+
+    STORE {
+        lakehouse ag_dim_stores
+        kusto receipt_created
+        kusto inventory_updated
+        kusto store_opened
+    }
+    RECEIPT {
+        lakehouse ag_fact_receipts
+        kusto receipt_created
+        kusto receipt_line_added
+    }
+    PAYMENT {
+        lakehouse ag_fact_payments
+        kusto payment_processed
+    }
+    PRODUCT {
+        lakehouse ag_dim_products
+        kusto receipt_line_added
+        kusto stockout_detected
+    }</code></pre>
+<hr />
+<h2 id="components">Components</h2>
+<h3 id="data-generator-utility">Data generator (<code>utility/</code>)</h3>
+<p>The Fabric-native <code>retail-setup</code> utility generates synthetic retail data directly in Fabric Spark via the setup notebooks, and renders/deploys the Fabric items.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/retail_setup/generation/</code></td>
+<td>Spark-native dimension, fact, and Gold generation, the table contract (<code>schemas.py</code>), and cross-table invariants</td>
+</tr>
+<tr>
+<td><code>src/retail_setup/dictionaries/</code></td>
+<td>JSON seed dictionaries and store-type profiles</td>
+</tr>
+<tr>
+<td><code>src/retail_setup/config/</code></td>
+<td>Generation and deployment configuration models</td>
+</tr>
+<tr>
+<td><code>src/retail_setup/cli/</code></td>
+<td><code>retail-setup</code> CLI (<code>configure</code>/<code>render</code>/<code>deploy</code>)</td>
+</tr>
+<tr>
+<td><code>notebooks/templates/</code></td>
+<td>Notebook driver templates, including the <code>stream-events</code> live driver (<code>driver-05-stream.py</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key features:</strong>
+- Deterministic, seeded Spark generation (reproducible runs)
+- Outputs Delta tables to the Lakehouse (Silver <code>ag</code>, Gold <code>au</code>)
+- Realistic temporal patterns (seasonality, dayparts, holidays)
+- Configurable via <code>utility/config.yaml</code> and deploy environment YAML</p>
+<blockquote>
+<p>The legacy FastAPI/DuckDB/Event Hub generator is retained under <code>datagen-deprecated/</code> for reference only.</p>
+</blockquote>
+<h3 id="fabric-kql-database-fabrickql_database">Fabric KQL Database (<code>fabric/kql_database/</code>)</h3>
+<p>Eventhouse schema and queries.</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01-create-tables.kql</code></td>
+<td>Event table definitions, retention/streaming/batching policies</td>
+</tr>
+<tr>
+<td><code>02-create-ingestion-mappings.kql</code></td>
+<td>JSON ingestion mappings</td>
+</tr>
+<tr>
+<td><code>03-create-functions.kql</code></td>
+<td>Reusable KQL functions (<code>fn_attribution_window</code>, <code>fn_truck_sla</code>)</td>
+</tr>
+<tr>
+<td><code>04-create-materialized-views.kql</code></td>
+<td>Pre-aggregated KPIs (<code>mv_store_sales_minute</code>, <code>mv_top_products_15m</code>, <code>mv_sales_product_minute</code>, <code>mv_tender_mix_15m</code>, <code>mv_zone_dwell_minute</code>)</td>
+</tr>
+<tr>
+<td><code>06-ml-anomaly-detection.kql</code></td>
+<td>KQL anomaly detection functions (<code>fn_detect_*</code>)</td>
+</tr>
+<tr>
+<td><code>07-pricing-approval-tables.kql</code></td>
+<td>Pricing approval tables and materialized views</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fabric-lakehouse-fabriclakehouse">Fabric Lakehouse (<code>fabric/lakehouse/</code>)</h3>
+<p>PySpark notebooks for batch transforms.</p>
+<table>
+<thead>
+<tr>
+<th>Notebook</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01-create-bronze-shortcuts.ipynb</code></td>
+<td>Create Bronze shortcuts (ADLS parquet + Eventhouse tables)</td>
+</tr>
+<tr>
+<td><code>02-historical-data-load.ipynb</code></td>
+<td>One-time batch load: <code>Files/</code> parquet → Silver (<code>ag</code>) → Gold (<code>au</code>), plus <code>dim_date</code></td>
+</tr>
+<tr>
+<td><code>03-streaming-to-silver.ipynb</code></td>
+<td>Incremental: Eventhouse events (<code>cusn</code>) → Silver (<code>ag</code>), watermark-based</td>
+</tr>
+<tr>
+<td><code>04-streaming-to-gold.ipynb</code></td>
+<td>Rebuild Gold (<code>au</code>) aggregations from Silver</td>
+</tr>
+<tr>
+<td><code>05-maintain-delta-tables.ipynb</code></td>
+<td>Delta table maintenance (OPTIMIZE/VACUUM)</td>
+</tr>
+<tr>
+<td><code>06</code>–<code>14-ml-*.ipynb</code></td>
+<td>ML notebooks (forecasting, segmentation, churn, pricing, etc.)</td>
+</tr>
+</tbody>
+</table>
+<p>Notebooks are orchestrated by Fabric pipelines in <code>fabric/pipelines/</code>: <code>historical-data-load</code>, <code>streaming-data-load</code> (03 → 04), <code>daily-maintenance</code>, and <code>machine-learning</code>.</p>
+<hr />
+<h2 id="event-schema">Event Schema</h2>
+<p>All events use a standard envelope:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;event_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;trace_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;uuid&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ingest_timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-datagen&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;correlation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;partition_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;session_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;parent_event_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The 18 event types and payload models are defined in <code>utility/notebooks/templates/driver-05-stream.py</code>. Events that fail to match a known type land in the <code>unknown_event</code> KQL table.</p>
+<hr />
+<h2 id="latency-targets">Latency Targets</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Target</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot (KQL)</td>
+<td>&lt; 2s</td>
+<td>Real-time dashboards, live KPIs</td>
+</tr>
+<tr>
+<td>Warm (alerts)</td>
+<td>&lt; 30s</td>
+<td>Stockout alerts, anomaly detection</td>
+</tr>
+<tr>
+<td>Cold (Lakehouse)</td>
+<td>&lt; 15m</td>
+<td>Historical reports, trend analysis</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="deployment">Deployment</h2>
+<p>See <a href="../setup/">Setup Guide</a> for deployment instructions. Requires:
+- Microsoft Fabric workspace with Eventhouse and Lakehouse</p>
+<p>:::note
+The live streaming path writes directly from <code>stream-events.ipynb</code> to the <code>retail_eventhouse</code> KQL database through the Fabric Spark connector for Kusto. The remaining manual deployment task is publishing the Power BI semantic model.
+:::</p>
+<hr />
+<h2 id="bronze-layer-architecture">Bronze Layer Architecture</h2>
+<p>The Bronze layer serves as the data ingestion layer in the Medallion architecture, bringing together batch historical data (ADLSv2 parquet) and real-time streaming data (Eventhouse) into the Lakehouse.</p>
+<h3 id="schema-naming-convention">Schema Naming Convention</h3>
+<table>
+<thead>
+<tr>
+<th>Schema</th>
+<th>Layer</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cusn</code></td>
+<td>Bronze</td>
+<td>Eventhouse event table shortcuts (Tables/)</td>
+</tr>
+<tr>
+<td><code>ag</code></td>
+<td>Silver</td>
+<td>Cleaned, deduplicated, typed Delta tables</td>
+</tr>
+<tr>
+<td><code>au</code></td>
+<td>Gold</td>
+<td>Pre-aggregated KPIs for dashboards</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note:</strong> ADLS parquet shortcuts are stored in <code>Files/</code> (not in a schema).</p>
+<h3 id="shortcut-locations">Shortcut Locations</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Location</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADLS Gen2 (parquet)</td>
+<td><strong>Files/</strong></td>
+<td>24 shortcuts</td>
+</tr>
+<tr>
+<td>Eventhouse (streaming)</td>
+<td><strong>Tables/cusn/</strong></td>
+<td>18 shortcuts</td>
+</tr>
+</tbody>
+</table>
+<h3 id="data-sources">Data Sources</h3>
+<h4 id="adlsv2-parquet-batch-historical-data-files">ADLSv2 Parquet (Batch Historical Data) → Files/</h4>
+<ul>
+<li><strong>Storage Account</strong>: <code>stdretail</code></li>
+<li><strong>Container</strong>: <code>supermarket</code></li>
+<li><strong>Format</strong>: Parquet (monthly partitions for fact tables)</li>
+<li><strong>Shortcuts</strong>: 24 folders in Files/</li>
+</ul>
+<p><strong>Dimension Folders (6):</strong>
+- <code>Files/dim_geographies</code>, <code>Files/dim_stores</code>, <code>Files/dim_distribution_centers</code>
+- <code>Files/dim_trucks</code>, <code>Files/dim_customers</code>, <code>Files/dim_products</code></p>
+<p><strong>Fact Folders (18):</strong>
+- <code>Files/fact_receipts</code>, <code>Files/fact_receipt_lines</code>, <code>Files/fact_store_inventory_txn</code>
+- <code>Files/fact_dc_inventory_txn</code>, <code>Files/fact_truck_moves</code>, <code>Files/fact_truck_inventory</code>
+- <code>Files/fact_foot_traffic</code>, <code>Files/fact_ble_pings</code>, <code>Files/fact_customer_zone_changes</code>
+- <code>Files/fact_marketing</code>, <code>Files/fact_online_order_headers</code>, <code>Files/fact_online_order_lines</code>
+- <code>Files/fact_payments</code>, <code>Files/fact_store_ops</code>, <code>Files/fact_stockouts</code>
+- <code>Files/fact_promotions</code>, <code>Files/fact_promo_lines</code>, <code>Files/fact_reorders</code></p>
+<h4 id="eventhouse-real-time-streaming-data-tablescusn">Eventhouse (Real-Time Streaming Data) → Tables/cusn/</h4>
+<ul>
+<li><strong>Database</strong>: <code>retail_eventhouse</code></li>
+<li><strong>Format</strong>: KQL tables (streaming events)</li>
+<li><strong>Shortcuts</strong>: 18 tables in cusn schema</li>
+</ul>
+<p><strong>Event Tables by Category:</strong>
+- <strong>Transaction (3):</strong> <code>cusn.receipt_created</code>, <code>cusn.receipt_line_added</code>, <code>cusn.payment_processed</code>
+- <strong>Inventory (3):</strong> <code>cusn.inventory_updated</code>, <code>cusn.stockout_detected</code>, <code>cusn.reorder_triggered</code>
+- <strong>Customer (3):</strong> <code>cusn.customer_entered</code>, <code>cusn.customer_zone_changed</code>, <code>cusn.ble_ping_detected</code>
+- <strong>Operational (4):</strong> <code>cusn.truck_arrived</code>, <code>cusn.truck_departed</code>, <code>cusn.store_opened</code>, <code>cusn.store_closed</code>
+- <strong>Marketing (2):</strong> <code>cusn.ad_impression</code>, <code>cusn.promotion_applied</code>
+- <strong>Omnichannel (3):</strong> <code>cusn.online_order_created</code>, <code>cusn.online_order_picked</code>, <code>cusn.online_order_shipped</code></p>
+<h3 id="total-bronze-shortcuts-42">Total Bronze Shortcuts: 42</h3>
+<ul>
+<li><strong>Files/ (ADLS parquet)</strong>: 24 shortcuts (6 dims + 18 facts)</li>
+<li><strong>Tables/cusn/ (Eventhouse)</strong>: 18 shortcuts</li>
+</ul>
+<h3 id="data-flow">Data Flow</h3>
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────────────────────────────────────┐
+│ ADLSv2 Parquet (Historical)        Eventhouse (Real-Time)  │
+│ - 6 Dimension Folders              - 18 Event Tables        │
+│ - 18 Fact Folders                  - Streaming from notebook    │
+│ - Monthly partitions               - Live events            │
+└─────────────────┬───────────────────────────┬───────────────┘
+                  │                           │
+                  │ (shortcuts)               │ (shortcuts)
+                  ▼                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Bronze Layer                             │
+│  ┌─────────────────────┐    ┌─────────────────────────┐    │
+│  │ Files/              │    │ Tables/cusn/            │    │
+│  │ - 24 parquet folders│    │ - 18 event tables       │    │
+│  │ - Read via path     │    │ - Read via schema.table │    │
+│  └─────────────────────┘    └─────────────────────────┘    │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │ (read &amp; transform)
+                  ┌───────────────▼───────────────┐
+                  │ Silver Layer (ag)             │
+                  │ - Combine batch+streaming     │
+                  │ - Validate &amp; transform        │
+                  │ - Delta format                │
+                  └───────────────┬───────────────┘
+                                  │ (aggregate)
+                  ┌───────────────▼───────────────┐
+                  │ Gold Layer (au)               │
+                  │ - Pre-aggregated KPIs         │
+                  │ - Dashboard-ready             │
+                  └───────────────────────────────┘
+</code></pre></div>
+<h3 id="data-access-patterns">Data Access Patterns</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># ADLS parquet (via Files/)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">read</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;Files/dim_stores&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">read</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;Files/fact_receipts&quot;</span><span class="p">)</span>
+
+<span class="c1"># Eventhouse (via Tables/cusn/)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">table</span><span class="p">(</span><span class="s2">&quot;cusn.receipt_created&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;SELECT * FROM cusn.inventory_updated&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="implementation">Implementation</h3>
+<p>The Bronze layer shortcuts are created via notebook: <code>fabric/lakehouse/01-create-bronze-shortcuts.ipynb</code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>

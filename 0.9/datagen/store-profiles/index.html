@@ -1,0 +1,3132 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/datagen/store-profiles/">
+      
+      
+        <link rel="prev" href="../local-data/">
+      
+      
+        <link rel="next" href="../streaming-api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Store Profile System - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#store-profile-system" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Store Profile System
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../architecture/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/schema-mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overview
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-solved" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Problem Solved
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Architecture
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Components
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-classifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume Classifications
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store Formats
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operating Hours
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integration Points
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integration Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dimension-data-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Dimension Data Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-database-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Database Storage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-fact-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Fact Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profile-assignment-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Profile Assignment Logic
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Profile Assignment Logic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#geographic-bias" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Geographic Bias
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Format Selection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-hours_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operating Hours
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validation Metrics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coefficient-of-variation-cv" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Coefficient of Variation (CV)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Range Check
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-class-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume Class Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Testing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unit Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#impact-on-data-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Impact on Data Generation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Impact on Data Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-volume-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Volume Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temporal-store-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Temporal + Store Effects
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Example Scenarios
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Future Enhancements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-stores-have-multiplier-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        All stores have multiplier = 1.0
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-missing-profile-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Database missing profile columns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profile-fields-are-none-in-fact-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Profile fields are None in fact generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        References
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overview
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-solved" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Problem Solved
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Architecture
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Components
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-classifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume Classifications
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store Formats
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operating Hours
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integration Points
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integration Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dimension-data-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Dimension Data Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-database-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Database Storage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-fact-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Fact Generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profile-assignment-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Profile Assignment Logic
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Profile Assignment Logic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#geographic-bias" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Geographic Bias
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Format Selection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-hours_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operating Hours
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validation Metrics
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coefficient-of-variation-cv" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Coefficient of Variation (CV)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Range Check
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-class-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume Class Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Testing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Unit Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#impact-on-data-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Impact on Data Generation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Impact on Data Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-volume-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Volume Distribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temporal-store-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Temporal + Store Effects
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Example Scenarios
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Future Enhancements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-stores-have-multiplier-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        All stores have multiplier = 1.0
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-missing-profile-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Database missing profile columns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profile-fields-are-none-in-fact-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Profile fields are None in fact generation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        References
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="store-profile-system">Store Profile System</h1>
+<h2 id="overview">Overview</h2>
+<p>The store profile system creates realistic variability in transaction volumes and operational characteristics across stores in the retail network. Instead of all stores having identical traffic patterns, stores are classified into volume tiers and assigned profiles that reflect real-world diversity in retail operations.</p>
+<h2 id="problem-solved">Problem Solved</h2>
+<p><strong>Before</strong>: All stores generated identical transaction counts, creating unrealistic uniform distribution.</p>
+<p><strong>After</strong>: Stores exhibit realistic variability based on:
+- Geographic location (urban vs rural)
+- Store format (hypermarket vs express)
+- Volume classification (flagship vs kiosk)
+- Operating hours and peak patterns</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="components">Components</h3>
+<div class="highlight"><pre><span></span><code>shared/store_profiles.py
+├── StoreVolumeClass (enum)      # Traffic tier classification
+├── StoreFormat (enum)           # Physical store format
+├── OperatingHours (enum)        # Operating hour patterns
+├── StoreProfile (dataclass)     # Complete store profile
+└── StoreProfiler (class)        # Profile assignment engine
+</code></pre></div>
+<h3 id="volume-classifications">Volume Classifications</h3>
+<table>
+<thead>
+<tr>
+<th>Volume Class</th>
+<th>% of Stores</th>
+<th>Traffic Multiplier</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAGSHIP</td>
+<td>5%</td>
+<td>2.5 - 3.0x</td>
+<td>Major metro flagship stores</td>
+</tr>
+<tr>
+<td>HIGH_VOLUME</td>
+<td>15%</td>
+<td>1.8 - 2.4x</td>
+<td>Busy urban/suburban locations</td>
+</tr>
+<tr>
+<td>MEDIUM_VOLUME</td>
+<td>50%</td>
+<td>0.8 - 1.2x</td>
+<td>Typical suburban stores</td>
+</tr>
+<tr>
+<td>LOW_VOLUME</td>
+<td>25%</td>
+<td>0.4 - 0.7x</td>
+<td>Rural/small town locations</td>
+</tr>
+<tr>
+<td>KIOSK</td>
+<td>5%</td>
+<td>0.25 - 0.35x</td>
+<td>Express/convenience formats</td>
+</tr>
+</tbody>
+</table>
+<h3 id="store-formats">Store Formats</h3>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Typical Size</th>
+<th>Basket Size</th>
+<th>Basket Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HYPERMARKET</td>
+<td>150k+ sq ft</td>
+<td>12-15 items</td>
+<td>$120-$180</td>
+</tr>
+<tr>
+<td>SUPERSTORE</td>
+<td>80-150k sq ft</td>
+<td>8-10 items</td>
+<td>$80-$120</td>
+</tr>
+<tr>
+<td>STANDARD</td>
+<td>40-80k sq ft</td>
+<td>5-7 items</td>
+<td>$40-$70</td>
+</tr>
+<tr>
+<td>NEIGHBORHOOD</td>
+<td>15-40k sq ft</td>
+<td>3-5 items</td>
+<td>$25-$45</td>
+</tr>
+<tr>
+<td>EXPRESS</td>
+<td>&lt;15k sq ft</td>
+<td>1.5-3 items</td>
+<td>$15-$30</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operating-hours">Operating Hours</h3>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Hours</th>
+<th>Typical Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ALWAYS_OPEN</td>
+<td>24/7</td>
+<td>Urban convenience stores</td>
+</tr>
+<tr>
+<td>EXTENDED</td>
+<td>6am-midnight</td>
+<td>Large format stores</td>
+</tr>
+<tr>
+<td>STANDARD</td>
+<td>8am-10pm</td>
+<td>Typical suburban</td>
+</tr>
+<tr>
+<td>LIMITED</td>
+<td>9am-9pm</td>
+<td>Smaller formats</td>
+</tr>
+<tr>
+<td>REDUCED</td>
+<td>9am-6pm</td>
+<td>Sundays/holidays</td>
+</tr>
+</tbody>
+</table>
+<h2 id="integration-points">Integration Points</h2>
+<h3 id="1-dimension-data-generation">1. Dimension Data Generation</h3>
+<p><strong>File</strong>: <code>generators/master_generators/store_generator.py</code></p>
+<p>Profiles are assigned during store generation:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># After stores are created</span>
+<span class="n">profiler</span> <span class="o">=</span> <span class="n">StoreProfiler</span><span class="p">(</span><span class="n">stores</span><span class="p">,</span> <span class="n">geography_master</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+<span class="n">store_profiles</span> <span class="o">=</span> <span class="n">profiler</span><span class="o">.</span><span class="n">assign_profiles</span><span class="p">()</span>
+
+<span class="c1"># Update store records with profile information</span>
+<span class="k">for</span> <span class="n">store</span> <span class="ow">in</span> <span class="n">stores</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">store</span><span class="o">.</span><span class="n">ID</span> <span class="ow">in</span> <span class="n">store_profiles</span><span class="p">:</span>
+        <span class="n">profile</span> <span class="o">=</span> <span class="n">store_profiles</span><span class="p">[</span><span class="n">store</span><span class="o">.</span><span class="n">ID</span><span class="p">]</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">volume_class</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">volume_class</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">store_format</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">store_format</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">operating_hours</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">operating_hours</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">store</span><span class="o">.</span><span class="n">daily_traffic_multiplier</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">daily_traffic_multiplier</span>
+</code></pre></div>
+<h3 id="2-database-storage">2. Database Storage</h3>
+<p>Store profiles are persisted as columns of the <code>dim_stores</code> table in the local DuckDB database (<code>data/retail.duckdb</code>): <code>volume_class</code>, <code>store_format</code>, <code>operating_hours</code>, and <code>daily_traffic_multiplier</code>. The corresponding Pydantic <code>Store</code> model lives in <code>shared/models.py</code>.</p>
+<h3 id="3-fact-generation">3. Fact Generation</h3>
+<p><strong>Files</strong>: <code>generators/fact_generators/receipts_mixin.py</code>, <code>generators/fact_generators/sensors_mixin.py</code></p>
+<p>Traffic multipliers are applied during hourly activity generation:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Apply store profile multiplier for realistic variability</span>
+<span class="n">store_multiplier</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">store</span><span class="p">,</span> <span class="s2">&quot;daily_traffic_multiplier&quot;</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;1.0&quot;</span><span class="p">)))</span>
+
+<span class="c1"># Final customer count includes temporal AND store-specific multipliers</span>
+<span class="n">expected_customers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">base_customers_per_hour</span> <span class="o">*</span> <span class="n">multiplier</span> <span class="o">*</span> <span class="n">store_multiplier</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="profile-assignment-logic">Profile Assignment Logic</h2>
+<h3 id="geographic-bias">Geographic Bias</h3>
+<p>Urban stores have higher probability of being high-volume:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Urban distribution (skewed higher)</span>
+<span class="n">FLAGSHIP</span><span class="p">:</span> <span class="mi">10</span><span class="o">%</span>      <span class="c1"># Double the base rate</span>
+<span class="n">HIGH_VOLUME</span><span class="p">:</span> <span class="mi">25</span><span class="o">%</span>
+<span class="n">MEDIUM_VOLUME</span><span class="p">:</span> <span class="mi">45</span><span class="o">%</span>
+<span class="n">LOW_VOLUME</span><span class="p">:</span> <span class="mi">15</span><span class="o">%</span>
+<span class="n">KIOSK</span><span class="p">:</span> <span class="mi">5</span><span class="o">%</span>
+
+<span class="c1"># Rural/suburban distribution (skewed lower)</span>
+<span class="n">FLAGSHIP</span><span class="p">:</span> <span class="mi">2</span><span class="o">%</span>
+<span class="n">HIGH_VOLUME</span><span class="p">:</span> <span class="mi">10</span><span class="o">%</span>
+<span class="n">MEDIUM_VOLUME</span><span class="p">:</span> <span class="mi">53</span><span class="o">%</span>
+<span class="n">LOW_VOLUME</span><span class="p">:</span> <span class="mi">30</span><span class="o">%</span>
+<span class="n">KIOSK</span><span class="p">:</span> <span class="mi">5</span><span class="o">%</span>
+</code></pre></div>
+<h3 id="format-selection">Format Selection</h3>
+<p>Store format is influenced by both volume class and geography:</p>
+<ul>
+<li><strong>Flagship stores</strong>: Tend toward HYPERMARKET or SUPERSTORE</li>
+<li><strong>Urban locations</strong>: Tend toward smaller formats due to space constraints</li>
+<li><strong>Rural areas</strong>: Can support larger formats with parking</li>
+</ul>
+<h3 id="operating-hours_1">Operating Hours</h3>
+<p>Operating hours depend on format and location:</p>
+<ul>
+<li><strong>Express stores</strong>: Often 24/7 in urban areas</li>
+<li><strong>Hypermarkets</strong>: Extended hours (6am-midnight)</li>
+<li><strong>Neighborhood stores</strong>: Standard hours (8am-10pm)</li>
+</ul>
+<h2 id="validation-metrics">Validation Metrics</h2>
+<p>The system ensures sufficient variability through statistical checks:</p>
+<h3 id="coefficient-of-variation-cv">Coefficient of Variation (CV)</h3>
+<p><strong>Target</strong>: CV ≥ 0.5</p>
+<p>Measures relative variability of traffic multipliers:
+<div class="highlight"><pre><span></span><code>CV = standard_deviation / mean
+</code></pre></div></p>
+<p>A CV of 0.5+ indicates strong variability (not uniform distribution).</p>
+<h3 id="range-check">Range Check</h3>
+<p><strong>Target</strong>: Max - Min ≥ 2.0</p>
+<p>The difference between highest and lowest multipliers should span at least 2.0x.</p>
+<h3 id="volume-class-distribution">Volume Class Distribution</h3>
+<p><strong>Target</strong>: At least 3 different volume classes present</p>
+<p>Ensures the dataset isn't dominated by a single store type.</p>
+<h2 id="testing">Testing</h2>
+<h3 id="unit-tests">Unit Tests</h3>
+<p><strong>File</strong>: <code>tests/unit/test_store_profile_variability.py</code></p>
+<p>Tests validate:
+- Profile assignment logic
+- Volume class distribution
+- Traffic multiplier variability
+- Basket size correlation with format
+- Geographic bias in volume classes</p>
+<p>Run the variability tests with:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>datagen-deprecated
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/unit/test_store_profile_variability.py<span class="w"> </span>-v
+</code></pre></div>
+<h2 id="impact-on-data-generation">Impact on Data Generation</h2>
+<h3 id="transaction-volume-distribution">Transaction Volume Distribution</h3>
+<p>With profiles enabled, a typical 200-store network shows:</p>
+<div class="highlight"><pre><span></span><code>Store Volume Distribution:
+  Top 10 stores:  35% of transactions
+  Middle 100:     50% of transactions
+  Bottom 90:      15% of transactions
+</code></pre></div>
+<h3 id="temporal-store-effects">Temporal + Store Effects</h3>
+<p>The final customer count at any hour is:</p>
+<div class="highlight"><pre><span></span><code>customers = base_rate × temporal_multiplier × store_multiplier
+</code></pre></div>
+<p>Where:
+- <code>base_rate</code>: Configured customers_per_day / 24
+- <code>temporal_multiplier</code>: Seasonal, daily, hourly patterns (0.3 - 2.5x)
+- <code>store_multiplier</code>: Store profile traffic multiplier (0.25 - 3.0x)</p>
+<h3 id="example-scenarios">Example Scenarios</h3>
+<p><strong>Flagship store on Saturday afternoon:</strong>
+<div class="highlight"><pre><span></span><code>base_rate = 2000 / 24 = 83 customers/hour
+temporal_multiplier = 2.2 (weekend peak)
+store_multiplier = 2.8 (flagship)
+
+customers = 83 × 2.2 × 2.8 = 511 customers/hour
+</code></pre></div></p>
+<p><strong>Kiosk on Tuesday morning:</strong>
+<div class="highlight"><pre><span></span><code>base_rate = 2000 / 24 = 83 customers/hour
+temporal_multiplier = 0.5 (weekday morning)
+store_multiplier = 0.3 (kiosk)
+
+customers = 83 × 0.5 × 0.3 = 12 customers/hour
+</code></pre></div></p>
+<h2 id="configuration">Configuration</h2>
+<p>Store profiling is deterministic and uses the same seed as master generation:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># In RetailConfig</span>
+<span class="n">seed</span><span class="p">:</span> <span class="mi">42</span>  <span class="c1"># Controls both dimension data AND profile assignment</span>
+
+<span class="c1"># In StoreGenerator</span>
+<span class="n">profiler</span> <span class="o">=</span> <span class="n">StoreProfiler</span><span class="p">(</span><span class="n">stores</span><span class="p">,</span> <span class="n">geography_master</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+</code></pre></div>
+<p>This ensures:
+- Reproducible profiles for the same seed
+- Consistent store characteristics across runs
+- Ability to regenerate identical datasets</p>
+<h2 id="future-enhancements">Future Enhancements</h2>
+<p>Potential improvements to the profile system:</p>
+<ol>
+<li><strong>Seasonal Operating Hours</strong>: Adjust hours based on holidays/seasons</li>
+<li><strong>Store Remodeling Events</strong>: Change format/profile over time</li>
+<li><strong>Competitive Clustering</strong>: Model stores near each other</li>
+<li><strong>Performance Tiers</strong>: Link to sales performance metrics</li>
+<li><strong>Format-Specific Product Mix</strong>: Tailor product availability by format</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="all-stores-have-multiplier-10">All stores have multiplier = 1.0</h3>
+<p><strong>Cause</strong>: Profiles not assigned during master generation or not loaded during fact generation.</p>
+<p><strong>Fix</strong>: Ensure <code>StoreProfiler.assign_profiles()</code> is called in <code>generators/master_generators/store_generator.py</code> and profile fields are loaded when dimension data is read for fact generation.</p>
+<h3 id="database-missing-profile-columns">Database missing profile columns</h3>
+<p><strong>Cause</strong>: Database schema not updated after adding profile fields.</p>
+<p><strong>Fix</strong>: Regenerate dimension data (dim_* tables) in DuckDB, or run a migration to add missing columns.</p>
+<h3 id="profile-fields-are-none-in-fact-generation">Profile fields are None in fact generation</h3>
+<p><strong>Cause</strong>: Database loader not including profile fields when converting ORM models to Pydantic models.</p>
+<p><strong>Fix</strong>: Verify <code>load_master_data_from_db()</code> includes all profile fields in Store constructor.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><strong>Store Profile Implementation</strong>: <code>src/retail_datagen/shared/store_profiles.py</code></li>
+<li><strong>Master Generator Integration</strong>: <code>src/retail_datagen/generators/master_generators/store_generator.py</code></li>
+<li><strong>Fact Generator Integration</strong>: <code>src/retail_datagen/generators/fact_generators/receipts_mixin.py</code>, <code>sensors_mixin.py</code></li>
+<li><strong>Pydantic Models</strong>: <code>src/retail_datagen/shared/models.py</code> (Store class)</li>
+<li><strong>Tests</strong>: <code>tests/unit/test_store_profile_variability.py</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>

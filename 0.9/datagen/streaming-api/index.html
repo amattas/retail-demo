@@ -1,0 +1,4691 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Archived documentation for Retail Demo 0.9.0.">
+      
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/0.9/datagen/streaming-api/">
+      
+      
+        <link rel="prev" href="../store-profiles/">
+      
+      
+        <link rel="next" href="../streaming-operations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Streaming API Reference - Retail Demo 0.9.0</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#streaming-api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-header__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Retail Demo 0.9.0
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Streaming API Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Retail Demo 0.9.0" class="md-nav__button md-logo" aria-label="Retail Demo 0.9.0" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    Retail Demo 0.9.0
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Retail Demo 0.9.0
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Roadmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../architecture/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/schema-mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Schema Mapping: Batch Parquet ↔ Streaming Events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/streaming-implementation-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Implementation Status
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Datagen
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Datagen
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Credential Management Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fact-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fact Data Generation System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Local Data (Dimensions + Facts)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Store Profile System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming API Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#base-url" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Base URL
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Authentication
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-control-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Control Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming Control Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stop Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-streaming-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Streaming Status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pause-resume-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pause / Resume Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistics-monitoring-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Statistics &amp; Monitoring Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistics &amp; Monitoring Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-detailed-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Detailed Statistics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-recent-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Recent Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-health-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stream Health Check
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Update Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-azure-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Test Azure Connection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-connection-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validate Connection String
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validate Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-type-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Type Management
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Type Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-available-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        List Available Event Types
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dead-letter-queue-dlq-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dead Letter Queue (DLQ) Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dead Letter Queue (DLQ) Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-dlq-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get DLQ Summary
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dlq-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get DLQ Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-dlq-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retry DLQ Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-outbox-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Outbox Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming Outbox Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-outbox-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Outbox Status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Preview Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drain-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Drain Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supply-chain-disruption-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supply Chain Disruption Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supply Chain Disruption Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-disruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Disruption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list-active-disruptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        List Active Disruptions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancel-disruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cancel Disruption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-all-disruptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear All Disruptions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-envelope-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Envelope Format
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Envelope Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#envelope-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Envelope Schema
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-types-payloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Types &amp; Payloads
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Types &amp; Payloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transaction Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receipt_created
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receipt_line_added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        payment_processed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inventory Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inventory_updated" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        inventory_updated
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stockout_detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stockout_detected
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reorder_triggered" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reorder_triggered
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Customer Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Customer Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#customer_entered" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        customer_entered
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer_zone_changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        customer_zone_changed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ble_ping_detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ble_ping_detected
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operational Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#truck_arrived" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        truck_arrived
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#truck_departed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        truck_departed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store_opened-store_closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        store_opened / store_closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketing-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Marketing Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ad_impression" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ad_impression
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#promotion_applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        promotion_applied
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnichannel-online-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Omnichannel / Online Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Omnichannel &#x2f; Online Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#online_order_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_created
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#online_order_picked" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_picked
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#online_order_shipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_shipped
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Rate Limiting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-responses" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Error Responses
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket-support-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WebSocket Support (Future)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#openapi-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        OpenAPI Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sdk-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SDK Examples
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SDK Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Python
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#javascriptnodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        JavaScript/Node.js
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curl" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cURL
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next Steps
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Operations Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming Setup Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Legacy Streaming Workflow Documentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Event Streaming System
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upload-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Upload Data (Export + Azure Storage Upload)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Demos
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Demos
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter Demo Script — Retail Fabric RTI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demos/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use Cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../fabric/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Fabric
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dashboards
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/data-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/eventstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Direct Eventhouse Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/kql-database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  KQL Database
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/lakehouse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Lakehouse
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/querysets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Querysets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Real-Time Rules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../fabric/taskflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Task Flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Monitoring &amp; Alerting Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Microsoft Fabric Security &amp; Access Control Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../setup/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/01-data-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 1: Configure and Render Setup Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/02-bronze-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 2: Create Fabric Resources and KQL Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/03-silver-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 3: Generate Silver Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/04-gold-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 4: Build Gold Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/05-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 5: Pipelines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/06-streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 6: Optional Live Streaming
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/07-dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 7: Dashboards &amp; Real-Time Analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/08-semantic-model-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 8: Semantic Model Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/09-ml-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Phase 9: ML &amp; Predictive Analytics Notebooks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/capacity-planning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Capacity Planning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration Reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/disaster-recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Disaster Recovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Validation &amp; Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#base-url" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Base URL
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Authentication
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-control-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Control Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming Control Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stop Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-streaming-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Streaming Status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pause-resume-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pause / Resume Streaming
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistics-monitoring-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Statistics &amp; Monitoring Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistics &amp; Monitoring Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-detailed-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Detailed Statistics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-recent-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Recent Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream-health-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stream Health Check
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Update Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-azure-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Test Azure Connection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-connection-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validate Connection String
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-streaming-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validate Streaming Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-type-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Type Management
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Type Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-available-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        List Available Event Types
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dead-letter-queue-dlq-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dead Letter Queue (DLQ) Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dead Letter Queue (DLQ) Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-dlq-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get DLQ Summary
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dlq-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get DLQ Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-dlq-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retry DLQ Events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-outbox-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Streaming Outbox Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming Outbox Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-outbox-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Get Outbox Status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Preview Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drain-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Drain Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-outbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear Outbox
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supply-chain-disruption-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supply Chain Disruption Endpoints
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supply Chain Disruption Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-disruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Create Disruption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list-active-disruptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        List Active Disruptions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancel-disruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cancel Disruption
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-all-disruptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear All Disruptions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-envelope-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Envelope Format
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Envelope Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#envelope-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Envelope Schema
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-types-payloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Event Types &amp; Payloads
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Types &amp; Payloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transaction-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transaction Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transaction Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#receipt_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receipt_created
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#receipt_line_added" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receipt_line_added
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payment_processed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        payment_processed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inventory Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inventory_updated" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        inventory_updated
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stockout_detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stockout_detected
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reorder_triggered" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reorder_triggered
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Customer Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Customer Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#customer_entered" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        customer_entered
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer_zone_changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        customer_zone_changed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ble_ping_detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ble_ping_detected
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operational Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#truck_arrived" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        truck_arrived
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#truck_departed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        truck_departed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#store_opened-store_closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        store_opened / store_closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketing-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Marketing Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ad_impression" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ad_impression
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#promotion_applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        promotion_applied
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnichannel-online-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Omnichannel / Online Events
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Omnichannel &#x2f; Online Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#online_order_created" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_created
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#online_order_picked" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_picked
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#online_order_shipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        online_order_shipped
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Rate Limiting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-responses" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Error Responses
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket-support-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WebSocket Support (Future)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#openapi-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        OpenAPI Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sdk-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SDK Examples
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SDK Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Python
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#javascriptnodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        JavaScript/Node.js
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curl" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cURL
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next Steps
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="streaming-api-reference">Streaming API Reference</h1>
+<p>Complete REST API reference for the deprecated local generator's legacy streaming endpoints. The current Fabric live path is <code>stream-events.ipynb</code> writing directly to Eventhouse; see <a href="../../setup/06-streaming/">Phase 6</a>.</p>
+<h2 id="base-url">Base URL</h2>
+<div class="highlight"><pre><span></span><code>http://localhost:8000/api
+</code></pre></div>
+<h2 id="authentication">Authentication</h2>
+<p>Currently no authentication required for local development. For production deployments, implement authentication middleware.</p>
+<hr />
+<h2 id="streaming-control-endpoints">Streaming Control Endpoints</h2>
+<h3 id="start-streaming">Start Streaming</h3>
+<p>Start legacy real-time event streaming to the configured target.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/start</span>
+</code></pre></div>
+<p><strong>Request Body:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;duration_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;event_types&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;inventory_updated&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;burst_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;emit_interval_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Parameters:</strong>
+- <code>duration_minutes</code> (integer, optional): Auto-stop after N minutes. Null = run indefinitely
+- <code>event_types</code> (array, optional): Filter specific event types (must be valid <code>EventType</code> values). Null = all types
+- <code>burst_override</code> (integer, optional): Override the configured burst size for this session
+- <code>emit_interval_override</code> (integer, optional): Override the configured emit interval (ms) for this session</p>
+<p>Streaming uses the outbox pattern: the background task drains pending <code>streaming_outbox</code> rows in timestamp order, and generates the next day of fact data only when the outbox is empty. See <a href="../streaming-workflow/">Streaming Workflow</a>.</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Event streaming started&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;streaming_a1b2c3d4&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;started_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:30:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Responses:</strong></p>
+<ul>
+<li><strong>409 Conflict</strong>: Streaming already active</li>
+<li><strong>400 Bad Request</strong>: Invalid event types or missing fact data</li>
+<li><strong>400 Bad Request</strong>: Azure connection string not configured</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/start<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1">    &quot;emit_interval_override&quot;: 1000,</span>
+<span class="s1">    &quot;burst_override&quot;: 50,</span>
+<span class="s1">    &quot;duration_minutes&quot;: 10</span>
+<span class="s1">  }&#39;</span>
+</code></pre></div>
+<hr />
+<h3 id="stop-streaming">Stop Streaming</h3>
+<p>Stop the currently active streaming session.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/stop</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Event streaming stopped&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;streaming_a1b2c3d4&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Responses:</strong></p>
+<ul>
+<li><strong>400 Bad Request</strong>: No active streaming session</li>
+<li><strong>404 Not Found</strong>: Streaming session not found</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/stop
+</code></pre></div>
+<hr />
+<h3 id="get-streaming-status">Get Streaming Status</h3>
+<p>Get current streaming status and basic statistics.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/status</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;is_streaming&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;running&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uptime_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">450.5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;events_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15234</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;events_per_second&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;last_event_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:37:30Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Status Values:</strong>
+- <code>running</code>: Actively streaming events
+- <code>stopped</code>: No active streaming session
+- <code>error</code>: Streaming encountered errors</p>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/stream/status
+</code></pre></div>
+<hr />
+<h3 id="pause-resume-streaming">Pause / Resume Streaming</h3>
+<p>Pause an active streaming session without losing state, then resume it later.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/pause</span>
+<span class="err">POST /stream/resume</span>
+<span class="err">GET /stream/pause-status</span>
+</code></pre></div>
+<p><strong>Pause status response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;is_paused&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;pause_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;total_pause_duration_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;currently_paused_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Responses:</strong>
+- <strong>400 Bad Request</strong>: No active streamer (start streaming first), or not in a pausable/resumable state</p>
+<hr />
+<h2 id="statistics-monitoring-endpoints">Statistics &amp; Monitoring Endpoints</h2>
+<h3 id="get-detailed-statistics">Get Detailed Statistics</h3>
+<p>Get comprehensive streaming statistics and metrics.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/statistics</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;events_generated&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;events_sent_successfully&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">24897</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;events_failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">103</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;batches_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">250</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;total_streaming_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">600.5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;events_per_second&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">41.6</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bytes_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15728640</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;last_event_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;event_type_counts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;receipt_created&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;receipt_line_added&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;inventory_updated&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;customer_entered&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2000</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;error_counts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;connection_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">85</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;throttling&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_failures&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;circuit_breaker_trips&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/stream/statistics
+</code></pre></div>
+<hr />
+<h3 id="get-recent-events">Get Recent Events</h3>
+<p>Retrieve the most recent streaming events (last 100 events buffered).</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/events/recent?limit=50</span>
+</code></pre></div>
+<p><strong>Query Parameters:</strong>
+- <code>limit</code> (integer): Number of events to return (1-100). Default: 100</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:15Z&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;event_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;trace_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TR_20240115_abc123&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">85.42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;item_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:30Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8000/api/stream/events/recent?limit=20&quot;</span>
+</code></pre></div>
+<hr />
+<h3 id="stream-health-check">Stream Health Check</h3>
+<p>Check health of streaming components.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/health</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;healthy&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;checks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;streaming_task&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;task_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;running&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;uptime_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;azure_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;configured&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;hub_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;statistics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;healthy&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;events_generated&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25000</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;events_per_second&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">41.6</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;failure_rate&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.004</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Status Values:</strong>
+- <code>healthy</code>: All components operational
+- <code>degraded</code>: Some components not configured or have issues
+- <code>unhealthy</code>: Critical failures detected</p>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/stream/health
+</code></pre></div>
+<hr />
+<h2 id="configuration-endpoints">Configuration Endpoints</h2>
+<h3 id="get-streaming-configuration">Get Streaming Configuration</h3>
+<p>Get current streaming and real-time configuration.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/config</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;realtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;emit_interval_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;burst&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;azure_connection_string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Endpoint=sb://...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max_batch_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;circuit_breaker_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;hub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;available_event_types&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;receipt_line_added&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;payment_processed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;inventory_updated&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;stockout_detected&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;reorder_triggered&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;customer_entered&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;customer_zone_changed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;ble_ping_detected&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;truck_arrived&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;truck_departed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;store_opened&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;store_closed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;ad_impression&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;promotion_applied&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_picked&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_shipped&quot;</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/stream/config
+</code></pre></div>
+<hr />
+<h3 id="update-streaming-configuration">Update Streaming Configuration</h3>
+<p>Update streaming configuration settings.</p>
+<div class="highlight"><pre><span></span><code><span class="err">PUT /stream/config</span>
+</code></pre></div>
+<p><strong>Request Body:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;emit_interval_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;burst&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_batch_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">128</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Parameters (all optional):</strong>
+- <code>emit_interval_ms</code> (integer): Time between bursts
+- <code>burst</code> (integer): Events per burst
+- <code>azure_connection_string</code> (string): Legacy Event Hub connection string
+- <code>max_batch_size</code> (integer): Max events per batch
+- <code>batch_timeout_ms</code> (integer): Batch timeout</p>
+<p>Other <code>realtime</code> settings (retry attempts, circuit breaker, etc.) are updated via <code>PUT /api/config</code> with a full configuration object.</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Streaming configuration updated successfully&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Responses:</strong></p>
+<ul>
+<li><strong>409 Conflict</strong>: Cannot update while streaming is active</li>
+<li><strong>400 Bad Request</strong>: Invalid configuration values</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>http://localhost:8000/api/stream/config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;emit_interval_ms&quot;: 2000, &quot;burst&quot;: 25}&#39;</span>
+</code></pre></div>
+<hr />
+<h3 id="test-azure-connection">Test Azure Connection</h3>
+<p>Test the legacy streaming connection.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/test</span>
+</code></pre></div>
+<p><strong>Response (200 OK - Success):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Connection test successful&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_time_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">45.2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-analytics&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;event_hub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Response (200 OK - Failure):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Connection test failed: Authentication failed&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;response_time_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">125.8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;exception_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AuthenticationError&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/test
+</code></pre></div>
+<hr />
+<h3 id="validate-connection-string">Validate Connection String</h3>
+<p>Validate the format of a legacy connection string without opening a connection; returns sanitized metadata (never the key itself).</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/validate-connection</span>
+</code></pre></div>
+<p><strong>Request Body:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;connection_string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=...;EntityPath=...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;strict&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;valid&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Connection string is valid&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;strict_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sb://retail-analytics.servicebus.windows.net/&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-analytics&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;key_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RootManageSharedAccessKey&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;entity_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-events&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;has_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;is_fabric_rti&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;sanitized&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Endpoint=sb://...;SharedAccessKey=[REDACTED]...&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h3 id="validate-streaming-configuration">Validate Streaming Configuration</h3>
+<p>Validate the current (or a proposed) streaming configuration, including the connection string.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /config/validate</span>
+</code></pre></div>
+<p><strong>Request Body</strong> (optional): a full configuration object to validate instead of the current one.</p>
+<p><strong>Response (200 OK):</strong> <code>errors</code>, <code>warnings</code>, and <code>recommendations</code> arrays plus connection metadata.</p>
+<hr />
+<h2 id="event-type-management">Event Type Management</h2>
+<h3 id="list-available-event-types">List Available Event Types</h3>
+<p>Get list of all available event types for streaming.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/event-types</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;event_types&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;receipt_line_added&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;payment_processed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;inventory_updated&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;stockout_detected&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;reorder_triggered&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;customer_entered&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;customer_zone_changed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;ble_ping_detected&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;truck_arrived&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;truck_departed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;store_opened&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;store_closed&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;ad_impression&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;promotion_applied&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_created&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_picked&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;online_order_shipped&quot;</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Available event types for real-time streaming&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/stream/event-types
+</code></pre></div>
+<hr />
+<h2 id="dead-letter-queue-dlq-endpoints">Dead Letter Queue (DLQ) Endpoints</h2>
+<p>Manage failed events in the dead letter queue.</p>
+<h3 id="get-dlq-summary">Get DLQ Summary</h3>
+<p>Get summary statistics of DLQ contents.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/dlq/summary</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;by_category&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;connection_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;throttling&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;by_severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;transient&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;permanent&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;oldest_entry&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:30:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;newest_entry&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:45:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h3 id="get-dlq-events">Get DLQ Events</h3>
+<p>Get events from DLQ with optional filtering.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/dlq/events?limit=100&amp;category=connection_timeout</span>
+</code></pre></div>
+<p><strong>Query Parameters:</strong>
+- <code>limit</code> (integer): Max events to return (1-1000). Default: 100
+- <code>category</code> (string, optional): Filter by error category</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;events&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;trace_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TR_20240115_abc123&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;event_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;error_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Connection timeout after 30s&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;error_category&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;connection_timeout&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;error_severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;transient&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;retry_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;last_retry_timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:42:00Z&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;returned&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h3 id="retry-dlq-events">Retry DLQ Events</h3>
+<p>Retry events from the dead letter queue.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/dlq/retry</span>
+</code></pre></div>
+<p><strong>Request Body:</strong> the max retry attempts per event as a bare JSON number (default 3):</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/dlq/retry<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;3&#39;</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;retried&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;succeeded&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;remaining_in_dlq&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="streaming-outbox-endpoints">Streaming Outbox Endpoints</h2>
+<p>Manage the streaming outbox queue for batch event delivery.</p>
+<h3 id="get-outbox-status">Get Outbox Status</h3>
+<p>Get counts of events by status in the outbox.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/outbox/status</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;pending&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">150</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;processing&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h3 id="preview-outbox">Preview Outbox</h3>
+<p>Preview rows from the streaming outbox table.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /stream/outbox/preview?status_filter=pending&amp;limit=100</span>
+</code></pre></div>
+<p><strong>Query Parameters:</strong>
+- <code>status_filter</code> (string, optional): Filter by status (pending, processing, sent)
+- <code>limit</code> (integer): Number of rows to return (1-1000). Default: 100</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;table_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;streaming_outbox&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;columns&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;outbox_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;event_ts&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;message_type&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;status&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;attempts&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;row_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5165</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;preview_rows&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;outbox_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12345</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;event_ts&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;message_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pending&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h3 id="drain-outbox">Drain Outbox</h3>
+<p>Drain all pending outbox events to the legacy streaming target with pacing.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /stream/outbox/drain</span>
+</code></pre></div>
+<p><strong>Request Body</strong> (optional): an emit-interval override in milliseconds as a bare JSON number:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/outbox/drain<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;500&#39;</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Outbox drain started&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;drain_outbox_a1b2c3d4&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;started_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:50:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Note:</strong> This runs as a background task. Use <code>/api/tasks/{operation_id}/status</code> to monitor progress.</p>
+<hr />
+<h3 id="clear-outbox">Clear Outbox</h3>
+<p>Drop and recreate the streaming outbox table (fast reset).</p>
+<div class="highlight"><pre><span></span><code><span class="err">DELETE /stream/outbox/clear</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Outbox cleared&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="supply-chain-disruption-endpoints">Supply Chain Disruption Endpoints</h2>
+<p>Simulate supply chain disruptions that affect streaming events.</p>
+<h3 id="create-disruption">Create Disruption</h3>
+<p>Create a supply chain disruption simulation.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /disruption/create</span>
+</code></pre></div>
+<p><strong>Request Body:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;disruption_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;truck_breakdown&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;target_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;duration_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">101</span><span class="p">,</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="mi">103</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Parameters:</strong>
+- <code>disruption_type</code> (string): Type of disruption
+  - <code>dc_outage</code>: Distribution center outage
+  - <code>inventory_shortage</code>: Inventory shortage
+  - <code>truck_breakdown</code>: Truck breakdown
+  - <code>weather_delay</code>: Weather-related delays
+- <code>target_id</code> (integer): Target entity ID (DC, store, or truck)
+- <code>severity</code> (float): Disruption severity (0.0-1.0)
+- <code>duration_minutes</code> (integer): Duration in minutes
+- <code>product_ids</code> (array, optional): Affected product IDs</p>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disruption_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;disruption_x7y8z9&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Created truck_breakdown disruption for target 5&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;active_until&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T11:10:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/disruption/create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1">    &quot;disruption_type&quot;: &quot;inventory_shortage&quot;,</span>
+<span class="s1">    &quot;target_id&quot;: 10,</span>
+<span class="s1">    &quot;severity&quot;: 0.5,</span>
+<span class="s1">    &quot;duration_minutes&quot;: 15</span>
+<span class="s1">  }&#39;</span>
+</code></pre></div>
+<hr />
+<h3 id="list-active-disruptions">List Active Disruptions</h3>
+<p>Get all currently active disruptions.</p>
+<div class="highlight"><pre><span></span><code><span class="err">GET /disruption/list</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;disruptions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;disruption_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;disruption_x7y8z9&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;truck_breakdown&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;target_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;created_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;active_until&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T11:10:00Z&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;time_remaining_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">12.5</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;events_affected&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:57:30Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8000/api/disruption/list
+</code></pre></div>
+<hr />
+<h3 id="cancel-disruption">Cancel Disruption</h3>
+<p>Cancel a specific active disruption.</p>
+<div class="highlight"><pre><span></span><code><span class="err">DELETE /disruption/{disruption_id}</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Cancelled disruption disruption_x7y8z9&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;disruption_x7y8z9&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Response:</strong></p>
+<ul>
+<li><strong>404 Not Found</strong>: Disruption not found or already expired</li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>http://localhost:8000/api/disruption/disruption_x7y8z9
+</code></pre></div>
+<hr />
+<h3 id="clear-all-disruptions">Clear All Disruptions</h3>
+<p>Cancel all active disruptions.</p>
+<div class="highlight"><pre><span></span><code><span class="err">POST /disruption/clear-all</span>
+</code></pre></div>
+<p><strong>Response (200 OK):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Cleared 3 active disruptions&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/disruption/clear-all
+</code></pre></div>
+<hr />
+<h2 id="event-envelope-format">Event Envelope Format</h2>
+<p>All events use a standard envelope format for consistency and traceability.</p>
+<h3 id="envelope-schema">Envelope Schema</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;event_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;receipt_created&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;subtotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">78.50</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tax&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.92</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">85.42</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tender_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CREDIT_CARD&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;item_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;trace_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TR_20240115_abc123xyz&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ingest_timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:15.123Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;retail-datagen&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;correlation_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SESSION_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;partition_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;store_42&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Envelope Fields:</strong>
+- <code>event_type</code> (string): Event type identifier (see Event Types section)
+- <code>payload</code> (object): Event-specific data
+- <code>trace_id</code> (string): Unique trace identifier for tracking
+- <code>ingest_timestamp</code> (string): ISO-8601 timestamp when event was created
+- <code>schema_version</code> (string): Event schema version (default: "1.0")
+- <code>source</code> (string): Source system (default: "retail-datagen")
+- <code>correlation_id</code> (string, optional): Links related events
+- <code>partition_key</code> (string, optional): Partition key for the legacy streaming target</p>
+<hr />
+<h2 id="event-types-payloads">Event Types &amp; Payloads</h2>
+<h3 id="transaction-events">Transaction Events</h3>
+<h4 id="receipt_created">receipt_created</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;subtotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">78.50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tax&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.92</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">85.42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tender_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CREDIT_CARD&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;item_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;campaign_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="receipt_line_added">receipt_line_added</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;line_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1523</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;quantity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;unit_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">12.99</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;extended_price&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">25.98</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;promo_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SAVE10&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="payment_processed">payment_processed</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;payment_method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CREDIT_CARD&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">85.42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;amount_cents&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8542</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;transaction_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TXN_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;processing_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:15Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;processing_time_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">230</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;APPROVED&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;decline_reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>receipt_id</code> is set for in-store payments and <code>order_id</code> for online payments (never both). <code>status</code> is <code>APPROVED</code> or <code>DECLINED</code>; declined payments include a <code>decline_reason</code>.</p>
+<h3 id="inventory-events">Inventory Events</h3>
+<h4 id="inventory_updated">inventory_updated</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1523</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;quantity_delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SALE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;POS&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="stockout_detected">stockout_detected</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1523</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;last_known_quantity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;detection_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="reorder_triggered">reorder_triggered</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1523</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;current_quantity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reorder_quantity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reorder_point&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;priority&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;HIGH&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="customer-events">Customer Events</h3>
+<h4 id="customer_entered">customer_entered</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sensor_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SENSOR_ENTRANCE_A&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ENTRANCE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dwell_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="customer_zone_changed">customer_zone_changed</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_ble_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BLE_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;from_zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ENTRANCE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;to_zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PRODUCE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:15Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="ble_ping_detected">ble_ping_detected</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;beacon_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BEACON_PRODUCE_1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_ble_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BLE_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;rssi&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">-65</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PRODUCE&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="operational-events">Operational Events</h3>
+<h4 id="truck_arrived">truck_arrived</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;truck_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TRK_12345&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;shipment_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SHIP_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;arrival_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T10:40:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;estimated_unload_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="truck_departed">truck_departed</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;truck_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TRK_12345&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;shipment_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SHIP_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;departure_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T11:25:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;actual_unload_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">48</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="store_opened-store_closed">store_opened / store_closed</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T08:00:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;operation_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;opened&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="marketing-events">Marketing Events</h3>
+<h4 id="ad_impression">ad_impression</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;channel&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SOCIAL_MEDIA&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;campaign_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CAMP_WINTER_2024&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;creative_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CREATIVE_001&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_ad_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AD_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;impression_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;IMP_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cost&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;device_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;MOBILE&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="promotion_applied">promotion_applied</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;receipt_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RCT_20240115_xyz789&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;promo_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SAVE10&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;discount_amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;discount_cents&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">850</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;discount_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PERCENTAGE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;product_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">1523</span><span class="p">,</span><span class="w"> </span><span class="mi">1524</span><span class="p">,</span><span class="w"> </span><span class="mi">1525</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;store_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>discount_type</code> is one of <code>PERCENTAGE</code>, <code>FIXED_AMOUNT</code>, or <code>BOGO</code>.</p>
+<h3 id="omnichannel-online-events">Omnichannel / Online Events</h3>
+<h4 id="online_order_created">online_order_created</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD_20240115_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;customer_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15678</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fulfillment_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SHIP_FROM_DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;item_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;subtotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">54.00</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tax&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">4.46</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">58.46</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tender_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CREDIT_CARD&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>fulfillment_mode</code> is one of <code>SHIP_FROM_STORE</code>, <code>SHIP_FROM_DC</code>, or <code>BOPIS</code>; <code>node_type</code> is <code>STORE</code> or <code>DC</code>.</p>
+<h4 id="online_order_picked">online_order_picked</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD_20240115_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fulfillment_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SHIP_FROM_DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;picked_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T12:05:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="online_order_shipped">online_order_shipped</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD_20240115_abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fulfillment_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SHIP_FROM_DC&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;shipped_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-01-15T15:30:00Z&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="rate-limiting">Rate Limiting</h2>
+<p>Some endpoints have rate limiting to prevent abuse:</p>
+<ul>
+<li><code>/stream/start</code>: 5 requests per 60 seconds</li>
+<li><code>/stream/test</code>: 10 requests per 60 seconds</li>
+<li><code>/stream/validate-connection</code>: 20 requests per 60 seconds</li>
+<li><code>/config/validate</code>: 20 requests per 60 seconds</li>
+<li><code>/disruption/create</code>: 20 requests per 60 seconds</li>
+</ul>
+<p><strong>Rate limit exceeded response (429):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Rate limit exceeded. Try again later.&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="error-responses">Error Responses</h2>
+<p>Standard error response format:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Error message describing the issue&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Common HTTP Status Codes:</strong>
+- <code>200 OK</code>: Request successful
+- <code>400 Bad Request</code>: Invalid request parameters
+- <code>404 Not Found</code>: Resource not found
+- <code>409 Conflict</code>: Conflicting state (e.g., streaming already active)
+- <code>429 Too Many Requests</code>: Rate limit exceeded
+- <code>500 Internal Server Error</code>: Server-side error
+- <code>501 Not Implemented</code>: Feature not yet implemented</p>
+<hr />
+<h2 id="websocket-support-future">WebSocket Support (Future)</h2>
+<p>WebSocket support for real-time event streaming is planned for future releases:</p>
+<div class="highlight"><pre><span></span><code>ws://localhost:8000/ws/stream
+</code></pre></div>
+<p>This will enable browser-based real-time event monitoring without polling.</p>
+<hr />
+<h2 id="openapi-documentation">OpenAPI Documentation</h2>
+<p>Interactive API documentation available at:</p>
+<ul>
+<li><strong>Swagger UI</strong>: http://localhost:8000/docs</li>
+<li><strong>ReDoc</strong>: http://localhost:8000/redoc</li>
+<li><strong>OpenAPI JSON</strong>: http://localhost:8000/openapi.json</li>
+</ul>
+<hr />
+<h2 id="sdk-examples">SDK Examples</h2>
+<h3 id="python">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+
+<span class="c1"># Start streaming</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s1">&#39;http://localhost:8000/api/stream/start&#39;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+    <span class="s1">&#39;emit_interval_override&#39;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span>
+    <span class="s1">&#39;burst_override&#39;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="s1">&#39;duration_minutes&#39;</span><span class="p">:</span> <span class="mi">10</span>
+<span class="p">})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+
+<span class="c1"># Get status</span>
+<span class="n">status</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;http://localhost:8000/api/stream/status&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">status</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+
+<span class="c1"># Stop streaming</span>
+<span class="n">stop</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s1">&#39;http://localhost:8000/api/stream/stop&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">stop</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+</code></pre></div>
+<h3 id="javascriptnodejs">JavaScript/Node.js</h3>
+<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">axios</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;axios&#39;</span><span class="p">);</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="nx">baseURL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;http://localhost:8000/api&#39;</span><span class="p">;</span>
+
+<span class="c1">// Start streaming</span>
+<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">startStreaming</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">baseURL</span><span class="si">}</span><span class="sb">/stream/start`</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">emit_interval_override</span><span class="o">:</span><span class="w"> </span><span class="mf">1000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">burst_override</span><span class="o">:</span><span class="w"> </span><span class="mf">50</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">duration_minutes</span><span class="o">:</span><span class="w"> </span><span class="mf">10</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Get status</span>
+<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getStatus</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">baseURL</span><span class="si">}</span><span class="sb">/stream/status`</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Stop streaming</span>
+<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">stopStreaming</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">baseURL</span><span class="si">}</span><span class="sb">/stream/stop`</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="curl">cURL</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Start streaming</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/start<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;emit_interval_override&quot;: 1000, &quot;burst_override&quot;: 50, &quot;duration_minutes&quot;: 10}&#39;</span>
+
+<span class="c1"># Get status</span>
+curl<span class="w"> </span>http://localhost:8000/api/stream/status
+
+<span class="c1"># Stop streaming</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/stream/stop
+</code></pre></div>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li><strong>Setup</strong>: See <a href="../streaming-setup/">streaming-setup.md</a> for configuration</li>
+<li><strong>Operations</strong>: See <a href="../streaming-operations/">streaming-operations.md</a> for monitoring</li>
+<li><strong>Security</strong>: See <a href="../auth-setup/">auth-setup.md</a> for credential management</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.indexes","navigation.top","search.highlight"],"search":"../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>
