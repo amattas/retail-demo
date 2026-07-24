@@ -7,6 +7,7 @@ import json
 import shutil
 import uuid
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,6 +37,21 @@ _KQL_TARGET_NOTEBOOKS = {
     "30-create-ontology",
     "stream-events",
 }
+_MONTH_NAMES = (
+    "",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
 
 
 def _logical_id(item_type: str, display_name: str) -> str:
@@ -269,12 +285,140 @@ def _replace_string_value(value: Any, old: str, new: str) -> Any:
     return value
 
 
+def _replace_string_values(value: object, replacements: dict[str, str]) -> object:
+    """Recursively replace exact JSON string values without changing object keys."""
+
+    if isinstance(value, dict):
+        return {
+            key: _replace_string_values(item, replacements)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_replace_string_values(item, replacements) for item in value]
+    if isinstance(value, str):
+        return replacements.get(value, value)
+    return value
+
+
+def _set_date_slicer_default(path: Path, default_date: date) -> None:
+    """Set one persisted Power BI date hierarchy slicer to ``default_date``'s month."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        visual = payload["visual"]
+        if visual["visualType"] != "slicer":
+            raise ValueError(f"{path}: expected a slicer visual")
+        general = visual["objects"]["general"]
+        filter_entries = [
+            entry
+            for entry in general
+            if isinstance(entry, dict)
+            and "filter" in entry.get("properties", {})
+        ]
+        if len(filter_entries) != 1:
+            raise ValueError(
+                f"{path}: expected exactly one persisted slicer filter, "
+                f"found {len(filter_entries)}"
+            )
+        filter_property = filter_entries[0]["properties"]["filter"]
+        date_filter = filter_property["filter"]
+        metadata = date_filter["Where"][0]["Annotations"][
+            "filterExpressionMetadata"
+        ]
+        value_maps = metadata["valueMap"]
+        if len(value_maps) != 1:
+            raise ValueError(
+                f"{path}: expected exactly one persisted date selection, "
+                f"found {len(value_maps)}"
+            )
+        current_period = value_maps[0]
+        current_year = str(current_period["0"])
+        current_quarter = str(current_period["1"])
+        current_month = str(current_period["2"])
+        expansion_states = visual["expansionStates"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError(f"{path}: unsupported persisted date slicer structure") from exc
+
+    year = str(default_date.year)
+    quarter = str((default_date.month - 1) // 3 + 1)
+    month = _MONTH_NAMES[default_date.month]
+    replacements = {
+        f"{current_year}L": f"{year}L",
+        f"{current_quarter}L": f"{quarter}L",
+        f"'{current_month}'": f"'{month}'",
+        current_year: year,
+        current_quarter: quarter,
+        current_month: month,
+    }
+
+    visual["expansionStates"] = _replace_string_values(
+        expansion_states, replacements
+    )
+    filter_property["filter"] = _replace_string_values(date_filter, replacements)
+
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _set_report_default_date(report_dir: Path, default_date: date) -> list[Path]:
+    """Set all named date slicers in a staged report to the configured month."""
+
+    slicers = sorted(
+        report_dir.glob(
+            "definition/pages/*/visuals/*_date_slicer/visual.json"
+        )
+    )
+    if not slicers:
+        raise ValueError(f"{report_dir}: no report date slicers found")
+    for slicer in slicers:
+        _set_date_slicer_default(slicer, default_date)
+    return slicers
+
+
+def _load_report_default_date(manifest_path: Path) -> date:
+    """Load the resolved setup end date emitted by ``retail-setup render``."""
+
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"Render manifest not found: {manifest_path}. "
+            "Run `retail-setup render` first."
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid render manifest JSON: {manifest_path}") from exc
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{manifest_path}: render manifest must be a JSON object")
+    if manifest.get("version") != 1:
+        raise ValueError(
+            f"{manifest_path}: unsupported render manifest version "
+            f"{manifest.get('version')!r}"
+        )
+    try:
+        end_date = manifest["generation"]["end_date"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError(
+            f"{manifest_path}: generation.end_date is required"
+        ) from exc
+    if not isinstance(end_date, str):
+        raise ValueError(f"{manifest_path}: generation.end_date must be a string")
+    try:
+        return date.fromisoformat(end_date)
+    except ValueError as exc:
+        raise ValueError(
+            f"{manifest_path}: invalid generation.end_date {end_date!r}"
+        ) from exc
+
+
 def stage_powerbi_items(
     source_dir: Path,
     output_dir: Path,
     selected_items: tuple[str, ...] | list[str] | None = None,
+    report_default_date: date | None = None,
 ) -> list[Path]:
-    """Copy Power BI SemanticModel and Report item folders into workspace output."""
+    """Copy Power BI items and configure staged report date defaults."""
 
     if not source_dir.exists():
         raise FileNotFoundError(f"Power BI source directory not found: {source_dir}")
@@ -297,6 +441,8 @@ def stage_powerbi_items(
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(item_dir, destination, ignore=_ignore_powerbi_local_state)
+        if item_dir.suffix == ".Report" and report_default_date is not None:
+            _set_report_default_date(destination, report_default_date)
         staged.append(destination)
     return staged
 
@@ -584,6 +730,7 @@ def build_workspace(
         "reporting",
         "post-ontology",
     ] = "all",
+    report_default_date: date | None = None,
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -666,6 +813,7 @@ def build_workspace(
                 repo_root / "fabric" / "powerbi",
                 output_dir / POWERBI_FOLDER,
                 powerbi_items,
+                report_default_date=report_default_date,
             )
         )
     # Curated KQL queries (fabric/querysets/*.kql) ship as a single
@@ -903,12 +1051,27 @@ def main() -> int:
         type=Path,
         help="Optional path for the validated JSON artifact inventory.",
     )
+    parser.add_argument(
+        "--render-manifest",
+        type=Path,
+        help=(
+            "Manifest written by `retail-setup render`; its generation end date "
+            "sets staged report date slicers."
+        ),
+    )
     args = parser.parse_args()
     if args.notebook_groups:
         parser.error(
             "--notebook-groups is no longer supported; select --profile "
             "(core, standard, or full-demo)"
         )
+
+    report_default_date = None
+    if args.render_manifest is not None:
+        manifest_path = args.render_manifest
+        if not manifest_path.is_absolute():
+            manifest_path = args.repo_root / manifest_path
+        report_default_date = _load_report_default_date(manifest_path)
 
     result = build_workspace(
         args.repo_root,
@@ -919,6 +1082,7 @@ def main() -> int:
         args.semantic_model_name,
         args.report_name,
         args.publication_phase,
+        report_default_date,
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

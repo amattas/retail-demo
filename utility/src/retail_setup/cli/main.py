@@ -58,6 +58,7 @@ _GENERATION_KEYS = ("store_type", "months", "store_count", "seed")
 _DEFAULT_MONTHS = 3
 _DEFAULT_ML_MONTHS = 18
 _MIN_REQUIRED_ML_HISTORY_DAYS = 540
+_RENDER_MANIFEST = "render-manifest.json"
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
 # capacity before the same name can be created again. Rather than a blind
@@ -939,10 +940,26 @@ def render(
     )
     for name in set(NOTEBOOKS) - set(selected_notebooks):
         (target_dir / f"{name}.ipynb").unlink(missing_ok=True)
+    manifest_path = target_dir / _RENDER_MANIFEST
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "generation": {
+                    "start_date": generation.start_date.isoformat(),
+                    "end_date": generation.end_date.isoformat(),
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     typer.echo(f"Rendered notebooks for profile {profile.deployment_name!r}:")
     for path in written:
         typer.echo(f"  {path}")
+    typer.echo(f"Render manifest:\n  {manifest_path}")
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo("  - Import the rendered notebooks into your Fabric workspace manually")
@@ -1176,6 +1193,22 @@ def _deploy_plan(
                 step_id="regenerate-configs",
             ),
         ]
+    steps.append(
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "retail_setup.cli.main",
+                "render",
+                "--repo-root",
+                str(repo_root),
+                "--env",
+                env,
+            ],
+            description="Render setup notebooks and deployment manifest",
+            step_id="render-notebooks",
+        )
+    )
     reporting_is_gated = profile.reporting_gate_pipeline_ref is not None
 
     def build_step(phase: str, step_id: str, description: str) -> DeployStep:
@@ -1200,6 +1233,8 @@ def _deploy_plan(
                 phase,
                 "--inventory-output",
                 f"deploy/.generated/{env}/artifact-inventory-{phase}.json",
+                "--render-manifest",
+                f"utility/out/{_RENDER_MANIFEST}",
             ],
             description=description,
             step_id=step_id,
