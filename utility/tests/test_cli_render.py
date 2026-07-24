@@ -1,9 +1,12 @@
+import json
 import shutil
+from datetime import date
 from pathlib import Path
 
 import yaml
 from typer.testing import CliRunner
 
+import retail_setup.config.generation as generation_config
 from retail_setup.cli.main import app
 
 runner = CliRunner()
@@ -54,6 +57,14 @@ def test_render_writes_rendered_notebooks(tmp_path):
     assert "deadbeef" in s1 and "{{" not in s1
     assert "lh_x" in (out / "setup-02-generate-dimensions.ipynb").read_text()
     assert "profile 'core'" in result.output
+    manifest = json.loads((out / "render-manifest.json").read_text())
+    assert manifest == {
+        "version": 1,
+        "generation": {
+            "start_date": "2025-01-01",
+            "end_date": "2025-02-28",
+        },
+    }
 
 
 def test_render_standard_adds_stream_notebook(tmp_path):
@@ -116,3 +127,40 @@ def test_render_requires_configure_first(tmp_path):
     result = runner.invoke(app, ["render", "--repo-root", str(tmp_path), "--env", "dev"])
     assert result.exit_code != 0
     assert "configure" in result.output
+
+
+def test_render_manifest_uses_months_resolved_setup_window(
+    monkeypatch, tmp_path
+):
+    _seed(tmp_path)
+    (tmp_path / "utility" / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "store_type": "grocery",
+                "months": 3,
+                "store_count": 5,
+                "seed": 3,
+            }
+        )
+    )
+
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 7, 23)
+
+    monkeypatch.setattr(generation_config, "date", FixedDate)
+
+    result = runner.invoke(
+        app,
+        ["render", "--repo-root", str(tmp_path), "--env", "dev", "--ref", "deadbeef"],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest = json.loads(
+        (tmp_path / "utility" / "out" / "render-manifest.json").read_text()
+    )
+    assert manifest["generation"] == {
+        "start_date": "2026-04-22",
+        "end_date": "2026-07-22",
+    }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from deploy.scripts import build_artifacts
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _MANIFEST, _VALIDATION = load_repository_manifest(REPO_ROOT)
+POWERBI_SOURCE = REPO_ROOT / "fabric" / "powerbi"
 
 
 def _profile(name: str):
@@ -182,6 +184,73 @@ def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
     ]
     assert (output / "retail_model.Report" / ".platform").exists()
     assert not (output / "retail_model.Report" / ".pbi").exists()
+
+
+def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
+    tmp_path: Path,
+) -> None:
+    source_slicers = sorted(
+        POWERBI_SOURCE.glob(
+            "*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
+        )
+    )
+    assert len(source_slicers) == 5
+    source_bytes = {path: path.read_bytes() for path in source_slicers}
+
+    output = tmp_path / "deploy" / "workspace"
+    build_artifacts.stage_powerbi_items(
+        POWERBI_SOURCE,
+        output,
+        report_default_date=date(2026, 7, 22),
+    )
+
+    staged_slicers = sorted(
+        output.glob(
+            "*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
+        )
+    )
+    assert len(staged_slicers) == 5
+    for slicer in staged_slicers:
+        staged = json.loads(slicer.read_text(encoding="utf-8"))
+        date_filter = staged["visual"]["objects"]["general"][0]["properties"][
+            "filter"
+        ]["filter"]
+        metadata = date_filter["Where"][0]["Annotations"][
+            "filterExpressionMetadata"
+        ]
+        assert metadata["valueMap"] == [{"0": "2026", "1": "3", "2": "July"}]
+        persisted_state = json.dumps(
+            {
+                "expansionStates": staged["visual"]["expansionStates"],
+                "filter": date_filter,
+            }
+        )
+        assert "2026L" in persisted_state
+        assert "3L" in persisted_state
+        assert "'July'" in persisted_state
+
+    for source, before in source_bytes.items():
+        assert source.read_bytes() == before
+
+
+def test_load_report_default_date_validates_render_manifest(tmp_path: Path) -> None:
+    manifest = tmp_path / "render-manifest.json"
+    _write_json(
+        manifest,
+        {
+            "version": 1,
+            "generation": {
+                "start_date": "2026-04-22",
+                "end_date": "2026-07-22",
+            },
+        },
+    )
+
+    assert build_artifacts._load_report_default_date(manifest) == date(2026, 7, 22)
+
+    _write_json(manifest, {"version": 1, "generation": {}})
+    with pytest.raises(ValueError, match="generation.end_date"):
+        build_artifacts._load_report_default_date(manifest)
 
 
 def test_stage_shell_item_writes_fabric_platform(tmp_path: Path) -> None:

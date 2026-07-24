@@ -444,6 +444,35 @@ def test_plan_uses_exact_profile_and_never_stages_reset_group():
     assert cmd[cmd.index("--profile") + 1] == "full-demo"
     assert "--notebook-groups" not in cmd
     assert "reset" not in cmd
+    manifest_idx = cmd.index("--render-manifest")
+    assert cmd[manifest_idx + 1] == "utility/out/render-manifest.json"
+
+
+def test_plan_renders_before_artifact_builds_and_passes_manifest():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=False,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+    )
+    commands = [" ".join(map(str, step.cmd)) for step in plan]
+    render_idx = next(
+        index
+        for index, command in enumerate(commands)
+        if "retail_setup.cli.main render" in command
+    )
+    build_indexes = [
+        index
+        for index, command in enumerate(commands)
+        if "deploy.scripts.build_artifacts" in command
+    ]
+
+    assert build_indexes
+    assert render_idx < min(build_indexes)
+    for index in build_indexes:
+        command = plan[index].cmd
+        manifest_idx = command.index("--render-manifest")
+        assert command[manifest_idx + 1] == "utility/out/render-manifest.json"
 
 
 def test_plan_orders_steps_and_gates_apply():
