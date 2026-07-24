@@ -1,0 +1,3703 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the Microsoft Fabric retail demo.">
+      
+      
+        <meta name="author" content="Retail Demo contributors">
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/latest/design/requirements/traceability/">
+      
+      
+        <link rel="prev" href="../core/demo/">
+      
+      
+        <link rel="next" href="../modules/setup/setup/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Requirements traceability - Microsoft Fabric Retail Demo</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#requirements-traceability" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Microsoft Fabric Retail Demo" class="md-header__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Microsoft Fabric Retail Demo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Requirements traceability
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Microsoft Fabric Retail Demo" class="md-nav__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    Microsoft Fabric Retail Demo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Guides
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Guides
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/workspace-inventory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workspace and profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployed walkthrough
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployed walkthrough
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployed-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployed-data-platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data platform
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployed-analytics-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics and AI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/presenter-journeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter journeys
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Design Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Design Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Requirements
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Core demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#threats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Threats
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/setup/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/setup/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployment
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/deployment/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/deployment/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Generation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/generation/generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/generation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_7" id="__nav_3_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Streaming
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/streaming/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/streaming/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_8" id="__nav_3_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Analytics
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/analytics/analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/analytics/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_9" id="__nav_3_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  ML and AI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/ml-ai/ml-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/ml-ai/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_10" id="__nav_3_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Power BI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Power BI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/power-bi/power-bi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/power-bi/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_11" id="__nav_3_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/operations/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/operations/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_12" id="__nav_3_2_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/security/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/security/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_13" id="__nav_3_2_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/documentation/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/documentation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../specifications/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Specifications
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Specifications
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/core/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/core/solution-manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solution manifest
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/setup/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup CLI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/deployment/framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment framework
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/generation/data-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/streaming/event-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/analytics/fabric-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/ml-ai/model-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI contracts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/power-bi/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations runbook
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/security/access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Access control
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specifications/modules/documentation/site/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation site
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Infrastructure
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security boundaries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Threat model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#threats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Threats
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Design Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Requirements
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/amattas/retail-demo/edit/main/docs/design/requirements/traceability.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/amattas/retail-demo/raw/main/docs/design/requirements/traceability.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="requirements-traceability">Requirements traceability<a class="headerlink" href="#requirements-traceability" title="Permanent link">&para;</a></h1>
+<p>This is the canonical evidence ledger. Each stable requirement and threat ID
+has one row. States are limited to those defined in
+<a href="../">Requirements ownership</a>, and a row is <code>verified</code> only when exact
+implementation and verification evidence exist.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Source</th>
+<th>State</th>
+<th>Specification</th>
+<th>Implementation evidence</th>
+<th>Verification evidence</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>REQ-CORE-001</code></td>
+<td><a href="../core/demo/">Core demo</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/setup/cli/">Setup CLI</a>; <a href="../../specifications/modules/deployment/framework/">deployment framework</a></td>
+<td><code>scripts/setup.py</code>; <code>utility/src/retail_setup/</code>; <code>deploy/</code>; <code>fabric/</code></td>
+<td><code>tests/scripts/test_setup_bootstrap.py</code>; <code>utility/tests/test_cli_entrypoint.py</code></td>
+<td>Live end-to-end workspace proof remains under <code>REQ-CORE-004</code> and <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-CORE-002</code></td>
+<td><a href="../core/demo/">Core demo</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/security/access-control/">Access control</a></td>
+<td><code>SECURITY.md</code>; generation modules; <code>dim_customers.tmdl</code></td>
+<td>—</td>
+<td>Field inventory, role review, and consumer tests remain open.</td>
+</tr>
+<tr>
+<td><code>REQ-CORE-003</code></td>
+<td><a href="../core/demo/">Core demo</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/generation/data-contract/">Data contract</a></td>
+<td><code>utility/src/retail_setup/generation/runtime.py</code>; seeded generation modules</td>
+<td><code>utility/tests/generation/test_runtime.py</code>; <code>utility/tests/generation/test_engine.py</code></td>
+<td>Deterministic generation is covered at runtime and engine layers.</td>
+</tr>
+<tr>
+<td><code>REQ-CORE-004</code></td>
+<td><a href="../core/demo/">Core demo</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a>; <a href="../../specifications/modules/operations/runbook/">operations runbook</a></td>
+<td>Terraform, deploy scripts, setup notebooks, Fabric item sources, and the profile-aware live verifier</td>
+<td>Local packaging, readiness, and deploy-script tests</td>
+<td>Actual workspace execution and retained freshness evidence remain <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-CORE-005</code></td>
+<td><a href="../core/demo/">Core demo</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td><code>contracts/retail-demo.json</code>; <a href="../../../guides/workspace-inventory/">workspace inventory</a>; guides, design docs, and README entry points</td>
+<td><code>tests/docs/test_solution_manifest_docs.py</code>; <code>utility/tests/contracts/test_solution_manifest.py</code>; clean Zensical build</td>
+<td>Manifest-owned claims and source-derived counts are contract-tested.</td>
+</tr>
+<tr>
+<td><code>REQ-SETUP-001</code></td>
+<td><a href="../modules/setup/setup/">Setup requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/setup/cli/">Setup CLI</a></td>
+<td><code>scripts/setup.ps1</code>; <code>scripts/setup.sh</code>; <code>scripts/setup.py</code></td>
+<td><code>tests/scripts/test_setup_bootstrap.py</code></td>
+<td>CI does not yet exercise every wrapper on its native operating system.</td>
+</tr>
+<tr>
+<td><code>REQ-SETUP-002</code></td>
+<td><a href="../modules/setup/setup/">Setup requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/setup/cli/">Setup CLI</a></td>
+<td><code>utility/src/retail_setup/cli/main.py</code>; <code>utility/src/retail_setup/config/generation.py</code></td>
+<td><code>utility/tests/test_cli_configure.py</code>; <code>utility/tests/test_generation_config.py</code></td>
+<td>Explicit target and deterministic generation inputs are covered.</td>
+</tr>
+<tr>
+<td><code>REQ-SETUP-003</code></td>
+<td><a href="../modules/setup/setup/">Setup requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/setup/cli/">Setup CLI</a></td>
+<td>notebook injection/render modules; setup notebooks 01-04; <code>stream-events</code></td>
+<td><code>utility/tests/test_cli_render.py</code>; <code>utility/tests/test_notebook_build.py</code></td>
+<td>Rendering is atomic and checked against committed notebook sources.</td>
+</tr>
+<tr>
+<td><code>REQ-SETUP-004</code></td>
+<td><a href="../modules/setup/setup/">Setup requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/setup/cli/">Setup CLI</a></td>
+<td><code>scripts/setup.py</code>; <code>utility/src/retail_setup/cli/main.py</code></td>
+<td><code>utility/tests/test_cli_deploy.py</code></td>
+<td>Live subprocess, Fabric, and recovery evidence remains incomplete.</td>
+</tr>
+<tr>
+<td><code>REQ-DEPLOY-001</code></td>
+<td><a href="../modules/deployment/deployment/">Deployment requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td>Workspace-derived ignored overlays; environment-local tfvars, backend state, Terraform data, bindings, outputs, and journals</td>
+<td><code>tests/deploy/test_deploy_config.py</code>; <code>utility/tests/test_cli_configure.py</code>; <code>utility/tests/test_cli_deploy.py</code></td>
+<td>Full concurrent publication still requires separate checkouts because item staging is shared.</td>
+</tr>
+<tr>
+<td><code>REQ-DEPLOY-002</code></td>
+<td><a href="../modules/deployment/deployment/">Deployment requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td><code>utility/src/retail_setup/cli/main.py</code>; <code>deploy/scripts/</code></td>
+<td>Build, KQL, offline validation, readiness, and CLI deploy tests</td>
+<td>Local tests exercise the live adapters by injection; actual Fabric evidence remains external.</td>
+</tr>
+<tr>
+<td><code>REQ-DEPLOY-003</code></td>
+<td><a href="../modules/deployment/deployment/">Deployment requirements</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td>Tenant-aware credential factory and clients; Terraform-resolved task-flow targets; configured staged KQL targets</td>
+<td><code>test_auth.py</code>; <code>test_apply_kql.py</code>; <code>test_taskflow.py</code>; <code>test_build_artifacts.py</code>; <code>test_cli_deploy.py</code></td>
+<td>Live Azure PowerShell and renamed-Eventhouse smoke evidence remains <code>IMP-001</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-DEPLOY-004</code></td>
+<td><a href="../modules/deployment/deployment/">Deployment requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a>; <a href="../../specifications/modules/operations/runbook/">operations runbook</a></td>
+<td>Required/optional deploy state machine, atomic deploy/readiness journals, exact-run terminal pipeline gates, bounded deletion and REST pagination</td>
+<td>CLI journal/readiness tests, pipeline polling tests, and workspace polling tests</td>
+<td>The control is locally verified; actual live readiness evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-DEPLOY-005</code></td>
+<td><a href="../modules/deployment/deployment/">Deployment requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td>Shared profile resolver; tiered ML pipelines; two-phase Reporting staging/publication; profile-aware configure/render/Terraform/KQL/task-flow orchestration</td>
+<td><code>utility/tests/contracts/test_profiles.py</code>; <code>tests/deploy/test_build_artifacts.py</code>; <code>tests/deploy/test_profile_preflight.py</code>; CLI gating tests</td>
+<td>Standard/full have no ML profile blocker. Fresh-workspace ML/Reporting proof remains <code>IMP-008</code>; live profile/capability proof keeps <code>IMP-012</code> open.</td>
+</tr>
+<tr>
+<td><code>REQ-GEN-001</code></td>
+<td><a href="../modules/generation/generation/">Generation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/generation/data-contract/">Data contract</a></td>
+<td><code>utility/src/retail_setup/generation/schemas.py</code>; <code>gold.py</code></td>
+<td><code>utility/tests/generation/test_schema_contract.py</code>; <code>test_engine.py</code>; <code>test_gold.py</code></td>
+<td>Base Silver and Gold inventory is contract-tested.</td>
+</tr>
+<tr>
+<td><code>REQ-GEN-002</code></td>
+<td><a href="../modules/generation/generation/">Generation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/generation/data-contract/">Data contract</a></td>
+<td><code>utility/src/retail_setup/generation/schemas.py</code></td>
+<td><code>utility/tests/generation/test_schema_contract.py</code></td>
+<td>The code contract, not README prose, owns physical schemas.</td>
+</tr>
+<tr>
+<td><code>REQ-GEN-003</code></td>
+<td><a href="../modules/generation/generation/">Generation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/generation/data-contract/">Data contract</a></td>
+<td>seeded runtime and generation modules</td>
+<td><code>utility/tests/generation/test_runtime.py</code>; representative generation tests</td>
+<td>Seed and range behavior are deterministic.</td>
+</tr>
+<tr>
+<td><code>REQ-GEN-004</code></td>
+<td><a href="../modules/generation/generation/">Generation requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/generation/data-contract/">Data contract</a></td>
+<td><code>utility/src/retail_setup/generation/invariants.py</code></td>
+<td>Generation module tests</td>
+<td>Shared business invariants (operating hours, launch eligibility, return timing, profile controls) enforced per <code>IMP-010</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-STREAM-001</code></td>
+<td><a href="../modules/streaming/streaming/">Streaming requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/streaming/event-contract/">Event contract</a></td>
+<td><code>contracts/retail-demo.json</code>; driver and KQL sources</td>
+<td><code>utility/tests/contracts/test_live_data_contract.py</code>; event and truck lifecycle tests</td>
+<td>The 18-event source-derived matrix passes; only live Fabric staging evidence remains under <code>IMP-005</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-STREAM-002</code></td>
+<td><a href="../modules/streaming/streaming/">Streaming requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/streaming/event-contract/">Event contract</a></td>
+<td>Fail-closed <code>write_to_eventhouse()</code> with persisted stream identity and idempotent Kusto request metadata; Delta debug sink</td>
+<td>Streaming duplicate-contract and generated-notebook tests</td>
+<td>A live Eventhouse injected-failure run remains the external verification gate.</td>
+</tr>
+<tr>
+<td><code>REQ-STREAM-003</code></td>
+<td><a href="../modules/streaming/streaming/">Streaming requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/streaming/event-contract/">Event contract</a>; <a href="../../specifications/modules/analytics/fabric-analytics/">Fabric analytics</a></td>
+<td>KQL mappings; source-derived Silver/Gold routes; attribution facts and Direct Lake terminals</td>
+<td>All-event matrix, marketing-attribution, live-stream, semantic-model, and truck-lifecycle contract tests</td>
+<td>All repository routes and named exceptions are verified; live staging evidence remains the <code>IMP-005</code> boundary.</td>
+</tr>
+<tr>
+<td><code>REQ-STREAM-004</code></td>
+<td><a href="../modules/streaming/streaming/">Streaming requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td>Spark checkpoints, Kusto replay tags, key-based Silver merges, staged historical/Gold publication, Delta version rollback, <code>ag._watermarks</code>, and the live freshness adapter</td>
+<td>Duplicate/replay, checkpoint-tag, freshness, publication, and rollback tests</td>
+<td>Actual Eventhouse and Lakehouse freshness evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-AN-001</code></td>
+<td><a href="../modules/analytics/analytics/">Analytics requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/analytics/fabric-analytics/">Fabric analytics</a></td>
+<td><code>fabric/kql_database/*.kql</code>; <code>deploy/scripts/apply_kql.py</code></td>
+<td><code>tests/deploy/test_apply_kql.py</code></td>
+<td>Live KQL execution remains a deployment gate.</td>
+</tr>
+<tr>
+<td><code>REQ-AN-002</code></td>
+<td><a href="../modules/analytics/analytics/">Analytics requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/analytics/fabric-analytics/">Fabric analytics</a></td>
+<td>Bronze shortcuts and historical/streaming transform notebooks</td>
+<td>Notebook contract and deployment packaging tests</td>
+<td>Live shortcut and transform execution is not fully verified.</td>
+</tr>
+<tr>
+<td><code>REQ-AN-003</code></td>
+<td><a href="../modules/analytics/analytics/">Analytics requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/analytics/fabric-analytics/">Fabric analytics</a>; <a href="../../specifications/modules/power-bi/semantic-model/">semantic model</a></td>
+<td>Current KQL and DAX calculations</td>
+<td>KPI status, weighting, label-vocabulary, date-key, grain, and technical-field contract tests</td>
+<td>Status casing, state, grain, weighting, labels, and time-slice semantics are normalized and guarded.</td>
+</tr>
+<tr>
+<td><code>REQ-AN-004</code></td>
+<td><a href="../modules/analytics/analytics/">Analytics requirements</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/analytics/fabric-analytics/">Fabric analytics</a></td>
+<td>querysets, dashboard templates, and rule definitions</td>
+<td>—</td>
+<td>First-class dashboard and Activator deployment remains <code>ENH-001</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-MLAI-001</code></td>
+<td><a href="../modules/ml-ai/ml-ai/">ML and AI requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/ml-ai/model-contracts/">ML and AI contracts</a></td>
+<td>Required/optional/experimental notebook groups and pipelines; runtime required-output validator; profile publication gate</td>
+<td>Profile resolver, pipeline, task-flow dependency, build-phase, and CLI fail-closed tests</td>
+<td>Fresh-workspace required-ML/Reporting proof remains <code>IMP-008</code>; preview capability proof remains <code>IMP-012</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-MLAI-002</code></td>
+<td><a href="../modules/ml-ai/ml-ai/">ML and AI requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/ml-ai/model-contracts/">ML and AI contracts</a></td>
+<td><code>contracts/retail-demo.json</code> <code>ml_contracts</code>; corrected notebooks 06-14; required TMDL metadata/measures</td>
+<td><code>utility/tests/contracts/test_ml_contracts.py</code>; required/optional ML logic tests; semantic/reference tests</td>
+<td>Contract, schema, temporal, lineage, and limitation behavior is locally guarded. Live execution remains the final <code>IMP-008</code> gate; richer explainability remains <code>ENH-007</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-MLAI-003</code></td>
+<td><a href="../modules/ml-ai/ml-ai/">ML and AI requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/ml-ai/model-contracts/">ML and AI contracts</a></td>
+<td><code>fabric/lakehouse/30-create-ontology.ipynb</code></td>
+<td><code>tests/deploy/test_ontology_notebook.py</code></td>
+<td>Live binding verification remains required.</td>
+</tr>
+<tr>
+<td><code>REQ-MLAI-004</code></td>
+<td><a href="../modules/ml-ai/ml-ai/">ML and AI requirements</a></td>
+<td><code>retired</code></td>
+<td><a href="../../specifications/modules/ml-ai/model-contracts/">ML and AI contracts</a></td>
+<td>—</td>
+<td>—</td>
+<td>Mandatory agent-governance metadata is outside the default release; persona-specific experiences remain optional under <code>ENH-003</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-BI-001</code></td>
+<td><a href="../modules/power-bi/power-bi/">Power BI requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/power-bi/semantic-model/">Semantic model</a></td>
+<td>Direct Lake expressions and <code>model.tmdl</code></td>
+<td><code>tests/scripts/test_reference_integrity.py</code></td>
+<td>Live workspace binding remains a deployment gate.</td>
+</tr>
+<tr>
+<td><code>REQ-BI-002</code></td>
+<td><a href="../modules/power-bi/power-bi/">Power BI requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/power-bi/semantic-model/">Semantic model</a></td>
+<td>TMDL measures, relationships, hierarchies, and properties</td>
+<td>KPI status, weighting, label-vocabulary, date-key, grain, and technical-field contract tests</td>
+<td>Status casing, technical-field visibility, grain, label vocabularies, and date-key slicing are guarded.</td>
+</tr>
+<tr>
+<td><code>REQ-BI-003</code></td>
+<td><a href="../modules/power-bi/power-bi/">Power BI requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/power-bi/semantic-model/">Semantic model</a></td>
+<td>Four contract-aligned ML tables; hidden lineage/as-of fields; freshness/limitation measures; two-phase publication</td>
+<td>ML manifest/TMDL agreement tests; semantic/report reference tests; negative CLI publication-gate tests</td>
+<td>Core excludes Reporting. Fresh-workspace proof that required validation precedes standard/full Reporting remains <code>IMP-008</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-BI-004</code></td>
+<td><a href="../modules/power-bi/power-bi/">Power BI requirements</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/power-bi/semantic-model/">Semantic model</a></td>
+<td>PBIP report pages and visual metadata</td>
+<td>—</td>
+<td>Accessibility, mobile, current-period, and empty-state review remains <code>ENH-006</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-OPS-001</code></td>
+<td><a href="../modules/operations/operations/">Operations requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td><code>retail-setup verify</code>; injectable REST/Kusto/SQL adapter; profile-aware items, definitions, task flow, KQL, schedules, and exact-run checks</td>
+<td><code>test_fabric_runtime.py</code>; <code>test_verify_readiness.py</code>; pipeline/export/task-flow and CLI tests</td>
+<td>Actual live Fabric execution evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-OPS-002</code></td>
+<td><a href="../modules/operations/operations/">Operations requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td>Atomic redacted readiness report over <code>setup_run_log</code>, <code>ag._watermarks</code>, Eventhouse ingestion/tags, pipeline jobs, model lineage, and alerts</td>
+<td>Freshness, stale-correlation, aggregation, redaction, and live-scaffold tests</td>
+<td>Actual live freshness evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-OPS-003</code></td>
+<td><a href="../modules/operations/operations/">Operations requirements</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td>dry-run, recreate, reset notebook, and manual fallbacks</td>
+<td>—</td>
+<td>Target validation, deletion polling, and recovery drills remain incomplete.</td>
+</tr>
+<tr>
+<td><code>REQ-OPS-004</code></td>
+<td><a href="../modules/operations/operations/">Operations requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td><code>.github/workflows/tests.yml</code>; <code>utility/scripts/run_ci_shards.py</code>; fixture-driven pytest markers</td>
+<td><code>utility/tests/test_ci_shards.py</code>; <code>tests/scripts/test_workflow_references.py</code>; <a href="https://github.com/amattas/retail-demo/actions/runs/29786920382">hosted release-gate run</a></td>
+<td>Ubuntu, Windows, four Spark shards, E2E, docs, notebook drift, and repository contracts pass through the aggregate release gate.</td>
+</tr>
+<tr>
+<td><code>REQ-SEC-001</code></td>
+<td><a href="../modules/security/security/">Security requirements</a></td>
+<td><code>implemented</code></td>
+<td><a href="../../security/threat-model/">Threat model</a>; <a href="../../security/controls/">controls</a></td>
+<td>Stable <code>THREAT-*</code> and <code>SEC-*</code> owners</td>
+<td>Traceability ID and link audit</td>
+<td>Control evidence remains conservative where verification is incomplete.</td>
+</tr>
+<tr>
+<td><code>REQ-SEC-002</code></td>
+<td><a href="../modules/security/security/">Security requirements</a></td>
+<td><code>retired</code></td>
+<td><a href="../../specifications/modules/security/access-control/">Access control</a></td>
+<td>Synthetic-only generator and demo boundary</td>
+<td>—</td>
+<td>Row-level classification and privacy controls for generated demo records are outside the release scope.</td>
+</tr>
+<tr>
+<td><code>REQ-SEC-003</code></td>
+<td><a href="../modules/security/security/">Security requirements</a></td>
+<td><code>accepted</code></td>
+<td><a href="../../specifications/modules/security/access-control/">Access control</a></td>
+<td><code>.gitignore</code>; identity-based deploy design; tenant-aware credentials; bearer-token request helpers; tenant-free deploy journals</td>
+<td>Bearer-header, tenant-propagation, and journal-redaction contract tests</td>
+<td>Live alternate-auth/renamed-target smoke coverage remains <code>IMP-001</code>; repository secret and dependency controls remain <code>IMP-003</code>.</td>
+</tr>
+<tr>
+<td><code>REQ-SEC-004</code></td>
+<td><a href="../modules/security/security/">Security requirements</a></td>
+<td><code>retired</code></td>
+<td><a href="../../specifications/modules/security/access-control/">Access control</a></td>
+<td>Fabric workspace and item permissions</td>
+<td>—</td>
+<td>Field-level restrictions, RLS, and mandatory agent-governance metadata are outside the default demo scope.</td>
+</tr>
+<tr>
+<td><code>REQ-DOCS-001</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td><code>docs/</code>; root and component README links</td>
+<td><code>python -m zensical build --clean</code></td>
+<td>Zensical is the current site generator; <code>website/</code> is retired.</td>
+</tr>
+<tr>
+<td><code>REQ-DOCS-002</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a>; <a href="../../specifications/core/solution-manifest/">solution manifest</a></td>
+<td><code>contracts/retail-demo.json</code>; canonical requirements, specifications, architecture, security, guides, backlogs, and evidence ledger</td>
+<td>Global ID/reference/source contracts in <code>utility/tests/contracts/test_solution_manifest.py</code>; docs/source contracts in <code>tests/docs/test_solution_manifest_docs.py</code></td>
+<td>Ownership, references, and authoritative-source boundaries are machine-checked.</td>
+</tr>
+<tr>
+<td><code>REQ-DOCS-003</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td><code>zensical.toml</code>; <code>requirements-docs.txt</code></td>
+<td><code>python -m zensical build --clean</code></td>
+<td>Current Markdown, navigation, Mermaid, and internal links build with pinned Zensical.</td>
+</tr>
+<tr>
+<td><code>REQ-DOCS-004</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a>; <a href="../../../guides/workspace-inventory/">workspace inventory</a></td>
+<td>Manifest-driven onboarding, deployment/operations guidance, root/component README links, and Zensical navigation</td>
+<td><code>tests/docs/test_solution_manifest_docs.py</code>; <code>tests/scripts/test_setup_bootstrap.py</code>; clean <code>python -m zensical build --clean</code></td>
+<td>Prerequisites, actual CLI flags, profiles, support, counts, and navigation are locally verified.</td>
+</tr>
+<tr>
+<td><code>REQ-PUBLISH-001</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td><code>.github/workflows/docs.yml</code>; <code>scripts/publish_versioned_docs.py</code>; orphan <code>gh-pages</code> branch</td>
+<td><a href="https://github.com/amattas/retail-demo/actions/runs/29283882198">Docs run 29283882198</a>; Pages API reports <code>gh-pages</code> root and <code>built</code>; <a href="https://amattas.github.io/retail-demo/">live site</a> redirects to <code>/latest/</code></td>
+<td>Recheck after changing Pages settings, workflow permissions, or branch publication.</td>
+</tr>
+<tr>
+<td><code>REQ-PUBLISH-002</code></td>
+<td><a href="../modules/documentation/documentation/">Documentation requirements</a></td>
+<td><code>verified</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td><code>scripts/docs_versioning.py</code>; <code>scripts/publish_versioned_docs.py</code>; Zensical <code>mike</code> provider</td>
+<td><code>tests/docs/test_publish_versioned_docs.py</code>; live <a href="https://amattas.github.io/retail-demo/versions.json"><code>versions.json</code></a></td>
+<td>Published metadata shows <strong>Latest</strong> and the highest selected patch per stable minor line.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="threats">Threats<a class="headerlink" href="#threats" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Source</th>
+<th>State</th>
+<th>Controls</th>
+<th>Specification</th>
+<th>Implementation evidence</th>
+<th>Verification evidence</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>THREAT-001</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>retired</code></td>
+<td><code>SEC-001</code>, <code>SEC-002</code></td>
+<td><a href="../../specifications/modules/security/access-control/">Access control</a></td>
+<td>Synthetic-only generator and Fabric workspace permissions</td>
+<td>—</td>
+<td>Row-level privacy controls for generated demo records are outside the release scope.</td>
+</tr>
+<tr>
+<td><code>THREAT-002</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>accepted</code></td>
+<td><code>SEC-001</code>, <code>SEC-003</code>, <code>SEC-009</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td>Tenant-aware identity clients, bearer request helpers, ignored local config, and redacted deploy journals</td>
+<td>Auth, bearer-header, tenant-propagation, and journal-redaction tests</td>
+<td>Live Azure PowerShell and renamed-target smoke evidence remains <code>IMP-001</code>.</td>
+</tr>
+<tr>
+<td><code>THREAT-003</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>retired</code></td>
+<td>—</td>
+<td><a href="../../specifications/modules/ml-ai/model-contracts/">ML and AI contracts</a></td>
+<td>—</td>
+<td>—</td>
+<td>Mandatory persona and prohibited-detail controls are outside the default demo release; richer agent experiences remain optional under <code>ENH-003</code>.</td>
+</tr>
+<tr>
+<td><code>THREAT-004</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>verified</code></td>
+<td><code>SEC-007</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td>Full-SHA actions with no runtime plugin marketplaces; hash-locked Python sets; exact Terraform provider lock; checksummed Miniforge bootstrap</td>
+<td>Workflow reference and supply-chain contract tests; pip hash validation; Terraform lock validation</td>
+<td>OS package managers, package registries, and hosted runner images remain documented external trust roots.</td>
+</tr>
+<tr>
+<td><code>THREAT-005</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>implemented</code></td>
+<td><code>SEC-008</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td>Fabric monitoring, run logs, watermarks, and bounded redacted readiness reports</td>
+<td>Readiness redaction, correlation, and atomic-write tests</td>
+<td>Actual Fabric evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>THREAT-006</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>verified</code></td>
+<td><code>SEC-001</code>, <code>SEC-009</code></td>
+<td><a href="../../specifications/modules/deployment/framework/">Deployment framework</a></td>
+<td>Workspace-derived local config, isolated Terraform backend/data paths, dry-run, recreate, and fail-closed output reuse</td>
+<td>State-path, placeholder-output, missing-output, wrong-workspace, and destructive-flow tests</td>
+<td>Full concurrent publication still requires separate checkouts because item staging is shared.</td>
+</tr>
+<tr>
+<td><code>THREAT-007</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>verified</code></td>
+<td><code>SEC-008</code>, <code>SEC-011</code></td>
+<td><a href="../../specifications/modules/operations/runbook/">Operations runbook</a></td>
+<td>Fail-closed checkpoints/watermarks, staged publication with rollback, required deploy/readiness failures, and atomic journals</td>
+<td>Injected deploy, readiness, publication, rollback, cleanup, pagination, and replay tests</td>
+<td>Actual live readiness and freshness evidence remains <code>IMP-013</code>.</td>
+</tr>
+<tr>
+<td><code>THREAT-008</code></td>
+<td><a href="../../security/threat-model/">Threat model</a></td>
+<td><code>implemented</code></td>
+<td><code>SEC-003</code>, <code>SEC-010</code></td>
+<td><a href="../../specifications/modules/documentation/site/">Documentation site</a></td>
+<td>Canonical <code>docs/</code> source, reviewed nav, generated <code>site/</code> ignored, orphan <code>gh-pages</code> publication</td>
+<td>Clean Zensical build, successful Docs workflow, <code>gh-pages</code> and live-site inspection</td>
+<td>Credential-content review remains required for every new public document.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../core/demo/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Core demo">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Core demo
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../modules/setup/setup/" class="md-footer__link md-footer__link--next" aria-label="Next: Requirements">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Requirements
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Retail Demo contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.action.edit","content.action.view","content.code.copy","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.path","navigation.top","navigation.tracking","search.highlight"],"search":"../../../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>
