@@ -20,7 +20,7 @@
         | extend attribution_journey_id = correlation_id,
                  touch_ts = ingest_timestamp,
                  touch_rank = strcat(
-                     format_datetime(ingest_timestamp, "yyyy-MM-ddTHH:mm:ss.fffffffZ"),
+                     format_datetime(ingest_timestamp, "yyyy-MM-dd HH:mm:ss.fffffff"),
                      "|",
                      impression_id
                  )
@@ -78,7 +78,7 @@
     | join kind=leftouter payments on attribution_journey_id
     | join kind=leftouter promotions on attribution_journey_id
     | extend lag_seconds = datetime_diff("second", purchase_ts, touch_ts),
-             promotion_discount_cents = coalesce(promotion_discount_cents, 0L)
+             promotion_discount_cents = coalesce(promotion_discount_cents, long(0))
     | extend window_valid = isnotnull(touch_ts)
                             and lag_seconds between (0 .. 604800),
              payment_reconciled = payment_status == "APPROVED"
@@ -102,7 +102,7 @@
              attribution_model = "LAST_TOUCH_7D",
              attribution_window_days = 7,
              attributed_revenue_cents = iff(
-                 attribution_status == "ATTRIBUTED", subtotal_cents, 0L
+                 attribution_status == "ATTRIBUTED", subtotal_cents, long(0)
              )
     | project attribution_id, attribution_journey_id, attribution_status,
               attribution_model, attribution_window_days,
@@ -149,11 +149,11 @@
             by campaign_id, channel, day = startofday(touch_ts);
     spend
     | join kind=leftouter conversions on campaign_id, channel, day
-    | extend conversions = coalesce(conversions, 0L),
-             attributed_revenue_cents = coalesce(attributed_revenue_cents, 0L),
-             discount_cents = coalesce(discount_cents, 0L),
-             tax_cents = coalesce(tax_cents, 0L),
-             payment_cents = coalesce(payment_cents, 0L)
+    | extend conversions = coalesce(conversions, long(0)),
+             attributed_revenue_cents = coalesce(attributed_revenue_cents, long(0)),
+             discount_cents = coalesce(discount_cents, long(0)),
+             tax_cents = coalesce(tax_cents, long(0)),
+             payment_cents = coalesce(payment_cents, long(0))
     | extend conversion_rate = iif(
                  impressions == 0, 0.0, todouble(conversions) / impressions
              ),
