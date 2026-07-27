@@ -289,6 +289,23 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         "12-ml-stockout-prediction",
     }
     validator = required["15-validate-required-ml-contract"]
+    required_chain = (
+        ("06-ml-demand-forecast", None),
+        ("08-ml-customer-segmentation", "06-ml-demand-forecast"),
+        ("09-ml-churn-prediction", "08-ml-customer-segmentation"),
+        ("12-ml-stockout-prediction", "09-ml-churn-prediction"),
+    )
+    for activity_name, predecessor in required_chain:
+        dependencies = required[activity_name]["dependsOn"]
+        if predecessor is None:
+            assert dependencies == []
+        else:
+            assert dependencies == [
+                {
+                    "activity": predecessor,
+                    "dependencyConditions": ["Succeeded"],
+                }
+            ]
     assert {
         dependency["activity"] for dependency in validator["dependsOn"]
     } == required_producers

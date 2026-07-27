@@ -7,7 +7,7 @@ extended ML:
 
 1. `setup-pipeline` runs setup notebooks 01 through 04.
 2. `ml-required` runs demand forecast, customer segmentation, churn, and
-   stockout producers in parallel.
+   stockout producers serially to avoid oversubscribing the shared Spark pool.
 3. `15-validate-required-ml-contract` runs only after all four producers
    succeed.
 4. Reporting can publish only after that exact pipeline run reaches terminal
