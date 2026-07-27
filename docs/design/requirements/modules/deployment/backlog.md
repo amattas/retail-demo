@@ -26,18 +26,18 @@
 - **Current boundary:** The shared manifest now resolves dependency-closed
   `core`, `standard`, and `full-demo` inventories. Configure, render, staging,
   Terraform, KQL, pipelines, Reporting, agents, task flow, dry-run output, and
-  journals use that exact selection. Local preflight is first and fails on
-  blockers, source gaps, unsafe downgrades, and missing acknowledgements before
-  mutation. Core is preview-free and excludes Reporting. Standard/full use an
+  journals use that exact selection. Local and live preflight fail on blockers,
+  source gaps, unsafe downgrades, disabled tenant switches, and unsuitable
+  capacities before mutation. Core is preview-free and excludes Reporting. Standard/full use an
   exact-run required ML gate and two-phase Reporting publication; their prior
-  `IMP-008` blockers are removed. Full-demo retains its four explicit preview,
-  capacity, task-flow, and manual acknowledgements.
+  `IMP-008` blockers are removed. Full-demo validates preview and capacity
+  prerequisites through documented read-only Fabric APIs.
 - **Remaining outcome:** Live runs must prove core completion without previews,
   the standard required Reporting gate, and full-demo fail-closed behavior at
   tenant/capacity/manual boundaries.
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication. Exact
-  local inventory, selection, acknowledgement, blocker, and ordering clauses
+  local inventory, selection, live prerequisite, blocker, and ordering clauses
   are implemented and contract-tested; only live profile/capability proof keeps
   this item open.
 

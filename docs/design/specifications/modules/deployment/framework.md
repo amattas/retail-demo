@@ -31,10 +31,10 @@ flowchart LR
     InitialVerify --> Ontology --> Agents --> TaskFlow --> FinalVerify
 ```
 
-Preflight is the first executable plan step and precedes every destroy, apply,
-publish, and KQL mutation. It validates local/queryable facts and explicit
-operator acknowledgements. It does not fabricate tenant preview or capacity
-APIs.
+Local and live preflight are the first executable plan steps and precede every
+destroy, apply, publish, and KQL mutation. Local preflight validates source and
+state contracts. Live preflight uses documented Fabric APIs to validate tenant
+switches and capacity state/SKU/region/Spark sizing.
 
 The current CLI applies Terraform directly; it does not insert a separate
 interactive `terraform plan` step. The CLI confirmation occurs before apply;
@@ -48,7 +48,6 @@ Terraform then prints its change preview and proceeds with `-auto-approve`.
 | `--yes` | Pre-confirms gated Terraform steps and existing-workspace handling; it never skips required pipeline gates. |
 | `--skip-terraform` | Omits Terraform only after captured outputs match the selected environment, workspace, resource names, and non-placeholder IDs. |
 | `--recreate` | Runs destroy, polls Fabric until the workspace name is absent (bounded at 180 seconds), then applies and publishes. |
-| `--acknowledge <id>` | Records one explicit `full-demo` preview, capacity, task-flow, or manual boundary; it cannot bypass a blocker. |
 
 `--recreate` and `--skip-terraform` are mutually exclusive. A normal
 interactive run detects an existing workspace by display name and offers
@@ -139,13 +138,10 @@ every staged `.platform` description is projected from the selected manifest
 asset. See the canonical
 [workspace inventory](../../../../guides/workspace-inventory.md).
 The prior `IMP-008` profile blockers are removed because the required path is
-now executable and fail-closed. Full-demo still requires these
-undetectable-boundary acknowledgements:
-
-- `ack.full-demo.preview-surfaces`
-- `ack.full-demo.custom-pool-capacity`
-- `ack.full-demo.task-flow-api`
-- `ack.full-demo.manual-assets`
+now executable and fail-closed. Full-demo checks Ontology/Data Agent tenant
+switches with the admin tenant-settings API and validates the selected
+capacity with the capacities API. Settings changes remain administrator-owned
+because Fabric publishes no tenant-settings update API.
 
 No profile enables schedules or starts the live stream. The source
 daily-maintenance schedule remains present but disabled. Dashboard templates
@@ -243,8 +239,7 @@ ontology-dependent checks explicitly deferred. After running
 `30-create-ontology`, invoke:
 
 ```powershell
-retail-setup post-ontology --env <env> `
-  --acknowledge ack.full-demo.ontology-created
+retail-setup post-ontology --env <env>
 ```
 
 This command validates that exactly one target ontology exists before
@@ -252,7 +247,7 @@ mutation, stages and publishes Data Agents, deploys the task flow, and runs
 complete readiness verification.
 
 Task-flow deployment fails before publication when any selected reference is
-unresolved; it never publishes a silently partial graph. The acknowledged
+unresolved; it never publishes a silently partial graph. The live-validated
 post-ontology command is the only automatic path across this preview/manual
 boundary.
 
@@ -261,11 +256,11 @@ that is not a stable public source-control item contract.
 
 ## Failure semantics
 
-- Required initial plan commands and acknowledged post-ontology commands fail
+- Required initial plan commands and post-ontology commands fail
   their respective run.
-- Blockers, missing/unknown/repeated acknowledgements, missing selected sources,
-  invalid pipeline references, and unsafe profile downgrades fail before
-  mutation.
+- Blockers, missing selected sources, invalid pipeline references, disabled
+  tenant switches, unsuitable capacities, and unsafe profile downgrades fail
+  before mutation.
 - For gated profiles, setup and required ML are mandatory exact-run terminal
   gates. `--yes` suppresses prompts but never skips either gate.
 - Post-Reporting optional/experimental ML failures are recorded and execution

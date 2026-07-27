@@ -412,11 +412,16 @@ def test_plan_propagates_selected_auth_mode():
         step.cmd
         for step in plan
         if any(
-            name in step.cmd for name in ("deploy.scripts.deploy_items", "deploy.scripts.apply_kql")
+            name in step.cmd
+            for name in (
+                "deploy.scripts.live_profile_preflight",
+                "deploy.scripts.deploy_items",
+                "deploy.scripts.apply_kql",
+            )
         )
     ]
 
-    assert len(authenticated) == 3
+    assert len(authenticated) == 4
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in authenticated
     )
@@ -479,13 +484,37 @@ def test_plan_orders_steps_and_gates_apply():
     plan = _deploy_plan("dev", skip_terraform=False)
     cmds = [" ".join(map(str, s.cmd)) for s in plan]
     apply_idx = next(i for i, c in enumerate(cmds) if "apply" in c and "terraform" in c)
-    preflight_idx = next(i for i, c in enumerate(cmds) if "profile_preflight" in c)
+    local_preflight_idx = next(
+        i for i, c in enumerate(cmds) if "profile_preflight" in c
+    )
+    live_preflight_idx = next(
+        i for i, c in enumerate(cmds) if "live_profile_preflight" in c
+    )
     assert plan[apply_idx].needs_confirmation
     # The redundant `terraform plan` step was removed; apply previews + confirms.
     assert not any(" plan " in f" {c} " for c in cmds)
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
-    assert preflight_idx < apply_idx < build_idx < deploy_idx
+    assert local_preflight_idx < live_preflight_idx < apply_idx < build_idx < deploy_idx
+
+
+def test_interactive_plan_allows_admin_setting_recheck():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=False,
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+        interactive_preflight=True,
+    )
+    live = next(
+        step.cmd
+        for step in plan
+        if "deploy.scripts.live_profile_preflight" in step.cmd
+    )
+
+    assert "--interactive" in live
+    assert live[live.index("--auth-mode") + 1] == "azure_powershell"
+    assert live[live.index("--tenant-id") + 1] == TENANT_ID
 
 
 def test_plan_isolates_terraform_state_and_data_directory():
@@ -843,7 +872,15 @@ def test_deploy_records_degraded_readiness_without_claiming_success(
         _deploy_journal.journal_path(tmp_path, "dev").read_text()
     )
     readiness = next(
-        step for step in journal["steps"] if step["step_id"] == "verify-readiness"
+        (
+            step
+            for step in journal["steps"]
+            if step["step_id"] == "verify-readiness"
+        ),
+        None,
+    )
+    assert readiness is not None, (
+        f"deploy exited before readiness: {result.exception!r}\n{result.output}"
     )
     assert readiness["status"] == "DEGRADED"
     assert journal["status"] == "DEGRADED"
@@ -952,28 +989,11 @@ def test_ontology_relink_hint_names_workspace_and_command(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "RetailOntology_AutoGen" in out
     assert "retail-setup post-ontology --env dev" in out
-    assert "--acknowledge ack.full-demo.ontology-created" in out
     assert "intentionally not published yet" in out
 
 
-def test_post_ontology_plan_requires_acknowledgement_and_orders_publication(
-    tmp_path,
-):
+def test_post_ontology_plan_orders_validated_publication(tmp_path):
     _seed_deploy_config(tmp_path, profile="full-demo")
-
-    missing = runner.invoke(
-        app,
-        [
-            "post-ontology",
-            "--repo-root",
-            str(tmp_path),
-            "--env",
-            "dev",
-            "--dry-run",
-        ],
-    )
-    assert missing.exit_code == 1
-    assert "ack.full-demo.ontology-created" in missing.output
 
     result = runner.invoke(
         app,
@@ -983,8 +1003,6 @@ def test_post_ontology_plan_requires_acknowledgement_and_orders_publication(
             str(tmp_path),
             "--env",
             "dev",
-            "--acknowledge",
-            "ack.full-demo.ontology-created",
             "--dry-run",
         ],
     )
@@ -1024,8 +1042,6 @@ def test_post_ontology_validates_live_ontology_before_mutation(
             str(tmp_path),
             "--env",
             "dev",
-            "--acknowledge",
-            "ack.full-demo.ontology-created",
         ],
     )
 
@@ -1136,6 +1152,30 @@ def test_journal_write_is_atomic_via_temp_file_and_replace(tmp_path, monkeypatch
     assert seen_tmp_names and seen_tmp_names[0] != path.name  # wrote to a temp name first
     # No leftover temp files after a successful write.
     assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_journal_retries_transient_windows_replace_denial(tmp_path, monkeypatch):
+    journal = _deploy_journal.start_run(
+        "dev",
+        targets={"workspace_name": "retail-demo-dev"},
+    )
+    real_replace = _deploy_journal.os.replace
+    attempts = 0
+
+    def flaky_replace(src, dst):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError(13, "Access is denied")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(_deploy_journal.os, "replace", flaky_replace)
+    monkeypatch.setattr(_deploy_journal.time, "sleep", lambda _seconds: None)
+
+    _deploy_journal.write(tmp_path, journal)
+
+    assert attempts == 3
+    assert _deploy_journal.journal_path(tmp_path, "dev").is_file()
 
 
 def test_journal_shape_has_required_fields_and_no_secrets(tmp_path):
@@ -1386,7 +1426,16 @@ def test_initial_full_deploy_defers_taskflow_until_post_ontology(
 
     monkeypatch.setattr("subprocess.run", fake_run)
     result = runner.invoke(
-        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes", "--skip-terraform"]
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -1461,7 +1510,14 @@ def test_required_ml_failure_leaves_reporting_unpublished(monkeypatch, tmp_path)
 
     result = runner.invoke(
         app,
-        ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform"],
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--skip-terraform",
+        ],
     )
 
     assert result.exit_code == 5, result.output
@@ -1500,7 +1556,16 @@ def test_yes_flag_runs_required_gates_without_prompt(monkeypatch, tmp_path):
     monkeypatch.setattr("subprocess.run", _always_ok)
 
     result = runner.invoke(
-        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes", "--skip-terraform"]
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -1522,7 +1587,6 @@ def test_yes_flag_runs_required_gates_without_prompt(monkeypatch, tmp_path):
     assert journal["targets"]["asset_ids"] == ",".join(profile.asset_ids)
     assert journal["targets"]["pipeline_refs"] == ",".join(profile.pipeline_refs)
     assert journal["targets"]["kql_scripts"] == ",".join(profile.kql_scripts)
-    assert journal["targets"]["acknowledgements"] == ""
     assert journal["manifest"]["version"] == profile.manifest_version
     assert journal["manifest"]["hash"] == profile.manifest_hash
     assert journal["manifest"]["profile_support_status"] == "preview"
@@ -1618,7 +1682,16 @@ def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_
 
     monkeypatch.setattr("subprocess.run", fake_run)
     result = runner.invoke(
-        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes", "--skip-terraform"]
+        app,
+        [
+            "deploy",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--yes",
+            "--skip-terraform",
+        ],
     )
 
     assert result.exit_code == 2, result.output

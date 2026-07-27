@@ -526,7 +526,7 @@ def run_retail_setup(
 
     _section(4, 4, "Deploying to Microsoft Fabric (optional)")
     deploy = deploy_requested
-    if not assume_yes and not deploy:
+    if not dry_run and not assume_yes and not deploy:
         _emit("")
         _emit("Deploying creates resources in Microsoft Fabric and may incur cost.")
         _emit("You can also do it later with: retail-setup deploy --env " + deploy_env)

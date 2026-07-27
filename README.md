@@ -30,11 +30,18 @@ cd retail-demo
 ```
 
 The bootstrap prepares Python, configures the target, renders notebooks, and
-offers to deploy. To deploy without the prompts:
+offers to deploy. The shell wrappers default to the complete `full-demo`
+profile; pass `--profile core` or `--profile standard` to select a smaller
+inventory. To proceed directly to deployment:
 
 ```powershell
 .\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
 ```
+
+Full-demo deployment checks the required Ontology/Data Agent tenant switches
+and the selected capacity before changing Fabric. Correct environments proceed
+without extra confirmation; disabled admin settings or incompatible capacity
+fail with exact remediation.
 
 For a manually managed Python environment:
 
@@ -50,10 +57,11 @@ retail-setup deploy --env alice --yes
 Rendering produces five workspace-specific notebooks in `utility\out\`:
 setup 01 through 04 and `stream-events.ipynb`.
 
-For the default `core` profile, `--yes` pre-confirms the Terraform apply gate
-but does not run data setup. Run setup notebooks 01-04 after deploy. Reporting
-profiles run setup and required ML gates automatically; `--yes` does not skip
-them.
+The guided `full-demo` path runs setup and required ML gates automatically,
+then publishes Reporting and runs isolated optional/experimental ML. An
+explicit `--profile core` deploy leaves setup notebooks 01-04 for the operator
+to run manually. `--yes` does not skip required gates or accept full-demo
+boundaries.
 
 After the selected workloads run, verify live items, bindings, pipeline
 evidence, and freshness:

@@ -99,8 +99,8 @@ concurrent full deploys from separate checkouts.
 
 ## Current constraints
 
-- The default `core` inventory is preview-free; `full-demo` is the explicitly
-  acknowledged preview/manual boundary.
+- The default `core` inventory is preview-free; `full-demo` is the
+  live-preflight-validated preview/manual boundary.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate

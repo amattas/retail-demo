@@ -16,6 +16,7 @@ import json
 import os
 import re
 import tempfile
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -37,6 +38,8 @@ StepClassification = Literal["required", "optional"]
 # exception message (e.g. one that embeds a URL or path) can't balloon the
 # journal or leak more context than a short diagnostic needs.
 _MAX_ERROR_LENGTH = 300
+_REPLACE_ATTEMPTS = 5
+_REPLACE_RETRY_SECONDS = 0.05
 
 # `Bearer <token>` credentials, wherever they show up in an exception message.
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-_.~+/]+=*")
@@ -274,7 +277,14 @@ def write(repo_root: Path, journal: DeployJournal) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(journal.to_dict(), handle, indent=2, sort_keys=False)
             handle.write("\n")
-        os.replace(tmp_name, path)
+        for attempt in range(1, _REPLACE_ATTEMPTS + 1):
+            try:
+                os.replace(tmp_name, path)
+                break
+            except PermissionError:
+                if attempt == _REPLACE_ATTEMPTS:
+                    raise
+                time.sleep(_REPLACE_RETRY_SECONDS * attempt)
     finally:
         if os.path.exists(tmp_name):
             os.remove(tmp_name)

@@ -109,8 +109,8 @@ with an artifact built against an unvalidated schema.
 - falls back to delete/recreate with polling and retry behavior when needed.
 
 Ontology creation is not part of the required ML pipeline. Run it deliberately
-after its preview/capacity boundaries are accepted, then use the acknowledged
-`post-ontology` command to publish Data Agents and task flow.
+after live tenant/capacity preflight passes, then use `post-ontology` to
+validate it and publish Data Agents and task flow.
 
 ## Data Agents
 

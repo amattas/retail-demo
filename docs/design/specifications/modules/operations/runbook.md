@@ -49,7 +49,7 @@ existing setup and required-ML gates. Deployment never adds
 readiness gaps mark the deploy journal `DEGRADED`. Core remains
 operator-executed: run setup notebooks 01-04, then invoke verification.
 The initial full-demo run marks only ontology, Data Agent, and task-flow checks
-as deferred. Its acknowledged post-ontology step publishes those items and
+as deferred. Its live-validated post-ontology step publishes those items and
 runs the complete taxonomy.
 
 ## Pipeline state
@@ -139,8 +139,8 @@ retains its event identities and ingestion tags.
 
 ### Ontology/task-flow binding missing
 
-Wait for ontology creation to complete, then run the acknowledged
-`post-ontology` command to publish the dependent agents and task flow.
+Wait for ontology creation to complete, then run `post-ontology`; it validates
+the live ontology before publishing the dependent agents and task flow.
 
 ### Power BI table missing
 

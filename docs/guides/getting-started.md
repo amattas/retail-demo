@@ -16,16 +16,21 @@ recovery, use the [deployment guide](deployment.md).
 
 ## What the supported path creates
 
-The default `core` profile creates the smallest supported path: a Fabric
+The manifest-default `core` profile creates the smallest supported path: a Fabric
 workspace, schema-enabled Lakehouse, Lakehouse shell, and four rendered
 historical setup notebooks. The operator runs setup 01 through 04 in order.
 
 `standard` is the supported opt-in Eventhouse, streaming, pipeline, required
-ML, Direct Lake semantic-model, and report path. `full-demo` adds acknowledged
+ML, Direct Lake semantic-model, and report path. `full-demo` adds live-checked
 preview and manual surfaces. No profile deploys the reset notebook or starts
 the long-running stream automatically. Choose with `--profile`; see the
 [canonical workspace and profile inventory](workspace-inventory.md) before
 selecting an opt-in profile.
+
+The guided `setup.ps1` and `setup.sh` wrappers intentionally select
+`full-demo` when `--profile` is omitted. This makes the guided path a complete
+demo install while keeping direct `retail-setup` commands on the conservative
+manifest default.
 
 ## 1. Check prerequisites
 
@@ -53,8 +58,10 @@ PowerShell-only workstation.
 
 The committed default disables the custom Spark pool. `core` and `standard`
 use the workspace starter pool. Only `full-demo` selects the source-defined
-custom pool and requires an explicit capacity acknowledgement. Start with a
-small history window and store count, then scale after measuring the setup run.
+custom pool; live preflight requires an active F64-or-larger capacity and
+validates the configured node count against its base Spark vCores. Reporting
+profiles require at least 18 months of history; start with a small store count,
+then scale after measuring the setup run.
 
 ## 2. Clone the repository
 
@@ -85,13 +92,13 @@ Use this path for a first deployment.
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --workspace-name retail-demo-alice --profile core
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --workspace-name retail-demo-alice --profile core
+    ./scripts/setup.sh --workspace-name retail-demo-alice
     ```
 
 The wrapper:
@@ -113,13 +120,13 @@ To proceed directly to the deploy phase after configuration:
 === "Windows PowerShell"
 
     ```powershell
-    .\scripts\setup.ps1 --workspace-name retail-demo-alice --profile core --deploy
+    .\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy
     ```
 
 === "macOS or Linux"
 
     ```bash
-    ./scripts/setup.sh --workspace-name retail-demo-alice --profile core --deploy
+    ./scripts/setup.sh --workspace-name retail-demo-alice --deploy
     ```
 
 Useful bootstrap flags:
@@ -127,7 +134,7 @@ Useful bootstrap flags:
 | Flag | Behavior |
 | --- | --- |
 | `--workspace-name <name>` | Names the Fabric workspace and derives its local environment key. |
-| `--profile <name>` | Selects `core`, `standard`, or `full-demo`; defaults to `core`. |
+| `--profile <name>` | Selects `core`, `standard`, or `full-demo`; guided wrappers default to `full-demo`. |
 | `--deploy` | Runs deploy after configure and render. |
 | `--dry-run` | Previews setup-engine commands; the wrapper may still prepare or activate Python first. |
 | `--skip-prereqs` | Skips package-manager installation of Git, Terraform, and Azure CLI. |
@@ -173,7 +180,7 @@ Review these choices:
 | Capacity | The capacity must be active and usable by the deploy operator. |
 | Lakehouse | Keep the default unless another checked-in binding requires a deliberate rename. |
 | Eventhouse and KQL database | Use the same name. The supported topology uses the default KQL database created with the Eventhouse. |
-| Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` selects the acknowledged custom pool. |
+| Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` validates and selects the custom pool. |
 | Store type | `supercenter`, `grocery`, `hardware`, or `luxury`. |
 | History | `--months` defines a range ending yesterday. |
 | Store count and seed | Control scale and deterministic reproduction. |

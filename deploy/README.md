@@ -19,7 +19,7 @@ recreate, post-deploy work, and troubleshooting.
 
 ## Ordered deploy plan
 
-1. Run profile/source preflight.
+1. Run local profile/source and live tenant/capacity preflight.
 2. Generate inputs and apply Terraform unless `--skip-terraform` is selected.
 3. Stage and publish selected infrastructure without Reporting.
 4. Build and execute the ordered KQL database script.
@@ -28,7 +28,7 @@ recreate, post-deploy work, and troubleshooting.
 7. Run selected post-Reporting ML and validate publication.
 8. For standard/full-demo, run read-only live readiness verification; the
    initial full-demo pass defers ontology-dependent checks.
-9. After ontology creation, use the acknowledged post-ontology command to
+9. After ontology creation, use the live-validating post-ontology command to
    publish Data Agents, task flow, and complete readiness.
 
 The CLI confirmation occurs before Terraform apply. Apply then prints the
@@ -134,8 +134,7 @@ identifiers are local-only and isolated by that key.
   omits Data Agents and task flow. After creating the ontology, run:
 
   ```powershell
-  retail-setup post-ontology --env <env> `
-    --acknowledge ack.full-demo.ontology-created
+  retail-setup post-ontology --env <env>
   ```
 
   to validate the ontology, publish deferred items, and verify full readiness.

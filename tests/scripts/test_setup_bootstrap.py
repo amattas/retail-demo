@@ -31,6 +31,16 @@ def test_setup_default_profile_comes_from_manifest(monkeypatch):
     assert setup.parse_args().profile == declared_default
 
 
+def test_later_profile_argument_overrides_wrapper_default(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["setup.py", "--profile", "full-demo", "--profile", "core"],
+    )
+
+    assert setup.parse_args().profile == "core"
+
+
 def test_detect_package_manager_prefers_winget_on_windows(monkeypatch):
     monkeypatch.setattr(setup, "_command_exists", lambda command: command == "winget")
 
@@ -55,7 +65,7 @@ def test_setup_sh_mirrors_ps1_bootstrap_contract():
     assert 'CondaPythonVersion="3.13"' in content
     assert 'MiniforgeVersion="26.3.2-3"' in content
     assert 'VenvPath="$RepoRoot/.venv"' in content
-    assert '"$python_exe" "$SetupPy" "$@"' in content
+    assert '"$python_exe" "$SetupPy" --profile full-demo "$@"' in content
     assert "install_miniforge" in content
     assert "releases/latest" not in content
     assert "verify_sha256" in content
@@ -71,6 +81,7 @@ def test_setup_ps1_pins_miniforge_winget_install():
     assert "$MiniforgeVersion = '26.3.2-3'" in content
     assert "--version $MiniforgeVersion --source winget" in content
     assert "--disable-interactivity --silent" in content
+    assert "& $python $SetupPy '--profile' 'full-demo' @ForwardArgs" in content
 
 
 def test_detect_package_manager_uses_brew_on_macos(monkeypatch):
@@ -184,7 +195,13 @@ def test_run_retail_setup_dry_run_without_deploy(monkeypatch):
     monkeypatch.setattr(
         setup, "run_command", lambda command, **_: commands.append(command)
     )
-    monkeypatch.setattr(setup, "prompt_yes_no", lambda *_, **__: False)
+    monkeypatch.setattr(
+        setup,
+        "prompt_yes_no",
+        lambda *_, **__: (_ for _ in ()).throw(
+            AssertionError("dry run must not prompt")
+        ),
+    )
 
     setup.run_retail_setup(
         env,

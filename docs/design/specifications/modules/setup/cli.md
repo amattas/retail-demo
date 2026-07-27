@@ -8,6 +8,9 @@
 - Installed CLI: `retail-setup`
 
 The shell wrappers converge on the Python guided setup.
+When `--profile` is omitted, both wrappers prepend `--profile full-demo`;
+a later explicit `--profile` argument overrides it. Direct `scripts/setup.py`
+and `retail-setup` commands retain the manifest-default `core` profile.
 
 Before dependencies are installed, `scripts/solution_manifest.py` reads the
 manifest version/hash, prerequisites, canonical examples, and profile
@@ -117,7 +120,10 @@ four producers feed `15-validate-required-ml-contract`; only exact-run success
 allows a second publication phase to stage the semantic model and report.
 `full-demo` runs `ml-optional` and `ml-experimental` afterward.
 
-`--yes` pre-confirms Terraform apply but does not skip required pipeline gates.
+`--yes` pre-confirms Terraform apply but does not skip required pipeline gates
+or live tenant/capacity preflight. Full-demo proceeds without boundary prompts
+when the required tenant switches and capacity are valid. Disabled settings
+and invalid capacity fail before Fabric mutation with exact remediation.
 `--skip-terraform` rejects missing, placeholder,
 incomplete, or wrong-workspace Terraform outputs before publication.
 `--recreate` polls for workspace-name release for up to 180 seconds between

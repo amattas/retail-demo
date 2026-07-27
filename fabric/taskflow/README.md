@@ -16,11 +16,11 @@ silently omitted.
 
 Ontology creation is a separate preview/operator action through
 `30-create-ontology`; it is not part of `setup-pipeline`. Run that notebook,
-wait for `RetailOntology_AutoGen` to exist, and complete the acknowledged
+wait for `RetailOntology_AutoGen` to exist, and complete the live-validated
 post-ontology publication step:
 
 ```powershell
-retail-setup post-ontology --env <environment> --acknowledge ack.full-demo.ontology-created
+retail-setup post-ontology --env <environment>
 ```
 
 That command validates the ontology before publishing Data Agents and the task

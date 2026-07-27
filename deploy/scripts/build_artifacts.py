@@ -1042,7 +1042,7 @@ def main() -> int:
         choices=("all", "infrastructure", "reporting", "post-ontology"),
         default="all",
         help=(
-            "Stage infrastructure, gated Reporting, or acknowledged "
+            "Stage infrastructure, gated Reporting, or live-validated "
             "post-ontology Data Agents."
         ),
     )

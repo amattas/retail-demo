@@ -2512,7 +2512,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "Skip ontology, Data Agent, and task-flow evidence until the "
-            "acknowledged post-ontology publication step."
+            "live-validated post-ontology publication step."
         ),
     )
     parser.add_argument("--timeout-seconds", type=float, default=21600)

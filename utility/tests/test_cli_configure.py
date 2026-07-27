@@ -239,6 +239,57 @@ def test_configure_selects_full_demo_custom_spark_pool(tmp_path):
     assert config["deployment"]["profile"] == "core"
 
 
+def test_configure_full_demo_lifts_saved_short_history_default(tmp_path):
+    _seed_deploy_config(tmp_path)
+    utility = tmp_path / "utility"
+    utility.mkdir()
+    (utility / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "store_type": "grocery",
+                "months": 3,
+                "store_count": 10,
+                "seed": 9,
+            }
+        )
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "configure",
+            "--repo-root",
+            str(tmp_path),
+            "--tenant-id",
+            "11111111-1111-1111-1111-111111111111",
+            "--workspace-name",
+            "retail-demo",
+            "--capacity-name",
+            "F64",
+            "--lakehouse-name",
+            "retail_lakehouse",
+            "--eventhouse-name",
+            "retail_eventhouse",
+            "--kql-database-name",
+            "retail_eventhouse",
+            "--profile",
+            "full-demo",
+            "--store-type",
+            "grocery",
+            "--store-count",
+            "10",
+            "--seed",
+            "9",
+        ],
+        input="\ny\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Months of data to generate (history ends yesterday) [18]" in result.output
+    generation = yaml.safe_load((utility / "config.yaml").read_text())
+    assert generation["months"] == 18
+
+
 def test_configure_rejects_short_history_for_reporting_profile(tmp_path):
     _seed_deploy_config(tmp_path)
     result = runner.invoke(

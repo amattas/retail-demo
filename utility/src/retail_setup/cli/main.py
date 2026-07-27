@@ -77,7 +77,6 @@ _DELETION_WAIT_INTERVAL_SECONDS = 10
 _PIPELINE_TRIGGER_ATTEMPTS = 3
 _PIPELINE_TRIGGER_RETRY_WAIT = 10
 _PROVIDER_TENANT_VARIABLES = ("FABRIC_TENANT_ID", "ARM_TENANT_ID")
-_POST_ONTOLOGY_ACKNOWLEDGEMENT = "ack.full-demo.ontology-created"
 
 
 def _default_repo_root() -> Path:
@@ -686,7 +685,12 @@ def configure(
         if manifest_profile.reporting_gate_pipeline_ref is not None
         else _DEFAULT_MONTHS
     )
-    months_default = int(existing_generation.get("months", default_months))
+    saved_months = int(existing_generation.get("months", default_months))
+    months_default = (
+        max(saved_months, default_months)
+        if manifest_profile.reporting_gate_pipeline_ref is not None
+        else saved_months
+    )
     store_count_default = int(
         existing_generation.get("store_count", GenerationConfig.model_fields["store_count"].default)
     )
@@ -1092,7 +1096,7 @@ def _deploy_plan(
     semantic_model_name: str = "retail_model",
     report_name: str = "retail_model",
     profile: ResolvedProfile | None = None,
-    acknowledgements: tuple[str, ...] | list[str] = (),
+    interactive_preflight: bool = False,
     repo_root: Path | None = None,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
@@ -1123,13 +1127,31 @@ def _deploy_plan(
         preflight_command.append("--recreate")
     if skip_terraform:
         preflight_command.append("--skip-terraform")
-    for acknowledgement in acknowledgements:
-        preflight_command.extend(["--acknowledge", acknowledgement])
+    live_preflight_command = [
+        py,
+        "-m",
+        "deploy.scripts.live_profile_preflight",
+        "--repo-root",
+        str(repo_root),
+        "--environment",
+        env,
+        "--auth-mode",
+        auth_mode,
+    ]
+    if tenant_id:
+        live_preflight_command.extend(["--tenant-id", tenant_id])
+    if interactive_preflight:
+        live_preflight_command.append("--interactive")
     steps = [
         DeployStep(
             cmd=preflight_command,
             description=f"Preflight deployment profile '{profile.deployment_name}'",
             step_id="profile-preflight",
+        ),
+        DeployStep(
+            cmd=live_preflight_command,
+            description="Validate live tenant and capacity prerequisites",
+            step_id="live-profile-preflight",
         ),
         DeployStep(
             cmd=generate_config_command,
@@ -1501,10 +1523,7 @@ def _deploy_banner(
     _hr("=")
 
 
-def _echo_profile_inventory(
-    profile: ResolvedProfile,
-    acknowledgements: tuple[str, ...] | list[str],
-) -> None:
+def _echo_profile_inventory(profile: ResolvedProfile) -> None:
     """Print the exact manifest-resolved inventory without live queries."""
 
     typer.echo("")
@@ -1561,16 +1580,6 @@ def _echo_profile_inventory(
     typer.echo(f"  Supported boundary: {profile.boundaries.supported}")
     typer.echo(f"  Preview boundary: {profile.boundaries.preview}")
     typer.echo(f"  Manual boundary: {profile.boundaries.manual}")
-    if profile.required_acknowledgements:
-        required = ", ".join(
-            acknowledgement.id
-            for acknowledgement in profile.required_acknowledgements
-        )
-        typer.echo(f"  Required acknowledgements: {required}")
-        typer.echo(
-            "  Provided acknowledgements: "
-            + (", ".join(acknowledgements) if acknowledgements else "(none)")
-        )
     if profile.blockers:
         for blocker in profile.blockers:
             typer.echo(
@@ -1769,11 +1778,6 @@ def deploy(
         "--recreate",
         help="Destroy the existing workspace and recreate it (clean slate).",
     ),
-    acknowledge: Optional[list[str]] = typer.Option(
-        None,
-        "--acknowledge",
-        help="Repeat for each profile boundary acknowledgement required by full-demo.",
-    ),
 ) -> None:
     """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
 
@@ -1787,7 +1791,6 @@ def deploy(
     optional.
     """
     repo_root = repo_root.resolve()
-    acknowledgements = tuple(acknowledge or ())
     if recreate and skip_terraform:
         typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
         raise typer.Exit(code=1)
@@ -1925,13 +1928,13 @@ def deploy(
         semantic_model_name=semantic_model,
         report_name=report_name,
         profile=profile,
-        acknowledgements=acknowledgements,
+        interactive_preflight=sys.stdin.isatty() and not yes,
         repo_root=repo_root,
     )
     total = len(plan)
 
     _deploy_banner(env, profile, total, recreate, dry_run)
-    _echo_profile_inventory(profile, acknowledgements)
+    _echo_profile_inventory(profile)
 
     if dry_run:
         for i, step in enumerate(plan, start=1):
@@ -1954,7 +1957,6 @@ def deploy(
             "kql_script_count": str(len(profile.kql_scripts)),
             "kql_scripts": ",".join(profile.kql_scripts),
             "item_types": ",".join(profile.item_types_in_scope),
-            "acknowledgements": ",".join(acknowledgements),
         },
         manifest={
             "version": profile.manifest_version,
@@ -2171,14 +2173,6 @@ def post_ontology(
         "--env",
         help="Workspace-derived deployment environment name.",
     ),
-    acknowledge: Optional[list[str]] = typer.Option(
-        None,
-        "--acknowledge",
-        help=(
-            "Required acknowledgement that 30-create-ontology completed in "
-            "the configured workspace."
-        ),
-    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -2188,14 +2182,6 @@ def post_ontology(
     """Publish Data Agents and task flow after ontology creation."""
 
     repo_root = repo_root.resolve()
-    acknowledgements = tuple(acknowledge or ())
-    if acknowledgements != (_POST_ONTOLOGY_ACKNOWLEDGEMENT,):
-        typer.echo(
-            "post-ontology requires exactly: "
-            f"--acknowledge {_POST_ONTOLOGY_ACKNOWLEDGEMENT}",
-            err=True,
-        )
-        raise typer.Exit(code=1)
     try:
         config = _load_deploy_environment(repo_root, env)
         if not config.profile.selects("asset.data-agents"):
@@ -2380,7 +2366,7 @@ def _print_ontology_relink_hint(
 
     The preview ontology is created only when an operator runs
     ``30-create-ontology``. Data Agents and task-flow metadata remain
-    unpublished until the acknowledged post-ontology command verifies it.
+    unpublished until the post-ontology command verifies it live.
     """
 
     _ = repo_root
@@ -2390,8 +2376,7 @@ def _print_ontology_relink_hint(
         "Post-ontology boundary: run '30-create-ontology' and wait for success.\n"
         "Data Agents and task-flow metadata are intentionally not published yet.\n"
         "After 'RetailOntology_AutoGen' exists, run:\n"
-        f"    retail-setup post-ontology --env {env} "
-        f"--acknowledge {_POST_ONTOLOGY_ACKNOWLEDGEMENT}\n"
+        f"    retail-setup post-ontology --env {env}\n"
         f"The command reuses the configured {auth_mode} Python credential, "
         "validates the ontology first, then publishes and verifies the deferred "
         "items."

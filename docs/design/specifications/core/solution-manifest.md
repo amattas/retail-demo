@@ -3,7 +3,7 @@
 ## Purpose
 
 `contracts/retail-demo.json` is the canonical container for cross-domain
-metadata. Its top-level sections are frozen at version `1.3.0`:
+metadata. Its top-level sections are frozen at version `1.4.0`:
 
 - `metadata` and `version`;
 - `prerequisites` and `commands`;

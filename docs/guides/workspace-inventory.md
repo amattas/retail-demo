@@ -4,7 +4,7 @@ This is the canonical human-readable inventory for the deployed workspace.
 `contracts/retail-demo.json` owns the stable IDs, descriptions, support status,
 source pointers, profiles, boundaries, prerequisites, commands, paths, ML tiers,
 publication expectations, and readiness taxonomy. It is currently manifest
-version `1.3.0`.
+version `1.4.0`.
 
 Physical fields, tables, notebook bodies, pipeline bodies, and TMDL remain in
 their authoritative sources. Contract tests derive those inventories rather
@@ -21,8 +21,9 @@ retail-setup deploy --env dev --dry-run
 retail-setup verify --env dev
 ```
 
-The guided bootstrap accepts `--profile`; `core` is its default. Render,
-deploy, and verify resolve that stored profile from the `--env` environment.
+The guided wrappers default to `full-demo`; direct `scripts/setup.py` and
+`retail-setup` commands retain the manifest-default `core` profile. Render,
+deploy, and verify resolve the stored profile from the `--env` environment.
 
 <!-- manifest-contract:prerequisites -->
 ## Prerequisites
@@ -49,7 +50,7 @@ both that constraint and Terraform's constraint in
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `core` | core/default | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
 | `standard` | supported opt-in | 8 | 4 | 5 | 6 | 26 | 2 | 28 |
-| `full-demo` | preview/acknowledged | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
+| `full-demo` | preview/live-preflight | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
 
 The logical asset selections are:
 
@@ -71,8 +72,8 @@ The Reporting profiles publish infrastructure first, wait for setup and the
 required ML validator to reach terminal success, then publish Reporting.
 `full-demo` runs optional and experimental ML only after Reporting. Ontology
 creation remains a separate preview/operator action; its two Data Agents are
-staged only by the acknowledged post-ontology command and are not included in
-the initial count.
+staged only after `post-ontology` verifies the live ontology and are not
+included in the initial count.
 
 ### Workspace folders and publication phases
 

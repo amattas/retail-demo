@@ -50,7 +50,6 @@ class ProfilePreflightReport:
 
     profile: ResolvedProfile
     selected_notebooks: tuple[str, ...]
-    acknowledgements: tuple[str, ...]
 
 
 def selected_notebook_names(profile: ResolvedProfile) -> tuple[str, ...]:
@@ -75,32 +74,14 @@ def validate_profile_preflight(
     repo_root: Path,
     config: DeployConfig,
     *,
-    acknowledgements: tuple[str, ...] | list[str] = (),
     recreate: bool = False,
     skip_terraform: bool = False,
     validate_rendered: bool = True,
 ) -> ProfilePreflightReport:
-    """Validate only local/queryable facts and explicit operator boundaries."""
+    """Validate local and source-controlled profile prerequisites."""
 
     profile = config.profile
-    provided = tuple(acknowledgements)
     errors: list[str] = []
-    expected_acknowledgements = {
-        acknowledgement.id for acknowledgement in profile.required_acknowledgements
-    }
-    unknown = sorted(set(provided) - expected_acknowledgements)
-    missing = sorted(expected_acknowledgements - set(provided))
-    if len(provided) != len(set(provided)):
-        errors.append("operator acknowledgements must not be repeated")
-    if unknown:
-        errors.append(
-            f"unknown acknowledgements for {profile.deployment_name}: {unknown}"
-        )
-    if missing:
-        errors.append(
-            "missing required acknowledgements: "
-            + ", ".join(missing)
-        )
     for blocker in profile.blockers:
         errors.append(
             f"{blocker.id} ({blocker.tracking_issue}): {blocker.description}"
@@ -132,7 +113,6 @@ def validate_profile_preflight(
     return ProfilePreflightReport(
         profile=profile,
         selected_notebooks=selected_notebooks,
-        acknowledgements=provided,
     )
 
 
@@ -452,7 +432,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate deployment profile preflight")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--environment", required=True)
-    parser.add_argument("--acknowledge", action="append", default=[])
     parser.add_argument("--recreate", action="store_true")
     parser.add_argument("--skip-terraform", action="store_true")
     args = parser.parse_args()
@@ -466,7 +445,6 @@ def main() -> int:
         report = validate_profile_preflight(
             args.repo_root,
             config,
-            acknowledgements=args.acknowledge,
             recreate=args.recreate,
             skip_terraform=args.skip_terraform,
         )

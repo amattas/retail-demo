@@ -28,7 +28,8 @@ for those definitions.
 The current deploy plan:
 
 1. resolves the exact profile inventory;
-2. runs local preflight before Terraform destroy/apply, publication, or KQL;
+2. runs local and live tenant/capacity preflight before Terraform
+   destroy/apply, publication, or KQL;
 3. generates profile-aware Terraform and `fabric-cicd` inputs;
 4. initializes and applies Terraform unless skipped;
 5. captures the selected Terraform-owned identifiers;
@@ -40,14 +41,14 @@ The current deploy plan:
 11. runs read-only readiness verification; the initial `full-demo` pass
     explicitly defers ontology-dependent evidence;
 12. after the operator creates the ontology, publishes Data Agents and task
-    flow only through the acknowledged `post-ontology` command and verifies
+    flow only after `post-ontology` validates it and verifies
     complete readiness.
 
 Each live run atomically updates
 `deploy/.generated/<env>/deploy-run.json`. Inspect it for target names,
 the manifest version/hash, profile support and expected counts/folders,
 core/optional/preview/manual boundaries, exact asset/group/pipeline/KQL
-inventory, provided acknowledgement IDs, required/optional classification,
+inventory, required/optional classification,
 failed step, exit code, and final `SUCCEEDED`, `DEGRADED`, or `FAILED` status.
 Artifact build steps link phase-specific `artifact-inventory-<phase>.json`
 evidence. Credential-like error text is redacted and raw subprocess output is
@@ -56,7 +57,7 @@ not stored.
 ### Profiles
 
 `core` is the default, `standard` is the supported opt-in Reporting path, and
-`full-demo` contains acknowledged preview/manual surfaces. The
+`full-demo` contains live-checked preview/manual surfaces. The
 [workspace and profile inventory](workspace-inventory.md) is the single
 canonical guide for exact asset IDs, groups, pipelines, KQL scripts, staged
 counts, folders, and support status.
@@ -68,10 +69,10 @@ profile enables a schedule or starts the long-running stream.
 ### Runtime, capacity, cost, preview, and manual boundaries
 
 The dry-run prints the manifest-owned runtime, capacity, cost, preview, and
-manual boundaries for the resolved profile. `full-demo` requires one explicit
-acknowledgement for each undetectable preview, custom-pool, task-flow API, and
-manual-asset boundary. Reporting remains absent unless the current required ML
-pipeline run, including the runtime contract validator, finishes successfully.
+manual boundaries for the resolved profile. A live `full-demo` run reads
+Fabric tenant settings and capacity metadata before mutation. Reporting
+remains absent unless the current required ML pipeline run, including the
+runtime contract validator, finishes successfully.
 
 ## Prerequisites
 
@@ -203,7 +204,8 @@ a separately named database is not a supported topology.
 ### Starter pool or custom pool
 
 `core` and `standard` use the workspace starter pool. Only `full-demo` selects
-the custom pool, and its capacity acknowledgement is mandatory. Legacy
+the custom pool. Live preflight requires an active F64-or-larger capacity and
+checks configured node vCores against the capacity's base vCores. Legacy
 `--use-custom-spark-pool` and
 `spark.use_custom_pool` overrides fail clearly; select the profile instead.
 Review the source-defined pool configuration against the target capacity.
@@ -214,8 +216,8 @@ Review the source-defined pool configuration against the target capacity.
 retail-setup deploy --env alice --dry-run
 ```
 
-The preview prints the resolved inventory, profile blockers, required
-acknowledgement IDs, ordered commands, and confirmation gates. It validates
+The preview prints the resolved inventory, profile blockers, ordered commands,
+and confirmation gates. It validates
 the existing environment configuration and authentication boundary but does
 not execute subprocesses or:
 
@@ -232,28 +234,22 @@ absent. The CLI asks for confirmation before invoking Terraform apply. Terraform
 prints its change preview and proceeds with `-auto-approve`; there is no
 separate plan review before the confirmation.
 
-## Preflight and acknowledgements
+## Preflight
 
-On a live run, profile preflight is the first plan step. It checks only local or
-otherwise queryable conditions: manifest/source pointers, rendered notebooks,
-selected pipeline references, KQL sources, selected Power BI/agent/task-flow
-sources, custom-pool configuration, prior local Terraform state and captured
-profile outputs, blockers, and
-acknowledgement syntax. It does not claim to detect tenant preview enrollment,
-capacity suitability, or completion of manual boundaries.
+On a live run, local profile preflight checks manifest/source pointers,
+rendered notebooks, selected pipeline references, KQL sources, selected Power
+BI/agent/task-flow sources, custom-pool configuration, prior local Terraform
+state and captured profile outputs, and blockers. A second read-only live
+preflight checks the selected capacity's identity, state, SKU, region, and
+Spark vCore fit. For `full-demo`, it also reads the Fabric admin tenant-settings
+API and verifies the required Ontology and Data Agent switches.
 
-A `full-demo` run must provide all four explicit acknowledgements:
-
-```powershell
-retail-setup deploy --env alice `
-  --acknowledge ack.full-demo.preview-surfaces `
-  --acknowledge ack.full-demo.custom-pool-capacity `
-  --acknowledge ack.full-demo.task-flow-api `
-  --acknowledge ack.full-demo.manual-assets
-```
-
-Unknown, missing, or repeated acknowledgement IDs fail preflight. Profile
-blockers are not acknowledgements and cannot be bypassed.
+Correct environments proceed without prompts. If a required tenant switch is
+disabled, interactive deploy prints the exact Admin Portal setting and offers
+to recheck after an administrator changes it. Fabric documents tenant-setting
+inspection but no write API, so setup never silently changes tenant policy.
+Noninteractive deploy and invalid/inaccessible capacity fail with exact
+remediation before mutation.
 
 Whenever environment-local Terraform state exists, missing or stale captured
 outputs and missing state profile evidence fail closed, including for state
@@ -399,8 +395,7 @@ boundary. Run `30-create-ontology`, wait for exactly one
 `RetailOntology_AutoGen` item, then run:
 
 ```powershell
-retail-setup post-ontology --env alice `
-  --acknowledge ack.full-demo.ontology-created
+retail-setup post-ontology --env alice
 ```
 
 The command validates the ontology and captured target IDs before mutation,
@@ -412,7 +407,7 @@ of publishing a partial graph when any selected item is absent.
 
 For `standard`, deployment runs the live verifier after the normal exact-run
 setup and ML gates. The initial `full-demo` pass does the same while marking
-ontology, Data Agents, and task flow as deferred; only the acknowledged
+ontology, Data Agents, and task flow as deferred; only the live-validated
 post-ontology command runs the complete pass. Verification is read-only and
 never adds another pipeline run. A required failure or unknown
 result fails deployment; an optional failure or unknown result records
@@ -464,9 +459,9 @@ state and output evidence must survive cleanup.
 | Azure CLI tenant mismatch | Run `az login --tenant <configured-tenant>` and confirm `az account show`. |
 | Azure PowerShell Terraform boundary | Use validated `--skip-terraform` outputs, switch to Azure CLI, or configure exactly one provider-supported service-principal, OIDC, or managed-identity credential. |
 | Capacity not found or inactive | Confirm the capacity display name, state, tenant, and operator access. |
-| Custom Spark pool fails | Select `core` or `standard`, or review the `full-demo` source configuration and capacity acknowledgement. Legacy pool overrides are unsupported. |
+| Custom Spark pool fails | Select `core` or `standard`, or use an active F64-or-larger capacity that passes live vCore sizing. Legacy pool overrides are unsupported. |
 | Required ML gate fails or is not terminal-successful | Inspect the exact `ml-required` pipeline/notebook run and `15-validate-required-ml-contract`; Reporting is intentionally unpublished. |
-| Full-demo reports missing acknowledgements | Review each named preview, capacity, task-flow, and manual boundary, then repeat `--acknowledge` once per required ID. |
+| Full-demo tenant preflight fails | Sign in as a Fabric administrator, enable the exact named Ontology/Data Agent tenant setting in the Admin Portal, then recheck. |
 | Terraform executable missing | Install Terraform or use `--skip-terraform` only with valid prior outputs. |
 | Workspace already exists | Update in place, configure `workspace.existing_id`, or explicitly recreate a disposable target. |
 | Fabric item publish fails | Inspect the failing item type and generated `.generated/<env>/fabric-cicd/parameter.yml`; do not treat later steps as completed. |
@@ -475,7 +470,7 @@ state and output evidence must survive cleanup.
 | Readiness verification is `UNKNOWN` | Install Microsoft ODBC Driver 17 or 18, confirm the deploy dependency set and identity permissions, and restore the matching Terraform output and deployment journal evidence. |
 | Readiness verification is `DEGRADED` | Read the optional failed/unknown check rows; do not present that optional capability until its evidence passes. |
 | Setup pipeline fails | Inspect the exact run and retry with `deploy.scripts.run_pipeline --wait`; required ML and Reporting remain unpublished. |
-| Ontology task-flow link is absent | Wait for ontology creation, then run the acknowledged `retail-setup post-ontology` command. |
+| Ontology task-flow link is absent | Wait for ontology creation, then run `retail-setup post-ontology --env <env>`; it validates the ontology before publication. |
 | Live rows are absent | Check notebook sink parameters, Query URI resolution, KQL permissions, connector errors, and ingestion timestamps. |
 | `--skip-terraform` rejects outputs | Use outputs captured for the same environment and workspace; run the normal Terraform path to refresh missing or stale identities. |
 

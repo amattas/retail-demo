@@ -186,23 +186,10 @@ def test_imp008_profile_blockers_are_replaced_by_executable_reporting_gate() -> 
         )
 
 
-def test_full_demo_declares_undetectable_operator_boundaries() -> None:
+def test_full_demo_uses_live_preflight_instead_of_acknowledgements() -> None:
     full_demo = _profiles()["full-demo"]
 
-    assert {
-        acknowledgement.id
-        for acknowledgement in full_demo.required_acknowledgements
-    } == {
-        "ack.full-demo.preview-surfaces",
-        "ack.full-demo.custom-pool-capacity",
-        "ack.full-demo.task-flow-api",
-        "ack.full-demo.manual-assets",
-    }
-    assert {ack.kind for ack in full_demo.required_acknowledgements} == {
-        "preview",
-        "capacity",
-        "manual",
-    }
+    assert full_demo.required_acknowledgements == ()
     assert set(full_demo.manual_asset_ids) == {
         "asset.dashboard-templates",
         "asset.activator-rules",
