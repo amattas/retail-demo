@@ -73,6 +73,7 @@ GOLD_SOURCE_TABLES = [
     "fact_receipt_lines",
     "fact_online_order_headers",
     "fact_marketing",
+    "fact_marketing_attribution",
     "fact_foot_traffic",
     "fact_truck_moves",
     "fact_store_inventory_txn",
