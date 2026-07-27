@@ -243,6 +243,10 @@ state and captured profile outputs, and blockers. A second read-only live
 preflight checks the selected capacity's identity, state, SKU, region, and
 Spark vCore fit. For `full-demo`, it also reads the Fabric admin tenant-settings
 API and verifies the required Ontology and Data Agent switches.
+After Terraform (or immediately when `--skip-terraform` is selected), target
+access validation requires captured workspace IDs to match managed resource
+IDs in state and a live workspace with the configured name that the operator
+can read.
 
 Correct environments proceed without prompts. If a required tenant switch is
 disabled, interactive deploy prints the exact Admin Portal setting and offers
@@ -464,6 +468,7 @@ state and output evidence must survive cleanup.
 | Full-demo tenant preflight fails | Sign in as a Fabric administrator, enable the exact named Ontology/Data Agent tenant setting in the Admin Portal, then recheck. |
 | Terraform executable missing | Install Terraform or use `--skip-terraform` only with valid prior outputs. |
 | Workspace already exists | Update in place, configure `workspace.existing_id`, or explicitly recreate a disposable target. |
+| Captured workspace is unreadable or mismatched | Run Terraform refresh/apply for the environment, recapture `terraform output -json`, and confirm the operator has a workspace role. |
 | Fabric item publish fails | Inspect the failing item type and generated `.generated/<env>/fabric-cicd/parameter.yml`; do not treat later steps as completed. |
 | KQL application fails | Inspect `deploy/.generated/<env>/database.kql`, target IDs, database name, and operator permissions; rerun the ordered script as one database script. |
 | Local validation passes but workspace is unusable | Perform the live checks in the operations guide; local validation is offline only. |

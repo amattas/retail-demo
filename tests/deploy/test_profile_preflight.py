@@ -329,6 +329,47 @@ def test_stale_captured_outputs_fail_before_profile_downgrade(
         )
 
 
+def test_managed_resource_id_mismatch_requires_output_recapture(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _disable_local_source_checks(monkeypatch)
+    _write_state(
+        tmp_path,
+        outputs={
+            "deployment_profile": "core",
+            "workspace_id": "state-output-id",
+        },
+        resource_type="fabric_workspace",
+    )
+    output_path = (
+        tmp_path
+        / "deploy"
+        / ".generated"
+        / "dev"
+        / "terraform-output.json"
+    )
+    output_path.write_text(
+        json.dumps(
+            {
+                "deployment_profile": "core",
+                "workspace_id": "state-output-id",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ProfilePreflightError,
+        match="managed resource IDs",
+    ):
+        validate_profile_preflight(
+            tmp_path,
+            _config(),
+            validate_rendered=False,
+        )
+
+
 def test_matching_state_profile_still_blocks_destructive_downgrade(
     monkeypatch,
     tmp_path,

@@ -38,6 +38,12 @@ _STATE_RESOURCE_ASSETS = {
     "fabric_spark_custom_pool": "asset.custom-spark-pool",
     "fabric_spark_workspace_settings": "asset.custom-spark-pool",
 }
+_STATE_RESOURCE_OUTPUT_KEYS = {
+    "fabric_workspace": "workspace_id",
+    "fabric_lakehouse": "lakehouse_id",
+    "fabric_eventhouse": "eventhouse_id",
+    "fabric_spark_custom_pool": "spark_custom_pool_id",
+}
 
 
 class ProfilePreflightError(ValueError):
@@ -278,10 +284,11 @@ def _validate_non_destructive_transition(
     )
     state_assets: set[str] = set()
     state_outputs: dict[str, object] = {}
+    state_resource_outputs: dict[str, object] = {}
     if state_path.is_file():
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            state_assets, state_outputs, _ = (
+            state_assets, state_outputs, _, state_resource_outputs = (
                 _terraform_state_signals(state)
             )
         except (OSError, ValueError) as exc:
@@ -302,6 +309,22 @@ def _validate_non_destructive_transition(
         return
 
     if state_path.is_file():
+        resource_mismatch = sorted(
+            key
+            for key, value in state_resource_outputs.items()
+            if (key in outputs or key in state_outputs)
+            and (
+                outputs.get(key) != value
+                or state_outputs.get(key) != value
+            )
+        )
+        if resource_mismatch:
+            errors.append(
+                "Terraform output IDs disagree with managed resource IDs in "
+                f"state for keys {resource_mismatch}; run Terraform refresh/apply "
+                "and recapture outputs before publication"
+            )
+            return
         stale = sorted(
             key
             for key, value in state_outputs.items()
@@ -384,7 +407,7 @@ def _validate_non_destructive_transition(
 
 def _terraform_state_signals(
     document: object,
-) -> tuple[set[str], dict[str, object], bool]:
+) -> tuple[set[str], dict[str, object], bool, dict[str, object]]:
     """Extract authoritative profile/resource signals from local state."""
 
     if not isinstance(document, dict):
@@ -401,6 +424,7 @@ def _terraform_state_signals(
         if isinstance(value, dict) and "value" in value
     }
     assets: set[str] = set()
+    resource_outputs: dict[str, object] = {}
     has_managed_resources = False
     for resource in resources:
         if not isinstance(resource, dict) or resource.get("mode") != "managed":
@@ -414,7 +438,27 @@ def _terraform_state_signals(
         asset = _STATE_RESOURCE_ASSETS.get(str(resource.get("type", "")))
         if asset:
             assets.add(asset)
-    return assets, outputs, has_managed_resources
+        instance = instances[0]
+        if not isinstance(instance, dict):
+            raise ValueError("Terraform managed resource instance is not an object")
+        attributes = instance.get("attributes")
+        if not isinstance(attributes, dict):
+            continue
+        resource_type = str(resource.get("type", ""))
+        output_key = _STATE_RESOURCE_OUTPUT_KEYS.get(resource_type)
+        resource_id = attributes.get("id")
+        if output_key and resource_id:
+            resource_outputs[output_key] = resource_id
+        if resource_type == "fabric_eventhouse":
+            properties = attributes.get("properties")
+            database_ids = (
+                properties.get("database_ids")
+                if isinstance(properties, dict)
+                else None
+            )
+            if isinstance(database_ids, list) and len(database_ids) == 1:
+                resource_outputs["kql_database_id"] = database_ids[0]
+    return assets, outputs, has_managed_resources, resource_outputs
 
 
 def _configured_kql_scripts(repo_root: Path) -> list[str]:

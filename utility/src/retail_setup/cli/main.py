@@ -1142,6 +1142,19 @@ def _deploy_plan(
         live_preflight_command.extend(["--tenant-id", tenant_id])
     if interactive_preflight:
         live_preflight_command.append("--interactive")
+    target_access_command = [
+        py,
+        "-m",
+        "deploy.scripts.validate_target_access",
+        "--repo-root",
+        str(repo_root),
+        "--environment",
+        env,
+        "--auth-mode",
+        auth_mode,
+    ]
+    if tenant_id:
+        target_access_command.extend(["--tenant-id", tenant_id])
     steps = [
         DeployStep(
             cmd=preflight_command,
@@ -1159,6 +1172,14 @@ def _deploy_plan(
             step_id="generate-configs",
         )
     ]
+    if skip_terraform:
+        steps.append(
+            DeployStep(
+                cmd=target_access_command,
+                description="Validate captured workspace access",
+                step_id="validate-target-access",
+            )
+        )
     if not skip_terraform:
         generated_root = f"../.generated/{env}"
         var_file = f"{generated_root}/terraform.tfvars"
@@ -1249,6 +1270,11 @@ def _deploy_plan(
                 ],
                 description="Regenerate configs with Terraform outputs",
                 step_id="regenerate-configs",
+            ),
+            DeployStep(
+                cmd=target_access_command,
+                description="Validate captured workspace access",
+                step_id="validate-target-access",
             ),
         ]
     steps.append(

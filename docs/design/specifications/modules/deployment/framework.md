@@ -35,6 +35,9 @@ Local and live preflight are the first executable plan steps and precede every
 destroy, apply, publish, and KQL mutation. Local preflight validates source and
 state contracts. Live preflight uses documented Fabric APIs to validate tenant
 switches and capacity state/SKU/region/Spark sizing.
+Before publication, target-access validation also proves that captured
+workspace IDs match managed state and resolve to the configured live workspace
+for the deployment operator.
 
 The current CLI applies Terraform directly; it does not insert a separate
 interactive `terraform plan` step. The CLI confirmation occurs before apply;

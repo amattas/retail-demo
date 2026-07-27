@@ -415,13 +415,14 @@ def test_plan_propagates_selected_auth_mode():
             name in step.cmd
             for name in (
                 "deploy.scripts.live_profile_preflight",
+                "deploy.scripts.validate_target_access",
                 "deploy.scripts.deploy_items",
                 "deploy.scripts.apply_kql",
             )
         )
     ]
 
-    assert len(authenticated) == 4
+    assert len(authenticated) == 5
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in authenticated
     )
@@ -490,12 +491,22 @@ def test_plan_orders_steps_and_gates_apply():
     live_preflight_idx = next(
         i for i, c in enumerate(cmds) if "live_profile_preflight" in c
     )
+    validate_access_idx = next(
+        i for i, c in enumerate(cmds) if "validate_target_access" in c
+    )
     assert plan[apply_idx].needs_confirmation
     # The redundant `terraform plan` step was removed; apply previews + confirms.
     assert not any(" plan " in f" {c} " for c in cmds)
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
-    assert local_preflight_idx < live_preflight_idx < apply_idx < build_idx < deploy_idx
+    assert (
+        local_preflight_idx
+        < live_preflight_idx
+        < apply_idx
+        < validate_access_idx
+        < build_idx
+        < deploy_idx
+    )
 
 
 def test_interactive_plan_allows_admin_setting_recheck():
@@ -511,10 +522,17 @@ def test_interactive_plan_allows_admin_setting_recheck():
         for step in plan
         if "deploy.scripts.live_profile_preflight" in step.cmd
     )
+    access = next(
+        step.cmd
+        for step in plan
+        if "deploy.scripts.validate_target_access" in step.cmd
+    )
 
     assert "--interactive" in live
     assert live[live.index("--auth-mode") + 1] == "azure_powershell"
     assert live[live.index("--tenant-id") + 1] == TENANT_ID
+    assert access[access.index("--auth-mode") + 1] == "azure_powershell"
+    assert access[access.index("--tenant-id") + 1] == TENANT_ID
 
 
 def test_plan_isolates_terraform_state_and_data_directory():
