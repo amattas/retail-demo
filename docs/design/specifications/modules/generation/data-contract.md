@@ -116,6 +116,12 @@ Current derived defaults include:
 - `brands_per_product = 3`
 - `truck_capacity = 15000`
 
+In-store customer assignment reserves a deterministic 10% cohort whose
+purchases stop at seeded, staggered dates inside the generation window.
+Post-cutoff receipts are reassigned to active customers. This preserves
+pre-churn behavior while guaranteeing forward-looking churn labels across
+chronological ML splits.
+
 ## Removed active-path behavior
 
 Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event

@@ -1,11 +1,16 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
 from retail_setup.generation.dims import generate_dimensions
-from retail_setup.generation.receipts import generate_receipts_group
+from retail_setup.generation.receipts import (
+    CHURN_COHORT_MODULUS,
+    _apply_churn_lifecycle,
+    generate_receipts_group,
+)
+from retail_setup.generation.runtime import seeded_draws
 from retail_setup.generation.schemas import column_names
 
 
@@ -119,6 +124,57 @@ def test_different_seeds_differ(spark, dicts):
         return {r.receipt_id_ext for r in g["fact_receipts"].collect()}
 
     assert gen(7) != gen(8)
+
+
+def test_churn_cohort_stops_receiving_purchases_after_cutoff(spark):
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 1, 1),
+        end_date=date(2026, 6, 30),
+        store_count=5,
+        customer_count=5000,
+        seed=7,
+    )
+    rows = [
+        (f"early-{customer_id}", cfg.start_date, customer_id)
+        for customer_id in range(10, 110, 10)
+    ] + [
+        (f"late-{customer_id}", cfg.end_date, customer_id)
+        for customer_id in range(10, 110, 10)
+    ] + [
+        (
+            f"mid-{customer_id}",
+            cfg.start_date + timedelta(days=180),
+            customer_id,
+        )
+        for customer_id in range(10, 5010, 10)
+    ] + [
+        ("active", cfg.end_date, 11)
+    ]
+    receipts = spark.createDataFrame(
+        rows,
+        "receipt_id_ext string, event_date date, customer_id long",
+    )
+
+    actual = {
+        row.receipt_id_ext: row.customer_id
+        for row in _apply_churn_lifecycle(
+            receipts,
+            seeded_draws(cfg.seed),
+            cfg,
+        ).collect()
+    }
+
+    for customer_id in range(10, 110, 10):
+        assert actual[f"early-{customer_id}"] == customer_id
+        assert actual[f"late-{customer_id}"] % CHURN_COHORT_MODULUS != 0
+        assert 1 <= actual[f"late-{customer_id}"] <= cfg.customer_count
+    assert actual["active"] == 11
+    mid_reassigned = sum(
+        actual[f"mid-{customer_id}"] != customer_id
+        for customer_id in range(10, 5010, 10)
+    )
+    assert 0 < mid_reassigned < 500
 
 
 def test_unknown_department_raises(spark, cfg, dicts):
