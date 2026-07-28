@@ -113,6 +113,7 @@ class JournalStep:
     exit_code: int | None = None
     error: str | None = None
     evidence_path: str | None = None
+    evidence_id: str | None = None
 
 
 @dataclass
@@ -202,11 +203,29 @@ def mark_running(journal: DeployJournal, step_id: str) -> None:
     step.started_at = _utc_now()
 
 
-def mark_succeeded(journal: DeployJournal, step_id: str, *, exit_code: int = 0) -> None:
+def mark_succeeded(
+    journal: DeployJournal,
+    step_id: str,
+    *,
+    exit_code: int = 0,
+    started_at: str | None = None,
+    ended_at: str | None = None,
+    evidence_id: str | None = None,
+) -> None:
+    """Record success, optionally adopting exact externally observed evidence."""
+
     step = _find_step(journal, step_id)
+    if evidence_id is not None:
+        try:
+            uuid.UUID(evidence_id)
+        except ValueError as exc:
+            raise ValueError("journal evidence_id must be a UUID") from exc
+    if started_at is not None:
+        step.started_at = started_at
     step.status = "SUCCEEDED"
     step.exit_code = exit_code
-    step.ended_at = _utc_now()
+    step.ended_at = ended_at or _utc_now()
+    step.evidence_id = evidence_id
 
 
 def mark_degraded(

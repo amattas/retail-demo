@@ -418,11 +418,12 @@ def test_plan_propagates_selected_auth_mode():
                 "deploy.scripts.validate_target_access",
                 "deploy.scripts.deploy_items",
                 "deploy.scripts.apply_kql",
+                "deploy.scripts.refresh_sql_endpoint",
             )
         )
     ]
 
-    assert len(authenticated) == 5
+    assert len(authenticated) == 6
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in authenticated
     )
@@ -507,6 +508,23 @@ def test_plan_orders_steps_and_gates_apply():
         < build_idx
         < deploy_idx
     )
+
+
+def test_full_demo_refreshes_sql_metadata_after_all_ml_pipelines():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=True,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+    )
+    step_ids = [step.step_id for step in plan]
+
+    refresh_idx = step_ids.index("refresh-sql-endpoint")
+    assert step_ids.index("required-ml-reporting-gate") < refresh_idx
+    assert step_ids.index("post-reporting-ml-optional") < refresh_idx
+    assert step_ids.index("post-reporting-ml-experimental") < refresh_idx
+    assert refresh_idx < step_ids.index("validate-reporting")
+    assert plan[refresh_idx].required is False
 
 
 def test_interactive_plan_allows_admin_setting_recheck():
@@ -1069,6 +1087,61 @@ def test_post_ontology_validates_live_ontology_before_mutation(
     assert calls == []
 
 
+def test_post_ontology_accepts_optional_readiness_degradation(
+    monkeypatch,
+    tmp_path,
+):
+    _seed_deploy_config(tmp_path, profile="full-demo")
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
+    monkeypatch.setattr(cli, "_validate_live_ontology", lambda *_args: None)
+
+    def fake_run(cmd, **_kwargs):
+        return SimpleNamespace(
+            returncode=3
+            if "deploy.scripts.verify_readiness" in cmd
+            else 0
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    result = runner.invoke(
+        app,
+        [
+            "post-ontology",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "publication complete" in result.output
+    assert "optional" in result.output.lower()
+
+
+def test_post_ontology_successful_path_completes(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="full-demo")
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
+    monkeypatch.setattr(cli, "_validate_live_ontology", lambda *_args: None)
+    monkeypatch.setattr("subprocess.run", _always_ok)
+
+    result = runner.invoke(
+        app,
+        [
+            "post-ontology",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "publication complete" in result.output
+    assert "remains degraded" not in result.output
+
+
 def test_deploy_reports_missing_terraform_without_traceback(monkeypatch, tmp_path):
     _seed_deploy_config(tmp_path)
 
@@ -1231,6 +1304,7 @@ def test_journal_shape_has_required_fields_and_no_secrets(tmp_path):
         "ended_at",
         "exit_code",
         "error",
+        "evidence_id",
     }
     dumped = json.dumps(data).lower()
     for forbidden in (
@@ -1242,6 +1316,29 @@ def test_journal_shape_has_required_fields_and_no_secrets(tmp_path):
         TENANT_ID,
     ):
         assert forbidden not in dumped
+
+
+def test_journal_records_exact_external_evidence_id() -> None:
+    journal = _deploy_journal.start_run("dev", targets={})
+    _deploy_journal.add_step(
+        journal,
+        "pipeline",
+        "Adopt exact pipeline run",
+        required=True,
+    )
+    evidence_id = "11111111-1111-4111-8111-111111111111"
+
+    _deploy_journal.mark_succeeded(
+        journal,
+        "pipeline",
+        started_at="2026-07-28T01:00:00+00:00",
+        ended_at="2026-07-28T01:05:00+00:00",
+        evidence_id=evidence_id,
+    )
+
+    assert journal.steps[0].started_at == "2026-07-28T01:00:00+00:00"
+    assert journal.steps[0].ended_at == "2026-07-28T01:05:00+00:00"
+    assert journal.steps[0].evidence_id == evidence_id
 
 
 def test_journal_error_is_redacted_and_truncated(tmp_path):

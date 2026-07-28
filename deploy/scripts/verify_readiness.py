@@ -721,11 +721,14 @@ def correlated_pipeline_run(
     pipeline_id: str,
     step_started: datetime,
     step_ended: datetime,
+    expected_run_id: str | None = None,
 ) -> dict[str, Any]:
     """Select a terminal run bounded by one successful deploy-journal step."""
 
     candidates: list[dict[str, object]] = []
     for run in runs:
+        if expected_run_id and str(run.get("id", "")) != expected_run_id:
+            continue
         started = _parse_time(run.get("startTimeUtc"))
         if (
             step_started - _CORRELATION_SKEW
@@ -735,13 +738,17 @@ def correlated_pipeline_run(
             candidates.append(run)
     if not candidates:
         raise EvidenceUnknown(
-            "pipeline history has no run within the deploy-journal step"
+            f"pipeline history has no exact adopted run {expected_run_id!r}"
+            if expected_run_id
+            else "pipeline history has no run within the deploy-journal step"
         )
     evidence = normalize_job_evidence(
         latest_pipeline_run(candidates, pipeline_id=pipeline_id)
     )
     if not evidence["item_id"]:
         evidence["item_id"] = pipeline_id
+    if expected_run_id and evidence["id"] != expected_run_id:
+        raise CheckFailed("pipeline run identity does not match adopted evidence")
     validate_terminal_job_evidence(evidence)
     ended = _parse_time(evidence["end_time"])
     if (
@@ -1617,22 +1624,30 @@ class ReadinessRunner:
     ) -> dict[str, Any]:
         item = self._item("DataPipeline", name)
         pipeline_id = str(item.get("id", ""))
-        window = self._journal_step_window(journal_step)
-        if window is None:
+        correlation = self._journal_step_correlation(journal_step)
+        if correlation is None:
             raise EvidenceUnknown(
                 f"Deploy journal has no correlation for pipeline {name!r}."
             )
         return correlated_pipeline_run(
             self.adapter.list_pipeline_runs(pipeline_id),
             pipeline_id=pipeline_id,
-            step_started=window[0],
-            step_ended=window[1],
+            step_started=correlation[0],
+            step_ended=correlation[1],
+            expected_run_id=correlation[2],
         )
 
     def _journal_step_window(
         self,
         step_id: str,
     ) -> tuple[datetime, datetime] | None:
+        correlation = self._journal_step_correlation(step_id)
+        return correlation[:2] if correlation is not None else None
+
+    def _journal_step_correlation(
+        self,
+        step_id: str,
+    ) -> tuple[datetime, datetime, str | None] | None:
         journal = self.context.deploy_journal
         if not journal or not _journal_matches_context(self.context, journal):
             return None
@@ -1647,7 +1662,14 @@ class ReadinessRunner:
                     ended = _parse_time(step.get("ended_at"))
                 except EvidenceUnknown:
                     return None
-                return (started, ended) if ended >= started else None
+                evidence_id = step.get("evidence_id")
+                if evidence_id is not None and not isinstance(evidence_id, str):
+                    return None
+                return (
+                    (started, ended, evidence_id)
+                    if ended >= started
+                    else None
+                )
         return None
 
     def _run_freshness_checks(self) -> None:
@@ -1834,15 +1856,6 @@ class ReadinessRunner:
         signals = self.adapter.model_signals(contracts)
         if len(signals) != len(contracts):
             raise EvidenceUnknown(f"{tier} model evidence is incomplete")
-        timestamps = [
-            _parse_time(signal.get("as_of"))
-            for signal in signals
-            if signal.get("as_of")
-        ]
-        if len(timestamps) != len(contracts):
-            raise EvidenceUnknown(
-                f"{tier} model generation timestamp evidence is missing"
-            )
         if tier == "required" and any(
             not signal.get("run_id_present") for signal in signals
         ):
@@ -1862,6 +1875,7 @@ class ReadinessRunner:
             )
         )
         not_before = None
+        pipeline_end = None
         if pipeline_reference:
             name = Path(pipeline_reference).stem
             if name not in self.pipeline_evidence:
@@ -1871,6 +1885,21 @@ class ReadinessRunner:
             not_before = _parse_time(
                 self.pipeline_evidence[name].get("start_time")
             )
+            pipeline_end = _parse_time(
+                self.pipeline_evidence[name].get("end_time")
+            )
+        timestamps = []
+        empty_contracts = []
+        for signal in signals:
+            if signal.get("as_of"):
+                timestamps.append(_parse_time(signal["as_of"]))
+                continue
+            if tier == "required" or pipeline_end is None:
+                raise EvidenceUnknown(
+                    f"{tier} model generation timestamp evidence is missing"
+                )
+            empty_contracts.append(str(signal.get("contract_id", "")))
+            timestamps.append(pipeline_end)
         source_time = min(timestamps)
         freshness = evaluate_freshness(
             source_time.isoformat(),
@@ -1888,6 +1917,7 @@ class ReadinessRunner:
                 "lineage_hashes": sorted(
                     str(signal.get("lineage_hash", "")) for signal in signals
                 ),
+                "empty_contracts": sorted(empty_contracts),
             },
             freshness,
         )
@@ -2146,6 +2176,13 @@ class FabricReadinessAdapter:
         }
 
     def watermark_signal(self) -> dict[str, Any] | None:
+        inventory = self._execute_sql(
+            "SELECT COUNT(*) AS table_count "
+            "FROM INFORMATION_SCHEMA.TABLES "
+            "WHERE TABLE_SCHEMA = 'ag' AND TABLE_NAME = '_watermarks'"
+        )
+        if not inventory or int(inventory[0].get("table_count") or 0) == 0:
+            return None
         rows = self._execute_sql(
             "SELECT COUNT(*) AS source_count, MAX(updated_at) AS updated_at "
             "FROM [ag].[_watermarks]"
@@ -2191,7 +2228,8 @@ class FabricReadinessAdapter:
     ) -> dict[str, Any] | None:
         rows = self._execute_kql(
             ".show database extents "
-            "| mv-expand tag=Tags "
+            "| extend tag_values=todynamic(Tags) "
+            "| mv-expand tag=tag_values "
             "| where tostring(tag) contains 'retail-demo:' "
             "| project TableName, tag=tostring(tag), MaxCreatedOn",
             management=True,
@@ -2219,6 +2257,16 @@ class FabricReadinessAdapter:
                 f"ORDER BY [{as_of}] DESC"
             )
             if not rows:
+                signals.append(
+                    {
+                        "contract_id": contract["id"],
+                        "as_of": None,
+                        "run_id_present": False,
+                        "lineage_hash": _hash_identifier(
+                            f"{contract['id']}|empty"
+                        ),
+                    }
+                )
                 continue
             row = rows[0]
             lineage_value = "|".join(
@@ -2285,13 +2333,6 @@ class FabricReadinessAdapter:
         return [row.to_dict() for row in response.primary_results[0]]
 
     def _execute_sql(self, query: str) -> list[dict[str, Any]]:
-        try:
-            import pyodbc
-        except ImportError as exc:
-            raise EvidenceUnknown(
-                "pyodbc is required for Lakehouse freshness checks"
-            ) from exc
-
         response = self.fabric.get(
             f"{FABRIC_API}/workspaces/{self.workspace_id}/lakehouses/"
             f"{self.outputs['lakehouse_id']}"
@@ -2304,36 +2345,12 @@ class FabricReadinessAdapter:
         server = str(properties.get("connectionString", "")).strip()
         if not server:
             raise EvidenceUnknown("Lakehouse SQL endpoint connection is unavailable")
-        driver = next(
-            (
-                candidate
-                for candidate in (
-                    "ODBC Driver 18 for SQL Server",
-                    "ODBC Driver 17 for SQL Server",
-                )
-                if candidate in pyodbc.drivers()
-            ),
-            None,
+        conn = _connect_lakehouse_sql(
+            server,
+            self.context.config.lakehouse.name,
+            self.credential,
         )
-        if driver is None:
-            raise EvidenceUnknown("No supported SQL Server ODBC driver is installed")
-        token = self.credential.get_token(SQL_SCOPE).token
-        token_bytes = token.encode("utf-16-le")
-        access_token = struct.pack(
-            f"<I{len(token_bytes)}s",
-            len(token_bytes),
-            token_bytes,
-        )
-        connection = (
-            f"Driver={{{driver}}};Server={server},1433;"
-            f"Database={self.context.config.lakehouse.name};"
-            "Encrypt=Yes;TrustServerCertificate=No"
-        )
-        with pyodbc.connect(
-            connection,
-            attrs_before={1256: access_token},
-            timeout=60,
-        ) as conn:
+        with conn:
             cursor = conn.cursor()
             cursor.execute(query)
             columns = [str(column[0]) for column in cursor.description]
@@ -2349,6 +2366,70 @@ class FabricReadinessAdapter:
             for row in rows
             if row.get(key) not in (None, "")
         }
+
+
+def _connect_lakehouse_sql(
+    server: str,
+    database: str,
+    credential: TokenCredential,
+) -> Any:
+    """Connect with system ODBC when available, otherwise the bundled driver."""
+
+    try:
+        import pyodbc
+    except ImportError:
+        pyodbc = None
+    driver = (
+        next(
+            (
+                candidate
+                for candidate in (
+                    "ODBC Driver 18 for SQL Server",
+                    "ODBC Driver 17 for SQL Server",
+                )
+                if candidate in pyodbc.drivers()
+            ),
+            None,
+        )
+        if pyodbc is not None
+        else None
+    )
+    token = credential.get_token(SQL_SCOPE).token
+    token_bytes = token.encode("utf-16-le")
+    access_token = struct.pack(
+        f"<I{len(token_bytes)}s",
+        len(token_bytes),
+        token_bytes,
+    )
+    if driver is not None:
+        connection = (
+            f"Driver={{{driver}}};Server={server},1433;"
+            f"Database={database};"
+            "Encrypt=Yes;TrustServerCertificate=No"
+        )
+        return pyodbc.connect(
+            connection,
+            attrs_before={1256: access_token},
+            timeout=60,
+        )
+
+    try:
+        import mssql_python
+    except ImportError as exc:
+        raise EvidenceUnknown(
+            "Lakehouse freshness checks require mssql-python or "
+            "pyodbc with SQL Server ODBC Driver 17/18"
+        ) from exc
+    connection = (
+        f"Server={server};"
+        f"Database={database};"
+        "Encrypt=yes;TrustServerCertificate=no"
+    )
+    return mssql_python.connect(
+        connection,
+        attrs_before={1256: access_token},
+        timeout=60,
+    )
 
 
 def _identifier(value: Any) -> str:

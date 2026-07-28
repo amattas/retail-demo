@@ -19,6 +19,7 @@ deploy = [
     "azure-identity>=1.25.3,<2",
     "azure-kusto-data>=6.0.4,<7",
     "fabric-cicd>=1.2.0,<2",
+    "mssql-python>=1.12,<2; sys_platform != 'darwin'",
     "pyodbc>=5.1,<6",
 ]
 spark = ["pyspark>=3.5.2,<4.3"]  # local testing; Fabric provides Spark at runtime

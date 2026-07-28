@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,6 +20,7 @@ from deploy.scripts.verify_readiness import (
     FabricReadinessAdapter,
     ReadinessContext,
     ReadinessRunner,
+    _connect_lakehouse_sql,
     aggregate_status,
     build_report,
     checkpoint_signal_from_rows,
@@ -394,6 +396,7 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
                     "generated_at": timestamp,
                 }
             ],
+            [{"table_count": 1}],
             [{"source_count": 2, "updated_at": timestamp}],
         ]
     )
@@ -406,6 +409,86 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
     assert setup["generated_at"] == "2026-07-21T09:58:00+00:00"
     assert watermark is not None
     assert watermark["updated_at"] == "2026-07-21T09:58:00+00:00"
+
+
+def test_checkpoint_query_coerces_extent_tags_to_dynamic() -> None:
+    adapter = object.__new__(FabricReadinessAdapter)
+    queries = []
+    adapter._execute_kql = (  # type: ignore[method-assign]
+        lambda query, **kwargs: queries.append((query, kwargs)) or []
+    )
+
+    signal = adapter.checkpoint_signal(frozenset({"receipt_created"}))
+
+    assert signal is None
+    assert "todynamic(Tags)" in queries[0][0]
+    assert "mv-expand tag=tag_values" in queries[0][0]
+
+
+def test_sql_connection_prefers_installed_system_odbc_driver(monkeypatch) -> None:
+    calls = []
+    connection = object()
+    pyodbc = SimpleNamespace(
+        drivers=lambda: ["ODBC Driver 18 for SQL Server"],
+        connect=lambda *args, **kwargs: calls.append((args, kwargs)) or connection,
+    )
+    monkeypatch.setitem(sys.modules, "pyodbc", pyodbc)
+    monkeypatch.setitem(
+        sys.modules,
+        "mssql_python",
+        SimpleNamespace(
+            connect=lambda *_args, **_kwargs: pytest.fail(
+                "bundled driver should not be used"
+            )
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com",
+        "retail_lakehouse",
+        credential,
+    )
+
+    assert result is connection
+    assert "ODBC Driver 18 for SQL Server" in calls[0][0][0]
+    assert calls[0][1]["timeout"] == 60
+    assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
+
+
+def test_sql_connection_falls_back_to_bundled_driver(monkeypatch) -> None:
+    calls = []
+    connection = object()
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(drivers=lambda: [], connect=lambda *_args, **_kwargs: None),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "mssql_python",
+        SimpleNamespace(
+            connect=lambda *args, **kwargs: calls.append((args, kwargs))
+            or connection
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com",
+        "retail_lakehouse",
+        credential,
+    )
+
+    assert result is connection
+    assert "Database=retail_lakehouse" in calls[0][0][0]
+    assert "Authentication=" not in calls[0][0][0]
+    assert calls[0][1]["timeout"] == 60
+    assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
 
 
 def test_terminal_pipeline_evidence_requires_complete_ordered_timestamps() -> None:
@@ -447,6 +530,7 @@ def test_pipeline_history_correlation_rejects_stale_and_out_of_window_runs() -> 
         pipeline_id="pipeline-a",
         step_started=step_started,
         step_ended=step_ended,
+        expected_run_id="job-a",
     )
     assert evidence["id"] == "job-a"
 
@@ -469,6 +553,14 @@ def test_pipeline_history_correlation_rejects_stale_and_out_of_window_runs() -> 
             pipeline_id="pipeline-a",
             step_started=step_started,
             step_ended=step_ended,
+        )
+    with pytest.raises(Exception, match="exact adopted run"):
+        correlated_pipeline_run(
+            [valid],
+            pipeline_id="pipeline-a",
+            step_started=step_started,
+            step_ended=step_ended,
+            expected_run_id="job-b",
         )
 
 
@@ -863,7 +955,8 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
     adapter = ModelAdapter()
     readiness = ReadinessRunner(context, adapter)
     readiness.pipeline_evidence["ml-required"] = {
-        "start_time": (now - timedelta(minutes=10)).isoformat()
+        "start_time": (now - timedelta(minutes=10)).isoformat(),
+        "end_time": (now - timedelta(minutes=4)).isoformat(),
     }
 
     observation = readiness._model_freshness("required")
@@ -874,6 +967,35 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
     adapter.run_id_present = False
     with pytest.raises(EvidenceUnknown, match="blank model_run_id"):
         readiness._model_freshness("required")
+
+
+def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> None:
+    now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
+    context = _profile_context("full-demo", now)
+
+    class EmptyModelAdapter:
+        def model_signals(self, contracts):
+            return [
+                {
+                    "contract_id": contract["id"],
+                    "as_of": None,
+                    "run_id_present": False,
+                    "lineage_hash": contract["id"],
+                }
+                for contract in contracts
+            ]
+
+    readiness = ReadinessRunner(context, EmptyModelAdapter())
+    readiness.pipeline_evidence["ml-optional"] = {
+        "start_time": (now - timedelta(minutes=10)).isoformat(),
+        "end_time": (now - timedelta(minutes=5)).isoformat(),
+    }
+
+    observation = readiness._model_freshness("optional")
+
+    assert observation.freshness is not None
+    assert observation.freshness["age_seconds"] == 300
+    assert len(observation.evidence["empty_contracts"]) == 6
 
 
 def test_full_demo_initial_inventory_defers_ontology_dependent_items() -> None:

@@ -1493,6 +1493,30 @@ def _deploy_plan(
                 cmd=[
                     py,
                     "-m",
+                    "deploy.scripts.refresh_sql_endpoint",
+                    "--repo-root",
+                    str(repo_root),
+                    "--environment",
+                    env,
+                    "--auth-mode",
+                    auth_mode,
+                    *tenant_args,
+                ],
+                description="Synchronize Lakehouse SQL endpoint metadata",
+                step_id="refresh-sql-endpoint",
+                required=False,
+                failure_message=(
+                    "SQL endpoint metadata refresh reported one or more "
+                    "unsynchronized tables; readiness will still fail closed "
+                    "if any required Reporting table is unavailable."
+                ),
+            )
+        )
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
                     "deploy.scripts.validate_deployment",
                     "--environment",
                     env,
@@ -2238,6 +2262,7 @@ def post_ontology(
         raise typer.Exit(code=1) from exc
 
     plan = _post_ontology_plan(repo_root, env, config)
+    degraded = False
     if dry_run:
         for index, step in enumerate(plan, start=1):
             _echo_step(index, len(plan), step)
@@ -2257,6 +2282,14 @@ def post_ontology(
         except FileNotFoundError as exc:
             typer.echo(_missing_executable_message(step.cmd[0]), err=True)
             raise typer.Exit(code=127) from exc
+        if result.returncode == 3 and step.step_id == "verify-post-ontology":
+            degraded = True
+            typer.echo(
+                "Post-ontology readiness is degraded only by optional evidence; "
+                "see the linked readiness report.",
+                err=True,
+            )
+            continue
         if result.returncode != 0:
             typer.echo(
                 f"Post-ontology step failed: {step.description}",
@@ -2264,6 +2297,11 @@ def post_ontology(
             )
             raise typer.Exit(code=result.returncode)
     typer.echo(f"Post-ontology publication complete for environment {env!r}.")
+    if degraded:
+        typer.echo(
+            "Optional live readiness evidence remains degraded.",
+            err=True,
+        )
 
 
 def _deploy_taskflow(

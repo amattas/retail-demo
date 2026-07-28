@@ -51,9 +51,10 @@ Before running the verifier:
 
 1. Record the repository commit, environment, tenant, workspace, operator, and
    deployment run.
-2. Install `utility/requirements-deploy.txt` and Microsoft ODBC Driver 17 or 18
-   for SQL Server. The verifier uses the existing Lakehouse SQL endpoint
-   connection for setup, watermark, and model evidence.
+2. Install `utility/requirements-deploy.txt`. On Windows and Linux it includes
+   the bundled `mssql-python` driver; macOS requires Microsoft ODBC Driver 17
+   or 18. The verifier uses the existing Lakehouse SQL endpoint connection for
+   setup, watermark, and model evidence.
 3. Confirm the configured identity can read Fabric items, definitions, job
    history, Eventhouse metadata, and the Lakehouse SQL endpoint.
 4. For `core`, run setup notebooks 01-04 in order before verification.
@@ -161,7 +162,7 @@ rather than ingestion time.
 | Gold data stale | Confirm the Silver run completed, then run the Gold transform. |
 | Power BI errors | Confirm required tables exist and the Direct Lake binding targets the correct Lakehouse. |
 | Local validation passed but live assets fail | Treat the deploy as not ready and perform item, binding, KQL, run, and data checks. |
-| Verifier reports `UNKNOWN` | Restore the missing permission, driver, output, journal, or live evidence; required unknowns are failures. |
+| Verifier reports `UNKNOWN` | Restore the missing permission, locked dependency, output, journal, or live evidence; required unknowns are failures. |
 | Verifier reports stale evidence | Run only the owning workload, retain its exact run evidence, and rerun the read-only verifier. |
 
 ## Rerun safely

@@ -36,24 +36,29 @@ def test_live_readiness_prerequisites_and_report() -> None:
             "RETAIL_DEMO_LIVE_ENV is set but live prerequisites are missing: "
             + ", ".join(missing)
         )
-    try:
-        import pyodbc
-    except ImportError:
-        pytest.fail(
-            "RETAIL_DEMO_LIVE_ENV is set but pyodbc is not installed; "
-            "install utility/requirements-deploy.txt",
-            pytrace=False,
-        )
     supported_drivers = {
         "ODBC Driver 17 for SQL Server",
         "ODBC Driver 18 for SQL Server",
     }
-    if not supported_drivers.intersection(pyodbc.drivers()):
-        pytest.fail(
-            "RETAIL_DEMO_LIVE_ENV is set but Microsoft ODBC Driver 17 or 18 "
-            "for SQL Server is not installed",
-            pytrace=False,
-        )
+    try:
+        import pyodbc
+    except ImportError:
+        pyodbc = None
+    has_system_driver = (
+        bool(supported_drivers.intersection(pyodbc.drivers()))
+        if pyodbc is not None
+        else False
+    )
+    if not has_system_driver:
+        try:
+            import mssql_python  # noqa: F401
+        except ImportError:
+            pytest.fail(
+                "RETAIL_DEMO_LIVE_ENV is set but neither mssql-python nor "
+                "pyodbc with SQL Server ODBC Driver 17/18 is available; "
+                "install utility/requirements-deploy.txt",
+                pytrace=False,
+            )
 
     report, path = verify_environment(repo_root, environment)
 

@@ -19,15 +19,15 @@ checks, profile choices, and profile default from that projection and validates
 its Python minimum against the manifest and utility package constraint.
 
 The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
-editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`, and
-`pyodbc`.
+editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`,
+`mssql-python`, and `pyodbc`.
 The lower-level deploy framework supports Azure PowerShell for Python Fabric
 clients only. Terraform still requires Azure CLI or a separately configured
 provider credential; alternatively, reuse validated outputs with
 `--skip-terraform`. The guided prerequisite check expects Azure CLI.
-Live Lakehouse freshness checks also require Microsoft ODBC Driver 17 or 18
-for SQL Server; the Python dependency set cannot install this operating-system
-driver.
+On Windows and Linux, live Lakehouse freshness checks use locked
+`mssql-python` when Microsoft ODBC Driver 17 or 18 is not installed. macOS
+continues to require Microsoft ODBC Driver 17 or 18.
 
 ## `configure`
 

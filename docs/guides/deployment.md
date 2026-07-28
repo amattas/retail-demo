@@ -86,8 +86,9 @@ runtime contract validator, finishes successfully.
 - `azure-kusto-data`
 - `fabric-cicd`
 - `pyodbc`
-- Microsoft ODBC Driver 17 or 18 for SQL Server (an operating-system
-  prerequisite for live Lakehouse freshness queries)
+- the locked deploy dependency set, which includes the bundled
+  `mssql-python` SQL driver on Windows and Linux; an installed Microsoft ODBC
+  Driver 17 or 18 is used when available and remains required on macOS
 - Azure CLI for the default auth mode, or Azure PowerShell for the lower-level
   alternative
 
@@ -390,6 +391,25 @@ python -m deploy.scripts.run_pipeline `
 `--wait` polls the exact submitted run to a bounded terminal state. Omit it
 only for an intentional asynchronous manual trigger.
 
+If a deployment stopped but every selected setup/ML pipeline was later
+recovered manually, adopt the exact successful Fabric job IDs instead of
+rerunning hours of Spark work:
+
+```powershell
+python -m deploy.scripts.adopt_pipeline_runs `
+  --environment alice `
+  --run setup-pipeline=<job-id> `
+  --run ml-required=<job-id> `
+  --run ml-optional=<job-id> `
+  --run ml-experimental=<job-id>
+```
+
+Supply every pipeline selected by the profile. Recovery validates the captured
+workspace against the live configured target, dependency order, and only
+accepts explicitly named, terminal-successful runs from the last seven days.
+It writes a current `deploy-run.json` with exact run IDs and runs readiness
+before finalizing that journal.
+
 ### 3. Complete post-ontology publication
 
 Ontology creation is a separate preview/manual boundary. The initial
@@ -472,7 +492,7 @@ state and output evidence must survive cleanup.
 | Fabric item publish fails | Inspect the failing item type and generated `.generated/<env>/fabric-cicd/parameter.yml`; do not treat later steps as completed. |
 | KQL application fails | Inspect `deploy/.generated/<env>/database.kql`, target IDs, database name, and operator permissions; rerun the ordered script as one database script. |
 | Local validation passes but workspace is unusable | Perform the live checks in the operations guide; local validation is offline only. |
-| Readiness verification is `UNKNOWN` | Install Microsoft ODBC Driver 17 or 18, confirm the deploy dependency set and identity permissions, and restore the matching Terraform output and deployment journal evidence. |
+| Readiness verification is `UNKNOWN` | Install the locked deploy dependency set, confirm identity permissions, and restore the matching Terraform output and deployment journal evidence. `mssql-python` provides a bundled SQL driver on Windows and Linux; macOS requires system ODBC Driver 17 or 18. |
 | Readiness verification is `DEGRADED` | Read the optional failed/unknown check rows; do not present that optional capability until its evidence passes. |
 | Setup pipeline fails | Inspect the exact run and retry with `deploy.scripts.run_pipeline --wait`; required ML and Reporting remain unpublished. |
 | Ontology task-flow link is absent | Wait for ontology creation, then run `retail-setup post-ontology --env <env>`; it validates the ontology before publication. |

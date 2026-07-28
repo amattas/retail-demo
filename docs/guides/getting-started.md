@@ -106,14 +106,15 @@ The wrapper:
 1. uses or creates a Python environment;
 2. checks Git, Terraform, and Azure CLI;
 3. installs `retail-setup`, `azure-identity`, `azure-kusto-data`,
-   `fabric-cicd`, and `pyodbc`;
+   `fabric-cicd`, `mssql-python`, and `pyodbc`;
 4. runs interactive configuration;
 5. renders five workspace-specific notebooks;
 6. offers to deploy.
 
-Install Microsoft ODBC Driver 17 or 18 for SQL Server separately before live
-readiness verification. It is an operating-system prerequisite and is not
-installed by the Python dependency set.
+On Windows and Linux, the locked dependency set includes `mssql-python` for
+live Lakehouse freshness verification. If Microsoft ODBC Driver 17 or 18 is
+already installed, readiness uses it. On macOS, install Microsoft ODBC Driver
+17 or 18 separately.
 
 To proceed directly to the deploy phase after configuration:
 
