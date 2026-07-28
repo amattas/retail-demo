@@ -4501,6 +4501,7 @@
       "source_tables": [
         "truck_arrived",
         "truck_departed",
+        "fact_truck_moves",
         "dim_trucks",
         "dim_stores",
         "dim_distribution_centers"
