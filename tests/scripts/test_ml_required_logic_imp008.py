@@ -243,6 +243,7 @@ def test_stockout_is_eod_future_labeled_and_calibrated() -> None:
     label_source = _function_source(path, "attach_future_stockout_labels")
     assert '"store_id", "product_id", "event_date"' in eod_source
     assert "F.row_number()" in eod_source
+    assert 'F.greatest(F.col("balance"), F.lit(0.0))' in eod_source
     assert '> F.col("snapshot.snapshot_date")' in label_source
     assert '"label_available_date"' in label_source
     assert "IsotonicRegression(" in code
@@ -250,6 +251,8 @@ def test_stockout_is_eod_future_labeled_and_calibrated() -> None:
     assert 'F.col("calibrated_probability")' in code
     assert 'F.col("inventory_as_of").cast("timestamp")' in code
     assert '["store_id", "product_id", "forecast_horizon_days"]' in code
+    assert 'F.col("receipt_type") == "SALE"' in code
+    assert 'F.col("quantity") > 0' in code
 
 
 def test_required_outputs_separate_generation_time_from_source_as_of() -> None:
