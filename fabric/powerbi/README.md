@@ -22,6 +22,11 @@ regional, omnichannel, customer/marketing, pricing/promotion, and logistics
 pages. Demo claims must follow the limitations in the
 [demo script](../../docs/guides/demo-script.md).
 
+During artifact staging, deployment sets the report's saved date filters to
+the month containing the configured history end date. This means each
+workspace opens on its own latest generated month rather than a date hard-coded
+in the source template.
+
 Use `scripts\configure_semantic_model.py` when a local PBIP copy needs its
 OneLake target rewritten. Automated deployment performs target parameterization
 through the deployment framework.

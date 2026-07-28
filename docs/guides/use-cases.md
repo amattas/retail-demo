@@ -6,12 +6,12 @@ The demo supports several retail stories, but their current maturity differs.
 | --- | --- | --- |
 | Real-time POS and product performance | Receipt, line, payment events; KQL aggregates; Direct Lake report | Implemented core story |
 | Inventory signals and replenishment | Inventory, stockout, and reorder events/tables | Implemented with normalized, contract-tested current-state semantics |
-| Customer presence and in-store movement | Entry, BLE, and zone-change events | Implemented synthetic scenario |
+| Customer presence and in-store movement | Entry, Bluetooth Low Energy (BLE), and zone-change events | Implemented synthetic scenario |
 | Omnichannel fulfillment | Online-order headers, lines, picked, and shipped events | Implemented with documented live/history differences |
 | Supply-chain dwell | Paired truck lifecycle, Eventhouse SLA function, Silver/Gold dwell, queryset and rule | Cross-layer contract tested; live Fabric validation pending |
-| Marketing attribution and promotion ROI | Seven-day last-touch journeys, reconciled promotions/payments, campaign ROAS, and purchase-level audit | Implemented and contract-tested; live Fabric validation pending |
-| Machine-learning insights | Required forecast/churn/segmentation/stockout plus optional delivery and experimental pricing outputs | Required Reporting outputs are contract-gated in `standard`/`full-demo`; fresh live proof remains `IMP-008` |
-| Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Optional and capability-gated |
+| Marketing attribution and promotion ROI | Seven-day last-touch journeys, reconciled promotions/payments, campaign return on ad spend (ROAS), and purchase-level audit | Implemented and contract-tested |
+| Machine-learning insights | Required forecast/churn/segmentation/stockout plus optional delivery and experimental pricing outputs | Required Reporting outputs are contract-gated and live-validated in `standard`/`full-demo` |
+| Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Optional, capability-gated, and live-validated for `full-demo` |
 
 ## Core presentation journeys
 

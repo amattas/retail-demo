@@ -25,11 +25,13 @@ recreate, post-deploy work, and troubleshooting.
 4. Build and execute the ordered KQL database script.
 5. For Reporting profiles, wait for setup and required ML validation.
 6. Stage and publish Reporting only after terminal success.
-7. Run selected post-Reporting ML and validate publication.
-8. For standard/full-demo, run read-only live readiness verification; the
+7. Run selected post-Reporting ML.
+8. Synchronize Lakehouse SQL endpoint metadata so new tables are visible to
+   Power BI and SQL readiness queries, then validate publication.
+9. For standard/full-demo, run read-only live readiness verification; the
    initial full-demo pass defers ontology-dependent checks.
-9. After ontology creation, use the live-validating post-ontology command to
-   publish Data Agents, task flow, and complete readiness.
+10. After ontology creation, use the live-validating post-ontology command to
+    publish Data Agents, task flow, and complete readiness.
 
 The CLI confirmation occurs before Terraform apply. Apply then prints the
 change preview and proceeds with `-auto-approve`; there is no separate
@@ -130,6 +132,13 @@ identifiers are local-only and isolated by that key.
   the prior report remains compatible because required ML schemas retain their
   legacy physical bindings.
 - Full-demo runs optional and experimental ML only after Reporting.
+- Reporting profiles refresh Lakehouse SQL endpoint metadata after ML. This
+  step may degrade the journal, but readiness still fails closed if a required
+  table is unavailable.
+- When a deployment was completed through manual recovery, use
+  `deploy.scripts.adopt_pipeline_runs` with the exact Fabric job IDs. It
+  validates the live workspace, completion status, seven-day age limit, and
+  setup-to-ML order, then runs readiness before finalizing a recovery journal.
 - Ontology creation is a separate preview/manual step. Initial publication
   omits Data Agents and task flow. After creating the ontology, run:
 

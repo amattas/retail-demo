@@ -15,10 +15,14 @@
   atomic report, and deployment-journal integration. Pagination, definitions,
   task flow, KQL sets, schedules, job states, freshness, aggregation,
   redaction, CLI, and journal behavior have unit/contract coverage.
-- **Remaining live boundary:** Run the surface against an actual configured
-  Fabric workspace and retain successful item, pipeline, SQL, Kusto, and
-  freshness evidence. This item stays open only for that external execution;
-  local implementation is complete.
+- **Live evidence completed:** A full-demo workspace has proven required items,
+  definitions and bindings, exact setup/ML runs, Lakehouse SQL access,
+  Reporting, ontology, Data Agents, and task flow. SQL endpoint metadata was
+  synchronized for every returned table.
+- **Remaining live boundary:** Start a bounded `stream-events` run and retain
+  recent Silver watermark, Eventhouse ingestion, and checkpoint-identity
+  evidence. These three checks are optional because streaming is intentionally
+  manual; they are the only remaining live evidence for this item.
 
 ### ENH-008 - Use more platform-native monitoring and governance {#enh-008}
 

@@ -4,8 +4,22 @@ This guide creates a Microsoft Fabric Retail Demo workspace through the
 supported Fabric-native path. It takes you from a clean clone to historical
 Lakehouse data and an optional bounded Eventhouse stream.
 
+**Audience:** first-time operators, business analysts working with a technical
+partner, and entry-level developers.
+
+You do not need to know every Fabric term before starting. The
+[plain-language glossary](glossary.md) explains the products, data layers, and
+deployment terms used in this guide.
+
 For deployment modes, generated files, reruns, existing workspaces, and
 recovery, use the [deployment guide](deployment.md).
+
+!!! tip "How to read the command examples"
+
+    Replace values inside angle brackets, such as `<env>` or `<tenant-id>`,
+    with values from your environment. In PowerShell, a backtick at the end of
+    a line continues the same command. In macOS/Linux examples, a backslash
+    performs the same job.
 
 !!! warning "Cost and destructive operations"
 
@@ -16,14 +30,15 @@ recovery, use the [deployment guide](deployment.md).
 
 ## What the supported path creates
 
-The manifest-default `core` profile creates the smallest supported path: a Fabric
-workspace, schema-enabled Lakehouse, Lakehouse shell, and four rendered
+The manifest-default `core` profile creates the smallest supported path: a
+Fabric workspace, an empty Lakehouse ready to receive tables, and four
 historical setup notebooks. The operator runs setup 01 through 04 in order.
 
-`standard` is the supported opt-in Eventhouse, streaming, pipeline, required
-ML, Direct Lake semantic-model, and report path. `full-demo` adds live-checked
-preview and manual surfaces. No profile deploys the reset notebook or starts
-the long-running stream automatically. Choose with `--profile`; see the
+`standard` adds Eventhouse for optional live events, automated pipelines,
+required machine-learning outputs, a Power BI semantic model, and a report.
+`full-demo` adds preview and manually completed experiences such as Ontology,
+Data Agents, and task flow. No profile deploys the destructive reset notebook
+or starts the long-running stream automatically. Choose with `--profile`; see the
 [canonical workspace and profile inventory](workspace-inventory.md) before
 selecting an opt-in profile.
 
@@ -57,11 +72,13 @@ PowerShell-only workstation.
 ### Capacity and Spark choice
 
 The committed default disables the custom Spark pool. `core` and `standard`
-use the workspace starter pool. Only `full-demo` selects the source-defined
-custom pool; live preflight requires an active F64-or-larger capacity and
-validates the configured node count against its base Spark vCores. Reporting
-profiles require at least 18 months of history; start with a small store count,
-then scale after measuring the setup run.
+use the workspace starter pool. Only `full-demo` selects the source-defined custom pool. Before deployment,
+live preflight confirms that the chosen capacity is active and large enough
+for the requested Spark workers. The current full-demo minimum is F64.
+Reporting profiles require at least 18 months of history so that the report and
+machine-learning examples have enough seasonal context. Start with a small
+store count, measure one setup run, and increase the size only when the
+capacity has room.
 
 ## 2. Clone the repository
 
@@ -105,8 +122,10 @@ The wrapper:
 
 1. uses or creates a Python environment;
 2. checks Git, Terraform, and Azure CLI;
-3. installs `retail-setup`, `azure-identity`, `azure-kusto-data`,
-   `fabric-cicd`, `mssql-python`, and `pyodbc`;
+3. installs `retail-setup`, version-locked Fabric libraries such as
+   `azure-identity`, `azure-kusto-data`, and `fabric-cicd`, plus the SQL
+   connectivity package supported by the operating system. The complete pinned
+   package list is in `utility/requirements-deploy.txt`;
 4. runs interactive configuration;
 5. renders five workspace-specific notebooks;
 6. offers to deploy.
@@ -177,13 +196,13 @@ Review these choices:
 | Choice | Guidance |
 | --- | --- |
 | Workspace/environment | Use a dedicated workspace. The normalized workspace name becomes its local environment key; `retail-demo-alice` becomes `alice`. |
-| Tenant | Use the Entra tenant that contains the Fabric capacity. |
-| Capacity | The capacity must be active and usable by the deploy operator. |
-| Lakehouse | Keep the default unless another checked-in binding requires a deliberate rename. |
-| Eventhouse and KQL database | Use the same name. The supported topology uses the default KQL database created with the Eventhouse. |
+| Tenant | Use the Microsoft Entra tenant, or organization directory, that contains the Fabric capacity. |
+| Capacity | The capacity supplies the computing resources for notebooks, pipelines, queries, and reports. It must be active and usable by the deploy operator. |
+| Lakehouse | The Lakehouse stores historical and analytical tables. Keep the default name unless you are deliberately updating every checked-in reference. |
+| Eventhouse and KQL database | Eventhouse stores optional live events, and KQL (Kusto Query Language) queries them. Use the same display name for both in this demo. |
 | Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` validates and selects the custom pool. |
 | Store type | `supercenter`, `grocery`, `hardware`, or `luxury`. |
-| History | `--months` defines a range ending yesterday. |
+| History | `--months` defines a range ending yesterday. Reporting profiles use at least 18 months by default. |
 | Store count and seed | Control scale and deterministic reproduction. |
 
 The CLI shows an estimated record count before writing configuration.
@@ -252,6 +271,12 @@ The command validates all substitutions before writing:
 Output is written to `utility/out/`. The first four notebooks are the ordered
 historical path. The stream notebook is optional and deployed separately.
 
+Rendering also records the configured history end date. During deployment, the
+artifact builder uses that date to set the Power BI report's saved date filters
+to the latest generated month. This keeps a three-month setup, an eighteen-month
+setup, and a two-year setup aligned with their own data instead of a hard-coded
+calendar month.
+
 ## 6. Preview and deploy
 
 Always preview the command plan:
@@ -296,16 +321,22 @@ Choose one path.
 In the Fabric workspace, run setup notebooks 01 through 04 in order. This is
 the smallest supported path and creates:
 
-- Silver schema `ag`: seven dimensions, nineteen fact tables, and run metadata;
-- Gold schema `au`: ten aggregate tables.
+- **Silver (`ag`)**: cleaned, typed historical data, including seven descriptive
+  dimensions, nineteen business facts, and setup-run metadata.
+- **Gold (`au`)**: ten business-ready summary tables used for analysis.
+
+The names `ag` and `au` are the short schema identifiers used throughout this
+demo. See [Data-layer terms](glossary.md#data-layer-terms) for more detail.
 
 ### Reporting profiles
 
 `retail-setup deploy` automatically waits for `setup-pipeline` and
 `ml-required` when `standard` or `full-demo` is selected. The required ML
 validator must succeed before the semantic model and report publish. Use at
-least 12 months of configured history. Ontology remains a separate
-preview/manual step.
+least 18 months of configured history. Ontology remains a separate
+preview/manual step. For `full-demo`, continue with
+[Complete post-ontology publication](deployment.md#complete-post-ontology-publication)
+after the initial deployment succeeds.
 
 You can retry setup deliberately from the repository:
 
@@ -327,7 +358,8 @@ Before using the demo:
    `core` includes a Lakehouse but excludes Eventhouse, KQL, ML, and Reporting.
 2. Confirm setup notebooks or `setup-pipeline` completed successfully.
 3. Confirm the `ag` and `au` schemas and expected tables are populated.
-4. Inspect `setup_run_log` and retain the successful run identifier.
+4. Inspect `setup_run_log`, the metadata table written by setup, and retain the
+   successful run identifier.
 5. For `standard` or `full-demo`, confirm the KQL database contains the selected
    tables, functions, mappings, and materialized views.
 6. For a Reporting profile, confirm the semantic model is bound to the intended
@@ -342,7 +374,12 @@ and recovery.
 
 ## 9. Start an optional bounded stream
 
-Open the deployed `stream-events` notebook and use a bounded first run:
+This step requires the `standard` or `full-demo` profile. The `core` profile
+does not deploy Eventhouse or the stream notebook.
+
+Open the deployed `stream-events` notebook in Fabric. Find the cell labeled
+**Parameters**, change the values there, and then select **Run all**. Use a
+bounded first run:
 
 ```python
 source_rows_per_second = 5
@@ -352,19 +389,31 @@ kusto_uri = ""
 kql_database = "retail_eventhouse"
 ```
 
-Leaving `kusto_uri` blank makes the notebook resolve the KQL Query URI by
-database display name in the current workspace. The stream writes typed
-micro-batches directly through the Spark Kusto connector; it does not require
-Kafka, Event Hubs, or a Fabric Eventstream.
+!!! warning "Do not leave the first run unbounded"
 
-After the notebook stops, allow for asynchronous ingestion and verify recent
-rows:
+    The source default is `run_seconds = 0`, which means “continue until
+    manually stopped.” Set a positive value such as `180` for the first run so
+    that the notebook stops after three minutes.
+
+Leaving `kusto_uri` blank makes the notebook resolve the KQL Query URI by
+database display name in the current workspace. Every few seconds, the
+notebook groups generated events and writes them directly to Eventhouse through
+the Fabric Spark Kusto connector. It does not require Kafka, Event Hubs, or a
+Fabric Eventstream.
+
+Eventhouse receives data asynchronously, so the last event may appear shortly
+after the notebook stops. Wait briefly, then verify recent rows with this KQL
+(Kusto Query Language) query:
 
 ```kql
 receipt_created
 | where ingest_timestamp > ago(10m)
 | summarize rows = count(), latest = max(ingest_timestamp)
 ```
+
+`ingest_timestamp` is the time Eventhouse received the event. It is the best
+field for checking whether the stream is currently arriving; the business
+event time can be slightly earlier.
 
 Proceed to incremental Silver and Gold transforms only after Eventhouse
 shortcuts, source tables, and watermarks are ready.

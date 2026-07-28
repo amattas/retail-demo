@@ -33,6 +33,12 @@ Common flags:
 | `--verbose` | Show full command and package output. |
 | `--recreate` | Destroy and rebuild the configured workspace. |
 
+The Windows and macOS/Linux wrappers pass `--profile full-demo` to the guided
+setup engine when no profile is supplied. This differs from the conservative
+`core` default used by direct `retail-setup` commands. Pass
+`--profile core` or `--profile standard` explicitly when you want a smaller
+workspace.
+
 ## Power BI helpers
 
 - `configure_semantic_model.py` rewrites the Direct Lake OneLake connection for

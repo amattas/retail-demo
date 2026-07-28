@@ -1,14 +1,20 @@
 # Workspace and profile inventory
 
-This is the canonical human-readable inventory for the deployed workspace.
+This guide is the canonical human-readable inventory for the deployed
+workspace. Use it when you need exact profile contents or item counts. If you
+only need to understand what the demo does, start with
+[Use cases](use-cases.md) or the
+[plain-language glossary](glossary.md).
+
 `contracts/retail-demo.json` owns the stable IDs, descriptions, support status,
 source pointers, profiles, boundaries, prerequisites, commands, paths, ML tiers,
 publication expectations, and readiness taxonomy. It is currently manifest
 version `1.4.0`.
 
-Physical fields, tables, notebook bodies, pipeline bodies, and TMDL remain in
-their authoritative sources. Contract tests derive those inventories rather
-than copying their definitions into the manifest or this guide.
+Physical fields, tables, notebook bodies, pipeline bodies, and the Tabular
+Model Definition Language (TMDL) files for Power BI remain in their
+authoritative sources. Automated contract tests derive those inventories so
+that this guide does not become a second, outdated schema definition.
 
 <!-- manifest-contract:canonical-commands -->
 ## Canonical commands
@@ -35,7 +41,7 @@ deploy, and verify resolve the stored profile from the `--env` environment.
 | `prerequisite.python` | Python `>=3.11` | core | required |
 | `prerequisite.terraform` | Terraform `>=1.8,<2.0` | core | required |
 | `prerequisite.azure-cli` | Azure CLI | core | required by guided bootstrap |
-| `prerequisite.odbc-driver` | SQL Server ODBC Driver 17 or 18 | optional | live Lakehouse freshness only |
+| `prerequisite.odbc-driver` | SQL Server ODBC Driver 17 or 18 | optional on Windows/Linux; required on macOS | live Lakehouse freshness only |
 | `prerequisite.azure-powershell` | Azure PowerShell | optional | manually prepared Python-client authentication; not a Terraform provider credential |
 
 Python packages are pinned by `utility/requirements-deploy.txt`; the utility
@@ -104,12 +110,10 @@ Source-derived current counts are:
 - data/event registry: 3 data contracts, 19 declared paths, and 4 intentional
   exceptions.
 
-The physical owners are `TABLES` in
-`utility/src/retail_setup/generation/schemas.py`, `GOLD_TABLES` in `gold.py`,
-`EVENT_PAYLOADS` in `driver-05-stream.py`, KQL DDL/mappings, Silver/Gold
-notebooks, and active TMDL. See the [data contract](../design/specifications/modules/generation/data-contract.md),
-[event contract](../design/specifications/modules/streaming/event-contract.md),
-and [semantic model](../design/specifications/modules/power-bi/semantic-model.md).
+For exact table and event definitions, see the
+[historical data contract](../design/specifications/modules/generation/data-contract.md),
+[live event contract](../design/specifications/modules/streaming/event-contract.md),
+and [Power BI semantic model specification](../design/specifications/modules/power-bi/semantic-model.md).
 
 <!-- manifest-contract:ml-tiers -->
 ## ML tiers
@@ -127,12 +131,20 @@ silently added to the 40-table semantic model.
 <!-- manifest-contract:readiness -->
 ## Readiness contract
 
-The verifier always emits **26 stable rows**: 1 target, 2 inventory, 6 binding,
-1 task-flow, 4 KQL, 1 schedule, 3 pipeline, and 8 freshness checks. The manifest
-owns each check ID, category, profile applicability, required/optional status,
-description, and source pointer. Repository validation resolves every pointer;
-the runner validates the IDs, categories, profile applicability, and
-required/optional behavior without changing check semantics.
+The verifier produces a stable, structured readiness report that covers:
+
+- the intended workspace and resource IDs;
+- the selected item inventory;
+- notebook, pipeline, Power BI, queryset, Data Agent, and task-flow bindings;
+- KQL tables, functions, mappings, and materialized views;
+- schedules and exact pipeline-run results; and
+- setup, streaming, machine-learning, and alert freshness.
+
+Required checks protect the supported historical and Reporting paths. Optional
+checks cover manually started streaming and preview/extended experiences. This
+is why a usable workspace can report `DEGRADED` when the optional stream has
+not been started. Contributors can find the exact 26 check IDs in the
+[operations runbook](../design/specifications/modules/operations/runbook.md).
 
 Dry-run output, the deployment journal, artifact inventories, and readiness
 reports all expose the resolved profile and canonical manifest version/hash.

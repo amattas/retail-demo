@@ -18,6 +18,7 @@ flowchart LR
     StageReporting[Stage Reporting]
     PublishReporting[Publish Reporting]
     ExtendedML[Run selected post-Reporting ML]
+    RefreshSQL[Synchronize Lakehouse SQL endpoint metadata]
     Validate[Validate publication]
     InitialVerify[Verify with post-ontology checks deferred]
     Ontology[Operator creates ontology]
@@ -27,14 +28,14 @@ flowchart LR
 
     Resolve --> Preflight --> Config --> TF --> StageInfra --> PublishInfra --> KQL
     KQL --> Setup --> RequiredML --> StageReporting --> PublishReporting
-    PublishReporting --> ExtendedML --> Validate --> InitialVerify
+    PublishReporting --> ExtendedML --> RefreshSQL --> Validate --> InitialVerify
     InitialVerify --> Ontology --> Agents --> TaskFlow --> FinalVerify
 ```
 
 Local and live preflight are the first executable plan steps and precede every
 destroy, apply, publish, and KQL mutation. Local preflight validates source and
 state contracts. Live preflight uses documented Fabric APIs to validate tenant
-switches and capacity state/SKU/region/Spark sizing.
+switches and capacity state, size/tier (SKU), region, and Spark sizing.
 Before publication, target-access validation also proves that captured
 workspace IDs match managed state and resolve to the configured live workspace
 for the deployment operator.
@@ -131,7 +132,7 @@ notebook references. All profiles exclude the destructive `reset` group.
 
 | Profile | Assets | Groups | Pipelines | KQL scripts | Publication behavior |
 | --- | ---: | --- | ---: | ---: | --- |
-| `core` (default) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
+| `core` (manifest/direct-CLI default) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
 | `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview surfaces |
 | `full-demo` | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
 
@@ -145,6 +146,10 @@ now executable and fail-closed. Full-demo checks Ontology/Data Agent tenant
 switches with the admin tenant-settings API and validates the selected
 capacity with the capacities API. Settings changes remain administrator-owned
 because Fabric publishes no tenant-settings update API.
+
+The guided `setup.ps1` and `setup.sh` entry points default to `full-demo`.
+Direct `retail-setup` commands and the manifest retain the conservative `core`
+default.
 
 No profile enables schedules or starts the live stream. The source
 daily-maintenance schedule remains present but disabled. Dashboard templates
@@ -161,7 +166,9 @@ For `standard` and `full-demo`, the orchestrator:
 3. starts `ml-required` and polls that exact run to a bounded terminal state;
 4. stages and publishes the semantic model and report only after status
    `Completed`;
-5. runs any selected optional/experimental pipelines after Reporting.
+5. runs any selected optional/experimental pipelines after Reporting;
+6. synchronizes Lakehouse SQL endpoint metadata so newly written tables become
+   visible to SQL and Power BI clients.
 
 The required pipeline's final activity is
 `15-validate-required-ml-contract`. A missing, empty, schema-incompatible,
@@ -170,6 +177,10 @@ pipeline. Skipped, failed, cancelled, deduplicated, timed-out, or unknown run
 states all fail closed and leave Reporting unpublished. Optional and
 experimental failures mark the journal `DEGRADED` but do not retract required
 Reporting.
+
+SQL endpoint metadata synchronization is also optional at the step level. A
+failure marks the journal `DEGRADED`; the later readiness check still fails
+closed if any required Reporting table is unavailable.
 
 ## Workspace folder mapping
 
@@ -268,6 +279,8 @@ that is not a stable public source-control item contract.
   gates. `--yes` suppresses prompts but never skips either gate.
 - Post-Reporting optional/experimental ML failures are recorded and execution
   continues.
+- SQL endpoint metadata synchronization failures are recorded as optional
+  degradation. Required-table visibility is checked again by readiness.
 - Recreate polls every visible Fabric workspace page and fails closed on timeout
   or malformed pagination before Terraform apply.
 - `deploy-run.json` records `PENDING`, `RUNNING`, `SUCCEEDED`, `DEGRADED`,
@@ -278,6 +291,11 @@ that is not a stable public source-control item contract.
 - Local deployment validation checks generated files only; it does not query
   live item, binding, run, or data readiness.
 
+An overall `DEGRADED` result means the required workspace is usable, but one or
+more optional capabilities have failed or unknown evidence. Operators inspect
+the linked readiness report before presenting those optional capabilities.
+`FAILED` means a required capability is not ready.
+
 Standard and full-demo run the profile-aware live verifier after their
 pipeline gates. The initial full-demo pass defers only ontology, Data Agent,
 and task-flow evidence; the post-ontology command runs the complete pass. Both
@@ -286,8 +304,9 @@ failed/unknown evidence marks the journal and linked readiness report
 `DEGRADED`. Operators may explicitly trigger the profile's post-publish
 pipeline only with `retail-setup verify --env <env> --run-pipeline`.
 
-The verifier, report, and local contracts are implemented. Actual Fabric
-execution and freshness evidence remain
+The verifier, report, and local contracts are implemented. Required full-demo
+execution has live evidence. Recent manually started streaming evidence remains
+the external boundary under
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Evidence

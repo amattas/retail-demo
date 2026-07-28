@@ -2,16 +2,20 @@
 
 ## Source and mode
 
-The source-controlled Power BI Project is
-`fabric/powerbi/retail_model.pbip`. The semantic model is Direct Lake over the
-target Lakehouse; it is not a current KQL/DirectQuery hybrid.
+The source-controlled Power BI Project (PBIP, the folder-based format used to
+version reports and semantic models) is `fabric/powerbi/retail_model.pbip`.
+The semantic model is Direct Lake over the target Lakehouse. Direct Lake reads
+OneLake tables directly without importing a second copy; the model is not a
+current KQL/DirectQuery hybrid.
 
 Deployment rewrites the Direct Lake/OneLake binding to the target workspace and
 Lakehouse.
 
 ## Active table set
 
-`definition/model.tmdl` currently contains 40 active table references:
+`definition/model.tmdl` currently contains 40 active table references. TMDL
+means Tabular Model Definition Language, the text format used to define the
+model:
 
 - 7 dimensions
 - 19 facts
@@ -52,6 +56,16 @@ and mark the deployment journal as degraded.
 
 The gated Reporting phase stages the semantic model and report under
 `Reporting`.
+During artifact staging, deployment sets every saved report date filter to the
+month containing `end_date` from `utility/out/render-manifest.json`. The
+checked-in PBIP remains a reusable template, while each deployed report opens
+on the latest period generated for that environment.
+
+After setup and ML, deployment refreshes Lakehouse SQL endpoint metadata so
+new tables become visible to SQL and Power BI. A refresh failure is optional
+at the step level, but readiness still fails when a required model table cannot
+be queried.
+
 Use `scripts/configure_semantic_model.py` only for supported manual workflows
 that need explicit workspace/Lakehouse binding.
 

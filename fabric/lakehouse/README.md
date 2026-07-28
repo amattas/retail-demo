@@ -13,6 +13,22 @@ The supported historical bootstrap is rendered from `utility/` and runs:
 Those notebooks write the base contract directly to Lakehouse Silver (`ag`) and
 Gold (`au`).
 
+## Retained notebooks
+
+These two notebooks remain for older or specialized flows. They are not the
+current historical bootstrap:
+
+- `01-create-bronze-shortcuts.ipynb` creates Lakehouse shortcuts to Eventhouse
+  tables for the optional live projection path.
+- `02-historical-data-load.ipynb` is the retained legacy historical loader.
+  The supported path now uses setup notebooks 01 through 04 rendered from
+  `utility/`.
+
+Do not run the retained historical loader as a substitute for
+`retail-setup deploy` or the ordered setup notebooks. The current path includes
+run logging, staged validation, rollback behavior, and profile-aware
+publication that the legacy notebook does not provide.
+
 Notable groups in this directory:
 
 - `03-streaming-to-silver` and `04-streaming-to-gold`: optional Eventhouse to

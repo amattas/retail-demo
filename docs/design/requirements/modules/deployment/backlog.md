@@ -31,15 +31,17 @@
   capacities before mutation. Core is preview-free and excludes Reporting. Standard/full use an
   exact-run required ML gate and two-phase Reporting publication; their prior
   `IMP-008` blockers are removed. Full-demo validates preview and capacity
-  prerequisites through documented read-only Fabric APIs.
-- **Remaining outcome:** Live runs must prove core completion without previews,
-  the standard required Reporting gate, and full-demo fail-closed behavior at
-  tenant/capacity/manual boundaries.
+  prerequisites through documented read-only Fabric APIs. A live full-demo run
+  has proven tenant/capacity preflight, required Reporting, post-ontology
+  publication, and fail-closed readiness.
+- **Remaining outcome:** Live runs must still prove core completion without
+  previews and the standalone standard Reporting profile. Full-demo proof is
+  complete.
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication. Exact
   local inventory, selection, live prerequisite, blocker, and ordering clauses
-  are implemented and contract-tested; only live profile/capability proof keeps
-  this item open.
+  are implemented and contract-tested; only the remaining core/standard
+  profile proof keeps this item open.
 
 ## Settled — do not reopen
 

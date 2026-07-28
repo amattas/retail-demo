@@ -22,6 +22,8 @@ in [security](../security/threat-model.md).
 | `REQ-SEC-*` | Security and governance outcomes |
 | `REQ-DOCS-*`, `REQ-PUBLISH-*` | Documentation and publishing |
 | `THREAT-*`, `SEC-*` | Security threats and controls |
+| `IMP-*` | Improvement or implementation item tracked in a module backlog |
+| `ENH-*` | Optional enhancement idea tracked in a module backlog |
 
 IDs are permanent. Retire an obsolete ID in
 [traceability.md](traceability.md); do not reuse it for a different outcome.

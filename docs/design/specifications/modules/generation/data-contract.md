@@ -92,7 +92,8 @@ Current invariant checks include:
 
 Shared live/batch business invariants — operating hours, product launch
 eligibility, return timing, lifecycle presence, and validated profile controls —
-are enforced in generation and checked by `IMP-010`.
+are enforced in
+`utility/src/retail_setup/generation/invariants.py`.
 
 ## Naming compatibility
 
@@ -125,8 +126,8 @@ chronological ML splits.
 ## Removed active-path behavior
 
 Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
-Hubs, outbox, DLQ, and Prometheus surfaces are not part of the supported
-Fabric-native contract.
+Hubs, outbox, dead-letter queue (DLQ), and Prometheus surfaces are not part of
+the supported Fabric-native contract.
 
 ## Verification
 

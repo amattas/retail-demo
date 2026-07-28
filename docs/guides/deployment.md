@@ -5,6 +5,14 @@ publishing, updating, and recovering a Microsoft Fabric Retail Demo workspace.
 Complete [Getting started](getting-started.md) first if the repository has not
 been configured and rendered.
 
+**Audience:** operators, entry-level developers, and support engineers. Business
+analysts can use the [deployment outcome](#deployment-outcome) and
+[troubleshooting](#troubleshooting) sections without following the advanced
+authentication details.
+
+See the [plain-language glossary](glossary.md) for terms such as Terraform,
+preflight, terminal success, Direct Lake, and `DEGRADED`.
+
 Exact command order and failure behavior are owned by the
 [deployment framework specification](../design/specifications/modules/deployment/framework.md).
 
@@ -38,9 +46,11 @@ The current deploy plan:
 8. for gated profiles, waits for setup and required ML validation to complete;
 9. stages and publishes Reporting only after required ML terminal success;
 10. runs selected optional/experimental ML after Reporting;
-11. runs read-only readiness verification; the initial `full-demo` pass
+11. tells the Lakehouse SQL endpoint about newly created tables so Power BI and
+    readiness queries can find them;
+12. runs read-only readiness verification; the initial `full-demo` pass
     explicitly defers ontology-dependent evidence;
-12. after the operator creates the ontology, publishes Data Agents and task
+13. after the operator creates the ontology, publishes Data Agents and task
     flow only after `post-ontology` validates it and verifies
     complete readiness.
 
@@ -54,10 +64,23 @@ Artifact build steps link phase-specific `artifact-inventory-<phase>.json`
 evidence. Credential-like error text is redacted and raw subprocess output is
 not stored.
 
+The final journal status is:
+
+- **`SUCCEEDED`:** every selected required and optional check passed.
+- **`DEGRADED`:** required capabilities passed, but at least one optional
+  capability has failed, stale, or missing evidence. The required demo path is
+  usable; inspect the linked report before presenting the affected optional
+  feature.
+- **`FAILED`:** a required capability failed or could not provide evidence.
+  Do not present the workspace as ready.
+
 ### Profiles
 
-`core` is the default, `standard` is the supported opt-in Reporting path, and
-`full-demo` contains live-checked preview/manual surfaces. The
+`core` is the conservative default for direct `retail-setup` commands,
+`standard` is the supported opt-in Reporting path, and `full-demo` contains
+live-checked preview/manual surfaces. The guided `setup.ps1` and `setup.sh`
+wrappers default to `full-demo` so that a first-time guided run offers the
+complete demo. The
 [workspace and profile inventory](workspace-inventory.md) is the single
 canonical guide for exact asset IDs, groups, pipelines, KQL scripts, staged
 counts, folders, and support status.
@@ -137,6 +160,13 @@ Azure CLI tenant.
 
 ### Azure PowerShell
 
+!!! note "Most users do not need this section"
+
+    Use Azure CLI unless your organization specifically requires Azure
+    PowerShell or an automated service identity. Azure PowerShell does not
+    provide credentials to the Fabric Terraform provider, so this path needs
+    additional identity configuration.
+
 For a manually prepared workstation:
 
 ```powershell
@@ -157,7 +187,8 @@ PowerShell session. Therefore this mode supports either:
 - Python-only publication with `--skip-terraform` and previously captured,
   validated outputs; or
 - normal Terraform with exactly one provider-supported service-principal
-  secret/certificate, OIDC, or managed-identity credential configured through
+  secret/certificate, OpenID Connect (OIDC) federated identity, or
+  managed-identity credential configured through
   the provider's `FABRIC_*` or `ARM_*` environment variables.
 
 Without one of those boundaries, apply and destroy fail before any command
@@ -237,12 +268,14 @@ separate plan review before the confirmation.
 
 ## Preflight
 
-On a live run, local profile preflight checks manifest/source pointers,
+Preflight means “check before making changes.” On a live run, local profile
+preflight checks manifest/source pointers,
 rendered notebooks, selected pipeline references, KQL sources, selected Power
 BI/agent/task-flow sources, custom-pool configuration, prior local Terraform
 state and captured profile outputs, and blockers. A second read-only live
-preflight checks the selected capacity's identity, state, SKU, region, and
-Spark vCore fit. For `full-demo`, it also reads the Fabric admin tenant-settings
+preflight checks the selected capacity's identity, active state, capacity
+size/tier, region, and Spark worker fit. For `full-demo`, it also reads the
+Fabric admin tenant-settings
 API and verifies the required Ontology and Data Agent switches.
 After Terraform (or immediately when `--skip-terraform` is selected), target
 access validation requires captured workspace IDs to match managed resource
@@ -360,13 +393,13 @@ destructive data reset asset.
 
 ## Post-deploy work
 
-### 1. Treat local validation correctly
+### Understand local validation
 
 `deploy.scripts.validate_deployment` checks generated files, YAML, staging, and
 placeholder rewrites. It does not query the live workspace. A successful deploy
 still requires live item, binding, KQL, run, and data checks.
 
-### 2. Generate data
+### Generate data
 
 For `core`, run setup notebooks 01 through 04 in order. `core` intentionally
 has no automatic pipeline run.
@@ -395,6 +428,20 @@ If a deployment stopped but every selected setup/ML pipeline was later
 recovered manually, adopt the exact successful Fabric job IDs instead of
 rerunning hours of Spark work:
 
+1. Open the Fabric **Monitoring hub**.
+2. Open each pipeline's run history.
+3. Copy the job ID from the successful run you want to adopt.
+4. Supply every pipeline selected by the stored profile.
+
+| Profile | Required run IDs |
+| --- | --- |
+| `core` | None; setup notebooks are run manually. |
+| `standard` | `setup-pipeline` and `ml-required` |
+| `full-demo` | `setup-pipeline`, `ml-required`, `ml-optional`, and `ml-experimental` |
+
+The example below is for `full-demo`. For `standard`, omit the
+`ml-optional` and `ml-experimental` lines.
+
 ```powershell
 python -m deploy.scripts.adopt_pipeline_runs `
   --environment alice `
@@ -405,18 +452,47 @@ python -m deploy.scripts.adopt_pipeline_runs `
 ```
 
 Supply every pipeline selected by the profile. Recovery validates the captured
-workspace against the live configured target, dependency order, and only
-accepts explicitly named, terminal-successful runs from the last seven days.
-It writes a current `deploy-run.json` with exact run IDs and runs readiness
-before finalizing that journal.
+workspace against the live configured target, confirms that setup finished
+before required ML and required ML finished before optional ML, and accepts
+only explicitly named, completed runs from the last seven days. It then writes
+a current `deploy-run.json`, runs readiness, and finalizes the journal only
+after that verification result is known.
 
-### 3. Complete post-ontology publication
+### Synchronize the Lakehouse SQL endpoint
+
+Reporting profiles do this automatically after setup and machine learning.
+The step tells Fabric's SQL endpoint that newly created Lakehouse tables exist,
+which allows Power BI and readiness queries to discover them. The step is
+optional because required-table availability is checked again by fail-closed
+readiness.
+
+Run it manually when tables exist in the Lakehouse but Power BI or SQL queries
+cannot see them:
+
+```powershell
+python -m deploy.scripts.refresh_sql_endpoint `
+  --environment alice
+```
+
+The command waits for Fabric's metadata operation to finish and reports any
+table that did not synchronize.
+
+The same artifact build also sets the deployed report's saved date filters to
+the month containing the configured history `end_date`. To change that default,
+update the history configuration, rerun `retail-setup render`, and deploy again.
+
+### Complete post-ontology publication {#complete-post-ontology-publication}
 
 Ontology creation is a separate preview/manual boundary. The initial
 `full-demo` deploy intentionally does not stage Data Agents or publish task
 flow, so a fresh workspace cannot fail on an ontology reference before this
-boundary. Run `30-create-ontology`, wait for exactly one
-`RetailOntology_AutoGen` item, then run:
+boundary.
+
+1. In the Fabric workspace, open the deployed `30-create-ontology` Spark
+   notebook and select **Run all**.
+2. Wait for the notebook to finish and for an Ontology item named
+   `RetailOntology_AutoGen` to appear.
+3. Run:
 
 ```powershell
 retail-setup post-ontology --env alice
@@ -424,10 +500,12 @@ retail-setup post-ontology --env alice
 
 The command validates the ontology and captured target IDs before mutation,
 then stages/publishes Data Agents, publishes the fully resolved task flow, and
-runs final readiness verification. Task-flow deployment fails closed instead
-of publishing a partial graph when any selected item is absent.
+runs final readiness verification. A Data Agent is a conversational Fabric
+experience that answers questions from an approved data source; the task flow
+is the workspace navigation map. Task-flow deployment fails closed instead of
+publishing a partial graph when any selected item is absent.
 
-### 4. Validate live readiness
+### Validate live readiness
 
 For `standard`, deployment runs the live verifier after the normal exact-run
 setup and ML gates. The initial `full-demo` pass does the same while marking
@@ -459,6 +537,11 @@ See the [operations readiness checklist](operations.md#readiness-checklist)
 for prerequisites, exit codes, taxonomy, freshness windows, and report
 contents. Offline `validate_deployment.py` behavior is unchanged and does not
 substitute for this live check.
+
+If the optional stream has never been started, three streaming checks are
+expected to be `UNKNOWN`: Silver watermarks, Eventhouse ingestion, and
+checkpoint identity. Required capabilities can still pass, so the overall
+result is `DEGRADED`, not `FAILED`.
 
 ## Update an existing deployment
 
@@ -494,6 +577,8 @@ state and output evidence must survive cleanup.
 | Local validation passes but workspace is unusable | Perform the live checks in the operations guide; local validation is offline only. |
 | Readiness verification is `UNKNOWN` | Install the locked deploy dependency set, confirm identity permissions, and restore the matching Terraform output and deployment journal evidence. `mssql-python` provides a bundled SQL driver on Windows and Linux; macOS requires system ODBC Driver 17 or 18. |
 | Readiness verification is `DEGRADED` | Read the optional failed/unknown check rows; do not present that optional capability until its evidence passes. |
+| SQL endpoint metadata is missing or stale | Run `python -m deploy.scripts.refresh_sql_endpoint --environment <env>`, wait for all required tables, then reload Power BI and rerun readiness. |
+| Power BI opens on the wrong month | Confirm the configured history end date, rerun `retail-setup render --env <env>`, and deploy again. The staged report uses the latest generated month, not a hard-coded calendar month. |
 | Setup pipeline fails | Inspect the exact run and retry with `deploy.scripts.run_pipeline --wait`; required ML and Reporting remain unpublished. |
 | Ontology task-flow link is absent | Wait for ontology creation, then run `retail-setup post-ontology --env <env>`; it validates the ontology before publication. |
 | Live rows are absent | Check notebook sink parameters, Query URI resolution, KQL permissions, connector errors, and ingestion timestamps. |
@@ -501,14 +586,14 @@ state and output evidence must survive cleanup.
 
 ## Current limitations
 
+`IMP-*` identifiers are named improvement items in the technical backlogs.
+Open a linked item to see its exact remaining acceptance criteria.
+
 - Live alternate-authentication and renamed-target smoke verification:
   [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
-- A fresh workspace must still prove the required ML validator and two-phase
-  Reporting path live; this is the remaining
-  [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008) gate.
-- Live profile/capability proof keeps
+- Separate live `core` and `standard` profile proof keeps
   [IMP-012](../design/requirements/modules/deployment/backlog.md#imp-012) open.
-- Live execution and freshness evidence for the implemented readiness surface:
+- Recent optional streaming freshness evidence:
   [IMP-013](../design/requirements/modules/operations/backlog.md#imp-013)
 
 These limitations are part of the current contract. Do not describe local

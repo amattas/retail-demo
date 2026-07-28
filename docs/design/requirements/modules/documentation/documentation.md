@@ -3,7 +3,9 @@
 ### REQ-DOCS-001 - Canonical source
 
 `docs/` shall be the only documentation site source. Root and component READMEs
-shall remain concise entry points that link to canonical owners.
+shall remain concise entry points that link to canonical owners. The published
+entry experience shall offer role-based paths for business users, analysts,
+presenters, operators, and developers, plus a shared plain-language glossary.
 
 ### REQ-DOCS-002 - Durable ownership
 
@@ -20,7 +22,9 @@ generator-neutral links, navigation, Mermaid diagrams, and assets.
 
 Commands, table counts, event counts, deployment inventory, schedules,
 semantic-model mode, optional features, and support status shall agree with the
-current repository.
+current repository. User-facing guides shall explain unavoidable technical
+terms on first use or link to the glossary, and shall distinguish required,
+optional, preview, manual, and proposed behavior in plain language.
 
 ### REQ-PUBLISH-001 - Branch publishing
 

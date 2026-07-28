@@ -27,6 +27,10 @@ notebooks to `utility\out\`:
 Setup 01 through 04 build the base historical Lakehouse contract. The stream
 notebook is optional and runs separately.
 
+Direct `retail-setup` commands use the conservative `core` profile unless a
+profile is supplied or stored for the environment. The guided
+`scripts/setup.ps1` and `scripts/setup.sh` wrappers default to `full-demo`.
+
 ## Contract owners
 
 - CLI and render behavior:

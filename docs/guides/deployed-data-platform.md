@@ -40,6 +40,10 @@ notebooks are grouped into repeatable operations:
     deployments separate required, optional, and experimental ML pipelines so
     extended-model failures cannot block Reporting.*
 
+    In a current workspace, `ml-required`, `ml-optional`, and `ml-experimental`
+    appear as separate pipelines. Use the screenshot only to explain the general
+    notebook sequence.
+
 The pipeline canvas shows orchestration order. Use the **Run** history and
 activity output, not the presence of a green dependency arrow, as execution
 evidence.
@@ -51,8 +55,9 @@ Open the **Spark Notebooks** folder, then open
 
 ![Streaming-to-Silver notebook](../assets/screenshots/notebook-streaming-to-silver.png)
 
-*The notebook documents the incremental Eventhouse-to-Silver flow, watermark
-strategy, and `snake_case` column convention.*
+*The notebook explains how new Eventhouse rows are moved into cleaned Silver
+tables, how it remembers the last processed event, and why column names use
+lowercase words separated by underscores.*
 
 Use the notebook header to explain the transform without scrolling through
 implementation details. Do not run the notebook until its Lakehouse binding
@@ -71,8 +76,8 @@ preview from the generated historical dataset.*
 
 Point out:
 
-- `ag` contains typed Silver dimensions and facts.
-- `au` contains Gold aggregates used for analytics.
+- `ag` contains cleaned, typed Silver dimensions and facts.
+- `au` contains business-ready Gold summaries used for analytics.
 - `fact_receipts` provides durable receipt-grain history.
 - The preview demonstrates shape and content, not current operational
   freshness.
@@ -83,7 +88,7 @@ when explaining table ownership and columns.
 
 ## 4. Inspect the Eventhouse hot path
 
-1. Open the KQL queryset or **KQL Workbench**.
+1. Open the KQL (Kusto Query Language) queryset or **KQL Workbench**.
 2. Confirm that the Eventhouse database appears in **Explorer**.
 3. Review the numbered table, mapping, function, and materialized-view tabs.
 4. Select `04-create-materialized-views` to explain bounded hot-path

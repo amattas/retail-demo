@@ -48,9 +48,10 @@ flowchart TB
 ## Resource ownership
 
 Terraform provisions or resolves the Fabric workspace, Lakehouse, Eventhouse,
-KQL database, and optional custom Spark pool. `fabric-cicd` publishes supported
-source-control items. KQL schema application runs separately with the operator
-identity.
+KQL database, and optional custom Spark pool. `fabric-cicd` (Microsoft's
+open-source Python library for deploying source-controlled Fabric item
+folders) publishes supported workspace items. KQL schema application runs
+separately with the operator identity.
 
 ## Current item layout
 
@@ -86,6 +87,8 @@ identity.
 - `fabric-cicd`
 - `azure-identity`
 - `azure-kusto-data`
+- `mssql-python` on Windows/Linux, or Microsoft ODBC Driver 17/18 on macOS,
+  for Lakehouse SQL readiness checks
 - Fabric Spark and Spark Kusto connector
 
 ## Local deployment state
@@ -105,7 +108,8 @@ concurrent full deploys from separate checkouts.
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate
   profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
-  surfaces; actual workspace evidence remains external.
+  surfaces. Required full-demo evidence has been exercised live; optional
+  stream evidence remains environment- and run-specific.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).

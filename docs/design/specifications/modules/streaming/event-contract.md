@@ -54,6 +54,8 @@ KQL defines an additional `unknown_event` catch-all table. It is not a
 nineteenth generated business event. The current notebook rejects unmapped
 event types before committing the micro-batch checkpoint. The catch-all is an
 operational queued-ingestion boundary, not an active direct-writer DLQ.
+Here DLQ means dead-letter queue: a place to preserve messages that could not
+be processed.
 
 ## Eventhouse writes
 
@@ -95,8 +97,9 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
 
 These controls make expected retries idempotent and are covered by injected
 failure/replay contracts. The readiness adapter checks live ingestion and
-checkpoint tags; actual workspace evidence remains
-[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
+checkpoint tags. The remaining
+[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) evidence
+is a recent bounded run of the intentionally manual stream.
 
 ## Cross-layer ownership
 

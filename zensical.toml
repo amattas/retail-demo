@@ -12,11 +12,13 @@ copyright = "Copyright &copy; 2026 Retail Demo contributors"
 
 nav = [
   { "Home" = "index.md" },
-  { "Guides" = [
+  { "Start here" = [
     { "Guide index" = "guides/README.md" },
+    { "Plain-language glossary" = "guides/glossary.md" },
     { "Getting started" = "guides/getting-started.md" },
     { "Workspace and profiles" = "guides/workspace-inventory.md" },
-    { "Deployment" = "guides/deployment.md" },
+  ] },
+  { "Explore the demo" = [
     { "Deployed walkthrough" = [
       { "Overview" = "guides/deployed-walkthrough.md" },
       { "Data platform" = "guides/deployed-data-platform.md" },
@@ -25,6 +27,9 @@ nav = [
     { "Presenter demo" = "guides/demo-script.md" },
     { "Presenter journeys" = "guides/presenter-journeys.md" },
     { "Use cases" = "guides/use-cases.md" },
+  ] },
+  { "Deploy and operate" = [
+    { "Deployment" = "guides/deployment.md" },
     { "Operations" = "guides/operations.md" },
   ] },
   { "Design Documentation" = [

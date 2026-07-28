@@ -116,17 +116,22 @@ The canonical human-readable projection is the
 Later work should populate existing sections rather than introduce parallel
 manifests:
 
-- profile execution belongs in `profiles`; live standard/full proof remains
-  under `IMP-012`;
-- ML methodology and outputs belong in executable `ml_contracts`; a fresh live
-  required-ML/Reporting run remains the final `IMP-008` gate;
+- profile execution belongs in `profiles`; separate live core/standard proof remains
+  under
+  [IMP-012](../../requirements/modules/deployment/backlog.md#imp-012);
+- ML methodology and outputs belong in executable `ml_contracts`; the live
+  required-ML/Reporting gate was completed under the settled
+  [IMP-008](../../requirements/modules/ml-ai/backlog.md#imp-008);
 - event fixtures and routes are implemented in `data_contracts`,
-  `event_paths`, and `exceptions`; live Fabric evidence remains `IMP-005`;
+  `event_paths`, and `exceptions`; live Fabric evidence remains
+  [IMP-005](../../requirements/modules/streaming/backlog.md#imp-005);
 - readiness taxonomy metadata belongs in `readiness_expectations`; actual live
-  evidence remains environment-local and is the remaining `IMP-013` gate;
-- live alternate-auth/renamed-target proof remains `IMP-001`, live profile
-  capability proof remains `IMP-012`, and fresh required-ML/Reporting proof
-  remains `IMP-008`.
+  evidence remains environment-local and the manual-stream boundary remains
+  [IMP-013](../../requirements/modules/operations/backlog.md#imp-013);
+- live alternate-auth/renamed-target proof remains
+  [IMP-001](../../requirements/modules/deployment/backlog.md#imp-001), while
+  core/standard profile proof remains
+  [IMP-012](../../requirements/modules/deployment/backlog.md#imp-012).
 
 Add a source-derived inventory when physical membership is needed. Add an
 `exceptions` record for intentional divergence and remove it when the sources

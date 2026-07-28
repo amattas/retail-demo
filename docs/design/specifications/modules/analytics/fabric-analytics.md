@@ -13,7 +13,8 @@ Deployment applies numbered scripts in repository order:
 
 `apply_kql.py` wraps the concatenated content in an outer database script with
 `ThrowOnErrors=true`. Some source files contain their own database-script
-wrappers; live execution remains the final proof of nested behavior.
+wrappers. A live full-demo deployment successfully executed all 135 resulting
+commands, proving the current nested-script behavior for the default target.
 
 ## KQL object inventory
 
@@ -32,7 +33,7 @@ mappings.
 
 | Layer | Schema/location | Role |
 | --- | --- | --- |
-| Live Bronze | `cusn` shortcuts | Eventhouse tables exposed to Spark |
+| Live Bronze | `cusn` shortcuts | Read-only Eventhouse table references exposed to Spark; `cusn` is the demo schema used for these shortcuts |
 | Silver | `ag` | Typed dimensions, facts, and operational state |
 | Gold | `au` | Ten reporting aggregates and contract-tiered ML outputs |
 
@@ -48,11 +49,10 @@ The four required Reporting tables also reference their active TMDL projection.
 Repository validation fails when a producer, manifest declaration, validator,
 or TMDL projection disagrees.
 
-| Tier | Outputs |
-| --- | --- |
-| Required | `demand_forecast`, `customer_segments`, `churn_predictions`, `stockout_risk` |
-| Optional promoted | `product_associations`, `product_recommendations`, `journey_patterns`, `zone_transitions`, `zone_dwell_stats`, `dwell_predictions` |
-| Experimental | `price_elasticity`, `promotion_lift`, `pricing_constraints`, `pricing_recommendations` |
+The authoritative list of all 14 outputs and their Required, Optional, or
+Experimental tier is in the
+[ML and AI contract](../ml-ai/model-contracts.md#ml-contracts). Keeping one
+tier table prevents the analytics and ML specifications from drifting.
 
 `15-validate-required-ml-contract` runs after all required producers. It fails
 on missing or empty tables, incompatible schemas, null or duplicate grain
@@ -112,8 +112,9 @@ query. Deployment rewrites its cluster/database binding.
 
 Dashboard JSON/templates and KQL rule definitions are source inputs, not yet
 guaranteed first-class deployable items. They may require manual import and
-binding. Claims about five-minute schedules or deployed Activator actions are
-not current defaults.
+binding. Activator is Fabric's event-driven alerting and action service.
+Claims about five-minute schedules or deployed Activator actions are not
+current defaults.
 
 ## KPI semantics
 

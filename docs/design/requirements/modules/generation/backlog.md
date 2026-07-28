@@ -16,7 +16,7 @@
 - Lakehouse Delta tables replace local DuckDB/parquet as the active contract.
 - New data columns use `snake_case`; legacy TMDL-bound exceptions remain
   documented until migrated.
-- Shared business invariants (IMP-010) are enforced in generation and checked
-  by `invariants.py`: no sales while closed, no pre-launch sales, no same-day
-  returns, product lifecycle dates present, and validated (non-degenerate)
-  profile controls.
+- Shared business invariants are enforced by
+  `utility/src/retail_setup/generation/invariants.py`: no sales while closed,
+  no pre-launch sales, no same-day returns, product lifecycle dates present,
+  and validated (non-degenerate) profile controls.

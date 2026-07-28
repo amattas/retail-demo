@@ -1,8 +1,18 @@
 # Semantic Model Changes - Date Dimension & Type Fixes
 
+> **Historical change record**
+>
+> This file explains a past semantic-model change. It is not the current
+> deployment procedure, and the historical table counts below do not describe
+> the current 40-table model. Use the
+> [deployment guide](../../docs/guides/deployment.md) for current commands and
+> the [semantic-model specification](../../docs/design/specifications/modules/power-bi/semantic-model.md)
+> for the current model contract.
+
 ## Summary
 
-This update adds a date dimension to the Silver layer and fixes ID type mismatches across the data pipeline.
+This update added a date dimension to the Silver layer and fixed ID type
+mismatches across the data pipeline.
 
 ## Changes Made
 
@@ -22,7 +32,8 @@ This update adds a date dimension to the Silver layer and fixes ID type mismatch
 
 **Date Range**: Automatically determined from fact data + 1 year forward
 
-**Creation**: Generated in notebook `02-historical-data-load.ipynb` after dimension loads
+**Creation at the time:** Generated in notebook
+`02-historical-data-load.ipynb` after dimension loads
 
 ### 2. ID Type Casting
 
@@ -78,22 +89,20 @@ Fixed type mismatches where IDs were stored as `double` instead of `int64/long`:
    - Updated table count (11 → 12)
    - Documented dim_date attributes
 
-## Deployment Steps
+## Current deployment and verification
 
-### Step 1: Re-run Historical Load
+Do not run `02-historical-data-load.ipynb` as the primary setup path. The
+current deployment renders and publishes setup notebooks 01 through 04, then
+runs them in order for Reporting profiles:
 
-The historical load notebook will now create `dim_date` automatically:
-
-```bash
-# In Fabric Lakehouse, run:
-fabric/lakehouse/02-historical-data-load.ipynb
+```powershell
+retail-setup render --env <env>
+retail-setup deploy --env <env>
 ```
 
-**Expected outcome**:
-- `ag.dim_date` created with ~700-1000 rows (depends on data range)
-- All dimension and fact tables have corrected ID types
+For `core`, run the four deployed setup notebooks in order after deployment.
 
-### Step 2: Verify dim_date Created
+After setup, verify that `dim_date` exists:
 
 ```sql
 -- Check dim_date was created
@@ -110,27 +119,13 @@ FROM ag.dim_date;
 SELECT * FROM ag.dim_date LIMIT 10;
 ```
 
-### Step 3: Update Semantic Model
+Then verify the deployed relationships in Power BI Model view:
 
-If using **Power BI Desktop**:
-1. Open the `.pbip` project
-2. Refresh the model (dim_date should appear automatically)
-3. Verify relationships in Model view
-4. Publish to Fabric
+- `dim_date` appears;
+- the four relationships to Gold daily tables are active; and
+- date filtering works across the intended report pages.
 
-If using **Fabric Portal**:
-1. The model will auto-sync via Git integration
-2. Or re-upload the semantic model folder
-3. Refresh the semantic model
-
-### Step 4: Verify Relationships
-
-In Power BI Model view, verify:
-- ✅ `dim_date` table appears
-- ✅ 4 relationships to Gold daily tables are active
-- ✅ Date filtering works across perspectives
-
-### Step 5: Test ID Type Fixes
+Test ID type consistency with read-only SQL:
 
 Run these queries to verify type consistency:
 
@@ -172,28 +167,19 @@ LIMIT 10;
 
 ### Issue: dim_date not created
 
-**Cause**: No fact data exists yet
+**Likely cause:** The supported setup sequence did not complete.
 
-**Solution**:
-```python
-# Manually set date range in notebook cell
-min_date = datetime(2024, 1, 1).date()
-max_date = datetime(2025, 12, 31).date()
-```
+**Solution:** Inspect `ag.setup_run_log`, correct the failed setup stage, and
+rerun the supported setup pipeline or notebooks. Do not edit generated date
+ranges directly unless you are intentionally developing the generator.
 
 ### Issue: Type mismatch errors in Gold tables
 
-**Cause**: Gold tables created before type fixes
+**Likely cause:** Gold tables were produced by an older deployment.
 
-**Solution**: Drop and recreate Gold tables
-```sql
-DROP TABLE IF EXISTS au.sales_minute_store;
-DROP TABLE IF EXISTS au.inventory_position_current;
--- ... repeat for all Gold tables
-
--- Then re-run:
-fabric/lakehouse/02-historical-data-load.ipynb
-```
+**Solution:** Rerender and redeploy the current setup notebooks. The supported
+publication path stages and validates replacements before promotion; do not
+manually drop all Gold tables as a first recovery action.
 
 ### Issue: Relationships not showing in model
 
@@ -210,19 +196,11 @@ DESCRIBE au.tender_mix_daily;
 
 ## Rollback
 
-If issues occur, revert to previous state:
-
-```bash
-# Restore previous notebook versions
-git checkout HEAD~1 fabric/lakehouse/02-historical-data-load.ipynb
-git checkout HEAD~1 fabric/lakehouse/03-streaming-to-silver.ipynb
-
-# Drop dim_date
-DROP TABLE IF EXISTS ag.dim_date;
-
-# Restore semantic model
-git checkout HEAD~1 fabric/powerbi/
-```
+Use normal source-control review and a deliberate revert when this historical
+change needs to be undone in a development branch. In a deployed workspace,
+follow the [operations guide](../../docs/guides/operations.md); do not delete
+`dim_date` or restore arbitrary notebook versions without checking dependent
+tables and report relationships.
 
 ## Next Steps
 
@@ -234,5 +212,5 @@ git checkout HEAD~1 fabric/powerbi/
 ## Contact
 
 For issues or questions, refer to:
-- Deployment guide: `docs/setup/08-semantic-model-deployment.md`
-- Troubleshooting: `docs/setup/troubleshooting.md`
+- [Deployment guide](../../docs/guides/deployment.md)
+- [Operations and troubleshooting](../../docs/guides/operations.md)
