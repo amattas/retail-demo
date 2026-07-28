@@ -119,6 +119,36 @@ def test_notebook_definition_requires_exact_lakehouse_binding() -> None:
     )
 
 
+def test_notebook_source_definition_reads_fabric_metadata_binding() -> None:
+    source = "\n".join(
+        [
+            "# Fabric notebook source",
+            "# META {",
+            '# META   "dependencies": {',
+            '# META     "lakehouse": {',
+            f'# META       "default_lakehouse": "{LAKEHOUSE_ID}",',
+            '# META       "default_lakehouse_name": "retail_lakehouse",',
+            (
+                '# META       "default_lakehouse_workspace_id": '
+                f'"{WORKSPACE_ID}"'
+            ),
+            "# META     }",
+            "# META   }",
+            "# META }",
+            "",
+            "print('ready')",
+        ]
+    )
+    definition = _definition("notebook-content.py", source)
+
+    assert notebook_binding_errors(
+        definition,
+        lakehouse_id=LAKEHOUSE_ID,
+        lakehouse_name="retail_lakehouse",
+        workspace_id=WORKSPACE_ID,
+    ) == []
+
+
 def test_pipeline_definition_detects_missing_and_mismatched_refs() -> None:
     definition = _definition(
         "pipeline-content.json",

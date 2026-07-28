@@ -471,12 +471,55 @@ def notebook_binding_errors(
     """Validate one live notebook's default-Lakehouse binding."""
 
     parts = decode_definition_parts(definition)
-    notebook = json_definition_part(parts, ".ipynb")
-    lakehouse = (
-        notebook.get("metadata", {})
-        .get("dependencies", {})
-        .get("lakehouse", {})
-    )
+    ipynb_paths = [
+        path for path in parts if path.casefold().endswith(".ipynb")
+    ]
+    if ipynb_paths:
+        notebook = json_definition_part(parts, ".ipynb")
+        metadata = notebook.get("metadata", {})
+    else:
+        source_paths = [
+            path
+            for path in parts
+            if path.casefold().endswith("notebook-content.py")
+        ]
+        if len(source_paths) != 1:
+            raise FabricDefinitionError(
+                "Notebook definition has neither one .ipynb nor one "
+                "notebook-content.py part."
+            )
+        try:
+            source = parts[source_paths[0]].decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise FabricDefinitionError(
+                "Fabric notebook source is not valid UTF-8."
+            ) from exc
+        metadata_lines: list[str] = []
+        collecting = False
+        for line in source.splitlines():
+            if line.startswith("# META "):
+                collecting = True
+                metadata_lines.append(line.removeprefix("# META "))
+            elif collecting:
+                break
+        try:
+            metadata = json.loads("\n".join(metadata_lines))
+        except json.JSONDecodeError as exc:
+            raise FabricDefinitionError(
+                "Fabric notebook source has invalid metadata JSON."
+            ) from exc
+    if not isinstance(metadata, dict):
+        raise FabricDefinitionError("Fabric notebook metadata is not an object.")
+    dependencies = metadata.get("dependencies", {})
+    if not isinstance(dependencies, dict):
+        raise FabricDefinitionError(
+            "Fabric notebook dependencies metadata is not an object."
+        )
+    lakehouse = dependencies.get("lakehouse", {})
+    if not isinstance(lakehouse, dict):
+        raise FabricDefinitionError(
+            "Fabric notebook Lakehouse metadata is not an object."
+        )
     errors: list[str] = []
     if lakehouse.get("default_lakehouse") != lakehouse_id:
         errors.append("default_lakehouse ID mismatch")
