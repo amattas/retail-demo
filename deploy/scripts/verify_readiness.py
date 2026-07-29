@@ -1404,6 +1404,7 @@ class ReadinessRunner:
         from deploy.scripts.taskflow import (
             filter_portable_items,
             profile_taskflow_artifacts,
+            taskflow_source_coverage_errors,
             to_portable,
         )
 
@@ -1415,13 +1416,19 @@ class ReadinessRunner:
                 self.context.repo_root / "fabric" / "taskflow" / "taskflow.json"
             ).read_text(encoding="utf-8")
         )
-        expected = filter_portable_items(
-            source,
-            profile_taskflow_artifacts(
-                self.context.repo_root,
-                self.context.config,
-            ),
+        required_artifacts = profile_taskflow_artifacts(
+            self.context.repo_root,
+            self.context.config,
         )
+        coverage_errors = taskflow_source_coverage_errors(
+            source,
+            required_artifacts,
+        )
+        if coverage_errors:
+            raise CheckFailed(
+                f"Task-flow source is incomplete ({len(coverage_errors)} error(s))."
+            )
+        expected = filter_portable_items(source, required_artifacts)
         guid_to_name = {
             str(item.get("id", "")): str(item.get("displayName", ""))
             for item in self.items
@@ -1984,17 +1991,16 @@ def taskflow_binding_errors(
 ) -> list[str]:
     """Compare task-flow references and edges, including unresolved live items."""
 
-    expected_refs = _taskflow_references(expected)
+    from deploy.scripts.taskflow import (
+        taskflow_item_binding_errors,
+        taskflow_portable_errors,
+    )
+
+    errors = taskflow_portable_errors(expected, portable_actual)
+    errors.extend(taskflow_item_binding_errors(raw_actual))
     actual_refs = _taskflow_references(portable_actual)
-    expected_edges = _taskflow_edges(expected)
-    actual_edges = _taskflow_edges(portable_actual)
-    errors: list[str] = []
     if len(actual_refs) != _taskflow_raw_item_count(raw_actual):
         errors.append("live task flow contains an unresolved item reference")
-    if Counter(expected_refs) != Counter(actual_refs):
-        errors.append("task-flow item references differ")
-    if Counter(expected_edges) != Counter(actual_edges):
-        errors.append("task-flow edges differ")
     return errors
 
 
@@ -2077,9 +2083,24 @@ class FabricReadinessAdapter:
         self._database_name: str | None = None
 
     def list_items(self) -> list[dict[str, Any]]:
-        return paginated_get(
+        from deploy.scripts.taskflow import supplement_workspace_items
+
+        items = paginated_get(
             self.fabric,
             f"{FABRIC_API}/workspaces/{self.workspace_id}/items",
+        )
+        required_types = {
+            item.item_type
+            for item in expected_live_items(
+                self.context,
+                include_post_ontology=True,
+            )
+        }
+        return supplement_workspace_items(
+            self.fabric,
+            self.workspace_id,
+            items,
+            required_types,
         )
 
     def get_definition(self, item_id: str) -> dict[str, Any]:

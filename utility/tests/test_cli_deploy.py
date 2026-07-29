@@ -478,6 +478,10 @@ def test_plan_renders_before_artifact_builds_and_passes_manifest():
     assert render_idx < min(build_indexes)
     for index in build_indexes:
         command = plan[index].cmd
+        if "--publication-phase" in command and (
+            command[command.index("--publication-phase") + 1] == "post-ontology"
+        ):
+            continue
         manifest_idx = command.index("--render-manifest")
         assert command[manifest_idx + 1] == "utility/out/render-manifest.json"
 
@@ -525,6 +529,29 @@ def test_full_demo_refreshes_sql_metadata_after_all_ml_pipelines():
     assert step_ids.index("post-reporting-ml-experimental") < refresh_idx
     assert refresh_idx < step_ids.index("validate-reporting")
     assert plan[refresh_idx].required is False
+
+
+def test_full_demo_completes_ontology_agents_and_taskflow_before_final_verify():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=True,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+    )
+    step_ids = [step.step_id for step in plan]
+
+    assert step_ids.index("validate-reporting") < step_ids.index(
+        "ensure-ontology"
+    )
+    assert step_ids.index("ensure-ontology") < step_ids.index(
+        "build-post-ontology"
+    )
+    assert step_ids.index("build-post-ontology") < step_ids.index(
+        "deploy-post-ontology"
+    )
+    assert step_ids.index("deploy-post-ontology") < step_ids.index(
+        "deploy-post-ontology-taskflow"
+    )
 
 
 def test_interactive_plan_allows_admin_setting_recheck():
@@ -1011,23 +1038,6 @@ def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
     assert "run 'setup-pipeline' manually" in captured.err
 
 
-def test_ontology_relink_hint_names_workspace_and_command(tmp_path, capsys):
-    cfg = tmp_path / "deploy" / "config"
-    (cfg / "environments").mkdir(parents=True)
-    (cfg / "deploy.yml").write_text("workspace:\n  name: retail-demo\n", encoding="utf-8")
-    (cfg / "environments" / "dev.yml").write_text(
-        "workspace:\n  name: retail-demo-dev\n", encoding="utf-8"
-    )
-    from retail_setup.cli.main import _print_ontology_relink_hint
-
-    _print_ontology_relink_hint(tmp_path, "dev")
-
-    out = capsys.readouterr().out
-    assert "RetailOntology_AutoGen" in out
-    assert "retail-setup post-ontology --env dev" in out
-    assert "intentionally not published yet" in out
-
-
 def test_post_ontology_plan_orders_validated_publication(tmp_path):
     _seed_deploy_config(tmp_path, profile="full-demo")
 
@@ -1044,31 +1054,33 @@ def test_post_ontology_plan_orders_validated_publication(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
+    assert result.output.index("full-demo ontology") < result.output.index(
+        "post-ontology Data Agents"
+    )
     assert result.output.index("post-ontology Data Agents") < result.output.index(
-        "fully resolved workspace task flow"
+        "complete workspace task flow"
     )
     assert "--environment dev --profile full-demo" in result.output
     assert "--defer-post-ontology" not in result.output
 
 
-def test_post_ontology_validates_live_ontology_before_mutation(
+def test_post_ontology_ensures_ontology_before_publication(
     monkeypatch,
     tmp_path,
 ):
     _seed_deploy_config(tmp_path, profile="full-demo")
     calls = []
     monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
-    monkeypatch.setattr(
-        cli,
-        "_validate_live_ontology",
-        lambda *_args: (_ for _ in ()).throw(
-            ValueError("ontology is not available")
-        ),
-    )
-    monkeypatch.setattr(
-        "subprocess.run",
-        lambda *args, **kwargs: calls.append(args),
-    )
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(
+            returncode=1
+            if "deploy.scripts.ensure_ontology" in cmd
+            else 0
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
 
     result = runner.invoke(
         app,
@@ -1082,9 +1094,9 @@ def test_post_ontology_validates_live_ontology_before_mutation(
     )
 
     assert result.exit_code == 1
-    assert "live preflight failed" in result.output
-    assert "ontology is not available" in result.output
-    assert calls == []
+    assert "Create or validate the full-demo ontology" in result.output
+    assert len(calls) == 1
+    assert "deploy.scripts.ensure_ontology" in calls[0]
 
 
 def test_post_ontology_accepts_optional_readiness_degradation(
@@ -1093,7 +1105,6 @@ def test_post_ontology_accepts_optional_readiness_degradation(
 ):
     _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
-    monkeypatch.setattr(cli, "_validate_live_ontology", lambda *_args: None)
 
     def fake_run(cmd, **_kwargs):
         return SimpleNamespace(
@@ -1123,7 +1134,6 @@ def test_post_ontology_accepts_optional_readiness_degradation(
 def test_post_ontology_successful_path_completes(monkeypatch, tmp_path):
     _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_args: None)
-    monkeypatch.setattr(cli, "_validate_live_ontology", lambda *_args: None)
     monkeypatch.setattr("subprocess.run", _always_ok)
 
     result = runner.invoke(
@@ -1522,7 +1532,7 @@ def test_mark_required_promotes_optional_step_to_required():
 # --- Task-flow and setup-pipeline: required-once-requested, skip behavior -----
 
 
-def test_initial_full_deploy_defers_taskflow_until_post_ontology(
+def test_initial_full_deploy_completes_taskflow_and_post_ontology(
     monkeypatch,
     tmp_path,
 ):
@@ -1532,11 +1542,23 @@ def test_initial_full_deploy_defers_taskflow_until_post_ontology(
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
 
     commands = []
+    readiness_registered_before_execution = []
 
     def fake_run(cmd, cwd=None):
+        if not commands:
+            journal = json.loads(
+                _deploy_journal.journal_path(tmp_path, "dev").read_text()
+            )
+            readiness = next(
+                step
+                for step in journal["steps"]
+                if step["step_id"] == "verify-readiness"
+            )
+            readiness_registered_before_execution.append(
+                readiness["status"] == "PENDING"
+                and journal["status"] == "RUNNING"
+            )
         commands.append(cmd)
-        if "deploy.scripts.taskflow" in cmd:
-            return SimpleNamespace(returncode=3)
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
@@ -1554,18 +1576,22 @@ def test_initial_full_deploy_defers_taskflow_until_post_ontology(
     )
 
     assert result.exit_code == 0, result.output
+    assert readiness_registered_before_execution == [True]
     assert "Deploy complete" in result.output
-    assert not any("deploy.scripts.taskflow" in command for command in commands)
+    assert any("deploy.scripts.ensure_ontology" in command for command in commands)
+    assert any("deploy.scripts.taskflow" in command for command in commands)
     readiness = next(
         command
         for command in commands
         if "deploy.scripts.verify_readiness" in command
     )
-    assert "--defer-post-ontology" in readiness
+    assert "--defer-post-ontology" not in readiness
     journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
     assert journal["status"] == "SUCCEEDED"
-    assert not any(
-        step["step_id"] == "task-flow-deploy" for step in journal["steps"]
+    assert any(
+        step["step_id"] == "deploy-post-ontology-taskflow"
+        and step["status"] == "SUCCEEDED"
+        for step in journal["steps"]
     )
 
 

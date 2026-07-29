@@ -1,6 +1,6 @@
 # Status: Retail Demo Deployment Hardening
 
-**Updated**: 2026-07-28 | **Tasks**: 6/6 complete
+**Updated**: 2026-07-28 | **Tasks**: 7/7 complete
 
 ## Tasks
 
@@ -12,6 +12,7 @@
 | Readiness and SQL metadata hardening | Done | E | Exact-run recovery and bundled SQL fallback verified |
 | Ontology, Data Agents, and task flow | Done | E | Published and live-validated |
 | Documentation structure and accessibility | Done | E | Role-based navigation, glossary, plain-language guides, and aligned technical references |
+| Complete full-demo task flow | Done | E | Ontology and agents auto-complete; live graph verified at 11 tasks, 48 items, and 11 edges |
 
 ## Artifacts
 
@@ -30,5 +31,8 @@
 - Completed: Documentation restructured for business users, business analysts,
   operators, presenters, and entry-level developers; Zensical and documentation
   contract checks pass.
+- Completed: Restored release-style automatic task-flow completion with
+  fail-closed source coverage and read-after-write verification. Required live
+  readiness passes; only the intentionally manual stream remains degraded.
 - In progress: PR #362 CI and merge.
 - Blocked: None.

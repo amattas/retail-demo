@@ -52,9 +52,8 @@ existing setup and required-ML gates. Deployment never adds
 `--run-pipeline`. A failed required check fails the deployment; optional
 readiness gaps mark the deploy journal `DEGRADED`. Core remains
 operator-executed: run setup notebooks 01-04, then invoke verification.
-The initial full-demo run marks only ontology, Data Agent, and task-flow checks
-as deferred. Its live-validated post-ontology step publishes those items and
-runs the complete taxonomy.
+Full-demo verification runs only after the ontology, both Data Agents, and the
+complete task flow have been created or validated in the same deploy.
 
 The deploy plan also runs optional SQL endpoint metadata synchronization after
 post-Reporting ML. This tells Fabric's SQL endpoint about newly created
@@ -177,8 +176,9 @@ retains its event identities and ingestion tags.
 
 ### Ontology/task-flow binding missing
 
-Wait for ontology creation to complete, then run `post-ontology`; it validates
-the live ontology before publishing the dependent agents and task flow.
+Run `retail-setup post-ontology --env <env>`. It creates the ontology when
+absent, rejects duplicates, republishes both agents, writes all selected task
+references, reads the graph back, and runs complete readiness.
 
 ### Power BI table missing
 

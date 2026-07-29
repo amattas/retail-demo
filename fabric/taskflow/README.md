@@ -12,12 +12,13 @@ python -m deploy.scripts.taskflow deploy --terraform-output deploy\.generated\<e
 Task-flow access uses undocumented Power BI metadata-cluster endpoints and may
 break independently of the public Fabric APIs. Any selected task whose item
 reference cannot be resolved fails deployment; selected references are never
-silently omitted.
+silently omitted. After create or update, deployment reads the graph back and
+requires all 11 tasks, 48 full-demo item references, and 11 edges to match.
 
-Ontology creation is a separate preview/operator action through
-`30-create-ontology`; it is not part of `setup-pipeline`. Run that notebook,
-wait for `RetailOntology_AutoGen` to exist, and complete the live-validated
-post-ontology publication step:
+Normal full-demo deployment runs `30-create-ontology` to create or revalidate
+the stable ontology and derived graph, publishes both Data Agents, and writes
+the complete graph.
+Use the following only as an idempotent recovery command:
 
 ```powershell
 retail-setup post-ontology --env <environment>

@@ -1079,11 +1079,11 @@
       "required_acknowledgements": [],
       "blockers": [],
       "boundaries": {
-        "runtime": "Publishes infrastructure, waits for setup and required ML validation, publishes Reporting, then runs isolated optional and experimental ML pipelines.",
+        "runtime": "Publishes infrastructure, waits for setup and required ML validation, publishes Reporting, runs isolated optional and experimental ML pipelines, then creates or validates the ontology and publishes Data Agents and the complete task flow.",
         "capacity": "Requires operator-reviewed capacity for concurrent Eventhouse, Spark, custom-pool, Power BI, ontology, and agent workloads.",
         "cost": "Selects every non-destructive demo surface and therefore has the broadest potential Fabric consumption; no numeric estimate is asserted.",
-        "manual": "Dashboard and Activator sources are not auto-published, the stream is manually controlled, and preview bindings may need operator repair.",
-        "preview": "Ontology and Data Agent tenant switches and custom-pool capacity are checked live before mutation; task-flow support is proven by the deferred API operation."
+        "manual": "Dashboard and Activator sources are not auto-published, and the stream remains manually controlled.",
+        "preview": "Ontology and Data Agent tenant switches and custom-pool capacity are checked live before mutation; ontology creation, Data Agent publication, and exact persisted task-flow verification complete automatically."
       },
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [

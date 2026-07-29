@@ -7,6 +7,18 @@
       "description": "Run setup and historical ingestion assets that build the base Lakehouse contract.",
       "items": [
         {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120101",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-01-seed-dictionaries"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120102",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-02-generate-dimensions"
+        },
+        {
           "artifactUniqueId": "SynapseNotebook:90009e22-24ab-4750-b2f6-b72cf6db2741",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
@@ -65,6 +77,12 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "stream-events"
+        },
+        {
+          "artifactUniqueId": "KQLQueryset:6dc40ab4-7dd7-4f70-a7f0-5de864120103",
+          "artifactType": "KQLQueryset",
+          "artifactObjectId": null,
+          "artifactName": "retail_querysets"
         }
       ],
       "loc": "-220 120"
@@ -75,6 +93,18 @@
       "name": "Transform Historical Data",
       "description": "Run the ordered setup and historical Lakehouse transformation pipelines.",
       "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120104",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-03-generate-facts"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120105",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-04-build-gold"
+        },
         {
           "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
           "artifactType": "Pipeline",
@@ -135,10 +165,10 @@
           "artifactName": "05-maintain-delta-tables"
         },
         {
-          "artifactUniqueId": "SynapseNotebook:4c58cdde-5ead-4292-999f-2f33696fff5d",
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120106",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
-          "artifactName": "99-reset-lakehouse"
+          "artifactName": "90-augment-and-dedupe-receipts"
         }
       ],
       "loc": "460 -280",
@@ -147,12 +177,18 @@
     {
       "id": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "type": "store data",
-      "name": "Semantic Model",
-      "description": "Serve the 40-table Direct Lake model only after required ML validation succeeds.",
+      "name": "Reporting",
+      "description": "Serve the validated 40-table Direct Lake semantic model and Power BI report.",
       "items": [
         {
           "artifactUniqueId": "3:4416500",
           "artifactType": "dataset",
+          "artifactObjectId": null,
+          "artifactName": "retail_model"
+        },
+        {
+          "artifactUniqueId": "Report:6dc40ab4-7dd7-4f70-a7f0-5de864120107",
+          "artifactType": "Report",
           "artifactObjectId": null,
           "artifactName": "retail_model"
         }

@@ -77,9 +77,10 @@ reset group, starts the long-running stream, or enables a schedule.
 The Reporting profiles publish infrastructure first, wait for setup and the
 required ML validator to reach terminal success, then publish Reporting.
 `full-demo` runs optional and experimental ML only after Reporting. Ontology
-creation remains a separate preview/operator action; its two Data Agents are
-staged only after `post-ontology` verifies the live ontology and are not
-included in the initial count.
+creation, both Data Agents, and exact task-flow publication then complete
+automatically in the same deployment. The two Data Agents are counted in their
+separate post-ontology publication phase rather than the initial infrastructure
+count.
 
 ### Workspace folders and publication phases
 
@@ -87,7 +88,7 @@ included in the initial count.
 | --- | --- | --- | --- |
 | `core` | `Setup` | none | Lakehouse |
 | `standard` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting` | Lakehouse, KQL queryset |
-| `full-demo` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting`; then `Data Agents` in the post-ontology phase | Lakehouse, KQL queryset |
+| `full-demo` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting`; then automatically completed `Data Agents` | Lakehouse, KQL queryset |
 
 Eventhouse and its default KQL database are Terraform-owned and are therefore
 not duplicated as staged shell items. Every staged `.platform` description is

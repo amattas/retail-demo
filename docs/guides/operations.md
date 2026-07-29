@@ -34,11 +34,10 @@ An unselected capability is `SKIPPED`; selected checks must produce evidence.
 Contributors can find the exact 26-row taxonomy in the
 [operations runbook](../design/specifications/modules/operations/runbook.md).
 
-The initial `full-demo` deploy invokes the same taxonomy with only ontology,
-Data Agent, and task-flow checks explicitly deferred. The readiness report
-records that mode. This is not complete readiness: run the live-validating
-`post-ontology` command after ontology creation to publish those items and
-produce a complete report.
+`full-demo` runs this taxonomy only after the ontology, both Data Agents, and
+the task flow have been published. The task-flow check compares the persisted
+workspace graph with the complete source graph, including every selected item
+reference and edge.
 
 | Result | Meaning | Exit |
 | --- | --- | --- |
@@ -175,7 +174,7 @@ rather than ingestion time.
 | Setup pipeline not started | Start `setup-pipeline` manually and retain its run ID. |
 | Setup pipeline failed | Resume from the first failed activity only after validating upstream tables. |
 | Required ML gate failed | Inspect producer/validator errors; Reporting is intentionally unpublished until a new exact run succeeds. |
-| Ontology/task-flow links missing | Complete ontology creation, then run `post-ontology`; it validates the ontology before publishing dependent items. |
+| Ontology, Data Agent, or task-flow links missing | Run `retail-setup post-ontology --env <env>` to recreate any missing ontology, republish agents, and verify the exact persisted graph. |
 | Live rows absent | Verify notebook parameters, resolved Query URI, KQL permissions, connector errors, and ingestion timestamps. |
 | Silver data stale | Inspect Eventhouse shortcuts, transform run history, source timestamps, and `ag._watermarks`. |
 | Gold data stale | Confirm the Silver run completed, then run the Gold transform. |

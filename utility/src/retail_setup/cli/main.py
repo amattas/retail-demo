@@ -1084,6 +1084,127 @@ class DeployStep:
             self.step_id = _slugify(self.description)
 
 
+def _post_ontology_steps(
+    repo_root: Path,
+    env: str,
+    *,
+    profile_name: str,
+    lakehouse_name: str,
+    kql_database_name: str,
+    semantic_model_name: str,
+    report_name: str,
+    auth_mode: str,
+    tenant_id: str | None,
+    include_verify: bool,
+) -> list[DeployStep]:
+    """Build idempotent ontology, Data Agent, task-flow, and verification steps."""
+
+    py = sys.executable
+    tenant_args = ["--tenant-id", tenant_id] if tenant_id else []
+    terraform_output = f"deploy/.generated/{env}/terraform-output.json"
+    steps = [
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.ensure_ontology",
+                "--repo-root",
+                str(repo_root),
+                "--environment",
+                env,
+                "--auth-mode",
+                auth_mode,
+                *tenant_args,
+            ],
+            description="Create or validate the full-demo ontology",
+            step_id="ensure-ontology",
+        ),
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.build_artifacts",
+                "--repo-root",
+                str(repo_root),
+                "--profile",
+                profile_name,
+                "--lakehouse-name",
+                lakehouse_name,
+                "--kql-database-name",
+                kql_database_name,
+                "--semantic-model-name",
+                semantic_model_name,
+                "--report-name",
+                report_name,
+                "--publication-phase",
+                "post-ontology",
+                "--inventory-output",
+                f"deploy/.generated/{env}/artifact-inventory-post-ontology.json",
+            ],
+            description="Stage post-ontology Data Agents",
+            step_id="build-post-ontology",
+            evidence_path=(
+                f"deploy/.generated/{env}/artifact-inventory-post-ontology.json"
+            ),
+        ),
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.deploy_items",
+                "--environment",
+                env,
+                "--config",
+                f"deploy/.generated/{env}/fabric-cicd/config.yml",
+                "--auth-mode",
+                auth_mode,
+                *tenant_args,
+            ],
+            description="Publish post-ontology Data Agents",
+            step_id="deploy-post-ontology",
+        ),
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
+                "deploy.scripts.taskflow",
+                "deploy",
+                "--terraform-output",
+                terraform_output,
+                "--environment",
+                env,
+                "--profile",
+                profile_name,
+                "--auth-mode",
+                auth_mode,
+                *tenant_args,
+            ],
+            description="Publish and verify the complete workspace task flow",
+            step_id="deploy-post-ontology-taskflow",
+        ),
+    ]
+    if include_verify:
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.verify_readiness",
+                    "--repo-root",
+                    str(repo_root),
+                    "--environment",
+                    env,
+                ],
+                description="Verify complete post-ontology readiness",
+                step_id="verify-post-ontology",
+                evidence_path=(
+                    f"deploy/.generated/{env}/readiness-report.json"
+                ),
+            )
+        )
+    return steps
+
+
 def _deploy_plan(
     env: str,
     skip_terraform: bool,
@@ -1523,6 +1644,21 @@ def _deploy_plan(
                 ],
                 description="Validate gated Reporting publication",
                 step_id="validate-reporting",
+            )
+        )
+    if profile.selects("asset.data-agents"):
+        steps.extend(
+            _post_ontology_steps(
+                repo_root,
+                env,
+                profile_name=profile.deployment_name,
+                lakehouse_name=lakehouse_name,
+                kql_database_name=kql_database_name,
+                semantic_model_name=semantic_model_name,
+                report_name=report_name,
+                auth_mode=auth_mode,
+                tenant_id=tenant_id,
+                include_verify=False,
             )
         )
     return steps
@@ -2054,35 +2190,29 @@ def deploy(
             required=step.required,
             evidence_path=step.evidence_path,
         )
-    _deploy_journal.write(repo_root, run_journal)
-
-    _run_plan_plain(repo_root, env, plan, total, yes=yes, journal=run_journal)
-
     if profile.post_deploy_pipeline_ref is not None:
-        report_path = f"deploy/.generated/{env}/readiness-report.json"
         _deploy_journal.add_step(
             run_journal,
             "verify-readiness",
             "Verify live readiness and freshness",
             required=True,
-            evidence_path=report_path,
+            evidence_path=(
+                f"deploy/.generated/{env}/readiness-report.json"
+            ),
         )
-        _deploy_journal.write(repo_root, run_journal)
+    _deploy_journal.write(repo_root, run_journal)
+
+    _run_plan_plain(repo_root, env, plan, total, yes=yes, journal=run_journal)
+
+    if profile.post_deploy_pipeline_ref is not None:
         _verify_readiness_after_deploy(
             repo_root,
             env,
             journal=run_journal,
-            defer_post_ontology=profile.selects("asset.data-agents"),
+            defer_post_ontology=False,
         )
 
     _deploy_journal.write(repo_root, run_journal)
-    if profile.selects("asset.data-agents"):
-        _print_ontology_relink_hint(
-            repo_root,
-            env,
-            auth_mode=auth_mode,
-            tenant_id=tenant_id,
-        )
     typer.echo("")
     _hr("=")
     typer.echo(f"  Deploy complete for environment '{env}'.")
@@ -2099,116 +2229,20 @@ def _post_ontology_plan(
     env: str,
     config: Any,
 ) -> list[DeployStep]:
-    """Build the deferred Data Agent, task-flow, and verification plan."""
+    """Build the idempotent ontology completion and verification plan."""
 
-    py = sys.executable
-    tenant_args = (
-        ["--tenant-id", config.tenant_id] if config.tenant_id else []
-    )
-    terraform_output = f"deploy/.generated/{env}/terraform-output.json"
-    return [
-        DeployStep(
-            cmd=[
-                py,
-                "-m",
-                "deploy.scripts.build_artifacts",
-                "--repo-root",
-                str(repo_root),
-                "--profile",
-                config.profile.deployment_name,
-                "--lakehouse-name",
-                config.lakehouse.name,
-                "--kql-database-name",
-                config.eventhouse.kql_database_name,
-                "--semantic-model-name",
-                config.powerbi.semantic_model_name,
-                "--report-name",
-                config.powerbi.report_name,
-                "--publication-phase",
-                "post-ontology",
-                "--inventory-output",
-                f"deploy/.generated/{env}/artifact-inventory-post-ontology.json",
-            ],
-            description="Stage post-ontology Data Agents",
-            step_id="build-post-ontology",
-        ),
-        DeployStep(
-            cmd=[
-                py,
-                "-m",
-                "deploy.scripts.deploy_items",
-                "--environment",
-                env,
-                "--config",
-                f"deploy/.generated/{env}/fabric-cicd/config.yml",
-                "--auth-mode",
-                config.auth_mode,
-                *tenant_args,
-            ],
-            description="Publish post-ontology Data Agents",
-            step_id="deploy-post-ontology",
-        ),
-        DeployStep(
-            cmd=[
-                py,
-                "-m",
-                "deploy.scripts.taskflow",
-                "deploy",
-                "--terraform-output",
-                terraform_output,
-                "--environment",
-                env,
-                "--profile",
-                config.profile.deployment_name,
-                "--auth-mode",
-                config.auth_mode,
-                *tenant_args,
-            ],
-            description="Publish fully resolved workspace task flow",
-            step_id="deploy-post-ontology-taskflow",
-        ),
-        DeployStep(
-            cmd=[
-                py,
-                "-m",
-                "deploy.scripts.verify_readiness",
-                "--repo-root",
-                str(repo_root),
-                "--environment",
-                env,
-            ],
-            description="Verify complete post-ontology readiness",
-            step_id="verify-post-ontology",
-        ),
-    ]
-
-
-def _validate_live_ontology(config: Any, outputs: dict[str, Any]) -> None:
-    """Require exactly one target ontology before any deferred publication."""
-
-    from deploy.scripts.export_items import build_session, list_items
-
-    session = build_session(
+    return _post_ontology_steps(
+        repo_root,
+        env,
+        profile_name=config.profile.deployment_name,
+        lakehouse_name=config.lakehouse.name,
+        kql_database_name=config.eventhouse.kql_database_name,
+        semantic_model_name=config.powerbi.semantic_model_name,
+        report_name=config.powerbi.report_name,
         auth_mode=config.auth_mode,
         tenant_id=config.tenant_id,
+        include_verify=True,
     )
-    ontology_items = list_items(
-        session,
-        str(outputs["workspace_id"]),
-        "Ontology",
-    )
-    matches = [
-        item
-        for item in ontology_items
-        if str(item.get("displayName", "")) == "RetailOntology_AutoGen"
-        and item.get("id")
-    ]
-    if len(matches) != 1:
-        raise ValueError(
-            "post-ontology publication requires exactly one "
-            "'RetailOntology_AutoGen' item in the configured workspace"
-        )
-
 
 @app.command("post-ontology")
 def post_ontology(
@@ -2240,16 +2274,6 @@ def post_ontology(
                 "the post-ontology Data Agent boundary"
             )
         _validate_reused_terraform_outputs(repo_root, env)
-        from deploy.scripts.deploy_config import load_terraform_outputs
-
-        output_path = (
-            repo_root
-            / "deploy"
-            / ".generated"
-            / env
-            / "terraform-output.json"
-        )
-        outputs = load_terraform_outputs(output_path)
     except (
         FileNotFoundError,
         json.JSONDecodeError,
@@ -2269,12 +2293,6 @@ def post_ontology(
         return
 
     _validate_azure_cli_tenant(repo_root, env)
-    try:
-        _validate_live_ontology(config, outputs)
-    except Exception as exc:
-        typer.echo(f"Post-ontology live preflight failed: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-
     for index, step in enumerate(plan, start=1):
         _echo_step(index, len(plan), step)
         try:
@@ -2417,35 +2435,6 @@ def _verify_readiness_after_deploy(
         exit_code=result.returncode,
     )
     raise typer.Exit(code=result.returncode)
-
-
-def _print_ontology_relink_hint(
-    repo_root: Path,
-    env: str,
-    *,
-    auth_mode: str = "azure_cli",
-    tenant_id: str | None = None,
-) -> None:
-    """Explain the explicit post-ontology publication boundary.
-
-    The preview ontology is created only when an operator runs
-    ``30-create-ontology``. Data Agents and task-flow metadata remain
-    unpublished until the post-ontology command verifies it live.
-    """
-
-    _ = repo_root
-    _ = tenant_id
-    typer.echo("")
-    typer.echo(
-        "Post-ontology boundary: run '30-create-ontology' and wait for success.\n"
-        "Data Agents and task-flow metadata are intentionally not published yet.\n"
-        "After 'RetailOntology_AutoGen' exists, run:\n"
-        f"    retail-setup post-ontology --env {env}\n"
-        f"The command reuses the configured {auth_mode} Python credential, "
-        "validates the ontology first, then publishes and verifies the deferred "
-        "items."
-    )
-
 
 def _run_setup_pipeline(
     repo_root: Path,

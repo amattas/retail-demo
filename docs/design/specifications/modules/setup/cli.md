@@ -141,11 +141,13 @@ readiness verification. It never triggers an additional pipeline. Required
 failed/unknown evidence fails deployment, while optional failed/unknown
 evidence records a degraded run.
 
-For `full-demo`, ontology creation remains a separate operator action. After
-the deployed `30-create-ontology` notebook creates exactly one target ontology,
-`retail-setup post-ontology --env <name>` publishes Data Agents and task flow
-and runs complete readiness. Optional stream freshness can leave this command
-`DEGRADED` without failing the required post-ontology publication.
+For `full-demo`, deployment automatically checks for the stable ontology. When
+it is absent, the orchestrator runs the deployed `30-create-ontology` notebook,
+waits for the item, publishes both Data Agents, deploys all selected task-flow
+references, and verifies the graph after persistence. The
+`retail-setup post-ontology --env <name>` command remains as an idempotent
+repair path. Optional stream freshness can leave either path `DEGRADED` without
+failing required ontology/task-flow publication.
 
 ## `verify`
 

@@ -74,7 +74,7 @@ every feature the Microsoft Fabric product supports.
 | **`DEGRADED`** | Required capabilities passed, but at least one optional capability has failed, stale, or missing evidence. The required demo path is usable; inspect the report before presenting the affected optional feature. |
 | **`FAILED`** | A required capability failed or could not provide evidence. Do not present the deployment as ready. |
 | **`UNKNOWN`** | The verifier could not obtain evidence for a selected check. A required `UNKNOWN` makes the overall result `FAILED`; an optional `UNKNOWN` makes it `DEGRADED`. |
-| **`SKIPPED`** | The check does not apply to the selected deployment profile or was explicitly deferred to a later supported phase. A skipped check does not count as a failure. |
+| **`SKIPPED`** | The check does not apply to the selected deployment profile or verification mode. A skipped check does not count as a failure. |
 | **`IMP-*` identifier** | A named improvement or implementation item in a technical backlog. The number provides a stable link to its acceptance criteria. |
 | **`ENH-*` identifier** | An optional enhancement idea in a technical backlog. It is not required for the current supported demo unless another document says it has been implemented. |
 

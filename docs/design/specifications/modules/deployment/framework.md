@@ -20,16 +20,15 @@ flowchart LR
     ExtendedML[Run selected post-Reporting ML]
     RefreshSQL[Synchronize Lakehouse SQL endpoint metadata]
     Validate[Validate publication]
-    InitialVerify[Verify with post-ontology checks deferred]
-    Ontology[Operator creates ontology]
+    Ontology[Create or validate ontology]
     Agents[Publish Data Agents]
-    TaskFlow[Deploy resolved task flow]
+    TaskFlow[Deploy and read back complete task flow]
     FinalVerify[Verify complete readiness]
 
     Resolve --> Preflight --> Config --> TF --> StageInfra --> PublishInfra --> KQL
     KQL --> Setup --> RequiredML --> StageReporting --> PublishReporting
-    PublishReporting --> ExtendedML --> RefreshSQL --> Validate --> InitialVerify
-    InitialVerify --> Ontology --> Agents --> TaskFlow --> FinalVerify
+    PublishReporting --> ExtendedML --> RefreshSQL --> Validate --> Ontology
+    Ontology --> Agents --> TaskFlow --> FinalVerify
 ```
 
 Local and live preflight are the first executable plan steps and precede every
@@ -246,32 +245,40 @@ Published items not owned by Terraform still bind by type and display name.
 requires matching `--environment` and `--profile full-demo`; unscoped legacy
 task-flow deployment fails.
 
-Ontology creation is a separate manual preview boundary, not part of
-`setup-pipeline` or the required Reporting gate. Initial `full-demo`
-publication omits Data Agents and task flow, then records readiness with those
-ontology-dependent checks explicitly deferred. After running
-`30-create-ontology`, invoke:
+Ontology creation is separate from `setup-pipeline` and the required Reporting
+gate, but it completes automatically later in the same `full-demo` deploy.
+The orchestrator starts the deployed `30-create-ontology` notebook on every
+full-demo deployment. The notebook updates an existing ontology in place or
+creates it when absent, requires the derived-graph definition rebuild to
+succeed, and then the orchestrator waits for both terminal notebook success
+and exactly one stable ontology item.
+
+The next phase publishes both Data Agents and deploys the source-controlled
+task flow. Before mutation, source coverage must include every selected
+full-demo artifact. After mutation, the metadata service is read back and all
+11 tasks, 48 item bindings, and 11 edges must match exactly.
+
+The recovery command reruns the same idempotent phase:
 
 ```powershell
 retail-setup post-ontology --env <env>
 ```
 
-This command validates that exactly one target ontology exists before
-mutation, stages and publishes Data Agents, deploys the task flow, and runs
-complete readiness verification.
+This command creates the ontology when absent, rejects duplicate ontology
+items, stages and publishes Data Agents, deploys and reads back the task flow,
+and runs complete readiness verification.
 
 Task-flow deployment fails before publication when any selected reference is
-unresolved; it never publishes a silently partial graph. The live-validated
-post-ontology command is the only automatic path across this preview/manual
-boundary.
+unresolved; it never publishes a silently partial graph. The normal full-demo deploy and the recovery command use the same completion
+path.
 
 Task-flow publication currently relies on Fabric/Power BI metadata behavior
 that is not a stable public source-control item contract.
 
 ## Failure semantics
 
-- Required initial plan commands and post-ontology commands fail
-  their respective run.
+- Required initial plan and ontology/task-flow completion commands fail their
+  respective run.
 - Blockers, missing selected sources, invalid pipeline references, disabled
   tenant switches, unsuitable capacities, and unsafe profile downgrades fail
   before mutation.
@@ -297,9 +304,9 @@ the linked readiness report before presenting those optional capabilities.
 `FAILED` means a required capability is not ready.
 
 Standard and full-demo run the profile-aware live verifier after their
-pipeline gates. The initial full-demo pass defers only ontology, Data Agent,
-and task-flow evidence; the post-ontology command runs the complete pass. Both
-are read-only: they do not trigger a second pipeline. Required failed/unknown evidence fails deployment; optional
+pipeline gates. Full-demo verification runs after automatic ontology,
+Data Agent, and exact task-flow completion. Verification is read-only: it does
+not trigger a second pipeline. Required failed/unknown evidence fails deployment; optional
 failed/unknown evidence marks the journal and linked readiness report
 `DEGRADED`. Operators may explicitly trigger the profile's post-publish
 pipeline only with `retail-setup verify --env <env> --run-pipeline`.

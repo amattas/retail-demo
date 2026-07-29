@@ -325,6 +325,40 @@ def test_committed_taskflow_has_only_bindable_items() -> None:
             )
 
 
+def test_committed_taskflow_covers_every_full_demo_artifact() -> None:
+    data = json.loads(
+        (REPO_ROOT / "fabric" / "taskflow" / "taskflow.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    manifest, validation = load_repository_manifest(REPO_ROOT)
+    profile = resolve_profile(manifest, validation, "full-demo")
+    config = SimpleNamespace(
+        profile=profile,
+        lakehouse=SimpleNamespace(name="retail_lakehouse"),
+        eventhouse=SimpleNamespace(
+            name="retail_eventhouse",
+            kql_database_name="retail_eventhouse",
+        ),
+        powerbi=SimpleNamespace(
+            semantic_model_name="retail_model",
+            report_name="retail_model",
+        ),
+    )
+
+    errors = taskflow.taskflow_source_coverage_errors(
+        data,
+        taskflow.profile_taskflow_artifacts(REPO_ROOT, config),
+    )
+
+    assert errors == []
+    assert all(
+        item.get("artifactName") != "99-reset-lakehouse"
+        for task in data["tasks"]
+        for item in task["items"]
+    )
+
+
 def test_committed_taskflow_places_reporting_after_required_ml() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     data = json.loads(
@@ -335,7 +369,7 @@ def test_committed_taskflow_places_reporting_after_required_ml() -> None:
     tasks = {task["name"]: task for task in data["tasks"]}
     required_ml = tasks["Required ML Reporting Gate"]
     extended_ml = tasks["Post-Reporting Extended ML"]
-    semantic = tasks["Semantic Model"]
+    semantic = tasks["Reporting"]
 
     required_pipelines = {
         item["artifactName"]
@@ -558,6 +592,13 @@ def test_deploy_creates_taskflow_when_workspace_has_none(monkeypatch, tmp_path) 
 
     monkeypatch.setattr(taskflow, "create_taskflow", fake_create)
     monkeypatch.setattr(
+        taskflow,
+        "wait_for_taskflow",
+        lambda _session, _cluster, _workspace, expected: {
+            "taskFlow": expected
+        },
+    )
+    monkeypatch.setattr(
         taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1)
     )
 
@@ -581,6 +622,7 @@ def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -
     monkeypatch.setattr(taskflow, "_credential", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
     monkeypatch.setattr(taskflow, "list_workspace_items", lambda *_a: [])
+    monkeypatch.setattr(taskflow, "paginated_get", lambda *_a, **_k: [])
     monkeypatch.setattr(taskflow, "resolve_cluster", lambda *_a: "https://c")
     monkeypatch.setattr(
         taskflow,
@@ -594,6 +636,13 @@ def test_deploy_updates_taskflow_when_workspace_has_one(monkeypatch, tmp_path) -
     )
     monkeypatch.setattr(
         taskflow, "put_taskflow", lambda *a, **k: calls.update(put=calls["put"] + 1)
+    )
+    monkeypatch.setattr(
+        taskflow,
+        "wait_for_taskflow",
+        lambda _session, _cluster, _workspace, expected: {
+            "taskFlow": expected
+        },
     )
 
     taskflow.deploy_taskflow("retail-demo-dev", path)
@@ -629,6 +678,7 @@ def test_deploy_rejects_unresolved_references_before_taskflow_mutation(
     monkeypatch.setattr(taskflow, "_credential", lambda *_a, **_k: object())
     monkeypatch.setattr(taskflow, "find_workspace_id", lambda *_a: "ws")
     monkeypatch.setattr(taskflow, "list_workspace_items", lambda *_a: [])
+    monkeypatch.setattr(taskflow, "paginated_get", lambda *_a, **_k: [])
     monkeypatch.setattr(
         taskflow,
         "resolve_cluster",
@@ -646,6 +696,168 @@ def test_artifact_type_mapping_covers_key_fabric_types() -> None:
     assert m["LLMPlugin"] == "DataAgent"
     assert m["dataset"] == "SemanticModel"
     assert m["KustoEventHouse"] == "Eventhouse"
+
+
+def test_taskflow_records_accept_old_and_current_collection_shapes() -> None:
+    record = {"resourceId": "resource", "taskFlow": {"tasks": [], "edges": []}}
+
+    assert taskflow._taskflow_records([record]) == [record]
+    assert taskflow._taskflow_records({"taskFlows": [record]}) == [record]
+    with pytest.raises(ValueError, match="unexpected response shape"):
+        taskflow._taskflow_records({"value": [record]})
+
+
+def test_supplement_workspace_items_queries_missing_preview_types(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def fake_paginated(_session, _url, *, params=None):
+        calls.append(params)
+        return [
+            {
+                "id": "ontology-id",
+                "type": "Ontology",
+                "displayName": "RetailOntology_AutoGen",
+            }
+        ]
+
+    monkeypatch.setattr(taskflow, "paginated_get", fake_paginated)
+
+    items = taskflow.supplement_workspace_items(
+        object(),
+        "workspace",
+        [{"id": "pipeline-id", "type": "DataPipeline"}],
+        {"DataPipeline", "Ontology"},
+    )
+
+    assert {item["id"] for item in items} == {
+        "pipeline-id",
+        "ontology-id",
+    }
+    assert calls == [{"type": "Ontology"}]
+
+
+def test_wait_for_taskflow_rejects_incomplete_persisted_graph(
+    monkeypatch,
+) -> None:
+    expected = {
+        "tasks": [
+            {
+                "id": "task",
+                "type": "get data",
+                "name": "Load",
+                "description": "",
+                "loc": "0 0",
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:pipeline-id",
+                        "artifactObjectId": "pipeline-id",
+                    }
+                ],
+            }
+        ],
+        "edges": [],
+    }
+    monkeypatch.setattr(
+        taskflow,
+        "get_taskflow",
+        lambda *_args: {
+            "taskFlow": {
+                **expected,
+                "tasks": [{**expected["tasks"][0], "items": []}],
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="item bindings differ"):
+        taskflow.wait_for_taskflow(
+            object(),
+            "cluster",
+            "workspace",
+            expected,
+            attempts=1,
+            interval_seconds=0,
+        )
+
+
+def test_deployment_comparison_rejects_conflicting_unique_id() -> None:
+    expected = {
+        "tasks": [
+            {
+                "id": "task",
+                "type": "get data",
+                "name": "Load",
+                "description": "",
+                "loc": "0 0",
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:expected",
+                        "artifactObjectId": "expected",
+                    }
+                ],
+            }
+        ],
+        "edges": [],
+    }
+    actual = json.loads(json.dumps(expected))
+    actual["tasks"][0]["items"][0]["artifactUniqueId"] = "Pipeline:wrong"
+
+    errors = taskflow.taskflow_deployment_errors(expected, actual)
+
+    assert any("object ID disagrees" in error for error in errors)
+    assert "task 'task' item bindings differ" in errors
+
+
+def test_portable_comparison_rejects_moved_items_and_changed_task_fields() -> None:
+    expected = {
+        "tasks": [
+            {
+                "id": "one",
+                "type": "get data",
+                "name": "Load",
+                "description": "Load data.",
+                "loc": "0 0",
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactName": "setup-pipeline",
+                    }
+                ],
+            },
+            {
+                "id": "two",
+                "type": "store data",
+                "name": "Store",
+                "description": "",
+                "loc": "1 1",
+                "items": [],
+            },
+        ],
+        "edges": [
+            {
+                "id": "edge",
+                "source": "one",
+                "target": "two",
+                "fromPort": "right",
+                "toPort": "left",
+            }
+        ],
+    }
+    actual = json.loads(json.dumps(expected))
+    actual["tasks"][0]["name"] = "Changed"
+    actual["tasks"][1]["items"] = actual["tasks"][0].pop("items")
+    actual["tasks"][0]["items"] = []
+    actual["edges"][0]["fromPort"] = "bottom"
+
+    errors = taskflow.taskflow_portable_errors(expected, actual)
+
+    assert "task 'one' field 'name' differs" in errors
+    assert "task 'one' portable item references differ" in errors
+    assert "task 'two' portable item references differ" in errors
+    assert "task-flow edges differ" in errors
 
 
 def test_looks_like_guid() -> None:

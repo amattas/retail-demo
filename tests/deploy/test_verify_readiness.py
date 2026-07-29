@@ -277,8 +277,16 @@ def test_taskflow_binding_detects_unresolved_references_and_duplicate_edges() ->
         "tasks": [
             {
                 "items": [
-                    {"artifactObjectId": "resolved"},
-                    {"artifactObjectId": "stale"},
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:resolved",
+                        "artifactObjectId": "resolved",
+                    },
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:stale",
+                        "artifactObjectId": "stale",
+                    },
                 ]
             }
         ],
@@ -294,13 +302,59 @@ def test_taskflow_binding_detects_unresolved_references_and_duplicate_edges() ->
 
     assert not taskflow_binding_errors(
         expected,
-        {"tasks": [{"items": [{"artifactObjectId": "resolved"}]}]},
+        {
+            "tasks": [
+                {
+                    "items": [
+                        {
+                            "artifactType": "Pipeline",
+                            "artifactUniqueId": "Pipeline:resolved",
+                            "artifactObjectId": "resolved",
+                        }
+                    ]
+                }
+            ]
+        },
         expected,
     )
     errors = taskflow_binding_errors(expected, raw_actual, portable_actual)
 
     assert "live task flow contains an unresolved item reference" in errors
     assert "task-flow edges differ" in errors
+
+
+def test_taskflow_binding_rejects_conflicting_unique_and_object_ids() -> None:
+    expected = {
+        "tasks": [
+            {
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactName": "setup-pipeline",
+                    }
+                ]
+            }
+        ],
+        "edges": [],
+    }
+    raw_actual = {
+        "tasks": [
+            {
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:wrong",
+                        "artifactObjectId": "expected",
+                    }
+                ]
+            }
+        ],
+        "edges": [],
+    }
+
+    errors = taskflow_binding_errors(expected, raw_actual, expected)
+
+    assert any("object ID disagrees" in error for error in errors)
 
 
 def test_selected_kql_inventory_is_source_derived_and_differences_fail_closed() -> None:
@@ -925,6 +979,49 @@ def _profile_context(profile_name: str, now: datetime) -> ReadinessContext:
         deploy_journal=None,
         observed_at=now,
     )
+
+
+def test_live_item_inventory_supplements_preview_types(monkeypatch) -> None:
+    import deploy.scripts.taskflow as taskflow_module
+    import deploy.scripts.verify_readiness as readiness_module
+
+    context = _profile_context(
+        "full-demo",
+        datetime(2026, 7, 21, 10, 0, tzinfo=UTC),
+    )
+    adapter = object.__new__(FabricReadinessAdapter)
+    adapter.context = context
+    adapter.fabric = object()
+    adapter.workspace_id = WORKSPACE_ID
+    captured = {}
+    monkeypatch.setattr(
+        readiness_module,
+        "paginated_get",
+        lambda *_args, **_kwargs: [{"id": "lakehouse", "type": "Lakehouse"}],
+    )
+
+    def supplement(_session, _workspace, items, required_types):
+        captured["required_types"] = required_types
+        return [
+            *items,
+            {"id": "ontology", "type": "Ontology"},
+            {"id": "agent", "type": "DataAgent"},
+        ]
+
+    monkeypatch.setattr(
+        taskflow_module,
+        "supplement_workspace_items",
+        supplement,
+    )
+
+    items = adapter.list_items()
+
+    assert {"Ontology", "DataAgent"} <= captured["required_types"]
+    assert {item["type"] for item in items} >= {
+        "Lakehouse",
+        "Ontology",
+        "DataAgent",
+    }
 
 
 def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> None:

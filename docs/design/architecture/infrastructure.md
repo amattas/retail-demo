@@ -64,7 +64,7 @@ separately with the operator identity.
 | `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
 | `Reporting` | Semantic model and report |
 | `ML` | ML experiment shells |
-| `Data Agents` | Semantic-model and ontology agents, post-ontology only |
+| `Data Agents` | Semantic-model and ontology agents, automatically published after ontology creation in full-demo |
 
 ## Pipeline topology
 

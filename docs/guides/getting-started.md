@@ -36,8 +36,10 @@ historical setup notebooks. The operator runs setup 01 through 04 in order.
 
 `standard` adds Eventhouse for optional live events, automated pipelines,
 required machine-learning outputs, a Power BI semantic model, and a report.
-`full-demo` adds preview and manually completed experiences such as Ontology,
-Data Agents, and task flow. No profile deploys the destructive reset notebook
+`full-demo` adds preview experiences such as Ontology, Data Agents, and task
+flow. After live tenant and capacity checks pass, the guided deployment creates
+or validates the ontology and publishes those items automatically. No profile
+deploys the destructive reset notebook
 or starts the long-running stream automatically. Choose with `--profile`; see the
 [canonical workspace and profile inventory](workspace-inventory.md) before
 selecting an opt-in profile.
@@ -333,10 +335,10 @@ demo. See [Data-layer terms](glossary.md#data-layer-terms) for more detail.
 `retail-setup deploy` automatically waits for `setup-pipeline` and
 `ml-required` when `standard` or `full-demo` is selected. The required ML
 validator must succeed before the semantic model and report publish. Use at
-least 18 months of configured history. Ontology remains a separate
-preview/manual step. For `full-demo`, continue with
-[Complete post-ontology publication](deployment.md#complete-post-ontology-publication)
-after the initial deployment succeeds.
+least 18 months of configured history. For `full-demo`, deployment then creates
+or validates `RetailOntology_AutoGen`, publishes both Data Agents, writes the
+complete workspace task flow, and verifies the persisted graph before
+reporting success.
 
 You can retry setup deliberately from the repository:
 

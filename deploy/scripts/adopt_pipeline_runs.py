@@ -388,7 +388,7 @@ def main() -> int:
         report, _report_path = verify_environment(
             args.repo_root,
             args.environment,
-            defer_post_ontology=config.profile.selects("asset.data-agents"),
+            defer_post_ontology=False,
         )
         readiness_status = str(report["status"])
         finalize_recovery_journal(journal, readiness_status)

@@ -48,11 +48,11 @@ The current deploy plan:
 10. runs selected optional/experimental ML after Reporting;
 11. tells the Lakehouse SQL endpoint about newly created tables so Power BI and
     readiness queries can find them;
-12. runs read-only readiness verification; the initial `full-demo` pass
-    explicitly defers ontology-dependent evidence;
-13. after the operator creates the ontology, publishes Data Agents and task
-    flow only after `post-ontology` validates it and verifies
-    complete readiness.
+12. for `full-demo`, runs the deployed ontology notebook to create or
+    revalidate the target ontology and its derived graph;
+13. publishes both Data Agents and the complete 48-item task flow, then reads
+    the graph back and compares every task, item binding, and edge;
+14. runs read-only readiness verification over the complete selected profile.
 
 Each live run atomically updates
 `deploy/.generated/<env>/deploy-run.json`. Inspect it for target names,
@@ -481,37 +481,35 @@ The same artifact build also sets the deployed report's saved date filters to
 the month containing the configured history `end_date`. To change that default,
 update the history configuration, rerun `retail-setup render`, and deploy again.
 
-### Complete post-ontology publication {#complete-post-ontology-publication}
+### Recover the ontology and task flow
 
-Ontology creation is a separate preview/manual boundary. The initial
-`full-demo` deploy intentionally does not stage Data Agents or publish task
-flow, so a fresh workspace cannot fail on an ontology reference before this
-boundary.
+Normal `full-demo` deployment completes this phase automatically. It runs the
+deployed `30-create-ontology` notebook to create or revalidate
+`RetailOntology_AutoGen`, waits for the item to appear, publishes both Data
+Agents, and deploys the
+source-controlled task flow. The task-flow write is read back and compared
+with all 11 tasks, 48 selected item references, and 11 edges before the command
+reports success.
 
-1. In the Fabric workspace, open the deployed `30-create-ontology` Spark
-   notebook and select **Run all**.
-2. Wait for the notebook to finish and for an Ontology item named
-   `RetailOntology_AutoGen` to appear.
-3. Run:
+Use this idempotent recovery command only when that final phase was interrupted
+or an operator removed one of its items:
 
 ```powershell
 retail-setup post-ontology --env alice
 ```
 
-The command validates the ontology and captured target IDs before mutation,
-then stages/publishes Data Agents, publishes the fully resolved task flow, and
-runs final readiness verification. A Data Agent is a conversational Fabric
-experience that answers questions from an approved data source; the task flow
-is the workspace navigation map. Task-flow deployment fails closed instead of
-publishing a partial graph when any selected item is absent.
+The command reuses the same completion path. A Data Agent is a conversational
+Fabric experience that answers questions from an approved data source; the
+task flow is the workspace navigation map. Missing selected references,
+ambiguous task-flow records, or a graph that does not persist exactly all fail
+closed.
 
 ### Validate live readiness
 
 For `standard`, deployment runs the live verifier after the normal exact-run
-setup and ML gates. The initial `full-demo` pass does the same while marking
-ontology, Data Agents, and task flow as deferred; only the live-validated
-post-ontology command runs the complete pass. Verification is read-only and
-never adds another pipeline run. A required failure or unknown
+setup and ML gates. `full-demo` runs the complete verifier after ontology,
+Data Agent, and task-flow publication. Verification is read-only and never
+adds another pipeline run. A required failure or unknown
 result fails deployment; an optional failure or unknown result records
 `DEGRADED` in `deploy-run.json`. The journal links:
 
@@ -580,7 +578,7 @@ state and output evidence must survive cleanup.
 | SQL endpoint metadata is missing or stale | Run `python -m deploy.scripts.refresh_sql_endpoint --environment <env>`, wait for all required tables, then reload Power BI and rerun readiness. |
 | Power BI opens on the wrong month | Confirm the configured history end date, rerun `retail-setup render --env <env>`, and deploy again. The staged report uses the latest generated month, not a hard-coded calendar month. |
 | Setup pipeline fails | Inspect the exact run and retry with `deploy.scripts.run_pipeline --wait`; required ML and Reporting remain unpublished. |
-| Ontology task-flow link is absent | Wait for ontology creation, then run `retail-setup post-ontology --env <env>`; it validates the ontology before publication. |
+| Ontology, Data Agent, or task-flow item is absent | Run `retail-setup post-ontology --env <env>`. It idempotently creates the ontology when needed, republishes both agents, writes the full graph, and verifies persistence. |
 | Live rows are absent | Check notebook sink parameters, Query URI resolution, KQL permissions, connector errors, and ingestion timestamps. |
 | `--skip-terraform` rejects outputs | Use outputs captured for the same environment and workspace; run the normal Terraform path to refresh missing or stale identities. |
 

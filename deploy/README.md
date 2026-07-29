@@ -28,10 +28,10 @@ recreate, post-deploy work, and troubleshooting.
 7. Run selected post-Reporting ML.
 8. Synchronize Lakehouse SQL endpoint metadata so new tables are visible to
    Power BI and SQL readiness queries, then validate publication.
-9. For standard/full-demo, run read-only live readiness verification; the
-   initial full-demo pass defers ontology-dependent checks.
-10. After ontology creation, use the live-validating post-ontology command to
-    publish Data Agents, task flow, and complete readiness.
+9. For full-demo, create or validate the ontology, publish both Data Agents,
+   deploy the complete source-controlled task flow, and read the graph back.
+10. For standard/full-demo, run read-only live readiness verification over the
+    complete selected profile.
 
 The CLI confirmation occurs before Terraform apply. Apply then prints the
 change preview and proceeds with `-auto-approve`; there is no separate
@@ -139,14 +139,15 @@ identifiers are local-only and isolated by that key.
   `deploy.scripts.adopt_pipeline_runs` with the exact Fabric job IDs. It
   validates the live workspace, completion status, seven-day age limit, and
   setup-to-ML order, then runs readiness before finalizing a recovery journal.
-- Ontology creation is a separate preview/manual step. Initial publication
-  omits Data Agents and task flow. After creating the ontology, run:
+- Full-demo automatically creates or validates the ontology, publishes Data
+  Agents, and verifies the complete persisted task flow. If that final phase
+  is interrupted, run:
 
   ```powershell
   retail-setup post-ontology --env <env>
   ```
 
-  to validate the ontology, publish deferred items, and verify full readiness.
+  to rerun the idempotent completion path and verify full readiness.
 - KQL application uses the selected local operator identity.
 - Secrets must come from identity, environment variables, a secret store, or
   ignored local files.

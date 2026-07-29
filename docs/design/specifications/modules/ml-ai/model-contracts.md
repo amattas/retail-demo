@@ -15,8 +15,9 @@ extended ML:
 5. `full-demo` runs `ml-optional` and `ml-experimental` after Reporting.
 
 Optional or experimental failure cannot block required Reporting. Ontology
-creation is a separate manual/preview boundary. The task-flow metadata mirrors
-the runtime order as `Required ML Reporting Gate` -> `Semantic Model` ->
+creation is a separate preview phase after Reporting and extended ML, but
+full-demo executes it automatically. The task-flow metadata mirrors the
+runtime order as `Required ML Reporting Gate` -> `Reporting` ->
 `Post-Reporting Extended ML`.
 
 ## ML contracts
@@ -118,15 +119,16 @@ with an artifact built against an unvalidated schema.
 - prefers update-in-place for an existing ontology;
 - falls back to delete/recreate with polling and retry behavior when needed.
 
-Ontology creation is not part of the required ML pipeline. Run it deliberately
-after live tenant/capacity preflight passes, then use `post-ontology` to
-validate it and publish Data Agents and task flow.
+Ontology creation is not part of the required ML pipeline. Full-demo runs it
+automatically after Reporting and extended ML, but only after live
+tenant/capacity preflight passes. `post-ontology` reruns this phase for
+recovery.
 
 ## Data Agents
 
 Source-controlled Data Agent definitions reference authoring-workspace GUIDs.
-They are not staged during initial `full-demo` publication. After ontology
-creation is validated, the post-ontology phase rewrites:
+They are staged after ontology creation in the same `full-demo` deployment.
+That completion phase rewrites:
 
 - `workspaceId`
 - semantic-model `artifactId`
