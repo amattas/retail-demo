@@ -52,6 +52,10 @@ flowchart LR
     Stream -->|Spark Kusto connector| Event --> Views --> Query
 ```
 
+The Spark Kusto connector groups Spark rows and writes them into Eventhouse
+KQL tables. It is the direct connection between the optional stream notebook
+and Fabric's real-time store.
+
 `unknown_event` is a KQL catch-all table, not a generated business event type.
 
 ## Optional Eventhouse-to-Lakehouse projection
@@ -59,7 +63,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     KQL[(Eventhouse KQL)]
-    Bronze[cusn shortcuts]
+    Bronze[cusn Eventhouse shortcuts]
     S[03-streaming-to-silver]
     Silver[(ag Silver)]
     G[04-streaming-to-gold]
@@ -95,6 +99,8 @@ Source evidence remains distributed across:
 - Eventhouse ingestion state
 - ML model output metadata where present
 
-`retail-setup verify` now queries these sources through one bounded, redacted
-report. `IMP-013` remains open for actual live Fabric execution and freshness
-evidence.
+`retail-setup verify` queries these sources through one bounded, redacted
+report. Required historical, Reporting, ontology, Data Agent, and task-flow
+evidence has been exercised live. The remaining
+[IMP-013](../requirements/modules/operations/backlog.md#imp-013) boundary is
+recent evidence from the intentionally manual stream.

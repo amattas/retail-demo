@@ -115,3 +115,37 @@ def test_setup03_is_the_single_silver_publication_boundary():
     assert "write_to_lakehouse(df" not in dimensions
     assert "Dimension validation complete" in dimensions
     assert "write_all(result.tables, {}, cfg, run_id" in facts
+
+
+def test_setup04_loads_every_gold_source_table():
+    driver_path = (
+        UTILITY / "notebooks" / "templates" / "driver-04-gold.py"
+    )
+    driver_tree = ast.parse(driver_path.read_text())
+    sources_assignment = next(
+        node
+        for node in driver_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "GOLD_SOURCE_TABLES"
+            for target in node.targets
+        )
+    )
+    loaded_sources = set(ast.literal_eval(sources_assignment.value))
+
+    gold_tree = ast.parse(
+        (
+            UTILITY / "src" / "retail_setup" / "generation" / "gold.py"
+        ).read_text()
+    )
+    required_sources = {
+        node.slice.value
+        for node in ast.walk(gold_tree)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "tables"
+        and isinstance(node.slice, ast.Constant)
+        and isinstance(node.slice.value, str)
+    }
+
+    assert loaded_sources == required_sources

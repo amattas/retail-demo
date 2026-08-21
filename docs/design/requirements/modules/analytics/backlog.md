@@ -2,11 +2,12 @@
 
 ## Open
 
-### ENH-001 - Deploy RTI dashboards and Activator scenarios as first-class assets {#enh-001}
+### ENH-001 - Deploy Real-Time Intelligence dashboards and Activator scenarios as first-class assets {#enh-001}
 
 - **Priority / effort:** Idea / M
-- **Outcome:** Source-controlled dashboards and deterministic Activator
-  scenarios deploy with parameterized bindings.
+- **Outcome:** Source-controlled Real-Time Intelligence (RTI) dashboards and
+  deterministic Activator scenarios deploy with parameterized bindings.
+  Activator is Fabric's event-driven alerting and action service.
 - **Acceptance:** Stockout, truck SLA, and pricing scenarios can be reset and
   triggered predictably from a selected profile.
 

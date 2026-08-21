@@ -266,7 +266,7 @@ main() {
     fi
 
     printf 'Using Python: %s\n' "$python_exe"
-    "$python_exe" "$SetupPy" "$@"
+    "$python_exe" "$SetupPy" --profile full-demo "$@"
 }
 
 main "$@"

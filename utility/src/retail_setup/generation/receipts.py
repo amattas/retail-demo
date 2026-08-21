@@ -43,6 +43,11 @@ DECLINE_REASONS = [
 # Share of in-store receipts whose customer lives in the store's geography
 # (datagen home-store locality). The rest draw a network-wide customer.
 GEO_AFFINITY = 0.70
+# A deterministic cohort stops receiving purchases at staggered dates. This
+# creates realistic forward churn labels throughout long histories while
+# preserving active customers and pre-churn behavior.
+CHURN_COHORT_MODULUS = 10
+CHURN_CUTOFF_MAX_MARGIN_DAYS = 60
 
 # Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
 # lowercase token matched as a substring of the department name so the one
@@ -220,6 +225,51 @@ def _promo_eligible_expr(idx_col: Column, month_col: Column,
     return expr.otherwise(F.lit(False))
 
 
+def _apply_churn_lifecycle(
+    receipts: DataFrame,
+    d: seeded_draws,
+    cfg: GenerationConfig,
+) -> DataFrame:
+    """Stop assigning purchases to a seeded customer cohort after its cutoff."""
+
+    customer_count = int(cfg.customer_count)
+    history_days = (cfg.end_date - cfg.start_date).days + 1
+    cutoff_margin = min(
+        CHURN_CUTOFF_MAX_MARGIN_DAYS,
+        max(1, history_days // 4),
+    )
+    cutoff_span = max(1, history_days - (2 * cutoff_margin))
+    cutoff_offset = (
+        F.lit(cutoff_margin)
+        + F.pmod(
+            d.h64(["customer_id"], "churn_cutoff"),
+            F.lit(cutoff_span),
+        )
+    ).cast("int")
+    cutoff_date = F.date_add(F.lit(cfg.start_date), cutoff_offset)
+
+    replacement_base = (
+        F.pmod(
+            d.h64(["receipt_id_ext"], "active_customer"),
+            F.lit(customer_count),
+        )
+        + F.lit(1)
+    ).cast("long")
+    replacement_customer = F.when(
+        F.pmod(replacement_base, F.lit(CHURN_COHORT_MODULUS)) == 0,
+        F.pmod(replacement_base, F.lit(customer_count)) + F.lit(1),
+    ).otherwise(replacement_base)
+    is_post_churn = (
+        F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0
+    ) & (F.col("event_date") >= cutoff_date)
+    return receipts.withColumn(
+        "customer_id",
+        F.when(is_post_churn, replacement_customer).otherwise(
+            F.col("customer_id")
+        ),
+    )
+
+
 def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
                       d: seeded_draws, cfg: GenerationConfig) -> DataFrame:
     """Resolve each receipt's customer_id with store-geography affinity.
@@ -253,7 +303,7 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
     local = cust_ranked.select(
         F.col("cust_geo_id").alias("_lgeo"), F.col("local_rank").alias("_lrank"),
         F.col("customer_id").alias("local_customer"))
-    return (
+    assigned = (
         r.join(local, (F.col("store_geo_id") == F.col("_lgeo"))
                & (F.col("local_rank_target") == F.col("_lrank")), "left")
         .withColumn("customer_id", F.when(
@@ -262,6 +312,7 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
         .drop("_lgeo", "_lrank", "local_customer", "global_customer",
               "want_local", "local_rank_target", "geo_cust_count")
     )
+    return _apply_churn_lifecycle(assigned, d, cfg)
 
 
 def _fmt(cents_col: Column) -> Column:

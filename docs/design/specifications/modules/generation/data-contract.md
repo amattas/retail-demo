@@ -92,7 +92,8 @@ Current invariant checks include:
 
 Shared live/batch business invariants — operating hours, product launch
 eligibility, return timing, lifecycle presence, and validated profile controls —
-are enforced in generation and checked by `IMP-010`.
+are enforced in
+`utility/src/retail_setup/generation/invariants.py`.
 
 ## Naming compatibility
 
@@ -116,11 +117,17 @@ Current derived defaults include:
 - `brands_per_product = 3`
 - `truck_capacity = 15000`
 
+In-store customer assignment reserves a deterministic 10% cohort whose
+purchases stop at seeded, staggered dates inside the generation window.
+Post-cutoff receipts are reassigned to active customers. This preserves
+pre-churn behavior while guaranteeing forward-looking churn labels across
+chronological ML splits.
+
 ## Removed active-path behavior
 
 Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
-Hubs, outbox, DLQ, and Prometheus surfaces are not part of the supported
-Fabric-native contract.
+Hubs, outbox, dead-letter queue (DLQ), and Prometheus surfaces are not part of
+the supported Fabric-native contract.
 
 ## Verification
 

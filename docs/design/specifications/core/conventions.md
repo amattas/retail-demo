@@ -44,7 +44,8 @@ not durable sources of truth.
 - KQL event tables use `snake_case`.
 - Presentation names may be user-friendly.
 - The current physical contract still contains PascalCase and mixed-case
-  columns required by existing TMDL bindings. Those exceptions are explicit in
+  columns required by existing Tabular Model Definition Language (TMDL)
+  bindings in the Power BI model. Those exceptions are explicit in
   `schemas.py`; documentation must not claim the current model is pure
   `snake_case`.
 

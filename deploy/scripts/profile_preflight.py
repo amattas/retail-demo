@@ -38,6 +38,12 @@ _STATE_RESOURCE_ASSETS = {
     "fabric_spark_custom_pool": "asset.custom-spark-pool",
     "fabric_spark_workspace_settings": "asset.custom-spark-pool",
 }
+_STATE_RESOURCE_OUTPUT_KEYS = {
+    "fabric_workspace": "workspace_id",
+    "fabric_lakehouse": "lakehouse_id",
+    "fabric_eventhouse": "eventhouse_id",
+    "fabric_spark_custom_pool": "spark_custom_pool_id",
+}
 
 
 class ProfilePreflightError(ValueError):
@@ -50,7 +56,6 @@ class ProfilePreflightReport:
 
     profile: ResolvedProfile
     selected_notebooks: tuple[str, ...]
-    acknowledgements: tuple[str, ...]
 
 
 def selected_notebook_names(profile: ResolvedProfile) -> tuple[str, ...]:
@@ -75,32 +80,14 @@ def validate_profile_preflight(
     repo_root: Path,
     config: DeployConfig,
     *,
-    acknowledgements: tuple[str, ...] | list[str] = (),
     recreate: bool = False,
     skip_terraform: bool = False,
     validate_rendered: bool = True,
 ) -> ProfilePreflightReport:
-    """Validate only local/queryable facts and explicit operator boundaries."""
+    """Validate local and source-controlled profile prerequisites."""
 
     profile = config.profile
-    provided = tuple(acknowledgements)
     errors: list[str] = []
-    expected_acknowledgements = {
-        acknowledgement.id for acknowledgement in profile.required_acknowledgements
-    }
-    unknown = sorted(set(provided) - expected_acknowledgements)
-    missing = sorted(expected_acknowledgements - set(provided))
-    if len(provided) != len(set(provided)):
-        errors.append("operator acknowledgements must not be repeated")
-    if unknown:
-        errors.append(
-            f"unknown acknowledgements for {profile.deployment_name}: {unknown}"
-        )
-    if missing:
-        errors.append(
-            "missing required acknowledgements: "
-            + ", ".join(missing)
-        )
     for blocker in profile.blockers:
         errors.append(
             f"{blocker.id} ({blocker.tracking_issue}): {blocker.description}"
@@ -132,7 +119,6 @@ def validate_profile_preflight(
     return ProfilePreflightReport(
         profile=profile,
         selected_notebooks=selected_notebooks,
-        acknowledgements=provided,
     )
 
 
@@ -298,10 +284,11 @@ def _validate_non_destructive_transition(
     )
     state_assets: set[str] = set()
     state_outputs: dict[str, object] = {}
+    state_resource_outputs: dict[str, object] = {}
     if state_path.is_file():
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            state_assets, state_outputs, _ = (
+            state_assets, state_outputs, _, state_resource_outputs = (
                 _terraform_state_signals(state)
             )
         except (OSError, ValueError) as exc:
@@ -322,6 +309,22 @@ def _validate_non_destructive_transition(
         return
 
     if state_path.is_file():
+        resource_mismatch = sorted(
+            key
+            for key, value in state_resource_outputs.items()
+            if (key in outputs or key in state_outputs)
+            and (
+                outputs.get(key) != value
+                or state_outputs.get(key) != value
+            )
+        )
+        if resource_mismatch:
+            errors.append(
+                "Terraform output IDs disagree with managed resource IDs in "
+                f"state for keys {resource_mismatch}; run Terraform refresh/apply "
+                "and recapture outputs before publication"
+            )
+            return
         stale = sorted(
             key
             for key, value in state_outputs.items()
@@ -404,7 +407,7 @@ def _validate_non_destructive_transition(
 
 def _terraform_state_signals(
     document: object,
-) -> tuple[set[str], dict[str, object], bool]:
+) -> tuple[set[str], dict[str, object], bool, dict[str, object]]:
     """Extract authoritative profile/resource signals from local state."""
 
     if not isinstance(document, dict):
@@ -421,6 +424,7 @@ def _terraform_state_signals(
         if isinstance(value, dict) and "value" in value
     }
     assets: set[str] = set()
+    resource_outputs: dict[str, object] = {}
     has_managed_resources = False
     for resource in resources:
         if not isinstance(resource, dict) or resource.get("mode") != "managed":
@@ -434,7 +438,27 @@ def _terraform_state_signals(
         asset = _STATE_RESOURCE_ASSETS.get(str(resource.get("type", "")))
         if asset:
             assets.add(asset)
-    return assets, outputs, has_managed_resources
+        instance = instances[0]
+        if not isinstance(instance, dict):
+            raise ValueError("Terraform managed resource instance is not an object")
+        attributes = instance.get("attributes")
+        if not isinstance(attributes, dict):
+            continue
+        resource_type = str(resource.get("type", ""))
+        output_key = _STATE_RESOURCE_OUTPUT_KEYS.get(resource_type)
+        resource_id = attributes.get("id")
+        if output_key and resource_id:
+            resource_outputs[output_key] = resource_id
+        if resource_type == "fabric_eventhouse":
+            properties = attributes.get("properties")
+            database_ids = (
+                properties.get("database_ids")
+                if isinstance(properties, dict)
+                else None
+            )
+            if isinstance(database_ids, list) and len(database_ids) == 1:
+                resource_outputs["kql_database_id"] = database_ids[0]
+    return assets, outputs, has_managed_resources, resource_outputs
 
 
 def _configured_kql_scripts(repo_root: Path) -> list[str]:
@@ -452,7 +476,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate deployment profile preflight")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--environment", required=True)
-    parser.add_argument("--acknowledge", action="append", default=[])
     parser.add_argument("--recreate", action="store_true")
     parser.add_argument("--skip-terraform", action="store_true")
     args = parser.parse_args()
@@ -466,7 +489,6 @@ def main() -> int:
         report = validate_profile_preflight(
             args.repo_root,
             config,
-            acknowledgements=args.acknowledge,
             recreate=args.recreate,
             skip_terraform=args.skip_terraform,
         )

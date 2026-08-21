@@ -1,47 +1,60 @@
 # Microsoft Fabric Retail Demo
 
-This repository demonstrates Microsoft Fabric with deterministic synthetic
-retail data. The supported path configures and deploys Fabric assets, generates
-historical Lakehouse data, optionally streams live events into Eventhouse, and
-serves analytics through KQL, Power BI, ontology, and data-agent surfaces.
+## About this demo
 
-## Start here
+This demo shows how a retailer can bring sales, inventory, customer, marketing,
+fulfillment, and supply-chain data together in Microsoft Fabric. All data is
+synthetic, so you can use the solution for learning and demonstrations without
+exposing real customer or company records.
 
-- [Set up a workspace](guides/getting-started.md)
-- [Choose a profile and inspect its inventory](guides/workspace-inventory.md)
-- [Deploy and update a workspace](guides/deployment.md)
-- [Tour a deployed workspace](guides/deployed-walkthrough.md)
-- [Present the demo](guides/demo-script.md)
-- [Choose a use case](guides/use-cases.md)
-- [Operate and recover the demo](guides/operations.md)
-- [Browse design documentation](design/README.md)
+The solution supports two complementary views of the business:
 
-## Current supported components
+- **Historical analysis:** repeatable sales and operations history stored in a
+  Lakehouse and presented through Power BI.
+- **Optional live operations:** generated retail events written to Eventhouse
+  and queried with KQL (Kusto Query Language).
 
-| Area | Current source |
-| --- | --- |
-| Setup and data generation | `utility/` and `scripts/setup.*` |
-| Deployment | `deploy/` |
-| Eventhouse/KQL | `fabric/kql_database/` |
-| Lakehouse and ML notebooks | `fabric/lakehouse/` |
-| Pipelines and task flow | `fabric/pipelines/`, `fabric/taskflow/` |
-| Power BI | `fabric/powerbi/` |
-| Real-time analytics queries and templates | `fabric/querysets/`, `fabric/dashboards/`, `fabric/rules/` |
-| Ontology and agents | ontology notebook and `fabric/data-agents/` |
+It also includes machine-learning outputs, a business ontology, and Data
+Agents. These extensions demonstrate how the same governed data can support
+forecasts, risk signals, business relationships, and natural-language
+questions.
+
+## Choose the path that matches your role
+
+| If you are... | Start with... | What you will learn |
+| --- | --- | --- |
+| A business user or executive | [Use cases](guides/use-cases.md) | Which retail questions the demo can answer and which capabilities are optional. |
+| A business analyst | [Deployed walkthrough](guides/deployed-walkthrough.md) | How data moves from operations into Power BI, machine learning, and conversational experiences. |
+| A presenter | [Presenter demo](guides/demo-script.md) | A supported talk track, evidence checks, and statements to avoid. |
+| Setting up the demo for the first time | [Getting started](guides/getting-started.md) | Prerequisites, profiles, configuration, deployment, and first validation. |
+| Operating an existing workspace | [Operations](guides/operations.md) | Readiness results, freshness, recovery, and safe reruns. |
+| An entry-level developer | [Plain-language glossary](guides/glossary.md), then [Design overview](design/README.md) | Fabric terminology first, then components, contracts, and implementation boundaries. |
+
+Not sure which guide you need? Use the [guide index](guides/README.md).
+
+## What the demo contains
+
+| Business capability | What you can demonstrate | Main Fabric area |
+| --- | --- | --- |
+| Sales and margin analysis | Compare stores, products, channels, and periods | Lakehouse and Power BI |
+| Inventory and replenishment | Review movements, stockout signals, reorder activity, and current position | Lakehouse, Eventhouse, and Power BI |
+| Omnichannel fulfillment | Follow online demand and fulfillment events alongside store sales | Lakehouse, Eventhouse, and Power BI |
+| Marketing and customer analysis | Explore campaigns, attribution, customer segments, and churn risk | Lakehouse, machine learning, and Power BI |
+| Optional live operations | Query recent generated events and operational summaries | Eventhouse and KQL |
+| Business context and questions | Navigate Store, Product, Customer, and Receipt concepts or ask grounded questions | Ontology and Data Agents |
 
 The base historical contract contains seven dimensions, nineteen fact tables,
 and ten Gold aggregates. The live driver emits eighteen business event types;
-KQL adds the non-emitted `unknown_event` catch-all. The active semantic model
-contains 40 tables. Optional ML, ontology, dashboard, rule, and agent surfaces
-have separate deployment and support gates.
+KQL adds an `unknown_event` catch-all for unexpected event types. The active
+Power BI semantic model contains 40 tables. Optional machine learning,
+ontology, dashboard, rule, and agent experiences have separate readiness
+checks so that an optional failure does not silently invalidate required
+reporting.
 
-## Documentation model
+## Learn more
 
-This `docs/` tree is the only site source. Task-focused content stays under
-[Guides](guides/README.md), while normative technical material is grouped
-under [Design Documentation](design/README.md):
-
-- [Requirements](design/requirements/README.md) own outcomes and acceptance criteria.
-- [Specifications](design/specifications/README.md) own exact interfaces and workflows.
-- [Architecture](design/architecture/overview.md) owns current components and data flow.
-- [Security](design/security/threat-model.md) owns threats and controls.
+- [Guide index](guides/README.md) explains every task-focused guide.
+- [Plain-language glossary](guides/glossary.md) defines Fabric, data, reporting,
+  deployment, streaming, and machine-learning terms.
+- [Design documentation](design/README.md) contains architecture, requirements,
+  exact specifications, and security controls for contributors.

@@ -5,8 +5,8 @@
 The repository delivers a Microsoft Fabric retail demo with two active modes:
 
 1. Fabric-native historical setup through `retail-setup` and setup notebooks.
-2. Optional live RTI through `stream-events.ipynb` writing directly to
-   Eventhouse/KQL.
+2. Optional live Real-Time Intelligence (RTI) through `stream-events.ipynb`
+   writing directly to Eventhouse and queried with KQL (Kusto Query Language).
 
 ```mermaid
 flowchart LR
@@ -55,9 +55,13 @@ parquet shortcuts or the retained historical-load notebook.
 ## Optional live path
 
 `stream-events` emits eighteen typed business event types to Eventhouse through
-the Spark Kusto connector. KQL supplies the hot query path. Optional
+the Spark Kusto connector, which is the Kusto software component for Apache
+Spark. KQL supplies the recent-event query path. Optional
 Eventhouse shortcuts and streaming transforms project events into Lakehouse
 Silver and Gold.
+
+Direct Lake is the Power BI connection mode that reads Lakehouse tables
+directly from OneLake without importing a second copy.
 
 ## Contract owners
 
@@ -65,17 +69,20 @@ Silver and Gold.
 - Deploy inventory: [deployment framework](../specifications/modules/deployment/framework.md)
 - Base Lakehouse schema: [historical data contract](../specifications/modules/generation/data-contract.md)
 - Event envelope and payloads: [live event contract](../specifications/modules/streaming/event-contract.md)
-- KQL and medallion transforms: [Fabric analytics](../specifications/modules/analytics/fabric-analytics.md)
+- Eventhouse and Lakehouse analytics: [Fabric analytics](../specifications/modules/analytics/fabric-analytics.md)
 - Power BI: [semantic model](../specifications/modules/power-bi/semantic-model.md)
 - Ontology and agents: [ML and AI contracts](../specifications/modules/ml-ai/model-contracts.md)
 
 ## Current support boundaries
 
-- The deploy plan currently mixes core, ML, ontology, reset, and stream groups.
+- Deployment profiles select exact, dependency-checked groups. The destructive
+  reset group is excluded from every automatic profile.
 - Dashboard and rule assets are not yet guaranteed first-class deployable items.
 - The semantic model is Direct Lake and has 40 active tables, including four ML
   outputs.
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.
-- Security, deployment, KPI, and runtime-readiness gaps remain visible in the
-  owning module backlogs.
+- Required full-demo setup, ML, Reporting, ontology, agents, task flow, and
+  readiness have live evidence. Alternate authentication, separate
+  core/standard profile proof, and recent optional streaming evidence remain
+  in the owning module backlogs.

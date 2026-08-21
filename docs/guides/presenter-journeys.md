@@ -22,6 +22,11 @@ Before presenting:
    `run_seconds = 0`; zero runs indefinitely. Each source row emits one
    scenario bundle, so the presenter settings create a three-minute bounded
    run rather than a fixed business-event count.
+
+   In Fabric, open the `stream-events` notebook, find the cell labeled
+   **Parameters**, replace the values there, and then select **Run all**. Do not
+   paste the values into a new cell; Fabric uses the designated Parameters cell
+   when a notebook is started by automation.
 3. Confirm the `retail_querysets.KQLQueryset` item is bound to that database.
 4. Keep the [Operations guide](operations.md) open for recovery.
 
@@ -40,12 +45,13 @@ The following surfaces are not part of these reproducible core journeys:
 - Ontology and agent experiences require their capability, source, and access
   gates; the journeys do not depend on conversational answers.
 - Core journeys exclude ML. Reporting profiles fail closed on the required ML
-  contract, but a fresh live validation run remains
-  [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008).
+  contract, and presenters must still confirm that the current model freshness
+  check passes before discussing predictions.
 - Pricing actions and writeback remain optional
   ([ENH-002](../design/requirements/modules/power-bi/backlog.md#enh-002)).
-- Marketing attribution and ROAS are contract-tested but remain outside the
-  core presenter path until a live Fabric journey is recorded.
+- Marketing attribution and return on ad spend (ROAS) are contract-tested but
+  remain outside the core presenter path until a live Fabric journey is
+  recorded.
 - Truck dwell is implemented but remains outside these core journeys until a
   bounded live run returns recent `fn_truck_sla()` rows.
 
@@ -356,9 +362,8 @@ union withsource=table_name payment_processed, online_order_created
    [Operations](operations.md#common-recovery-paths).
 4. Do not clear Eventhouse or Lakehouse data between presentations.
 
-## Remaining ENH-005 boundary
+!!! note "Timing is a presentation target"
 
-These journeys complete only the documentation-first prompt-pack slice.
-Deployment presets named `lite`, `standard`, and `full-demo`, including measured
-runtimes and preset-specific asset controls, are not implemented. ENH-005
-therefore remains open.
+    The 5-7 minute duration describes the talk track, not deployment or data
+    generation time. Measure setup and streaming on the selected Fabric
+    capacity before scheduling a live session.

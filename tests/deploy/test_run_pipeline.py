@@ -17,6 +17,7 @@ TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 class _StatusResponse:
     def __init__(self, status: object) -> None:
         self._status = status
+        self.status_code = 200
 
     def raise_for_status(self) -> None:
         return None
@@ -166,6 +167,34 @@ def test_wait_for_pipeline_run_polls_exact_location_until_completed() -> None:
         == "Completed"
     )
     assert session.urls == [location, location, location]
+
+
+def test_wait_for_pipeline_run_refreshes_expired_token() -> None:
+    class _UnauthorizedResponse:
+        status_code = 401
+
+    class _ExpiredSession:
+        def get(self, _url: str) -> _UnauthorizedResponse:
+            return _UnauthorizedResponse()
+
+    replacement = _StatusSession(["Completed"])
+    refreshes = 0
+
+    def refresh():
+        nonlocal refreshes
+        refreshes += 1
+        return replacement
+
+    status = run_pipeline.wait_for_pipeline_run(
+        _ExpiredSession(),
+        "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+        refresh_session=refresh,
+    )
+
+    assert status == "Completed"
+    assert refreshes == 1
 
 
 @pytest.mark.parametrize(

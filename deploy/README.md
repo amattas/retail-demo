@@ -19,17 +19,19 @@ recreate, post-deploy work, and troubleshooting.
 
 ## Ordered deploy plan
 
-1. Run profile/source preflight.
+1. Run local profile/source and live tenant/capacity preflight.
 2. Generate inputs and apply Terraform unless `--skip-terraform` is selected.
 3. Stage and publish selected infrastructure without Reporting.
 4. Build and execute the ordered KQL database script.
 5. For Reporting profiles, wait for setup and required ML validation.
 6. Stage and publish Reporting only after terminal success.
-7. Run selected post-Reporting ML and validate publication.
-8. For standard/full-demo, run read-only live readiness verification; the
-   initial full-demo pass defers ontology-dependent checks.
-9. After ontology creation, use the acknowledged post-ontology command to
-   publish Data Agents, task flow, and complete readiness.
+7. Run selected post-Reporting ML.
+8. Synchronize Lakehouse SQL endpoint metadata so new tables are visible to
+   Power BI and SQL readiness queries, then validate publication.
+9. For full-demo, create or validate the ontology, publish both Data Agents,
+   deploy the complete source-controlled task flow, and read the graph back.
+10. For standard/full-demo, run read-only live readiness verification over the
+    complete selected profile.
 
 The CLI confirmation occurs before Terraform apply. Apply then prints the
 change preview and proceeds with `-auto-approve`; there is no separate
@@ -130,15 +132,22 @@ identifiers are local-only and isolated by that key.
   the prior report remains compatible because required ML schemas retain their
   legacy physical bindings.
 - Full-demo runs optional and experimental ML only after Reporting.
-- Ontology creation is a separate preview/manual step. Initial publication
-  omits Data Agents and task flow. After creating the ontology, run:
+- Reporting profiles refresh Lakehouse SQL endpoint metadata after ML. This
+  step may degrade the journal, but readiness still fails closed if a required
+  table is unavailable.
+- When a deployment was completed through manual recovery, use
+  `deploy.scripts.adopt_pipeline_runs` with the exact Fabric job IDs. It
+  validates the live workspace, completion status, seven-day age limit, and
+  setup-to-ML order, then runs readiness before finalizing a recovery journal.
+- Full-demo automatically creates or validates the ontology, publishes Data
+  Agents, and verifies the complete persisted task flow. If that final phase
+  is interrupted, run:
 
   ```powershell
-  retail-setup post-ontology --env <env> `
-    --acknowledge ack.full-demo.ontology-created
+  retail-setup post-ontology --env <env>
   ```
 
-  to validate the ontology, publish deferred items, and verify full readiness.
+  to rerun the idempotent completion path and verify full readiness.
 - KQL application uses the selected local operator identity.
 - Secrets must come from identity, environment variables, a secret store, or
   ignored local files.

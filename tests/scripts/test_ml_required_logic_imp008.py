@@ -96,6 +96,10 @@ def test_demand_uses_dense_rolling_origins_and_recursive_state() -> None:
     assert 'subset=["units_sold", "revenue"]' in code
     assert "def forecast_recursively" in code
     assert 'F.col("predicted_units").alias("units_sold")' in code
+    recursive_source = _function_source(path, "forecast_recursively")
+    assert "state_history_days = max(" in recursive_source
+    assert recursive_source.count(".localCheckpoint(eager=True)") == 2
+    assert "previous_state.unpersist()" in recursive_source
     assert "def calibration_residual_quantiles" in code
     assert "F.percentile_approx(" in code
     assert "FORECAST_INTERVAL_Z" not in code
@@ -239,6 +243,7 @@ def test_stockout_is_eod_future_labeled_and_calibrated() -> None:
     label_source = _function_source(path, "attach_future_stockout_labels")
     assert '"store_id", "product_id", "event_date"' in eod_source
     assert "F.row_number()" in eod_source
+    assert 'F.greatest(F.col("balance"), F.lit(0.0))' in eod_source
     assert '> F.col("snapshot.snapshot_date")' in label_source
     assert '"label_available_date"' in label_source
     assert "IsotonicRegression(" in code
@@ -246,6 +251,8 @@ def test_stockout_is_eod_future_labeled_and_calibrated() -> None:
     assert 'F.col("calibrated_probability")' in code
     assert 'F.col("inventory_as_of").cast("timestamp")' in code
     assert '["store_id", "product_id", "forecast_horizon_days"]' in code
+    assert 'F.col("receipt_type") == "SALE"' in code
+    assert 'F.col("quantity") > 0' in code
 
 
 def test_required_outputs_separate_generation_time_from_source_as_of() -> None:

@@ -11,7 +11,7 @@
       }
     ]
   },
-  "version": "1.3.0",
+  "version": "1.4.0",
   "prerequisites": [
     {
       "id": "prerequisite.fabric-access",
@@ -1076,35 +1076,14 @@
         "streaming-data-load.DataPipeline"
       ],
       "post_deploy_pipeline_ref": "setup-pipeline.DataPipeline",
-      "required_acknowledgements": [
-        {
-          "id": "ack.full-demo.preview-surfaces",
-          "kind": "preview",
-          "description": "The operator verified that the tenant permits Ontology and Data Agent preview surfaces."
-        },
-        {
-          "id": "ack.full-demo.custom-pool-capacity",
-          "kind": "capacity",
-          "description": "The operator reviewed the configured custom Spark pool against the target capacity."
-        },
-        {
-          "id": "ack.full-demo.task-flow-api",
-          "kind": "preview",
-          "description": "The operator accepts that task-flow deployment uses an undocumented metadata endpoint."
-        },
-        {
-          "id": "ack.full-demo.manual-assets",
-          "kind": "manual",
-          "description": "The operator accepts that dashboard templates, rule definitions, stream execution, and final bindings require manual work."
-        }
-      ],
+      "required_acknowledgements": [],
       "blockers": [],
       "boundaries": {
-        "runtime": "Publishes infrastructure, waits for setup and required ML validation, publishes Reporting, then runs isolated optional and experimental ML pipelines.",
+        "runtime": "Publishes infrastructure, waits for setup and required ML validation, publishes Reporting, runs isolated optional and experimental ML pipelines, then creates or validates the ontology and publishes Data Agents and the complete task flow.",
         "capacity": "Requires operator-reviewed capacity for concurrent Eventhouse, Spark, custom-pool, Power BI, ontology, and agent workloads.",
         "cost": "Selects every non-destructive demo surface and therefore has the broadest potential Fabric consumption; no numeric estimate is asserted.",
-        "manual": "Dashboard and Activator sources are not auto-published, the stream is manually controlled, and preview bindings may need operator repair.",
-        "preview": "Ontology, Data Agents, custom Spark pool, and undocumented task-flow metadata behavior require explicit acknowledgements."
+        "manual": "Dashboard and Activator sources are not auto-published, and the stream remains manually controlled.",
+        "preview": "Ontology and Data Agent tenant switches and custom-pool capacity are checked live before mutation; ontology creation, Data Agent publication, and exact persisted task-flow verification complete automatically."
       },
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [
@@ -4522,6 +4501,7 @@
       "source_tables": [
         "truck_arrived",
         "truck_departed",
+        "fact_truck_moves",
         "dim_trucks",
         "dim_stores",
         "dim_distribution_centers"

@@ -141,6 +141,8 @@ def test_delivery_logic_is_chronological_calibrated_and_inference_only() -> None
     assert "randomSplit" not in source
     assert 'BRONZE_SCHEMA = get_env("BRONZE_SCHEMA", default="cusn")' in source
     assert "read_bronze(TRUCK_ARRIVED_TABLE)" in source
+    assert "silver_exists(TRUCK_MOVES_TABLE)" in source
+    assert 'F.col("status") == "COMPLETED"' in source
     assert "read_bronze(TRUCK_DEPARTED_TABLE)" in source
     assert "FACT_TRUCK_MOVES_TABLE" not in source
     assert (
@@ -163,7 +165,7 @@ def test_delivery_logic_is_chronological_calibrated_and_inference_only() -> None
     assert source.index("if inference_ready_count == 0:") < source.index(
         'save_gold(df_predictions, OUTPUT_TABLE)'
     )
-    assert "existing output is retained" in source
+    assert "empty contract-valid prediction snapshot" in source
 
 
 def test_delivery_split_helper_is_deterministic() -> None:

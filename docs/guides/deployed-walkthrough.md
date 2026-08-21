@@ -28,6 +28,13 @@ contains the detailed talk track and support boundaries.
 
 Open the workspace task flow and select the **Retail Demo** flow.
 
+!!! info "Task flow is a full-demo experience"
+
+    The task flow is published only after the `full-demo` ontology step is
+    complete. If the workspace uses `core` or `standard`, skip this step and
+    open the workspace item list. You can still follow the historical, live,
+    and Reporting paths described below.
+
 ![Retail Demo workspace task flow](../assets/screenshots/workspace-task-flow.png)
 
 *The task flow groups ingestion, transformation, storage, semantic, ontology,
@@ -70,9 +77,9 @@ to Analytics and AI.
 - Skip optional ontology, agent, ML, or live-streaming surfaces that have not
   passed their source, permission, and capability checks.
 
-## Walkthrough validation
+## What to check during the walkthrough
 
-| Interaction | Expected result |
+| What you open | What a ready workspace should show |
 | --- | --- |
 | Open the Retail Demo task flow | Historical, live, storage, semantic, ontology, ML, and agent tasks are visible. |
 | Open the Data platform guide | Pipeline, notebook, Lakehouse, and Eventhouse steps are available without analytics detail. |

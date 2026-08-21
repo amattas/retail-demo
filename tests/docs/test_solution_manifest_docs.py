@@ -311,7 +311,7 @@ def test_profile_inventory_safety_and_guide_rows_match_manifest() -> None:
     support_labels = {
         "core": "core/default",
         "standard": "supported opt-in",
-        "full-demo": "preview/acknowledged",
+        "full-demo": "preview/live-preflight",
     }
     configured_kql_scripts = tuple(
         path.name

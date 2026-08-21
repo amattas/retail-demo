@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,6 +32,7 @@ _IN_PROGRESS_STATUSES = frozenset({"NotStarted", "InProgress"})
 _FAILED_STATUSES = frozenset({"Failed", "Cancelled", "Deduped", "Skipped"})
 _SUCCESS_STATUS = "Completed"
 _KNOWN_STATUSES = _IN_PROGRESS_STATUSES | _FAILED_STATUSES | {_SUCCESS_STATUS}
+_MAX_AUTH_REFRESHES = 8
 
 
 class PipelineRunError(RuntimeError):
@@ -85,6 +87,7 @@ def wait_for_pipeline_run(
     pipeline_id: str | None = None,
     timeout_seconds: float = 21600,
     poll_interval_seconds: float = 15,
+    refresh_session: Callable[[], requests.Session] | None = None,
 ) -> str:
     """Poll the returned job URL until the exact run reaches ``Completed``."""
 
@@ -94,6 +97,7 @@ def wait_for_pipeline_run(
         pipeline_id=pipeline_id,
         timeout_seconds=timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
+        refresh_session=refresh_session,
     )
     return str(payload["status"])
 
@@ -105,6 +109,7 @@ def wait_for_pipeline_job(
     pipeline_id: str | None = None,
     timeout_seconds: float = 21600,
     poll_interval_seconds: float = 15,
+    refresh_session: Callable[[], requests.Session] | None = None,
 ) -> dict[str, object]:
     """Poll one exact job URL and return its terminal-success payload."""
 
@@ -116,8 +121,18 @@ def wait_for_pipeline_job(
         raise ValueError("pipeline wait timeout must be positive and interval non-negative")
 
     deadline = time.monotonic() + timeout_seconds
+    auth_refreshes = 0
     while True:
         response = session.get(location)
+        if getattr(response, "status_code", None) == 401 and refresh_session:
+            auth_refreshes += 1
+            if auth_refreshes > _MAX_AUTH_REFRESHES:
+                raise PipelineRunError(
+                    "Pipeline status polling remained unauthorized after "
+                    f"{_MAX_AUTH_REFRESHES} token refreshes."
+                )
+            session = refresh_session()
+            continue
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
@@ -265,10 +280,15 @@ def main() -> int:
         and args.tenant_id.casefold() != config.tenant_id.casefold()
     ):
         raise SystemExit("--tenant-id does not match the configured tenant")
-    session = build_session(
-        auth_mode=args.auth_mode or config.auth_mode,
-        tenant_id=tenant_id,
-    )
+    auth_mode = args.auth_mode or config.auth_mode
+
+    def fresh_session():
+        return build_session(
+            auth_mode=auth_mode,
+            tenant_id=tenant_id,
+        )
+
+    session = fresh_session()
     pipeline_id = find_pipeline_id(session, workspace_id, args.pipeline)
     location = run_pipeline(session, workspace_id, pipeline_id)
     console.info(f"Started pipeline run for {args.pipeline!r} ({pipeline_id}).")
@@ -282,6 +302,7 @@ def main() -> int:
                 pipeline_id=pipeline_id,
                 timeout_seconds=args.timeout_seconds,
                 poll_interval_seconds=args.poll_interval_seconds,
+                refresh_session=fresh_session,
             )
         except PipelineRunError as exc:
             console.error(str(exc))

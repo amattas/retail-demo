@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,6 +20,7 @@ from deploy.scripts.verify_readiness import (
     FabricReadinessAdapter,
     ReadinessContext,
     ReadinessRunner,
+    _connect_lakehouse_sql,
     aggregate_status,
     build_report,
     checkpoint_signal_from_rows,
@@ -117,6 +119,36 @@ def test_notebook_definition_requires_exact_lakehouse_binding() -> None:
         lakehouse_name="retail_lakehouse",
         workspace_id=WORKSPACE_ID,
     )
+
+
+def test_notebook_source_definition_reads_fabric_metadata_binding() -> None:
+    source = "\n".join(
+        [
+            "# Fabric notebook source",
+            "# META {",
+            '# META   "dependencies": {',
+            '# META     "lakehouse": {',
+            f'# META       "default_lakehouse": "{LAKEHOUSE_ID}",',
+            '# META       "default_lakehouse_name": "retail_lakehouse",',
+            (
+                '# META       "default_lakehouse_workspace_id": '
+                f'"{WORKSPACE_ID}"'
+            ),
+            "# META     }",
+            "# META   }",
+            "# META }",
+            "",
+            "print('ready')",
+        ]
+    )
+    definition = _definition("notebook-content.py", source)
+
+    assert notebook_binding_errors(
+        definition,
+        lakehouse_id=LAKEHOUSE_ID,
+        lakehouse_name="retail_lakehouse",
+        workspace_id=WORKSPACE_ID,
+    ) == []
 
 
 def test_pipeline_definition_detects_missing_and_mismatched_refs() -> None:
@@ -245,8 +277,16 @@ def test_taskflow_binding_detects_unresolved_references_and_duplicate_edges() ->
         "tasks": [
             {
                 "items": [
-                    {"artifactObjectId": "resolved"},
-                    {"artifactObjectId": "stale"},
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:resolved",
+                        "artifactObjectId": "resolved",
+                    },
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:stale",
+                        "artifactObjectId": "stale",
+                    },
                 ]
             }
         ],
@@ -262,13 +302,59 @@ def test_taskflow_binding_detects_unresolved_references_and_duplicate_edges() ->
 
     assert not taskflow_binding_errors(
         expected,
-        {"tasks": [{"items": [{"artifactObjectId": "resolved"}]}]},
+        {
+            "tasks": [
+                {
+                    "items": [
+                        {
+                            "artifactType": "Pipeline",
+                            "artifactUniqueId": "Pipeline:resolved",
+                            "artifactObjectId": "resolved",
+                        }
+                    ]
+                }
+            ]
+        },
         expected,
     )
     errors = taskflow_binding_errors(expected, raw_actual, portable_actual)
 
     assert "live task flow contains an unresolved item reference" in errors
     assert "task-flow edges differ" in errors
+
+
+def test_taskflow_binding_rejects_conflicting_unique_and_object_ids() -> None:
+    expected = {
+        "tasks": [
+            {
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactName": "setup-pipeline",
+                    }
+                ]
+            }
+        ],
+        "edges": [],
+    }
+    raw_actual = {
+        "tasks": [
+            {
+                "items": [
+                    {
+                        "artifactType": "Pipeline",
+                        "artifactUniqueId": "Pipeline:wrong",
+                        "artifactObjectId": "expected",
+                    }
+                ]
+            }
+        ],
+        "edges": [],
+    }
+
+    errors = taskflow_binding_errors(expected, raw_actual, expected)
+
+    assert any("object ID disagrees" in error for error in errors)
 
 
 def test_selected_kql_inventory_is_source_derived_and_differences_fail_closed() -> None:
@@ -364,6 +450,7 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
                     "generated_at": timestamp,
                 }
             ],
+            [{"table_count": 1}],
             [{"source_count": 2, "updated_at": timestamp}],
         ]
     )
@@ -376,6 +463,86 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
     assert setup["generated_at"] == "2026-07-21T09:58:00+00:00"
     assert watermark is not None
     assert watermark["updated_at"] == "2026-07-21T09:58:00+00:00"
+
+
+def test_checkpoint_query_coerces_extent_tags_to_dynamic() -> None:
+    adapter = object.__new__(FabricReadinessAdapter)
+    queries = []
+    adapter._execute_kql = (  # type: ignore[method-assign]
+        lambda query, **kwargs: queries.append((query, kwargs)) or []
+    )
+
+    signal = adapter.checkpoint_signal(frozenset({"receipt_created"}))
+
+    assert signal is None
+    assert "todynamic(Tags)" in queries[0][0]
+    assert "mv-expand tag=tag_values" in queries[0][0]
+
+
+def test_sql_connection_prefers_installed_system_odbc_driver(monkeypatch) -> None:
+    calls = []
+    connection = object()
+    pyodbc = SimpleNamespace(
+        drivers=lambda: ["ODBC Driver 18 for SQL Server"],
+        connect=lambda *args, **kwargs: calls.append((args, kwargs)) or connection,
+    )
+    monkeypatch.setitem(sys.modules, "pyodbc", pyodbc)
+    monkeypatch.setitem(
+        sys.modules,
+        "mssql_python",
+        SimpleNamespace(
+            connect=lambda *_args, **_kwargs: pytest.fail(
+                "bundled driver should not be used"
+            )
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com",
+        "retail_lakehouse",
+        credential,
+    )
+
+    assert result is connection
+    assert "ODBC Driver 18 for SQL Server" in calls[0][0][0]
+    assert calls[0][1]["timeout"] == 60
+    assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
+
+
+def test_sql_connection_falls_back_to_bundled_driver(monkeypatch) -> None:
+    calls = []
+    connection = object()
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(drivers=lambda: [], connect=lambda *_args, **_kwargs: None),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "mssql_python",
+        SimpleNamespace(
+            connect=lambda *args, **kwargs: calls.append((args, kwargs))
+            or connection
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com",
+        "retail_lakehouse",
+        credential,
+    )
+
+    assert result is connection
+    assert "Database=retail_lakehouse" in calls[0][0][0]
+    assert "Authentication=" not in calls[0][0][0]
+    assert calls[0][1]["timeout"] == 60
+    assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
 
 
 def test_terminal_pipeline_evidence_requires_complete_ordered_timestamps() -> None:
@@ -417,6 +584,7 @@ def test_pipeline_history_correlation_rejects_stale_and_out_of_window_runs() -> 
         pipeline_id="pipeline-a",
         step_started=step_started,
         step_ended=step_ended,
+        expected_run_id="job-a",
     )
     assert evidence["id"] == "job-a"
 
@@ -439,6 +607,14 @@ def test_pipeline_history_correlation_rejects_stale_and_out_of_window_runs() -> 
             pipeline_id="pipeline-a",
             step_started=step_started,
             step_ended=step_ended,
+        )
+    with pytest.raises(Exception, match="exact adopted run"):
+        correlated_pipeline_run(
+            [valid],
+            pipeline_id="pipeline-a",
+            step_started=step_started,
+            step_ended=step_ended,
+            expected_run_id="job-b",
         )
 
 
@@ -805,6 +981,49 @@ def _profile_context(profile_name: str, now: datetime) -> ReadinessContext:
     )
 
 
+def test_live_item_inventory_supplements_preview_types(monkeypatch) -> None:
+    import deploy.scripts.taskflow as taskflow_module
+    import deploy.scripts.verify_readiness as readiness_module
+
+    context = _profile_context(
+        "full-demo",
+        datetime(2026, 7, 21, 10, 0, tzinfo=UTC),
+    )
+    adapter = object.__new__(FabricReadinessAdapter)
+    adapter.context = context
+    adapter.fabric = object()
+    adapter.workspace_id = WORKSPACE_ID
+    captured = {}
+    monkeypatch.setattr(
+        readiness_module,
+        "paginated_get",
+        lambda *_args, **_kwargs: [{"id": "lakehouse", "type": "Lakehouse"}],
+    )
+
+    def supplement(_session, _workspace, items, required_types):
+        captured["required_types"] = required_types
+        return [
+            *items,
+            {"id": "ontology", "type": "Ontology"},
+            {"id": "agent", "type": "DataAgent"},
+        ]
+
+    monkeypatch.setattr(
+        taskflow_module,
+        "supplement_workspace_items",
+        supplement,
+    )
+
+    items = adapter.list_items()
+
+    assert {"Ontology", "DataAgent"} <= captured["required_types"]
+    assert {item["type"] for item in items} >= {
+        "Lakehouse",
+        "Ontology",
+        "DataAgent",
+    }
+
+
 def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> None:
     now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
     context = _profile_context("standard", now)
@@ -833,7 +1052,8 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
     adapter = ModelAdapter()
     readiness = ReadinessRunner(context, adapter)
     readiness.pipeline_evidence["ml-required"] = {
-        "start_time": (now - timedelta(minutes=10)).isoformat()
+        "start_time": (now - timedelta(minutes=10)).isoformat(),
+        "end_time": (now - timedelta(minutes=4)).isoformat(),
     }
 
     observation = readiness._model_freshness("required")
@@ -844,6 +1064,35 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
     adapter.run_id_present = False
     with pytest.raises(EvidenceUnknown, match="blank model_run_id"):
         readiness._model_freshness("required")
+
+
+def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> None:
+    now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
+    context = _profile_context("full-demo", now)
+
+    class EmptyModelAdapter:
+        def model_signals(self, contracts):
+            return [
+                {
+                    "contract_id": contract["id"],
+                    "as_of": None,
+                    "run_id_present": False,
+                    "lineage_hash": contract["id"],
+                }
+                for contract in contracts
+            ]
+
+    readiness = ReadinessRunner(context, EmptyModelAdapter())
+    readiness.pipeline_evidence["ml-optional"] = {
+        "start_time": (now - timedelta(minutes=10)).isoformat(),
+        "end_time": (now - timedelta(minutes=5)).isoformat(),
+    }
+
+    observation = readiness._model_freshness("optional")
+
+    assert observation.freshness is not None
+    assert observation.freshness["age_seconds"] == 300
+    assert len(observation.evidence["empty_contracts"]) == 6
 
 
 def test_full_demo_initial_inventory_defers_ontology_dependent_items() -> None:

@@ -26,10 +26,13 @@ Open the [architecture overview](../design/architecture/overview.md).
 
 Talk track:
 
-- Setup notebooks create deterministic historical Silver and Gold data.
+- Setup notebooks create repeatable historical data. Silver is the cleaned,
+  detailed layer; Gold is the business-ready summary layer.
 - `stream-events.ipynb` writes eighteen live event types directly to Eventhouse.
-- KQL serves the hot path; Lakehouse stores typed history and aggregates.
-- Power BI uses Direct Lake.
+- KQL (Kusto Query Language) answers recent event questions; Lakehouse stores
+  durable history and summaries.
+- Power BI uses Direct Lake, which reads Lakehouse data without importing a
+  second copy.
 - Optional ontology and agent surfaces add business context after their
   capability and binding checks pass.
 
@@ -53,8 +56,14 @@ mv_store_sales_minute
 | order by sales desc
 ```
 
-Explain the envelope (`event_type`, `trace_id`, timestamps, correlation and
-partition fields) and typed payload mapping.
+Suggested talk track:
+
+> Each generated business event says what happened and when. A unique trace
+> identifier connects related receipt, line-item, promotion, and payment
+> events, so we can follow one synthetic transaction across the process. The
+> payload also identifies the store or order used to keep related events
+> together. Eventhouse records when it received each event, which lets us prove
+> that the optional stream is currently active.
 
 ## 3. Ask operational questions
 
@@ -82,8 +91,14 @@ Lakehouse:
 
 ## 5. Show Power BI
 
-Open the PBIP report and demonstrate historical and operational pages backed by
-the Direct Lake model. Use explicit measures and current data periods.
+Open the Power BI Project (PBIP) report and demonstrate historical and
+operational pages backed by the Direct Lake model. Use explicit measures and
+current data periods.
+
+Deployment saves each date filter to the month containing the configured
+history end date. State that month before showing a number. If the report was
+rerendered with a different history window, its default month changes with the
+data.
 
 If required ML tables have not been generated and validated, do not present
 predictive pages as supported output.
@@ -104,9 +119,9 @@ Avoid using these as headline proof points without the stated qualification:
   [event contract](../design/specifications/modules/streaming/event-contract.md#truck-lifecycle);
   do not present it as live-validated until a Fabric smoke run has been
   recorded.
-- Marketing attribution and ROAS are implemented and contract-tested; do not
-  present them as live-validated until a Fabric smoke run has been recorded.
-- Required ML publication is fail-closed locally, but do not present it as
-  live-validated until the fresh-workspace
-  [IMP-008](../design/requirements/modules/ml-ai/backlog.md#imp-008) run is
-  recorded.
+- Marketing attribution and return on ad spend (ROAS) are implemented and
+  contract-tested. State the seven-day last-touch rule and selected data period
+  before presenting a result.
+- Required ML publication has been exercised live and remains fail-closed.
+  Still check the current readiness report before presenting predictions,
+  because model evidence is time-bounded.

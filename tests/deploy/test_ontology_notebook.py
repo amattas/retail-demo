@@ -136,3 +136,14 @@ def test_business_entities_emit_multiple_data_bindings() -> None:
     assert "'dataBindingType': 'TimeSeries'" in source
     assert "'sourceType': 'KustoTable'" in source
     assert "relationship_groups" in source
+
+
+def test_first_create_requires_successful_derived_graph_rebuild() -> None:
+    source = _notebook_source()
+
+    assert "GRAPH_SETTLE_SECONDS" in source
+    assert "def _validate_created_graph():" in source
+    assert source.count("_validate_created_graph()") == 3
+    assert "Re-applied ontology definition to rebuild the derived graph." in source
+    assert "the derived graph is not proven ready." in source
+    assert "if the graph shows no valid content, re-run this notebook." not in source

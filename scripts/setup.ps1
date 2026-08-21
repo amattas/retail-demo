@@ -221,7 +221,7 @@ try {
     # Delegate to the Python guided setup engine. Forward setup.py's exit code
     # without letting PowerShell 7.4+ turn a non-zero exit into a thrown error.
     $PSNativeCommandUseErrorActionPreference = $false
-    & $python $SetupPy @ForwardArgs
+    & $python $SetupPy '--profile' 'full-demo' @ForwardArgs
     $exitCode = $LASTEXITCODE
 }
 finally {

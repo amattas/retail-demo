@@ -26,7 +26,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import uuid
+from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -68,6 +71,9 @@ TERRAFORM_ITEM_OUTPUTS = {
     "Eventhouse": "eventhouse_id",
     "KQLDatabase": "kql_database_id",
 }
+TASKFLOW_READ_PATHS = ("taskflow202602", "taskflow202512")
+TASKFLOW_VERIFY_ATTEMPTS = 10
+TASKFLOW_VERIFY_INTERVAL_SECONDS = 1.0
 
 
 def _credential(
@@ -134,19 +140,85 @@ def list_workspace_items(
     )
 
 
+def supplement_workspace_items(
+    fabric_session: requests.Session,
+    workspace_id: str,
+    items: list[dict[str, Any]],
+    required_item_types: set[str],
+) -> list[dict[str, Any]]:
+    """Query missing preview item types explicitly and merge by item ID."""
+
+    merged = {
+        str(item.get("id", "")): item
+        for item in items
+        if item.get("id")
+    }
+    present_types = {str(item.get("type", "")) for item in merged.values()}
+    for item_type in sorted(required_item_types - present_types):
+        for item in paginated_get(
+            fabric_session,
+            f"{FABRIC_API}/workspaces/{workspace_id}/items",
+            params={"type": item_type},
+        ):
+            if item.get("id"):
+                merged[str(item["id"])] = item
+    return list(merged.values())
+
+
+def _required_item_types(task_flow: dict[str, Any]) -> set[str]:
+    return {
+        ARTIFACT_TO_ITEM_TYPE.get(artifact_type, artifact_type)
+        for task in task_flow.get("tasks", [])
+        if isinstance(task, dict)
+        for item in task.get("items", [])
+        if isinstance(item, dict)
+        for artifact_type in (str(item.get("artifactType", "")),)
+        if artifact_type
+    }
+
+
+def _taskflow_records(payload: Any) -> list[dict[str, Any]]:
+    """Normalize the metadata service's old and current collection envelopes."""
+
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("taskFlows"), list):
+        records = payload["taskFlows"]
+    else:
+        raise ValueError("Task-flow metadata returned an unexpected response shape.")
+    if not all(isinstance(record, dict) for record in records):
+        raise ValueError("Task-flow metadata returned a non-object record.")
+    return records
+
+
+def list_taskflow_records(
+    pbi_session: requests.Session, cluster: str, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Read task-flow records across the metadata service's response versions."""
+
+    for path in TASKFLOW_READ_PATHS:
+        url = f"{cluster}/metadata/workspaces/{workspace_id}/{path}"
+        response = pbi_session.get(url)
+        if response.status_code == 404:
+            continue
+        response.raise_for_status()
+        records = _taskflow_records(response.json())
+        if records:
+            return records
+    return []
+
+
 def get_taskflow(
     pbi_session: requests.Session, cluster: str, workspace_id: str
 ) -> dict[str, Any] | None:
-    """Read the raw task flow record (``{etag, resourceId, taskFlow}``) or ``None``.
+    """Read the workspace's single task flow, failing on ambiguous records."""
 
-    A workspace that has never had a task flow returns an empty list; this
-    returns ``None`` in that case so callers can create one.
-    """
-
-    url = f"{cluster}/metadata/workspaces/{workspace_id}/taskflow202602"
-    response = pbi_session.get(url)
-    response.raise_for_status()
-    records = response.json()
+    records = list_taskflow_records(pbi_session, cluster, workspace_id)
+    if len(records) > 1:
+        raise ValueError(
+            f"Workspace {workspace_id} has {len(records)} task flows; "
+            "refusing to update an ambiguous target."
+        )
     return records[0] if records else None
 
 
@@ -297,6 +369,226 @@ def filter_portable_items(
     return filtered
 
 
+def taskflow_source_coverage_errors(
+    portable: dict[str, Any],
+    required_artifacts: set[tuple[str, str]],
+) -> list[str]:
+    """Report selected profile artifacts absent from the portable graph."""
+
+    present = {
+        (
+            str(item.get("artifactType", "")),
+            str(item.get("artifactName", "")),
+        )
+        for task in portable.get("tasks", [])
+        if isinstance(task, dict)
+        for item in task.get("items", [])
+        if isinstance(item, dict)
+    }
+    return [
+        f"task-flow source omits selected artifact {artifact_type}:{name}"
+        for artifact_type, name in sorted(required_artifacts - present)
+    ]
+
+
+def taskflow_deployment_errors(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> list[str]:
+    """Compare the exact persisted tasks, item bindings, and edges."""
+
+    errors: list[str] = []
+    expected_tasks = {
+        str(task.get("id", "")): task
+        for task in expected.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    actual_tasks = {
+        str(task.get("id", "")): task
+        for task in actual.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    if len(expected_tasks) != len(expected.get("tasks", [])):
+        errors.append("expected task flow contains duplicate or invalid task IDs")
+    if len(actual_tasks) != len(actual.get("tasks", [])):
+        errors.append("persisted task flow contains duplicate or invalid task IDs")
+    if set(expected_tasks) != set(actual_tasks):
+        errors.append("persisted task IDs differ from the source graph")
+
+    for task_id in sorted(set(expected_tasks) & set(actual_tasks)):
+        expected_task = expected_tasks[task_id]
+        actual_task = actual_tasks[task_id]
+        for key in ("type", "name", "description", "loc"):
+            if expected_task.get(key, "") != actual_task.get(key, ""):
+                errors.append(f"task {task_id!r} field {key!r} differs")
+        expected_item_errors, expected_items = _taskflow_item_bindings(
+            expected_task.get("items", []),
+            f"expected task {task_id!r}",
+        )
+        actual_item_errors, actual_items = _taskflow_item_bindings(
+            actual_task.get("items", []),
+            f"persisted task {task_id!r}",
+        )
+        errors.extend(expected_item_errors)
+        errors.extend(actual_item_errors)
+        if expected_items != actual_items:
+            errors.append(f"task {task_id!r} item bindings differ")
+
+    edge_fields = ("id", "source", "target", "fromPort", "toPort")
+    expected_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in expected.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    actual_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in actual.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    if expected_edges != actual_edges:
+        errors.append("persisted task-flow edges differ from the source graph")
+    return errors
+
+
+def taskflow_portable_errors(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> list[str]:
+    """Compare portable task identity, item placement, and complete edges."""
+
+    errors: list[str] = []
+    expected_tasks = {
+        str(task.get("id", "")): task
+        for task in expected.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    actual_tasks = {
+        str(task.get("id", "")): task
+        for task in actual.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    if set(expected_tasks) != set(actual_tasks):
+        errors.append("task-flow task IDs differ")
+    for task_id in sorted(set(expected_tasks) & set(actual_tasks)):
+        expected_task = expected_tasks[task_id]
+        actual_task = actual_tasks[task_id]
+        for key in ("type", "name", "description", "loc"):
+            if expected_task.get(key, "") != actual_task.get(key, ""):
+                errors.append(f"task {task_id!r} field {key!r} differs")
+        expected_items = Counter(
+            (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            for item in expected_task.get("items", [])
+            if isinstance(item, dict)
+        )
+        actual_items = Counter(
+            (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            for item in actual_task.get("items", [])
+            if isinstance(item, dict)
+        )
+        if expected_items != actual_items:
+            errors.append(f"task {task_id!r} portable item references differ")
+
+    edge_fields = ("id", "source", "target", "fromPort", "toPort")
+    expected_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in expected.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    actual_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in actual.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    if expected_edges != actual_edges:
+        errors.append("task-flow edges differ")
+    return errors
+
+
+def _taskflow_item_bindings(
+    items: Any,
+    context: str,
+) -> tuple[list[str], Counter[tuple[str, str]]]:
+    """Normalize task-flow item IDs and reject contradictory binding fields."""
+
+    errors: list[str] = []
+    bindings: Counter[tuple[str, str]] = Counter()
+    if not isinstance(items, list):
+        return [f"{context} items are not a list"], bindings
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            errors.append(f"{context} item {index} is not an object")
+            continue
+        artifact_type = str(item.get("artifactType", ""))
+        unique_type, separator, unique_id = str(
+            item.get("artifactUniqueId", "")
+        ).partition(":")
+        object_id = str(item.get("artifactObjectId") or "")
+        if not artifact_type or not separator or not unique_id:
+            errors.append(f"{context} item {index} has no canonical unique ID")
+            continue
+        if unique_type != artifact_type:
+            errors.append(
+                f"{context} item {index} artifact type disagrees with its unique ID"
+            )
+        if object_id and object_id != unique_id:
+            errors.append(
+                f"{context} item {index} object ID disagrees with its unique ID"
+            )
+        bindings[(artifact_type, unique_id)] += 1
+    return errors, bindings
+
+
+def taskflow_item_binding_errors(task_flow: dict[str, Any]) -> list[str]:
+    """Validate canonical item bindings throughout one raw task flow."""
+
+    errors: list[str] = []
+    for task in task_flow.get("tasks", []):
+        if not isinstance(task, dict):
+            errors.append("task-flow task is not an object")
+            continue
+        task_errors, _bindings = _taskflow_item_bindings(
+            task.get("items", []),
+            f"task {str(task.get('id', ''))!r}",
+        )
+        errors.extend(task_errors)
+    return errors
+
+
+def wait_for_taskflow(
+    pbi_session: requests.Session,
+    cluster: str,
+    workspace_id: str,
+    expected: dict[str, Any],
+    *,
+    attempts: int = TASKFLOW_VERIFY_ATTEMPTS,
+    interval_seconds: float = TASKFLOW_VERIFY_INTERVAL_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Wait until the metadata service returns the exact deployed graph."""
+
+    last_errors = ["task flow did not appear after the write"]
+    for attempt in range(1, attempts + 1):
+        record = get_taskflow(pbi_session, cluster, workspace_id)
+        if record is not None and isinstance(record.get("taskFlow"), dict):
+            last_errors = taskflow_deployment_errors(
+                expected,
+                record["taskFlow"],
+            )
+            if not last_errors:
+                return record
+        if attempt < attempts:
+            sleep(interval_seconds)
+    raise RuntimeError(
+        "Task-flow write was not persisted exactly: " + "; ".join(last_errors)
+    )
+
+
 def profile_taskflow_artifacts(
     repo_root: Path,
     config: Any,
@@ -378,8 +670,15 @@ def export_taskflow(
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
         raise ValueError(f"No task flow found in workspace {workspace}")
-    guid_to_name = _guid_name_map(list_workspace_items(fabric, workspace_id))
-    portable = to_portable(record["taskFlow"], guid_to_name)
+    task_flow = record["taskFlow"]
+    items = supplement_workspace_items(
+        fabric,
+        workspace_id,
+        list_workspace_items(fabric, workspace_id),
+        _required_item_types(task_flow),
+    )
+    guid_to_name = _guid_name_map(items)
+    portable = to_portable(task_flow, guid_to_name)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(portable, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -401,6 +700,12 @@ def deploy_taskflow(
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
     if allowed_artifacts is not None:
+        coverage_errors = taskflow_source_coverage_errors(
+            portable,
+            allowed_artifacts,
+        )
+        if coverage_errors:
+            raise ValueError("; ".join(coverage_errors))
         portable = filter_portable_items(portable, allowed_artifacts)
     credential = _credential(
         credential,
@@ -414,7 +719,12 @@ def deploy_taskflow(
         if _looks_like_guid(workspace)
         else find_workspace_id(fabric, workspace)
     )
-    items = list_workspace_items(fabric, workspace_id)
+    items = supplement_workspace_items(
+        fabric,
+        workspace_id,
+        list_workspace_items(fabric, workspace_id),
+        _required_item_types(portable),
+    )
     name_type_to_guid = {
         (str(i["type"]), str(i.get("displayName", ""))): str(i["id"]) for i in items
     }
@@ -435,6 +745,12 @@ def deploy_taskflow(
         create_taskflow(pbi, cluster, workspace_id, {**portable, **task_flow})
     else:
         put_taskflow(pbi, cluster, workspace_id, record, task_flow)
+    wait_for_taskflow(
+        pbi,
+        cluster,
+        workspace_id,
+        task_flow,
+    )
     return unresolved
 
 

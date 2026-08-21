@@ -14,6 +14,7 @@ After publication, verify:
 - semantic-model binding and required tables;
 - task-flow references;
 - optional ontology and agent rebinding;
+- Lakehouse SQL endpoint metadata visibility;
 - a minimal historical and live data query.
 
 Local `validate_deployment.py` output is necessary but not sufficient evidence
@@ -37,6 +38,9 @@ usage errors exit `2`. The report stores bounded operational evidence, hashes,
 target IDs/names, and lineage only. It excludes tokens, definition payloads,
 business rows, and raw tenant-sensitive diagnostics.
 
+`DEGRADED` means required capabilities are usable but one or more optional
+capabilities need attention. It is not equivalent to `FAILED`.
+
 `retail-setup verify --env <env> --run-pipeline` is an explicit mutation. It
 starts only the profile-required post-publish pipeline and polls the exact job
 instance to terminal success. Missing, unknown, timed-out, stale, or mismatched
@@ -48,9 +52,13 @@ existing setup and required-ML gates. Deployment never adds
 `--run-pipeline`. A failed required check fails the deployment; optional
 readiness gaps mark the deploy journal `DEGRADED`. Core remains
 operator-executed: run setup notebooks 01-04, then invoke verification.
-The initial full-demo run marks only ontology, Data Agent, and task-flow checks
-as deferred. Its acknowledged post-ontology step publishes those items and
-runs the complete taxonomy.
+Full-demo verification runs only after the ontology, both Data Agents, and the
+complete task flow have been created or validated in the same deploy.
+
+The deploy plan also runs optional SQL endpoint metadata synchronization after
+post-Reporting ML. This tells Fabric's SQL endpoint about newly created
+Lakehouse tables. A synchronization failure degrades the journal; readiness
+still fails the deployment when a required table is not queryable.
 
 ## Pipeline state
 
@@ -79,15 +87,27 @@ The verifier evaluates these signals together:
 - generation timestamps and model/run IDs for ML output
 - alert/action state where deployed
 
+| Check | Required? | Operational meaning |
+| --- | --- | --- |
+| Setup run log | Yes | Historical setup completed and published a known run. |
+| Silver watermarks | No | The manually started stream has recently reached Silver. |
+| Eventhouse ingestion | No | Eventhouse has received recent optional events. |
+| Checkpoint identity | No | Recent Eventhouse extents can be tied to a stream and batch. |
+| Required model outputs | Yes | The four Reporting models were published by the required pipeline. |
+| Optional model outputs | No | Full-demo optional outputs are recent or have a valid empty snapshot. |
+| Experimental model outputs | No | Full-demo experimental outputs are recent or have a valid empty snapshot. |
+| Alerts | No | Optional alert queries are available and recent when rows exist. |
+
 Required ML evidence selects the latest `generated_at` and a nonblank
 `model_run_id` from the same Gold row. Source/business dates remain separate
 lineage and cannot make an old model generation appear fresh. Setup and model
 evidence use a seven-day maximum age. Streaming watermark,
 Eventhouse ingestion, and checkpoint evidence use a 30-minute maximum age.
 Pipeline and data evidence must match the exact triggered run or the retained
-successful deployment-journal step. The remaining `IMP-013` boundary is actual
-live Fabric execution and retained freshness evidence, not local
-implementation.
+successful deployment-journal step. Required full-demo execution has live
+evidence. The remaining
+[IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) boundary
+is a recent bounded stream that satisfies the three optional streaming checks.
 
 ## Failure handling
 
@@ -107,6 +127,19 @@ all candidate tables before promotion; partial promotion invokes compensating
 Delta restore/drop rollback. Deployment required-step outcomes persist in
 `deploy/.generated/<env>/deploy-run.json`; its readiness step links the
 separate bounded readiness report.
+
+The exact-run recovery command accepts only explicitly named, recent,
+terminal-successful Fabric job IDs, verifies setup-to-ML dependency order,
+writes those IDs to the journal, and runs readiness before finalizing:
+
+```powershell
+python -m deploy.scripts.adopt_pipeline_runs `
+  --environment <env> `
+  --run setup-pipeline=<job-id> `
+  --run ml-required=<job-id>
+```
+
+Full-demo recovery also supplies `ml-optional` and `ml-experimental`.
 
 ## Recovery
 
@@ -132,6 +165,10 @@ without recording the resulting state.
 
 ### Streaming stopped or stale
 
+If streaming has never been started, `DEGRADED` results for watermarks,
+Eventhouse ingestion, and checkpoint identity are expected. Start a bounded
+stream only when the live-event story is required.
+
 Check notebook errors, KQL permissions, resolved Query URI, ingestion failures,
 checkpoint path, persisted stream ID, Eventhouse shortcuts, and Silver
 watermarks. Restart with the same checkpoint root so the failed micro-batch
@@ -139,13 +176,17 @@ retains its event identities and ingestion tags.
 
 ### Ontology/task-flow binding missing
 
-Wait for ontology creation to complete, then run the acknowledged
-`post-ontology` command to publish the dependent agents and task flow.
+Run `retail-setup post-ontology --env <env>`. It creates the ontology when
+absent, rejects duplicates, republishes both agents, writes all selected task
+references, reads the graph back, and runs complete readiness.
 
 ### Power BI table missing
 
-Confirm whether the table is base or optional. Run the owning setup/ML notebook
-or gate the dependent report surface; do not create placeholder business data.
+Confirm whether the table exists in the Lakehouse. If it exists but SQL or
+Power BI cannot see it, run
+`python -m deploy.scripts.refresh_sql_endpoint --environment <env>`. If the
+table does not exist, run the owning setup/ML notebook or gate the dependent
+report surface; do not create placeholder business data.
 
 ## Destructive actions
 

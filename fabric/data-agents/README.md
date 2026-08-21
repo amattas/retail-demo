@@ -8,9 +8,11 @@ This directory contains source-control definitions for:
 | `retail-ontology-agent` | `RetailOntology_AutoGen` ontology |
 
 Deployment rewrites workspace and artifact identifiers for the target
-environment. The ontology is created only when an operator runs the separate
-preview `30-create-ontology` notebook; redeploy the agent or task flow afterward
-if the initial publication left that binding unresolved.
+environment. Full-demo runs the preview `30-create-ontology` notebook to create
+or revalidate the stable ontology and derived graph, waits for it to appear,
+publishes both agents, and verifies the complete task flow. Use
+`retail-setup post-ontology --env <environment>` only to repair an interrupted
+or manually altered completion phase.
 
 The checked-in agents are demo assets and still require governance hardening,
 including explicit instructions and authorization validation. See

@@ -1,8 +1,18 @@
 # Dynamic Pricing Approval Dashboard
 
+> **Manual design template, not an automatically deployed workflow**
+>
+> The repository includes KQL pricing tables and a dashboard template, but it
+> does not publish a production approval application or automatically apply
+> price changes. Use this document as design guidance. The supported demo
+> reports and readiness checks do not depend on this dashboard.
+
 ## Overview
 
-This Real-Time Dashboard implements the human-in-the-loop approval workflow for ML-driven dynamic pricing recommendations (Phase 3 of #199). It provides business users with a comprehensive view of pending pricing changes, their expected impact, and an audit trail of approval/rejection decisions.
+This Real-Time Dashboard template illustrates a human-in-the-loop approval
+workflow for experimental dynamic-pricing recommendations. It shows how a
+future business user could review pending price changes, estimated impact, and
+an audit trail of approval or rejection decisions.
 
 ## Purpose
 
@@ -16,7 +26,9 @@ The dashboard enables:
 
 ### Required Tables/Events
 
-This dashboard requires the following event tables in the KQL Eventhouse (schema: `cusn`):
+This dashboard requires the following tables in the Eventhouse KQL database.
+If Lakehouse shortcuts are created, those shortcuts appear under the separate
+`cusn` Lakehouse schema.
 
 #### 1. `pricing_recommendation_created`
 Created when the ML pricing engine generates a new recommendation.
@@ -103,9 +115,15 @@ These events should be:
    ingests synthetic events
 3. Typed by the DataFrame schema (no Eventstream/JSON-mapping hop required)
 
-**Sample JSON Ingestion Mapping:**
+**Optional queued-JSON ingestion mapping:**
+
+The direct Spark path does not use this mapping. It is included only for a
+future queued-JSON integration.
+
 ```kql
 .create table pricing_recommendation_created ingestion json mapping 'pricing_recommendation_created_json_mapping'
+```
+
 ```json
 [
     {"column": "event_ts", "path": "$.event_ts", "datatype": "datetime"},
@@ -126,8 +144,6 @@ These events should be:
     {"column": "status", "path": "$.status", "datatype": "string"},
     {"column": "created_by", "path": "$.created_by", "datatype": "string"}
 ]
-```
-'''
 ```
 
 ## Dashboard Tiles
@@ -293,38 +309,29 @@ Run the following in your Fabric KQL Eventhouse:
 Modify `fabric/lakehouse/14-ml-dynamic-pricing.ipynb` to:
 1. Generate `recommendation_id` (use UUID)
 2. Calculate `expected_revenue_impact` (demand forecast * price change)
-3. Set `ml_confidence` (for Phase 1, can be rule-based heuristic)
+3. Preserve nullable `ml_confidence`; do not invent a numeric score when the
+   experimental model has no calibrated confidence evidence
 4. Write `pricing_recommendation_created` events to the Eventhouse (Spark Kusto connector)
 
 **Sample PySpark code:**
 ```python
-from azure.eventhub import EventHubProducerClient, EventData
-import json
-import uuid
-
-def publish_pricing_recommendation(product_row):
-    event_data = {
-        "event_ts": datetime.now(timezone.utc).isoformat(),
-        "recommendation_id": str(uuid.uuid4()),
-        "product_id": product_row["product_id"],
-        "product_name": product_row["ProductName"],
-        "department": product_row["Department"],
-        "category": product_row["Category"],
-        "subcategory": product_row["Subcategory"],
-        "current_price": float(product_row["current_price"]),
-        "recommended_price": float(product_row["recommended_price"]),
-        "expected_revenue_impact": float(product_row["expected_revenue_impact"]),
-        "ml_confidence": float(product_row["ml_confidence"]),
-        "model_type": product_row["model_type"],
-        "reason_codes": product_row["reason_codes"],
-        "constraint_status": product_row["constraint_status"],
-        "constraint_details": product_row["constraint_details"],
-        "status": "PENDING",
-        "created_by": "pricing_engine"
-    }
-
-    producer.send_event(EventData(json.dumps(event_data)))
+# Conceptual only: use the same connector and credential pattern as
+# utility/notebooks/templates/driver-05-stream.py.
+(
+    pricing_events.write
+    .format("com.microsoft.kusto.spark.synapse.datasource")
+    .option("kustoCluster", kusto_uri)
+    .option("kustoDatabase", kql_database)
+    .option("kustoTable", "pricing_recommendation_created")
+    .option("tableCreateOptions", "FailIfNotExist")
+    .mode("Append")
+    .save()
+)
 ```
+
+The current experimental pricing notebook intentionally does not publish a
+numeric model-confidence claim when evidence is unavailable. A future event
+writer must preserve that limitation rather than inventing a heuristic score.
 
 ### Step 5: Import Dashboard Template
 1. In Fabric, navigate to your workspace
@@ -340,7 +347,9 @@ For full human-in-the-loop workflow, build a custom Power App or Fabric app that
 3. Publishes `pricing_recommendation_approved` or `pricing_recommendation_rejected` events
 4. Updates `pricing_recommendation_created.status` (via KQL update policy or separate state table)
 
-**Note:** For Phase 3 MVP, approvals can be simulated via direct KQL inserts or test events from the `stream-events` notebook.
+**Note:** For a design demonstration, approvals can be simulated with explicit
+test rows in a disposable workspace. The current `stream-events` notebook does
+not emit pricing-approval events.
 
 ## Data Flow
 
@@ -349,28 +358,31 @@ graph LR
     A[Pricing Notebook] -->|Generates| B[pricing_recommendation_created]
     B -->|Spark Kusto connector| E[KQL Eventhouse]
     E -->|Queried by| F[Dashboard]
-    G[Approval UI] -->|Publishes| H[pricing_recommendation_approved/rejected]
-    H -->|Spark Kusto connector| E
+    G[Approval UI] -->|Creates governed decision| H[pricing_recommendation_approved/rejected]
+    H -->|Approved integration path| E
 ```
 
-## Acceptance Criteria Checklist
+## Design and implementation checklist
 
-- [x] Dashboard shows pending recommendations (**Tiles 1-6**)
-- [x] Clear visualization of pricing changes (**Tiles 3-4**)
+- [x] Dashboard template defines pending-recommendation tiles (**Tiles 1-6**)
+- [x] Template defines pricing-change visuals (**Tiles 3-4**)
   - Current vs. suggested price (Tile 3)
   - Expected revenue impact (Tile 3)
   - Confidence level (Tile 5)
   - Constraint compliance status (Tile 6)
-- [x] Approve/reject workflow support concept (**Documentation + Event Schemas**)
+- [x] Approval/rejection event schemas are documented
   - Event schemas defined for approval/rejection
-  - Sample PySpark code provided
   - Future UI requirements outlined
-- [x] Approval history tracking (**Tiles 7-12**)
+- [x] Template defines approval-history tiles (**Tiles 7-12**)
   - Recent approvals timeline (Tile 7)
   - Approval rates by confidence (Tile 8)
   - Approver activity audit (Tile 10)
   - Decision time metrics (Tile 11)
   - Rejection reason analysis (Tile 12)
+- [ ] Pricing notebook publishes typed recommendation events
+- [ ] Approval UI writes approved/rejected decisions
+- [ ] Dashboard import, bindings, queries, and refresh are live-validated
+- [ ] Approved prices are applied through a governed business process
 
 ## Future Enhancements
 
@@ -434,14 +446,13 @@ To test the dashboard before full integration:
 
 ## Related Files
 
-- **Phase 1 Notebook:** `fabric/lakehouse/14-ml-dynamic-pricing.ipynb`
+- **Experimental pricing notebook:** `fabric/lakehouse/14-ml-dynamic-pricing.ipynb`
 - **Dashboard Template:** `fabric/dashboards/pricing-approval.template.json`
 - **KQL Tables Script:** `fabric/kql_database/07-pricing-approval-tables.kql`
 - **Event Schemas:** `utility/notebooks/templates/driver-05-stream.py`
 
 ## References
 
-- Parent Issue: #199 (ML Enhancement: Dynamic Pricing Recommendations)
-- Phase 1 (Rule-based engine): #217
-- Phase 2 (ML model): #218
-- Fabric Real-Time Dashboards: https://learn.microsoft.com/fabric/real-time-intelligence/dashboard-real-time-create
+- [Analytics backlog](../../docs/design/requirements/modules/analytics/backlog.md)
+- [Power BI enhancement backlog](../../docs/design/requirements/modules/power-bi/backlog.md)
+- [Fabric Real-Time Dashboard documentation](https://learn.microsoft.com/fabric/real-time-intelligence/dashboard-real-time-create)

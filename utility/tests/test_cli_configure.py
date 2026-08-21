@@ -123,6 +123,57 @@ def test_configure_writes_both_configs(tmp_path):
     assert "Estimated records" in result.output
 
 
+def test_configure_migrates_legacy_profile_controlled_overrides(tmp_path):
+    _seed_deploy_config(tmp_path)
+    env_path = tmp_path / "deploy/config/environments/retail-demo.yml"
+    env = yaml.safe_load(env_path.read_text())
+    env["spark"] = {"use_custom_pool": True}
+    env["notebooks"] = {
+        "include": ["core", "stream"],
+        "default_lakehouse_name": "retail_lakehouse",
+    }
+    env_path.write_text(yaml.safe_dump(env, sort_keys=False))
+
+    result = runner.invoke(
+        app,
+        [
+            "configure",
+            "--repo-root",
+            str(tmp_path),
+            "--tenant-id",
+            "11111111-1111-1111-1111-111111111111",
+            "--workspace-name",
+            "retail-demo",
+            "--capacity-name",
+            "F64",
+            "--lakehouse-name",
+            "retail_lakehouse",
+            "--eventhouse-name",
+            "retail_eventhouse",
+            "--kql-database-name",
+            "retail_eventhouse",
+            "--profile",
+            "core",
+            "--store-type",
+            "grocery",
+            "--months",
+            "3",
+            "--store-count",
+            "10",
+            "--seed",
+            "9",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    migrated = yaml.safe_load(env_path.read_text())
+    assert "spark" not in migrated
+    assert migrated["notebooks"] == {
+        "default_lakehouse_name": "retail_lakehouse"
+    }
+    assert migrated["deployment"]["profile"] == "core"
+
+
 def test_configure_prompts_show_defaults_and_store_types(tmp_path):
     _seed_deploy_config(tmp_path)
     result = runner.invoke(
@@ -186,6 +237,57 @@ def test_configure_selects_full_demo_custom_spark_pool(tmp_path):
     assert generation["months"] == 18
     config = yaml.safe_load((tmp_path / "deploy/config/deploy.yml").read_text())
     assert config["deployment"]["profile"] == "core"
+
+
+def test_configure_full_demo_lifts_saved_short_history_default(tmp_path):
+    _seed_deploy_config(tmp_path)
+    utility = tmp_path / "utility"
+    utility.mkdir()
+    (utility / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "store_type": "grocery",
+                "months": 3,
+                "store_count": 10,
+                "seed": 9,
+            }
+        )
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "configure",
+            "--repo-root",
+            str(tmp_path),
+            "--tenant-id",
+            "11111111-1111-1111-1111-111111111111",
+            "--workspace-name",
+            "retail-demo",
+            "--capacity-name",
+            "F64",
+            "--lakehouse-name",
+            "retail_lakehouse",
+            "--eventhouse-name",
+            "retail_eventhouse",
+            "--kql-database-name",
+            "retail_eventhouse",
+            "--profile",
+            "full-demo",
+            "--store-type",
+            "grocery",
+            "--store-count",
+            "10",
+            "--seed",
+            "9",
+        ],
+        input="\ny\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Months of data to generate (history ends yesterday) [18]" in result.output
+    generation = yaml.safe_load((utility / "config.yaml").read_text())
+    assert generation["months"] == 18
 
 
 def test_configure_rejects_short_history_for_reporting_profile(tmp_path):

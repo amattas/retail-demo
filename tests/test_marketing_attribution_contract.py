@@ -135,6 +135,7 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
 
     for expected in (
         "touch_rank = strcat(",
+        'format_datetime(ingest_timestamp, "yyyy-MM-dd HH:mm:ss.fffffff")',
         "arg_max(touch_rank, *)",
         "lag_seconds between (0 .. 604800)",
         'payment_status == "APPROVED"',
@@ -147,6 +148,7 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
         "or impression_id in (converted_impressions)",
     ):
         assert expected in source
+    assert "0L" not in source
 
 
 def test_querysets_use_reconciled_attribution_functions() -> None:

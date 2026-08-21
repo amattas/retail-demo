@@ -10,6 +10,8 @@
   `fabric/kql_database/01-create-tables.kql`
 - Active semantic-model tables:
   `fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl`
+  (TMDL, or Tabular Model Definition Language, is the text format used to
+  define the Power BI semantic model)
 
 Exact detail belongs in the
 [historical data contract](../specifications/modules/generation/data-contract.md),
@@ -18,8 +20,9 @@ Exact detail belongs in the
 
 ## Naming reality
 
-New columns use `snake_case`, but the current physical contract includes
-PascalCase and mixed-case columns retained for existing TMDL bindings.
+New columns use `snake_case` (lowercase words separated by underscores), but
+the current physical contract includes PascalCase and mixed-case columns
+retained for existing TMDL bindings.
 `schemas.py` is authoritative for those exceptions.
 
 ## Eventhouse
@@ -78,7 +81,9 @@ model.
 
 ## Semantic model
 
-The Direct Lake model has 40 active tables:
+The Direct Lake model has 40 active tables. Direct Lake is a Power BI
+connection mode that reads Delta/Parquet data from OneLake directly, without a
+separate import copy or DirectQuery round trip:
 
 - 7 dimensions
 - 19 facts

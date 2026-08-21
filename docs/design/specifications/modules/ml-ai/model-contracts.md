@@ -7,7 +7,7 @@ extended ML:
 
 1. `setup-pipeline` runs setup notebooks 01 through 04.
 2. `ml-required` runs demand forecast, customer segmentation, churn, and
-   stockout producers in parallel.
+   stockout producers serially to avoid oversubscribing the shared Spark pool.
 3. `15-validate-required-ml-contract` runs only after all four producers
    succeed.
 4. Reporting can publish only after that exact pipeline run reaches terminal
@@ -15,8 +15,9 @@ extended ML:
 5. `full-demo` runs `ml-optional` and `ml-experimental` after Reporting.
 
 Optional or experimental failure cannot block required Reporting. Ontology
-creation is a separate manual/preview boundary. The task-flow metadata mirrors
-the runtime order as `Required ML Reporting Gate` -> `Semantic Model` ->
+creation is a separate preview phase after Reporting and extended ML, but
+full-demo executes it automatically. The task-flow metadata mirrors the
+runtime order as `Required ML Reporting Gate` -> `Reporting` ->
 `Post-Reporting Extended ML`.
 
 ## ML contracts
@@ -38,7 +39,8 @@ Every contract identifies its producer and source tables, exact output schema
 and grain, as-of and lineage fields, intended use, and limitations. Producer
 notebooks declare the same schema and validate types and non-null constraints
 immediately before writing that exact physical target. Required contracts
-additionally reference the active TMDL projection and the runtime validator.
+additionally reference the active Tabular Model Definition Language (TMDL)
+projection and the runtime validator.
 This checked agreement prevents the manifest from becoming an independent,
 unvalidated physical schema.
 
@@ -56,6 +58,13 @@ probabilities or bounds, NaN or infinity in any floating output, missing
 as-of/lineage, and incomplete forecast horizons. Repository validation parses
 the validator's required grain, as-of, lineage, probability, and horizon rules
 and compares them exactly with the manifest.
+
+Optional outputs may be empty when the business preconditions for a result do
+not exist. For example, sparse baskets can produce no association rules, and a
+delivery run can have no currently open arrivals to score. In those cases the
+producer overwrites the target with an empty table that still has the exact
+contract schema. Readiness accepts that empty snapshot only when the owning
+optional pipeline has exact, recent terminal-success evidence.
 
 Demand evaluation freezes store/product eligibility at the training cutoff;
 current production inference selects its cohort independently. Churn and
@@ -75,10 +84,12 @@ Optional and experimental corrections are also contract-bound:
 - promotion prices use net extended cents per unit and comparisons include only
   episodes with complete baseline and post windows inside each store's observed
   receipt range;
-- delivery training uses matched `cusn` Bronze lifecycle events, partitions on
+- delivery training uses matched `cusn` Bronze lifecycle events (`cusn` is the
+  Lakehouse schema that exposes Eventhouse tables as read-only shortcuts),
+  partitions on
   departure-time label availability with a purge, and scores only unmatched
-  arrivals with arrival-known features; missing sources or no inference-ready
-  arrivals fail before replacing prior output;
+  arrivals with arrival-known features; missing training sources fail, while
+  no inference-ready arrivals publish an empty contract-valid snapshot;
 - pricing uses a non-null no-estimate evidence sentinel, advances cooldown state
   only for accepted price changes, and applies the log-log quantity response
   `(new_price / old_price) ** elasticity - 1`.
@@ -108,15 +119,16 @@ with an artifact built against an unvalidated schema.
 - prefers update-in-place for an existing ontology;
 - falls back to delete/recreate with polling and retry behavior when needed.
 
-Ontology creation is not part of the required ML pipeline. Run it deliberately
-after its preview/capacity boundaries are accepted, then use the acknowledged
-`post-ontology` command to publish Data Agents and task flow.
+Ontology creation is not part of the required ML pipeline. Full-demo runs it
+automatically after Reporting and extended ML, but only after live
+tenant/capacity preflight passes. `post-ontology` reruns this phase for
+recovery.
 
 ## Data Agents
 
 Source-controlled Data Agent definitions reference authoring-workspace GUIDs.
-They are not staged during initial `full-demo` publication. After ontology
-creation is validated, the post-ontology phase rewrites:
+They are staged after ontology creation in the same `full-demo` deployment.
+That completion phase rewrites:
 
 - `workspaceId`
 - semantic-model `artifactId`

@@ -20,8 +20,19 @@ historical tags when reconstructing an archived release.
 Navigation is explicit in `zensical.toml`:
 
 1. Home
-2. Guides
-3. Design Documentation
+2. Start here
+   - guide index
+   - plain-language glossary
+   - getting started
+   - workspace profiles
+3. Explore the demo
+   - deployed walkthroughs
+   - presenter guides
+   - use cases
+4. Deploy and operate
+   - deployment
+   - operations
+5. Design Documentation
    - Requirements
    - Specifications
    - Architecture
@@ -34,6 +45,13 @@ Docusaurus-only metadata.
 Task-focused user documentation remains under `docs/guides/`. Normative
 technical material remains under `docs/design/` so implementation detail does
 not dominate the primary user journey.
+
+The Home and guide-index pages route readers by role and task. User-facing
+guides assume no source-code knowledge. They explain business meaning before
+implementation detail, define acronyms on first use, and link repeated terms
+to `docs/guides/glossary.md`. Formal requirements and specifications may use
+precise identifiers, but they still define domain-specific terms before relying
+on them.
 
 Top-level navigation groups remain collapsible. Do not enable
 `navigation.sections`, which renders them as persistent sidebar groups on
@@ -83,8 +101,10 @@ python -m zensical serve
    IDs.
 3. Keep module backlogs limited to `Open` and `Settled - do not reopen`.
 4. Use Mermaid for diagrams.
-5. Run `python -m zensical build --clean`.
-6. Check for broken links, missing navigation targets, stale `website/`
+5. Define unfamiliar acronyms and explain what an operational status means
+   before listing internal field names or check IDs.
+6. Run `python -m zensical build --clean`.
+7. Check for broken links, missing navigation targets, stale `website/`
    references, and dated plans that still own durable content.
 
 ## Publishing workflow

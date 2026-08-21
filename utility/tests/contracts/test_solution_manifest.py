@@ -52,7 +52,7 @@ def test_manifest_has_frozen_top_level_schema() -> None:
     assert tuple(document) == TOP_LEVEL_SECTIONS
     assert set(SolutionManifest.model_fields) == set(TOP_LEVEL_SECTIONS)
     assert SolutionManifest.model_json_schema()["additionalProperties"] is False
-    assert load_solution_manifest(MANIFEST_PATH).version == "1.3.0"
+    assert load_solution_manifest(MANIFEST_PATH).version == "1.4.0"
 
 
 def test_manifest_rejects_duplicate_ids() -> None:

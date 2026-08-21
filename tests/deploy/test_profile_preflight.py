@@ -95,13 +95,30 @@ def test_core_preflight_validates_existing_queryable_sources() -> None:
 
     assert report.profile.deployment_name == "core"
     assert len(report.selected_notebooks) == 4
-    assert report.acknowledgements == ()
 
 
-def test_preflight_requires_rendered_setup_notebooks() -> None:
+def test_preflight_requires_rendered_setup_notebooks(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        profile_preflight,
+        "_validate_pipeline_sources",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        profile_preflight,
+        "_validate_selected_assets",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        profile_preflight,
+        "_validate_spark_config",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(ProfilePreflightError, match="missing rendered setup"):
         validate_profile_preflight(
-            REPO_ROOT,
+            tmp_path,
             _config(),
             skip_terraform=True,
             validate_rendered=True,
@@ -125,10 +142,9 @@ def test_standard_preflight_is_internally_coherent() -> None:
     assert report.profile.reporting_gate_pipeline_ref == "ml-required.DataPipeline"
     assert len(report.profile.pipeline_refs) == 5
     assert report.profile.blockers == ()
-    assert report.acknowledgements == ()
 
 
-def test_full_demo_requires_all_explicit_acknowledgements(
+def test_full_demo_preflight_uses_queryable_checks_without_acknowledgements(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -136,44 +152,15 @@ def test_full_demo_requires_all_explicit_acknowledgements(
     config = _config("full-demo")
     full_profile = config.profile
     assert full_profile.blockers == ()
-    assert len(full_profile.required_acknowledgements) == 4
-    expected = tuple(
-        acknowledgement.id
-        for acknowledgement in full_profile.required_acknowledgements
-    )
-
-    with pytest.raises(ProfilePreflightError, match="missing required acknowledgements"):
-        validate_profile_preflight(
-            tmp_path,
-            config,
-            skip_terraform=True,
-            validate_rendered=False,
-        )
-    with pytest.raises(ProfilePreflightError, match="unknown acknowledgements"):
-        validate_profile_preflight(
-            tmp_path,
-            config,
-            acknowledgements=(*expected, "ack.full-demo.unknown"),
-            skip_terraform=True,
-            validate_rendered=False,
-        )
-    with pytest.raises(ProfilePreflightError, match="must not be repeated"):
-        validate_profile_preflight(
-            tmp_path,
-            config,
-            acknowledgements=(*expected, expected[0]),
-            skip_terraform=True,
-            validate_rendered=False,
-        )
+    assert full_profile.required_acknowledgements == ()
 
     report = validate_profile_preflight(
         tmp_path,
         config,
-        acknowledgements=expected,
         skip_terraform=True,
         validate_rendered=False,
     )
-    assert report.acknowledgements == expected
+    assert report.profile.deployment_name == "full-demo"
 
 
 def test_profile_downgrade_requires_explicit_recreate(
@@ -335,6 +322,47 @@ def test_stale_captured_outputs_fail_before_profile_downgrade(
     )
 
     with pytest.raises(ProfilePreflightError, match="stale relative to local state"):
+        validate_profile_preflight(
+            tmp_path,
+            _config(),
+            validate_rendered=False,
+        )
+
+
+def test_managed_resource_id_mismatch_requires_output_recapture(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _disable_local_source_checks(monkeypatch)
+    _write_state(
+        tmp_path,
+        outputs={
+            "deployment_profile": "core",
+            "workspace_id": "state-output-id",
+        },
+        resource_type="fabric_workspace",
+    )
+    output_path = (
+        tmp_path
+        / "deploy"
+        / ".generated"
+        / "dev"
+        / "terraform-output.json"
+    )
+    output_path.write_text(
+        json.dumps(
+            {
+                "deployment_profile": "core",
+                "workspace_id": "state-output-id",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ProfilePreflightError,
+        match="managed resource IDs",
+    ):
         validate_profile_preflight(
             tmp_path,
             _config(),

@@ -48,9 +48,10 @@ flowchart TB
 ## Resource ownership
 
 Terraform provisions or resolves the Fabric workspace, Lakehouse, Eventhouse,
-KQL database, and optional custom Spark pool. `fabric-cicd` publishes supported
-source-control items. KQL schema application runs separately with the operator
-identity.
+KQL database, and optional custom Spark pool. `fabric-cicd` (Microsoft's
+open-source Python library for deploying source-controlled Fabric item
+folders) publishes supported workspace items. KQL schema application runs
+separately with the operator identity.
 
 ## Current item layout
 
@@ -63,7 +64,7 @@ identity.
 | `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
 | `Reporting` | Semantic model and report |
 | `ML` | ML experiment shells |
-| `Data Agents` | Semantic-model and ontology agents, post-ontology only |
+| `Data Agents` | Semantic-model and ontology agents, automatically published after ontology creation in full-demo |
 
 ## Pipeline topology
 
@@ -73,7 +74,7 @@ identity.
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
 | `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |
-| `ml-required` | Four required producers, then contract validator | On demand; terminal Reporting gate |
+| `ml-required` | Four serialized required producers, then contract validator | On demand; terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
 
@@ -86,6 +87,8 @@ identity.
 - `fabric-cicd`
 - `azure-identity`
 - `azure-kusto-data`
+- `mssql-python` on Windows/Linux, or Microsoft ODBC Driver 17/18 on macOS,
+  for Lakehouse SQL readiness checks
 - Fabric Spark and Spark Kusto connector
 
 ## Local deployment state
@@ -99,13 +102,14 @@ concurrent full deploys from separate checkouts.
 
 ## Current constraints
 
-- The default `core` inventory is preview-free; `full-demo` is the explicitly
-  acknowledged preview/manual boundary.
+- The default `core` inventory is preview-free; `full-demo` is the
+  live-preflight-validated preview/manual boundary.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate
   profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
-  surfaces; actual workspace evidence remains external.
+  surfaces. Required full-demo evidence has been exercised live; optional
+  stream evidence remains environment- and run-specific.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).
