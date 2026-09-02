@@ -1,0 +1,95 @@
+table product_recommendations
+	lineageTag: c5e6e000-0000-0000-0006-000000000000
+	sourceLineageTag: [au].[product_recommendations]
+
+	/// Distinct anchor products that have at least one recommendation.
+	measure 'Products With Recommendations' = DISTINCTCOUNT('product_recommendations'[Product ID])
+		formatString: #,0
+		displayFolder: ML\Recommendations
+		lineageTag: c5e6e000-0000-0000-0006-000000000101
+
+	/// Total number of market-basket recommendation rules in context.
+	measure 'Recommendation Rules' = COUNTROWS('product_recommendations')
+		formatString: #,0
+		displayFolder: ML\Recommendations
+		lineageTag: c5e6e000-0000-0000-0006-000000000102
+
+	/// Average lift across the in-context recommendation rules. Lift > 1
+	/// means the pair is bought together more than chance would predict.
+	measure 'Avg Recommendation Lift' = AVERAGE('product_recommendations'[Lift])
+		formatString: #,0.00
+		displayFolder: ML\Recommendations
+		lineageTag: c5e6e000-0000-0000-0006-000000000103
+
+	/// Average confidence across the in-context recommendation rules.
+	measure 'Avg Recommendation Confidence' = AVERAGE('product_recommendations'[Confidence])
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: ML\Recommendations
+		lineageTag: c5e6e000-0000-0000-0006-000000000104
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0006-000000000001
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Recommended Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0006-000000000002
+		sourceLineageTag: recommended_product_id
+		summarizeBy: none
+		sourceColumn: recommended_product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column Support
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: c5e6e000-0000-0000-0006-000000000003
+		sourceLineageTag: support
+		summarizeBy: none
+		sourceColumn: support
+
+		annotation SummarizationSetBy = Automatic
+
+	column Confidence
+		dataType: double
+		formatString: 0.0%;-0.0%;0.0%
+		lineageTag: c5e6e000-0000-0000-0006-000000000004
+		sourceLineageTag: confidence
+		summarizeBy: none
+		sourceColumn: confidence
+
+		annotation SummarizationSetBy = Automatic
+
+	column Lift
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0006-000000000005
+		sourceLineageTag: lift
+		summarizeBy: none
+		sourceColumn: lift
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0006-000000000006
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition product_recommendations = entity
+		mode: directLake
+		source
+			entityName: product_recommendations
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

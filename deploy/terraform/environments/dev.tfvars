@@ -11,5 +11,5 @@ spark_custom_pool_name = "retail_setup_pool"
 spark_node_size = "Medium"
 spark_min_node_count = 1
 spark_max_node_count = 10
-tenant_id = "9d379b85-7b26-46a5-bbc8-2ce467f202b8"
-capacity_name = "amattas"
+tenant_id = null
+capacity_name = null

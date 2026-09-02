@@ -60,8 +60,10 @@ def generate_gold(
         .select(*column_names("sales_minute_store"))
     )
 
-    # Top products by revenue (15m windows)
-    gold["top_products_15m"] = (
+    # Top products by revenue (15m windows). Real-time tile: keep only the most
+    # recent 15-minute window so SUM(revenue)/SUM(units) reflect the latest
+    # window, not lifetime totals (the legacy build retained every window).
+    _top15 = (
         tables["fact_receipt_lines"]
         .withColumn("window_15m", F.window(F.col("event_ts"), "15 minutes"))
         .groupBy("product_id", "window_15m")
@@ -71,8 +73,11 @@ def generate_gold(
         )
         .withColumn("computed_at", F.col("window_15m.end"))
         .drop("window_15m")
-        .select(*column_names("top_products_15m"))
     )
+    _latest_15m = _top15.agg(F.max("computed_at").alias("m")).collect()[0]["m"]
+    if _latest_15m is not None:
+        _top15 = _top15.filter(F.col("computed_at") == F.lit(_latest_15m))
+    gold["top_products_15m"] = _top15.select(*column_names("top_products_15m"))
 
     # Current store inventory position (latest balance per store/product)
     store_pos_window = Window.partitionBy("store_id", "product_id").orderBy(

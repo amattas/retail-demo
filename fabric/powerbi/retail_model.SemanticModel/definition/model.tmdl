@@ -51,3 +51,5 @@ ref table churn_predictions
 ref table customer_segments
 ref table demand_forecast
 ref table stockout_risk
+ref table price_elasticity
+ref table product_recommendations

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Operations — Retail Intelligence</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Retail Intelligence</h1>
+    </div>
+    <nav class="tabs">
+      <a class="tab" href="/">Dashboard</a>
+      <a class="tab active" href="/actions.html">Agent Operations</a>
+      <a class="tab" href="/ontology.html">Ontology Explorer</a>
+      <a class="tab" href="/architecture.html">Architecture</a>
+      <a class="tab" href="/walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="meta" id="meta">live from Eventhouse &middot; agent_actions</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel ops-panel">
+      <div class="panel-head">
+        <h2>Agent Operations — live approval funnel</h2>
+        <span class="status" id="ops-status">
+          <span class="live-dot"></span><span id="ops-updated">connecting…</span>
+        </span>
+      </div>
+
+      <div id="ops-kpis" class="kpi-grid"></div>
+
+      <div class="ops-row">
+        <div class="ops-card ops-timeline">
+          <div class="ops-card-head">Events — last hour (per minute)</div>
+          <div id="ops-timeline" class="timeline"></div>
+          <div class="timeline-legend">
+            <span><i class="sw sw-drafted"></i>drafted</span>
+            <span><i class="sw sw-approved"></i>approved</span>
+            <span><i class="sw sw-dismissed"></i>dismissed</span>
+          </div>
+        </div>
+        <div class="ops-card ops-byagent">
+          <div class="ops-card-head">By agent (current state)</div>
+          <div id="ops-byagent"></div>
+        </div>
+      </div>
+
+      <div class="ops-card ops-feed">
+        <div class="ops-card-head">Recent agent actions &amp; approvals</div>
+        <table class="rec-table" id="ops-feed-table">
+          <thead><tr>
+            <th>Time</th><th>Agent</th><th>Kind</th><th>Status</th>
+            <th>Action</th><th>Impact</th>
+          </tr></thead>
+          <tbody id="ops-feed"></tbody>
+        </table>
+      </div>
+
+      <p class="ops-note">
+        Every recommendation an agent drafts and every human approval/dismissal is
+        written back to the Fabric Eventhouse table <code>agent_actions</code> and
+        shown here within ~2&nbsp;seconds. This is the closed loop — the same
+        real-time store that streams live sales now captures the multi-agent
+        operations layer.
+      </p>
+    </section>
+  </main>
+
+  <script src="actions.js"></script>
+</body>
+</html>

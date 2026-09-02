@@ -361,7 +361,7 @@ TABLES: dict[str, list[tuple[str, str]]] = {
     ],
     "top_products_15m": [
         ("product_id", "long"), ("revenue", "double"), ("units", "long"),
-        ("computed_at", "timestamp"),  # produced by legacy code, unbound in TMDL
+        ("computed_at", "timestamp"),  # window end; bound as 'Window End' in TMDL
     ],
     "inventory_position_current": [
         ("store_id", "long"), ("product_id", "long"), ("on_hand", "long"),

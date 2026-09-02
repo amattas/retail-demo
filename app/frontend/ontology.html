@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ontology Explorer — Retail Intelligence</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Retail Intelligence</h1>
+    </div>
+    <nav class="tabs">
+      <a class="tab" href="/">Dashboard</a>
+      <a class="tab" href="/actions.html">Agent Operations</a>
+      <a class="tab active" href="/ontology.html">Ontology Explorer</a>
+      <a class="tab" href="/architecture.html">Architecture</a>
+      <a class="tab" href="/walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="meta" id="meta">workspace &middot; semantic model &middot; ontology</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel graph-panel">
+      <div class="panel-head">
+        <h2>Ontology</h2>
+        <div class="legend">
+          <span class="lg lg-entity"></span> entity
+          <span class="lg lg-lakehouse"></span> lakehouse
+          <span class="lg lg-eventhouse"></span> telemetry
+        </div>
+      </div>
+      <div id="cy"></div>
+      <div id="entity-detail" class="entity-detail">
+        <p class="hint">Click an entity to see its properties and telemetry.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="ontology.js"></script>
+</body>
+</html>

@@ -48,6 +48,16 @@ table top_products_15m
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'Window End'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 01a1a1c2-0001-0001-0001-000000000003
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		annotation SummarizationSetBy = Automatic
+
 	partition top_products_15m = entity
 		mode: directLake
 		source

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail Intelligence</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Retail Intelligence</h1>
+    </div>
+    <nav class="tabs">
+      <a class="tab active" href="/">Dashboard</a>
+      <a class="tab" href="/actions.html">Agent Operations</a>
+      <a class="tab" href="/ontology.html">Ontology Explorer</a>
+      <a class="tab" href="/architecture.html">Architecture</a>
+      <a class="tab" href="/walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="meta" id="meta">workspace &middot; semantic model &middot; ontology</div>
+  </header>
+
+  <main class="layout">
+    <div class="dashboard">
+      <section class="panel report-panel">
+        <div class="panel-head"><h2>Power BI</h2><span id="report-status" class="status"></span></div>
+        <div id="report" class="report-embed"></div>
+      </section>
+
+      <section class="panel chat-panel">
+        <div class="panel-head">
+          <h2>Ask your data</h2>
+          <div class="head-right">
+            <div class="router-toggle" id="router-toggle" title="Choose how the orchestrator routes your question">
+              <button type="button" class="rt-btn active" data-router="llm">LLM router</button>
+              <button type="button" class="rt-btn" data-router="keyword">Keyword</button>
+            </div>
+            <span class="status" id="chat-route"></span>
+          </div>
+        </div>
+        <div id="messages" class="messages"></div>
+        <div id="chips" class="chips"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" autocomplete="off"
+                 placeholder="Ask anything — e.g. total net sales, churn risk, or the segment & churn for a customer's loyalty card" />
+          <button type="submit" id="send-btn">Send</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

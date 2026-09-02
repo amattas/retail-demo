@@ -217,6 +217,14 @@ relationship 'Demand Forecast to Date'
 	fromColumn: demand_forecast.'Forecast Date'
 	toColumn: dim_date.Date
 
+relationship 'Price Elasticity to Products'
+	fromColumn: price_elasticity.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Product Recommendations to Products'
+	fromColumn: product_recommendations.'Product ID'
+	toColumn: dim_products.ID
+
 relationship 'Receipts to Date'
 	fromColumn: fact_receipts.'Event Date'
 	toColumn: dim_date.Date
