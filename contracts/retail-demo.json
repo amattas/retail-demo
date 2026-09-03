@@ -992,7 +992,7 @@
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 26,
+        "infrastructure_item_count": 30,
         "reporting_item_count": 2,
         "infrastructure_folders": [
           "Setup",
@@ -3373,13 +3373,15 @@
         }
       ],
       "kind": "inventory-difference",
-      "rationale": "Four contract-validated required ML outputs intentionally extend the base historical generator schema.",
+      "rationale": "Six contract-validated required ML outputs intentionally extend the base historical generator schema.",
       "verification_owner": "owner.ml-ai",
       "event_ids": [],
       "target_names": [
         "churn_predictions",
         "customer_segments",
         "demand_forecast",
+        "price_elasticity",
+        "product_recommendations",
         "stockout_risk"
       ],
       "tracking_issue": "IMP-008",
@@ -4086,7 +4088,7 @@
       "name": "Product Recommendations",
       "owner": "owner.ml-ai",
       "support_status": "optional",
-      "description": "Product Recommendations optional support-tier producer and physical output contract.",
+      "description": "Product Recommendations required support-tier producer and physical output contract.",
       "sources": [
         {
           "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
@@ -4095,18 +4097,35 @@
           }
         },
         {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
           "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
         }
       ],
       "implementation": "executable",
-      "tier": "optional",
+      "tier": "required",
       "producer": {
         "path": "fabric/lakehouse/07-ml-market-basket.ipynb",
         "selector": {
           "kind": "notebook_ml_contract"
         }
       },
-      "validator": null,
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
       "source_tables": [
         "fact_receipts",
         "fact_receipt_lines"
@@ -4143,17 +4162,39 @@
             "name": "computed_at",
             "data_type": "timestamp",
             "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
           }
         ],
         "grain": [
           "product_id",
           "recommended_product_id"
         ],
-        "as_of_column": "computed_at",
-        "lineage_columns": [],
-        "probability_columns": []
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "computed_at",
+          "model_run_id",
+          "schema_version"
+        ],
+        "probability_columns": [
+          "support",
+          "confidence"
+        ]
       },
-      "reporting_required": false,
+      "reporting_required": true,
       "intended_use": "Provide deduplicated product-pair recommendations from association rules.",
       "limitations": [
         "Recommendations inherit observational association-rule bias.",
@@ -4601,7 +4642,7 @@
       "name": "Price Elasticity",
       "owner": "owner.ml-ai",
       "support_status": "experimental",
-      "description": "Price Elasticity experimental support-tier producer and physical output contract.",
+      "description": "Price Elasticity required support-tier producer and physical output contract.",
       "sources": [
         {
           "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
@@ -4610,18 +4651,35 @@
           }
         },
         {
+          "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+          "selector": {
+            "kind": "notebook_ml_validator"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        },
+        {
           "path": "docs/design/specifications/modules/ml-ai/model-contracts.md"
         }
       ],
       "implementation": "executable",
-      "tier": "experimental",
+      "tier": "required",
       "producer": {
         "path": "fabric/lakehouse/10-ml-promotion-effectiveness.ipynb",
         "selector": {
           "kind": "notebook_ml_contract"
         }
       },
-      "validator": null,
+      "validator": {
+        "path": "fabric/lakehouse/15-validate-required-ml-contract.ipynb",
+        "selector": {
+          "kind": "notebook_ml_validator"
+        }
+      },
       "source_tables": [
         "fact_receipts",
         "fact_receipt_lines",
@@ -4721,16 +4779,35 @@
             "name": "computed_at",
             "data_type": "timestamp",
             "nullable": false
+          },
+          {
+            "name": "generated_at",
+            "data_type": "timestamp",
+            "nullable": false
+          },
+          {
+            "name": "model_run_id",
+            "data_type": "string",
+            "nullable": false
+          },
+          {
+            "name": "schema_version",
+            "data_type": "string",
+            "nullable": false
           }
         ],
         "grain": [
           "product_id"
         ],
-        "as_of_column": "computed_at",
-        "lineage_columns": [],
+        "as_of_column": "generated_at",
+        "lineage_columns": [
+          "computed_at",
+          "model_run_id",
+          "schema_version"
+        ],
         "probability_columns": []
       },
-      "reporting_required": false,
+      "reporting_required": true,
       "intended_use": "Explore observational price-demand sensitivity with evidence diagnostics.",
       "limitations": [
         "Observational OLS estimates are not causal price effects.",

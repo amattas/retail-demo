@@ -74,7 +74,7 @@ separately with the operator identity.
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
 | `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |
-| `ml-required` | Four serialized required producers, then contract validator | On demand; terminal Reporting gate |
+| `ml-required` | Six serialized required producers, then contract validator | On demand; terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
 

@@ -81,15 +81,15 @@ model.
 
 ## Semantic model
 
-The Direct Lake model has 40 active tables. Direct Lake is a Power BI
+The Direct Lake model has 42 active tables. Direct Lake is a Power BI
 connection mode that reads Delta/Parquet data from OneLake directly, without a
 separate import copy or DirectQuery round trip:
 
 - 7 dimensions
 - 19 facts
 - 10 Gold aggregates
-- 4 ML outputs: `churn_predictions`, `customer_segments`, `demand_forecast`,
-  `stockout_risk`
+- 6 ML outputs: `churn_predictions`, `customer_segments`, `demand_forecast`,
+  `stockout_risk`, `product_recommendations`, `price_elasticity`
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ flowchart LR
     Generation[Historical generator] --> Silver[7 dimensions + 19 facts]
     Projection --> Silver
     Silver --> Gold[10 aggregates]
-    Silver --> Model[40-table Direct Lake model]
+    Silver --> Model[42-table Direct Lake model]
     Gold --> Model
-    ML[4 active ML outputs] --> Model
+    ML[6 active ML outputs] --> Model
 ```

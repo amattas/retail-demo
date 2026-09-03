@@ -13,19 +13,21 @@ Lakehouse.
 
 ## Active table set
 
-`definition/model.tmdl` currently contains 40 active table references. TMDL
+`definition/model.tmdl` currently contains 42 active table references. TMDL
 means Tabular Model Definition Language, the text format used to define the
 model:
 
 - 7 dimensions
 - 19 facts
 - 10 Gold aggregates
-- 4 ML tables
+- 6 ML tables
 
-The four active ML tables are `churn_predictions`, `customer_segments`,
-`demand_forecast`, and `stockout_risk`.
+The six active ML tables are `churn_predictions`, `customer_segments`,
+`demand_forecast`, `stockout_risk`, `product_recommendations`, and
+`price_elasticity`. Two relationships bind `product_recommendations.product_id`
+and `price_elasticity.product_id` to `dim_products`.
 
-The semantic-model source is the authority for active tables. The four ML
+The semantic-model source is the authority for active tables. The six ML
 tables are required Reporting outputs and have executable producer, schema,
 grain, temporal, lineage, intended-use, and limitation contracts in
 `contracts/retail-demo.json`.
@@ -43,7 +45,7 @@ grain, temporal, lineage, intended-use, and limitation contracts in
 
 The historical generator remains valid without ML or Reporting. `standard` and
 `full-demo` publish infrastructure first, run `setup-pipeline`, and then wait
-for the exact `ml-required` run to finish. That pipeline runs the four required
+for the exact `ml-required` run to finish. That pipeline runs the six required
 producers and `15-validate-required-ml-contract`. A missing, empty, incompatible,
 duplicate, temporally incomplete, or invalid required output fails the run.
 Only terminal success permits the semantic model and report to be staged.
@@ -74,7 +76,7 @@ Validation should confirm:
 1. all active tables exist;
 2. Direct Lake points to the intended Lakehouse;
 3. required relationships and measures load;
-4. all four required ML tables pass their runtime contract;
+4. all six required ML tables pass their runtime contract;
 5. access and field visibility match the intended persona.
 
 Relevant tests:

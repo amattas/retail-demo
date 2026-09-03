@@ -35,7 +35,7 @@ physical schema.
 | Event tables, fields, types, and JSON paths | KQL DDL/mappings and `driver-05-stream.py` `ENVELOPE`/`EVENT_PAYLOADS` |
 | Historical Lakehouse tables, fields, and types | `utility/src/retail_setup/generation/schemas.py` `TABLES` |
 | Active semantic-model tables and Direct Lake bindings | `model.tmdl` references plus each table TMDL's executable `schemaName`/`entityName` partition |
-| ML output schemas | Producer notebook `ML_OUTPUT_CONTRACTS`; active TMDL for the four Reporting outputs |
+| ML output schemas | Producer notebook `ML_OUTPUT_CONTRACTS`; active TMDL for the six Reporting outputs |
 
 Physical inventories are declarations with a derivation and source selector.
 Validators calculate their values from those sources. Item names, event fields,

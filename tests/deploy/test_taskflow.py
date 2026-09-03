@@ -227,8 +227,12 @@ def test_profile_taskflow_inventory_uses_only_selected_ml_tiers() -> None:
 
     allowed = taskflow.profile_taskflow_artifacts(repo_root, config)
 
-    assert ("MLExperiment", "demand_forecast") in allowed
-    assert ("MLExperiment", "market_basket") not in allowed
+    assert {
+        ("MLExperiment", "demand_forecast"),
+        ("MLExperiment", "market_basket"),
+        ("MLExperiment", "promotion_effectiveness"),
+    } <= allowed
+    assert ("MLExperiment", "journey_analysis") not in allowed
     assert ("MLExperiment", "dynamic_pricing") not in allowed
 
 
@@ -398,11 +402,11 @@ def test_committed_taskflow_places_reporting_after_required_ml() -> None:
         "08-ml-customer-segmentation",
         "09-ml-churn-prediction",
         "12-ml-stockout-prediction",
+        "07-ml-market-basket",
+        "10-ml-promotion-effectiveness",
         "15-validate-required-ml-contract",
     }
     assert extended_notebooks == {
-        "07-ml-market-basket",
-        "10-ml-promotion-effectiveness",
         "11-ml-journey-analysis",
         "13-ml-delivery-prediction",
         "14-ml-dynamic-pricing",

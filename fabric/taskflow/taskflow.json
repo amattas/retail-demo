@@ -281,16 +281,7 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "15-validate-required-ml-contract"
-        }
-      ],
-      "loc": "460 320"
-    },
-    {
-      "id": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
-      "type": "analyze and train data",
-      "name": "Post-Reporting Extended ML",
-      "description": "Optional and experimental models run after Reporting; their failures do not block the required report.",
-      "items": [
+        },
         {
           "artifactUniqueId": "SynapseNotebook:e1aaa8df-b835-4f32-8240-f75d0d1889db",
           "artifactType": "SynapseNotebook",
@@ -314,7 +305,16 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "10-ml-promotion-effectiveness"
-        },
+        }
+      ],
+      "loc": "460 320"
+    },
+    {
+      "id": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
+      "type": "analyze and train data",
+      "name": "Post-Reporting Extended ML",
+      "description": "Optional and experimental models run after Reporting; their failures do not block the required report.",
+      "items": [
         {
           "artifactUniqueId": "SynapseNotebook:09fc05bb-ef5f-45d3-85bf-de3b096c425b",
           "artifactType": "SynapseNotebook",

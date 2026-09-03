@@ -45,7 +45,7 @@ The Eventhouse shortcut path is optional for incremental live projection.
 `contracts/retail-demo.json` defines 14 executable output contracts. Each
 references its authoritative producer notebook and declares exact schema,
 grain, as-of and lineage fields, source tables, intended use, and limitations.
-The four required Reporting tables also reference their active TMDL projection.
+The six required Reporting tables also reference their active TMDL projection.
 Repository validation fails when a producer, manifest declaration, validator,
 or TMDL projection disagrees.
 

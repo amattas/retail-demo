@@ -287,13 +287,19 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         "08-ml-customer-segmentation",
         "09-ml-churn-prediction",
         "12-ml-stockout-prediction",
+        "07-ml-market-basket",
+        "10-ml-promotion-effectiveness",
     }
     validator = required["15-validate-required-ml-contract"]
+    # 07 and 10 produce required-tier outputs (product_recommendations and
+    # price_elasticity), so they run inside the required serial chain.
     required_chain = (
         ("06-ml-demand-forecast", None),
         ("08-ml-customer-segmentation", "06-ml-demand-forecast"),
         ("09-ml-churn-prediction", "08-ml-customer-segmentation"),
         ("12-ml-stockout-prediction", "09-ml-churn-prediction"),
+        ("07-ml-market-basket", "12-ml-stockout-prediction"),
+        ("10-ml-promotion-effectiveness", "07-ml-market-basket"),
     )
     for activity_name, predecessor in required_chain:
         dependencies = required[activity_name]["dependsOn"]
@@ -315,16 +321,17 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
     )
 
     optional = set(activities("ml-optional"))
-    experimental = set(activities("ml-experimental"))
+    experimental_activities = activities("ml-experimental")
+    experimental = set(experimental_activities)
     assert optional == {
-        "07-ml-market-basket",
         "11-ml-journey-analysis",
         "13-ml-delivery-prediction",
     }
     assert experimental == {
-        "10-ml-promotion-effectiveness",
         "14-ml-dynamic-pricing",
     }
+    # 14 consumes price_elasticity produced by the earlier required run.
+    assert experimental_activities["14-ml-dynamic-pricing"]["dependsOn"] == []
     assert not (required_producers & optional)
     assert not (required_producers & experimental)
 

@@ -105,14 +105,14 @@ ML_EXPERIMENT_GROUPS = {
         "customer_segmentation",
         "churn_prediction",
         "stockout_prediction",
+        "market_basket",
+        "promotion_effectiveness",
     ],
     "ml-optional": [
-        "market_basket",
         "journey_analysis",
         "delivery_prediction",
     ],
     "ml-experimental": [
-        "promotion_effectiveness",
         "dynamic_pricing",
     ],
 }
@@ -129,15 +129,15 @@ NOTEBOOK_GROUPS = {
         "08-ml-customer-segmentation.ipynb",
         "09-ml-churn-prediction.ipynb",
         "12-ml-stockout-prediction.ipynb",
+        "07-ml-market-basket.ipynb",
+        "10-ml-promotion-effectiveness.ipynb",
         "15-validate-required-ml-contract.ipynb",
     ],
     "ml-optional": [
-        "07-ml-market-basket.ipynb",
         "11-ml-journey-analysis.ipynb",
         "13-ml-delivery-prediction.ipynb",
     ],
     "ml-experimental": [
-        "10-ml-promotion-effectiveness.ipynb",
         "14-ml-dynamic-pricing.ipynb",
     ],
     "ontology": ["30-create-ontology.ipynb"],

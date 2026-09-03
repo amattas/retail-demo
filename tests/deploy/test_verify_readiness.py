@@ -1069,6 +1069,11 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
 def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> None:
     now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
     context = _profile_context("full-demo", now)
+    optional_contracts = [
+        contract
+        for contract in context.manifest.ml_contracts
+        if contract.tier == "optional"
+    ]
 
     class EmptyModelAdapter:
         def model_signals(self, contracts):
@@ -1083,6 +1088,10 @@ def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> 
             ]
 
     readiness = ReadinessRunner(context, EmptyModelAdapter())
+    readiness.pipeline_evidence["ml-required"] = {
+        "start_time": (now - timedelta(minutes=20)).isoformat(),
+        "end_time": (now - timedelta(minutes=12)).isoformat(),
+    }
     readiness.pipeline_evidence["ml-optional"] = {
         "start_time": (now - timedelta(minutes=10)).isoformat(),
         "end_time": (now - timedelta(minutes=5)).isoformat(),
@@ -1091,8 +1100,77 @@ def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> 
     observation = readiness._model_freshness("optional")
 
     assert observation.freshness is not None
-    assert observation.freshness["age_seconds"] == 300
-    assert len(observation.evidence["empty_contracts"]) == 6
+    # Optional contracts produced by a notebook that runs inside ml-required
+    # fall back to that pipeline's end time, which is the oldest evidence.
+    assert observation.freshness["age_seconds"] == 720
+    assert len(observation.evidence["empty_contracts"]) == len(optional_contracts)
+
+
+def test_model_freshness_correlates_contracts_with_their_producer_pipeline() -> None:
+    """A contract is judged against the pipeline that runs its producer notebook.
+
+    07-ml-market-basket and 10-ml-promotion-effectiveness run inside ml-required
+    because they emit required-tier outputs, so their non-required outputs must
+    not be flagged stale for predating the ml-optional/ml-experimental windows.
+    """
+
+    now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
+    context = _profile_context("full-demo", now)
+
+    class ModelAdapter:
+        def model_signals(self, contracts):
+            # Outputs of a producer that runs inside ml-required are generated
+            # well before the ml-optional / ml-experimental pipelines start.
+            return [
+                {
+                    "contract_id": contract["id"],
+                    "as_of": (
+                        now
+                        - timedelta(
+                            minutes=(
+                                15
+                                if contract["pipeline_ref"]
+                                == "ml-required.DataPipeline"
+                                else 8
+                            )
+                        )
+                    ).isoformat(),
+                    "run_id_present": True,
+                    "lineage_hash": contract["id"],
+                }
+                for contract in contracts
+            ]
+
+    readiness = ReadinessRunner(context, ModelAdapter())
+    readiness.pipeline_evidence["ml-required"] = {
+        "start_time": (now - timedelta(minutes=20)).isoformat(),
+        "end_time": (now - timedelta(minutes=12)).isoformat(),
+    }
+    for name in ("ml-optional", "ml-experimental"):
+        readiness.pipeline_evidence[name] = {
+            "start_time": (now - timedelta(minutes=10)).isoformat(),
+            "end_time": (now - timedelta(minutes=5)).isoformat(),
+        }
+
+    producer_pipelines = readiness._producer_pipeline_refs()
+    assert producer_pipelines["07-ml-market-basket"] == "ml-required.DataPipeline"
+    assert (
+        producer_pipelines["10-ml-promotion-effectiveness"]
+        == "ml-required.DataPipeline"
+    )
+
+    for tier in ("optional", "experimental"):
+        observation = readiness._model_freshness(tier)
+        assert observation.freshness is not None
+        assert observation.freshness["age_seconds"] == 900
+        assert observation.evidence["empty_contracts"] == []
+        assert observation.evidence["model_count"] == len(
+            [
+                contract
+                for contract in context.manifest.ml_contracts
+                if contract.tier == tier
+            ]
+        )
 
 
 def test_full_demo_initial_inventory_defers_ontology_dependent_items() -> None:

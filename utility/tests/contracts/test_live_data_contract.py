@@ -201,7 +201,7 @@ def test_nullable_and_unknown_fixtures_cover_intentional_boundaries() -> None:
 
 
 def test_active_tmdl_types_and_legacy_names_are_source_derived() -> None:
-    assert len(SNAPSHOT.semantic_tables) == 40
+    assert len(SNAPSHOT.semantic_tables) == 42
     assert (
         next(
             field
@@ -457,6 +457,8 @@ def test_contract_check_command_is_non_mutating() -> None:
         "churn_predictions",
         "customer_segments",
         "demand_forecast",
+        "price_elasticity",
+        "product_recommendations",
         "stockout_risk",
     ]
     assert {path: _digest(path) for path in authoritative} == before
