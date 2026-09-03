@@ -5,11 +5,11 @@
   --border: #343434;
   --text: #ffffff;
   --muted: #b5b5b5;
-  --accent: #c7ff00;
-  --accent-2: #8fbd00;
-  --lakehouse: #c7ff00;
+  --accent: #f15a24;
+  --accent-2: #ff7a33;
+  --lakehouse: #f15a24;
   --eventhouse: #ffffff;
-  --entity: #c7ff00;
+  --entity: #f15a24;
   --user: #292929;
   --bot: #171717;
 }
@@ -33,7 +33,7 @@ body {
 .brand h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .2px; }
 .dot {
   width: 12px; height: 12px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 12px rgba(199,255,0,.55);
+  background: var(--accent); box-shadow: 0 0 12px rgba(241,90,36,.55);
 }
 .meta { color: var(--muted); font-size: 12px; }
 
@@ -67,7 +67,7 @@ body {
 }
 .synthetic-badge {
   display: inline-flex; align-items: center; border: 1px solid var(--accent);
-  color: var(--accent); background: #111600; border-radius: 999px; padding: 2px 8px;
+  color: #ffb394; background: #251008; border-radius: 999px; padding: 2px 8px;
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
 }
 
@@ -148,7 +148,7 @@ body {
 }
 .decision-pill {
   display: inline-block; padding: 2px 7px; border-radius: 999px;
-  background: #111600; color: var(--accent); border: 1px solid var(--accent-2);
+  background: #251008; color: #ffb394; border: 1px solid var(--accent-2);
   font-size: 10px; font-weight: 700; text-transform: uppercase;
 }
 .mock-footnote { color: var(--muted); font-size: 10px; margin-top: 12px; }
@@ -199,7 +199,7 @@ body {
 .studio-layout {
   flex: 1; min-height: 0; overflow: auto; padding: 18px;
   background:
-    radial-gradient(circle at 85% 0%, rgba(199,255,0,.10), transparent 28%),
+    radial-gradient(circle at 85% 0%, rgba(241,90,36,.14), transparent 28%),
     var(--bg);
 }
 .studio-hero {
@@ -214,12 +214,12 @@ body {
 .studio-hero p { color: var(--muted); max-width: 720px; line-height: 1.5; }
 .signal-card {
   border: 1px solid var(--accent); border-radius: 14px; padding: 20px;
-  background: #111600; display: flex; justify-content: space-between;
+  background: #251008; display: flex; justify-content: space-between;
   gap: 16px; align-items: center;
 }
 .signal-card > div { display: flex; flex-direction: column; gap: 7px; }
 .signal-card strong { font-size: 18px; }
-.signal-card p { margin: 0; color: #d9e6ad; font-size: 12px; }
+.signal-card p { margin: 0; color: #ffd1bd; font-size: 12px; }
 .signal-card b { color: var(--accent); }
 .signal-card button, .iq-card button {
   border: 1px solid var(--accent); background: var(--accent); color: #050505;
@@ -249,7 +249,7 @@ body {
   background: #444;
 }
 .iq-card.complete::before { background: var(--accent); }
-.iq-card.complete { border-color: #637c0d; }
+.iq-card.complete { border-color: #8f3517; }
 .iq-card .iq-number { color: #555; font-size: 28px; font-weight: 900; }
 .iq-card > span { color: var(--accent); font-size: 11px; font-weight: 800; text-transform: uppercase; }
 .iq-card > strong { font-size: 16px; line-height: 1.3; }
@@ -282,7 +282,7 @@ body {
 .stage-output h3 { color: #fff; font-size: 15px; line-height: 1.45; }
 .source-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
 .source-list span {
-  border: 1px solid #4b5f08; background: #111600; color: #dfff70;
+  border: 1px solid #8f3517; background: #251008; color: #ffb394;
   border-radius: 999px; padding: 3px 7px; font-size: 10px;
 }
 .command-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
