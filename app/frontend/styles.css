@@ -49,6 +49,23 @@ body {
 
 /* ---- page layout ---- */
 .layout { flex: 1; min-height: 0; padding: 10px; display: grid; }
+.experience {
+  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0;
+}
+.scenario-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 10px 14px; border: 1px solid #285c45; border-radius: 10px;
+  background: linear-gradient(90deg, #142a22, #171a21);
+  font-size: 12px; color: var(--muted);
+}
+.scenario-banner > div:first-child { display: flex; align-items: center; gap: 10px; }
+.scenario-banner strong { color: #fff; font-size: 14px; }
+.scenario-flow { color: #9fd3b0; font-weight: 600; white-space: nowrap; }
+.synthetic-badge {
+  display: inline-flex; align-items: center; border: 1px solid #2e9e6b;
+  color: #8ee0b5; background: #14321f; border-radius: 999px; padding: 2px 8px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+}
 
 /* Dashboard: Power BI report + chat side by side */
 .dashboard {
@@ -98,6 +115,81 @@ body {
 
 .report-embed { flex: 1; min-height: 0; }
 .report-embed iframe { border: 0; }
+.mock-report { height: 100%; overflow: auto; padding: 16px; }
+.mock-report-title {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+}
+.mock-report-title div { display: flex; flex-direction: column; gap: 2px; }
+.mock-report-title strong { font-size: 20px; }
+.mock-report-title span:not(.synthetic-badge) { color: var(--muted); font-size: 12px; }
+.mock-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.mock-kpi {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+  background: var(--panel-2);
+}
+.mock-kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.mock-kpi-value { color: #fff; font-size: 24px; font-weight: 700; margin: 5px 0; }
+.mock-kpi-delta { color: #9fd3b0; font-size: 11px; }
+.mock-insight {
+  display: flex; align-items: baseline; gap: 12px; margin: 14px 0;
+  padding: 14px; border: 1px solid #4a3b18; border-radius: 10px;
+  background: linear-gradient(90deg, #2f2818, #1f232c);
+}
+.mock-insight span { color: var(--muted); text-transform: uppercase; font-size: 10px; }
+.mock-insight strong { color: #ffd9a8; font-size: 20px; }
+.mock-insight small { color: var(--muted); }
+.mock-table-title {
+  margin: 16px 0 6px; color: var(--muted); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.decision-pill {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  background: #1d2b3f; color: #9fc7ff; border: 1px solid #31557e;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+}
+.mock-footnote { color: var(--muted); font-size: 10px; margin-top: 12px; }
+.decision-panel { height: 100%; overflow: auto; }
+.decision-canvas {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px; padding: 16px;
+}
+.decision-stage {
+  min-height: 180px; padding: 16px; border: 1px solid var(--border);
+  border-radius: 12px; background: var(--panel-2); display: flex;
+  flex-direction: column; gap: 9px;
+}
+.decision-stage > span {
+  color: var(--muted); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .5px; font-weight: 700;
+}
+.decision-stage > strong { color: #fff; font-size: 16px; }
+.decision-stage p, .decision-stage li { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.decision-stage ul { margin: 0; padding-left: 18px; }
+.decision-stage.signal { border-color: #31557e; background: #172334; }
+.decision-stage.constraint { border-color: #6e5725; background: #292416; }
+.decision-stage.recommendation { border-color: #285c45; background: #142a22; }
+.decision-stage.override { border-color: #6b456e; background: #281d2c; }
+.decision-stage.package { border-color: #31557e; }
+.decision-actions { display: grid; gap: 8px; }
+.decision-actions div {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px;
+  background: rgba(255,255,255,.04); border-radius: 8px; font-size: 12px;
+}
+.decision-actions b { color: #9fd3b0; font-size: 10px; text-transform: uppercase; }
+.override-form { display: flex; flex-direction: column; gap: 8px; }
+.override-form label { color: #fff; font-weight: 700; }
+.override-form span { color: var(--muted); font-size: 11px; }
+.override-form input {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 9px 10px;
+}
+.override-form button {
+  align-self: flex-start; border: 0; border-radius: 8px; padding: 8px 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; cursor: pointer; font-weight: 600;
+}
+.override-result { display: flex; flex-direction: column; gap: 9px; }
+.override-result span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .status { font-size: 11px; color: var(--muted); }
 .head-right { display: flex; align-items: center; gap: 10px; }
 .router-toggle {

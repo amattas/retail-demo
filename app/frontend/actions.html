@@ -14,6 +14,7 @@
     </div>
     <nav class="tabs">
       <a class="tab" href="/">Dashboard</a>
+      <a class="tab" href="/decision.html">Decision Canvas</a>
       <a class="tab active" href="/actions.html">Agent Operations</a>
       <a class="tab" href="/ontology.html">Ontology Explorer</a>
       <a class="tab" href="/architecture.html">Architecture</a>
@@ -25,7 +26,7 @@
   <main class="layout">
     <section class="panel ops-panel">
       <div class="panel-head">
-        <h2>Agent Operations — live approval funnel</h2>
+        <h2>Agent Operations — approval funnel</h2>
         <span class="status" id="ops-status">
           <span class="live-dot"></span><span id="ops-updated">connecting…</span>
         </span>
@@ -61,11 +62,10 @@
       </div>
 
       <p class="ops-note">
-        Every recommendation an agent drafts and every human approval/dismissal is
-        written back to the Fabric Eventhouse table <code>agent_actions</code> and
-        shown here within ~2&nbsp;seconds. This is the closed loop — the same
-        real-time store that streams live sales now captures the multi-agent
-        operations layer.
+        In replay mode, this view uses synthetic local proposal events. In live
+        mode, recommendations and human decisions are written to the Fabric
+        Eventhouse table <code>agent_actions</code>. Both modes use the same
+        dashboard contract.
       </p>
     </section>
   </main>

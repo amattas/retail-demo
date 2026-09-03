@@ -89,7 +89,7 @@ async function showEntity(name) {
 function init() {
   api("/api/config").then((c) => {
     document.getElementById("meta").textContent =
-      `workspace ${c.workspaceId.slice(0, 8)}… · data agent · ontology`;
+      `${c.brand || "fictional retail"} · ${c.mode} · ontology`;
   }).catch(() => {});
   renderGraph();
 }

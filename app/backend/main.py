@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agents, config, llm_router, mcp_client, ontology_graph, proposals
+from . import agents, config, llm_router, mcp_client, ontology_graph, proposals, replay
 
 app = FastAPI(title="Retail Ontology Explorer")
 
@@ -44,19 +44,49 @@ class ChatRequest(BaseModel):
     router: str = "llm"
 
 
+class OverrideRequest(BaseModel):
+    reason: str
+
+
 @app.get("/api/config")
-def get_config() -> dict[str, str]:
+def get_config() -> dict[str, Any]:
+    if config.REPLAY_MODE:
+        return replay.config_payload()
     return {
         "workspaceId": config.WORKSPACE_ID,
         "reportId": config.REPORT_ID,
         "dataAgentId": config.DATA_AGENT_ID,
         "ontologyItemId": config.ONTOLOGY_ITEM_ID,
+        "mode": "live",
+        "synthetic": True,
+        "brand": replay.BRAND,
+        "scenario": replay.REPORT["scenario"],
     }
+
+
+@app.get("/api/demo/dashboard")
+def demo_dashboard() -> dict[str, Any]:
+    return replay.report_payload()
+
+
+@app.get("/api/demo/decision")
+def demo_decision() -> dict[str, Any]:
+    return replay.decision_payload()
+
+
+@app.post("/api/demo/decision/override")
+def demo_decision_override(req: OverrideRequest) -> dict[str, Any]:
+    try:
+        return replay.apply_override(req.reason)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/embed")
 def get_embed() -> dict[str, str]:
     """Resolve the report's embed URL and return an AAD token for the PBI client."""
+    if config.REPLAY_MODE:
+        raise HTTPException(409, "Power BI embedding is disabled in replay mode")
     token = mcp_client.get_token(config.POWERBI_SCOPE)
     headers = {"Authorization": f"Bearer {token}"}
     report_id = config.REPORT_ID
@@ -729,6 +759,8 @@ def chat(req: ChatRequest) -> dict[str, Any]:
     message = (req.message or "").strip()
     if not message:
         raise HTTPException(400, "Empty message")
+    if config.REPLAY_MODE:
+        return replay.chat(message)
 
     # Real-time sales-velocity questions ("which sold the most in the last 15
     # minutes") have no answer in the historical semantic model and 500 the full
@@ -903,6 +935,8 @@ def update_proposal(pid: str, action: ProposalAction) -> dict[str, Any]:
 @app.get("/api/actions/dashboard")
 def actions_dashboard() -> dict[str, Any]:
     """Live approval-funnel snapshot from the Eventhouse agent_actions table."""
+    if config.REPLAY_MODE:
+        return replay.actions_dashboard()
     try:
         from . import eventhouse
         return eventhouse.dashboard()
@@ -913,6 +947,8 @@ def actions_dashboard() -> dict[str, Any]:
 
 @app.get("/api/ontology/graph")
 def ontology_graph_endpoint() -> dict[str, Any]:
+    if config.REPLAY_MODE:
+        return replay.GRAPH
     try:
         return ontology_graph.build_graph()
     except Exception as exc:  # pragma: no cover - network error path
@@ -922,6 +958,8 @@ def ontology_graph_endpoint() -> dict[str, Any]:
 @app.get("/api/ontology/entity")
 def ontology_entity(name: str) -> JSONResponse:
     """Return properties + telemetry for a single entity (for the detail panel)."""
+    if config.REPLAY_MODE:
+        return JSONResponse(replay.ontology_entity(name))
     import json as _json
 
     try:

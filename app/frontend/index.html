@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Retail Intelligence</title>
+  <title>Retail CX Decision Studio</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
 </head>
@@ -11,22 +11,32 @@
   <header class="topbar">
     <div class="brand">
       <span class="dot"></span>
-      <h1>Retail Intelligence</h1>
+      <h1>Retail CX Decision Studio</h1>
     </div>
     <nav class="tabs">
       <a class="tab active" href="/">Dashboard</a>
+      <a class="tab" href="/decision.html">Decision Canvas</a>
       <a class="tab" href="/actions.html">Agent Operations</a>
       <a class="tab" href="/ontology.html">Ontology Explorer</a>
       <a class="tab" href="/architecture.html">Architecture</a>
       <a class="tab" href="/walkthrough.html">Walkthrough</a>
     </nav>
-    <div class="meta" id="meta">workspace &middot; semantic model &middot; ontology</div>
+    <div class="meta" id="meta">synthetic retail &middot; semantic model &middot; ontology</div>
   </header>
 
   <main class="layout">
-    <div class="dashboard">
+    <div class="experience">
+      <section class="scenario-banner">
+        <div>
+          <span class="synthetic-badge">Synthetic demo</span>
+          <strong>Protect the Winner</strong>
+          <span id="scenario-headline">Loading the fictional retail scenario…</span>
+        </div>
+        <div class="scenario-flow">Signal → Diagnose → Recommend → Approve → Audit</div>
+      </section>
+      <div class="dashboard">
       <section class="panel report-panel">
-        <div class="panel-head"><h2>Power BI</h2><span id="report-status" class="status"></span></div>
+        <div class="panel-head"><h2>Decision Cockpit</h2><span id="report-status" class="status"></span></div>
         <div id="report" class="report-embed"></div>
       </section>
 
@@ -49,6 +59,7 @@
           <button type="submit" id="send-btn">Send</button>
         </form>
       </section>
+      </div>
     </div>
   </main>
 

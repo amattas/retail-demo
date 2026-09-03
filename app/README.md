@@ -3,6 +3,10 @@
 A self-contained local web app for demoing conversational analytics + the
 business ontology over the deployed **retail-demo** Microsoft Fabric workspace.
 
+The app starts in a deterministic **synthetic replay mode** when live Fabric
+configuration is absent. Set `RETAIL_DEMO_MODE=live` and the deployment-specific
+environment variables below to use live Fabric services.
+
 It has three pages:
 
 1. **Dashboard** (`/`) — the `retail_model` Power BI report and a **chat** panel
@@ -108,6 +112,7 @@ stored in the repository:
 | `RETAIL_ANTHROPIC_API_KEY` | _(unset)_ — required for `RETAIL_LLM_PROVIDER=anthropic` |
 | `RETAIL_ANTHROPIC_MODEL` | `claude-sonnet-4-5` |
 | `RETAIL_ONTOLOGY_TIMEOUT` | `115` (seconds the ontology MCP gets before fallback) |
+| `RETAIL_DEMO_MODE` | `auto` (`replay` when live IDs are absent; otherwise `live`) |
 
 ### Which model does what
 

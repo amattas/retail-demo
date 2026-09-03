@@ -9,6 +9,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Demo mode. "auto" uses replay whenever the minimum live Fabric configuration
+# is absent, so a fresh clone starts as a complete synthetic experience.
+DEMO_MODE = os.getenv("RETAIL_DEMO_MODE", "auto").strip().lower()
+
 # Fabric workspace that hosts the semantic model, report, data agent and ontology.
 WORKSPACE_ID = os.getenv("RETAIL_WORKSPACE_ID", "")
 
@@ -17,6 +21,11 @@ DATA_AGENT_ID = os.getenv("RETAIL_DATA_AGENT_ID", "")
 
 # The Fabric ontology item.
 ONTOLOGY_ITEM_ID = os.getenv("RETAIL_ONTOLOGY_ITEM_ID", "")
+
+LIVE_CONFIGURED = bool(WORKSPACE_ID and DATA_AGENT_ID and ONTOLOGY_ITEM_ID)
+REPLAY_MODE = DEMO_MODE == "replay" or (
+    DEMO_MODE == "auto" and not LIVE_CONFIGURED
+)
 
 # Minimal "lite" ontology (Store + receipt_created + stockout_detected). It is
 # bounded to live event tables so it answers real-time, store-level sales-velocity

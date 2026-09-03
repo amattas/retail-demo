@@ -9,6 +9,41 @@ const api = (path, opts) => fetch(path, opts).then(async (r) => {
 });
 
 /* ---------- Power BI embed ---------- */
+function renderReplayDashboard(data) {
+  const status = document.getElementById("report-status");
+  status.textContent = "replay · synthetic";
+  document.getElementById("scenario-headline").textContent = data.headline;
+  const kpis = (data.kpis || []).map((k) =>
+    `<div class="mock-kpi">
+       <div class="mock-kpi-label">${escapeHtml(k.label)}</div>
+       <div class="mock-kpi-value">${escapeHtml(k.value)}</div>
+       <div class="mock-kpi-delta">${escapeHtml(k.delta)}</div>
+     </div>`).join("");
+  const rows = (data.stores || []).map((s) =>
+    `<tr><td>${escapeHtml(s.store)}</td><td>${escapeHtml(s.market)}</td>
+      <td>${escapeHtml(s.velocity)}</td><td>${escapeHtml(s.weeks_cover)}</td>
+      <td><span class="decision-pill">${escapeHtml(s.recommendation)}</span></td></tr>`
+  ).join("");
+  document.getElementById("report").innerHTML =
+    `<div class="mock-report">
+       <div class="mock-report-title">
+         <div><strong>${escapeHtml(data.brand)}</strong><span>${escapeHtml(data.period)}</span></div>
+         <span class="synthetic-badge">Synthetic data</span>
+       </div>
+       <div class="mock-kpis">${kpis}</div>
+       <div class="mock-insight">
+         <span>Growth signal</span>
+         <strong>Momentum Runner +18.6%</strong>
+         <small>inside Performance Footwear -4.8%</small>
+       </div>
+       <div class="mock-table-title">Supply-aware store opportunity</div>
+       <table class="rec-table"><thead><tr><th>Store</th><th>Market</th>
+         <th>Units/day</th><th>Weeks cover</th><th>Decision</th></tr></thead>
+         <tbody>${rows}</tbody></table>
+       <div class="mock-footnote">All names, values, entities, and decisions are fictional.</div>
+     </div>`;
+}
+
 async function embedReport() {
   const status = document.getElementById("report-status");
   try {
@@ -184,6 +219,7 @@ const ROUTE_LABEL = {
   "data-agent": "answered via semantic model",
   "inventory-agent": "Inventory Agent",
   "retention-agent": "Retention Agent",
+  "merchandising-agent": "Merchandising Agent",
 };
 
 /* ---------- transparency trace ("how I reached this") ---------- */
@@ -301,12 +337,11 @@ async function sendChat(message) {
 
 /* ---------- starter question chips ---------- */
 const CHIPS = [
-  "What products are at risk of stockout — and what should we do about it?",
-  "Customer churn is rising — what can we do to retain them?",
-  "What were total net sales and gross margin company-wide?",
-  "How many customers are predicted to churn, and their total lifetime value?",
-  "Top products in the last 15 minutes",
-  "What segment is the customer with loyalty card LC012304678 in, and what is their churn probability?",
+  "Which product families are growing inside declining categories?",
+  "Is Momentum Runner growth broad or concentrated?",
+  "Which stores carry Momentum Runner and how are they supplied?",
+  "Which stores have traffic growth but declining conversion?",
+  "What should we do to protect Momentum Runner growth without creating stockouts?",
 ];
 
 function renderChips() {
@@ -323,7 +358,7 @@ function renderChips() {
 }
 
 /* ---------- wiring ---------- */
-function init() {
+async function init() {
   document.getElementById("chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const input = document.getElementById("chat-input");
@@ -333,18 +368,24 @@ function init() {
     sendChat(msg);
   });
 
-  api("/api/config").then((c) => {
+  try {
+    const c = await api("/api/config");
     document.getElementById("meta").textContent =
-      `workspace ${c.workspaceId.slice(0, 8)}… · data agent · ontology`;
-  }).catch(() => {});
-
-  embedReport();
+      `${c.brand || "fictional retail"} · ${c.mode} · semantic model · ontology`;
+    if (c.mode === "replay") {
+      renderReplayDashboard(await api("/api/demo/dashboard"));
+    } else {
+      embedReport();
+    }
+  } catch (err) {
+    document.getElementById("report-status").textContent = "configuration error";
+  }
   renderChips();
   initRouterToggle();
   addMessage(
-    "Ask a business question in plain English — sales, margins, churn, " +
-    "stockouts, real-time trends, or how entities relate. The assistant picks " +
-    "the right source automatically.", "bot", "Assistant");
+    "Welcome to the synthetic Aster & Pine scenario. Start with the signal, " +
+    "use the ontology to understand the connected stores and inventory, then " +
+    "ask for a supply-aware action plan.", "bot", "Assistant");
 }
 
 document.addEventListener("DOMContentLoaded", init);

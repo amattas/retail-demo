@@ -129,7 +129,8 @@ async function refresh() {
     renderTimeline(d.timeline || []);
     renderByAgent(d.byAgent || []);
     renderFeed(d.recent || []);
-    upd.textContent = "updated " + new Date().toLocaleTimeString();
+    upd.textContent = (d.mode === "replay" ? "synthetic replay · " : "updated ") +
+      new Date().toLocaleTimeString();
   } catch (err) {
     upd.textContent = "error: " + err.message;
   }
