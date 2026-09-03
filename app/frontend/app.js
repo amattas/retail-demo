@@ -33,8 +33,8 @@ function renderReplayDashboard(data) {
        <div class="mock-kpis">${kpis}</div>
        <div class="mock-insight">
          <span>Growth signal</span>
-         <strong>Momentum Runner +18.6%</strong>
-         <small>inside Performance Footwear -4.8%</small>
+         <strong>Momentum Runner +38.0%</strong>
+         <small>inside Footwear -6.2%</small>
        </div>
        <div class="mock-table-title">Supply-aware store opportunity</div>
        <table class="rec-table"><thead><tr><th>Store</th><th>Market</th>

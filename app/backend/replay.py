@@ -14,45 +14,90 @@ SCENARIO_ID = "protect-the-winner"
 REPORT = {
     "brand": BRAND,
     "scenario": "Protect the Winner",
-    "period": "FY26 P08",
+    "persona": "Dana Reyes",
+    "scope": {
+        "territory": "Central Region",
+        "salesPeriod": "Retail Fiscal Month 11, Fall 2026",
+        "comparisonPeriod": "Retail Fiscal Month 11, Fall 2025",
+        "inventorySnapshot": "2026-08-28",
+        "mode": "Certified synthetic replay",
+    },
+    "period": "Retail Fiscal Month 11, Fall 2026",
     "headline": (
-        "Performance Footwear is down 4.8%, while Momentum Runner is up 18.6%."
+        "Footwear is down 6.2% YoY in Central Region. Momentum Runner is up "
+        "38% inside that decline, and three stores will run out of core sizes "
+        "before the next receipt window."
     ),
     "kpis": [
         {"label": "Net sales", "value": "$42.8M", "delta": "-1.9% vs prior year"},
-        {"label": "Momentum Runner", "value": "$6.4M", "delta": "+18.6%"},
+        {"label": "Footwear", "value": "$18.7M", "delta": "-6.2% YoY"},
+        {"label": "Momentum Runner", "value": "$6.4M", "delta": "+38.0%"},
         {"label": "Stores at risk", "value": "3", "delta": "under 1.5 weeks cover"},
-        {"label": "Sales protected", "value": "$286K", "delta": "modeled 14-day impact"},
+        {"label": "Demand protected", "value": "740 units", "delta": "before next receipt"},
     ],
+    "waterfall": [
+        {"label": "Central footwear", "value": -6.2},
+        {"label": "Outlet stores", "value": -11.0},
+        {"label": "Full-price stores", "value": 2.0},
+        {"label": "Momentum Runner", "value": 38.0},
+        {"label": "Everything else", "value": 0.2},
+    ],
+    "concentration": {
+        "storesUp": 7,
+        "storesTotal": 10,
+        "storesAbove50": 3,
+    },
     "stores": [
         {
-            "store": "STORE-014",
+            "store": "Store A",
             "market": "Central Metro",
             "velocity": 34.2,
             "weeks_cover": 0.8,
-            "recommendation": "Replenish",
+            "quadrant": "Strong velocity / low coverage",
+            "recommendation": "Hold + replenish",
         },
         {
-            "store": "STORE-022",
+            "store": "Store B",
             "market": "Lakeside",
             "velocity": 28.7,
             "weeks_cover": 1.1,
-            "recommendation": "Transfer",
+            "quadrant": "Strong velocity / low coverage",
+            "recommendation": "Hold + transfer",
         },
         {
-            "store": "STORE-031",
-            "market": "North Ridge",
-            "velocity": 8.4,
-            "weeks_cover": 7.6,
-            "recommendation": "Source candidate",
-        },
-        {
-            "store": "STORE-009",
+            "store": "Store C",
             "market": "River District",
+            "velocity": 31.4,
+            "weeks_cover": 1.3,
+            "quadrant": "Strong velocity / low coverage",
+            "recommendation": "Hold + replenish",
+        },
+        {
+            "store": "Store D",
+            "market": "Market Square",
             "velocity": 25.1,
             "weeks_cover": 4.2,
+            "quadrant": "Strong velocity / adequate coverage",
             "recommendation": "Activate",
         },
+        {"store": "Store E", "market": "West End", "velocity": 24.2,
+         "weeks_cover": 4.8, "quadrant": "Strong velocity / adequate coverage",
+         "recommendation": "Activate"},
+        {"store": "Store F", "market": "University", "velocity": 23.5,
+         "weeks_cover": 5.1, "quadrant": "Strong velocity / adequate coverage",
+         "recommendation": "Activate"},
+        {"store": "Store G", "market": "South Loop", "velocity": 22.9,
+         "weeks_cover": 3.9, "quadrant": "Strong velocity / adequate coverage",
+         "recommendation": "Activate"},
+        {"store": "Store H", "market": "North Ridge", "velocity": 8.8,
+         "weeks_cover": 7.4, "quadrant": "Weak velocity / adequate coverage",
+         "recommendation": "Transfer source"},
+        {"store": "Store I", "market": "Airport", "velocity": 7.9,
+         "weeks_cover": 8.1, "quadrant": "Weak velocity / adequate coverage",
+         "recommendation": "Transfer source"},
+        {"store": "Store J", "market": "Old Town", "velocity": 7.2,
+         "weeks_cover": 8.5, "quadrant": "Weak velocity / adequate coverage",
+         "recommendation": "Transfer source"},
     ],
 }
 
@@ -134,11 +179,13 @@ ENTITY_PROPERTIES = {
                  "replacement_candidate", "owner_role", "created_at"],
 }
 
-_override: dict[str, str] | None = None
+_override: dict[str, Any] | None = None
 _studio_state = {
     "signalStatus": "active",
     "completed": [],
     "decisionStatus": "draft",
+    "packageStatus": "not built",
+    "reviewStatus": "not sent",
 }
 
 IQ_STAGES = {
@@ -165,9 +212,9 @@ IQ_STAGES = {
             "where can inventory support the opportunity?"
         ),
         "answer": (
-            "Momentum Runner is up 18.6% while Performance Footwear is down 4.8%. "
-            "STORE-009 can support activation, STORE-014 and STORE-022 need "
-            "inventory intervention, and STORE-031 is an initial transfer source."
+            "Momentum Runner is up 38% while Footwear is down 6.2%. Stores D-G "
+            "can support activation, Stores A-C need inventory intervention, "
+            "and Stores H-J are initial transfer candidates."
         ),
         "sources": ["Direct Lake semantic model", "Fabric Ontology",
                     "Synthetic Eventhouse signals"],
@@ -228,14 +275,22 @@ def studio_payload() -> dict[str, Any]:
     return {
         "brand": BRAND,
         "scenario": REPORT["scenario"],
+        "persona": REPORT["persona"],
+        "scope": REPORT["scope"],
+        "waterfall": REPORT["waterfall"],
+        "concentration": REPORT["concentration"],
+        "stores": REPORT["stores"],
         "signal": {
             "status": _studio_state["signalStatus"],
-            "title": "Momentum Runner growth opportunity",
+            "title": "A hidden winner is at risk of stocking out",
+            "summary": REPORT["headline"],
             "detail": REPORT["headline"],
-            "impact": "$286K modeled value protected",
+            "impact": "740 units of demand protected",
         },
         "completed": list(_studio_state["completed"]),
         "decisionStatus": _studio_state["decisionStatus"],
+        "packageStatus": _studio_state["packageStatus"],
+        "reviewStatus": _studio_state["reviewStatus"],
         "stages": [
             {"id": stage_id, **stage}
             for stage_id, stage in IQ_STAGES.items()
@@ -266,9 +321,23 @@ def set_decision_status(status: str) -> dict[str, Any]:
     return studio_payload()
 
 
+def set_package_status(status: str) -> dict[str, Any]:
+    if status not in ("not built", "built", "sent for review"):
+        raise ValueError(
+            "Package status must be not built, built, or sent for review"
+        )
+    _studio_state["packageStatus"] = (
+        "built" if status == "sent for review" else status
+    )
+    _studio_state["reviewStatus"] = (
+        "sent for review" if status == "sent for review" else "not sent"
+    )
+    return studio_payload()
+
+
 def decision_payload() -> dict[str, Any]:
-    source = "STORE-031"
-    replacement = "STORE-027"
+    sources = ["Store H", "Store I", "Store J"]
+    effective_sources = ["Store H", "Store I"] if _override else sources
     return {
         "scenarioId": SCENARIO_ID,
         "brand": BRAND,
@@ -279,22 +348,29 @@ def decision_payload() -> dict[str, Any]:
             "period": REPORT["period"],
         },
         "diagnosis": [
-            "Growth is concentrated in Central Metro and Lakeside.",
-            "STORE-014 and STORE-022 have less than 1.5 weeks of cover.",
-            "STORE-009 has enough cover for a local activation.",
+            "Growth is broad across seven stores and exceeds 50% in three.",
+            "Stores A-C combine strong velocity with less than 1.5 weeks of cover.",
+            "Stores D-G can support activation; Stores H-J are source candidates.",
         ],
         "constraint": (
-            "Reserved inventory is certified at fulfillment-node/product grain "
-            "and is not allocated to stores in this decision."
+            "Reserved inventory is validated at location, style, size, and "
+            "snapshot-date grain before it can enter a transfer plan."
         ),
         "recommendation": {
-            "activate": ["STORE-009"],
-            "replenish": ["STORE-014"],
-            "transfer": [{"from": source, "to": "STORE-022", "units": 180}],
-            "expectedValue": "$286K modeled value protected",
+            "activate": ["Store D", "Store E", "Store F", "Store G"],
+            "hold": ["Store A", "Store B", "Store C"],
+            "replenish": ["Store A", "Store B", "Store C"],
+            "transfer": [{
+                "from": sources,
+                "to": ["Store A", "Store B", "Store C"],
+                "units": 420,
+            }],
+            "expectedValue": "740 units of demand protected",
         },
         "override": _override,
-        "effectiveTransferSource": replacement if _override else source,
+        "effectiveTransferSources": effective_sources,
+        "packageStatus": _studio_state["packageStatus"],
+        "reviewStatus": _studio_state["reviewStatus"],
         "actionPackage": [
             "Replenishment review list",
             "Inter-store transfer review",
@@ -311,8 +387,8 @@ def apply_override(reason: str) -> dict[str, Any]:
     if not clean_reason:
         raise ValueError("An override reason is required")
     _override = {
-        "excludedCandidate": "STORE-031",
-        "replacementCandidate": "STORE-027",
+        "excludedCandidate": "Store J",
+        "replacementCandidates": ["Store H", "Store I"],
         "reason": clean_reason,
         "owner": "Regional Merchandising Lead",
         "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -396,65 +472,65 @@ def _action_response() -> dict[str, Any]:
     actions = [
         _ensure_action(
             "reorder",
-            "Replenish Momentum Runner at STORE-014",
-            "420 units from FC-02; raises modeled cover from 0.8 to 3.6 weeks.",
+            "Protect Momentum Runner at Stores A-C",
+            "Replenish core sizes before the next receipt window.",
             {
                 "agent": "inventory",
-                "store_id": "STORE-014",
+                "store_id": "Stores A-C",
                 "product_id": "MOMENTUM-RUNNER",
                 "reorder_quantity": 420,
             },
-            "$148K sales protected",
+            "420 units of demand protected",
         ),
         _ensure_action(
             "transfer",
-            "Transfer compatible stock to STORE-022",
-            "Move 180 units from STORE-031 after operator review.",
+            "Transfer compatible stock from Stores H-I",
+            "Move 420 compatible units into Stores A-C after operator review.",
             {
                 "agent": "inventory",
-                "store_id": "STORE-022",
-                "source_store_id": "STORE-031",
+                "store_id": "Stores A-C",
+                "source_store_id": "Stores H-I",
                 "product_id": "MOMENTUM-RUNNER",
-                "reorder_quantity": 180,
+                "reorder_quantity": 420,
             },
-            "$76K sales protected",
+            "Core style-size gaps covered",
         ),
         _ensure_action(
             "activation",
-            "Activate Momentum Runner at STORE-009",
-            "Launch the synthetic local activation only where cover exceeds 4 weeks.",
+            "Activate Momentum Runner at Stores D-G",
+            "Launch only where strong velocity and adequate coverage intersect.",
             {
                 "agent": "merchandising",
-                "store_id": "STORE-009",
+                "store_id": "Stores D-G",
                 "product_id": "MOMENTUM-RUNNER",
             },
-            "$62K incremental sales",
+            "Selective regional activation",
         ),
     ]
     evidence = [
         {
-            "store": "STORE-014",
+            "store": "Store A",
             "market": "Central Metro",
             "velocity": "34.2/day",
             "cover": "0.8 weeks",
-            "decision": "REPLENISH",
+            "decision": "HOLD + REPLENISH",
         },
         {
-            "store": "STORE-022",
+            "store": "Store B",
             "market": "Lakeside",
             "velocity": "28.7/day",
             "cover": "1.1 weeks",
-            "decision": "TRANSFER",
+            "decision": "HOLD + TRANSFER",
         },
         {
-            "store": "STORE-031",
+            "store": "Stores H-I",
             "market": "North Ridge",
             "velocity": "8.4/day",
-            "cover": "7.6 weeks",
+            "cover": "7.8 weeks",
             "decision": "SOURCE",
         },
         {
-            "store": "STORE-009",
+            "store": "Stores D-G",
             "market": "River District",
             "velocity": "25.1/day",
             "cover": "4.2 weeks",
@@ -464,11 +540,10 @@ def _action_response() -> dict[str, Any]:
     return {
         "answer": (
             "Momentum Runner is the growth opportunity, but a broad activation "
-            "would create avoidable stockouts. Replenish STORE-014, transfer "
-            "compatible stock to STORE-022, and activate STORE-009. Keep "
-            "STORE-031 as a reviewed source candidate. Distribution-center "
-            "reserved inventory remains excluded because it is not certified at "
-            "store grain."
+            "would create avoidable stockouts. Hold and replenish Stores A-C, "
+            "activate Stores D-G, and transfer compatible stock from Stores H-I "
+            "after Dana excludes Store J. Reserved inventory is validated at "
+            "location, style, size, and snapshot-date grain."
         ),
         "surface": "action-agent",
         "tool": "draft_supply_aware_activation",
@@ -495,7 +570,7 @@ def _action_response() -> dict[str, Any]:
         ),
         "recommendation": {
             "title": "Supply-aware Momentum Runner activation",
-            "impact": "$286K modeled value protected",
+            "impact": "740 units of demand protected",
             "summary": (
                 "Three draft actions balance growth capture with inventory risk. "
                 "All values and records are synthetic."
@@ -526,10 +601,10 @@ def chat(message: str) -> dict[str, Any]:
     )):
         return {
             "answer": (
-                "Momentum Runner is carried by 12 synthetic stores. STORE-014 "
-                "and STORE-022 combine high velocity with low coverage. "
-                "STORE-031 is a compatible transfer source, and FC-02 is the "
-                "serving fulfillment node for the two risk stores."
+                "Momentum Runner is carried by 10 synthetic Central Region stores. "
+                "Stores A-C combine strong velocity with low coverage, Stores D-G "
+                "can support activation, and Stores H-I are compatible transfer "
+                "sources after Dana excludes Store J."
             ),
             "surface": "ontology",
             "tool": "search_ontology",
@@ -563,20 +638,20 @@ def chat(message: str) -> dict[str, Any]:
     if any(term in low for term in ("traffic", "conversion")):
         answer = (
             "Traffic increased 9.4% in Central Metro, but conversion fell 2.1 "
-            "points. STORE-014 contributes most of the gap, making inventory "
+            "points. Store A contributes most of the gap, making inventory "
             "availability and floor execution the next diagnostic steps."
         )
     elif any(term in low for term in ("category", "gainer", "drainer", "family")):
         answer = (
-            "Performance Footwear is down 4.8% versus the comparable fictional "
+            "Footwear is down 6.2% versus the comparable fictional "
             "fiscal period. Momentum Runner is the strongest positive family at "
-            "+18.6%, contributing $6.4M in synthetic net sales."
+            "+38%, contributing $6.4M in synthetic net sales."
         )
     else:
         answer = (
-            "Aster & Pine generated $42.8M in synthetic net sales for FY26 P08. "
-            "The key decision signal is Momentum Runner growth (+18.6%) inside a "
-            "declining Performance Footwear category (-4.8%)."
+            "Aster & Pine generated $42.8M in synthetic net sales for Retail "
+            "Fiscal Month 11. The key decision signal is Momentum Runner growth "
+            "(+38%) inside declining Footwear (-6.2%)."
         )
     return {
         "answer": answer,

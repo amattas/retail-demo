@@ -23,7 +23,7 @@ from typing import Any
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -50,6 +50,11 @@ class OverrideRequest(BaseModel):
 
 class StudioStatusRequest(BaseModel):
     status: str
+
+
+@app.get("/", include_in_schema=False)
+def flagship_entry() -> RedirectResponse:
+    return RedirectResponse("/studio.html")
 
 
 @app.get("/api/config")
@@ -103,6 +108,14 @@ def demo_studio_signal(req: StudioStatusRequest) -> dict[str, Any]:
 def demo_studio_decision(req: StudioStatusRequest) -> dict[str, Any]:
     try:
         return replay.set_decision_status(req.status)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/demo/studio/package")
+def demo_studio_package(req: StudioStatusRequest) -> dict[str, Any]:
+    try:
+        return replay.set_package_status(req.status)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

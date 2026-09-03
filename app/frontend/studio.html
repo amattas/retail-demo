@@ -1,81 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Story Studio — Retail CX Decision Studio</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="dot"></span>
-      <h1>Retail CX Decision Studio</h1>
-    </div>
-    <nav class="tabs">
-      <a class="tab" href="/">Dashboard</a>
-      <a class="tab active" href="/studio.html">Story Studio</a>
-      <a class="tab" href="/decision.html">Decision Canvas</a>
-      <a class="tab" href="/actions.html">Agent Operations</a>
-      <a class="tab" href="/ontology.html">Ontology Explorer</a>
-      <a class="tab" href="/architecture.html">Architecture</a>
-      <a class="tab" href="/walkthrough.html">Walkthrough</a>
-    </nav>
-    <div class="meta">four IQs &middot; user-steered decisions</div>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Protect the Winner | Aster & Pine</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="flagship-body">
+    <header class="topbar">
+      <a class="brand" href="/">Aster & Pine</a>
+      <nav aria-label="Demo navigation">
+        <a class="active" href="/studio.html">Protect the Winner</a>
+        <a href="/walkthrough.html">Presenter guide</a>
+        <a href="/architecture.html">Architecture</a>
+      </nav>
+    </header>
 
-  <main class="studio-layout">
-    <section class="studio-hero">
-      <div>
-        <span class="synthetic-badge">Synthetic retail</span>
-        <h2>From signal to governed action</h2>
-        <p>Select the signal, invoke each intelligence layer, ask independent
-          Fabric questions, trigger agents, and decide what happens next.</p>
+    <div id="scope-bar" class="scope-bar" aria-label="Fixed demo scope"></div>
+
+    <main class="flagship-shell">
+      <section class="flagship-hero">
+        <div>
+          <p class="eyebrow">Dana's morning decision</p>
+          <h1>Protect the winner without over-activating the region.</h1>
+          <p class="hero-copy">
+            Follow one signal from performance evidence through inventory
+            reasoning, a human override, and a governed action package.
+          </p>
+        </div>
+        <div class="progress-panel">
+          <span id="progress-label">Beat 1 of 5</span>
+          <div class="progress-track"><span id="progress-fill"></span></div>
+        </div>
+      </section>
+
+      <div class="flagship-grid">
+        <section class="story-workspace">
+          <ol id="beat-nav" class="beat-nav" aria-label="Story beats"></ol>
+          <div id="beat-content" class="beat-content"></div>
+        </section>
+
+        <aside class="action-rail">
+          <div class="coach-card">
+            <p class="eyebrow">Presenter coach</p>
+            <h2 id="coach-title">Start with the signal</h2>
+            <dl>
+              <dt>Say this</dt>
+              <dd id="coach-say"></dd>
+              <dt>Click this</dt>
+              <dd id="coach-click"></dd>
+              <dt>Expected result</dt>
+              <dd id="coach-result"></dd>
+            </dl>
+          </div>
+          <div class="next-card">
+            <p class="eyebrow">What you can do now</p>
+            <button id="primary-action" class="button primary wide"></button>
+            <button id="secondary-action" class="button secondary wide hidden"></button>
+            <p id="action-hint" class="muted"></p>
+          </div>
+          <details class="evidence-drawer">
+            <summary>Evidence and agent details</summary>
+            <div id="evidence-content"></div>
+          </details>
+        </aside>
       </div>
-      <div id="signal-card" class="signal-card"></div>
-    </section>
+    </main>
 
-    <section class="iq-journey">
-      <div class="section-title">
-        <span>Guided intelligence journey</span>
-        <small>You decide when each IQ participates.</small>
-      </div>
-      <div id="iq-stages" class="iq-stage-grid"></div>
-    </section>
+    <dialog id="override-dialog">
+      <form id="override-form" method="dialog" class="dialog-form">
+        <p class="eyebrow">Human judgment</p>
+        <h2>Exclude Store J from transfer sourcing</h2>
+        <p>
+          Dana knows Store J has a local community event not represented in the
+          current inventory snapshot. The plan will recalculate from Stores H and I.
+        </p>
+        <label for="override-reason">Required reason</label>
+        <textarea id="override-reason" required minlength="8">Local community event requires protected inventory.</textarea>
+        <div class="dialog-actions">
+          <button type="button" class="button secondary" id="cancel-override">Cancel</button>
+          <button type="submit" class="button primary">Apply override</button>
+        </div>
+      </form>
+    </dialog>
 
-    <section class="studio-workspace">
-      <div class="panel question-lab">
-        <div class="panel-head">
-          <h2>Fabric Data Agent Question Lab</h2>
-          <span class="status">independent exploration</span>
-        </div>
-        <p class="studio-help">Ask these governed business questions at any time.
-          They do not have to become decisions.</p>
-        <div id="question-list" class="question-list"></div>
-        <div id="question-answer" class="question-answer">
-          Select a question to see the simulated Fabric Data Agent response.
-        </div>
-      </div>
-
-      <div class="panel command-center">
-        <div class="panel-head">
-          <h2>Decision Command Center</h2>
-          <span class="status" id="decision-state">draft</span>
-        </div>
-        <div id="stage-output" class="stage-output">
-          Run an IQ stage to build the decision context.
-        </div>
-        <div class="command-actions">
-          <button id="trigger-agents" class="primary-action">Trigger action agents</button>
-          <a href="/decision.html" class="secondary-action">Open Decision Canvas</a>
-          <button id="approve-decision" class="secondary-action">Approve decision</button>
-          <button id="dismiss-decision" class="secondary-action">Dismiss decision</button>
-        </div>
-        <div id="agent-output" class="agent-output"></div>
-      </div>
-    </section>
-  </main>
-
-  <script src="studio.js"></script>
-</body>
+    <script src="/studio.js"></script>
+  </body>
 </html>

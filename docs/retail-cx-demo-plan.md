@@ -72,12 +72,12 @@ same experience can later be hosted behind a Fabric Workload.
 
 ### Persona
 
-**Morgan Lee**, Regional Merchandising Lead for Aster & Pine Outfitters.
+**Dana Reyes**, Regional Merchandising Lead for Aster & Pine Outfitters.
 
 ### Business situation
 
 The morning brief shows that the **Performance Footwear** category is declining,
-but the fictional **Momentum Runner** product family is growing. Morgan wants to
+but the fictional **Momentum Runner** product family is growing. Dana wants to
 capture the demand without promoting stores that cannot support it.
 
 ### Act 1 - Detect the signal
@@ -140,7 +140,7 @@ The application produces:
 
 ### Act 4 - Human override
 
-Morgan removes one proposed source store because of a local operational event
+Dana removes one proposed source store because of a local operational event
 that is not represented in the data. The application:
 
 - records the override reason;

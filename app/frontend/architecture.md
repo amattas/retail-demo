@@ -102,8 +102,8 @@ flowchart LR
 
 ## The Protect the Winner scenario
 
-The fictional **Performance Footwear** category is down **4.8%**, while the
-**Momentum Runner** family is up **18.6%**. The opportunity is real, but inventory
+The fictional **Footwear** category is down **6.2%**, while the
+**Momentum Runner** family is up **38%**. The opportunity is real, but inventory
 coverage differs by store.
 
 The app combines:
@@ -116,11 +116,11 @@ The app combines:
 
 The resulting draft plan:
 
-- replenishes `STORE-014`;
-- transfers compatible stock to `STORE-022`;
-- activates `STORE-009`;
-- initially uses `STORE-031` as a source candidate;
-- recalculates to `STORE-027` after the presenter records an override.
+- holds and replenishes Stores A-C;
+- activates Stores D-G;
+- initially uses Stores H-J as transfer candidates;
+- excludes Store J after Dana records local context;
+- recalculates the transfer from Stores H and I.
 
 ## Why the ontology matters
 

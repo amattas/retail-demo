@@ -41,14 +41,16 @@ def test_replay_override_recalculates_transfer_source() -> None:
 
     decision = replay.apply_override("Local event requires safety stock.")
 
-    assert decision["override"]["excludedCandidate"] == "STORE-031"
-    assert decision["effectiveTransferSource"] == "STORE-027"
+    assert decision["override"]["excludedCandidate"] == "Store J"
+    assert decision["effectiveTransferSources"] == ["Store H", "Store I"]
 
 
 def test_story_studio_supports_four_iqs_and_signal_resolution() -> None:
     replay._studio_state["signalStatus"] = "active"
     replay._studio_state["completed"] = []
     replay._studio_state["decisionStatus"] = "draft"
+    replay._studio_state["packageStatus"] = "not built"
+    replay._studio_state["reviewStatus"] = "not sent"
 
     for stage in ("work", "fabric", "foundry", "web"):
         result = replay.run_iq_stage(stage)
@@ -60,3 +62,21 @@ def test_story_studio_supports_four_iqs_and_signal_resolution() -> None:
     assert resolved["signal"]["status"] == "resolved"
     assert approved["decisionStatus"] == "approved"
     assert approved["completed"] == ["work", "fabric", "foundry", "web"]
+
+
+def test_flagship_scope_store_matrix_and_package_lifecycle() -> None:
+    replay._studio_state["packageStatus"] = "not built"
+    replay._studio_state["reviewStatus"] = "not sent"
+
+    studio = replay.studio_payload()
+    built = replay.set_package_status("built")
+    sent = replay.set_package_status("sent for review")
+
+    assert studio["persona"] == "Dana Reyes"
+    assert studio["scope"]["territory"] == "Central Region"
+    assert studio["scope"]["inventorySnapshot"] == "2026-08-28"
+    assert len(studio["stores"]) == 10
+    assert built["packageStatus"] == "built"
+    assert built["reviewStatus"] == "not sent"
+    assert sent["packageStatus"] == "built"
+    assert sent["reviewStatus"] == "sent for review"

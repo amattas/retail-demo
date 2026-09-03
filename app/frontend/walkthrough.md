@@ -1,182 +1,157 @@
-# Protect the Winner - Presenter Walkthrough
+# Protect the Winner - 15-minute flagship walkthrough
 
-> **Run time:** 12-15 minutes
-> **Data:** wholly synthetic
-> **Persona:** Morgan Lee, Regional Merchandising Lead
+> **Data:** independently generated and wholly fictional
+> **Protagonist:** Dana Reyes, Regional Merchandising Lead
+> **Primary page:** **Protect the Winner**
+
+## Fixed scope
+
+Keep this scope visible throughout the story:
+
+| Scope | Value |
+|---|---|
+| Territory | Central Region |
+| Sales period | Retail Fiscal Month 11, Fall 2026 |
+| Comparison | Retail Fiscal Month 11, Fall 2025 |
+| Inventory snapshot | 2026-08-28 |
+| Mode | Certified synthetic replay |
+
+The story never changes period, territory, inventory date, or protagonist.
 
 ## Opening
 
 Say:
 
-> Aster & Pine is a fictional omnichannel retailer. This experience shows how
-> Microsoft Fabric can connect governed analytics, a business ontology, AI
-> agents, and human decisions without using customer data.
+> Dana starts her morning with one decision-worthy signal. Fabric does not ask
+> her to inspect every dashboard or trust one autonomous agent. It connects
+> governed evidence, business relationships, decision policy, and human context
+> to help her produce a reviewable action package.
 
-The story is:
+## Beat 1 - Morning signal
 
-**See the signal → understand the connected business context → make a
-supply-aware recommendation → apply a human override → audit the result.**
+**Click:** **Open the signal**
 
-## Start in Story Studio
+Point to the performance waterfall:
 
-Open **Story Studio**. This is the presenter-controlled journey modeled after
-the IQ Accelerator retail experience. Nothing advances automatically.
-
-The four cards have distinct jobs:
-
-1. **Work IQ** supplies mocked assignment, review, and organizational context.
-2. **Fabric IQ** supplies governed measures, semantic-model answers, ontology
-   relationships, and synthetic operational signals.
-3. **Foundry IQ** applies the mocked policy and agent instructions, then prepares
-   typed draft actions.
-4. **Web IQ** supplies a mocked public market brief without replacing internal
-   business truth.
-
-Invoke the cards one at a time. After each response, decide whether to continue,
-ask an independent Fabric Data Agent question, trigger the action agents, or
-resolve the signal.
-
-### Signal controls
-
-The signal card starts as **active**. Use **Resolve signal** after approving or
-dismissing the decision. Use **Reopen signal** to replay the scenario.
-
-### Independent Question Lab
-
-The Fabric Data Agent Question Lab is intentionally independent from the
-decision canvas. Ask any of the available questions in any order. Those answers
-demonstrate governed analytics and ontology behavior without automatically
-creating actions.
-
-### Triggering agents and decisions
-
-Use **Trigger action agents** only when you want to transform context into draft
-actions. Then:
-
-- open **Decision Canvas** to inspect or override the recommendation;
-- choose **Approve decision** or **Dismiss decision** in Story Studio;
-- resolve the signal when the review is complete;
-- open **Agent Operations** to inspect proposal states.
-
-## 1. See the signal
-
-Open **Dashboard**.
-
-Point out:
-
-- Performance Footwear is down 4.8%;
-- Momentum Runner is up 18.6%;
-- three stores have less than 1.5 weeks of cover;
-- the modeled opportunity is $286K.
-
-Ask:
-
-> Which product families are growing inside declining categories?
-
-Expand **how I reached this**.
-
-Explain that the semantic-model Data Agent is used because the question requires
-aggregation, comparison, and contribution analysis.
-
-## 2. Test whether growth is broad
-
-Ask:
-
-> Is Momentum Runner growth broad or concentrated?
-
-Then ask:
-
-> Which stores have traffic growth but declining conversion?
-
-Explain that the semantic model is still the correct source because these are
-ranked, period-aware measures across many rows.
-
-## 3. Use the business graph
-
-Ask:
-
-> Which stores carry Momentum Runner and how are they supplied?
-
-Expand the trace and point to:
-
-```text
-ProductFamily → Product → SKU → InventorySnapshot → Store → FulfillmentNode
-```
+- Central Region Footwear is down **6.2%** year over year.
+- Outlet stores are down **11%**.
+- Full-price stores are up **2%**.
+- Momentum Runner is up **38%**.
+- Everything else is approximately flat.
 
 Say:
 
-> The semantic model found the opportunity. The ontology now explains the
-> connected products, compatible SKUs, stores, inventory context, and serving
-> fulfillment node.
+> The category decline is real, but it hides a winner. Dana needs to know
+> whether this is a small anomaly or a regional opportunity.
 
-Open **Ontology Explorer** and click `Store`, `InventorySnapshot`, and
-`Recommendation`.
+**Click:** **Continue to concentration**
 
-## 4. Ask for a decision
+## Beat 2 - Test concentration
 
-Return to **Dashboard** and ask:
+Point to the ten-store velocity and coverage matrix:
 
-> What should we do to protect Momentum Runner growth without creating
-> stockouts?
+- **7 of 10** stores are growing.
+- **3 stores** are growing above 50%.
+- Stores A-C have strong velocity and low coverage.
+- Stores D-G have strong velocity and adequate coverage.
+- Stores H-J have weak velocity and adequate coverage.
 
-The recommendation should:
+**Click:** **Test territory-wide activation**
 
-- replenish `STORE-014`;
-- transfer 180 units from `STORE-031` to `STORE-022`;
-- activate `STORE-009`;
-- preserve the fulfillment-node grain limitation.
+The system should contradict the blanket promotion:
 
-Approve one action and dismiss another to show that the agent proposes while the
-operator decides.
+> Do not activate the whole territory. Stores A-C have less than 1.5 weeks of
+> cover, so promotion would accelerate avoidable stockouts.
 
-## 5. Apply a human override
+Point to the guardrail:
 
-Open **Decision Canvas**.
+> Reserved inventory is validated at location × style × size × snapshot date.
+> It cannot be treated as a generic regional pool.
 
-Read the signal, diagnosis, constraint, and recommendation from left to right.
+**Click:** **Review recommendation**
 
-Enter this override reason:
+## Beat 3 - Shape the decision
 
-> Local event requires safety stock at the proposed source store.
+Read the selective recommendation:
 
-Apply the override.
-
-The source candidate changes from `STORE-031` to `STORE-027`, while the original
-recommendation and reason remain visible.
+- **Hold + replenish:** Stores A-C.
+- **Activate:** Stores D-G.
+- **Transfer:** compatible style-size inventory from Stores H-J into A-C.
 
 Say:
 
-> The human knows something the data does not. The system does not hide that
-> intervention; it records it and recalculates transparently.
+> The recommendation is not “promote the winner.” It is a coordinated inventory
+> and activation decision that respects where demand and coverage intersect.
 
-## 6. Close the loop
+**Click:** **Apply Dana's override**
 
-Open **Agent Operations**.
+Use the prefilled reason:
 
-Show:
+> Local community event requires protected inventory.
 
-- total proposed actions;
-- pending, approved, and dismissed states;
-- approved replenishment units;
-- the recent action feed.
-
-In replay mode these are synthetic local events. In live mode the identical
-contract is backed by the Fabric Eventhouse `agent_actions` table.
-
-## Closing message
+Apply the override. Store J is excluded and the transfer plan recalculates from
+Stores H and I.
 
 Say:
 
-> This is not one published agent being reused against another customer's data.
-> It is a customer-safe pattern: independently generated data, a purpose-built
-> semantic model and ontology, specialized instructions, evidence-bound action
-> tools, and a replayable application. Fabric provides the governed data and
-> business context; the human remains accountable for the decision.
+> Dana knows something the inventory snapshot does not. Her intervention is not
+> hidden; the reason and recalculation remain part of the decision record.
+
+**Click:** **Continue to package**
+
+## Beat 4 - Build the package
+
+**Click:** **Build the package**
+
+Three artifacts appear:
+
+1. **Transfer review list** — sources, destinations, compatible styles and
+   sizes, quantity, grain, and snapshot date.
+2. **Activation brief** — activates Stores D-G and explicitly excludes A-C and
+   J with reasons.
+3. **Decision log** — evidence sources, periods, grains, recommendation,
+   override, owners, and review date.
+
+Say:
+
+> The output is not another chat transcript. It is an operational package that
+> can be reviewed, audited, and connected to downstream workflows.
+
+**Click:** **Continue to review**
+
+## Beat 5 - Send for review
+
+**Click:** **Send for review**
+
+The Decision Canvas should show:
+
+- selective activation and inventory protection;
+- Dana's Store J override;
+- transfer recalculation from Stores H and I;
+- the three package artifacts;
+- the morning signal resolved with monitoring continuing.
+
+Close with:
+
+> This customer-safe demonstration uses no customer records, names, branding,
+> tenant identifiers, or published customer agent. Fabric supplies governed
+> data and business context; specialized agents prepare evidence-bound drafts;
+> Dana remains accountable for the final decision.
+
+## Optional technical reveal
+
+Open **Evidence and agent details** only after the business story is clear:
+
+- **Fabric IQ** grounds performance and inventory evidence.
+- **Foundry IQ** orchestrates recommendation and policy checks.
+- **Work IQ** supplies fictional ownership and review context.
+- **Web IQ** can add mocked public-market context but is not required.
+
+Open **Architecture** for the Fabric implementation view. Do not end the
+flagship story on the architecture screen; end on the completed Decision Canvas.
 
 ## Presenter recovery
 
-- If live configuration is unavailable, use replay mode.
-- If an answer is delayed, click the matching guided prompt chip.
-- If a draft was already created, the replay service returns the existing
-  proposal instead of duplicating it.
-- Restart the app to clear the in-memory override.
+- Refreshing the page preserves package/review state until the app restarts.
+- If the override was already applied, continue directly to the package.
+- Restart the app to reset all in-memory flagship state.

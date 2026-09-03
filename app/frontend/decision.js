@@ -23,11 +23,11 @@ function renderDecision(d) {
          <strong>Override recorded</strong>
          <span>${escapeHtml(d.override.excludedCandidate)} excluded:
            ${escapeHtml(d.override.reason)}</span>
-         <span>Replacement source: <strong>${escapeHtml(d.override.replacementCandidate)}</strong></span>
+         <span>Replacement sources: <strong>${escapeHtml(d.override.replacementCandidates.join(", "))}</strong></span>
        </div>`
     : `<form id="override-form" class="override-form">
          <label for="override-reason">Human override</label>
-         <span>Exclude ${escapeHtml(transfer.from)} and recalculate the source candidate.</span>
+         <span>Exclude Store J and recalculate from the remaining source candidates.</span>
          <input id="override-reason" required
            placeholder="Reason, e.g. local event requires safety stock" />
          <button type="submit">Apply override</button>
@@ -50,7 +50,7 @@ function renderDecision(d) {
        <div class="decision-actions">
          <div><b>Activate</b>${escapeHtml(d.recommendation.activate.join(", "))}</div>
          <div><b>Replenish</b>${escapeHtml(d.recommendation.replenish.join(", "))}</div>
-         <div><b>Transfer</b>${escapeHtml(d.effectiveTransferSource)} → ${escapeHtml(transfer.to)}
+         <div><b>Transfer</b>${escapeHtml(d.effectiveTransferSources.join(", "))} → ${escapeHtml(transfer.to.join(", "))}
            · ${escapeHtml(transfer.units)} units</div>
        </div>
      </div>
