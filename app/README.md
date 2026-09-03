@@ -7,7 +7,7 @@ The app starts in a deterministic **synthetic replay mode** when live Fabric
 configuration is absent. Set `RETAIL_DEMO_MODE=live` and the deployment-specific
 environment variables below to use live Fabric services.
 
-It has three pages:
+It has five core pages:
 
 1. **Dashboard** (`/`) — the `retail_model` Power BI report and a **chat** panel
    side by side, in one place. Ask any business question in plain English; a
@@ -45,13 +45,20 @@ It has three pages:
    closed and auditable. Each chat answer carries a **"how I reached this"** trace
    showing the source used (semantic model / ontology / agent), the routing
    decision, and the steps/tables behind it.
-2. **Agent Operations** (`/actions.html`) — a **live approval-funnel dashboard** that
+2. **Story Studio** (`/studio.html`) — an interactive, presenter-controlled
+   journey across **Work IQ**, **Fabric IQ**, **Foundry IQ**, and **Web IQ**.
+   Select or resolve the signal, invoke each IQ independently, ask Fabric Data
+   Agent questions that do not create decisions, trigger the action agents, and
+   approve or dismiss the final draft.
+3. **Decision Canvas** (`/decision.html`) — the scenario's signal, diagnosis,
+   grain constraint, recommendation, human override, and action package.
+4. **Agent Operations** (`/actions.html`) — a **live approval-funnel dashboard** that
    streams from the Eventhouse `agent_actions` table and auto-refreshes every ~5s.
    KPI cards (proposed / approved / pending / dismissed, reorder units approved,
    churn LTV addressed), an events-per-minute timeline, a per-agent funnel, and a
    live feed of every recommendation and approval. This is the closed loop made
    visible. Set `RETAIL_EVENTHOUSE_LOG=0` to disable the write-back for an offline demo.
-3. **Ontology Explorer** (`/ontology.html`) — a separate page showing entity
+5. **Ontology Explorer** (`/ontology.html`) — a separate page showing entity
    types (live from the Ontology MCP) and their relationships (lakehouse +
    telemetry) as an interactive graph. Click any entity to inspect its
    properties and telemetry signals. Navigate between the pages via the header.

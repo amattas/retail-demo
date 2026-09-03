@@ -19,6 +19,19 @@ The same user experience can run in two modes:
 
 Both modes use the same frontend and API response contracts.
 
+## The four IQ roles
+
+| IQ | Role in the interactive story |
+|---|---|
+| Work IQ | Mocked assignment, people, communication, calendar, and review context |
+| Fabric IQ | Governed semantic measures, ontology relationships, and operational signals |
+| Foundry IQ | Mocked policy grounding, orchestration, agent instructions, and typed tools |
+| Web IQ | Mocked current public context used to challenge or refine the recommendation |
+
+Story Studio lets the user invoke these layers independently. Fabric Data Agent
+questions do not automatically create decisions; the user explicitly triggers
+the action agents when analytical context should become a draft recommendation.
+
 ## End-to-end architecture
 
 ```mermaid
@@ -35,6 +48,9 @@ flowchart LR
     end
 
     subgraph DECISION["Decision intelligence"]
+        WORK["Work IQ<br/>mocked team context"]
+        FOUNDRY["Foundry IQ<br/>policy + orchestration"]
+        WEB["Web IQ<br/>mocked market context"]
         ORCH["Decision orchestrator<br/>routing + grain rules"]
         INV["Inventory agent"]
         MERCH["Merchandising agent"]
@@ -59,6 +75,9 @@ flowchart LR
     SM --> DA
     ON --> DA
     DA --> ORCH
+    WORK --> ORCH
+    WEB --> ORCH
+    FOUNDRY --> ORCH
     ORCH --> INV
     ORCH --> MERCH
     ORCH --> OPS

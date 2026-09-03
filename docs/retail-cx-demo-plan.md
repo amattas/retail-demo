@@ -174,7 +174,17 @@ Approval writes an auditable action event to Eventhouse.
 - visible route badge: semantic model, ontology, or action agent;
 - collapsible evidence and query trace.
 
-### Page 2 - Decision Canvas
+### Page 2 - Story Studio
+
+- presenter-controlled chapter navigation;
+- Work IQ, Fabric IQ, Foundry IQ, and Web IQ cards;
+- active/resolved signal controls;
+- independent Fabric Data Agent Question Lab;
+- explicit action-agent trigger;
+- approve/dismiss decision controls;
+- navigation into the Decision Canvas and Agent Operations.
+
+### Page 3 - Decision Canvas
 
 Show one scenario as a persistent decision object:
 
@@ -187,12 +197,12 @@ Show one scenario as a persistent decision object:
 | Override | Human reason and recalculated candidate set |
 | Action package | Draft artifacts, owners, review date, and status |
 
-### Page 3 - Ontology Explorer
+### Page 4 - Ontology Explorer
 
 Render entities, properties, relationships, and the graph path used for a
 selected answer. Highlight the entities touched by the active scenario.
 
-### Page 4 - Agent Operations
+### Page 5 - Agent Operations
 
 Show:
 
@@ -203,7 +213,7 @@ Show:
 - evidence and decision owners;
 - replay/live source status.
 
-### Page 5 - Architecture and Walkthrough
+### Page 6 - Architecture and Walkthrough
 
 Explain which Fabric capability answers each class of question and provide the
 exact click path and expected synthetic answers.

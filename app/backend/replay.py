@@ -135,6 +135,76 @@ ENTITY_PROPERTIES = {
 }
 
 _override: dict[str, str] | None = None
+_studio_state = {
+    "signalStatus": "active",
+    "completed": [],
+    "decisionStatus": "draft",
+}
+
+IQ_STAGES = {
+    "work": {
+        "name": "Work IQ",
+        "promise": "Understand the assignment and how the team works.",
+        "prompt": (
+            "What outcomes and review criteria matter for this merchandising decision?"
+        ),
+        "answer": (
+            "The fictional planning brief prioritizes profitable growth, avoids "
+            "promoting inventory-constrained stores, requires a named decision "
+            "owner, and asks for an explicit review date and override trail."
+        ),
+        "sources": ["Mocked email brief", "Mocked Teams decision thread",
+                    "Synthetic operating calendar"],
+        "next": "Use Fabric IQ to find the governed business opportunity.",
+    },
+    "fabric": {
+        "name": "Fabric IQ",
+        "promise": "Understand governed business data and relationships.",
+        "prompt": (
+            "Which product family is growing inside a declining category, and "
+            "where can inventory support the opportunity?"
+        ),
+        "answer": (
+            "Momentum Runner is up 18.6% while Performance Footwear is down 4.8%. "
+            "STORE-009 can support activation, STORE-014 and STORE-022 need "
+            "inventory intervention, and STORE-031 is an initial transfer source."
+        ),
+        "sources": ["Direct Lake semantic model", "Fabric Ontology",
+                    "Synthetic Eventhouse signals"],
+        "next": "Use Foundry IQ to apply the decision policy and trigger agents.",
+    },
+    "foundry": {
+        "name": "Foundry IQ",
+        "promise": "Ground the orchestrator in policy and invoke action tools.",
+        "prompt": (
+            "Apply the supply-aware activation policy and prepare reviewable actions."
+        ),
+        "answer": (
+            "Policy requires at least 3 weeks of modeled cover for activation, "
+            "evidence for every action, and approval before any external write. "
+            "The orchestrator prepares one activation, one replenishment, and "
+            "one transfer draft."
+        ),
+        "sources": ["Synthetic merchandising policy", "Agent instructions",
+                    "Typed draft-action tools"],
+        "next": "Use Web IQ to test the recommendation against external context.",
+    },
+    "web": {
+        "name": "Web IQ",
+        "promise": "Add current public context without replacing internal truth.",
+        "prompt": (
+            "What fictional market signals could strengthen or challenge the activation?"
+        ),
+        "answer": (
+            "The replay market brief shows increased interest in lightweight "
+            "daily trainers and value-focused bundles. It supports a targeted "
+            "activation but does not change the internal inventory constraints."
+        ),
+        "sources": ["Synthetic market brief", "Mocked trend digest",
+                    "Fictional competitor summary"],
+        "next": "Review the recommendation, override if needed, and approve the draft.",
+    },
+}
 
 
 def config_payload() -> dict[str, Any]:
@@ -152,6 +222,48 @@ def config_payload() -> dict[str, Any]:
 
 def report_payload() -> dict[str, Any]:
     return REPORT
+
+
+def studio_payload() -> dict[str, Any]:
+    return {
+        "brand": BRAND,
+        "scenario": REPORT["scenario"],
+        "signal": {
+            "status": _studio_state["signalStatus"],
+            "title": "Momentum Runner growth opportunity",
+            "detail": REPORT["headline"],
+            "impact": "$286K modeled value protected",
+        },
+        "completed": list(_studio_state["completed"]),
+        "decisionStatus": _studio_state["decisionStatus"],
+        "stages": [
+            {"id": stage_id, **stage}
+            for stage_id, stage in IQ_STAGES.items()
+        ],
+    }
+
+
+def run_iq_stage(stage_id: str) -> dict[str, Any]:
+    if stage_id not in IQ_STAGES:
+        raise ValueError(f"Unknown IQ stage: {stage_id}")
+    if stage_id not in _studio_state["completed"]:
+        _studio_state["completed"].append(stage_id)
+    return {"stage": {"id": stage_id, **IQ_STAGES[stage_id]},
+            "studio": studio_payload()}
+
+
+def set_signal_status(status: str) -> dict[str, Any]:
+    if status not in ("active", "resolved"):
+        raise ValueError("Signal status must be active or resolved")
+    _studio_state["signalStatus"] = status
+    return studio_payload()
+
+
+def set_decision_status(status: str) -> dict[str, Any]:
+    if status not in ("draft", "approved", "dismissed"):
+        raise ValueError("Decision status must be draft, approved, or dismissed")
+    _studio_state["decisionStatus"] = status
+    return studio_payload()
 
 
 def decision_payload() -> dict[str, Any]:

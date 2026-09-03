@@ -17,6 +17,47 @@ The story is:
 **See the signal → understand the connected business context → make a
 supply-aware recommendation → apply a human override → audit the result.**
 
+## Start in Story Studio
+
+Open **Story Studio**. This is the presenter-controlled journey modeled after
+the IQ Accelerator retail experience. Nothing advances automatically.
+
+The four cards have distinct jobs:
+
+1. **Work IQ** supplies mocked assignment, review, and organizational context.
+2. **Fabric IQ** supplies governed measures, semantic-model answers, ontology
+   relationships, and synthetic operational signals.
+3. **Foundry IQ** applies the mocked policy and agent instructions, then prepares
+   typed draft actions.
+4. **Web IQ** supplies a mocked public market brief without replacing internal
+   business truth.
+
+Invoke the cards one at a time. After each response, decide whether to continue,
+ask an independent Fabric Data Agent question, trigger the action agents, or
+resolve the signal.
+
+### Signal controls
+
+The signal card starts as **active**. Use **Resolve signal** after approving or
+dismissing the decision. Use **Reopen signal** to replay the scenario.
+
+### Independent Question Lab
+
+The Fabric Data Agent Question Lab is intentionally independent from the
+decision canvas. Ask any of the available questions in any order. Those answers
+demonstrate governed analytics and ontology behavior without automatically
+creating actions.
+
+### Triggering agents and decisions
+
+Use **Trigger action agents** only when you want to transform context into draft
+actions. Then:
+
+- open **Decision Canvas** to inspect or override the recommendation;
+- choose **Approve decision** or **Dismiss decision** in Story Studio;
+- resolve the signal when the review is complete;
+- open **Agent Operations** to inspect proposal states.
+
 ## 1. See the signal
 
 Open **Dashboard**.

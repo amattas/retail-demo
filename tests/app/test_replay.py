@@ -43,3 +43,20 @@ def test_replay_override_recalculates_transfer_source() -> None:
 
     assert decision["override"]["excludedCandidate"] == "STORE-031"
     assert decision["effectiveTransferSource"] == "STORE-027"
+
+
+def test_story_studio_supports_four_iqs_and_signal_resolution() -> None:
+    replay._studio_state["signalStatus"] = "active"
+    replay._studio_state["completed"] = []
+    replay._studio_state["decisionStatus"] = "draft"
+
+    for stage in ("work", "fabric", "foundry", "web"):
+        result = replay.run_iq_stage(stage)
+        assert result["stage"]["name"].endswith("IQ")
+
+    resolved = replay.set_signal_status("resolved")
+    approved = replay.set_decision_status("approved")
+
+    assert resolved["signal"]["status"] == "resolved"
+    assert approved["decisionStatus"] == "approved"
+    assert approved["completed"] == ["work", "fabric", "foundry", "web"]

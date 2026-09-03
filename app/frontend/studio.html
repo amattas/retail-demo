@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story Studio — Retail CX Decision Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Retail CX Decision Studio</h1>
+    </div>
+    <nav class="tabs">
+      <a class="tab" href="/">Dashboard</a>
+      <a class="tab active" href="/studio.html">Story Studio</a>
+      <a class="tab" href="/decision.html">Decision Canvas</a>
+      <a class="tab" href="/actions.html">Agent Operations</a>
+      <a class="tab" href="/ontology.html">Ontology Explorer</a>
+      <a class="tab" href="/architecture.html">Architecture</a>
+      <a class="tab" href="/walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="meta">four IQs &middot; user-steered decisions</div>
+  </header>
+
+  <main class="studio-layout">
+    <section class="studio-hero">
+      <div>
+        <span class="synthetic-badge">Synthetic retail</span>
+        <h2>From signal to governed action</h2>
+        <p>Select the signal, invoke each intelligence layer, ask independent
+          Fabric questions, trigger agents, and decide what happens next.</p>
+      </div>
+      <div id="signal-card" class="signal-card"></div>
+    </section>
+
+    <section class="iq-journey">
+      <div class="section-title">
+        <span>Guided intelligence journey</span>
+        <small>You decide when each IQ participates.</small>
+      </div>
+      <div id="iq-stages" class="iq-stage-grid"></div>
+    </section>
+
+    <section class="studio-workspace">
+      <div class="panel question-lab">
+        <div class="panel-head">
+          <h2>Fabric Data Agent Question Lab</h2>
+          <span class="status">independent exploration</span>
+        </div>
+        <p class="studio-help">Ask these governed business questions at any time.
+          They do not have to become decisions.</p>
+        <div id="question-list" class="question-list"></div>
+        <div id="question-answer" class="question-answer">
+          Select a question to see the simulated Fabric Data Agent response.
+        </div>
+      </div>
+
+      <div class="panel command-center">
+        <div class="panel-head">
+          <h2>Decision Command Center</h2>
+          <span class="status" id="decision-state">draft</span>
+        </div>
+        <div id="stage-output" class="stage-output">
+          Run an IQ stage to build the decision context.
+        </div>
+        <div class="command-actions">
+          <button id="trigger-agents" class="primary-action">Trigger action agents</button>
+          <a href="/decision.html" class="secondary-action">Open Decision Canvas</a>
+          <button id="approve-decision" class="secondary-action">Approve decision</button>
+          <button id="dismiss-decision" class="secondary-action">Dismiss decision</button>
+        </div>
+        <div id="agent-output" class="agent-output"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="studio.js"></script>
+</body>
+</html>

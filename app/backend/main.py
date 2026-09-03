@@ -48,6 +48,10 @@ class OverrideRequest(BaseModel):
     reason: str
 
 
+class StudioStatusRequest(BaseModel):
+    status: str
+
+
 @app.get("/api/config")
 def get_config() -> dict[str, Any]:
     if config.REPLAY_MODE:
@@ -72,6 +76,35 @@ def demo_dashboard() -> dict[str, Any]:
 @app.get("/api/demo/decision")
 def demo_decision() -> dict[str, Any]:
     return replay.decision_payload()
+
+
+@app.get("/api/demo/studio")
+def demo_studio() -> dict[str, Any]:
+    return replay.studio_payload()
+
+
+@app.post("/api/demo/studio/iq/{stage_id}")
+def demo_studio_iq(stage_id: str) -> dict[str, Any]:
+    try:
+        return replay.run_iq_stage(stage_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.post("/api/demo/studio/signal")
+def demo_studio_signal(req: StudioStatusRequest) -> dict[str, Any]:
+    try:
+        return replay.set_signal_status(req.status)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/demo/studio/decision")
+def demo_studio_decision(req: StudioStatusRequest) -> dict[str, Any]:
+    try:
+        return replay.set_decision_status(req.status)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/demo/decision/override")
