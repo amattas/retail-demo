@@ -1,4 +1,4 @@
-"""Tests for the 9 Gold aggregates (port of 02-historical-data-load Part 3).
+"""Tests for the 10 Gold aggregates (port of 02-historical-data-load Part 3).
 
 Runs the full generation engine for a tiny config, then validates the gold
 aggregates against the in-memory fact tables.
@@ -8,7 +8,7 @@ Deviation from plan: the plan's test inlined
 normal ``from pyspark.sql.window import Window`` import (same semantics).
 """
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from pyspark.sql import functions as F
@@ -17,7 +17,11 @@ from pyspark.sql.window import Window
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
 from retail_setup.generation.engine import generate_all
-from retail_setup.generation.gold import GOLD_TABLES, generate_gold
+from retail_setup.generation.gold import (
+    GOLD_TABLES,
+    generate_campaign_performance,
+    generate_gold,
+)
 from retail_setup.generation.schemas import column_names
 
 
@@ -32,7 +36,7 @@ def setup(spark):
     return result.tables, generate_gold(spark, result.tables)
 
 
-def test_all_nine_tables(setup):
+def test_all_gold_tables(setup):
     _, gold = setup
     assert set(gold) == set(GOLD_TABLES)
     for name, df in gold.items():
@@ -72,3 +76,44 @@ def test_online_sales_daily(setup):
     tables, gold = setup
     assert gold["online_sales_daily"].agg(F.sum("orders")).first()[0] == \
         tables["fact_online_order_headers"].count()
+
+
+def test_campaign_performance_reconciles_spend_and_conversions(spark):
+    marketing = spark.createDataFrame(
+        [
+            ("CMP-1", "EMAIL", datetime(2025, 10, 6, 10), "IMP-1", 10),
+            ("CMP-1", "EMAIL", datetime(2025, 10, 6, 11), "IMP-2", 20),
+        ],
+        "campaign_id string, channel string, event_ts timestamp, "
+        "impression_id_ext string, cost_cents long",
+    )
+    attribution = spark.createDataFrame(
+        [
+            (
+                "ATTR-1",
+                "ATTRIBUTED",
+                "CMP-1",
+                "EMAIL",
+                datetime(2025, 10, 6, 11),
+                1000,
+                100,
+                80,
+                1080,
+            )
+        ],
+        "attribution_id string, attribution_status string, campaign_id string, "
+        "channel string, touch_ts timestamp, attributed_revenue_cents long, "
+        "discount_cents long, tax_cents long, payment_cents long",
+    )
+
+    row = generate_campaign_performance(marketing, attribution).first()
+
+    assert row.impressions == 2
+    assert row.spend_cents == 30
+    assert row.conversions == 1
+    assert row.attributed_revenue_cents == 1000
+    assert row.discount_cents == 100
+    assert row.tax_cents == 80
+    assert row.payment_cents == 1080
+    assert row.conversion_rate == pytest.approx(0.5)
+    assert row.roas == pytest.approx(1000 / 30)

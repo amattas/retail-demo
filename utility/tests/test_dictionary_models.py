@@ -135,3 +135,37 @@ def test_profile_rates_bounded():
         StoreTypeProfile(**kwargs, promo_rate=1.5, online_order_share=0.1)
     with pytest.raises(ValidationError):
         StoreTypeProfile(**kwargs, promo_rate=0.1, online_order_share=-0.1)
+
+
+def _profile_kwargs(**overrides):
+    kwargs = dict(
+        store_type="grocery",
+        display_name="Grocery",
+        basket_lambda=8.0,
+        avg_ticket_target=55.0,
+        hourly_weights=[1.0] * 24,
+        daily_weights=[1.0] * 7,
+        monthly_weights=[1.0] * 12,
+        department_weights={"Grocery": 1.0},
+        promo_rate=0.15,
+        online_order_share=0.10,
+        zones=["entrance"],
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
+def test_profile_rejects_all_zero_weight_vector():
+    # IMP-010: a declared-but-unused (all-zero) weight control is invalid.
+    with pytest.raises(ValidationError):
+        StoreTypeProfile(**_profile_kwargs(hourly_weights=[0.0] * 24))
+    with pytest.raises(ValidationError):
+        StoreTypeProfile(**_profile_kwargs(monthly_weights=[0.0] * 12))
+
+
+def test_profile_rejects_zero_department_weight():
+    # IMP-010: a zero-weight department is an unused control that silently
+    # excludes the department from every basket.
+    with pytest.raises(ValidationError):
+        StoreTypeProfile(**_profile_kwargs(
+            department_weights={"Grocery": 1.0, "Deli": 0.0}))

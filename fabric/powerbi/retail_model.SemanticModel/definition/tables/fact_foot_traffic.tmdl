@@ -60,12 +60,12 @@ table fact_foot_traffic
 		formatString: 0
 		lineageTag: 569af1b5-d33d-496c-b590-76158423c9ce
 		sourceLineageTag: store_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: store_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column 'Sensor ID'
 		dataType: string
@@ -82,6 +82,7 @@ table fact_foot_traffic
 	column 'Event Date'
 		dataType: dateTime
 		formatString: Short Date
+		isHidden
 		lineageTag: 347e7b41-cd79-4e79-8f79-45413192743d
 		sourceLineageTag: event_date
 		summarizeBy: none

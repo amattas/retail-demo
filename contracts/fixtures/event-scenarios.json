@@ -1,0 +1,531 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "sale-attribution",
+      "description": "Two-touch store attribution with a promoted sale and reconciled payment.",
+      "events": [
+        {
+          "event_type": "ad_impression",
+          "trace_id": "TRC-FIX-AD-001",
+          "ingest_timestamp": "2026-07-20T12:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-STORE-001",
+          "partition_key": "camp_CMP-7",
+          "session_id": "SES-FIX-STORE-001",
+          "parent_event_id": null,
+          "payload": {
+            "channel": "SOCIAL",
+            "campaign_id": "CMP-7",
+            "creative_id": "CRV-21",
+            "customer_ad_id": "AD42",
+            "impression_id": "IMP-FIX-001",
+            "cost": 0.35,
+            "device_type": "mobile",
+            "customer_id": 42
+          }
+        },
+        {
+          "event_type": "receipt_created",
+          "trace_id": "TRC-FIX-RECEIPT-001",
+          "ingest_timestamp": "2026-07-20T12:30:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-STORE-001",
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-STORE-001",
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "customer_id": 42,
+            "receipt_id": "RCP-FIX-001",
+            "subtotal": 18.0,
+            "tax": 1.44,
+            "total": 19.44,
+            "tender_type": "CREDIT",
+            "item_count": 2,
+            "campaign_id": "CMP-7",
+            "impression_id": "IMP-FIX-001",
+            "gross_subtotal_cents": 2000,
+            "discount_cents": 200,
+            "subtotal_cents": 1800,
+            "tax_cents": 144,
+            "total_cents": 1944
+          }
+        },
+        {
+          "event_type": "receipt_line_added",
+          "trace_id": "TRC-FIX-LINE-001",
+          "ingest_timestamp": "2026-07-20T12:30:00.100Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-STORE-001",
+          "parent_event_id": "RCP-FIX-001",
+          "payload": {
+            "receipt_id": "RCP-FIX-001",
+            "line_number": 1,
+            "product_id": 501,
+            "quantity": 2,
+            "unit_price": 10.0,
+            "extended_price": 18.0,
+            "promo_code": "SAVE10"
+          }
+        },
+        {
+          "event_type": "promotion_applied",
+          "trace_id": "TRC-FIX-PROMO-001",
+          "ingest_timestamp": "2026-07-20T12:30:00.200Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-STORE-001",
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-STORE-001",
+          "parent_event_id": null,
+          "payload": {
+            "receipt_id": "RCP-FIX-001",
+            "promo_code": "SAVE10",
+            "discount_amount": 2.0,
+            "discount_cents": 200,
+            "discount_type": "PERCENT",
+            "product_count": 1,
+            "product_ids": [
+              501
+            ],
+            "store_id": 3,
+            "customer_id": 42
+          }
+        },
+        {
+          "event_type": "payment_processed",
+          "trace_id": "TRC-FIX-PAYMENT-001",
+          "ingest_timestamp": "2026-07-20T12:30:01.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-STORE-001",
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-STORE-001",
+          "parent_event_id": "RCP-FIX-001",
+          "payload": {
+            "receipt_id": "RCP-FIX-001",
+            "order_id": null,
+            "payment_method": "CREDIT",
+            "amount": 19.44,
+            "amount_cents": 1944,
+            "transaction_id": "TXN-FIX-001",
+            "processing_time": "2026-07-20T12:30:01.000Z",
+            "processing_time_ms": 225,
+            "status": "APPROVED",
+            "decline_reason": null,
+            "store_id": 3,
+            "customer_id": 42
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory-stockout-reorder",
+      "description": "A store inventory adjustment triggers verified stockout and reorder payloads.",
+      "events": [
+        {
+          "event_type": "inventory_updated",
+          "trace_id": "TRC-FIX-INVENTORY-001",
+          "ingest_timestamp": "2026-07-20T13:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "dc_id": null,
+            "product_id": 501,
+            "quantity_delta": -4,
+            "reason": "SALE",
+            "source": "POS"
+          }
+        },
+        {
+          "event_type": "stockout_detected",
+          "trace_id": "TRC-FIX-STOCKOUT-001",
+          "ingest_timestamp": "2026-07-20T13:00:00.100Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "dc_id": null,
+            "product_id": 501,
+            "last_known_quantity": 0,
+            "detection_time": "2026-07-20T13:00:00.100Z"
+          }
+        },
+        {
+          "event_type": "reorder_triggered",
+          "trace_id": "TRC-FIX-REORDER-001",
+          "ingest_timestamp": "2026-07-20T13:00:00.200Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "dc_id": null,
+            "product_id": 501,
+            "current_quantity": 0,
+            "reorder_quantity": 100,
+            "reorder_point": 10,
+            "priority": "URGENT"
+          }
+        }
+      ]
+    },
+    {
+      "id": "customer-ble-zone",
+      "description": "Customer entry, BLE ping, and zone transition retain their exact wire names.",
+      "events": [
+        {
+          "event_type": "customer_entered",
+          "trace_id": "TRC-FIX-ENTRY-001",
+          "ingest_timestamp": "2026-07-20T14:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-CUSTOMER-001",
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "sensor_id": "SENSOR_3_ENTRANCE",
+            "zone": "ENTRANCE_MAIN",
+            "customer_count": 1,
+            "dwell_time": 45
+          }
+        },
+        {
+          "event_type": "ble_ping_detected",
+          "trace_id": "TRC-FIX-BLE-001",
+          "ingest_timestamp": "2026-07-20T14:00:01.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-CUSTOMER-001",
+          "parent_event_id": "TRC-FIX-ENTRY-001",
+          "payload": {
+            "store_id": 3,
+            "beacon_id": "BEACON_3_1",
+            "customer_ble_id": "BLE42",
+            "rssi": -58,
+            "zone": "AISLE_1"
+          }
+        },
+        {
+          "event_type": "customer_zone_changed",
+          "trace_id": "TRC-FIX-ZONE-001",
+          "ingest_timestamp": "2026-07-20T14:00:02.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": "SES-FIX-CUSTOMER-001",
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "customer_ble_id": "BLE42",
+            "from_zone": "ENTRANCE_MAIN",
+            "to_zone": "AISLE_1",
+            "timestamp": "2026-07-20T14:00:02.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "truck-lifecycle",
+      "description": "Arrival and departure share all four lifecycle keys and ordered UTC times.",
+      "events": [
+        {
+          "event_type": "truck_arrived",
+          "trace_id": "TRC-FIX-TRUCK-ARRIVE-001",
+          "ingest_timestamp": "2026-07-20T15:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "dc_2",
+          "session_id": "SHP-FIX-001",
+          "parent_event_id": null,
+          "payload": {
+            "truck_id": "TRUCK_9",
+            "dc_id": 2,
+            "store_id": 3,
+            "shipment_id": "SHP-FIX-001",
+            "arrival_time": "2026-07-20T15:00:00.000Z",
+            "estimated_unload_duration": 60
+          }
+        },
+        {
+          "event_type": "truck_departed",
+          "trace_id": "TRC-FIX-TRUCK-DEPART-001",
+          "ingest_timestamp": "2026-07-20T17:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "dc_2",
+          "session_id": "SHP-FIX-001",
+          "parent_event_id": null,
+          "payload": {
+            "truck_id": "TRUCK_9",
+            "dc_id": 2,
+            "store_id": 3,
+            "shipment_id": "SHP-FIX-001",
+            "departure_time": "2026-07-20T17:00:00.000Z",
+            "actual_unload_duration": 120
+          }
+        }
+      ]
+    },
+    {
+      "id": "store-lifecycle",
+      "description": "Open and close events share a store key while preserving operation timestamps.",
+      "events": [
+        {
+          "event_type": "store_opened",
+          "trace_id": "TRC-FIX-STORE-OPEN-001",
+          "ingest_timestamp": "2026-07-20T08:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "operation_time": "2026-07-20T08:00:00.000Z",
+            "operation_type": "OPENED"
+          }
+        },
+        {
+          "event_type": "store_closed",
+          "trace_id": "TRC-FIX-STORE-CLOSE-001",
+          "ingest_timestamp": "2026-07-20T22:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_3",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 3,
+            "operation_time": "2026-07-20T22:00:00.000Z",
+            "operation_type": "CLOSED"
+          }
+        }
+      ]
+    },
+    {
+      "id": "online-create-pick-ship",
+      "description": "Online creation, payment, picking, and shipping retain one order/session identity.",
+      "events": [
+        {
+          "event_type": "online_order_created",
+          "trace_id": "TRC-FIX-ORDER-001",
+          "ingest_timestamp": "2026-07-20T16:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-ONLINE-001",
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": null,
+          "payload": {
+            "order_id": "ONL-FIX-001",
+            "customer_id": 42,
+            "fulfillment_mode": "SHIP_FROM_DC",
+            "node_type": "DC",
+            "node_id": 2,
+            "item_count": 2,
+            "subtotal": 25.0,
+            "tax": 2.0,
+            "total": 27.0,
+            "tender_type": "CREDIT",
+            "campaign_id": "CMP-7",
+            "impression_id": "IMP-FIX-001",
+            "gross_subtotal_cents": 2500,
+            "discount_cents": 0,
+            "subtotal_cents": 2500,
+            "tax_cents": 200,
+            "total_cents": 2700
+          }
+        },
+        {
+          "event_type": "payment_processed",
+          "trace_id": "TRC-FIX-PAYMENT-ONLINE-001",
+          "ingest_timestamp": "2026-07-20T16:00:00.100Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-ONLINE-001",
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": "ONL-FIX-001",
+          "payload": {
+            "receipt_id": null,
+            "order_id": "ONL-FIX-001",
+            "payment_method": "CREDIT",
+            "amount": 27.0,
+            "amount_cents": 2700,
+            "transaction_id": "TXN-FIX-ONLINE-001",
+            "processing_time": "2026-07-20T16:00:00.100Z",
+            "processing_time_ms": 240,
+            "status": "APPROVED",
+            "decline_reason": null,
+            "store_id": null,
+            "customer_id": 42
+          }
+        },
+        {
+          "event_type": "online_order_picked",
+          "trace_id": "TRC-FIX-PICK-001",
+          "ingest_timestamp": "2026-07-20T16:20:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-ONLINE-001",
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": "ONL-FIX-001",
+          "payload": {
+            "order_id": "ONL-FIX-001",
+            "node_type": "DC",
+            "node_id": 2,
+            "fulfillment_mode": "SHIP_FROM_DC",
+            "picked_time": "2026-07-20T16:20:00.000Z"
+          }
+        },
+        {
+          "event_type": "online_order_shipped",
+          "trace_id": "TRC-FIX-SHIP-001",
+          "ingest_timestamp": "2026-07-20T16:40:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": "JRN-FIX-ONLINE-001",
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": "ONL-FIX-001",
+          "payload": {
+            "order_id": "ONL-FIX-001",
+            "node_type": "DC",
+            "node_id": 2,
+            "fulfillment_mode": "SHIP_FROM_DC",
+            "shipped_time": "2026-07-20T16:40:00.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nullable-variants",
+      "description": "Nullable campaign, linkage, promotion, and decline fields remain accepted without renaming.",
+      "events": [
+        {
+          "event_type": "receipt_created",
+          "trace_id": "TRC-FIX-RECEIPT-NULL-001",
+          "ingest_timestamp": "2026-07-20T18:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_4",
+          "session_id": "SES-FIX-NULL-001",
+          "parent_event_id": null,
+          "payload": {
+            "store_id": 4,
+            "customer_id": 84,
+            "receipt_id": "RCP-FIX-NULL-001",
+            "subtotal": 9.0,
+            "tax": 0.72,
+            "total": 9.72,
+            "tender_type": "DEBIT",
+            "item_count": 1,
+            "campaign_id": null,
+            "impression_id": null,
+            "gross_subtotal_cents": 900,
+            "discount_cents": 0,
+            "subtotal_cents": 900,
+            "tax_cents": 72,
+            "total_cents": 972
+          }
+        },
+        {
+          "event_type": "receipt_line_added",
+          "trace_id": "TRC-FIX-LINE-NULL-001",
+          "ingest_timestamp": "2026-07-20T18:00:00.100Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_4",
+          "session_id": "SES-FIX-NULL-001",
+          "parent_event_id": "RCP-FIX-NULL-001",
+          "payload": {
+            "receipt_id": "RCP-FIX-NULL-001",
+            "line_number": 1,
+            "product_id": 777,
+            "quantity": 1,
+            "unit_price": 9.0,
+            "extended_price": 9.0,
+            "promo_code": null
+          }
+        },
+        {
+          "event_type": "payment_processed",
+          "trace_id": "TRC-FIX-PAYMENT-DECLINED-001",
+          "ingest_timestamp": "2026-07-20T18:00:01.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "store_4",
+          "session_id": "SES-FIX-NULL-001",
+          "parent_event_id": "RCP-FIX-NULL-001",
+          "payload": {
+            "receipt_id": "RCP-FIX-NULL-001",
+            "order_id": null,
+            "payment_method": "DEBIT",
+            "amount": 9.72,
+            "amount_cents": 972,
+            "transaction_id": "TXN-FIX-DECLINED-001",
+            "processing_time": "2026-07-20T18:00:01.000Z",
+            "processing_time_ms": 260,
+            "status": "DECLINED",
+            "decline_reason": "INSUFFICIENT_FUNDS",
+            "store_id": 4,
+            "customer_id": 84
+          }
+        }
+      ]
+    },
+    {
+      "id": "unknown-event-dlq",
+      "description": "Queued unknown JSON can use the operational catch-all; the direct writer still fails closed.",
+      "events": [
+        {
+          "event_type": "legacy_price_changed",
+          "trace_id": "TRC-FIX-UNKNOWN-001",
+          "ingest_timestamp": "2026-07-20T19:00:00.000Z",
+          "schema_version": "0.9",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "legacy_1",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "legacy_product": 501,
+            "legacy_price": 12.5
+          }
+        }
+      ]
+    }
+  ]
+}

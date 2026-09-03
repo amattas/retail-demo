@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import inspect
+import sys
 from pathlib import Path
 
 import pytest
 
 from deploy.scripts import apply_kql
+
+TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 
 class _FakeRow:
@@ -71,6 +75,19 @@ def test_collect_kql_scripts_orders_and_validates(tmp_path: Path) -> None:
         apply_kql.collect_kql_scripts(empty)
 
 
+def test_collect_kql_scripts_uses_exact_profile_order(tmp_path: Path) -> None:
+    _write_scripts(tmp_path)
+
+    selected = apply_kql.collect_kql_scripts(
+        tmp_path,
+        ["02-create-functions.kql"],
+    )
+
+    assert [path.name for path in selected] == ["02-create-functions.kql"]
+    with pytest.raises(FileNotFoundError, match="03-missing.kql"):
+        apply_kql.collect_kql_scripts(tmp_path, ["03-missing.kql"])
+
+
 def test_resolve_kql_database_returns_uri_and_name(monkeypatch) -> None:
     requests = pytest.importorskip("requests")
 
@@ -81,7 +98,9 @@ def test_resolve_kql_database_returns_uri_and_name(monkeypatch) -> None:
         def json(self) -> dict:
             return {
                 "displayName": "retail_kql",
-                "properties": {"queryServiceUri": "https://cluster.kusto.fabric.microsoft.com"},
+                "properties": {
+                    "queryServiceUri": "https://cluster.kusto.fabric.microsoft.com"
+                },
             }
 
     captured: dict[str, object] = {}
@@ -173,6 +192,162 @@ def test_apply_to_database_runs_resolved_script(monkeypatch) -> None:
     assert calls["query_uri"] == "https://cluster"
     assert calls["database_name"] == "retail_kql"
     assert "ThrowOnErrors=true" in calls["script"]
+
+
+def test_apply_to_database_uses_selected_auth_mode(monkeypatch) -> None:
+    assert "auth_mode" in inspect.signature(apply_kql.apply_to_database).parameters
+    calls: dict[str, object] = {}
+    credential = object()
+
+    def fake_credential(
+        provided=None,
+        *,
+        auth_mode: str,
+        tenant_id: str | None,
+    ):
+        calls["provided"] = provided
+        calls["auth_mode"] = auth_mode
+        calls["tenant_id"] = tenant_id
+        return credential
+
+    monkeypatch.setattr(apply_kql, "_credential", fake_credential)
+    monkeypatch.setattr(
+        apply_kql,
+        "resolve_kql_database",
+        lambda *_args: ("https://cluster", "retail_kql"),
+    )
+
+    class _Response:
+        primary_results = [_FakeTable([])]
+
+    monkeypatch.setattr(
+        apply_kql,
+        "execute_database_script",
+        lambda *_args: _Response(),
+    )
+
+    apply_kql.apply_to_database(
+        script=".execute database script <| .show tables",
+        workspace_id="workspace-id",
+        kql_database_id="non-default-database-id",
+        kql_database_name="renamed_eventhouse",
+        auth_mode="azure_powershell",
+        tenant_id=TENANT_ID,
+    )
+
+    assert calls == {
+        "provided": None,
+        "auth_mode": "azure_powershell",
+        "tenant_id": TENANT_ID,
+    }
+
+
+def test_main_passes_selected_auth_mode(monkeypatch, tmp_path: Path) -> None:
+    output = tmp_path / "database.kql"
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "apply_kql",
+            "--execute",
+            "--profile",
+            "standard",
+            "--workspace-id",
+            "workspace-id",
+            "--kql-database-id",
+            "non-default-database-id",
+            "--kql-database-name",
+            "renamed_eventhouse",
+            "--auth-mode",
+            "azure_powershell",
+            "--tenant-id",
+            TENANT_ID,
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(apply_kql, "collect_kql_scripts", lambda *_args: [])
+    monkeypatch.setattr(
+        apply_kql,
+        "build_database_script",
+        lambda _scripts: ".execute database script <| .show tables",
+    )
+    monkeypatch.setattr(
+        apply_kql,
+        "apply_to_database",
+        lambda **kwargs: calls.update(kwargs) or 0,
+    )
+
+    try:
+        result = apply_kql.main()
+    except SystemExit as exc:
+        pytest.fail(f"--auth-mode was not accepted: {exc}")
+
+    assert result == 0
+    assert calls["auth_mode"] == "azure_powershell"
+    assert calls["tenant_id"] == TENANT_ID
+    assert calls["workspace_id"] == "workspace-id"
+    assert calls["kql_database_id"] == "non-default-database-id"
+    assert calls["kql_database_name"] == "renamed_eventhouse"
+
+
+def test_environment_execution_rejects_unvalidated_target_override(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "database.kql"
+    config = type(
+        "Config",
+        (),
+        {
+            "deployment": type("Deployment", (), {"profile": "standard"})(),
+            "profile": type("Profile", (), {"kql_scripts": ("01.kql",)})(),
+            "tenant_id": TENANT_ID,
+            "auth_mode": "azure_cli",
+        },
+    )()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "apply_kql",
+            "--execute",
+            "--environment",
+            "dev",
+            "--workspace-id",
+            "wrong-workspace",
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.load_environment",
+        lambda _env: config,
+    )
+    monkeypatch.setattr(
+        apply_kql,
+        "_terraform_outputs",
+        lambda _env: {
+            "workspace_id": "workspace-id",
+            "kql_database_id": "database-id",
+            "kql_database_name": "retail_eventhouse",
+            "tenant_id": TENANT_ID,
+        },
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.validate_terraform_outputs",
+        lambda _config, _outputs: None,
+    )
+    monkeypatch.setattr(apply_kql, "collect_kql_scripts", lambda *_args: [])
+    monkeypatch.setattr(
+        apply_kql,
+        "build_database_script",
+        lambda _scripts: ".execute database script <| .show tables",
+    )
+
+    with pytest.raises(SystemExit, match="--workspace-id"):
+        apply_kql.main()
 
 
 def test_summarize_result_is_concise_on_success(capsys) -> None:

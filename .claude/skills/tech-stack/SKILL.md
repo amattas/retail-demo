@@ -26,8 +26,6 @@ description: Describes the primary technologies, frameworks, libraries, and lang
 - **Typer**: `retail-setup` CLI (configure/render/deploy)
 - **PyYAML**: Configuration files
 
-> The legacy DuckDB/FastAPI/Event Hub generator lives under `datagen-deprecated/`.
-
 ### Lakehouse
 - **Delta Lake**: ACID transactions, schema enforcement
 - **PySpark**: Distributed data processing

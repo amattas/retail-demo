@@ -25,7 +25,9 @@ import sys
 
 subprocess.check_call([
     sys.executable, "-m", "pip", "install", "--quiet",
-    "typing_extensions>=4.12.2", "pydantic>=2,<2.12",
+    "annotated-types==0.7.0", "pydantic==2.11.10",
+    "pydantic-core==2.33.2", "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
 ])
 for _name in [m for m in list(sys.modules)
               if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
@@ -58,9 +60,12 @@ spark.conf.set("spark.advise.divisionExprConvertRule.enable", "true")
 # %% [engine]
 
 # %% [markdown]
-# ## Read persisted facts, build the nine gold tables, write
+# ## Read persisted facts, build the ten gold tables, publish
 
 # %%
+from datetime import date, datetime, timezone
+from uuid import uuid4
+
 # Gold derives from what was actually persisted by setup-03 — read the
 # source fact tables back from the catalog instead of regenerating.
 GOLD_SOURCE_TABLES = [
@@ -68,6 +73,7 @@ GOLD_SOURCE_TABLES = [
     "fact_receipt_lines",
     "fact_online_order_headers",
     "fact_marketing",
+    "fact_marketing_attribution",
     "fact_foot_traffic",
     "fact_truck_moves",
     "fact_store_inventory_txn",
@@ -80,11 +86,24 @@ tables = {
 
 gold = generate_gold(spark, tables)
 
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {LAKEHOUSE_NAME}.{GOLD_DB}")
-for name in GOLD_TABLES:
-    df = gold[name]
-    write_to_lakehouse(df, LAKEHOUSE_NAME, GOLD_DB, name)
-    # Count the written table, not df: df.count() would recompute the aggregation;
-    # the persisted Delta table answers count() from metadata.
+# cfg only carries run-log metadata here (gold doesn't regenerate from
+# dictionaries) — write_all stages every gold table, validates it against
+# the in-memory aggregate, and only then promotes to GOLD_DB, rolling back
+# any already-promoted table if a later promotion fails.
+cfg = GenerationConfig(
+    store_type=STORE_TYPE,
+    start_date=date.fromisoformat(START_DATE),
+    end_date=date.fromisoformat(END_DATE),
+    store_count=STORE_COUNT,
+    seed=SEED,
+    silver_db=SILVER_DB,
+    gold_db=GOLD_DB,
+    dictionary_root="/lakehouse/default/Files/setup/dictionaries",
+)
+attempt_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+run_id = f"setup-gold-{STORE_TYPE}-{SEED}-{attempt_ts}-{uuid4().hex[:8]}"
+written = write_all({}, gold, cfg, run_id, lakehouse=LAKEHOUSE_NAME)
+for name in written:
     n = spark.table(f"{LAKEHOUSE_NAME}.{GOLD_DB}.{name}").count()
     print(f"wrote {LAKEHOUSE_NAME}.{GOLD_DB}.{name}: {n:,} rows")
+print(f"published {len(written)} gold tables (run_id={run_id})")

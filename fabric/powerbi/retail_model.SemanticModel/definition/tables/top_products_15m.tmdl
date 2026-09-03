@@ -15,12 +15,12 @@ table top_products_15m
 		formatString: 0
 		lineageTag: f71dd371-de91-495f-ad76-db7f3c6fde8b
 		sourceLineageTag: product_id
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: product_id
 
 		changedProperty = Name
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	column Revenue
 		dataType: double

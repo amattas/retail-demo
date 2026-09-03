@@ -8,6 +8,7 @@ before project dependencies are installed.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import platform
 import re
 import shutil
@@ -18,12 +19,58 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_URL = "https://github.com/amattas/retail-demo/blob/main/README.md"
+
+
+def _load_manifest_reader():
+    path = REPO_ROOT / "scripts" / "solution_manifest.py"
+    spec = importlib.util.spec_from_file_location(
+        "_retail_demo_solution_manifest",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load solution manifest reader: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.load_solution_manifest
+
+
+load_solution_manifest = _load_manifest_reader()
+
+BOOTSTRAP_MANIFEST = load_solution_manifest(
+    REPO_ROOT / "contracts" / "retail-demo.json"
+)
+
+
+def _minimum_python() -> tuple[int, int]:
+    requirement = next(
+        prerequisite.requirement
+        for prerequisite in BOOTSTRAP_MANIFEST.prerequisites
+        if prerequisite.id == "prerequisite.python"
+    )
+    match = re.fullmatch(r">=(\d+)\.(\d+)", requirement or "")
+    if match is None:
+        raise RuntimeError("manifest Python requirement must use >=MAJOR.MINOR")
+    return int(match.group(1)), int(match.group(2))
+
+
 MIN_PYTHON = (3, 11)
+if MIN_PYTHON != _minimum_python():
+    raise RuntimeError("scripts/setup.py Python constraint differs from the manifest")
+PROFILE_CHOICES = tuple(
+    profile.deployment_name for profile in BOOTSTRAP_MANIFEST.profiles
+)
+DEFAULT_PROFILE = next(
+    profile.deployment_name
+    for profile in BOOTSTRAP_MANIFEST.profiles
+    if profile.default
+)
 
 # Set from --verbose in main(). When False, routine commands print a short,
 # plain-language progress line instead of the raw command. The raw command is
 # always shown if a step fails, so troubleshooting never loses information.
 VERBOSE = False
+
 
 def _emit(text: str = "") -> None:
     """Write a line to stdout."""
@@ -54,8 +101,6 @@ def _section(step: int, total: int, title: str) -> None:
     _divider("=")
     _emit(f"  Step {step} of {total}: {title}")
     _divider("=")
-
-
 
 
 @dataclass(frozen=True)
@@ -154,9 +199,7 @@ def detect_package_manager(system: str | None = None) -> PackageManager | None:
                 "apt-get",
                 {
                     "git": [["sudo", "apt-get", "install", "-y", "git"]],
-                    "terraform": [
-                        ["sudo", "apt-get", "install", "-y", "terraform"]
-                    ],
+                    "terraform": [["sudo", "apt-get", "install", "-y", "terraform"]],
                     "az": [["sudo", "apt-get", "install", "-y", "azure-cli"]],
                 },
             )
@@ -185,9 +228,13 @@ def prerequisites() -> dict[str, str]:
     """Command-line tools the setup flow needs, with plain-language reasons."""
 
     return {
-        "git": "Git - to work with the project files",
-        "terraform": "Terraform - to create the Microsoft Fabric resources",
-        "az": "Azure CLI - to sign in to Azure / Fabric",
+        prerequisite.check_command[0]: (
+            f"{prerequisite.name} - {prerequisite.description}"
+        )
+        for prerequisite in BOOTSTRAP_MANIFEST.prerequisites
+        if prerequisite.bootstrap_required
+        and prerequisite.check_command
+        and prerequisite.id != "prerequisite.python"
     }
 
 
@@ -228,9 +275,7 @@ def run_command(
     _run_inherit(command, cwd, rendered, show_raw=True)
 
 
-def _run_inherit(
-    command: list[str], cwd: Path, rendered: str, show_raw: bool
-) -> None:
+def _run_inherit(command: list[str], cwd: Path, rendered: str, show_raw: bool) -> None:
     """Run a command with inherited stdio so output stays linear."""
     try:
         subprocess.run(command, cwd=cwd, check=True)
@@ -245,10 +290,8 @@ def _run_inherit(
         if not show_raw:
             _emit(f"    (command: {rendered})")
         raise SystemExit(
-            f"That step failed (exit code {exc.returncode}). "
-            f"Command: {rendered}"
+            f"That step failed (exit code {exc.returncode}). Command: {rendered}"
         ) from None
-
 
 
 def install_prerequisites(
@@ -296,11 +339,15 @@ def current_python_env() -> PythonEnv:
     """Use the Python interpreter that launched this setup script."""
 
     if sys.version_info < MIN_PYTHON:
+        minimum = ".".join(map(str, MIN_PYTHON))
         raise SystemExit(
-            "Python 3.11 or later is required. Activate a Python 3.11+ conda "
+            f"Python {minimum} or later is required. Activate a Python "
+            f"{minimum}+ conda "
             "environment or virtual environment, then rerun this script."
         )
-    return PythonEnv(python=Path(sys.executable), description="current Python environment")
+    return PythonEnv(
+        python=Path(sys.executable), description="current Python environment"
+    )
 
 
 def _pip_flags() -> list[str]:
@@ -318,14 +365,18 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     _emit("Installing the Python packages the demo needs (this can take a minute).")
     flags = _pip_flags()
     run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "--upgrade", "pip"],
+        [
+            str(env.python),
+            "-m",
+            "pip",
+            "install",
+            *flags,
+            "--require-hashes",
+            "-r",
+            str(REPO_ROOT / "utility" / "requirements-deploy.txt"),
+        ],
         dry_run=dry_run,
-        label="Updating pip",
-    )
-    run_command(
-        [str(env.python), "-m", "pip", "install", *flags, "-e", str(REPO_ROOT / "utility")],
-        dry_run=dry_run,
-        label="Installing the retail-setup tool",
+        label="Installing locked Python dependencies",
     )
     run_command(
         [
@@ -334,12 +385,12 @@ def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
             "pip",
             "install",
             *flags,
-            "azure-identity",
-            "azure-kusto-data",
-            "fabric-cicd",
+            "--no-deps",
+            "-e",
+            str(REPO_ROOT / "utility"),
         ],
         dry_run=dry_run,
-        label="Installing Azure and Fabric libraries",
+        label="Installing the retail-setup tool",
     )
 
 
@@ -368,6 +419,19 @@ def _extract_auth_mode(text: str) -> str | None:
     return match.group(1).strip().strip('"').strip("'")
 
 
+def workspace_environment_name(workspace_name: str) -> str:
+    """Return the normalized deployment environment for a workspace name."""
+
+    normalized = re.sub(r"[^a-z0-9]+", "-", workspace_name.strip().lower()).strip("-")
+    if normalized.startswith("retail-demo-"):
+        normalized = normalized.removeprefix("retail-demo-")
+    if not normalized:
+        raise ValueError(
+            "workspace name must contain at least one ASCII letter or number"
+        )
+    return normalized
+
+
 def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
     """Return (auth_mode, tenant_id) from the merged deploy config.
 
@@ -382,9 +446,7 @@ def read_deploy_auth(deploy_env: str) -> tuple[str, str | None]:
 
     tenant_id = _extract_tenant_id(overlay_text) or _extract_tenant_id(base_text)
     auth_mode = (
-        _extract_auth_mode(overlay_text)
-        or _extract_auth_mode(base_text)
-        or "azure_cli"
+        _extract_auth_mode(overlay_text) or _extract_auth_mode(base_text) or "azure_cli"
     )
     return auth_mode, tenant_id
 
@@ -432,17 +494,28 @@ def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
 def run_retail_setup(
     env: PythonEnv,
     *,
-    deploy_env: str,
+    workspace_name: str,
+    profile: str,
     dry_run: bool,
     assume_yes: bool,
     deploy_requested: bool,
     recreate: bool = False,
 ) -> None:
+    deploy_env = workspace_environment_name(workspace_name)
     _section(3, 4, "Configuring the project")
     run_command(
-        [str(env.python), "-m", "retail_setup.cli.main", "configure", "--env", deploy_env],
+        [
+            str(env.python),
+            "-m",
+            "retail_setup.cli.main",
+            "configure",
+            "--workspace-name",
+            workspace_name,
+            "--profile",
+            profile,
+        ],
         dry_run=dry_run,
-        label=f"Configuring the project for '{deploy_env}'",
+        label=f"Configuring the project for workspace '{workspace_name}'",
         interactive=True,
     )
     run_command(
@@ -453,7 +526,7 @@ def run_retail_setup(
 
     _section(4, 4, "Deploying to Microsoft Fabric (optional)")
     deploy = deploy_requested
-    if not assume_yes and not deploy:
+    if not dry_run and not assume_yes and not deploy:
         _emit("")
         _emit("Deploying creates resources in Microsoft Fabric and may incur cost.")
         _emit("You can also do it later with: retail-setup deploy --env " + deploy_env)
@@ -486,16 +559,30 @@ def run_retail_setup(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Guided retail-demo setup")
     parser.add_argument(
-        "--env",
-        default="dev",
+        "--workspace-name",
         help=(
-            "Deployment environment name. This selects deploy/config/environments/<env>.yml "
-            "and scopes generated files under deploy/.generated/<env>/."
+            "Fabric workspace name. Its normalized value identifies the local "
+            "deployment environment and isolated Terraform state."
         ),
     )
-    parser.add_argument("--dry-run", action="store_true", help="Print commands without running them.")
-    parser.add_argument("--yes", action="store_true", help="Accept setup prompts with defaults.")
-    parser.add_argument("--deploy", action="store_true", help="Run deploy after configure/render.")
+    parser.add_argument(
+        "--profile",
+        choices=PROFILE_CHOICES,
+        default=DEFAULT_PROFILE,
+        help=(
+            "Deployment profile selected during configure "
+            f"(default: {DEFAULT_PROFILE})."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print commands without running them."
+    )
+    parser.add_argument(
+        "--yes", action="store_true", help="Accept setup prompts with defaults."
+    )
+    parser.add_argument(
+        "--deploy", action="store_true", help="Run deploy after configure/render."
+    )
     parser.add_argument(
         "--recreate",
         action="store_true",
@@ -516,6 +603,15 @@ def parse_args() -> argparse.Namespace:
 
 def _run_guided(args: argparse.Namespace) -> int:
     """Run the four guided setup steps (under the console when one is active)."""
+    workspace_name = args.workspace_name
+    if not workspace_name:
+        if args.yes or args.dry_run:
+            workspace_name = "retail-demo"
+        else:
+            workspace_name = (
+                input("Fabric workspace name [retail-demo]: ").strip() or "retail-demo"
+            )
+
     _banner(
         [
             "Retail Demo - Guided Setup",
@@ -527,7 +623,10 @@ def _run_guided(args: argparse.Namespace) -> int:
             "  4. Optionally deploy to Microsoft Fabric",
         ]
     )
-    _emit(f"Environment: {args.env}   (change with --env)")
+    _emit(f"Workspace:   {workspace_name}   (change with --workspace-name)")
+    _emit(f"Environment: {workspace_environment_name(workspace_name)}")
+    _emit(f"Profile:     {args.profile}")
+    _emit(f"Manifest:    {BOOTSTRAP_MANIFEST.version}")
     _emit(f"Project:     {REPO_ROOT}")
     if not args.verbose:
         _emit("Tip: add --verbose to see the exact commands being run.")
@@ -552,7 +651,8 @@ def _run_guided(args: argparse.Namespace) -> int:
 
     run_retail_setup(
         env,
-        deploy_env=args.env,
+        workspace_name=workspace_name,
+        profile=args.profile,
         dry_run=args.dry_run,
         assume_yes=args.yes,
         deploy_requested=args.deploy or args.recreate,

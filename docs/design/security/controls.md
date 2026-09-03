@@ -1,0 +1,56 @@
+# Security controls
+
+Security controls use the states defined by
+[requirements traceability](../requirements/traceability.md). A control is not
+`verified` without exact implementation and verification evidence.
+
+| ID | State | Control | Current evidence | Verification needed |
+| --- | --- | --- | --- | --- |
+| `SEC-001` | `accepted` | Use Entra ID and validate the configured tenant and target workspace before deployment. | `utility/src/retail_setup/cli/main.py`; `deploy/README.md` | Request-contract tests for both Azure CLI and Azure PowerShell plus a live target check. |
+| `SEC-002` | `accepted` | Apply least-privilege Fabric workspace, Eventhouse, storage, model, and consumer roles. | Fabric role guidance and deployment configuration | Environment role review and role-based access tests. |
+| `SEC-003` | `accepted` | Load secrets only from Azure sign-in, GitHub Actions secrets, environment variables, Key Vault, or ignored local files. | `.gitignore`; `deploy/README.md`; `SECURITY.md` | Secret scanning and a test that generated artifacts contain no credentials. |
+| `SEC-004` | `retired` | Classify customer-like data as synthetic-but-sensitive. | Synthetic-only demo boundary | Retired: row-level classification controls are outside the release scope. |
+| `SEC-005` | `retired` | Make broad-use models and agents aggregated, field-restricted, or RLS-gated by default. | Fabric workspace and item permissions | Retired: default RLS and field masking are outside the demo scope. |
+| `SEC-006` | `retired` | Give every data agent an owner, purpose, allowed-use instructions, and approved question set. | Optional persona work under `ENH-003` | Retired as a release control. |
+| `SEC-007` | `verified` | Pin privileged actions, plugins, providers, and dependency sets to reviewed immutable versions. | Full-SHA workflow actions with no runtime plugin marketplaces; hash-locked Python requirements; exact Fabric provider plus `.terraform.lock.hcl`; pinned Miniforge installers | `tests/scripts/test_workflow_references.py`; `tests/scripts/test_supply_chain.py`; native pip and Terraform lock validation. |
+| `SEC-008` | `implemented` | Retain deployment, pipeline, watermark, ingestion, model, and alert evidence with actionable failure signals. | Atomic deploy journal; bounded redacted readiness report; Fabric run history; `setup_run_log`; `ag._watermarks`; Eventhouse ingestion/tags | Actual live post-deploy readiness and freshness evidence. |
+| `SEC-009` | `accepted` | Isolate environments and require explicit confirmation and target validation for destructive operations. | Environment files; deploy dry-run and recreate flows | Separate state tests and wrong-target negative tests. |
+| `SEC-010` | `verified` | Publish only reviewed current Markdown from `docs/` and documentation captured in immutable SemVer tags; exclude temporary plans and generated source artifacts. | `zensical.toml`; `.github/workflows/docs.yml`; `scripts/docs_versioning.py` | Successful Docs workflow run, `gh-pages` branch inspection, and live `/latest/` plus `versions.json` inspection. |
+| `SEC-011` | `verified` | Fail closed for required writes and preserve failed payloads or replay evidence before advancing progress. | Replay-safe Eventhouse/Silver progress; staged Silver/Gold promotion with Delta rollback; required deploy-step journal and exit status | Injected deployment, publication, rollback, cleanup, pagination, checkpoint, and watermark tests. |
+
+## Minimum deployment baseline
+
+Before a shared or customer-facing demo:
+
+1. Confirm the signed-in tenant and target workspace.
+2. Review workspace and item roles.
+3. Confirm generated files contain no credentials or operator-specific secrets.
+4. Confirm the workspace contains generated synthetic demo data only.
+5. Confirm monitoring and failure notifications are available.
+6. Validate that reset and recreate actions target the intended environment.
+
+## Supply-chain lock maintenance
+
+Change the owning input (`requirements-*.in`, `utility/pyproject.toml`, or
+`deploy/terraform/providers.tf`) before regenerating its reviewed lock:
+
+```powershell
+python -m pip install uv==0.11.29
+python -m uv pip compile requirements-docs.in --universal --generate-hashes --output-file requirements-docs.txt
+python -m uv pip compile requirements-test.in --universal --generate-hashes --output-file requirements-test.txt
+python -m uv pip compile utility/pyproject.toml --extra deploy --universal --generate-hashes --output-file utility/requirements-deploy.txt
+python -m uv pip compile utility/pyproject.toml --extra dev --extra deploy --universal --generate-hashes --output-file utility/requirements-ci.txt
+```
+
+After changing the Fabric provider version, regenerate all supported platform
+checksums:
+
+```powershell
+terraform -chdir=deploy/terraform providers lock `
+  -platform=linux_amd64 -platform=linux_arm64 `
+  -platform=windows_amd64 -platform=windows_arm64 `
+  -platform=darwin_amd64 -platform=darwin_arm64
+```
+
+Miniforge version changes require updating every platform URL and SHA-256 value
+in `scripts/setup.sh` plus the exact winget version in `scripts/setup.ps1`.

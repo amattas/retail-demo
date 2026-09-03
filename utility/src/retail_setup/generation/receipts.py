@@ -43,6 +43,11 @@ DECLINE_REASONS = [
 # Share of in-store receipts whose customer lives in the store's geography
 # (datagen home-store locality). The rest draw a network-wide customer.
 GEO_AFFINITY = 0.70
+# A deterministic cohort stops receiving purchases at staggered dates. This
+# creates realistic forward churn labels throughout long histories while
+# preserving active customers and pre-churn behavior.
+CHURN_COHORT_MODULUS = 10
+CHURN_CUTOFF_MAX_MARGIN_DAYS = 60
 
 # Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
 # lowercase token matched as a substring of the department name so the one
@@ -220,6 +225,51 @@ def _promo_eligible_expr(idx_col: Column, month_col: Column,
     return expr.otherwise(F.lit(False))
 
 
+def _apply_churn_lifecycle(
+    receipts: DataFrame,
+    d: seeded_draws,
+    cfg: GenerationConfig,
+) -> DataFrame:
+    """Stop assigning purchases to a seeded customer cohort after its cutoff."""
+
+    customer_count = int(cfg.customer_count)
+    history_days = (cfg.end_date - cfg.start_date).days + 1
+    cutoff_margin = min(
+        CHURN_CUTOFF_MAX_MARGIN_DAYS,
+        max(1, history_days // 4),
+    )
+    cutoff_span = max(1, history_days - (2 * cutoff_margin))
+    cutoff_offset = (
+        F.lit(cutoff_margin)
+        + F.pmod(
+            d.h64(["customer_id"], "churn_cutoff"),
+            F.lit(cutoff_span),
+        )
+    ).cast("int")
+    cutoff_date = F.date_add(F.lit(cfg.start_date), cutoff_offset)
+
+    replacement_base = (
+        F.pmod(
+            d.h64(["receipt_id_ext"], "active_customer"),
+            F.lit(customer_count),
+        )
+        + F.lit(1)
+    ).cast("long")
+    replacement_customer = F.when(
+        F.pmod(replacement_base, F.lit(CHURN_COHORT_MODULUS)) == 0,
+        F.pmod(replacement_base, F.lit(customer_count)) + F.lit(1),
+    ).otherwise(replacement_base)
+    is_post_churn = (
+        F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0
+    ) & (F.col("event_date") >= cutoff_date)
+    return receipts.withColumn(
+        "customer_id",
+        F.when(is_post_churn, replacement_customer).otherwise(
+            F.col("customer_id")
+        ),
+    )
+
+
 def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
                       d: seeded_draws, cfg: GenerationConfig) -> DataFrame:
     """Resolve each receipt's customer_id with store-geography affinity.
@@ -253,7 +303,7 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
     local = cust_ranked.select(
         F.col("cust_geo_id").alias("_lgeo"), F.col("local_rank").alias("_lrank"),
         F.col("customer_id").alias("local_customer"))
-    return (
+    assigned = (
         r.join(local, (F.col("store_geo_id") == F.col("_lgeo"))
                & (F.col("local_rank_target") == F.col("_lrank")), "left")
         .withColumn("customer_id", F.when(
@@ -262,6 +312,7 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
         .drop("_lgeo", "_lrank", "local_customer", "global_customer",
               "want_local", "local_rank_target", "geo_cust_count")
     )
+    return _apply_churn_lifecycle(assigned, d, cfg)
 
 
 def _fmt(cents_col: Column) -> Column:
@@ -269,16 +320,66 @@ def _fmt(cents_col: Column) -> Column:
     return F.format_string("%.2f", cents_col / F.lit(100.0))
 
 
-def _pick_hour(u: Column, hourly_weights: list[float]) -> Column:
-    """Inverse-CDF hour pick over the 24 relative weights."""
-    total = sum(hourly_weights)
+def _open_close(operating_hours: str) -> tuple[int, int]:
+    """Parse an ``operating_hours`` string into ``[open, close)`` integer hours."""
+    if operating_hours == "24h":
+        return 0, 24
+    lo, hi = operating_hours.split("-")
+    return int(lo), int(hi)
+
+
+def _open_close_cols(operating_hours: Column) -> tuple[Column, Column]:
+    """Column form of :func:`_open_close` for ``[open, close)`` hour bounds.
+
+    ``"24h"`` maps to ``[0, 24)``; ``"7-22"`` maps to ``[7, 22)``. The close hour
+    is exclusive, so a ``"7-22"`` store transacts in hours 7..21 inclusive.
+    """
+    is_24 = operating_hours == "24h"
+    parts = F.split(operating_hours, "-")
+    open_h = F.when(is_24, F.lit(0)).otherwise(parts.getItem(0).cast("int"))
+    close_h = F.when(is_24, F.lit(24)).otherwise(parts.getItem(1).cast("int"))
+    return open_h, close_h
+
+
+def _pick_hour_static(u: Column, hourly_weights: list[float],
+                      open_h: int, close_h: int) -> Column:
+    """Inverse-CDF hour pick for a single, statically known operating window.
+
+    Weights outside ``[open_h, close_h)`` are zeroed and the CDF renormalised
+    over the open hours, so the pick can never land on a closed hour. The
+    cumulative fractions are Python floats (not column arithmetic), keeping the
+    generated expression small.
+    """
+    masked = [w if open_h <= h < close_h else 0.0
+              for h, w in enumerate(hourly_weights)]
+    total = sum(masked) or 1.0
     chain: Column | None = None
     acc = 0.0
-    for h, w in enumerate(hourly_weights[:-1]):
-        acc += w / total
-        cond = u < F.lit(acc)
+    for h in range(close_h - 1):
+        acc += masked[h]
+        cond = u < F.lit(acc / total)
         chain = F.when(cond, F.lit(h)) if chain is None else chain.when(cond, F.lit(h))
-    return F.lit(23) if chain is None else chain.otherwise(F.lit(23))
+    last_open = close_h - 1
+    return F.lit(last_open) if chain is None else chain.otherwise(F.lit(last_open))
+
+
+def _pick_hour(u: Column, hourly_weights: list[float],
+               operating_hours: Column, patterns: list[str]) -> Column:
+    """Masked inverse-CDF hour pick that respects each store's operating window.
+
+    Operating hours come from a small fixed set of patterns, so the per-pattern
+    static CDF (cheap Python-float chain) is selected by the store's
+    ``operating_hours`` string — avoiding a per-row column CDF that would
+    explode the Catalyst expression tree.
+    """
+    expr: Column | None = None
+    for pat in patterns:
+        open_h, close_h = _open_close(pat)
+        branch = _pick_hour_static(u, hourly_weights, open_h, close_h)
+        cond = operating_hours == F.lit(pat)
+        expr = F.when(cond, branch) if expr is None else expr.when(cond, branch)
+    # Every store carries one of ``patterns``; the fallback only guards nulls.
+    return F.lit(12) if expr is None else expr.otherwise(F.lit(12))
 
 
 def generate_receipts_group(
@@ -293,8 +394,10 @@ def generate_receipts_group(
 
     stores = dims["dim_stores"].select(
         F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier",
-        F.col("GeographyID").alias("store_geo_id"))
+        "operating_hours", F.col("GeographyID").alias("store_geo_id"))
     store_ids = [r.store_id for r in stores.select("store_id").collect()]
+    hour_patterns = [r.operating_hours
+                     for r in stores.select("operating_hours").distinct().collect()]
     grid = store_day_grid(
         spark, store_ids, cfg.start_date, cfg.end_date, cfg.seed, "receipts"
     ).join(stores, "store_id")
@@ -317,11 +420,14 @@ def generate_receipts_group(
         F.lit(1), F.round(lam + d.gauss(["store_id", "day"], "n") * F.sqrt(lam)))
     grid = grid.withColumn("n_receipts", n_rcpt.cast("int"))
 
-    # --- explode to receipts; hour from hourly weights (inverse CDF over 24 bins)
+    # --- explode to receipts; hour from hourly weights (inverse CDF over 24
+    # bins), masked to each store's operating window so no sale lands while the
+    # store is closed (IMP-010 sales-while-closed invariant).
     receipts = (
         grid.withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_receipts"))))
         .withColumn("hour", _pick_hour(
-            d.u(["store_id", "day", "seq"], "hour"), profile.hourly_weights))
+            d.u(["store_id", "day", "seq"], "hour"), profile.hourly_weights,
+            F.col("operating_hours"), hour_patterns))
         .withColumn("minute", (d.h64(["store_id", "day", "seq"], "min") % 60).cast("int"))
         .withColumn("second", (d.h64(["store_id", "day", "seq"], "sec") % 60).cast("int"))
         .withColumn("event_ts", F.make_timestamp(
@@ -358,10 +464,13 @@ def generate_receipts_group(
             ["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]))
     )
 
-    # --- lines: explode baskets, weighted department -> uniform product within dept
+    # --- lines: explode baskets, weighted department -> price-tiered product
+    # within department, restricted to products already launched on the sale day
+    # (IMP-010 no-pre-launch-sales invariant).
     products = dims["dim_products"].select(
         F.col("ID").alias("product_id"), F.col("SalePrice"), F.col("taxability"),
-        F.col("Department").alias("department"))
+        F.col("Department").alias("department"),
+        F.to_date("LaunchDate").alias("launch_date"))
 
     product_departments = {r.department for r in products.select("department").distinct().collect()}
     unknown = set(profile.department_weights) - product_departments
@@ -370,11 +479,20 @@ def generate_receipts_group(
             f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
         )
 
-    # rank products by price within department so the segment skew can target a
-    # cheap/pricey tier (datagen CustomerJourney price preference)
-    pw = Window.partitionBy("department").orderBy("SalePrice", "product_id")
-    products_ranked = products.withColumn("dept_rank", F.row_number().over(pw))
-    dept_sizes = products.groupBy("department").agg(F.count("*").alias("dept_size"))
+    # Per sale day, the eligible product set is those launched on or before that
+    # day. Rank them by price within department so the segment skew can still
+    # target a cheap/pricey tier over the *launched* catalog. Bounded by
+    # (distinct sale days x products); products broadcast into a nested-loop
+    # inequality join. dims guarantees >=1 launched product per department per
+    # day, so no basket line is ever left without a product to bind.
+    sale_dates = receipts.select("event_date").distinct()
+    elig = sale_dates.join(F.broadcast(products),
+                           products["launch_date"] <= sale_dates["event_date"])
+    ew = Window.partitionBy("event_date", "department").orderBy("SalePrice", "product_id")
+    elig_ranked = elig.withColumn("dept_rank", F.row_number().over(ew)).select(
+        "event_date", "department", "dept_rank", "product_id", "SalePrice", "taxability")
+    dept_sizes = elig.groupBy("event_date", "department").agg(
+        F.count("*").alias("dept_size"))
 
     exploded = (
         receipts.select("receipt_id_ext", "event_ts", "event_date", "store_id",
@@ -385,14 +503,18 @@ def generate_receipts_group(
         exploded, d.u(["receipt_id_ext", "line_num"], "dept"),
         profile.department_weights)
 
+    # Broadcast only provably-small frames: `products` (bounded catalog) and
+    # `dept_sizes` (distinct days x departments). conftest disables auto
+    # broadcast (autoBroadcastJoinThreshold=-1); `elig_ranked` can be large in
+    # production (days x launched products) so it is left to a normal join.
     lines = (
         exploded
-        .join(dept_sizes, "department")
+        .join(F.broadcast(dept_sizes), ["event_date", "department"])
         .withColumn("_pskew", _segment_price_skew(
             d.u(["receipt_id_ext", "line_num"], "prod"), F.col("_seg")))
         .withColumn("dept_rank", F.least(F.col("dept_size"), F.greatest(F.lit(1),
             (F.floor(F.col("_pskew") * F.col("dept_size")) + 1).cast("int"))))
-        .join(products_ranked, ["department", "dept_rank"])
+        .join(elig_ranked, ["event_date", "department", "dept_rank"])
         .withColumn("quantity", F.greatest(F.lit(1), F.least(F.lit(5), F.round(
             d.u(["receipt_id_ext", "line_num"], "qty") * 3 + 0.7).cast("int"))))
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
@@ -463,6 +585,14 @@ def generate_receipts_group(
         .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
         .withColumn("receipt_type", F.lit("SALE"))
         .withColumn("payment_method", F.col("tender_type"))
+        # IMP-007: discount is applied before tax, so subtotal_cents (kept as
+        # the existing net subtotal) plus discount_cents recovers the
+        # pre-discount gross subtotal. attribution fields default NULL here;
+        # attribution.py enriches the ~5% of receipts selected for attribution.
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
+        .withColumn("campaign_id", F.lit(None).cast("string"))
+        .withColumn("impression_id_ext", F.lit(None).cast("string"))
         .select(
             "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
             "customer_id", "receipt_type", "tender_type", "subtotal_cents",
@@ -473,6 +603,8 @@ def generate_receipts_group(
             # Legacy semantic-model column (sourceColumn: Subtotal); same value
             # as subtotal_amount per the TMDL contract.
             _fmt(F.col("subtotal_cents")).alias("Subtotal"),
+            "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
+            "campaign_id", "impression_id_ext",
         ).select(*column_names("fact_receipts"))
     )
 

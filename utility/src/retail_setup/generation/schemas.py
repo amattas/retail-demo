@@ -136,6 +136,13 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         # Present in fact_receipts.tmdl as a string column; added here to
         # satisfy the TMDL contract test (TMDL arbiter rule).
         ("Subtotal", "string"),
+        # --- IMP-007 marketing attribution (additive, snake_case) ---
+        # gross_subtotal_cents = subtotal_cents (net, unchanged) + discount_cents;
+        # discount before tax is preserved (subtotal_cents stays the net amount).
+        ("gross_subtotal_cents", "long"), ("discount_cents", "long"),
+        # NULL unless this SALE receipt was selected for marketing attribution.
+        ("attribution_journey_id", "string"), ("campaign_id", "string"),
+        ("impression_id_ext", "string"),
     ],
     "fact_receipt_lines": [
         ("receipt_id_ext", "string"), ("event_ts", "timestamp"), ("event_date", "date"),
@@ -150,6 +157,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("transaction_id", "string"), ("status", "string"),
         ("decline_reason", "string"), ("processing_time_ms", "long"),
         ("store_id", "long"), ("customer_id", "long"),
+        # IMP-007: NULL unless this payment's receipt/order was attributed.
+        ("attribution_journey_id", "string"),
     ],
     # -----------------------------------------------------------------------
     # Plan 2b: 15 remaining fact tables
@@ -215,6 +224,9 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("impression_id_ext", "string"), ("cost", "string"),
         ("device", "string"), ("event_date", "date"),
         ("__index_level_0__", "long"),
+        # IMP-007: NULL for organic/background impressions; set on the two
+        # synthetic touches created for a selected purchase's journey.
+        ("attribution_journey_id", "string"),
     ],
     "fact_promotions": [
         # TMDL-bound: receipt_id_ext, promo_code, discount_amount, discount_cents
@@ -226,6 +238,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("discount_cents", "long"), ("discount_type", "string"),
         ("product_count", "long"), ("product_ids", "string"), ("store_id", "long"),
         ("customer_id", "long"), ("event_date", "date"),
+        # IMP-007: NULL unless the underlying receipt was attributed.
+        ("attribution_journey_id", "string"),
     ],
     "fact_promo_lines": [
         # TMDL-bound PascalCase: ReceiptId, PromoCode, LineNumber (int64→long),
@@ -257,6 +271,31 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("subtotal_amount", "string"), ("tax_amount", "string"),
         ("total_amount", "string"), ("payment_method", "string"),
         ("event_ts", "timestamp"), ("event_date", "date"),
+        # --- IMP-007 marketing attribution (additive, snake_case) ---
+        ("gross_subtotal_cents", "long"), ("discount_cents", "long"),
+        ("attribution_journey_id", "string"), ("campaign_id", "string"),
+        ("impression_id_ext", "string"),
+    ],
+    # -----------------------------------------------------------------------
+    # IMP-007: dedicated marketing-attribution fact. One row per in-store SALE
+    # receipt or online order, including attributed, unattributed, declined,
+    # and reconciliation-failed outcomes (see attribution.py).
+    # -----------------------------------------------------------------------
+    "fact_marketing_attribution": [
+        ("attribution_id", "string"), ("attribution_journey_id", "string"),
+        ("attribution_status", "string"), ("attribution_model", "string"),
+        ("attribution_window_days", "int"),
+        ("impression_id_ext", "string"), ("campaign_id", "string"),
+        ("creative_id", "string"), ("channel", "string"),
+        ("customer_ad_id", "string"), ("customer_id", "long"),
+        ("touch_ts", "timestamp"), ("purchase_ts", "timestamp"),
+        ("lag_seconds", "long"), ("purchase_type", "string"),
+        ("receipt_id_ext", "string"), ("order_id_ext", "string"),
+        ("store_id", "long"),
+        ("gross_subtotal_cents", "long"), ("discount_cents", "long"),
+        ("net_subtotal_cents", "long"), ("tax_cents", "long"),
+        ("total_cents", "long"), ("payment_cents", "long"),
+        ("attributed_revenue_cents", "long"), ("event_date", "date"),
     ],
     "fact_online_order_lines": [
         # TMDL-bound: order_id, unit_cents (int64→long), fulfillment_mode,
@@ -350,7 +389,7 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("__index_level_0__", "long"),
     ],
     # -----------------------------------------------------------------------
-    # Plan 2c: 9 Gold (au) aggregate tables
+    # Plan 2c: 10 Gold (au) aggregate tables
     # TMDL audit 2026-06-12: bindings match exactly; `computed_at` and `as_of`
     # are produced by the legacy transforms but unbound in TMDL (extras OK).
     # TMDL `day`/`ts` are dateTime — TYPE_COMPAT accepts timestamp|date.
@@ -386,6 +425,14 @@ TABLES: dict[str, list[tuple[str, str]]] = {
     "marketing_cost_daily": [
         ("campaign_id", "string"), ("day", "date"), ("impressions", "long"),
         ("cost", "double"),
+    ],
+    "campaign_performance_daily": [
+        ("campaign_id", "string"), ("channel", "string"), ("day", "date"),
+        ("impressions", "long"), ("spend_cents", "long"),
+        ("conversions", "long"), ("attributed_revenue_cents", "long"),
+        ("discount_cents", "long"), ("tax_cents", "long"),
+        ("payment_cents", "long"), ("conversion_rate", "double"),
+        ("roas", "double"),
     ],
     "tender_mix_daily": [
         ("day", "date"), ("payment_method", "string"), ("transactions", "long"),

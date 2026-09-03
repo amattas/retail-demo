@@ -4,9 +4,8 @@ Fetches each item definition from a live Fabric workspace via the
 ``getDefinition`` REST API and writes it as a source-control item folder
 (``<name>.<ItemType>/`` containing ``.platform`` and the returned definition
 parts, e.g. ``pipeline-content.json`` for pipelines or ``Files/Config/...`` for
-data agents). Authentication uses the Azure CLI login (``AzureCliCredential``),
-matching the ``azure_cli`` auth mode used by the rest of the deployment
-framework.
+data agents). Authentication uses the operator login selected by deployment
+configuration.
 
 Example:
     python -m deploy.scripts.export_items \
@@ -23,9 +22,12 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from deploy.scripts._auth import AUTH_MODES, build_credential
+from deploy.scripts.fabric_runtime import paginated_get
+
 if TYPE_CHECKING:
     import requests
-    from azure.identity import AzureCliCredential
+    from azure.core.credentials import TokenCredential
 
 FABRIC_API = "https://api.fabric.microsoft.com/v1"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
@@ -35,25 +37,35 @@ _JSON_PART_SUFFIXES = (".json",)
 _JSON_PART_NAMES = {".platform", ".schedules"}
 
 
-def build_session(credential: AzureCliCredential | None = None) -> requests.Session:
-    """Create an authenticated requests session for the Fabric REST API.
+def _token(scope: str, credential: TokenCredential) -> str:
+    """Acquire a token, retrying transient operator-login failures."""
 
-    Uses a generous credential process timeout and retries transient cold-``az``
-    token failures (the deploy's pipeline trigger runs this right after a long
-    Terraform/publish step, when the token cache may have lapsed).
-    """
-
-    import requests
     from azure.core.exceptions import ClientAuthenticationError
-    from azure.identity import AzureCliCredential
 
     from deploy.scripts._retry import retry_call
 
-    credential = credential or AzureCliCredential(process_timeout=120)
-    token = retry_call(
-        lambda: credential.get_token(FABRIC_SCOPE).token,
+    return retry_call(
+        lambda: credential.get_token(scope).token,
         retry_on=(ClientAuthenticationError,),
     )
+
+
+def build_session(
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
+) -> requests.Session:
+    """Create an authenticated requests session for the Fabric REST API.
+
+    Retries transient operator-login failures because the deploy can request a
+    token after a long Terraform/publish step.
+    """
+
+    import requests
+
+    credential = credential or build_credential(auth_mode, tenant_id=tenant_id)
+    token = _token(FABRIC_SCOPE, credential)
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {token}"
     return session
@@ -62,10 +74,8 @@ def build_session(credential: AzureCliCredential | None = None) -> requests.Sess
 def find_workspace_id(session: requests.Session, workspace_name: str) -> str:
     """Resolve a workspace display name to its id (case-insensitive)."""
 
-    response = session.get(f"{FABRIC_API}/workspaces")
-    response.raise_for_status()
     target = workspace_name.casefold()
-    for workspace in response.json().get("value", []):
+    for workspace in paginated_get(session, f"{FABRIC_API}/workspaces"):
         if str(workspace.get("displayName", "")).casefold() == target:
             return str(workspace["id"])
     raise ValueError(f"Workspace not found: {workspace_name!r}")
@@ -76,12 +86,12 @@ def list_items(
 ) -> list[dict[str, Any]]:
     """List items of a given type in a workspace, sorted by display name."""
 
-    response = session.get(
-        f"{FABRIC_API}/workspaces/{workspace_id}/items", params={"type": item_type}
-    )
-    response.raise_for_status()
     return sorted(
-        response.json().get("value", []),
+        paginated_get(
+            session,
+            f"{FABRIC_API}/workspaces/{workspace_id}/items",
+            params={"type": item_type},
+        ),
         key=lambda item: str(item.get("displayName", "")),
     )
 
@@ -151,11 +161,18 @@ def export_items(
     workspace_name: str,
     item_type: str,
     output_dir: Path,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> list[Path]:
     """Export all items of ``item_type`` from a workspace into item folders."""
 
-    session = build_session(credential)
+    session = build_session(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     workspace_id = find_workspace_id(session, workspace_name)
     written: list[Path] = []
     for item in list_items(session, workspace_id, item_type):
@@ -183,9 +200,25 @@ def main() -> int:
         help="Fabric item type to export, e.g. DataPipeline or DataAgent.",
     )
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default="azure_cli",
+        help="Operator credential used for Fabric REST requests.",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
+    )
     args = parser.parse_args()
 
-    written = export_items(args.workspace_name, args.item_type, args.output_dir)
+    written = export_items(
+        args.workspace_name,
+        args.item_type,
+        args.output_dir,
+        auth_mode=args.auth_mode,
+        tenant_id=args.tenant_id,
+    )
     print(f"Exported {len(written)} {args.item_type} item(s) to {args.output_dir}")
     for item in written:
         print(f"  {item.name}")

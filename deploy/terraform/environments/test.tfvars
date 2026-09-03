@@ -1,8 +1,0 @@
-environment = "test"
-workspace_name = "retail-demo-test"
-workspace_description = "Microsoft Fabric retail demo workspace"
-skip_capacity_state_validation = false
-role_assignments = []
-lakehouse_name = "retail_lakehouse"
-lakehouse_enable_schemas = true
-eventhouse_name = "retail_eventhouse"

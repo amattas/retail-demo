@@ -32,6 +32,23 @@ table customer_segments
 		displayFolder: ML\Customer Segmentation
 		lineageTag: c5e6e000-0000-0000-0001-000000000105
 
+	/// Timestamp of the latest segmentation snapshot in context.
+	measure 'Segmentation Data As Of' = MAX('customer_segments'[Segmented At])
+		formatString: General Date
+		displayFolder: ML\Customer Segmentation\Metadata
+		lineageTag: c5e6e000-0000-0000-0001-000000000106
+
+	/// Age in hours of the latest segmentation output in the current filter context.
+	measure 'Segmentation Freshness (Hours)' = DATEDIFF(MAX('customer_segments'[Segmented At]), UTCNOW(), HOUR)
+		formatString: #,0
+		displayFolder: ML\Customer Segmentation\Metadata
+		lineageTag: c5e6e000-0000-0000-0001-000000000108
+
+	/// Important interpretation boundary for the descriptive clusters.
+	measure 'Segmentation Limitation' = "Segments are descriptive K-means clusters over historical RFM features; labels are not causal or stable customer attributes."
+		displayFolder: ML\Customer Segmentation\Metadata
+		lineageTag: c5e6e000-0000-0000-0001-000000000107
+
 	column 'Customer ID'
 		dataType: int64
 		formatString: 0
@@ -123,11 +140,43 @@ table customer_segments
 
 	column 'Segmented At'
 		dataType: dateTime
+		isHidden
 		formatString: General Date
 		lineageTag: c5e6e000-0000-0000-0001-00000000000a
 		sourceLineageTag: segmented_at
 		summarizeBy: none
 		sourceColumn: segmented_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Generated At'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0001-00000000000d
+		sourceLineageTag: generated_at
+		summarizeBy: none
+		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Model Run ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0001-00000000000b
+		sourceLineageTag: model_run_id
+		summarizeBy: none
+		sourceColumn: model_run_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Schema Version'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0001-00000000000c
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
 
 		annotation SummarizationSetBy = Automatic
 
@@ -137,4 +186,3 @@ table customer_segments
 			entityName: customer_segments
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

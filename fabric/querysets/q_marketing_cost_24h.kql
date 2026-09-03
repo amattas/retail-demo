@@ -1,7 +1,7 @@
 // Marketing cost per campaign in last 24h
-let window = 24h;
-ad_impression
-| where ingest_timestamp > ago(window)
-| summarize impressions = count(), cost = sum(cost) by campaign_id
-| order by cost desc
-
+fn_campaign_performance(24h)
+| summarize impressions = sum(impressions),
+            spend_cents = sum(spend_cents)
+    by campaign_id
+| extend cost = todouble(spend_cents) / 100.0
+| order by spend_cents desc

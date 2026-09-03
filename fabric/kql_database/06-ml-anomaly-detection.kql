@@ -194,8 +194,8 @@
     let time_series = payment_processed
         | where ingest_timestamp > ago(lookback_hours * 1h)
         | summarize total_payments = count(),
-                    failed_payments = countif(status == "declined"),
-                    failure_rate = todouble(countif(status == "declined")) / count() * 100
+                    failed_payments = countif(status == "DECLINED"),
+                    failure_rate = todouble(countif(status == "DECLINED")) / count() * 100
               by store_id, ts = bin(ingest_timestamp, 1h)
         | order by store_id asc, ts asc;
     // Detect anomalies in failure rate

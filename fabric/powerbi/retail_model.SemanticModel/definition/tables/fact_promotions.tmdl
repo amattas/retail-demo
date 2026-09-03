@@ -117,9 +117,11 @@ table fact_promotions
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Raw event date carried for lineage only. Promotions inherit date context via the active Promotions-to-Receipts relationship, so this technical column is hidden to avoid duplicate/ambiguous date slicers.
 	column event_date
 		dataType: dateTime
 		formatString: General Date
+		isHidden
 		lineageTag: e5bdf9a5-d264-46a2-ad65-0f11dea87b29
 		sourceLineageTag: event_date
 		summarizeBy: none

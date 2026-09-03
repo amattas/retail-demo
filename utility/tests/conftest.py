@@ -6,7 +6,23 @@ from pathlib import Path
 # Make utility/scripts importable so catalog_builder and catalogs/* can be imported directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+# Make the repo root importable so the deploy framework (deploy.scripts.*) resolves
+# the same way it does from a real repo checkout. The retail-setup CLI shells out to
+# and imports deploy.scripts for target-safety validation; without the repo root on
+# sys.path those imports fail under the installed-package CI job (which runs from
+# utility/), so exercise them here exactly as an operator would.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import pytest
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Classify runtime-dependent tests without maintaining module lists."""
+    for item in items:
+        test_path = Path(item.path).resolve()
+        if "spark" in item.fixturenames:
+            item.add_marker(pytest.mark.spark)
+        if test_path.name == "test_e2e_local.py":
+            item.add_marker(pytest.mark.e2e)
 
 
 @pytest.fixture(scope="session")
@@ -45,6 +61,11 @@ def spark():
         SparkSession.builder.master("local[2]")
         .appName("retail-setup-tests")
         .config("spark.sql.shuffle.partitions", "4")
+        # Disable broadcast joins: the constrained local driver heap cannot build
+        # and broadcast some intermediate tables in the generation DAG (CI hit
+        # "Not enough memory to build and broadcast the table"). Forcing sort-merge
+        # joins yields identical results with a smaller memory footprint.
+        .config("spark.sql.autoBroadcastJoinThreshold", "-1")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.local.dir", tmpdir)
@@ -53,4 +74,5 @@ def spark():
         .getOrCreate()
     )
     yield session
+    session.catalog.clearCache()
     session.stop()

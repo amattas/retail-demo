@@ -6,26 +6,17 @@ import argparse
 from pathlib import Path
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES, build_credential
 from deploy.scripts.deploy_config import DEPLOY_ROOT
 
 
-def build_credential(auth_mode: str):
-    """Build an explicit Azure credential for fabric-cicd."""
-
-    if auth_mode == "azure_cli":
-        from azure.identity import AzureCliCredential
-
-        return AzureCliCredential()
-    if auth_mode == "azure_powershell":
-        from azure.identity import AzurePowerShellCredential
-
-        return AzurePowerShellCredential()
-    raise ValueError(
-        "Unsupported auth mode. Use 'azure_cli' or 'azure_powershell' for this wrapper."
-    )
-
-
-def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
+def deploy(
+    config_path: Path,
+    environment: str,
+    auth_mode: str,
+    *,
+    tenant_id: str | None = None,
+) -> None:
     """Run fabric-cicd configuration deployment with quiet, consistent output.
 
     fabric-cicd logs verbose ``[info] HH:MM:SS - ####`` banners at INFO. Raise
@@ -42,7 +33,7 @@ def deploy(config_path: Path, environment: str, auth_mode: str) -> None:
     console.info(f"Publishing Fabric items (environment '{environment}')...")
     deploy_with_config(
         config_file_path=str(config_path.resolve()),
-        token_credential=build_credential(auth_mode),
+        token_credential=build_credential(auth_mode, tenant_id=tenant_id),
         environment=environment,
     )
     console.info("Published Fabric items.")
@@ -52,20 +43,32 @@ def main() -> int:
     """Deploy staged Fabric items with fabric-cicd."""
 
     parser = argparse.ArgumentParser(description="Deploy Fabric items with fabric-cicd")
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", required=True)
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEPLOY_ROOT / "fabric-cicd" / "config.yml",
+        help="Generated fabric-cicd config path.",
     )
     parser.add_argument(
         "--auth-mode",
-        choices=["azure_cli", "azure_powershell"],
+        choices=AUTH_MODES,
         default="azure_cli",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
     )
     args = parser.parse_args()
 
-    deploy(args.config, args.environment, args.auth_mode)
+    config_path = args.config or (
+        DEPLOY_ROOT / ".generated" / args.environment / "fabric-cicd" / "config.yml"
+    )
+    deploy(
+        config_path,
+        args.environment,
+        args.auth_mode,
+        tenant_id=args.tenant_id,
+    )
     return 0
 
 

@@ -1,14 +1,17 @@
-// Campaign conversion funnel - impressions to purchases with attribution
-let window = 24h;
-ad_impression
-| where ingest_timestamp > ago(window)
-| summarize impressions = count() by campaign_id
-| join kind=leftouter (
-    receipt_created
-    | where ingest_timestamp > ago(window)
-    | where isnotempty(campaign_id)
-    | summarize conversions = count(), revenue = sum(total) by campaign_id
-  ) on campaign_id
-| extend conversion_rate = toreal(coalesce(conversions, 0)) / toreal(impressions)
-| extend revenue = coalesce(revenue, 0.0)
-| order by revenue desc
+// Seven-day deterministic last-touch conversion funnel.
+fn_campaign_performance(7d)
+| summarize impressions = sum(impressions),
+            conversions = sum(conversions),
+            spend_cents = sum(spend_cents),
+            attributed_revenue_cents = sum(attributed_revenue_cents)
+    by campaign_id
+| extend conversion_rate = iif(
+             impressions == 0, 0.0, todouble(conversions) / impressions
+         ),
+         roas = iif(
+             spend_cents == 0, 0.0,
+             todouble(attributed_revenue_cents) / spend_cents
+         )
+| extend spend = todouble(spend_cents) / 100.0,
+         attributed_revenue = todouble(attributed_revenue_cents) / 100.0
+| order by attributed_revenue_cents desc

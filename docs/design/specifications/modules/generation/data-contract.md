@@ -1,0 +1,140 @@
+# Historical data contract
+
+## Authority
+
+`utility/src/retail_setup/generation/schemas.py` is the authoritative base
+Lakehouse table/column/type contract. `engine.py` owns orchestration,
+`invariants.py` owns cross-table validation, `writer.py` owns publication, and
+`gold.py` owns the ten aggregate outputs.
+
+## Base Silver output
+
+### Dimensions
+
+`dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`,
+`dim_customers`, `dim_products`, and `dim_date`.
+
+### Facts
+
+`fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
+`fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
+`fact_marketing`, `fact_marketing_attribution`, `fact_promotions`,
+`fact_promo_lines`,
+`fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
+`fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
+`fact_store_inventory_txn`, and `fact_stockouts`.
+
+### Operational output
+
+`setup_run_log` appends a unique setup-attempt record, table-level completion
+records, and a final completion or failure record. Reusing an existing `run_id`
+is rejected so retries cannot create ambiguous duplicate history.
+
+Setup-02 generates and validates dimensions without publishing them. Setup-03
+regenerates the same deterministic dimensions with all facts and is the single
+Silver publication boundary. `write_all` stages every candidate under a
+run-scoped `<schema>_stage` schema, validates schema and row counts, captures
+existing Delta versions, then promotes. An attempted promotion failure restores
+pre-existing targets and drops newly created targets in reverse order.
+
+Terminal publication states distinguish data recovery from staging cleanup:
+`COMPLETED`, `FAILED`, `ROLLED_BACK`, `ROLLBACK_FAILED`,
+`COMPLETED_CLEANUP_FAILED`, and `ROLLED_BACK_CLEANUP_FAILED`.
+
+## Gold output
+
+- `sales_minute_store`
+- `top_products_15m`
+- `inventory_position_current`
+- `dc_inventory_position_current`
+- `truck_dwell_daily`
+- `online_sales_daily`
+- `zone_dwell_minute`
+- `marketing_cost_daily`
+- `campaign_performance_daily`
+- `tender_mix_daily`
+
+ML output tables are not part of this base contract.
+
+The source-derived live-route check compares this inventory with declared
+event paths. Seven dimensions, `fact_promo_lines`,
+`fact_online_order_lines`, `fact_truck_inventory`,
+`fact_dc_inventory_txn`, and `dc_inventory_position_current` are the named
+historical-only boundary. The manifest records those targets and rationale;
+`schemas.py` continues to own their fields, types, nullability behavior, and
+mixed-case compatibility.
+
+## Generation order
+
+The engine creates dimensions and date context before dependent facts, then
+builds sales, returns, online orders, payments, promotions, marketing,
+deterministic attribution, store activity, sensors, inventory, replenishment,
+stockouts, trucks, and Gold output.
+Reusable intermediate data is cached where repeated calculations would
+otherwise recompute it.
+
+## Invariants
+
+Current invariant checks include:
+
+- key uniqueness and required foreign keys;
+- non-null event dates;
+- online-order header/line integrity;
+- pricing, tax, and promotion consistency;
+- seven-day last-touch uniqueness and impression/purchase linkage;
+- attributed revenue, discount, tax, total, and payment reconciliation;
+- stockout location exclusivity;
+- truck timing and inventory relationships;
+- sales only within each store's operating hours;
+- no receipt line sold before its product's launch date;
+- returns posted strictly after the originating sale (never same-day);
+- product lifecycle dates present (no degenerate lifecycles).
+
+Shared live/batch business invariants — operating hours, product launch
+eligibility, return timing, lifecycle presence, and validated profile controls —
+are enforced in
+`utility/src/retail_setup/generation/invariants.py`.
+
+## Naming compatibility
+
+New columns use `snake_case`, but current TMDL compatibility requires explicit
+legacy exceptions such as `ID`, `StoreNumber`, `CustomerId`, `StoreID`,
+`ReceiptId`, `Source`, `Subtotal`, and `__index_level_0__`. These exceptions are
+documented in `schemas.py` and must not be silently normalized in a transform.
+
+## Store profiles and derived defaults
+
+Supported profiles are `supercenter`, `grocery`, `hardware`, and `luxury`.
+Current derived defaults include:
+
+- `silver_db = ag`
+- `gold_db = au`
+- `dc_count = max(1, store_count // 10)`
+- `customer_count = max(store_count * 1000, 5000)`
+- `online_orders_per_day = store_count * 8`
+- `transactions_per_store_day = 400`
+- `return_rate = 0.01`
+- `brands_per_product = 3`
+- `truck_capacity = 15000`
+
+In-store customer assignment reserves a deterministic 10% cohort whose
+purchases stop at seeded, staggered dates inside the generation window.
+Post-cutoff receipts are reassigned to active customers. This preserves
+pre-churn behavior while guaranteeing forward-looking churn labels across
+chronological ML splits.
+
+## Removed active-path behavior
+
+Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
+Hubs, outbox, dead-letter queue (DLQ), and Prometheus surfaces are not part of
+the supported Fabric-native contract.
+
+## Verification
+
+- `utility/tests/generation/test_schema_contract.py`
+- `utility/tests/generation/test_engine.py`
+- `utility/tests/generation/test_gold.py`
+- module-specific generation tests
+- `utility/tests/test_notebook_build.py`
+- `utility/tests/contracts/test_live_data_contract.py`
+- `python scripts/check_data_contracts.py`

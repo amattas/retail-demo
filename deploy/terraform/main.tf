@@ -64,6 +64,7 @@ resource "fabric_lakehouse" "main" {
 }
 
 resource "fabric_eventhouse" "main" {
+  count        = var.eventhouse_enabled ? 1 : 0
   display_name = var.eventhouse_name
   workspace_id = local.workspace_id
 

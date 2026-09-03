@@ -1,0 +1,180 @@
+# Setup CLI and render contract
+
+## Entry points
+
+- Windows: `scripts/setup.ps1`
+- macOS/Linux: `scripts/setup.sh`
+- Direct Python: `python scripts/setup.py`
+- Installed CLI: `retail-setup`
+
+The shell wrappers converge on the Python guided setup.
+When `--profile` is omitted, both wrappers prepend `--profile full-demo`;
+a later explicit `--profile` argument overrides it. Direct `scripts/setup.py`
+and `retail-setup` commands retain the manifest-default `core` profile.
+
+Before dependencies are installed, `scripts/solution_manifest.py` reads the
+manifest version/hash, prerequisites, canonical examples, and profile
+names/default/publication expectations. `scripts/setup.py` derives its tool
+checks, profile choices, and profile default from that projection and validates
+its Python minimum against the manifest and utility package constraint.
+
+The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
+editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`,
+`mssql-python`, and `pyodbc`.
+The lower-level deploy framework supports Azure PowerShell for Python Fabric
+clients only. Terraform still requires Azure CLI or a separately configured
+provider credential; alternatively, reuse validated outputs with
+`--skip-terraform`. The guided prerequisite check expects Azure CLI.
+On Windows and Linux, live Lakehouse freshness checks use `mssql-python`
+(Microsoft's Python SQL driver, installed automatically on non-macOS
+platforms) when Microsoft ODBC Driver 17 or 18 is not detected. On macOS,
+`mssql-python` is excluded because its supported wheel is not portable across
+the repository's macOS range; ODBC Driver 17 or 18 remains required.
+
+## `configure`
+
+`retail-setup configure --workspace-name <name> --profile <profile>` writes:
+
+- ignored `deploy/config/environments/<env>.yml`
+- ignored `utility/config.yaml`
+
+The environment key is derived from the normalized workspace name. A leading
+`retail-demo-` prefix is omitted, so workspace `retail-demo-alice` maps to
+environment `alice`. Reconfiguring another workspace creates another local
+overlay instead of changing shared defaults.
+
+Reconfiguring an existing environment removes the legacy
+`spark.use_custom_pool` and `notebooks.include` overlay keys. Deployment
+profiles now own both selections; unrelated Spark and notebook settings remain
+unchanged.
+
+The active non-interactive inputs include:
+
+- tenant, workspace, capacity, Lakehouse, Eventhouse, and KQL database names;
+- authentication mode; the workspace name determines the environment;
+- store type: `supercenter`, `grocery`, `hardware`, or `luxury`;
+- history `months`, store count, and deterministic seed.
+
+The CLI derives `start_date` and `end_date` from `months` with an end date of
+yesterday. The configuration model still accepts explicit dates for backward
+compatibility, but public examples use `--months`. `core` defaults to three
+months. Profiles with required ML/Reporting default to 18 months and reject
+windows shorter than 540 days because the required churn feature window,
+90-day forward labels, and purged train/calibration/test partitions cannot be
+trained coherently on shorter history.
+
+## `render`
+
+`retail-setup render --env <name>` renders all notebooks in memory before
+writing any file. Unknown keys, missing values, or remaining tokens fail the
+operation without a partial notebook output set. It also writes
+`utility/out/render-manifest.json` with the resolved generation window.
+
+### Render targets
+
+1. `setup-01-seed-dictionaries.ipynb`
+2. `setup-02-generate-dimensions.ipynb`
+3. `setup-03-generate-facts.ipynb`
+4. `setup-04-build-gold.ipynb`
+5. `stream-events.ipynb`
+
+### Required tokens
+
+| Token | Meaning |
+| --- | --- |
+| `LAKEHOUSE_NAME` | Target Lakehouse display name |
+| `SILVER_DB` | Silver schema, normally `ag` |
+| `GOLD_DB` | Gold schema, normally `au` |
+| `STORE_TYPE` | Dictionary/profile |
+| `START_DATE` | Derived or explicit historical start |
+| `END_DATE` | Derived or explicit historical end |
+| `STORE_COUNT` | Number of stores |
+| `SEED` | Deterministic seed |
+| `DICTIONARY_REF` | Git ref used for dictionary content |
+
+`stream-events` is rendered with the setup notebooks but is staged separately
+and is not part of the ordered setup pipeline.
+
+## `deploy`
+
+Common flags:
+
+- `--env <name>`
+- `--skip-terraform`
+- `--dry-run`
+- `--yes`
+- `--recreate`
+
+`--recreate` and `--skip-terraform` cannot be combined. A non-dry-run deploy
+loads the environment, validates the current Azure CLI tenant where applicable,
+detects an existing workspace for interactive reset, executes the deployment
+plan, and deploys the task flow where selected.
+
+`setup-pipeline` includes only setup notebooks 01 through 04. For profiles that
+publish Reporting, deploy then runs `ml-required` with terminal polling. Its
+four producers feed `15-validate-required-ml-contract`; only exact-run success
+allows a second publication phase to stage the semantic model and report.
+`full-demo` runs `ml-optional` and `ml-experimental` afterward.
+
+After those pipelines, deployment synchronizes Lakehouse SQL endpoint metadata.
+This makes newly written tables visible to SQL and Power BI clients. The step
+is optional because readiness independently fails closed when a required table
+is unavailable.
+
+The deployment artifact build also consumes the render manifest and rewrites
+the staged Power BI report date filters to the month containing `end_date`.
+The committed Power BI Project (PBIP) remains an authoring template, while
+each deployed report opens on the latest month generated by that setup,
+including custom `months` or explicit date ranges.
+
+`--yes` pre-confirms Terraform apply but does not skip required pipeline gates
+or live tenant/capacity preflight. Full-demo proceeds without boundary prompts
+when the required tenant switches and capacity are valid. Disabled settings
+and invalid capacity fail before Fabric mutation with exact remediation.
+`--skip-terraform` rejects missing, placeholder,
+incomplete, or wrong-workspace Terraform outputs before publication.
+`--recreate` polls for workspace-name release for up to 180 seconds between
+destroy and apply.
+
+For standard and full-demo, deployment finishes with a read-only live
+readiness verification. It never triggers an additional pipeline. Required
+failed/unknown evidence fails deployment, while optional failed/unknown
+evidence records a degraded run.
+
+For `full-demo`, deployment automatically checks for the stable ontology. When
+it is absent, the orchestrator runs the deployed `30-create-ontology` notebook,
+waits for the item, publishes both Data Agents, deploys all selected task-flow
+references, and verifies the graph after persistence. The
+`retail-setup post-ontology --env <name>` command remains as an idempotent
+repair path. Optional stream freshness can leave either path `DEGRADED` without
+failing required ontology/task-flow publication.
+
+## `verify`
+
+`retail-setup verify --env <name>` queries profile-selected live items,
+definitions, task flow, KQL objects, schedules, pipeline jobs, and freshness
+signals. It writes
+`deploy/.generated/<env>/readiness-report.json` atomically and returns `0` for
+success, `1` for required failure/unknown, `2` for usage, or `3` for optional
+degradation.
+
+The default is read-only. `--run-pipeline` is the only mutating verifier flag;
+it explicitly starts and waits for the profile-required post-publish pipeline.
+It is rejected for profiles without that pipeline and does not start streaming
+or other workloads.
+
+## Output behavior
+
+CLI output is linear plain text with ASCII separators. Required command
+failures propagate from the plan. Task-flow and pipeline gate/failure behavior
+is documented in the [deployment specification](../deployment/framework.md)
+and [operations runbook](../operations/runbook.md).
+
+## Evidence
+
+- `utility/src/retail_setup/cli/main.py`
+- `utility/src/retail_setup/notebooks/inject.py`
+- `utility/src/retail_setup/config/generation.py`
+- `utility/tests/test_cli_configure.py`
+- `utility/tests/test_cli_render.py`
+- `utility/tests/test_cli_deploy.py`

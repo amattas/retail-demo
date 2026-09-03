@@ -15,16 +15,12 @@ REQUIRED_TOKENS = [
     "LAKEHOUSE_NAME", "SILVER_DB", "GOLD_DB", "STORE_TYPE", "START_DATE",
     "END_DATE", "STORE_COUNT", "SEED", "DICTIONARY_REF",
 ]
-NOTEBOOKS = [
+SETUP_NOTEBOOKS = [
     "setup-01-seed-dictionaries", "setup-02-generate-dimensions",
     "setup-03-generate-facts", "setup-04-build-gold",
-    # The live streaming generator. Rendered alongside the batch setup notebooks
-    # (it shares the {{LAKEHOUSE_NAME}}/{{STORE_TYPE}}/... tokens) but it is the
-    # optional long-running driver, so it is staged separately by the deploy
-    # ("stream" group) and is NOT part of the ordered setup pipeline. It has no
-    # number prefix because it is the only notebook in the streaming path.
-    "stream-events",
 ]
+STREAM_NOTEBOOKS = ["stream-events"]
+NOTEBOOKS = [*SETUP_NOTEBOOKS, *STREAM_NOTEBOOKS]
 _NOTEBOOK_DIR = Path(__file__).resolve().parents[3] / "notebooks"
 
 
@@ -32,6 +28,7 @@ def render_notebooks(
     values: dict[str, str],
     output_dir: Path,
     notebook_dir: Path | None = None,
+    notebook_names: list[str] | tuple[str, ...] | None = None,
 ) -> list[Path]:
     """Render all setup notebooks by substituting token values.
 
@@ -44,6 +41,8 @@ def render_notebooks(
         output_dir: Directory to write rendered notebooks into.
         notebook_dir: Source directory containing the committed notebooks.
             Defaults to the module-relative ``utility/notebooks`` directory.
+        notebook_names: Exact managed notebook names to render. Defaults to all
+            renderable notebooks.
 
     Returns:
         List of paths to the written notebook files.
@@ -61,9 +60,15 @@ def render_notebooks(
         raise ValueError(f"unknown render keys (typo?): {unknown}")
 
     src_dir = Path(notebook_dir) if notebook_dir is not None else _NOTEBOOK_DIR
+    selected = tuple(notebook_names) if notebook_names is not None else tuple(NOTEBOOKS)
+    if len(selected) != len(set(selected)):
+        raise ValueError("notebook_names contains duplicates")
+    unknown_notebooks = sorted(set(selected) - set(NOTEBOOKS))
+    if unknown_notebooks:
+        raise ValueError(f"unknown render notebooks: {unknown_notebooks}")
 
     rendered: list[tuple[Path, str]] = []
-    for name in NOTEBOOKS:
+    for name in selected:
         src = (src_dir / f"{name}.ipynb").read_text(encoding="utf-8")
         for token, value in values.items():
             src = src.replace("{{" + token + "}}", str(value))

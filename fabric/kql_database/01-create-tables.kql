@@ -9,10 +9,10 @@
 // Event tables reference dimension IDs (store_id, customer_id, product_id, etc.)
 // without database-level FK constraints. Validation is handled as follows:
 //
-// 1. SOURCE VALIDATION (Primary): The datagen Python package validates all
-//    foreign key relationships before generating events. See:
-//    - datagen/src/retail_datagen/shared/validators.py (SyntheticDataValidator)
-//    - datagen/src/retail_datagen/generators/retail_patterns.py (BusinessRulesEngine)
+// 1. SOURCE VALIDATION (Primary): Historical generation validates cross-table
+//    relationships before writing Lakehouse tables. See:
+//    - utility/src/retail_setup/generation/invariants.py
+//    - utility/src/retail_setup/generation/schemas.py
 //
 // 2. POST-INGESTION QUERIES: For data quality monitoring, use these queries:
 //
@@ -53,6 +53,12 @@
     tender_type:string,
     item_count:long,
     campaign_id:string,  // Null for non-campaign purchases; use isnull(campaign_id, '') in queries
+    impression_id:string,
+    gross_subtotal_cents:long,
+    discount_cents:long,
+    subtotal_cents:long,
+    tax_cents:long,
+    total_cents:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -294,6 +300,7 @@
     impression_id:string,
     cost:real,
     device_type:string,
+    customer_id:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -339,6 +346,13 @@
     tax:real,
     total:real,
     tender_type:string,
+    campaign_id:string,
+    impression_id:string,
+    gross_subtotal_cents:long,
+    discount_cents:long,
+    subtotal_cents:long,
+    tax_cents:long,
+    total_cents:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

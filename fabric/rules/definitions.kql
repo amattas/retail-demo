@@ -10,12 +10,13 @@ reorder_triggered
 | where priority == 'URGENT' and ingest_timestamp > ago(10m)
 | project store_id, dc_id, product_id, reorder_quantity, reorder_point, current_quantity, trace_id
 
-// Truck dwell breach: arrived without depart > threshold
-let thresholdMinutes = 90m;
-truck_arrived
-| join kind=leftanti (truck_departed) on truck_id, dc_id, store_id, shipment_id
-| where datetime_diff('minute', now(), arrival_time) > thresholdMinutes
-| project truck_id, dc_id, store_id, shipment_id, arrival_time
+// Truck dwell breach: completed lifecycle exceeds the 90-minute SLA
+let threshold_minutes = 90.0;
+fn_truck_sla()
+| where arrival_ingest_timestamp > ago(5m)
+| where dwell_minutes > threshold_minutes
+| project truck_id, dc_id, store_id, shipment_id, site,
+          arrival_time, departure_time, dwell_minutes, threshold_minutes
 
 // Zone overcrowded: rolling 5-min window
 customer_entered

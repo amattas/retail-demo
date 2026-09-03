@@ -96,17 +96,10 @@ data/facts/**/*.csv
 *.wal
 
 # Generated documentation and reports
-datagen/site/
 *_report.json
 
 # Data directories
-/datagen/data/*.db*
-/datagen/data/*.json
-/datagen/data/cache
-/datagen/data/export
-/datagen/data
 site/
-/datagen/event_histograms
 /fabric/lakehouse/.stubs
 /fabric/lakehouse/5219ac70-71d4-4dfc-af32-5b8a6c29a471
 fabric/lakehouse/.work-folder-info
@@ -115,18 +108,14 @@ fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 /.github/skills
 
 # Deployment framework generated files and local Terraform state
+/deploy/config/environments/*.yml
+!/deploy/config/environments/.gitkeep
 /deploy/.generated/
 /deploy/workspace/*
 !/deploy/workspace/.gitkeep
 /deploy/terraform/.terraform/
 /deploy/terraform/*.tfstate
 /deploy/terraform/*.tfstate.*
-/deploy/terraform/.terraform.lock.hcl
-
-# Docusaurus site (website/)
-website/node_modules/
-website/build/
-website/.docusaurus/
 
 # Setup utility — rendered notebooks and local config (contain env-specific values)
 utility/out/

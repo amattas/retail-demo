@@ -1,0 +1,168 @@
+[project]
+site_name = "Microsoft Fabric Retail Demo"
+site_description = "Documentation for the Microsoft Fabric retail demo."
+site_author = "Retail Demo contributors"
+site_url = "https://amattas.github.io/retail-demo/"
+docs_dir = "docs"
+site_dir = "site"
+repo_url = "https://github.com/amattas/retail-demo"
+repo_name = "amattas/retail-demo"
+edit_uri = "edit/main/docs/"
+copyright = "Copyright &copy; 2026 Retail Demo contributors"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Start here" = [
+    { "Guide index" = "guides/README.md" },
+    { "Plain-language glossary" = "guides/glossary.md" },
+    { "Getting started" = "guides/getting-started.md" },
+    { "Workspace and profiles" = "guides/workspace-inventory.md" },
+  ] },
+  { "Explore the demo" = [
+    { "Deployed walkthrough" = [
+      { "Overview" = "guides/deployed-walkthrough.md" },
+      { "Data platform" = "guides/deployed-data-platform.md" },
+      { "Analytics and AI" = "guides/deployed-analytics-ai.md" },
+    ] },
+    { "Presenter demo" = "guides/demo-script.md" },
+    { "CIO walkthrough" = "guides/cio-walkthrough.md" },
+    { "Presenter journeys" = "guides/presenter-journeys.md" },
+    { "Use cases" = "guides/use-cases.md" },
+  ] },
+  { "Deploy and operate" = [
+    { "Deployment" = "guides/deployment.md" },
+    { "Operations" = "guides/operations.md" },
+  ] },
+  { "Design Documentation" = [
+    { "Overview" = "design/README.md" },
+    { "Requirements" = [
+      { "Ownership and IDs" = "design/requirements/README.md" },
+      { "Core demo" = "design/requirements/core/demo.md" },
+      { "Traceability" = "design/requirements/traceability.md" },
+      { "Setup" = [
+        { "Requirements" = "design/requirements/modules/setup/setup.md" },
+        { "Backlog" = "design/requirements/modules/setup/backlog.md" },
+      ] },
+      { "Deployment" = [
+        { "Requirements" = "design/requirements/modules/deployment/deployment.md" },
+        { "Backlog" = "design/requirements/modules/deployment/backlog.md" },
+      ] },
+      { "Generation" = [
+        { "Requirements" = "design/requirements/modules/generation/generation.md" },
+        { "Backlog" = "design/requirements/modules/generation/backlog.md" },
+      ] },
+      { "Streaming" = [
+        { "Requirements" = "design/requirements/modules/streaming/streaming.md" },
+        { "Backlog" = "design/requirements/modules/streaming/backlog.md" },
+      ] },
+      { "Analytics" = [
+        { "Requirements" = "design/requirements/modules/analytics/analytics.md" },
+        { "Backlog" = "design/requirements/modules/analytics/backlog.md" },
+      ] },
+      { "ML and AI" = [
+        { "Requirements" = "design/requirements/modules/ml-ai/ml-ai.md" },
+        { "Backlog" = "design/requirements/modules/ml-ai/backlog.md" },
+      ] },
+      { "Power BI" = [
+        { "Requirements" = "design/requirements/modules/power-bi/power-bi.md" },
+        { "Backlog" = "design/requirements/modules/power-bi/backlog.md" },
+      ] },
+      { "Operations" = [
+        { "Requirements" = "design/requirements/modules/operations/operations.md" },
+        { "Backlog" = "design/requirements/modules/operations/backlog.md" },
+      ] },
+      { "Security" = [
+        { "Requirements" = "design/requirements/modules/security/security.md" },
+        { "Backlog" = "design/requirements/modules/security/backlog.md" },
+      ] },
+      { "Documentation" = [
+        { "Requirements" = "design/requirements/modules/documentation/documentation.md" },
+        { "Backlog" = "design/requirements/modules/documentation/backlog.md" },
+      ] },
+    ] },
+    { "Specifications" = [
+      { "Ownership" = "design/specifications/README.md" },
+      { "Conventions" = "design/specifications/core/conventions.md" },
+      { "Solution manifest" = "design/specifications/core/solution-manifest.md" },
+      { "Setup CLI" = "design/specifications/modules/setup/cli.md" },
+      { "Deployment framework" = "design/specifications/modules/deployment/framework.md" },
+      { "Data contract" = "design/specifications/modules/generation/data-contract.md" },
+      { "Event contract" = "design/specifications/modules/streaming/event-contract.md" },
+      { "Fabric analytics" = "design/specifications/modules/analytics/fabric-analytics.md" },
+      { "ML and AI contracts" = "design/specifications/modules/ml-ai/model-contracts.md" },
+      { "Semantic model" = "design/specifications/modules/power-bi/semantic-model.md" },
+      { "Operations runbook" = "design/specifications/modules/operations/runbook.md" },
+      { "Access control" = "design/specifications/modules/security/access-control.md" },
+      { "Documentation site" = "design/specifications/modules/documentation/site.md" },
+    ] },
+    { "Architecture" = [
+      { "Overview" = "design/architecture/overview.md" },
+      { "Infrastructure" = "design/architecture/infrastructure.md" },
+      { "Data flow" = "design/architecture/data-flow.md" },
+      { "Data schema" = "design/architecture/data-schema.md" },
+      { "Security boundaries" = "design/architecture/security.md" },
+      { "Agentic application" = "design/architecture/agentic-application.md" },
+    ] },
+    { "Security" = [
+      { "Threat model" = "design/security/threat-model.md" },
+      { "Controls" = "design/security/controls.md" },
+    ] },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.action.edit",
+  "content.action.view",
+  "content.code.copy",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[project.theme.icon]
+logo = "material/store"
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.extra.version]
+provider = "mike"
+default = "latest"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true

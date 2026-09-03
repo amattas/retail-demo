@@ -1,49 +1,69 @@
-# Docs — build the Docusaurus site and deploy to GitHub Pages on every push
-# to main. Replaces the old MkDocs workflow (mkdocs-pages.yml); docs ship when
-# they merge. Template reused from the pydmp docs-site workflow.
 name: Docs
 
 on:
   push:
     branches: [main]
+    tags:
+      - '*.*.*'
+      - 'v*.*.*'
     paths:
-      - 'website/**'
+      - 'README.md'
+      - 'contracts/retail-demo.json'
+      - 'deploy/README.md'
+      - 'deploy/config/deploy.yml'
+      - 'deploy/scripts/**'
+      - 'deploy/terraform/providers.tf'
+      - 'docs/**'
+      - 'fabric/**'
+      - 'scripts/setup.py'
+      - 'scripts/solution_manifest.py'
+      - 'scripts/docs_versioning.py'
+      - 'scripts/publish_versioned_docs.py'
+      - 'tests/docs/**'
+      - 'utility/README.md'
+      - 'utility/pyproject.toml'
+      - 'utility/src/retail_setup/**'
+      - 'zensical.toml'
+      - 'requirements-docs.in'
+      - 'requirements-docs.txt'
+      - 'requirements-test.in'
+      - 'requirements-test.txt'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: pages
+  group: docs-gh-pages
   cancel-in-progress: false
 
 jobs:
   docs:
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
+          ref: main
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: website/package-lock.json
-      - name: Build
-        working-directory: website
+          python-version: "3.13"
+      - name: Install documentation tools
         run: |
-          npm ci
-          npm run build
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: website/build
-      - uses: actions/deploy-pages@v5
-        id: deployment
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements-docs.txt
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements-test.txt
+      - name: Validate documentation contracts
+        run: python -m pytest tests/docs -q
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Configure publish credentials
+        env:
+          GH_PAGES_TOKEN: ${{ github.token }}
+        run: |
+          git remote set-url origin "https://x-access-token:${GH_PAGES_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Publish
+        run: python scripts/publish_versioned_docs.py --push

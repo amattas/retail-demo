@@ -18,23 +18,28 @@ Because those GUIDs are workspace-specific, ``export_taskflow`` resolves each GU
 to the artifact's display name (a portable form), and ``deploy_taskflow`` resolves
 the names back to the **target** workspace's GUIDs before saving.
 
-Auth uses the Azure CLI login: the metadata cluster needs a Power BI token and
-item listing needs a Fabric token.
+Auth uses the configured operator login: the metadata cluster needs a Power BI
+token and item listing needs a Fabric token.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import time
 import uuid
+from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
+from deploy.scripts._auth import AUTH_MODES, build_credential
+from deploy.scripts.fabric_runtime import paginated_get
 
 if TYPE_CHECKING:
     import requests
-    from azure.identity import AzureCliCredential
+    from azure.core.credentials import TokenCredential
 
 PBI_SCOPE = "https://analysis.windows.net/powerbi/api/.default"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
@@ -61,29 +66,29 @@ ARTIFACT_TO_ITEM_TYPE = {
     "Report": "Report",
     "dataset": "SemanticModel",
 }
+TERRAFORM_ITEM_OUTPUTS = {
+    "Lakehouse": "lakehouse_id",
+    "Eventhouse": "eventhouse_id",
+    "KQLDatabase": "kql_database_id",
+}
+TASKFLOW_READ_PATHS = ("taskflow202602", "taskflow202512")
+TASKFLOW_VERIFY_ATTEMPTS = 10
+TASKFLOW_VERIFY_INTERVAL_SECONDS = 1.0
 
 
-def _credential(credential: AzureCliCredential | None = None) -> AzureCliCredential:
-    """Azure CLI credential with a generous process timeout.
+def _credential(
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
+) -> TokenCredential:
+    """Return an injected credential or construct the configured operator login."""
 
-    On Windows ``az.cmd`` is slow to start, and a *cold* token for the Power BI /
-    Fabric audience can take ~90s (the deploy fetches both back to back; warm
-    calls are ~1s). 120s absorbs the cold-start without making a genuinely-broken
-    ``az`` hang excessively. One credential is reused for both token requests.
-    """
-
-    from azure.identity import AzureCliCredential
-
-    return credential or AzureCliCredential(process_timeout=120)
+    return credential or build_credential(auth_mode, tenant_id=tenant_id)
 
 
-def _token(scope: str, credential: AzureCliCredential) -> str:
-    """Acquire an access token, retrying transient cold-``az`` auth failures.
-
-    A cold ``az account get-access-token`` (Power BI / Fabric audience) can time
-    out even with a generous process timeout; a retry usually succeeds once ``az``
-    has warmed up.
-    """
+def _token(scope: str, credential: TokenCredential) -> str:
+    """Acquire an access token, retrying transient operator-login failures."""
 
     from azure.core.exceptions import ClientAuthenticationError
 
@@ -93,7 +98,7 @@ def _token(scope: str, credential: AzureCliCredential) -> str:
         lambda: credential.get_token(scope).token,
         retry_on=(ClientAuthenticationError,),
         on_retry=lambda n, exc: console.warn(
-            f"Azure CLI token attempt {n} failed ({type(exc).__name__}); retrying..."
+            f"Operator token attempt {n} failed ({type(exc).__name__}); retrying..."
         ),
     )
 
@@ -117,10 +122,8 @@ def resolve_cluster(pbi_session: requests.Session) -> str:
 def find_workspace_id(fabric_session: requests.Session, workspace_name: str) -> str:
     """Resolve a workspace display name to its id (case-insensitive)."""
 
-    response = fabric_session.get(f"{FABRIC_API}/workspaces")
-    response.raise_for_status()
     target = workspace_name.casefold()
-    for workspace in response.json().get("value", []):
+    for workspace in paginated_get(fabric_session, f"{FABRIC_API}/workspaces"):
         if str(workspace.get("displayName", "")).casefold() == target:
             return str(workspace["id"])
     raise ValueError(f"Workspace not found: {workspace_name!r}")
@@ -131,24 +134,91 @@ def list_workspace_items(
 ) -> list[dict[str, Any]]:
     """List all items in a workspace."""
 
-    response = fabric_session.get(f"{FABRIC_API}/workspaces/{workspace_id}/items")
-    response.raise_for_status()
-    return response.json().get("value", [])
+    return paginated_get(
+        fabric_session,
+        f"{FABRIC_API}/workspaces/{workspace_id}/items",
+    )
+
+
+def supplement_workspace_items(
+    fabric_session: requests.Session,
+    workspace_id: str,
+    items: list[dict[str, Any]],
+    required_item_types: set[str],
+) -> list[dict[str, Any]]:
+    """Query missing preview item types explicitly and merge by item ID."""
+
+    merged = {
+        str(item.get("id", "")): item
+        for item in items
+        if item.get("id")
+    }
+    present_types = {str(item.get("type", "")) for item in merged.values()}
+    for item_type in sorted(required_item_types - present_types):
+        for item in paginated_get(
+            fabric_session,
+            f"{FABRIC_API}/workspaces/{workspace_id}/items",
+            params={"type": item_type},
+        ):
+            if item.get("id"):
+                merged[str(item["id"])] = item
+    return list(merged.values())
+
+
+def _required_item_types(task_flow: dict[str, Any]) -> set[str]:
+    return {
+        ARTIFACT_TO_ITEM_TYPE.get(artifact_type, artifact_type)
+        for task in task_flow.get("tasks", [])
+        if isinstance(task, dict)
+        for item in task.get("items", [])
+        if isinstance(item, dict)
+        for artifact_type in (str(item.get("artifactType", "")),)
+        if artifact_type
+    }
+
+
+def _taskflow_records(payload: Any) -> list[dict[str, Any]]:
+    """Normalize the metadata service's old and current collection envelopes."""
+
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("taskFlows"), list):
+        records = payload["taskFlows"]
+    else:
+        raise ValueError("Task-flow metadata returned an unexpected response shape.")
+    if not all(isinstance(record, dict) for record in records):
+        raise ValueError("Task-flow metadata returned a non-object record.")
+    return records
+
+
+def list_taskflow_records(
+    pbi_session: requests.Session, cluster: str, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Read task-flow records across the metadata service's response versions."""
+
+    for path in TASKFLOW_READ_PATHS:
+        url = f"{cluster}/metadata/workspaces/{workspace_id}/{path}"
+        response = pbi_session.get(url)
+        if response.status_code == 404:
+            continue
+        response.raise_for_status()
+        records = _taskflow_records(response.json())
+        if records:
+            return records
+    return []
 
 
 def get_taskflow(
     pbi_session: requests.Session, cluster: str, workspace_id: str
 ) -> dict[str, Any] | None:
-    """Read the raw task flow record (``{etag, resourceId, taskFlow}``) or ``None``.
+    """Read the workspace's single task flow, failing on ambiguous records."""
 
-    A workspace that has never had a task flow returns an empty list; this
-    returns ``None`` in that case so callers can create one.
-    """
-
-    url = f"{cluster}/metadata/workspaces/{workspace_id}/taskflow202602"
-    response = pbi_session.get(url)
-    response.raise_for_status()
-    records = response.json()
+    records = list_taskflow_records(pbi_session, cluster, workspace_id)
+    if len(records) > 1:
+        raise ValueError(
+            f"Workspace {workspace_id} has {len(records)} task flows; "
+            "refusing to update an ambiguous target."
+        )
     return records[0] if records else None
 
 
@@ -205,7 +275,9 @@ def create_taskflow(
         "tasks": task_flow.get("tasks", []),
         "edges": task_flow.get("edges", []),
     }
-    response = pbi_session.post(url, json=body, headers={"Content-Type": "application/json"})
+    response = pbi_session.post(
+        url, json=body, headers={"Content-Type": "application/json"}
+    )
     response.raise_for_status()
     return response.status_code
 
@@ -214,7 +286,9 @@ def _guid_name_map(items: list[dict[str, Any]]) -> dict[str, str]:
     return {str(i["id"]): str(i.get("displayName", "")) for i in items}
 
 
-def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict[str, Any]:
+def to_portable(
+    task_flow: dict[str, Any], guid_to_name: dict[str, str]
+) -> dict[str, Any]:
     """Replace each item's GUID with its display name so the flow is workspace-agnostic.
 
     Items whose GUID can't be resolved to a name (deleted/stale references, or ids
@@ -227,7 +301,9 @@ def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict
     for task in portable.get("tasks", []):
         kept: list[dict[str, Any]] = []
         for item in task.get("items", []):
-            artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(":")
+            artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(
+                ":"
+            )
             name = guid_to_name.get(item.get("artifactObjectId") or guid)
             if name is None:
                 continue
@@ -239,16 +315,19 @@ def to_portable(task_flow: dict[str, Any], guid_to_name: dict[str, str]) -> dict
 
 
 def to_workspace(
-    portable: dict[str, Any], name_type_to_guid: dict[tuple[str, str], str]
+    portable: dict[str, Any],
+    name_type_to_guid: dict[tuple[str, str], str],
+    item_type_to_guid: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Resolve portable item names to target GUIDs. Returns (task_flow, unresolved).
+    """Resolve portable items to target GUIDs. Returns (task_flow, unresolved).
 
-    Items that can't be resolved to a target-workspace GUID are dropped from
-    their task (the server rejects references to non-existent artifacts) and
-    reported in the returned ``unresolved`` list.
+    Terraform-owned item types use their supplied IDs without a name lookup.
+    Other items resolve by type and display name. Unresolved items are dropped
+    because the server rejects references to non-existent artifacts.
     """
 
     resolved = json.loads(json.dumps(portable))
+    item_type_to_guid = item_type_to_guid or {}
     unresolved: list[str] = []
     for task in resolved.get("tasks", []):
         kept_items: list[dict[str, Any]] = []
@@ -256,7 +335,9 @@ def to_workspace(
             artifact_type = str(item.get("artifactType", ""))
             name = item.get("artifactName")
             item_type = ARTIFACT_TO_ITEM_TYPE.get(artifact_type, artifact_type)
-            guid = name_type_to_guid.get((item_type, name)) if name else None
+            guid = item_type_to_guid.get(item_type)
+            if not guid and name:
+                guid = name_type_to_guid.get((item_type, name))
             if guid:
                 item["artifactUniqueId"] = f"{artifact_type}:{guid}"
                 item["artifactObjectId"] = guid
@@ -268,25 +349,336 @@ def to_workspace(
     return resolved, unresolved
 
 
+def filter_portable_items(
+    portable: dict[str, Any],
+    allowed_artifacts: set[tuple[str, str]],
+) -> dict[str, Any]:
+    """Keep only task-flow item references selected by the deployment profile."""
+
+    filtered = json.loads(json.dumps(portable))
+    for task in filtered.get("tasks", []):
+        task["items"] = [
+            item
+            for item in task.get("items", [])
+            if (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            in allowed_artifacts
+        ]
+    return filtered
+
+
+def taskflow_source_coverage_errors(
+    portable: dict[str, Any],
+    required_artifacts: set[tuple[str, str]],
+) -> list[str]:
+    """Report selected profile artifacts absent from the portable graph."""
+
+    present = {
+        (
+            str(item.get("artifactType", "")),
+            str(item.get("artifactName", "")),
+        )
+        for task in portable.get("tasks", [])
+        if isinstance(task, dict)
+        for item in task.get("items", [])
+        if isinstance(item, dict)
+    }
+    return [
+        f"task-flow source omits selected artifact {artifact_type}:{name}"
+        for artifact_type, name in sorted(required_artifacts - present)
+    ]
+
+
+def taskflow_deployment_errors(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> list[str]:
+    """Compare the exact persisted tasks, item bindings, and edges."""
+
+    errors: list[str] = []
+    expected_tasks = {
+        str(task.get("id", "")): task
+        for task in expected.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    actual_tasks = {
+        str(task.get("id", "")): task
+        for task in actual.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    if len(expected_tasks) != len(expected.get("tasks", [])):
+        errors.append("expected task flow contains duplicate or invalid task IDs")
+    if len(actual_tasks) != len(actual.get("tasks", [])):
+        errors.append("persisted task flow contains duplicate or invalid task IDs")
+    if set(expected_tasks) != set(actual_tasks):
+        errors.append("persisted task IDs differ from the source graph")
+
+    for task_id in sorted(set(expected_tasks) & set(actual_tasks)):
+        expected_task = expected_tasks[task_id]
+        actual_task = actual_tasks[task_id]
+        for key in ("type", "name", "description", "loc"):
+            if expected_task.get(key, "") != actual_task.get(key, ""):
+                errors.append(f"task {task_id!r} field {key!r} differs")
+        expected_item_errors, expected_items = _taskflow_item_bindings(
+            expected_task.get("items", []),
+            f"expected task {task_id!r}",
+        )
+        actual_item_errors, actual_items = _taskflow_item_bindings(
+            actual_task.get("items", []),
+            f"persisted task {task_id!r}",
+        )
+        errors.extend(expected_item_errors)
+        errors.extend(actual_item_errors)
+        if expected_items != actual_items:
+            errors.append(f"task {task_id!r} item bindings differ")
+
+    edge_fields = ("id", "source", "target", "fromPort", "toPort")
+    expected_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in expected.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    actual_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in actual.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    if expected_edges != actual_edges:
+        errors.append("persisted task-flow edges differ from the source graph")
+    return errors
+
+
+def taskflow_portable_errors(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> list[str]:
+    """Compare portable task identity, item placement, and complete edges."""
+
+    errors: list[str] = []
+    expected_tasks = {
+        str(task.get("id", "")): task
+        for task in expected.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    actual_tasks = {
+        str(task.get("id", "")): task
+        for task in actual.get("tasks", [])
+        if isinstance(task, dict)
+    }
+    if set(expected_tasks) != set(actual_tasks):
+        errors.append("task-flow task IDs differ")
+    for task_id in sorted(set(expected_tasks) & set(actual_tasks)):
+        expected_task = expected_tasks[task_id]
+        actual_task = actual_tasks[task_id]
+        for key in ("type", "name", "description", "loc"):
+            if expected_task.get(key, "") != actual_task.get(key, ""):
+                errors.append(f"task {task_id!r} field {key!r} differs")
+        expected_items = Counter(
+            (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            for item in expected_task.get("items", [])
+            if isinstance(item, dict)
+        )
+        actual_items = Counter(
+            (
+                str(item.get("artifactType", "")),
+                str(item.get("artifactName", "")),
+            )
+            for item in actual_task.get("items", [])
+            if isinstance(item, dict)
+        )
+        if expected_items != actual_items:
+            errors.append(f"task {task_id!r} portable item references differ")
+
+    edge_fields = ("id", "source", "target", "fromPort", "toPort")
+    expected_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in expected.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    actual_edges = Counter(
+        tuple(str(edge.get(field, "")) for field in edge_fields)
+        for edge in actual.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    if expected_edges != actual_edges:
+        errors.append("task-flow edges differ")
+    return errors
+
+
+def _taskflow_item_bindings(
+    items: Any,
+    context: str,
+) -> tuple[list[str], Counter[tuple[str, str]]]:
+    """Normalize task-flow item IDs and reject contradictory binding fields."""
+
+    errors: list[str] = []
+    bindings: Counter[tuple[str, str]] = Counter()
+    if not isinstance(items, list):
+        return [f"{context} items are not a list"], bindings
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            errors.append(f"{context} item {index} is not an object")
+            continue
+        artifact_type = str(item.get("artifactType", ""))
+        unique_type, separator, unique_id = str(
+            item.get("artifactUniqueId", "")
+        ).partition(":")
+        object_id = str(item.get("artifactObjectId") or "")
+        if not artifact_type or not separator or not unique_id:
+            errors.append(f"{context} item {index} has no canonical unique ID")
+            continue
+        if unique_type != artifact_type:
+            errors.append(
+                f"{context} item {index} artifact type disagrees with its unique ID"
+            )
+        if object_id and object_id != unique_id:
+            errors.append(
+                f"{context} item {index} object ID disagrees with its unique ID"
+            )
+        bindings[(artifact_type, unique_id)] += 1
+    return errors, bindings
+
+
+def taskflow_item_binding_errors(task_flow: dict[str, Any]) -> list[str]:
+    """Validate canonical item bindings throughout one raw task flow."""
+
+    errors: list[str] = []
+    for task in task_flow.get("tasks", []):
+        if not isinstance(task, dict):
+            errors.append("task-flow task is not an object")
+            continue
+        task_errors, _bindings = _taskflow_item_bindings(
+            task.get("items", []),
+            f"task {str(task.get('id', ''))!r}",
+        )
+        errors.extend(task_errors)
+    return errors
+
+
+def wait_for_taskflow(
+    pbi_session: requests.Session,
+    cluster: str,
+    workspace_id: str,
+    expected: dict[str, Any],
+    *,
+    attempts: int = TASKFLOW_VERIFY_ATTEMPTS,
+    interval_seconds: float = TASKFLOW_VERIFY_INTERVAL_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Wait until the metadata service returns the exact deployed graph."""
+
+    last_errors = ["task flow did not appear after the write"]
+    for attempt in range(1, attempts + 1):
+        record = get_taskflow(pbi_session, cluster, workspace_id)
+        if record is not None and isinstance(record.get("taskFlow"), dict):
+            last_errors = taskflow_deployment_errors(
+                expected,
+                record["taskFlow"],
+            )
+            if not last_errors:
+                return record
+        if attempt < attempts:
+            sleep(interval_seconds)
+    raise RuntimeError(
+        "Task-flow write was not persisted exactly: " + "; ".join(last_errors)
+    )
+
+
+def profile_taskflow_artifacts(
+    repo_root: Path,
+    config: Any,
+) -> set[tuple[str, str]]:
+    """Return exact portable task-flow references selected by a profile."""
+
+    from deploy.scripts.build_artifacts import ML_EXPERIMENT_GROUPS
+    from deploy.scripts.deploy_config import ONTOLOGY_ITEM_NAME
+    from deploy.scripts.profile_preflight import selected_notebook_names
+
+    profile = config.profile
+    allowed = {
+        ("SynapseNotebook", name)
+        for name in selected_notebook_names(profile)
+    }
+    allowed.update(
+        ("Pipeline", Path(pipeline_ref).stem)
+        for pipeline_ref in profile.pipeline_refs
+    )
+    if profile.selects("asset.lakehouse"):
+        allowed.update(
+            {
+                ("Lakehouse", config.lakehouse.name),
+                ("SqlAnalyticsEndpoint", config.lakehouse.name),
+            }
+        )
+    if profile.provisions_eventhouse:
+        allowed.update(
+            {
+                ("KustoEventHouse", config.eventhouse.name),
+                ("KustoDatabase", config.eventhouse.kql_database_name),
+            }
+        )
+    if profile.selects("asset.semantic-model"):
+        allowed.add(("dataset", config.powerbi.semantic_model_name))
+    if profile.selects("asset.report"):
+        allowed.add(("Report", config.powerbi.report_name))
+    if profile.selects("asset.ml-notebooks"):
+        allowed.update(
+            ("MLExperiment", name)
+            for group in profile.notebook_groups
+            for name in ML_EXPERIMENT_GROUPS.get(group, ())
+        )
+    if profile.selects("asset.ontology"):
+        allowed.add(("Ontology", ONTOLOGY_ITEM_NAME))
+    if profile.selects("asset.data-agents"):
+        allowed.update(
+            ("LLMPlugin", path.stem)
+            for path in (repo_root / "fabric" / "data-agents").glob("*.DataAgent")
+        )
+    if profile.selects("asset.kql-queryset"):
+        allowed.add(("KQLQueryset", "retail_querysets"))
+    return allowed
+
+
 def export_taskflow(
     workspace: str,
     output_path: Path = DEFAULT_TASKFLOW_PATH,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
 ) -> Path:
     """Export a workspace task flow to a portable JSON file (artifacts by name)."""
 
-    credential = _credential(credential)
+    credential = _credential(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
-    workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(
-        fabric, workspace
+    workspace_id = (
+        workspace
+        if _looks_like_guid(workspace)
+        else find_workspace_id(fabric, workspace)
     )
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
         raise ValueError(f"No task flow found in workspace {workspace}")
-    guid_to_name = _guid_name_map(list_workspace_items(fabric, workspace_id))
-    portable = to_portable(record["taskFlow"], guid_to_name)
+    task_flow = record["taskFlow"]
+    items = supplement_workspace_items(
+        fabric,
+        workspace_id,
+        list_workspace_items(fabric, workspace_id),
+        _required_item_types(task_flow),
+    )
+    guid_to_name = _guid_name_map(items)
+    portable = to_portable(task_flow, guid_to_name)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(portable, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -297,22 +689,55 @@ def export_taskflow(
 def deploy_taskflow(
     workspace: str,
     input_path: Path = DEFAULT_TASKFLOW_PATH,
-    credential: AzureCliCredential | None = None,
+    credential: TokenCredential | None = None,
+    *,
+    auth_mode: str = "azure_cli",
+    tenant_id: str | None = None,
+    item_type_to_guid: dict[str, str] | None = None,
+    allowed_artifacts: set[tuple[str, str]] | None = None,
 ) -> list[str]:
     """Deploy a portable task flow to a workspace. Returns unresolved references."""
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
-    credential = _credential(credential)
+    if allowed_artifacts is not None:
+        coverage_errors = taskflow_source_coverage_errors(
+            portable,
+            allowed_artifacts,
+        )
+        if coverage_errors:
+            raise ValueError("; ".join(coverage_errors))
+        portable = filter_portable_items(portable, allowed_artifacts)
+    credential = _credential(
+        credential,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
+    )
     pbi = _session(_token(PBI_SCOPE, credential))
     fabric = _session(_token(FABRIC_SCOPE, credential))
-    workspace_id = workspace if _looks_like_guid(workspace) else find_workspace_id(
-        fabric, workspace
+    workspace_id = (
+        workspace
+        if _looks_like_guid(workspace)
+        else find_workspace_id(fabric, workspace)
     )
-    items = list_workspace_items(fabric, workspace_id)
+    items = supplement_workspace_items(
+        fabric,
+        workspace_id,
+        list_workspace_items(fabric, workspace_id),
+        _required_item_types(portable),
+    )
     name_type_to_guid = {
         (str(i["type"]), str(i.get("displayName", ""))): str(i["id"]) for i in items
     }
-    task_flow, unresolved = to_workspace(portable, name_type_to_guid)
+    task_flow, unresolved = to_workspace(
+        portable,
+        name_type_to_guid,
+        item_type_to_guid,
+    )
+    if unresolved:
+        raise ValueError(
+            "Selected task-flow references are unresolved: "
+            + ", ".join(sorted(unresolved))
+        )
     cluster = resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
@@ -320,6 +745,12 @@ def deploy_taskflow(
         create_taskflow(pbi, cluster, workspace_id, {**portable, **task_flow})
     else:
         put_taskflow(pbi, cluster, workspace_id, record, task_flow)
+    wait_for_taskflow(
+        pbi,
+        cluster,
+        workspace_id,
+        task_flow,
+    )
     return unresolved
 
 
@@ -327,23 +758,128 @@ def _looks_like_guid(value: str) -> bool:
     return len(value) == 36 and value.count("-") == 4
 
 
+def terraform_taskflow_targets(
+    output_path: Path,
+    *,
+    config: Any | None = None,
+) -> tuple[str, dict[str, str]]:
+    """Load the workspace and Terraform-owned item IDs for task-flow deployment."""
+
+    from deploy.scripts.deploy_config import (
+        load_terraform_outputs,
+        validate_terraform_outputs,
+    )
+
+    outputs = load_terraform_outputs(output_path)
+    if config is not None:
+        validate_terraform_outputs(config, outputs)
+    workspace_id = outputs.get("workspace_id")
+    if not workspace_id:
+        raise ValueError(f"workspace_id missing from {output_path}")
+
+    item_ids: dict[str, str] = {}
+    for item_type, output_name in TERRAFORM_ITEM_OUTPUTS.items():
+        item_id = outputs.get(output_name)
+        if not item_id:
+            raise ValueError(f"{output_name} missing from {output_path}")
+        item_ids[item_type] = str(item_id)
+    return str(workspace_id), item_ids
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Export or deploy a Fabric Task Flow")
     parser.add_argument("action", choices=["export", "deploy"])
-    parser.add_argument("--workspace", required=True, help="Workspace name or id.")
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--workspace", help="Workspace name or id (manual mode).")
+    target.add_argument(
+        "--terraform-output",
+        type=Path,
+        help=(
+            "Terraform output JSON providing the workspace and Terraform-owned "
+            "item IDs."
+        ),
+    )
     parser.add_argument("--path", type=Path, default=DEFAULT_TASKFLOW_PATH)
+    parser.add_argument(
+        "--environment",
+        help="Configured environment required for profile-aware task-flow deploy.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="Expected executable deployment profile.",
+    )
+    parser.add_argument(
+        "--auth-mode",
+        choices=AUTH_MODES,
+        default=None,
+        help="Operator credential used for Power BI and Fabric requests.",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        help="Entra tenant passed to the selected operator credential.",
+    )
     args = parser.parse_args()
 
     if args.action == "export":
-        out = export_taskflow(args.workspace, args.path)
+        workspace = args.workspace
+        if args.terraform_output:
+            workspace, _item_ids = terraform_taskflow_targets(
+                args.terraform_output
+            )
+        if workspace is None:
+            raise ValueError("A workspace name, ID, or Terraform output is required")
+        out = export_taskflow(
+            workspace,
+            args.path,
+            auth_mode=args.auth_mode or "azure_cli",
+            tenant_id=args.tenant_id,
+        )
         console.info(f"Exported task flow to {out}")
     else:
-        unresolved = deploy_taskflow(args.workspace, args.path)
+        if not args.environment or not args.profile:
+            raise ValueError(
+                "task-flow deploy requires --environment and --profile; "
+                "unscoped legacy deployment is unsupported"
+            )
+        from deploy.scripts.deploy_config import load_environment
+
+        config = load_environment(args.environment)
+        if config.deployment.profile != args.profile:
+            raise ValueError(
+                f"--profile {args.profile!r} does not match configured profile "
+                f"{config.deployment.profile!r}"
+            )
+        if not config.profile.deploys_task_flow:
+            raise ValueError(
+                f"profile {args.profile!r} does not select task-flow deployment"
+            )
+        configured_tenant = getattr(config, "tenant_id", None)
+        if (
+            args.tenant_id
+            and configured_tenant
+            and args.tenant_id.casefold() != configured_tenant.casefold()
+        ):
+            raise ValueError("--tenant-id does not match the configured tenant")
+        auth_mode = args.auth_mode or getattr(config, "auth_mode", "azure_cli")
+        tenant_id = args.tenant_id or configured_tenant
+        workspace = args.workspace
+        item_type_to_guid = None
+        if args.terraform_output:
+            workspace, item_type_to_guid = terraform_taskflow_targets(
+                args.terraform_output,
+                config=config,
+            )
+        if workspace is None:
+            raise ValueError("A workspace name, ID, or Terraform output is required")
+        deploy_taskflow(
+            workspace,
+            args.path,
+            auth_mode=auth_mode,
+            tenant_id=tenant_id,
+            item_type_to_guid=item_type_to_guid,
+            allowed_artifacts=profile_taskflow_artifacts(REPO_ROOT, config),
+        )
         console.info("Deployed task flow.")
-        if unresolved:
-            console.warn("Unresolved references (left unbound):")
-            for ref in unresolved:
-                console.detail(ref)
     return 0
 
 

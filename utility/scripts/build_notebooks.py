@@ -44,12 +44,14 @@ ENGINE_MODULES = [
     "generation/online_orders.py",
     "generation/promotions.py",
     "generation/marketing.py",
+    "generation/attribution.py",
     "generation/sensors.py",
     "generation/inventory_balances.py",
     "generation/inventory.py",
     "generation/gold.py",
     "generation/invariants.py",
     "generation/engine.py",
+    "generation/publication.py",
     "generation/writer.py",
 ]
 
@@ -63,6 +65,7 @@ ENGINE_ALIASES = [
     "online_orders",
     "promotions",
     "marketing",
+    "attribution",
     "store_activity",
     "sensors",
     "inventory",
@@ -235,7 +238,7 @@ def build_all(output_dir: Path) -> dict[str, str]:
         needs_engine = name not in NO_ENGINE
         nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None)
         payload = notebook_json(nb)
-        (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8")
+        (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8", newline="\n")
         built[name] = payload
     return built
 

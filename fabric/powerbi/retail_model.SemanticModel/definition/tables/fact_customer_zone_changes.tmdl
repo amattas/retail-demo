@@ -51,11 +51,12 @@ table fact_customer_zone_changes
 		dataType: int64
 		formatString: 0
 		lineageTag: fec0f7bc-2420-4ca6-9e66-6b1e2482f51e
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_customer_zone_changes = entity
 		mode: directLake

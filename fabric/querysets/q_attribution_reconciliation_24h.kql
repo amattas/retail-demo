@@ -1,0 +1,13 @@
+// Purchase-level attribution and financial reconciliation in the last 24h.
+fn_marketing_attribution()
+| where purchase_ts > ago(24h)
+| extend gross_discount_net_delta =
+             gross_subtotal_cents - discount_cents - subtotal_cents,
+         net_tax_total_delta = subtotal_cents + tax_cents - total_cents,
+         payment_total_delta = payment_cents - total_cents
+| project purchase_ts, attribution_journey_id, attribution_status,
+          campaign_id, impression_id, purchase_type, receipt_id, order_id,
+          gross_subtotal_cents, discount_cents, subtotal_cents, tax_cents,
+          total_cents, payment_cents, attributed_revenue_cents,
+          gross_discount_net_delta, net_tax_total_delta, payment_total_delta
+| order by purchase_ts desc

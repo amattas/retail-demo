@@ -25,7 +25,9 @@ import sys
 
 subprocess.check_call([
     sys.executable, "-m", "pip", "install", "--quiet",
-    "typing_extensions>=4.12.2", "pydantic>=2,<2.12",
+    "annotated-types==0.7.0", "pydantic==2.11.10",
+    "pydantic-core==2.33.2", "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
 ])
 for _name in [m for m in list(sys.modules)
               if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
@@ -61,7 +63,8 @@ spark.conf.set("spark.advise.divisionExprConvertRule.enable", "true")
 # ## Generate facts, check invariants, write
 
 # %%
-from datetime import date
+from datetime import date, datetime, timezone
+from uuid import uuid4
 
 cfg = GenerationConfig(
     store_type=STORE_TYPE,
@@ -95,7 +98,8 @@ if not report.passed:
 print("all invariants passed")
 
 # %%
-run_id = f"setup-{STORE_TYPE}-{SEED}"
+attempt_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+run_id = f"setup-{STORE_TYPE}-{SEED}-{attempt_ts}-{uuid4().hex[:8]}"
 # Gold is built in setup-04 from the persisted tables — pass an empty dict.
 written = write_all(result.tables, {}, cfg, run_id, lakehouse=LAKEHOUSE_NAME)
 print(f"wrote {len(written)} tables to {LAKEHOUSE_NAME}.{SILVER_DB} (run_id={run_id})")

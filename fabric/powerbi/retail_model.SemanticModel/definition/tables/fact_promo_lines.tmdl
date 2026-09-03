@@ -99,11 +99,12 @@ table fact_promo_lines
 		dataType: int64
 		formatString: 0
 		lineageTag: 046e12d9-a984-4b67-81bd-5c6afeca49f4
+		isHidden
 		sourceLineageTag: __index_level_0__
-		summarizeBy: sum
+		summarizeBy: none
 		sourceColumn: __index_level_0__
 
-		annotation SummarizationSetBy = Automatic
+		annotation SummarizationSetBy = User
 
 	partition fact_promo_lines = entity
 		mode: directLake

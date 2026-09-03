@@ -1,0 +1,599 @@
+# Deployment
+
+This guide covers the supported `retail-setup deploy` workflow for provisioning,
+publishing, updating, and recovering a Microsoft Fabric Retail Demo workspace.
+Complete [Getting started](getting-started.md) first if the repository has not
+been configured and rendered.
+
+**Audience:** operators, entry-level developers, and support engineers. Business
+analysts can use the [deployment outcome](#deployment-outcome) and
+[troubleshooting](#troubleshooting) sections without following the advanced
+authentication details.
+
+See the [plain-language glossary](glossary.md) for terms such as Terraform,
+preflight, terminal success, Direct Lake, and `DEGRADED`.
+
+Exact command order and failure behavior are owned by the
+[deployment framework specification](../design/specifications/modules/deployment/framework.md).
+
+!!! danger "Confirm the target"
+
+    `--recreate` destroys the configured workspace and every item in it. The
+    deploy polls Fabric until the workspace name is absent and fails before
+    apply if deletion times out or pagination is incomplete. Use recreate only
+    for a disposable demo workspace after confirming the tenant, environment,
+    workspace name, and Terraform state.
+
+## Deployment outcome
+
+Every deployment resolves `deployment.profile` from
+`contracts/retail-demo.json`. The manifest selects stable logical asset IDs,
+existing notebook groups, existing pipeline folders, and existing KQL scripts.
+It does not redefine physical items or schemas: `deploy/config/deploy.yml`,
+`deploy/scripts/build_artifacts.py`, and the source folders remain authoritative
+for those definitions.
+
+The current deploy plan:
+
+1. resolves the exact profile inventory;
+2. runs local and live tenant/capacity preflight before Terraform
+   destroy/apply, publication, or KQL;
+3. generates profile-aware Terraform and `fabric-cicd` inputs;
+4. initializes and applies Terraform unless skipped;
+5. captures the selected Terraform-owned identifiers;
+6. stages and publishes infrastructure without Reporting;
+7. executes only the selected ordered KQL scripts and validates infrastructure;
+8. for gated profiles, waits for setup and required ML validation to complete;
+9. stages and publishes Reporting only after required ML terminal success;
+10. runs selected optional/experimental ML after Reporting;
+11. tells the Lakehouse SQL endpoint about newly created tables so Power BI and
+    readiness queries can find them;
+12. for `full-demo`, runs the deployed ontology notebook to create or
+    revalidate the target ontology and its derived graph;
+13. publishes both Data Agents and the complete 48-item task flow, then reads
+    the graph back and compares every task, item binding, and edge;
+14. runs read-only readiness verification over the complete selected profile.
+
+Each live run atomically updates
+`deploy/.generated/<env>/deploy-run.json`. Inspect it for target names,
+the manifest version/hash, profile support and expected counts/folders,
+core/optional/preview/manual boundaries, exact asset/group/pipeline/KQL
+inventory, required/optional classification,
+failed step, exit code, and final `SUCCEEDED`, `DEGRADED`, or `FAILED` status.
+Artifact build steps link phase-specific `artifact-inventory-<phase>.json`
+evidence. Credential-like error text is redacted and raw subprocess output is
+not stored.
+
+The final journal status is:
+
+- **`SUCCEEDED`:** every selected required and optional check passed.
+- **`DEGRADED`:** required capabilities passed, but at least one optional
+  capability has failed, stale, or missing evidence. The required demo path is
+  usable; inspect the linked report before presenting the affected optional
+  feature.
+- **`FAILED`:** a required capability failed or could not provide evidence.
+  Do not present the workspace as ready.
+
+### Profiles
+
+`core` is the conservative default for direct `retail-setup` commands,
+`standard` is the supported opt-in Reporting path, and `full-demo` contains
+live-checked preview/manual surfaces. The guided `setup.ps1` and `setup.sh`
+wrappers default to `full-demo` so that a first-time guided run offers the
+complete demo. The
+[workspace and profile inventory](workspace-inventory.md) is the single
+canonical guide for exact asset IDs, groups, pipelines, KQL scripts, staged
+counts, folders, and support status.
+
+All profiles exclude the destructive `reset` group. Pipeline selection is
+explicit; a notebook reference does not implicitly select a pipeline. No
+profile enables a schedule or starts the long-running stream.
+
+### Runtime, capacity, cost, preview, and manual boundaries
+
+The dry-run prints the manifest-owned runtime, capacity, cost, preview, and
+manual boundaries for the resolved profile. A live `full-demo` run reads
+Fabric tenant settings and capacity metadata before mutation. Reporting
+remains absent unless the current required ML pipeline run, including the
+runtime contract validator, finishes successfully.
+
+## Prerequisites
+
+### Local tools
+
+- Git
+- Python 3.11 or later
+- Terraform `>= 1.8, < 2.0`
+- `retail-setup`
+- `azure-identity`
+- `azure-kusto-data`
+- `fabric-cicd`
+- `pyodbc`
+- the locked deploy dependency set, which includes the bundled
+  `mssql-python` SQL driver on Windows and Linux; an installed Microsoft ODBC
+  Driver 17 or 18 is used when available and remains required on macOS
+- Azure CLI for the default auth mode, or Azure PowerShell for the lower-level
+  alternative
+
+Install the Python dependencies manually when you are not using the guided
+bootstrap:
+
+```powershell
+python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
+python -m pip install --no-deps -e .\utility
+```
+
+### Fabric target
+
+The operator must be able to:
+
+- use the selected tenant and active Fabric capacity;
+- create or update the target workspace and Fabric items;
+- create or publish every item type selected by the chosen profile;
+- apply KQL schema when the profile includes Eventhouse;
+- perform the profile's documented manual steps.
+
+Use a dedicated workspace. Review workspace and item roles before sharing the
+demo, because synthetic customer-like fields still require governance.
+
+## Authentication
+
+### Azure CLI
+
+Azure CLI is the default and the only mode the guided bootstrap installs and
+checks automatically.
+
+```powershell
+az login --tenant 00000000-0000-0000-0000-000000000000
+az account show --query tenantId -o tsv
+```
+
+Set:
+
+```yaml
+auth:
+  mode: azure_cli
+```
+
+`retail-setup deploy` rejects a configured tenant that differs from the active
+Azure CLI tenant.
+
+### Azure PowerShell
+
+!!! note "Most users do not need this section"
+
+    Use Azure CLI unless your organization specifically requires Azure
+    PowerShell or an automated service identity. Azure PowerShell does not
+    provide credentials to the Fabric Terraform provider, so this path needs
+    additional identity configuration.
+
+For a manually prepared workstation:
+
+```powershell
+Connect-AzAccount -Tenant 00000000-0000-0000-0000-000000000000
+```
+
+Set:
+
+```yaml
+auth:
+  mode: azure_powershell
+```
+
+The deploy REST and KQL helpers use `AzurePowerShellCredential` with the
+configured tenant. The Fabric Terraform provider cannot consume an Azure
+PowerShell session. Therefore this mode supports either:
+
+- Python-only publication with `--skip-terraform` and previously captured,
+  validated outputs; or
+- normal Terraform with exactly one provider-supported service-principal
+  secret/certificate, OpenID Connect (OIDC) federated identity, or
+  managed-identity credential configured through
+  the provider's `FABRIC_*` or `ARM_*` environment variables.
+
+Without one of those boundaries, apply and destroy fail before any command
+runs. Terraform always receives the configured `tenant_id`; Azure CLI use is
+explicitly disabled in Azure PowerShell mode, so an unrelated CLI login is
+never used silently. A conflicting `FABRIC_TENANT_ID` or `ARM_TENANT_ID` also
+fails before mutation. The guided `scripts/setup.*` prerequisite check still
+expects Azure CLI, so invoke `retail-setup` directly for this advanced flow.
+
+## Configure an environment
+
+The workspace name defines the environment. `configure` normalizes the name to
+lowercase hyphenated text and omits a leading `retail-demo-` prefix. For
+example, workspace `retail-demo-alice` uses environment `alice`. Each workspace
+gets its own ignored target overlay, generated inputs, Terraform data
+directory, state, outputs, and run journal.
+
+Run:
+
+```powershell
+retail-setup configure --workspace-name retail-demo-alice --profile core
+retail-setup render --env alice
+```
+
+`configure` prints the derived environment key. Configure another workspace to
+create another local environment without replacing the first.
+
+Valid profiles are `core`, `standard`, and `full-demo`. Omitting `--profile`
+prompts with `core` as the default. The selected value is stored in the
+workspace environment overlay as `deployment.profile`.
+
+Important configuration boundaries:
+
+| Path | Purpose | Tracked |
+| --- | --- | --- |
+| `deploy/config/deploy.yml` | Shared deployment defaults | Yes |
+| `deploy/config/environments/<env>.yml` | Workspace-specific target overlay | No |
+| `utility/config.yaml` | Local generation scale and seed | No |
+| `utility/out/` | Rendered workspace-specific notebooks | No |
+
+Keep the Eventhouse and KQL database display names aligned. The Eventhouse
+creates one default KQL database with the Eventhouse display name; provisioning
+a separately named database is not a supported topology.
+
+### Starter pool or custom pool
+
+`core` and `standard` use the workspace starter pool. Only `full-demo` selects
+the custom pool. Live preflight requires an active F64-or-larger capacity and
+checks configured node vCores against the capacity's base vCores. Legacy
+`--use-custom-spark-pool` and
+`spark.use_custom_pool` overrides fail clearly; select the profile instead.
+Review the source-defined pool configuration against the target capacity.
+
+## Preview the plan
+
+```powershell
+retail-setup deploy --env alice --dry-run
+```
+
+The preview prints the resolved inventory, profile blockers, ordered commands,
+and confirmation gates. It validates
+the existing environment configuration and authentication boundary but does
+not execute subprocesses or:
+
+- contact identity endpoints or validate live permissions;
+- contact Fabric;
+- validate capacity state;
+- prove live generated IDs unless `--skip-terraform` is selected;
+- run Terraform plan as a separate command.
+
+With `--skip-terraform`, dry-run validates the existing captured outputs just
+like a live run. Malformed or invalid existing YAML always fails; the default
+core fallback applies only when a legacy environment overlay is genuinely
+absent. The CLI asks for confirmation before invoking Terraform apply. Terraform then
+prints its change preview and proceeds with `-auto-approve`; there is no
+separate plan review before the confirmation.
+
+## Preflight
+
+Preflight means “check before making changes.” On a live run, local profile
+preflight checks manifest/source pointers,
+rendered notebooks, selected pipeline references, KQL sources, selected Power
+BI/agent/task-flow sources, custom-pool configuration, prior local Terraform
+state and captured profile outputs, and blockers. A second read-only live
+preflight checks the selected capacity's identity, active state, capacity
+size/tier, region, and Spark worker fit. For `full-demo`, it also reads the
+Fabric admin tenant-settings
+API and verifies the required Ontology and Data Agent switches.
+After Terraform (or immediately when `--skip-terraform` is selected), target
+access validation requires captured workspace IDs to match managed resource
+IDs in state and a live workspace with the configured name that the operator
+can read.
+
+Correct environments proceed without prompts. If a required tenant switch is
+disabled, interactive deploy prints the exact Admin Portal setting and offers
+to recheck after an administrator changes it. Fabric documents tenant-setting
+inspection but no write API, so setup never silently changes tenant policy.
+Noninteractive deploy and invalid/inaccessible capacity fail with exact
+remediation before mutation.
+
+Whenever environment-local Terraform state exists, missing or stale captured
+outputs and missing state profile evidence fail closed, including for state
+with no managed instances. A profile downgrade that would delete an Eventhouse
+or custom Spark pool is rejected unless the operator explicitly selects
+`--recreate`.
+
+## Run a normal deployment
+
+Interactive:
+
+```powershell
+retail-setup deploy --env alice
+```
+
+Pre-confirm the Terraform apply gate:
+
+```powershell
+retail-setup deploy --env alice --yes
+```
+
+Without `--yes`, an existing workspace detected by display name produces a
+choice:
+
+- keep it and update in place; or
+- reset it and follow the recreate path.
+
+With `--yes`, the CLI does not perform that interactive existing-workspace
+check. It still runs mandatory setup and required ML gates for profiles that
+publish Reporting.
+
+## Understand generated files
+
+Deployment writes or refreshes:
+
+| Path | Content | Git status |
+| --- | --- | --- |
+| `deploy/.generated/<env>/terraform.tfvars` | Terraform input generated from merged YAML | Ignored |
+| `deploy/.generated/<env>/terraform.tfstate` | Environment-local Terraform state | Ignored |
+| `deploy/.generated/<env>/.terraform/` | Environment-local Terraform data directory | Ignored |
+| `deploy/.generated/<env>/fabric-cicd/config.yml` | `fabric-cicd` environment and item scope | Ignored |
+| `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Ignored |
+| `deploy/.generated/<env>/terraform-output.json` | Captured live Fabric item identifiers | Ignored |
+| `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | Ignored |
+| `deploy/workspace/` | Staged Fabric item folders | Ignored except `.gitkeep` |
+
+Terraform operations for different environments use different backend and data
+paths. Full publication still shares `deploy/workspace/` staging; use separate
+checkouts for concurrent full deploys. Never commit local target overlays,
+credentials, tokens, or generated bindings.
+
+If an older checkout left state at `deploy/terraform/terraform.tfstate`, deploy
+stops before Terraform. Verify which workspace owns that state, then move it to
+`deploy/.generated/<env>/terraform.tfstate`. Never copy one legacy state into
+multiple environments.
+
+## Existing workspaces
+
+For a workspace that Terraform should resolve rather than create, set
+`workspace.existing_id` in deployment configuration and run the normal
+Terraform path. This resolves the workspace only; it does not automatically
+discover or import pre-existing Lakehouse, Eventhouse, role-assignment, or
+Spark resources into Terraform state. Avoid name collisions and import or
+reconcile existing child resources deliberately before apply.
+
+Use `--skip-terraform` only when all required resources already exist and
+`deploy/.generated/<env>/terraform-output.json` contains correct identifiers
+from an earlier deployment:
+
+```powershell
+retail-setup deploy --env alice --skip-terraform
+```
+
+Before publication, the command verifies the captured environment, workspace
+and resource names, required Fabric IDs, and absence of placeholder IDs. A
+`full-demo` capture must also include the custom Spark pool ID. A first-time or
+wrong-workspace `--skip-terraform` run fails before mutation.
+
+`--skip-terraform` cannot be combined with `--recreate`.
+
+## Recreate a disposable workspace
+
+Preview:
+
+```powershell
+retail-setup deploy --env alice --recreate --dry-run
+```
+
+Execute:
+
+```powershell
+retail-setup deploy --env alice --recreate
+```
+
+The current sequence is profile preflight, configuration generation, Terraform
+initialization, Terraform destroy, bounded polling until the workspace name is
+absent, Terraform apply, and normal publication. Preflight therefore cannot
+destroy the workspace on failure. Preserve run evidence before retrying if
+Fabric does not release the workspace within the documented timeout.
+
+Do not use `99-reset-lakehouse` as part of normal deployment. It is a manual,
+destructive data reset asset.
+
+## Post-deploy work
+
+### Understand local validation
+
+`deploy.scripts.validate_deployment` checks generated files, YAML, staging, and
+placeholder rewrites. It does not query the live workspace. A successful deploy
+still requires live item, binding, KQL, run, and data checks.
+
+### Generate data
+
+For `core`, run setup notebooks 01 through 04 in order. `core` intentionally
+has no automatic pipeline run.
+
+For `standard` and `full-demo`, the deploy command already waits for
+`setup-pipeline` and `ml-required`, publishes Reporting only after both
+succeed, and waits for selected post-Reporting ML pipelines. `--yes` does not
+skip these gates. No profile starts the long-running stream or enables an automatic schedule;
+the committed daily-maintenance schedule is disabled.
+
+To retry one pipeline deliberately, run:
+
+```powershell
+python -m deploy.scripts.run_pipeline `
+  --environment alice `
+  --pipeline setup-pipeline `
+  --auth-mode azure_cli `
+  --tenant-id <tenant-id> `
+  --wait
+```
+
+`--wait` polls the exact submitted run to a bounded terminal state. Omit it
+only for an intentional asynchronous manual trigger.
+
+If a deployment stopped but every selected setup/ML pipeline was later
+recovered manually, adopt the exact successful Fabric job IDs instead of
+rerunning hours of Spark work:
+
+1. Open the Fabric **Monitoring hub**.
+2. Open each pipeline's run history.
+3. Copy the job ID from the successful run you want to adopt.
+4. Supply every pipeline selected by the stored profile.
+
+| Profile | Required run IDs |
+| --- | --- |
+| `core` | None; setup notebooks are run manually. |
+| `standard` | `setup-pipeline` and `ml-required` |
+| `full-demo` | `setup-pipeline`, `ml-required`, `ml-optional`, and `ml-experimental` |
+
+The example below is for `full-demo`. For `standard`, omit the
+`ml-optional` and `ml-experimental` lines.
+
+```powershell
+python -m deploy.scripts.adopt_pipeline_runs `
+  --environment alice `
+  --run setup-pipeline=<job-id> `
+  --run ml-required=<job-id> `
+  --run ml-optional=<job-id> `
+  --run ml-experimental=<job-id>
+```
+
+Supply every pipeline selected by the profile. Recovery validates the captured
+workspace against the live configured target, confirms that setup finished
+before required ML and required ML finished before optional ML, and accepts
+only explicitly named, completed runs from the last seven days. It then writes
+a current `deploy-run.json`, runs readiness, and finalizes the journal only
+after that verification result is known.
+
+### Synchronize the Lakehouse SQL endpoint
+
+Reporting profiles do this automatically after setup and machine learning.
+The step tells Fabric's SQL endpoint that newly created Lakehouse tables exist,
+which allows Power BI and readiness queries to discover them. The step is
+optional because required-table availability is checked again by fail-closed
+readiness.
+
+Run it manually when tables exist in the Lakehouse but Power BI or SQL queries
+cannot see them:
+
+```powershell
+python -m deploy.scripts.refresh_sql_endpoint `
+  --environment alice
+```
+
+The command waits for Fabric's metadata operation to finish and reports any
+table that did not synchronize.
+
+The same artifact build also sets the deployed report's saved date filters to
+the month containing the configured history `end_date`. To change that default,
+update the history configuration, rerun `retail-setup render`, and deploy again.
+
+### Recover the ontology and task flow
+
+Normal `full-demo` deployment completes this phase automatically. It runs the
+deployed `30-create-ontology` notebook to create or revalidate
+`RetailOntology_AutoGen`, waits for the item to appear, publishes both Data
+Agents, and deploys the
+source-controlled task flow. The task-flow write is read back and compared
+with all 11 tasks, 48 selected item references, and 11 edges before the command
+reports success.
+
+Use this idempotent recovery command only when that final phase was interrupted
+or an operator removed one of its items:
+
+```powershell
+retail-setup post-ontology --env alice
+```
+
+The command reuses the same completion path. A Data Agent is a conversational
+Fabric experience that answers questions from an approved data source; the
+task flow is the workspace navigation map. Missing selected references,
+ambiguous task-flow records, or a graph that does not persist exactly all fail
+closed.
+
+### Validate live readiness
+
+For `standard`, deployment runs the live verifier after the normal exact-run
+setup and ML gates. `full-demo` runs the complete verifier after ontology,
+Data Agent, and task-flow publication. Verification is read-only and never
+adds another pipeline run. A required failure or unknown
+result fails deployment; an optional failure or unknown result records
+`DEGRADED` in `deploy-run.json`. The journal links:
+
+```text
+deploy/.generated/<env>/readiness-report.json
+```
+
+For `core`, run setup notebooks 01-04 manually, then run:
+
+```powershell
+retail-setup verify --env <env>
+```
+
+You can rerun the read-only command for any profile. Add `--run-pipeline` only
+to explicitly start and wait for the profile-required post-publish pipeline:
+
+```powershell
+retail-setup verify --env <env> --run-pipeline
+```
+
+The flag is invalid for `core`. It does not start streaming or other pipelines.
+See the [operations readiness checklist](operations.md#readiness-checklist)
+for prerequisites, exit codes, taxonomy, freshness windows, and report
+contents. Offline `validate_deployment.py` behavior is unchanged and does not
+substitute for this live check.
+
+If the optional stream has never been started, three streaming checks are
+expected to be `UNKNOWN`: Silver watermarks, Eventhouse ingestion, and
+checkpoint identity. Required capabilities can still pass, so the overall
+result is `DEGRADED`, not `FAILED`.
+
+## Update an existing deployment
+
+For normal source or configuration changes:
+
+1. pull or check out the intended revision;
+2. rerun `retail-setup configure` when target or generation values changed;
+3. rerun `retail-setup render`;
+4. inspect `retail-setup deploy --env <env> --dry-run`;
+5. run the normal deploy without recreate;
+6. rerun only the data or optional workloads affected by the change;
+7. validate live bindings and freshness.
+
+Environment-local Terraform paths make switching between workspaces safe.
+Preserve each environment's ignored `.generated/<env>/` directory when its
+state and output evidence must survive cleanup.
+
+## Troubleshooting
+
+| Symptom | Action |
+| --- | --- |
+| Azure CLI tenant mismatch | Run `az login --tenant <configured-tenant>` and confirm `az account show`. |
+| Azure PowerShell Terraform boundary | Use validated `--skip-terraform` outputs, switch to Azure CLI, or configure exactly one provider-supported service-principal, OIDC, or managed-identity credential. |
+| Capacity not found or inactive | Confirm the capacity display name, state, tenant, and operator access. |
+| Custom Spark pool fails | Select `core` or `standard`, or use an active F64-or-larger capacity that passes live vCore sizing. Legacy pool overrides are unsupported. |
+| Required ML gate fails or is not terminal-successful | Inspect the exact `ml-required` pipeline/notebook run and `15-validate-required-ml-contract`; Reporting is intentionally unpublished. |
+| Full-demo tenant preflight fails | Sign in as a Fabric administrator, enable the exact named Ontology/Data Agent tenant setting in the Admin Portal, then recheck. |
+| Terraform executable missing | Install Terraform or use `--skip-terraform` only with valid prior outputs. |
+| Workspace already exists | Update in place, configure `workspace.existing_id`, or explicitly recreate a disposable target. |
+| Captured workspace is unreadable or mismatched | Run Terraform refresh/apply for the environment, recapture `terraform output -json`, and confirm the operator has a workspace role. |
+| Fabric item publish fails | Inspect the failing item type and generated `.generated/<env>/fabric-cicd/parameter.yml`; do not treat later steps as completed. |
+| KQL application fails | Inspect `deploy/.generated/<env>/database.kql`, target IDs, database name, and operator permissions; rerun the ordered script as one database script. |
+| Local validation passes but workspace is unusable | Perform the live checks in the operations guide; local validation is offline only. |
+| Readiness verification is `UNKNOWN` | Install the locked deploy dependency set, confirm identity permissions, and restore the matching Terraform output and deployment journal evidence. `mssql-python` provides a bundled SQL driver on Windows and Linux; macOS requires system ODBC Driver 17 or 18. |
+| Readiness verification is `DEGRADED` | Read the optional failed/unknown check rows; do not present that optional capability until its evidence passes. |
+| SQL endpoint metadata is missing or stale | Run `python -m deploy.scripts.refresh_sql_endpoint --environment <env>`, wait for all required tables, then reload Power BI and rerun readiness. |
+| Power BI opens on the wrong month | Confirm the configured history end date, rerun `retail-setup render --env <env>`, and deploy again. The staged report uses the latest generated month, not a hard-coded calendar month. |
+| Setup pipeline fails | Inspect the exact run and retry with `deploy.scripts.run_pipeline --wait`; required ML and Reporting remain unpublished. |
+| Ontology, Data Agent, or task-flow item is absent | Run `retail-setup post-ontology --env <env>`. It idempotently creates the ontology when needed, republishes both agents, writes the full graph, and verifies persistence. |
+| Live rows are absent | Check notebook sink parameters, Query URI resolution, KQL permissions, connector errors, and ingestion timestamps. |
+| `--skip-terraform` rejects outputs | Use outputs captured for the same environment and workspace; run the normal Terraform path to refresh missing or stale identities. |
+
+## Current limitations
+
+`IMP-*` identifiers are named improvement items in the technical backlogs.
+Open a linked item to see its exact remaining acceptance criteria.
+
+- Live alternate-authentication and renamed-target smoke verification:
+  [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
+- Separate live `core` and `standard` profile proof keeps
+  [IMP-012](../design/requirements/modules/deployment/backlog.md#imp-012) open.
+- Recent optional streaming freshness evidence:
+  [IMP-013](../design/requirements/modules/operations/backlog.md#imp-013)
+
+These limitations are part of the current contract. Do not describe local
+staging success, a task-flow node, a pipeline trigger, or a checked-in optional
+asset as proof of a usable live deployment.

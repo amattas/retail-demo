@@ -217,6 +217,13 @@ def generate_dimensions(
     tags_by_product = {t.ProductName: t.Tags for t in dicts.tags}
     # Use naive UTC datetimes — Spark session timezone is UTC (set in conftest fixture)
     hist_start = datetime.combine(cfg.start_date, datetime.min.time())
+    # Guarantee every department has at least one product available from the
+    # first day of history: without this, an adversarial seed could push every
+    # product in a department past `hist_start`, leaving a sale-eligible
+    # department with no launched product and forcing receipts.py to either drop
+    # lines or violate the no-pre-launch-sales invariant (IMP-010). The first
+    # generated variant per department is pinned to a pre-history launch.
+    dept_covered: set[str] = set()
     prod_rows = []
     pid = 0
     for p in dicts.products:
@@ -236,7 +243,13 @@ def generate_dimensions(
             pid += 1
             chosen = pool[int(j)]
             launch_r = float(rng.random())  # 60% before history, 30% first half, 10% later
-            if launch_r < 0.6:
+            if p.Department not in dept_covered:
+                # First product seen for this department: pin pre-history so the
+                # department is sale-eligible on day one. Draw the RNG regardless
+                # (above) to keep every other product's launch stream unchanged.
+                launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))
+                dept_covered.add(p.Department)
+            elif launch_r < 0.6:
                 launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))
             elif launch_r < 0.9:
                 launch = hist_start + timedelta(days=int(rng.integers(0, 183)))

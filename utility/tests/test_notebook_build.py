@@ -1,19 +1,27 @@
 import ast
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 UTILITY = Path(__file__).resolve().parents[1]
 PY = sys.executable
-NOTEBOOKS = ["setup-01-seed-dictionaries", "setup-02-generate-dimensions",
-             "setup-03-generate-facts", "setup-04-build-gold", "stream-events"]
+NOTEBOOKS = [
+    "setup-01-seed-dictionaries",
+    "setup-02-generate-dimensions",
+    "setup-03-generate-facts",
+    "setup-04-build-gold",
+    "stream-events",
+]
 
 
 def test_build_produces_notebooks(tmp_path):
     out = subprocess.run(
         [PY, str(UTILITY / "scripts" / "build_notebooks.py"), "--output-dir", str(tmp_path)],
-        capture_output=True, text=True)
+        capture_output=True,
+        text=True,
+    )
     assert out.returncode == 0, out.stderr
     for name in NOTEBOOKS:
         nb = json.loads((tmp_path / f"{name}.ipynb").read_text())
@@ -27,14 +35,19 @@ def test_build_produces_notebooks(tmp_path):
 def test_committed_notebooks_in_sync():
     out = subprocess.run(
         [PY, str(UTILITY / "scripts" / "build_notebooks.py"), "--check"],
-        capture_output=True, text=True)
+        capture_output=True,
+        text=True,
+    )
     assert out.returncode == 0, f"committed notebooks drifted:\n{out.stdout}{out.stderr}"
 
 
 def test_engine_cell_compiles_standalone():
     nb = json.loads((UTILITY / "notebooks" / "setup-03-generate-facts.ipynb").read_text())
-    engine_cells = [c for c in nb["cells"]
-                    if c["cell_type"] == "code" and "ENGINE SOURCE" in "".join(c["source"])]
+    engine_cells = [
+        c
+        for c in nb["cells"]
+        if c["cell_type"] == "code" and "ENGINE SOURCE" in "".join(c["source"])
+    ]
     assert len(engine_cells) == 1
     compile("".join(engine_cells[0]["source"]), "<engine>", "exec")
 
@@ -55,24 +68,19 @@ def test_stream_notebook_code_compiles():
     assert any("parameters" in c["metadata"].get("tags", []) for c in nb["cells"])
 
 
-def test_stream_template_emits_legacy_event_type_set():
-    legacy_root = UTILITY.parent / "datagen-deprecated"
-    if not legacy_root.exists():
-        legacy_root = UTILITY.parent / "datagen"
-    legacy_schema = legacy_root / "src" / "retail_datagen" / "streaming" / "schemas.py"
-    tree = ast.parse(legacy_schema.read_text())
-    event_type_class = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EventType")
-    legacy_events = {
-        stmt.value.value
-        for stmt in event_type_class.body
-        if isinstance(stmt, ast.Assign)
-        and isinstance(stmt.value, ast.Constant)
-        and isinstance(stmt.value.value, str)
-    }
-
+def test_stream_template_emits_declared_eventhouse_event_types():
     template = (UTILITY / "notebooks" / "templates" / "driver-05-stream.py").read_text()
     stream_tree = ast.parse(template)
+    payload_assignment = next(
+        node
+        for node in stream_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "EVENT_PAYLOADS"
+            for target in node.targets
+        )
+    )
+    declared_events = set(ast.literal_eval(payload_assignment.value))
     stream_events = {
         node.args[1].value
         for node in ast.walk(stream_tree)
@@ -87,5 +95,57 @@ def test_stream_template_emits_legacy_event_type_set():
     assert 'F.concat(F.lit("store_"), op_type)' in template
     stream_events.update({"store_opened", "store_closed"})
 
-    assert len(legacy_events) == 18
-    assert stream_events == legacy_events
+    kql = (UTILITY.parent / "fabric" / "kql_database" / "01-create-tables.kql").read_text()
+    kql_tables = set(re.findall(r"^\.create-merge table ([a-z_]+) \(", kql, re.MULTILINE))
+
+    assert len(declared_events) == 18
+    assert stream_events == declared_events
+    assert declared_events <= kql_tables
+    assert "unknown_event" in kql_tables - declared_events
+
+
+def test_setup03_is_the_single_silver_publication_boundary():
+    dimensions = (
+        UTILITY / "notebooks" / "templates" / "driver-02-dimensions.py"
+    ).read_text()
+    facts = (
+        UTILITY / "notebooks" / "templates" / "driver-03-facts.py"
+    ).read_text()
+
+    assert "write_to_lakehouse(df" not in dimensions
+    assert "Dimension validation complete" in dimensions
+    assert "write_all(result.tables, {}, cfg, run_id" in facts
+
+
+def test_setup04_loads_every_gold_source_table():
+    driver_path = (
+        UTILITY / "notebooks" / "templates" / "driver-04-gold.py"
+    )
+    driver_tree = ast.parse(driver_path.read_text())
+    sources_assignment = next(
+        node
+        for node in driver_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "GOLD_SOURCE_TABLES"
+            for target in node.targets
+        )
+    )
+    loaded_sources = set(ast.literal_eval(sources_assignment.value))
+
+    gold_tree = ast.parse(
+        (
+            UTILITY / "src" / "retail_setup" / "generation" / "gold.py"
+        ).read_text()
+    )
+    required_sources = {
+        node.slice.value
+        for node in ast.walk(gold_tree)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "tables"
+        and isinstance(node.slice, ast.Constant)
+        and isinstance(node.slice.value, str)
+    }
+
+    assert loaded_sources == required_sources
