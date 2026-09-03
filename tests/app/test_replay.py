@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+import json
+
+from app.backend import proposals, replay
+
+
+def test_replay_routes_semantic_and_ontology_questions() -> None:
+    semantic = replay.chat(
+        "Which product families are growing inside declining categories?"
+    )
+    ontology = replay.chat(
+        "Which stores carry Momentum Runner and how are they supplied?"
+    )
+
+    assert semantic["routedTo"] == "data-agent"
+    assert ontology["routedTo"] == "ontology"
+    assert "FulfillmentNode" in ontology["trace"]["entities"]
+
+
+def test_replay_action_creates_deduplicated_drafts(tmp_path, monkeypatch) -> None:
+    store = tmp_path / "proposals.json"
+    store.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(proposals, "_STORE", store)
+
+    first = replay.chat(
+        "What should we do to protect Momentum Runner growth without stockouts?"
+    )
+    second = replay.chat(
+        "What should we do to protect Momentum Runner growth without stockouts?"
+    )
+
+    assert len(first["recommendation"]["actions"]) == 3
+    assert len(second["recommendation"]["actions"]) == 3
+    assert len(json.loads(store.read_text(encoding="utf-8"))) == 3
+    assert replay.actions_dashboard()["kpis"]["total"] == 3
+
+
+def test_replay_override_recalculates_transfer_source() -> None:
+    replay._override = None
+
+    decision = replay.apply_override("Local event requires safety stock.")
+
+    assert decision["override"]["excludedCandidate"] == "Store J"
+    assert decision["effectiveTransferSources"] == ["Store H", "Store I"]
+
+
+def test_story_studio_supports_four_iqs_and_signal_resolution() -> None:
+    replay._studio_state["signalStatus"] = "active"
+    replay._studio_state["completed"] = []
+    replay._studio_state["decisionStatus"] = "draft"
+    replay._studio_state["packageStatus"] = "not built"
+    replay._studio_state["reviewStatus"] = "not sent"
+
+    for stage in ("work", "fabric", "foundry", "web"):
+        result = replay.run_iq_stage(stage)
+        assert result["stage"]["name"].endswith("IQ")
+
+    resolved = replay.set_signal_status("resolved")
+    approved = replay.set_decision_status("approved")
+
+    assert resolved["signal"]["status"] == "resolved"
+    assert approved["decisionStatus"] == "approved"
+    assert approved["completed"] == ["work", "fabric", "foundry", "web"]
+
+
+def test_flagship_scope_store_matrix_and_package_lifecycle() -> None:
+    replay._studio_state["packageStatus"] = "not built"
+    replay._studio_state["reviewStatus"] = "not sent"
+
+    studio = replay.studio_payload()
+    built = replay.set_package_status("built")
+    sent = replay.set_package_status("sent for review")
+
+    assert studio["persona"] == "Dana Reyes"
+    assert studio["scope"]["territory"] == "Central Region"
+    assert studio["scope"]["inventorySnapshot"] == "2026-08-28"
+    assert len(studio["stores"]) == 10
+    assert built["packageStatus"] == "built"
+    assert built["reviewStatus"] == "not sent"
+    assert sent["packageStatus"] == "built"
+    assert sent["reviewStatus"] == "sent for review"

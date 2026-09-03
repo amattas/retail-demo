@@ -294,7 +294,9 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("profile_name", "expected_count"),
-    [("standard", 28), ("full-demo", 42)],
+    # standard gained 07/10 and their MLflow experiments when
+    # product_recommendations and price_elasticity became required-tier.
+    [("standard", 32), ("full-demo", 42)],
 )
 def test_build_workspace_stages_exact_optional_profile_inventory(
     tmp_path: Path,
@@ -550,8 +552,12 @@ def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path
         repo, tmp_path / "ws2", ml_profile
     )
     assert (tmp_path / "ws2" / "ML" / "demand_forecast.MLExperiment").is_dir()
-    assert "demand_forecast.MLExperiment" in with_ml.staged_items
-    assert "market_basket.MLExperiment" not in with_ml.staged_items
+    assert {
+        "demand_forecast.MLExperiment",
+        "market_basket.MLExperiment",
+        "promotion_effectiveness.MLExperiment",
+    } <= set(with_ml.staged_items)
+    assert "journey_analysis.MLExperiment" not in with_ml.staged_items
 
 
 def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:

@@ -78,7 +78,7 @@ directly from OneLake without importing a second copy.
 - Deployment profiles select exact, dependency-checked groups. The destructive
   reset group is excluded from every automatic profile.
 - Dashboard and rule assets are not yet guaranteed first-class deployable items.
-- The semantic model is Direct Lake and has 40 active tables, including four ML
+- The semantic model is Direct Lake and has 42 active tables, including six ML
   outputs.
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.

@@ -35,12 +35,13 @@ _REQUIRED_ML_TABLES = frozenset(
         "customer_segments",
         "churn_predictions",
         "stockout_risk",
+        "product_recommendations",
+        "price_elasticity",
     }
 )
 _OPTIONAL_ML_TABLES = frozenset(
     {
         "product_associations",
-        "product_recommendations",
         "journey_patterns",
         "zone_transitions",
         "zone_dwell_stats",
@@ -49,7 +50,6 @@ _OPTIONAL_ML_TABLES = frozenset(
 )
 _EXPERIMENTAL_ML_TABLES = frozenset(
     {
-        "price_elasticity",
         "promotion_lift",
         "pricing_constraints",
         "pricing_recommendations",

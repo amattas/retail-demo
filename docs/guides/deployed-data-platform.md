@@ -21,7 +21,8 @@ notebooks are grouped into repeatable operations:
 
 - `historical-data-load` creates the durable historical foundation.
 - `streaming-data-load` runs Silver transformation before Gold aggregation.
-- `ml-required` runs the four Reporting producers and contract validator.
+- `ml-required` runs the six Reporting producers (including market-basket
+  mining and promotion/elasticity analysis) and contract validator.
 - `ml-optional` and `ml-experimental` isolate full-demo extensions after
   Reporting.
 

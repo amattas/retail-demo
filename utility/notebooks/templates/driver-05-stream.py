@@ -757,6 +757,14 @@ EVENT_PAYLOADS = {
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
 }
 
+# Columns present in the KQL table but NOT produced by the stream. They sit
+# between the payload block and the envelope block in the table schema (see
+# 01-create-tables.kql), so they must be written as explicit nulls in that
+# position to keep the positional ingestion aligned.
+TABLE_EXTRA_NULLS = {
+    "receipt_created": [("campaign_id", "string")],
+}
+
 KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
 # flushImmediately tells the Kusto data-management service to flush each ingestion
 # right away instead of aggregating per the table IngestionBatching policy
@@ -781,18 +789,28 @@ def _from_json_schema(event_type):
 
 
 def _kusto_columns(event_type):
-    """Project a parsed-envelope frame to the target KQL table's exact columns."""
+    """Project a parsed-envelope frame to the target KQL table's exact column
+    ORDER.
+
+    The Spark Kusto connector ingests a DataFrame into an existing table by
+    column POSITION, not by name. The KQL tables (fabric/kql_database/
+    01-create-tables.kql) are laid out as: payload columns, then any
+    table-only columns, then the shared envelope columns. The DataFrame we
+    write here MUST mirror that exact order or every value lands one block
+    over (e.g. store_id ends up null and partition_key lands in tender_type)."""
     cols = []
-    for name, dt in ENVELOPE:
-        c = F.col(name)
-        if dt == "datetime":
-            c = F.to_timestamp(c, _ISO_FMT)
-        cols.append(c.alias(name))
     for col, jf, dt in EVENT_PAYLOADS[event_type]:
         c = F.col("payload").getField(jf)
         if dt == "datetime":
             c = F.to_timestamp(c, _ISO_FMT)
         cols.append(c.alias(col))
+    for name, dt in TABLE_EXTRA_NULLS.get(event_type, []):
+        cols.append(F.lit(None).cast(_SPARK_TYPE[dt]).alias(name))
+    for name, dt in ENVELOPE:
+        c = F.col(name)
+        if dt == "datetime":
+            c = F.to_timestamp(c, _ISO_FMT)
+        cols.append(c.alias(name))
     return cols
 
 

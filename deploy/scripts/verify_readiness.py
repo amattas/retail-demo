@@ -17,7 +17,7 @@ import tempfile
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from deploy.scripts import _output as console
@@ -26,6 +26,7 @@ from deploy.scripts.apply_kql import resolve_kql_database
 from deploy.scripts.build_artifacts import ML_EXPERIMENT_GROUPS
 from deploy.scripts.deploy_config import (
     DeployConfig,
+    collect_pipeline_notebook_refs,
     load_environment,
     load_terraform_outputs,
     validate_terraform_outputs,
@@ -1001,6 +1002,7 @@ class ReadinessRunner:
         self.kql_inventory: KqlInventory | None = None
         self.pipeline_evidence: dict[str, dict[str, Any]] = {}
         self.trigger_error: Exception | None = None
+        self._producer_pipeline_ref_cache: dict[str, str] | None = None
 
     def run(self) -> list[CheckResult]:
         """Run all 26 checks; unselected capabilities are explicit SKIPPED rows."""
@@ -1836,13 +1838,73 @@ class ReadinessRunner:
             freshness,
         )
 
+    def _producer_pipeline_refs(self) -> dict[str, str]:
+        """Map each notebook display name to the pipeline reference running it.
+
+        A notebook can produce outputs of more than one tier (07-ml-market-basket
+        emits a required and an optional table), so freshness must correlate with
+        the pipeline that actually executes the producer, not with ``ml-<tier>``.
+        """
+
+        if self._producer_pipeline_ref_cache is not None:
+            return self._producer_pipeline_ref_cache
+        references: list[str] = []
+        if self.profile.reporting_gate_pipeline_ref is not None:
+            references.append(self.profile.reporting_gate_pipeline_ref)
+        references.extend(self.profile.post_reporting_pipeline_refs)
+        mapping: dict[str, str] = {}
+        for reference in references:
+            notebooks = collect_pipeline_notebook_refs(
+                self.context.repo_root,
+                (Path(reference).name,),
+            )
+            for name in notebooks.values():
+                mapping.setdefault(name, reference)
+        self._producer_pipeline_ref_cache = mapping
+        return mapping
+
+    def _pipeline_window(
+        self,
+        reference: str | None,
+        tier: str,
+    ) -> tuple[datetime | None, datetime | None]:
+        """Return the (start, end) correlation window of a pipeline reference."""
+
+        if not reference:
+            return None, None
+        name = Path(reference).stem
+        if name not in self.pipeline_evidence:
+            raise EvidenceUnknown(f"{tier} model pipeline correlation is missing")
+        evidence = self.pipeline_evidence[name]
+        return (
+            _parse_time(evidence.get("start_time")),
+            _parse_time(evidence.get("end_time")),
+        )
+
     def _model_freshness(self, tier: str) -> Observation:
+        producer_pipelines = self._producer_pipeline_refs()
+        tier_reference = (
+            self.profile.reporting_gate_pipeline_ref
+            if tier == "required"
+            else next(
+                (
+                    reference
+                    for reference in self.profile.post_reporting_pipeline_refs
+                    if Path(reference).stem == f"ml-{tier}"
+                ),
+                None,
+            )
+        )
         contracts = [
             {
                 "id": contract.id,
                 "table": contract.output.table,
                 "as_of_column": contract.output.as_of_column,
                 "lineage_columns": list(contract.output.lineage_columns),
+                "pipeline_ref": producer_pipelines.get(
+                    PurePosixPath(contract.producer.path).stem,
+                    tier_reference,
+                ),
             }
             for contract in self.context.manifest.ml_contracts
             if contract.tier == tier
@@ -1869,54 +1931,42 @@ class ReadinessRunner:
             raise EvidenceUnknown(
                 f"{tier} model generation evidence has a blank model_run_id"
             )
-        pipeline_reference = (
-            self.profile.reporting_gate_pipeline_ref
-            if tier == "required"
-            else next(
-                (
-                    reference
-                    for reference in self.profile.post_reporting_pipeline_refs
-                    if Path(reference).stem == f"ml-{tier}"
-                ),
-                None,
-            )
-        )
-        not_before = None
-        pipeline_end = None
-        if pipeline_reference:
-            name = Path(pipeline_reference).stem
-            if name not in self.pipeline_evidence:
-                raise EvidenceUnknown(
-                    f"{tier} model pipeline correlation is missing"
-                )
-            not_before = _parse_time(
-                self.pipeline_evidence[name].get("start_time")
-            )
-            pipeline_end = _parse_time(
-                self.pipeline_evidence[name].get("end_time")
-            )
-        timestamps = []
+        references = {
+            str(contract["id"]): contract["pipeline_ref"] for contract in contracts
+        }
+        # Group by correlation window so each contract is judged against the
+        # pipeline run that produced it, then report the worst (oldest) group.
+        windows: dict[str | None, list[datetime]] = {}
         empty_contracts = []
         for signal in signals:
+            contract_id = str(signal.get("contract_id", ""))
+            reference = references.get(contract_id, tier_reference)
+            not_before, pipeline_end = self._pipeline_window(reference, tier)
             if signal.get("as_of"):
-                timestamps.append(_parse_time(signal["as_of"]))
+                windows.setdefault(reference, []).append(
+                    _parse_time(signal["as_of"])
+                )
                 continue
             if tier == "required" or pipeline_end is None:
                 raise EvidenceUnknown(
                     f"{tier} model generation timestamp evidence is missing"
                 )
-            empty_contracts.append(str(signal.get("contract_id", "")))
-            timestamps.append(pipeline_end)
-        source_time = min(timestamps)
-        freshness = evaluate_freshness(
-            source_time.isoformat(),
-            observed_at=self.context.observed_at,
-            max_age=_MODEL_MAX_AGE,
-            not_before=not_before,
-            lineage=(
-                f"au model tables ({tier}) oldest latest generation timestamp"
-            ),
-        )
+            empty_contracts.append(contract_id)
+            windows.setdefault(reference, []).append(pipeline_end)
+        lineage = f"au model tables ({tier}) oldest latest generation timestamp"
+        candidates = [
+            evaluate_freshness(
+                min(timestamps).isoformat(),
+                observed_at=self.context.observed_at,
+                max_age=_MODEL_MAX_AGE,
+                not_before=self._pipeline_window(reference, tier)[0],
+                lineage=lineage,
+            )
+            for reference, timestamps in windows.items()
+        ]
+        if not candidates:
+            raise EvidenceUnknown(f"{tier} model evidence is incomplete")
+        freshness = max(candidates, key=lambda entry: entry["age_seconds"])
         return Observation(
             f"Every {tier} model table has fresh lineage evidence.",
             {

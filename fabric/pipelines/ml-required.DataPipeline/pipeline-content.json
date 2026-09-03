@@ -87,6 +87,52 @@
         }
       },
       {
+        "name": "07-ml-market-basket",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "12-ml-stockout-prediction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "0ed73c24-11c5-5538-8834-6c8a1a884bee",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "10-ml-promotion-effectiveness",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "07-ml-market-basket",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "10f2071c-4ae2-5328-8f4a-2c9f43afbdff",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
         "name": "15-validate-required-ml-contract",
         "type": "TridentNotebook",
         "dependsOn": [
@@ -110,6 +156,18 @@
           },
           {
             "activity": "12-ml-stockout-prediction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "07-ml-market-basket",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "10-ml-promotion-effectiveness",
             "dependencyConditions": [
               "Succeeded"
             ]

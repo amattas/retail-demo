@@ -279,9 +279,9 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
     assert (len(dimensions), len(facts), len(gold_tables)) == (7, 19, 10)
     assert len(event_names) == 18
     assert kql_tables == event_names | {"unknown_event"}
-    assert len(model_tables) == 40
+    assert len(model_tables) == 42
     assert model_tables == set(tables) | set(gold_tables) | required_ml
-    assert tier_counts == {"required": 4, "optional": 6, "experimental": 4}
+    assert tier_counts == {"required": 6, "optional": 5, "experimental": 3}
 
     guide = GUIDE_PATH.read_text(encoding="utf-8")
     for claim in (
@@ -290,10 +290,10 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
         "**10 Gold aggregates**",
         "**18 emitted business event types**",
         "**19 KQL event tables**",
-        "**40 tables**",
-        "| required | 4 |",
-        "| optional | 6 |",
-        "| experimental | 4 |",
+        "**42 tables**",
+        "| required | 6 |",
+        "| optional | 5 |",
+        "| experimental | 3 |",
     ):
         assert claim in guide
 

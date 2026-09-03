@@ -94,17 +94,17 @@ def test_ml_tier_inventory_is_exact_and_reporting_requires_only_required() -> No
         "customer_segments",
         "churn_predictions",
         "stockout_risk",
+        "product_recommendations",
+        "price_elasticity",
     }
     assert validation.ml_contracts.optional_tables == {
         "product_associations",
-        "product_recommendations",
         "journey_patterns",
         "zone_transitions",
         "zone_dwell_stats",
         "dwell_predictions",
     }
     assert validation.ml_contracts.experimental_tables == {
-        "price_elasticity",
         "promotion_lift",
         "pricing_constraints",
         "pricing_recommendations",

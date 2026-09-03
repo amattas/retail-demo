@@ -112,8 +112,10 @@ plan, and deploys the task flow where selected.
 
 `setup-pipeline` includes only setup notebooks 01 through 04. For profiles that
 publish Reporting, deploy then runs `ml-required` with terminal polling. Its
-four producers feed `15-validate-required-ml-contract`; only exact-run success
-allows a second publication phase to stage the semantic model and report.
+six producers (demand forecast, customer segmentation, churn, stockout,
+market-basket mining, and promotion/elasticity analysis) feed
+`15-validate-required-ml-contract`; only exact-run success allows a second
+publication phase to stage the semantic model and report.
 `full-demo` runs `ml-optional` and `ml-experimental` afterward.
 
 After those pipelines, deployment synchronizes Lakehouse SQL endpoint metadata.

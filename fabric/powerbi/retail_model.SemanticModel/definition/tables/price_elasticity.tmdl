@@ -1,0 +1,222 @@
+table price_elasticity
+	lineageTag: c5e6e000-0000-0000-0005-000000000000
+	sourceLineageTag: [au].[price_elasticity]
+
+	/// Distinct products with an estimated price-elasticity coefficient.
+	measure 'Products Priced' = DISTINCTCOUNT('price_elasticity'[Product ID])
+		formatString: #,0
+		displayFolder: ML\Price Elasticity
+		lineageTag: c5e6e000-0000-0000-0005-000000000101
+
+	/// Mean price-elasticity coefficient across the in-context products.
+	measure 'Avg Price Elasticity' = AVERAGE('price_elasticity'[Elasticity Coefficient])
+		formatString: #,0.00
+		displayFolder: ML\Price Elasticity
+		lineageTag: c5e6e000-0000-0000-0005-000000000102
+
+	/// Products whose demand is highly sensitive to price changes.
+	measure 'Highly Elastic SKUs' = CALCULATE(DISTINCTCOUNT('price_elasticity'[Product ID]), 'price_elasticity'[Elasticity Category] = "Highly Elastic")
+		formatString: #,0
+		displayFolder: ML\Price Elasticity
+		lineageTag: c5e6e000-0000-0000-0005-000000000103
+
+	/// Products whose demand barely moves with price (pricing power).
+	measure 'Inelastic SKUs' = CALCULATE(DISTINCTCOUNT('price_elasticity'[Product ID]), 'price_elasticity'[Elasticity Category] = "Inelastic")
+		formatString: #,0
+		displayFolder: ML\Price Elasticity
+		lineageTag: c5e6e000-0000-0000-0005-000000000104
+
+	column 'Product ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0005-000000000001
+		sourceLineageTag: product_id
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+	column 'Product Name'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0005-000000000002
+		sourceLineageTag: product_name
+		summarizeBy: none
+		sourceColumn: product_name
+
+		annotation SummarizationSetBy = Automatic
+	column 'Product Category'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0005-000000000003
+		sourceLineageTag: product_category
+		summarizeBy: none
+		sourceColumn: product_category
+
+		annotation SummarizationSetBy = Automatic
+	column 'Elasticity Coefficient'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0005-000000000004
+		sourceLineageTag: elasticity_coefficient
+		summarizeBy: none
+		sourceColumn: elasticity_coefficient
+
+		annotation SummarizationSetBy = Automatic
+	column 'Elasticity Category'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0005-000000000005
+		sourceLineageTag: elasticity_category
+		summarizeBy: none
+		sourceColumn: elasticity_category
+
+		annotation SummarizationSetBy = Automatic
+	column 'Confidence Interval Lower'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0005-000000000006
+		sourceLineageTag: confidence_interval_lower
+		summarizeBy: none
+		sourceColumn: confidence_interval_lower
+
+		annotation SummarizationSetBy = Automatic
+	column 'Confidence Interval Upper'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0005-000000000007
+		sourceLineageTag: confidence_interval_upper
+		summarizeBy: none
+		sourceColumn: confidence_interval_upper
+
+		annotation SummarizationSetBy = Automatic
+	column 'Standard Error'
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: c5e6e000-0000-0000-0005-00000000000d
+		sourceLineageTag: standard_error
+		summarizeBy: none
+		sourceColumn: standard_error
+
+		annotation SummarizationSetBy = Automatic
+	column 'R Squared'
+		dataType: double
+		formatString: #,0.000
+		lineageTag: c5e6e000-0000-0000-0005-00000000000e
+		sourceLineageTag: r_squared
+		summarizeBy: none
+		sourceColumn: r_squared
+
+		annotation SummarizationSetBy = Automatic
+	column 'N Observations'
+		dataType: int64
+		formatString: 0
+		lineageTag: c5e6e000-0000-0000-0005-000000000008
+		sourceLineageTag: n_observations
+		summarizeBy: sum
+		sourceColumn: n_observations
+
+		annotation SummarizationSetBy = Automatic
+	column Sxx
+		dataType: double
+		isHidden
+		formatString: #,0.0000
+		lineageTag: c5e6e000-0000-0000-0005-00000000000f
+		sourceLineageTag: sxx
+		summarizeBy: none
+		sourceColumn: sxx
+
+		annotation SummarizationSetBy = Automatic
+	column Sse
+		dataType: double
+		isHidden
+		formatString: #,0.0000
+		lineageTag: c5e6e000-0000-0000-0005-000000000010
+		sourceLineageTag: sse
+		summarizeBy: none
+		sourceColumn: sse
+
+		annotation SummarizationSetBy = Automatic
+	column 'Avg Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: c5e6e000-0000-0000-0005-000000000009
+		sourceLineageTag: avg_price
+		summarizeBy: none
+		sourceColumn: avg_price
+
+		annotation SummarizationSetBy = Automatic
+	column 'Regular Price'
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: c5e6e000-0000-0000-0005-00000000000a
+		sourceLineageTag: regular_price
+		summarizeBy: none
+		sourceColumn: regular_price
+
+		annotation SummarizationSetBy = Automatic
+	column 'Avg Daily Quantity'
+		dataType: double
+		formatString: #,0.00
+		lineageTag: c5e6e000-0000-0000-0005-00000000000b
+		sourceLineageTag: avg_daily_quantity
+		summarizeBy: none
+		sourceColumn: avg_daily_quantity
+
+		annotation SummarizationSetBy = Automatic
+	column 'Elasticity Evidence Status'
+		dataType: string
+		lineageTag: c5e6e000-0000-0000-0005-000000000011
+		sourceLineageTag: elasticity_evidence_status
+		summarizeBy: none
+		sourceColumn: elasticity_evidence_status
+
+		annotation SummarizationSetBy = Automatic
+	column 'Analysis Design'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0005-000000000012
+		sourceLineageTag: analysis_design
+		summarizeBy: none
+		sourceColumn: analysis_design
+
+		annotation SummarizationSetBy = Automatic
+	column 'Computed At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0005-00000000000c
+		sourceLineageTag: computed_at
+		summarizeBy: none
+		sourceColumn: computed_at
+
+		annotation SummarizationSetBy = Automatic
+	column 'Generated At'
+		dataType: dateTime
+		isHidden
+		formatString: General Date
+		lineageTag: c5e6e000-0000-0000-0005-000000000013
+		sourceLineageTag: generated_at
+		summarizeBy: none
+		sourceColumn: generated_at
+
+		annotation SummarizationSetBy = Automatic
+	column 'Model Run ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0005-000000000014
+		sourceLineageTag: model_run_id
+		summarizeBy: none
+		sourceColumn: model_run_id
+
+		annotation SummarizationSetBy = Automatic
+	column 'Schema Version'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0005-000000000015
+		sourceLineageTag: schema_version
+		summarizeBy: none
+		sourceColumn: schema_version
+
+		annotation SummarizationSetBy = Automatic
+	partition price_elasticity = entity
+		mode: directLake
+		source
+			entityName: price_elasticity
+			schemaName: au
+			expressionSource: 'DirectLake - retail_lakehouse'

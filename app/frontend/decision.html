@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decision Canvas — Retail CX Decision Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Retail CX Decision Studio</h1>
+    </div>
+    <nav class="tabs">
+      <a class="tab" href="/">Dashboard</a>
+      <a class="tab" href="/studio.html">Story Studio</a>
+      <a class="tab active" href="/decision.html">Decision Canvas</a>
+      <a class="tab" href="/actions.html">Agent Operations</a>
+      <a class="tab" href="/ontology.html">Ontology Explorer</a>
+      <a class="tab" href="/architecture.html">Architecture</a>
+      <a class="tab" href="/walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="meta">synthetic scenario &middot; human in the loop</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel decision-panel">
+      <div class="panel-head">
+        <h2>Protect the Winner — Decision Canvas</h2>
+        <span class="synthetic-badge">Synthetic demo</span>
+      </div>
+      <div id="decision-canvas" class="decision-canvas">
+        <div class="empty">Loading decision scenario…</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="decision.js"></script>
+</body>
+</html>

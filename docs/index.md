@@ -46,7 +46,7 @@ Not sure which guide you need? Use the [guide index](guides/README.md).
 The base historical contract contains seven dimensions, nineteen fact tables,
 and ten Gold aggregates. The live driver emits eighteen business event types;
 KQL adds an `unknown_event` catch-all for unexpected event types. The active
-Power BI semantic model contains 40 tables. Optional machine learning,
+Power BI semantic model contains 42 tables. Optional machine learning,
 ontology, dashboard, rule, and agent experiences have separate readiness
 checks so that an optional failure does not silently invalidate required
 reporting.

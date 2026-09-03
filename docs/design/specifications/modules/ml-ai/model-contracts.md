@@ -6,13 +6,17 @@ The deployment separates data setup, required Reporting dependencies, and
 extended ML:
 
 1. `setup-pipeline` runs setup notebooks 01 through 04.
-2. `ml-required` runs demand forecast, customer segmentation, churn, and
-   stockout producers serially to avoid oversubscribing the shared Spark pool.
-3. `15-validate-required-ml-contract` runs only after all four producers
-   succeed.
+2. `ml-required` runs demand forecast (06), customer segmentation (08), churn
+   (09), stockout (12), market-basket mining (07), and promotion/elasticity
+   analysis (10) producers serially, in that order, to avoid oversubscribing
+   the shared Spark pool.
+3. `15-validate-required-ml-contract` runs only after all six producers
+   succeed, and validates all six required output tables.
 4. Reporting can publish only after that exact pipeline run reaches terminal
    `Completed`.
-5. `full-demo` runs `ml-optional` and `ml-experimental` after Reporting.
+5. `full-demo` runs `ml-optional` (notebooks 11 and 13) and `ml-experimental`
+   (notebook 14, which consumes `price_elasticity` produced by the required
+   run) after Reporting.
 
 Optional or experimental failure cannot block required Reporting. Ontology
 creation is a separate preview phase after Reporting and extended ML, but
@@ -31,9 +35,9 @@ each of their 14 outputs:
 
 | Tier | Outputs |
 | --- | --- |
-| Required | `demand_forecast`, `customer_segments`, `churn_predictions`, `stockout_risk` |
-| Optional promoted | `product_associations`, `product_recommendations`, `journey_patterns`, `zone_transitions`, `zone_dwell_stats`, `dwell_predictions` |
-| Experimental | `price_elasticity`, `promotion_lift`, `pricing_constraints`, `pricing_recommendations` |
+| Required | `demand_forecast`, `customer_segments`, `churn_predictions`, `stockout_risk`, `product_recommendations`, `price_elasticity` |
+| Optional promoted | `product_associations`, `journey_patterns`, `zone_transitions`, `zone_dwell_stats`, `dwell_predictions` |
+| Experimental | `promotion_lift`, `pricing_constraints`, `pricing_recommendations` |
 
 Every contract identifies its producer and source tables, exact output schema
 and grain, as-of and lineage fields, intended use, and limitations. Producer
@@ -44,13 +48,21 @@ projection and the runtime validator.
 This checked agreement prevents the manifest from becoming an independent,
 unvalidated physical schema.
 
-For all four required outputs, `generated_at` is the true Gold publication
+For all six required outputs, `generated_at` is the true Gold publication
 timestamp and `model_run_id` identifies that generation. Source/business
 cutoffs remain separate lineage: `source_as_of` for demand, `segmented_at` for
 segments, `prediction_date` for churn, and `predicted_at` plus
-`inventory_as_of` for stockout. Readiness orders and ages `generated_at` from
+`inventory_as_of` for stockout. `product_recommendations` and
+`price_elasticity` carry the same `generated_at`, `model_run_id`, and
+`schema_version` lineage columns as the original four; their business as-of
+remains `computed_at`. Readiness orders and ages `generated_at` from
 the same row as a nonblank run ID; it never treats a business as-of date as a
 generation timestamp.
+
+Promoting `product_recommendations` and `price_elasticity` to the required
+tier means the Reporting gate now also depends on market-basket mining and
+promotion/elasticity analysis succeeding with non-empty results, not only on
+the original demand/segmentation/churn/stockout producers.
 
 The runtime validator creates no tables. It rejects missing/empty required
 outputs, incompatible columns or types, null/duplicate grain keys, invalid
@@ -96,12 +108,14 @@ Optional and experimental corrections are also contract-bound:
 
 ## Semantic-model dependency
 
-The active semantic model currently references four ML output tables:
+The active semantic model currently references six ML output tables:
 
 - `churn_predictions`
 - `customer_segments`
 - `demand_forecast`
 - `stockout_risk`
+- `product_recommendations`
+- `price_elasticity`
 
 `core` does not publish ML or Reporting. `standard` and `full-demo` use the
 required runtime gate; a skipped, failed, cancelled, deduplicated, or unknown

@@ -68,9 +68,9 @@ still fails the deployment when a required table is not queryable.
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Schedule file present, disabled |
 | `daily-maintenance` | Delta maintenance | Schedule file present, disabled |
-| `ml-required` | Required producers, then runtime contract validation | Terminal Reporting gate |
+| `ml-required` | Demand, segmentation, churn, stockout, market-basket, and promotion/elasticity producers, then runtime contract validation | Terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
-| `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
+| `ml-experimental` | Experimental outputs (consumes `price_elasticity` from `ml-required`) | Full-demo post-Reporting |
 
 Do not describe the disabled streaming schedule as an active five-minute or
 fifteen-minute service.
@@ -93,7 +93,7 @@ The verifier evaluates these signals together:
 | Silver watermarks | No | The manually started stream has recently reached Silver. |
 | Eventhouse ingestion | No | Eventhouse has received recent optional events. |
 | Checkpoint identity | No | Recent Eventhouse extents can be tied to a stream and batch. |
-| Required model outputs | Yes | The four Reporting models were published by the required pipeline. |
+| Required model outputs | Yes | The six Reporting models were published by the required pipeline. |
 | Optional model outputs | No | Full-demo optional outputs are recent or have a valid empty snapshot. |
 | Experimental model outputs | No | Full-demo experimental outputs are recent or have a valid empty snapshot. |
 | Alerts | No | Optional alert queries are available and recent when rows exist. |
@@ -105,7 +105,13 @@ evidence use a seven-day maximum age. Streaming watermark,
 Eventhouse ingestion, and checkpoint evidence use a 30-minute maximum age.
 Pipeline and data evidence must match the exact triggered run or the retained
 successful deployment-journal step. Required full-demo execution has live
-evidence. The remaining
+evidence. Readiness correlates each model table's freshness with the pipeline
+that runs its producer notebook: because notebooks 07 (market-basket mining)
+and 10 (promotion/elasticity analysis) now also run inside `ml-required` to
+produce the required `product_recommendations` and `price_elasticity`
+outputs, the optional/experimental `product_associations` and `promotion_lift`
+outputs they produce in the same run are correlated with the `ml-required`
+window rather than the `ml-optional`/`ml-experimental` windows. The remaining
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) boundary
 is a recent bounded stream that satisfies the three optional streaming checks.
 

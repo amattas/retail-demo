@@ -31,12 +31,30 @@ def draw_int(u: Column, lo: int, hi: int) -> Column:
 def with_balances(txns: DataFrame, lo: int, hi: int, tag: str,
                   d: seeded_draws, cfg: GenerationConfig) -> DataFrame:
     """Fold a day-0 INITIAL seed txn per (node, product) into the stream and
-    compute the running balance ordered by (event_ts, trace_id). Negative
-    balances are not clamped — they become stockout signals."""
-    seeds = (txns.select("node_id", "product_id").distinct()
-             .withColumn("quantity",
+    compute the running balance ordered by (event_ts, trace_id).
+
+    The seed is **demand-aware**: rather than a flat opening draw (which made
+    the running balance drift to roughly ``-(period demand)`` once cumulative
+    SALE outflow dwarfed the tiny seed + sparse replenishment), the opening
+    stock is sized so the *ending* on-hand lands at a realistic positive
+    buffer. With ``net = Σ quantity`` (inbound − outbound) for the (node,
+    product) and a per-key target ``buffer ∈ [lo, hi]``, we set
+    ``seed = greatest(buffer - net, 0)`` so the final running balance equals
+    ``greatest(buffer, net) ≥ 0``. Intermediate balances can still dip on a
+    bursty interleave, so genuine stockout crossings remain possible, but the
+    current inventory position is no longer a large negative number."""
+    # Net flow per (node, product): SALE/OUTBOUND are negative, INBOUND/RETURN
+    # positive. Used to back out the opening stock that yields a positive
+    # ending balance.
+    net = (txns.groupBy("node_id", "product_id")
+           .agg(F.sum("quantity").alias("_net")))
+    seeds = (net
+             .withColumn("_buffer",
                          draw_int(d.u(["node_id", "product_id"],
                                       f"seed-stock-{tag}"), lo, hi))
+             .withColumn("quantity",
+                         F.greatest(F.col("_buffer") - F.col("_net"),
+                                    F.lit(0)).cast("long"))
              .withColumn("txn_type", F.lit("INITIAL"))
              .withColumn("source", F.lit("SEED"))
              # String-built timestamp (session-TZ semantics) to match every

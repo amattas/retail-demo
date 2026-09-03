@@ -212,6 +212,14 @@ relationship 'Demand Forecast to Products'
 	fromColumn: demand_forecast.'Product ID'
 	toColumn: dim_products.ID
 
+relationship 'Product Recommendations to Products'
+	fromColumn: product_recommendations.'Product ID'
+	toColumn: dim_products.ID
+
+relationship 'Price Elasticity to Products'
+	fromColumn: price_elasticity.'Product ID'
+	toColumn: dim_products.ID
+
 relationship 'Demand Forecast to Date'
 	joinOnDateBehavior: datePartOnly
 	fromColumn: demand_forecast.'Forecast Date'

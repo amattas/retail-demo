@@ -55,7 +55,7 @@ both that constraint and Terraform's constraint in
 | Profile | Support | Logical assets | Groups | Pipelines | KQL scripts | Infrastructure | Reporting | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `core` | core/default | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
-| `standard` | supported opt-in | 8 | 4 | 5 | 6 | 26 | 2 | 28 |
+| `standard` | supported opt-in | 8 | 4 | 5 | 6 | 30 | 2 | 32 |
 | `full-demo` | preview/live-preflight | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
 
 The logical asset selections are:
@@ -106,8 +106,8 @@ Source-derived current counts are:
   **10 Gold aggregates**;
 - live events: **18 emitted business event types** and **19 KQL event tables**,
   where `unknown_event` is the non-emitted operational catch-all;
-- active Direct Lake semantic model: **40 tables** — the 36 historical tables
-  plus the 4 required ML outputs;
+- active Direct Lake semantic model: **42 tables** — the 36 historical tables
+  plus the 6 required ML outputs;
 - data/event registry: 3 data contracts, 19 declared paths, and 4 intentional
   exceptions.
 
@@ -121,13 +121,14 @@ and [Power BI semantic model specification](../design/specifications/modules/pow
 
 | Tier | Contracts | Publication behavior |
 | --- | ---: | --- |
-| required | 4 | Must pass the runtime contract validator before Reporting publishes. |
-| optional | 6 | Runs after Reporting only in `full-demo`; failure degrades, not blocks, required Reporting. |
-| experimental | 4 | Runs after Reporting only in `full-demo`; preview limitations apply. |
+| required | 6 | Must pass the runtime contract validator before Reporting publishes. |
+| optional | 5 | Runs after Reporting only in `full-demo`; failure degrades, not blocks, required Reporting. |
+| experimental | 3 | Runs after Reporting only in `full-demo`; preview limitations apply. |
 
-The four active Reporting tables are demand forecast, customer segments, churn
-predictions, and stockout risk. Optional and experimental outputs are not
-silently added to the 40-table semantic model.
+The six active Reporting tables are demand forecast, customer segments, churn
+predictions, stockout risk, product recommendations, and price elasticity.
+Optional and experimental outputs are not silently added to the 42-table
+semantic model.
 
 <!-- manifest-contract:readiness -->
 ## Readiness contract

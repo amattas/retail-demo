@@ -25,6 +25,7 @@ nav = [
       { "Analytics and AI" = "guides/deployed-analytics-ai.md" },
     ] },
     { "Presenter demo" = "guides/demo-script.md" },
+    { "CIO walkthrough" = "guides/cio-walkthrough.md" },
     { "Presenter journeys" = "guides/presenter-journeys.md" },
     { "Use cases" = "guides/use-cases.md" },
   ] },
@@ -100,6 +101,7 @@ nav = [
       { "Data flow" = "design/architecture/data-flow.md" },
       { "Data schema" = "design/architecture/data-schema.md" },
       { "Security boundaries" = "design/architecture/security.md" },
+      { "Agentic application" = "design/architecture/agentic-application.md" },
     ] },
     { "Security" = [
       { "Threat model" = "design/security/threat-model.md" },
