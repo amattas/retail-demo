@@ -138,6 +138,13 @@ automatically after Reporting and extended ML, but only after live
 tenant/capacity preflight passes. `post-ontology` reruns this phase for
 recovery.
 
+The Fabric ontology public definition `EntityTypeProperty` schema doesn't
+currently expose field descriptions. After creating or updating the public
+definition, the deployment notebook uses the same Digital Operations authoring
+API as the Fabric UI to apply descriptions to every regular and time-series
+property, then reads the entity types back and fails if any description wasn't
+persisted.
+
 ## Data Agents
 
 Source-controlled Data Agent definitions reference authoring-workspace GUIDs.

@@ -147,3 +147,33 @@ def test_first_create_requires_successful_derived_graph_rebuild() -> None:
     assert "Re-applied ontology definition to rebuild the derived graph." in source
     assert "the derived graph is not proven ready." in source
     assert "if the graph shows no valid content, re-run this notebook." not in source
+
+
+def test_ontology_generates_descriptions_for_every_property_kind() -> None:
+    source = _notebook_source()
+
+    assert "def ontology_field_description(" in source
+    assert "'description': ontology_field_description(" in source
+    assert source.count("'semanticEnrichment': {") >= 2
+    assert source.count("'description': column['description']") == 2
+
+
+def test_ontology_applies_descriptions_through_authoring_api() -> None:
+    source = _notebook_source()
+
+    assert "notebookutils.credentials.getToken('pbi')" in source
+    assert "'Authorization': f'Bearer {pbi_token}'" in source
+    assert "/metadata/v201606/generatemwctokenv2" in source
+    assert "'Authorization': f'MwcToken {workload_token}'" in source
+    assert "f'entityTypes/{entity_type_id}'" in source
+    assert "'properties': described_properties" in source
+    assert "'timeseriesProperties': described_timeseries_properties" in source
+    assert "field.get('semanticEnrichment', {}).get('description')" in source
+
+
+def test_ontology_verifies_persisted_field_descriptions() -> None:
+    source = _notebook_source()
+
+    assert "def _verify_field_descriptions(" in source
+    assert "missing_descriptions" in source
+    assert "_verify_field_descriptions(authoring_context)" in source
