@@ -1,0 +1,4246 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the Microsoft Fabric retail demo.">
+      
+      
+        <meta name="author" content="Retail Demo contributors">
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/latest/sample-retail-questions-results/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.57">
+    
+    
+      
+        <title>Sample Retail Questions — Test Run Results - Microsoft Fabric Retail Demo</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.812a03bb.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sample-retail-questions-test-run-results" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="Microsoft Fabric Retail Demo" class="md-header__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Microsoft Fabric Retail Demo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sample Retail Questions — Test Run Results
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="Microsoft Fabric Retail Demo" class="md-nav__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    Microsoft Fabric Retail Demo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Start here
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Start here
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Plain-language glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/workspace-inventory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workspace and profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Explore the demo
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Explore the demo
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployed walkthrough
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployed walkthrough
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-data-platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data platform
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-analytics-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics and AI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/cio-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CIO walkthrough
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/presenter-journeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter journeys
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy and operate
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deploy and operate
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Design Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Design Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/requirements/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Requirements
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/core/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Core demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/traceability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_4" id="__nav_5_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/setup/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/setup/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_5" id="__nav_5_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployment
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/deployment/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/deployment/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_6" id="__nav_5_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Generation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/generation/generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/generation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_7" id="__nav_5_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Streaming
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/streaming/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/streaming/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_8" id="__nav_5_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Analytics
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/analytics/analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/analytics/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_9" id="__nav_5_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  ML and AI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/ml-ai/ml-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/ml-ai/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_10" id="__nav_5_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Power BI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Power BI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/power-bi/power-bi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/power-bi/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_11" id="__nav_5_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/operations/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/operations/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_12" id="__nav_5_2_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/security/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/security/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_13" id="__nav_5_2_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/documentation/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/documentation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/specifications/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Specifications
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Specifications
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/core/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/core/solution-manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solution manifest
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/setup/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup CLI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/deployment/framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment framework
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/generation/data-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/streaming/event-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/analytics/fabric-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/ml-ai/model-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI contracts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/power-bi/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations runbook
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/security/access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Access control
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/documentation/site/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation site
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Infrastructure
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security boundaries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/agentic-application/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Agentic application
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Threat model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/security/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-scorecard" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Executive Scorecard
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Executive Scorecard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#after-the-redeploy-pipeline-re-run-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        After the redeploy + pipeline re-run (current)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#original-run-before-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Original run (before fixes)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-works-well" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What works well
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-findings-action-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Key findings / action items
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Recommended next steps
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fixes-applied-code-deployed-validated" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes Applied (code) — DEPLOYED &amp; VALIDATED
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fixes Applied (code) — DEPLOYED &amp; VALIDATED">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operational-note-setup-pipeline-reliability" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational note — setup pipeline reliability
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-1-executive" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 1 Executive
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 1 Executive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q1-da-237s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q1 (DA, 23.7s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q3-da-239s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q3 (DA, 23.9s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-2-merchandising" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 2 Merchandising
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 2 Merchandising">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q9-da-256s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q9 (DA, 25.6s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q12-ont-1010s-rating-error-ontology-http-500-100s-timeout-on-multi-hop-customer-receipt-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q12 (ONT, 101.0s) — <em>rating: <strong>ERROR</strong> — Ontology HTTP 500 (~100s timeout) on multi-hop customer-&gt;receipt-&gt;product</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-3-omnichannel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 3 Omnichannel
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 3 Omnichannel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q15-da-150s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q15 (DA, 15.0s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q16-da-361s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q16 (DA, 36.1s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-4-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 4 Inventory
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 4 Inventory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q20-da-286s-rating-pass-inventory-balance-fixed-all-positions-positive-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q20 (DA, 28.6s) — <em>rating: <strong>PASS</strong> — Inventory balance fixed; all positions positive (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q23-ont-110s-rating-pass-simple-single-relationship-traversal-worked" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q23 (ONT, 11.0s) — <em>rating: <strong>PASS</strong> — Simple single-relationship traversal worked</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-5-trafficrt" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 5 Traffic/RT
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 5 Traffic&#x2f;RT">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q27-da-254s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q27 (DA, 25.4s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q29-da-244s-rating-pass-now-honors-the-most-recent-15-min-window-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q29 (DA, 24.4s) — <em>rating: <strong>PASS</strong> — Now honors the most-recent 15-min window (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-6-marketing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 6 Marketing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 6 Marketing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q31-da-200s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q31 (DA, 20.0s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q33-ont-1011s-rating-error-ontology-http-500-on-promotion-customer-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q33 (ONT, 101.1s) — <em>rating: <strong>ERROR</strong> — Ontology HTTP 500 on promotion-&gt;customer-&gt;store</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-7-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 7 Segmentation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 7 Segmentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q35-da-144s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q35 (DA, 14.4s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q37-da-183s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q37 (DA, 18.3s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-8-churn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 8 Churn
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 8 Churn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q39-da-123s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q39 (DA, 12.3s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q42-ont-240s-rating-empty-ontology-returned-no-rows-for-churn-risk-segment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q42 (ONT, 24.0s) — <em>rating: <strong>EMPTY</strong> — Ontology returned no rows for churn-risk + segment</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-9-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 9 Forecast
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 9 Forecast">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q44-da-216s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q44 (DA, 21.6s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q45-da-256s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q45 (DA, 25.6s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-10-stockout" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 10 Stockout
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 10 Stockout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q48-da-279s-rating-pass-stockout-risk-ranked-days-of-inventory-now-positive-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q48 (DA, 27.9s) — <em>rating: <strong>PASS</strong> — Stockout risk ranked; days-of-inventory now positive (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q49-da-222s-rating-pass-now-positive-days-of-inventory-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q49 (DA, 22.2s) — <em>rating: <strong>PASS</strong> — Now positive days-of-inventory (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-11-marketbasket" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 11 MarketBasket
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 11 MarketBasket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q52-da-244s-rating-pass-market-basket-rules-now-in-the-model-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q52 (DA, 24.4s) — <em>rating: <strong>PASS</strong> — Market-basket rules now in the model (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-12-elasticity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 12 Elasticity
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 12 Elasticity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q55-da-260s-rating-pass-price_elasticity-now-in-the-model-re-tested-after-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q55 (DA, 26.0s) — <em>rating: <strong>PASS</strong> — price_elasticity now in the model (re-tested after redeploy)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-13-journey" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 13 Journey
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 13 Journey">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q59-da-195s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q59 (DA, 19.5s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-14-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 14 Delivery
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 14 Delivery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q62-da-290s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q62 (DA, 29.0s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-15-anomaly" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 15 Anomaly
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 15 Anomaly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q64-da-519s-rating-pass-surfaced-inventory-velocity-drops-tied-to-inventory-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q64 (DA, 51.9s) — <em>rating: <strong>PASS</strong> — Surfaced inventory velocity drops (tied to inventory bug)</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-16-crosssurface" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Section 16 CrossSurface
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 16 CrossSurface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q66-ont-153s-rating-empty-ontology-returned-no-rows-for-churn-risk-championsloyal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q66 (ONT, 15.3s) — <em>rating: <strong>EMPTY</strong> — Ontology returned no rows for churn-risk + Champions/Loyal</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q67-da-302s-rating-pass-churn-ltv-5273m" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q67 (DA, 30.2s) — <em>rating: <strong>PASS</strong> — Churn LTV = $527.3M</em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q72-da-386s-rating-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Q72 (DA, 38.6s) — <em>rating: <strong>PASS</strong></em>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/amattas/retail-demo/edit/main/docs/sample-retail-questions-results.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/amattas/retail-demo/raw/main/docs/sample-retail-questions-results.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="sample-retail-questions-test-run-results">Sample Retail Questions — Test Run Results<a class="headerlink" href="#sample-retail-questions-test-run-results" title="Permanent link">&para;</a></h1>
+<p>Run against a development workspace via the Fabric Data Agent MCP and Ontology MCP.
+Environment identifiers and the test identity are redacted. Surface: <strong>DA</strong> = Data Agent / semantic model, <strong>ONT</strong> = Ontology MCP (<code>search_ontology</code>).</p>
+<h2 id="executive-scorecard">Executive Scorecard<a class="headerlink" href="#executive-scorecard" title="Permanent link">&para;</a></h2>
+<p><strong>Subset:</strong> 28 questions (23 Data Agent, 5 Ontology MCP). <strong>Identity:</strong> redacted test identity.</p>
+<h3 id="after-the-redeploy-pipeline-re-run-current">After the redeploy + pipeline re-run (current)<a class="headerlink" href="#after-the-redeploy-pipeline-re-run-current" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th style="text-align: center;">PASS</th>
+<th style="text-align: center;">WEAK</th>
+<th style="text-align: center;">EMPTY</th>
+<th style="text-align: center;">MISSING</th>
+<th style="text-align: center;">ERROR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Data Agent (semantic model)</strong></td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+</tr>
+<tr>
+<td><strong>Ontology MCP</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">2*</td>
+</tr>
+</tbody>
+</table>
+<p>All 7 previously-failing/weak Data Agent questions (Q20, Q29, Q48, Q49, Q52, Q55, Q64) now <strong>PASS</strong> — see each section below. The four data fixes are deployed and validated in Fabric.</p>
+<p><em>The Ontology MCP still can't resolve the 4 multi-hop/meta questions (Q12, Q33 return server 500 on complex phrasings; Q42, Q66 return no rows). It </em><em>does</em>* answer entity- and relationship-centric data queries well — verified live: "which trucks deliver to which stores", "stores supplied by a distribution center", "products low on inventory", "customers who churned" all return rows. The demo app now degrades these gracefully instead of erroring.</p>
+<h3 id="original-run-before-fixes">Original run (before fixes)<a class="headerlink" href="#original-run-before-fixes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th style="text-align: center;">PASS</th>
+<th style="text-align: center;">PASS* (data caveat)</th>
+<th style="text-align: center;">WEAK</th>
+<th style="text-align: center;">EMPTY</th>
+<th style="text-align: center;">MISSING</th>
+<th style="text-align: center;">ERROR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Data Agent (semantic model)</strong></td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+</tr>
+<tr>
+<td><strong>Ontology MCP</strong></td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">2</td>
+</tr>
+</tbody>
+</table>
+<p>PASS* = correct shape but values distorted by the inventory data bug below.</p>
+<h3 id="what-works-well">What works well<a class="headerlink" href="#what-works-well" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Data Agent is strong</strong> for aggregate metrics, rankings, channel mix, segmentation, churn, demand forecast, and stockout counts. Clean numeric answers in ~12-40s each. Cross-entity reasoning it handled <em>better than the ontology</em> (e.g. "total LTV of churn customers" = $527.3M; "below-median stores' top stockout products").</li>
+</ul>
+<h3 id="key-findings-action-items">Key findings / action items<a class="headerlink" href="#key-findings-action-items" title="Permanent link">&para;</a></h3>
+<ol>
+<li>~~<strong>Inventory balance is broken (highest impact).</strong>~~ <strong>RESOLVED.</strong> Store units on hand was <strong>-195M</strong> and days-of-inventory <strong>-360</strong> (Q20, Q48, Q49). Fixed (demand-aware inventory seed) and validated: <code>inventory_position_current</code> is now 100% positive.</li>
+<li><strong>Ontology MCP is the weak link (open).</strong> It answers entity/relationship <strong>data</strong> queries well (DC→Truck, trucks→stores, products low on inventory, churned customers) but returns server 500 on complex/meta phrasings (Q12, Q33) and no rows on some filtered joins (Q42, Q66). Still wants: (a) an <strong>agent-instructions file</strong> with exact entity/property names + a rule to decompose multi-hop into simple queries; (b) note Eventhouse-bound entities (Receipt, Promotion) may not aggregate like Lakehouse entities. The demo app degrades these gracefully.</li>
+<li>~~<strong>Some ML tables are not in the semantic model.</strong>~~ <strong>RESOLVED.</strong> Price elasticity (Q55) and market basket (Q52) now answer — tables added to the model + a refresh, and notebook 07 fixed to actually produce rules (top-200 product cap).</li>
+<li>~~<strong>Real-time window not honored.</strong>~~ <strong>RESOLVED.</strong> Q29 now returns the most-recent 15-min window (Gold <code>gold.py</code> keeps only the latest window).</li>
+<li><strong>Latency:</strong> Data Agent 22-76s typical; Ontology 17-102s (complex queries still slow).</li>
+</ol>
+<h3 id="recommended-next-steps">Recommended next steps<a class="headerlink" href="#recommended-next-steps" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Author an <strong>ontology agent-instructions</strong> file (entity/property cheat-sheet + decomposition rules) and re-test the multi-hop ONT questions — the only remaining open item.</li>
+<li>Prefer the <strong>Data Agent</strong> for cross-entity questions; reserve the ontology for entity/relationship data lookups.</li>
+<li>(Optional) Diversify market-basket recommendations — the top-200-product cap concentrates rules on one popular product.</li>
+</ul>
+<hr />
+<h2 id="fixes-applied-code-deployed-validated">Fixes Applied (code) — DEPLOYED &amp; VALIDATED<a class="headerlink" href="#fixes-applied-code-deployed-validated" title="Permanent link">&para;</a></h2>
+<p>These code fixes address findings 1, 3, and 4. They are now <strong>deployed to Fabric and validated</strong> against live data (re-tested via the demo app's <code>/api/chat</code>).</p>
+<ol>
+<li><strong>Inventory balance (finding 1).</strong> <code>utility/src/retail_setup/generation/inventory_balances.py::with_balances</code> now sizes the day-0 <code>INITIAL</code> seed <strong>demand-aware</strong>: <code>seed = greatest(buffer − net, 0)</code> where <code>net = Σ quantity</code> per (node, product). Ending on-hand becomes <code>greatest(buffer, net) ≥ 0</code> instead of drifting to <code>−(period demand)</code>. <strong>Validated:</strong> <code>inventory_position_current</code> is now 100% positive (100,500 rows, min 40, max 2,789, 0 negatives; sum 8.06M). Setup notebooks regenerated via <code>build_notebooks.py</code> → <code>retail-setup render</code> → fabric-cicd. (The earlier redeploy was stale because the <code>render</code> step — which writes <code>utility/out/</code>, the source fabric-cicd actually stages — had been skipped.)</li>
+<li><strong>Trade-off:</strong> store-side <code>fact_stockouts</code> (balance≤0 crossings) shrinks substantially. Lean the stockout narrative on the ML <code>stockout_risk</code> table rather than realized store stockouts.</li>
+<li><strong>ML tables in the model (finding 3).</strong> Added <code>price_elasticity</code> and <code>product_recommendations</code> to the semantic model (DirectLake, schema <code>au</code>) + a full dataset refresh so the tables bind. <strong>Validated:</strong> both now queryable (<code>price_elasticity</code> 100 rows, <code>product_recommendations</code> 199 rows); Q52 and Q55 answer.</li>
+<li><strong>Sub-fix — market basket actually produced rules.</strong> Notebook <code>fabric/lakehouse/07-ml-market-basket.ipynb</code> found 0 rules at <code>MIN_SUPPORT=0.01</code>, so <code>product_recommendations</code> was never created. Lowering support naively to 0.001 made FP-Growth <strong>explode</strong> (the job ran 90+ min without finishing). Final fix: <strong>bound the item space to the top-200 products by basket frequency</strong> (new <code>TOP_PRODUCTS</code> param), then mine at <code>MIN_SUPPORT=0.001</code>. The job now completes in ~13 min and yields 100 rules (lift 5.6–6.0). <strong>Caveat:</strong> the top-products cap makes one high-frequency product dominate the consequents — fine for a demo, but the rule set isn't very diverse.</li>
+<li><strong>Real-time 15-min window (finding 4).</strong> Root cause: the active Gold builder <code>utility/src/retail_setup/generation/gold.py</code> (compiled into <code>setup-04-build-gold</code>) retained <strong>every</strong> historical 15-min window, so <code>SUM(Revenue)</code> summed all windows = lifetime totals. (An earlier attempt edited the wrong hand-notebooks <code>fabric/lakehouse/02,04</code>.) Fixed <code>gold.py</code> to keep only the most-recent window and exposed <code>computed_at</code> as <strong>Window End</strong> in the TMDL. <strong>Validated:</strong> <code>top_products_15m</code> is now 233 rows in a single window (was 35.3M rows); Q29 returns the latest window.</li>
+</ol>
+<p>Finding 2 (Ontology MCP) is a tuning/agent-instructions task, not a code bug. The demo app now degrades unresolved ontology questions gracefully and steers users to the Data Agent.</p>
+<h3 id="operational-note-setup-pipeline-reliability">Operational note — setup pipeline reliability<a class="headerlink" href="#operational-note-setup-pipeline-reliability" title="Permanent link">&para;</a></h3>
+<p>The <code>setup-pipeline</code> fans all 8 ML notebooks (06–13) out in parallel from <code>setup-04-build-gold</code>. On the shared Spark capacity this occasionally over-subscribes the pool, and one downstream notebook (observed: <code>14-ml-dynamic-pricing</code>) gets its session cancelled with <code>System_Cancelled_Session_Statements_Failed</code>. The failure is <strong>intermittent and infra-side, not a code/data bug</strong> — the same notebook completes every time it runs standalone, and all ML output tables were validated as correct. Two mitigations applied to <code>fabric/pipelines/setup-pipeline.DataPipeline/pipeline-content.json</code>: (1) <code>14-ml-dynamic-pricing</code> now also depends on <code>06-ml-demand-forecast</code> (the longest-running ML job), so it starts after the parallel wave drains instead of overlapping peak load; (2) <code>retry=2</code> (120 s interval) on every notebook activity as a safety net. With this change a full run completed every ML + <code>14</code> notebook cleanly.</p>
+<p>A second, <strong>environmental</strong> failure mode is the Fabric <strong>capacity auto-pausing</strong> (<code>CapacityNotActive</code>): the F64 capacity backing this workspace was paused overnight, which failed the in-flight <code>30-create-ontology</code> step. This is not a pipeline bug — resume the capacity (<code>az resource invoke-action --ids &lt;capacityResourceId&gt; --action resume</code>) and re-run. The ontology notebook completes in ~3 min once capacity is active.</p>
+<hr />
+<h2 id="section-1-executive">Section 1 Executive<a class="headerlink" href="#section-1-executive" title="Permanent link">&para;</a></h2>
+<h3 id="q1-da-237s-rating-pass">Q1 (DA, 23.7s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q1-da-237s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What were total net sales, gross profit, and gross margin percent company-wide, and how many receipts?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Company-wide, the total net sales were $5,048,062,409.15. The total gross profit was $1,460,907,984.11, with a gross margin percent of 28.9%. The total number of receipts was 7,556,528.
+</span></code></pre></div>
+<h3 id="q3-da-239s-rating-pass">Q3 (DA, 23.9s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q3-da-239s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which top 10 stores drove the most net sales? Show the net sales for each.</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Here are the top 10 stores that drove the most net sales, along with their net sales amounts:
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>1. Store S000025: $213,512,166.75
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>2. Store S000031: $213,492,365.17
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>3. Store S000044: $192,292,234.30
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>4. Store S000026: $189,290,745.97
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>5. Store S000021: $185,436,401.86
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>6. Store S000013: $175,969,928.41
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>7. Store S000018: $165,657,046.52
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>8. Store S000017: $164,366,679.05
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>9. Store S000034: $162,563,071.30
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>10. Store S000046: $140,963,071.06
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>Let me know if you need more details about any of these stores!
+</span></code></pre></div>
+<h2 id="section-2-merchandising">Section 2 Merchandising<a class="headerlink" href="#section-2-merchandising" title="Permanent link">&para;</a></h2>
+<h3 id="q9-da-256s-rating-pass">Q9 (DA, 25.6s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q9-da-256s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What are the top 15 products by revenue, and the gross margin percent for each?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Here are the top 15 products by revenue, along with their gross margin percent:
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>1. Smart Fitness Tracker – $320,333,486.47 (Gross Margin: 16.1%)
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>2. White Truffle Powder – $295,198,754.45 (Gross Margin: 22.9%)
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>3. Bird&#39;s Nest Soup – $182,847,623.66 (Gross Margin: 40.1%)
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>4. Women&#39;s Running Shoes – $145,103,348.72 (Gross Margin: 28.7%)
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>5. Digital Photo Frame – $135,994,337.40 (Gross Margin: 39.4%)
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>6. Caviar Beluga – $128,341,706.13 (Gross Margin: 25.3%)
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>7. Wireless Bluetooth Headphones – $95,131,841.13 (Gross Margin: 42.1%)
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>8. Electric Toothbrush – $88,834,038.63 (Gross Margin: 28.8%)
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>9. Office Chair Ergonomic – $81,055,095.07 (Gross Margin: 33.4%)
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>10. Ceramic Dinner Plate Set – $72,814,554.26 (Gross Margin: 31.8%)
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>11. Cordyceps Sinensis – $69,399,497.39 (Gross Margin: 18.8%)
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>12. Men&#39;s Dress Shirt – $68,530,662.68 (Gross Margin: 27.4%)
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>13. Bluetooth Speaker Portable – $62,557,133.38 (Gross Margin: 37.0%)
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>14. Black Truffle Fresh – $57,613,260.37 (Gross Margin: 37.6%)
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>15. Shark Fin Soup – $54,582,770.02 (Gross Margin: 16.5%)
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>Let me know if you need further details about any product!
+</span></code></pre></div>
+<h3 id="q12-ont-1010s-rating-error-ontology-http-500-100s-timeout-on-multi-hop-customer-receipt-product">Q12 (ONT, 101.0s) — <em>rating: <strong>ERROR</strong> — Ontology HTTP 500 (~100s timeout) on multi-hop customer-&gt;receipt-&gt;product</em><a class="headerlink" href="#q12-ont-1010s-rating-error-ontology-http-500-100s-timeout-on-multi-hop-customer-receipt-product" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> List the distinct products purchased by the customer with the highest number of receipts.</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[HTTP 500] {&quot;error&quot;:{&quot;code&quot;:-32603,&quot;message&quot;:&quot;The server was unable to complete your request due to an internal error&quot;,&quot;data&quot;:{&quot;requestId&quot;:&quot;&lt;redacted-request-id&gt;&quot;}},&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1}
+</span></code></pre></div>
+<h2 id="section-3-omnichannel">Section 3 Omnichannel<a class="headerlink" href="#section-3-omnichannel" title="Permanent link">&para;</a></h2>
+<h3 id="q15-da-150s-rating-pass">Q15 (DA, 15.0s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q15-da-150s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Compare average order value and units per order between in-store and online channels.</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Here is the comparison between in-store and online sales channels:
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>- Average Order Value:
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  - In-Store: $689.25
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  - Online: $77.29
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>- Units per Order:
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  - In-Store: 27.38 units
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  - Online: 3.91 units
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>In-store orders tend to have significantly higher value and more items per transaction compared to online orders.
+</span></code></pre></div>
+<h3 id="q16-da-361s-rating-pass">Q16 (DA, 36.1s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q16-da-361s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is the online order fulfillment mix across Ship-from-DC, Ship-from-Store, and BOPIS?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>The online order fulfillment mix is as follows:
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>- Ship-from-Distribution Center (DC): 59.96%
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>- Ship-from-Store: 30.11%
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>- Buy Online Pickup In Store (BOPIS): 9.93%
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>This breakdown shows that the majority of online orders are fulfilled from distribution centers, followed by fulfillment from stores, with BOPIS being the smallest portion of the mix.
+</span></code></pre></div>
+<h2 id="section-4-inventory">Section 4 Inventory<a class="headerlink" href="#section-4-inventory" title="Permanent link">&para;</a></h2>
+<h3 id="q20-da-286s-rating-pass-inventory-balance-fixed-all-positions-positive-re-tested-after-redeploy">Q20 (DA, 28.6s) — <em>rating: <strong>PASS</strong> — Inventory balance fixed; all positions positive (re-tested after redeploy)</em><a class="headerlink" href="#q20-da-286s-rating-pass-inventory-balance-fixed-all-positions-positive-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is current total units on hand across stores versus distribution centers, and the inventory to sales ratio?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>- Total units on hand at stores: 8,057,733
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>- Total units on hand at distribution centers: 10,954,670
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>- Total units on hand across the entire network: 19,012,403
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>- Inventory to sales ratio: 0.03
+</span></code></pre></div>
+<p><em>Was -195,326,490 (store) before the demand-aware inventory-seed fix. After redeploy + pipeline re-run, <code>inventory_position_current</code> is 100% positive (min 40, max 2,789, 0 negatives across 100,500 rows).</em></p>
+<h3 id="q23-ont-110s-rating-pass-simple-single-relationship-traversal-worked">Q23 (ONT, 11.0s) — <em>rating: <strong>PASS</strong> — Simple single-relationship traversal worked</em><a class="headerlink" href="#q23-ont-110s-rating-pass-simple-single-relationship-traversal-worked" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which distribution center and which trucks are assigned to serve stores? Show distribution center to truck relationships.</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>{&quot;raw&quot;:{&quot;Fields&quot;:[&quot;DistributionCenter_id&quot;,&quot;Truck_id&quot;,&quot;TruckAssignedToDistributionCenter_id&quot;],&quot;Value&quot;:[[1,11,11],[1,1,1],[1,6,6],[3,3,3],[3,13,13],[3,8,8],[5,10,10],[5,5,5],[4,9,9],[4,4,4],[2,12,12],[2,7,7],[2,2,2]]},&quot;naturalLanguageResponse&quot;:&quot;The following distribution centers have the associated trucks assigned to serve stores:\n\n- Distribution Center 1: Truck 11 (11), Truck 1 (1), Truck 6 (6)\n- Distribution Center 3: Truck 3 (3), Truck 13 (13), Truck 8 (8)\n- Distribution Center 5: Truck 10 (10), Truck 5 (5)\n- Distribution Center 4: Truck 9 (9), Truck 4 (4)\n- Distribution Center 2: Truck 12 (12), Truck 7 (7), Truck 2 (2)\n\n(The numbers in parentheses are the corresponding TruckAssignedToDistributionCenter_id values.)&quot;}
+</span></code></pre></div>
+<h2 id="section-5-trafficrt">Section 5 Traffic/RT<a class="headerlink" href="#section-5-trafficrt" title="Permanent link">&para;</a></h2>
+<h3 id="q27-da-254s-rating-pass">Q27 (DA, 25.4s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q27-da-254s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is the average customer dwell time by store zone, and where do customers linger longest?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>The average customer dwell time by store zone is as follows:
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>- **Aisles A:** Customers spend the most time here, with average dwell times per store around 299–302 minutes. This is the zone where customers linger the longest by a significant margin.
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>- **Aisles B:** Average dwell times are around 208–211 minutes per store, making this the second longest linger zone.
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>- **Checkout:** Here, average dwell times are around 164–166 minutes per store.
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>- **Entrance/Main Entrance:** Customers spend the least time here, averaging about 67–68 minutes per store.
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>**Conclusion:** Customers linger the longest in the &quot;Aisles A&quot; zone across nearly all stores. This zone markedly outpaces all other zones in terms of average customer dwell time.
+</span></code></pre></div>
+<h3 id="q29-da-244s-rating-pass-now-honors-the-most-recent-15-min-window-re-tested-after-redeploy">Q29 (DA, 24.4s) — <em>rating: <strong>PASS</strong> — Now honors the most-recent 15-min window (re-tested after redeploy)</em><a class="headerlink" href="#q29-da-244s-rating-pass-now-honors-the-most-recent-15-min-window-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What were the top selling products in the most recent 15 minute window?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>The top selling products in the most recent 15-minute window were:
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>1. White Truffle Powder (Pantry, Prime Pantry) — $923.31 revenue, 3 units
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>2. Shark Fin Soup (Pantry, Harvest Gold) — $716.76 revenue, 4 units
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>3. Office Chair Ergonomic (Furniture, Print Office) — $528.92 revenue, 4 units
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>4. Women&#39;s Running Shoes (Women&#39;s Apparel, Core Clothing) — $528.48 revenue, 6 units
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>5. Smart Fitness Tracker (Wearables, Byte Systems) — $493.80 revenue, 3 units
+</span></code></pre></div>
+<p><em>Was lifetime totals ($320M revenue, 2.2M units) before the fix. The Gold <code>top_products_15m</code> builder now keeps only the most-recent 15-min window (233 rows, single <code>computed_at</code>) instead of summing all historical windows (was 35.3M rows).</em></p>
+<h2 id="section-6-marketing">Section 6 Marketing<a class="headerlink" href="#section-6-marketing" title="Permanent link">&para;</a></h2>
+<h3 id="q31-da-200s-rating-pass">Q31 (DA, 20.0s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q31-da-200s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is total marketing spend and impressions by campaign, and the resulting CPM?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Here are the total marketing spend and impressions by campaign, along with the resulting CPM (cost per thousand impressions) for each campaign:
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>- For each campaign, CPM is calculated as: CPM = (Total Marketing Spend / Total Impressions) x 1000.
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Examples:
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>- Campaign ID: CAMP2025062201 — Total Spend: $1,582.76, Impressions: 3,994, CPM: $396.28
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>- Campaign ID: CAMP2025062202 — Total Spend: $8,043.99, Impressions: 16,336, CPM: $492.41
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>- Campaign ID: CAMP2025062203 — Total Spend: $880.39, Impressions: 8,764, CPM: $100.46
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>This pattern continues for all campaigns. If you need specific campaigns or want the values in a table or in file format, let me know!
+</span></code></pre></div>
+<h3 id="q33-ont-1011s-rating-error-ontology-http-500-on-promotion-customer-store">Q33 (ONT, 101.1s) — <em>rating: <strong>ERROR</strong> — Ontology HTTP 500 on promotion-&gt;customer-&gt;store</em><a class="headerlink" href="#q33-ont-1011s-rating-error-ontology-http-500-on-promotion-customer-store" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which customers redeemed promotions, and at which stores were promotions applied?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>[HTTP 500] {&quot;error&quot;:{&quot;code&quot;:-32603,&quot;message&quot;:&quot;The server was unable to complete your request due to an internal error&quot;,&quot;data&quot;:{&quot;requestId&quot;:&quot;&lt;redacted-request-id&gt;&quot;}},&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1}
+</span></code></pre></div>
+<h2 id="section-7-segmentation">Section 7 Segmentation<a class="headerlink" href="#section-7-segmentation" title="Permanent link">&para;</a></h2>
+<h3 id="q35-da-144s-rating-pass">Q35 (DA, 14.4s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q35-da-144s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> How many customers are in each customer segment, and what is the average monetary value per segment?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Here’s the information on each customer segment:
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>- At Risk: 8,055 customers, with an average monetary value of 37,947.07 per customer.
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>- Champions: 5,312 customers, with an average monetary value of 99,195.37 per customer.
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>- Hibernating: 6,206 customers, with an average monetary value of 41,530.63 per customer.
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>- Potential Loyalists: 30,427 customers, with an average monetary value of 137,095.95 per customer.
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>If you want more details about each segment, let me know!
+</span></code></pre></div>
+<h3 id="q37-da-183s-rating-pass">Q37 (DA, 18.3s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q37-da-183s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which customer segment has the worst recency, and what is its average frequency and average order value?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>The customer segment with the worst recency is the &quot;Hibernating&quot; segment. For this segment:
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>- Average frequency: 66.51
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>- Average order value: $658.64
+</span></code></pre></div>
+<h2 id="section-8-churn">Section 8 Churn<a class="headerlink" href="#section-8-churn" title="Permanent link">&para;</a></h2>
+<h3 id="q39-da-123s-rating-pass">Q39 (DA, 12.3s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q39-da-123s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> How many customers are predicted to churn, what is the predicted churn rate percent, and the average churn probability?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>- Customers predicted to churn: 8,610
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>- Predicted churn rate percent: 17.2%
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>- Average churn probability: 18.2%
+</span></code></pre></div>
+<h3 id="q42-ont-240s-rating-empty-ontology-returned-no-rows-for-churn-risk-segment">Q42 (ONT, 24.0s) — <em>rating: <strong>EMPTY</strong> — Ontology returned no rows for churn-risk + segment</em><a class="headerlink" href="#q42-ont-240s-rating-empty-ontology-returned-no-rows-for-churn-risk-segment" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which customers have a high churn risk prediction, and what customer segment is each of them in?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>{&quot;raw&quot;:{&quot;Fields&quot;:[],&quot;Value&quot;:[]},&quot;naturalLanguageResponse&quot;:&quot;No results were found.&quot;}
+</span></code></pre></div>
+<h2 id="section-9-forecast">Section 9 Forecast<a class="headerlink" href="#section-9-forecast" title="Permanent link">&para;</a></h2>
+<h3 id="q44-da-216s-rating-pass">Q44 (DA, 21.6s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q44-da-216s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What are total forecasted units by store, and which stores have the widest forecast confidence interval?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Here are the answers to your questions:
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>1. **Total forecasted units by store**:
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>   - Each store has a specific forecasted unit value. Some examples:
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>     - S000001: 174,281 units
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>     - S000025: 341,882 units
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>     - S000031: 345,886 units
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>     - ...and more for all 50 stores.
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>2. **Stores with the widest forecast confidence interval**:
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>   - The stores with the widest confidence intervals (indicating the most uncertainty in their forecasts) are:
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>     - S000031: Forecasted 345,886 units, Confidence Interval Width 507,075
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>     - S000025: Forecasted 341,882 units, Confidence Interval Width 503,574
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>     - S000026: Forecasted 323,563 units, Confidence Interval Width 493,947
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>     - S000044: Forecasted 317,863 units, Confidence Interval Width 490,728
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>     - S000021: Forecasted 290,830 units, Confidence Interval Width 480,381
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a>If you’d like detailed numbers or a complete list, let me know!
+</span></code></pre></div>
+<h3 id="q45-da-256s-rating-pass">Q45 (DA, 25.6s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q45-da-256s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which product and store combinations have the highest forecast MAPE?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>The product and store combinations with the highest forecast MAPE (Mean Absolute Percentage Error) are as follows:
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>- Products:
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>  - Abalone Canned
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  - Acai Berry Powder
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  - All Beef Hot Dogs 10ct
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  - All-Purpose Cleaner Spray
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>- Stores:
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>  - All stores labeled S000001 to S000050
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>- For these products and stores, the forecast MAPE is extremely high at 7,440.60%.
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>This indicates that these specific product and store combinations had the largest gaps between forecasted and actual values.
+</span></code></pre></div>
+<h2 id="section-10-stockout">Section 10 Stockout<a class="headerlink" href="#section-10-stockout" title="Permanent link">&para;</a></h2>
+<h3 id="q48-da-279s-rating-pass-stockout-risk-ranked-days-of-inventory-now-positive-re-tested-after-redeploy">Q48 (DA, 27.9s) — <em>rating: <strong>PASS</strong> — Stockout risk ranked; days-of-inventory now positive (re-tested after redeploy)</em><a class="headerlink" href="#q48-da-279s-rating-pass-stockout-risk-ranked-days-of-inventory-now-positive-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which store and product positions are at high stockout risk, ranked by stockout probability, with days of inventory remaining?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Store and product combinations at highest risk of stockout, ranked by
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>stockout probability with remaining days of inventory:
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>1. Store S000029, Women&#39;s Running Shoes — 97.1% probability, 0.9 days inventory
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>2. Store S000031, Cornbread Mix 8.5oz — 96.8%, 0.5 days
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>3. Store S000008, Birthday Candles 24ct — 96.6%, 0.6 days
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>4. Store S000008, Ceramic Dinner Plate Set — 96.5%, 0.9 days
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>5. Store S000043, Cornbread Mix 8.5oz — 96.4%, 1.1 days
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>6. Store S000047, Fresh Corn Sweet — 96.3%, 9.3 days
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>7. Store S000029, Memory Foam Pillow — 96.1%, 1.0 days
+</span></code></pre></div>
+<p><em>Days-of-inventory were large negatives (-200 to -428) before the inventory fix; they now read as realistic positive days-on-hand.</em></p>
+<h3 id="q49-da-222s-rating-pass-now-positive-days-of-inventory-re-tested-after-redeploy">Q49 (DA, 22.2s) — <em>rating: <strong>PASS</strong> — Now positive days-of-inventory (re-tested after redeploy)</em><a class="headerlink" href="#q49-da-222s-rating-pass-now-positive-days-of-inventory-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> How many SKUs are flagged high stockout risk, and the average days of inventory and daily demand velocity across them?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>There are 907 SKUs flagged as high stockout risk. Across these SKUs, the
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>average days of inventory is 4.0 days, and their average daily demand
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>velocity is 22.11 units per day.
+</span></code></pre></div>
+<p><em>Was 2,010 SKUs with avg days-of-inventory -360.4 before the fix. Now realistic: 907 SKUs, 4.0 days, velocity 22.11.</em></p>
+<h2 id="section-11-marketbasket">Section 11 MarketBasket<a class="headerlink" href="#section-11-marketbasket" title="Permanent link">&para;</a></h2>
+<h3 id="q52-da-244s-rating-pass-market-basket-rules-now-in-the-model-re-tested-after-redeploy">Q52 (DA, 24.4s) — <em>rating: <strong>PASS</strong> — Market-basket rules now in the model (re-tested after redeploy)</em><a class="headerlink" href="#q52-da-244s-rating-pass-market-basket-rules-now-in-the-model-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What are the strongest bought-together product pairs by lift and confidence?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>The strongest bought-together product pairs, by lift and confidence:
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>- White Truffle Powder pairings — confidence up to 0.26, lift up to 5.99
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>- Smart Fitness Tracker → White Truffle Powder — confidence ~0.26, lift ~5.99
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>- Women&#39;s Running Shoes → White Truffle Powder — confidence ~0.26, lift ~5.87
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>- Christmas Tree Lights LED → White Truffle Powder — confidence ~0.24, lift ~5.60
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>- Dog Food Dry 15lb Bag → White Truffle Powder — confidence ~0.24, lift ~5.60
+</span></code></pre></div>
+<p><em>Was HTTP 500 before, because <code>product_recommendations</code> didn't exist (notebook 07 found 0 rules at 1% support). Fix: bound FP-Growth to the top-200 products by basket frequency, allowing <code>MIN_SUPPORT=0.001</code>. Now 100 association rules (lift 5.6–6.0) and 199 recommendations. <strong>Caveat:</strong> with the top-products cap, one high-frequency product (White Truffle Powder) dominates the consequents — fine for a demo but the rule set isn't very diverse.</em></p>
+<h2 id="section-12-elasticity">Section 12 Elasticity<a class="headerlink" href="#section-12-elasticity" title="Permanent link">&para;</a></h2>
+<h3 id="q55-da-260s-rating-pass-price_elasticity-now-in-the-model-re-tested-after-redeploy">Q55 (DA, 26.0s) — <em>rating: <strong>PASS</strong> — price_elasticity now in the model (re-tested after redeploy)</em><a class="headerlink" href="#q55-da-260s-rating-pass-price_elasticity-now-in-the-model-re-tested-after-redeploy" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which products are highly elastic versus inelastic based on price elasticity?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Highly elastic products (large demand change with price):
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>- Ceramic Dinner Plate Set (Kitchen)
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>- Wireless Computer Mouse (Computer)
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>- Cordyceps Sinensis (Pantry)
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>- Smart Fitness Tracker (Wearables)
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>- Electric Toothbrush (Oral Care)
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>- Non-Stick Frying Pan 12in (Kitchen)
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>- Dog Food Dry 15lb Bag (Dog)
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>- Kids&#39; Sneakers Size 10 (Children&#39;s Apparel)
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>- Wireless Bluetooth Headphones (Audio)
+</span></code></pre></div>
+<p><em>Was "MISSING" before — <code>price_elasticity</code> (100 rows) existed in the lakehouse but the model table was unrefreshed. Fix: redeploy the SemanticModel TMDL + run a full dataset refresh so the DirectLake table binds.</em></p>
+<h2 id="section-13-journey">Section 13 Journey<a class="headerlink" href="#section-13-journey" title="Permanent link">&para;</a></h2>
+<h3 id="q59-da-195s-rating-pass">Q59 (DA, 19.5s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q59-da-195s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What are the most common in-store zone transition paths for customers?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>The most common in-store zone transition paths for customers are:
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>1. ENTRANCE → CHECKOUT
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>2. CHECKOUT → GROCERY
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>3. GROCERY → ELECTRONICS
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>4. CLOTHING → GROCERY
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>5. ELECTRONICS → GROCERY
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>6. ELECTRONICS → ENTRANCE
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>7. ELECTRONICS → CHECKOUT
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>8. CHECKOUT → ENTRANCE
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>9. ENTRANCE → CLOTHING
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>10. CLOTHING → CHECKOUT
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>These transitions represent the most frequent movement patterns as customers navigate between store zones. The list shows common paths such as moving from the Entrance straight to Checkout, or from Checkout to Grocery, highlighting typical shopping journeys.
+</span></code></pre></div>
+<h2 id="section-14-delivery">Section 14 Delivery<a class="headerlink" href="#section-14-delivery" title="Permanent link">&para;</a></h2>
+<h3 id="q62-da-290s-rating-pass">Q62 (DA, 29.0s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q62-da-290s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is the predicted truck unload dwell time for deliveries, and which sites are at risk of long dwell?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>The predicted truck unload dwell times for deliveries vary across sites. The sites most at risk of long dwell times (i.e., consistently high predicted average dwell minutes and frequent recent breaches) include:
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>- STORE_50: 94.4 minutes (7 breach days in last 30)
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>- STORE_18: 92.9 minutes (7 breach days)
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>- STORE_4: 90.3 minutes (7 breach days)
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>- STORE_1: 88.3 minutes (7 breach days)
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>- STORE_7: 87.0 minutes (7 breach days)
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>- STORE_42: 86.7 minutes (7 breach days)
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>Sites with high predicted dwell times (80+ minutes) and multiple breach days should be considered at increased risk for long unload times.
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>If you require more details about specific sites or lesser-risk sites, let me know!
+</span></code></pre></div>
+<h2 id="section-15-anomaly">Section 15 Anomaly<a class="headerlink" href="#section-15-anomaly" title="Permanent link">&para;</a></h2>
+<h3 id="q64-da-519s-rating-pass-surfaced-inventory-velocity-drops-tied-to-inventory-bug">Q64 (DA, 51.9s) — <em>rating: <strong>PASS</strong> — Surfaced inventory velocity drops (tied to inventory bug)</em><a class="headerlink" href="#q64-da-519s-rating-pass-surfaced-inventory-velocity-drops-tied-to-inventory-bug" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Are there any recent sales or inventory anomalies, such as sudden velocity spikes or drops?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>Yes, there are recent inventory anomalies, specifically significant velocity drops (very low or negative days of inventory on hand) for a wide range of products at store S000001. Examples include:
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>- Candy Canes 12ct: -363.5 days of inventory
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>- Dark Chocolate Bar: -403.6 days of inventory
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>- Hot Dog Buns 8ct: -465.7 days of inventory
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>- Free Range Lamb Chops: -473.7 days of inventory
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>- USB Flash Drive 32GB: -441.8 days of inventory
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>- Potassium Citrate: -469.4 days of inventory
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>
+</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>These negative days of inventory suggest the products have either sold out rapidly or there are discrepancies in inventory tracking. This pattern affects a variety of products from food items to general merchandise, indicating widespread anomalous inventory velocity rather than isolated spikes or drops in sales for specific products.
+</span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>
+</span><span id="__span-24-12"><a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>If you want to focus on particular categories or stores for deeper analysis, let me know!
+</span></code></pre></div>
+<h2 id="section-16-crosssurface">Section 16 CrossSurface<a class="headerlink" href="#section-16-crosssurface" title="Permanent link">&para;</a></h2>
+<h3 id="q66-ont-153s-rating-empty-ontology-returned-no-rows-for-churn-risk-championsloyal">Q66 (ONT, 15.3s) — <em>rating: <strong>EMPTY</strong> — Ontology returned no rows for churn-risk + Champions/Loyal</em><a class="headerlink" href="#q66-ont-153s-rating-empty-ontology-returned-no-rows-for-churn-risk-championsloyal" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> Which high churn risk customers are also in the Champions or Loyal Customers segment?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>{&quot;raw&quot;:{&quot;Fields&quot;:[],&quot;Value&quot;:[]},&quot;naturalLanguageResponse&quot;:&quot;No results were found.&quot;}
+</span></code></pre></div>
+<h3 id="q67-da-302s-rating-pass-churn-ltv-5273m">Q67 (DA, 30.2s) — <em>rating: <strong>PASS</strong> — Churn LTV = $527.3M</em><a class="headerlink" href="#q67-da-302s-rating-pass-churn-ltv-5273m" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> What is the total historical monetary value of customers predicted to churn?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>The total historical monetary value of customers predicted to churn is $527,292,926.59.
+</span></code></pre></div>
+<h3 id="q72-da-386s-rating-pass">Q72 (DA, 38.6s) — <em>rating: <strong>PASS</strong></em><a class="headerlink" href="#q72-da-386s-rating-pass" title="Permanent link">&para;</a></h3>
+<p><strong>Q:</strong> For stores with below-median net sales, what are their highest stockout-risk products?</p>
+<p><strong>A:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>For stores with below-median net sales, the highest stockout-risk products are as follows:
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>- Brown Gravy Mix 1oz
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>- Hand Soap 12oz
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>- Hand Sanitizer Gel 8oz
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>- Dish Soap Liquid
+</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>- Plastic Food Wrap
+</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>- Fluoride Toothpaste 6oz
+</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>- Lip Balm SPF 15
+</span><span id="__span-27-10"><a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a>- Plastic Party Plates 20ct
+</span><span id="__span-27-11"><a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a>- Aluminum Foil 75 sq ft
+</span><span id="__span-27-12"><a id="__codelineno-27-12" name="__codelineno-27-12" href="#__codelineno-27-12"></a>- All-Purpose Cleaner Spray
+</span><span id="__span-27-13"><a id="__codelineno-27-13" name="__codelineno-27-13" href="#__codelineno-27-13"></a>- Sponges Kitchen 8-Pack
+</span><span id="__span-27-14"><a id="__codelineno-27-14" name="__codelineno-27-14" href="#__codelineno-27-14"></a>- Plastic Cups 50ct
+</span><span id="__span-27-15"><a id="__codelineno-27-15" name="__codelineno-27-15" href="#__codelineno-27-15"></a>- Paper Plates 100ct
+</span><span id="__span-27-16"><a id="__codelineno-27-16" name="__codelineno-27-16" href="#__codelineno-27-16"></a>- Cat Treats Salmon Flavor
+</span><span id="__span-27-17"><a id="__codelineno-27-17" name="__codelineno-27-17" href="#__codelineno-27-17"></a>- Dinner Napkins 200ct
+</span><span id="__span-27-18"><a id="__codelineno-27-18" name="__codelineno-27-18" href="#__codelineno-27-18"></a>- Gift Wrap Paper Roll
+</span><span id="__span-27-19"><a id="__codelineno-27-19" name="__codelineno-27-19" href="#__codelineno-27-19"></a>- Valentine&#39;s Day Cards 32ct
+</span><span id="__span-27-20"><a id="__codelineno-27-20" name="__codelineno-27-20" href="#__codelineno-27-20"></a>- Birthday Candles 24ct
+</span><span id="__span-27-21"><a id="__codelineno-27-21" name="__codelineno-27-21" href="#__codelineno-27-21"></a>- Deodorant Antiperspirant
+</span><span id="__span-27-22"><a id="__codelineno-27-22" name="__codelineno-27-22" href="#__codelineno-27-22"></a>- LED Light Bulb 60W
+</span><span id="__span-27-23"><a id="__codelineno-27-23" name="__codelineno-27-23" href="#__codelineno-27-23"></a>- Aquarium Fish Food Flakes
+</span><span id="__span-27-24"><a id="__codelineno-27-24" name="__codelineno-27-24" href="#__codelineno-27-24"></a>
+</span><span id="__span-27-25"><a id="__codelineno-27-25" name="__codelineno-27-25" href="#__codelineno-27-25"></a>These products in the below-median net sales stores are at highest risk of stockout, with stockout probabilities as high as 98.6% and negative days of inventory, indicating urgent replenishment needs. If you need a more detailed breakdown by store or specific product metrics, let me know!
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Retail Demo contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.action.edit","content.action.view","content.code.copy","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.path","navigation.top","navigation.tracking","search.highlight"],"search":"../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.49251538.min.js"></script>
+      
+    
+  </body>
+</html>

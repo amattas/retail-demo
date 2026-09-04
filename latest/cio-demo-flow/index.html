@@ -1,0 +1,3680 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the Microsoft Fabric retail demo.">
+      
+      
+        <meta name="author" content="Retail Demo contributors">
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/latest/cio-demo-flow/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.57">
+    
+    
+      
+        <title>CIO Demo Flow — Ordered Questions (data agent → ontology → action) - Microsoft Fabric Retail Demo</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.812a03bb.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cio-demo-flow-ordered-questions-data-agent-ontology-action" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="Microsoft Fabric Retail Demo" class="md-header__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Microsoft Fabric Retail Demo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CIO Demo Flow — Ordered Questions (data agent → ontology → action)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="Microsoft Fabric Retail Demo" class="md-nav__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    Microsoft Fabric Retail Demo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Start here
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Start here
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Plain-language glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/workspace-inventory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workspace and profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Explore the demo
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Explore the demo
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployed walkthrough
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployed walkthrough
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-data-platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data platform
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployed-analytics-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics and AI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/cio-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CIO walkthrough
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/presenter-journeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter journeys
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy and operate
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deploy and operate
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Design Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Design Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/requirements/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Requirements
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/core/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Core demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/traceability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_4" id="__nav_5_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/setup/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/setup/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_5" id="__nav_5_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployment
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/deployment/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/deployment/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_6" id="__nav_5_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Generation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/generation/generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/generation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_7" id="__nav_5_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Streaming
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/streaming/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/streaming/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_8" id="__nav_5_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Analytics
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/analytics/analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/analytics/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_9" id="__nav_5_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  ML and AI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/ml-ai/ml-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/ml-ai/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_10" id="__nav_5_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Power BI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Power BI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/power-bi/power-bi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/power-bi/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_11" id="__nav_5_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/operations/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/operations/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_12" id="__nav_5_2_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/security/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/security/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_13" id="__nav_5_2_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/documentation/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/requirements/modules/documentation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../design/specifications/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Specifications
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Specifications
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/core/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/core/solution-manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solution manifest
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/setup/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup CLI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/deployment/framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment framework
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/generation/data-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/streaming/event-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/analytics/fabric-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/ml-ai/model-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI contracts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/power-bi/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations runbook
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/security/access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Access control
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/specifications/modules/documentation/site/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation site
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Infrastructure
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security boundaries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/architecture/agentic-application/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Agentic application
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Threat model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/security/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-learned-from-testing-read-this-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What we learned from testing (read this first)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-report-connects-to-the-chat-read-this-its-the-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How the report connects to the chat (read this — it's the bridge)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ontology-real-time-question-bank-anchored-on-report-entities" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ontology + real-time question bank (anchored on report entities)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-flow-8-questions-2-actions-13-min" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The flow (≈8 questions + 2 actions, ~13 min)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The flow (≈8 questions + 2 actions, ~13 min)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#act-1-what-happened-data-agent-semantic-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Act 1 — "What happened" (Data Agent → semantic model)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#act-2-who-and-what-it-connects-to-ontology-graph-mcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Act 2 — "Who and what it connects to" (Ontology graph / MCP)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#act-3-whats-happening-right-now-ontology-live-events-kql-velocity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Act 3 — "What's happening right now" (Ontology live events + KQL velocity)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#act-4-what-we-should-do-about-it-operations-agents-recommend-approve" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Act 4 — "What we should do about it" (Operations agents → recommend → approve)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#act-5-closed-loop-governed-eventhouse-write-back-agent-operations-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Act 5 — "Closed loop, governed" (Eventhouse write-back → Agent Operations dashboard)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-what-answers-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick reference — what answers what
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys-to-use-on-stage-read-them-off-the-report-dont-invent-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Keys to use on stage — read them off the report, don't invent them
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#do-not-ask-the-ontology-these-on-stage-they-failare-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Do NOT ask the ontology these on stage (they fail/are slow)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caveats-to-frame-honestly" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Caveats to frame honestly
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/amattas/retail-demo/edit/main/docs/cio-demo-flow.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/amattas/retail-demo/raw/main/docs/cio-demo-flow.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="cio-demo-flow-ordered-questions-data-agent-ontology-action">CIO Demo Flow — Ordered Questions (data agent → ontology → action)<a class="headerlink" href="#cio-demo-flow-ordered-questions-data-agent-ontology-action" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>A tight, <strong>empirically validated</strong> demo script. Every question below was tested live
+against the deployed Fabric retail demo through <code>/api/chat</code>. Each step names <strong>which
+brain answers it</strong> (semantic model via Data Agent, ontology graph via MCP, or an
+operations agent) and <strong>why</strong>, so you can narrate the routing decision on screen.</p>
+<p>The arc deliberately escalates: <strong>what happened → who/what it connects to → what's
+happening right now → what we should <em>do</em> about it.</strong> The last act lands the customer's
+ask — the agent says <em>"here is the situation, the recommended action is X"</em> and waits
+for your approval.</p>
+</blockquote>
+<hr />
+<h2 id="what-we-learned-from-testing-read-this-first">What we learned from testing (read this first)<a class="headerlink" href="#what-we-learned-from-testing-read-this-first" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Updated 2026-06-26</strong> after deduping the ontology bindings to <em>one event table → one
+owning entity</em> and re-validating live. The ontology now <strong>does</strong> have a reliable
+real-time-over-Eventhouse story — for the right question shapes.</p>
+</blockquote>
+<p>The ontology is <strong>not</strong> a general-purpose query engine. Through the Fabric NL→graph
+translator, it is reliable for a specific set of shapes and flaky/failing for the rest:</p>
+<table>
+<thead>
+<tr>
+<th>Works reliably on the ontology</th>
+<th>Fails on the ontology (route elsewhere)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ML prediction surfaced as a relationship</strong> — "which stores are at stockout risk for product X" (17s)</td>
+<td><strong><code>receipt_created</code> aggregations</strong> — sales/velocity by store, "sales per minute" (table too high-volume → ~100s → 500)</td>
+</tr>
+<tr>
+<td><strong>Named-entity facets</strong> — a customer (by loyalty card) → segment, churn probability, geography (14–33s)</td>
+<td><strong>Cross-entity traversal <em>over events</em></strong> — "stockouts by store region", "category of stocked-out products" (not supported / data too large)</td>
+</tr>
+<tr>
+<td><strong>Live event counts grouped by the owning key</strong> — "stockout_detected events for each store_id", "reorder_triggered by store_id", "truck_arrived by dc_id" (8–18s)</td>
+<td><strong><code>store N</code> <em>entity-name</em> resolution</strong> — "what geography is store 10 in" (Store display name is <code>S000010</code>, not <code>10</code>)</td>
+</tr>
+<tr>
+<td><strong>Single-entity live drill-down</strong> — "product_id values from stockout_detected at store_id 28" (~2,010 rows, 55s)</td>
+<td><strong>Open-ended "360 view"</strong> of an entity (100s → 500)</td>
+</tr>
+<tr>
+<td><strong>ML / dimension distributions</strong> — "customers in each churn risk category", "stores per region", "products per category" (8–12s)</td>
+<td><strong>Deep 2-hop traversals</strong> — customer → orders/receipts → products across channels</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implication for the demo:</strong> the ontology now has <strong>three</strong> strengths to show — (1) the
+<strong>model's predictions as first-class relationships</strong> in the graph, (2) <strong>named-customer
+enrichment</strong>, and (3) <strong>live event aggregations over the Eventhouse</strong> grouped by the owning
+entity's key (stockouts, reorders, truck arrivals). The one place the <strong>full</strong> ontology must
+<strong>not</strong> go is unbounded <strong><code>receipt_created</code> sales-velocity</strong> — that high-volume stream 500s the
+full graph. For live "last 15 minutes" store sales velocity we use a <strong>purpose-built lite
+ontology</strong> bound to the live event tables (Store + receipt_created), which the app auto-routes to;
+a <strong>direct KQL panel</strong> is the raw fallback. This split is a <em>stronger</em> story: each brain does what
+it's best at, and the router proves it on screen.</p>
+<hr />
+<h2 id="how-the-report-connects-to-the-chat-read-this-its-the-bridge">How the report connects to the chat (read this — it's the bridge)<a class="headerlink" href="#how-the-report-connects-to-the-chat-read-this-its-the-bridge" title="Permanent link">&para;</a></h2>
+<p>The biggest demo trap is asking the chat "random" questions that have nothing to do with what's
+on the Power BI report. Don't. <strong>The report is the visual anchor; the chat drills into the
+specific entity you're looking at.</strong> Concretely, the <code>retail_model</code> report is built around three
+<strong>drill-through</strong> entities — and those are the <em>only</em> identifiers you should feed the chat:</p>
+<table>
+<thead>
+<tr>
+<th>You see on the report…</th>
+<th>…on these pages</th>
+<th>Drill-through entity (right-click → <em>Drill through</em>)</th>
+<th>What you then ask the chat about</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Store Number</strong> (e.g. 28)</td>
+<td>Executive Cockpit (top stores), Supply Chain Control Tower, Operations &amp; Marketing</td>
+<td><strong>Store Detail</strong> (filtered by <code>dim_stores[Store Number]</code>)</td>
+<td>live stockouts/reorders <strong>for that store_id</strong></td>
+</tr>
+<tr>
+<td><strong>Product Name</strong> (e.g. "Memory Foam Pillow")</td>
+<td>Supply Chain Control Tower, Sales, Product Detail</td>
+<td><strong>Product Detail</strong> (filtered by <code>dim_products</code>)</td>
+<td>live inventory updates / stockout risk <strong>for that product_id</strong></td>
+</tr>
+<tr>
+<td><strong>Receipt</strong></td>
+<td>Receipt Detail</td>
+<td><strong>Receipt Detail</strong></td>
+<td>line items, payment, promo for that receipt</td>
+</tr>
+</tbody>
+</table>
+<p><strong>How to get the IDs you need on stage:</strong> you never invent them — you <em>read them off the report</em>.
+- The <strong>Supply Chain Control Tower</strong> lists stores with their <strong>Stockout Events</strong> and <strong>High Risk SKUs</strong>, and products with <strong>Avg Stockout Probability</strong> / <strong>Total Reorder Quantity</strong>. Pick the worst store/product <em>you can see</em> → that's your <code>store_id</code> / <code>product_id</code> for the chat.
+- The <strong>Executive Cockpit</strong> "top stores" visual gives you store numbers; <strong>Operations &amp; Marketing</strong> shows <strong>Risk Category</strong> and <strong>Predicted Churn Rate %</strong> (the churn cohort), and <strong>Campaign ID</strong>.
+- The <strong>Product Detail</strong> drill page shows a product's <strong>Total Units on Hand</strong>, <strong>Avg Days of Inventory</strong>, <strong>Avg Daily Demand Velocity</strong>, and <strong>stores at risk</strong> — the exact things the ontology/agents then act on live.</p>
+<blockquote>
+<p>⚠️ <strong>There is no customer loyalty-card field anywhere on this report.</strong> Earlier drafts asked
+the ontology about <code>LC012304678</code> — drop those on stage; a viewer has no way to pick a loyalty
+card off the screen. Keep the customer/churn story at the <strong>cohort</strong> level (Risk Category,
+Customers At Risk on Operations &amp; Marketing), which <em>is</em> on the report, and let the <strong>Retention
+agent</strong> handle the individual targeting. Anchor everything else on <strong>Store Number</strong> and
+<strong>Product Name</strong>, which are the things you can actually point at.</p>
+</blockquote>
+<p><strong>The gesture that ties it together (do this once on stage):</strong> open <strong>Supply Chain Control
+Tower</strong> → point at a store with high <strong>Stockout Events</strong> (say store 28) → <strong>right-click → Drill
+through → Store Detail</strong> → now switch to the chat and ask the ontology <em>"for store_id 28, how
+many stockout_detected events are happening, and which products?"</em> The historical number you
+just saw on the report becomes the <strong>live</strong> event stream in the chat — same entity, deeper and
+in real time. That single move answers "how do these relate?"</p>
+<hr />
+<h2 id="ontology-real-time-question-bank-anchored-on-report-entities">Ontology + real-time question bank (anchored on report entities)<a class="headerlink" href="#ontology-real-time-question-bank-anchored-on-report-entities" title="Permanent link">&para;</a></h2>
+<p>More ontology-over-Eventhouse questions, each tied to something visible on the report. All use
+the <strong>validated shape</strong>: aggregate events by the <strong>owning entity's key</strong>, or drill a single
+entity. All rows below were <strong>run live on 2026-06-26</strong> (✅).</p>
+<table>
+<thead>
+<tr>
+<th>Report element it ties to</th>
+<th>Ontology + real-time question</th>
+<th>Owning entity</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Supply Chain → <strong>Stockout Events</strong> per store</td>
+<td>"How many stockout_detected events are there for each store_id?"</td>
+<td>Store</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Store Detail (drilled store S000028)</td>
+<td>"For store S000028, how many stockout_detected events have occurred, and which products were affected? List the product names only."</td>
+<td>Store</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Supply Chain → <strong>Total Reorder Quantity</strong></td>
+<td>"How many reorder_triggered events are there for each store_id?"</td>
+<td>Store</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Product Detail → <strong>Total Units on Hand</strong></td>
+<td>"Show the latest stock reading for White Truffle Powder with its timestamp and on-hand quantity."</td>
+<td>Product</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Product Detail → <strong>Avg Stockout Probability</strong></td>
+<td>"Which stores are at risk of selling out White Truffle Powder (the #1 bar on the Stockout Probability chart)?" (ML-as-relationship)</td>
+<td>Product/Store</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Inventory by product</td>
+<td>"How many inventory_updated events are there for each product_id?"</td>
+<td>Product</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Supply Chain logistics (inbound)</td>
+<td>"How many truck_arrived events are there for each dc_id?"</td>
+<td>DistributionCenter</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Supply Chain logistics (outbound)</td>
+<td>"How many truck_departed events are there for each dc_id?"</td>
+<td>DistributionCenter</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Validated NOT to use on the ontology</strong> (tested live 2026-06-26 — route these to the <strong>Data
+Agent / KQL</strong> instead): omnichannel order events (<code>online_order_*</code> — high-volume and the
+store/dc keys come back null), <code>payment_processed</code>, and <code>promotion_applied</code> all return 500 or
+mismatched columns through the ontology translator. The <strong>Omnichannel Fulfillment</strong> and
+<strong>Operations &amp; Marketing</strong> report pages are already served by the semantic model — keep those
+stories on the Data Agent.</p>
+<p><strong>Why live "last 15 minutes" sales velocity uses the LITE ontology, not the full one:</strong>
+aggregating <code>receipt_line_added</code>/<code>receipt_created</code> across the whole stream is far too
+high-volume for the full ontology translator (→ ~100s → 500), and the semantic-model Data Agent
+is a historical batch with no last-15-minutes data. So the app auto-routes the question to a
+<strong>lite ontology</strong> (Store + receipt_created) bound to the live event tables, which returns the
+<strong>top stores by live sales</strong> reliably. Ask it by <strong>store</strong> ("which stores sold the most…"), since
+the live receipt stream is keyed at the store level. Use a <strong>KQL panel</strong> for the raw fallback.
+Narrate the difference —
+the on-screen router badge proves which brain answered.</p>
+</blockquote>
+<hr />
+<h2 id="the-flow-8-questions-2-actions-13-min">The flow (≈8 questions + 2 actions, ~13 min)<a class="headerlink" href="#the-flow-8-questions-2-actions-13-min" title="Permanent link">&para;</a></h2>
+<h3 id="act-1-what-happened-data-agent-semantic-model">Act 1 — "What happened" (Data Agent → semantic model)<a class="headerlink" href="#act-1-what-happened-data-agent-semantic-model" title="Permanent link">&para;</a></h3>
+<p>Fast aggregate metrics. Establishes that the assistant answers in plain business language
+and shows its work (the trace shows it called the Data Agent over the star schema).</p>
+<ol>
+<li>
+<p><strong>"What were total net sales by department last quarter?"</strong>
+   → <em>Data Agent / semantic model.</em> Warm-up; a clean bar of numbers.</p>
+</li>
+<li>
+<p><strong>"Which 10 products have the highest stockout risk right now?"</strong>
+   → <em>Data Agent / semantic model (ML <code>stockout_risk</code> Gold table).</em>
+   Moves from "what happened" to "what the model predicts." Note in the trace it's the
+   <strong>ML table</strong>, not a rule. <em>Leave this on screen — it sets up Act 3.</em></p>
+</li>
+<li>
+<p><strong>"How many customers are predicted to churn, and what's their total lifetime value?"</strong>
+   → <em>Data Agent / semantic model (ML churn table).</em> The number that makes a CIO lean in:
+   <strong>8,286 customers ≈ $534M LTV at risk.</strong> <em>Sets up the retention action.</em></p>
+</li>
+</ol>
+<blockquote>
+<p><strong>Narration:</strong> "So far every answer came from the semantic model — the governed star
+schema and the ML Gold tables. Watch what happens when I ask a <em>relationship</em> question."</p>
+</blockquote>
+<hr />
+<h3 id="act-2-who-and-what-it-connects-to-ontology-graph-mcp">Act 2 — "Who and what it connects to" (Ontology graph / MCP)<a class="headerlink" href="#act-2-who-and-what-it-connects-to-ontology-graph-mcp" title="Permanent link">&para;</a></h3>
+<p>The <strong>validated</strong> ontology shapes. These are the moments to open the <strong>"how I reached this"</strong>
+trace and show <strong>Router → ontology</strong>, the <strong>graph path walked</strong>, and the <strong>raw rows</strong>.
+<strong>Anchor each on something you just pointed at in the report</strong> (a product on the Supply Chain
+Control Tower, a churn cohort on Operations &amp; Marketing).</p>
+<ol>
+<li>
+<p><strong>"Which stores are at risk of selling out White Truffle Powder (the #1 bar on the Stockout Probability chart)?"</strong>  <em>(read White Truffle Powder off the
+   Supply Chain Control Tower / Product Detail first)</em>
+   → <em>Ontology graph.</em> <strong>The headline ontology moment.</strong> The answer comes back as a list
+   of <em>stores with addresses</em> — because the <strong>ML stockout prediction is modeled as a
+   relationship</strong> (<code>Product —at-risk-at→ Store</code>) in the graph, fused with the static store
+   dimension. Narrate: <em>"The model's prediction is a first-class edge in the graph. The
+   semantic model can tell you the score; the ontology can tell you the </em><em>connected
+   entities</em><em> — which physical stores, where."</em></p>
+</li>
+<li>
+<p><strong>"How many customers are in each churn risk category?"</strong>  <em>(the report's Operations &amp;
+   Marketing page shows Risk Category + Customers At Risk — this is the same cohort, traversed)</em>
+   → <em>Ontology graph.</em> Customer → ChurnPrediction distribution (8,286 Very High / 41,714 Very
+   Low, ~8s). Narrate: <em>"The graph carries the ML churn class as a relationship on every
+   customer — the report shows the cohort, the graph lets me traverse it, and in Act 4 the
+   agent acts on it."</em> <em>(Static-traversal backups that also validate: "How many stores in each
+   geography region?", "How many products in each category?")</em></p>
+</li>
+</ol>
+<blockquote>
+<p><strong>Honesty beat (plays well with technical CIOs):</strong> "Notice I'm asking the ontology <em>prediction
+and structure</em> questions, anchored on entities I can see on the report — not high-volume sales
+aggregations. The router picks the right brain for each shape and tells you which one it used."</p>
+</blockquote>
+<hr />
+<h3 id="act-3-whats-happening-right-now-ontology-live-events-kql-velocity">Act 3 — "What's happening right now" (Ontology live events + KQL velocity)<a class="headerlink" href="#act-3-whats-happening-right-now-ontology-live-events-kql-velocity" title="Permanent link">&para;</a></h3>
+<p>The live layer. <strong>Start from the drill-through gesture:</strong> on the <strong>Supply Chain Control Tower</strong>,
+point at a store with high <strong>Stockout Events</strong> (say store 28), right-click → <strong>Drill through →
+Store Detail</strong>, then switch to the chat. The historical number on the report becomes the live
+event stream below — same <code>store_id</code>, in real time.</p>
+<ol>
+<li>
+<p><strong>"For store S000028, how many stockout_detected events have occurred, and which products were affected? List the product names only."</strong>
+   <em>(then: "How many stockout_detected events for each store?" and "…reorder_triggered events
+   for each store?")</em>
+   → <em>Ontology → Eventhouse.</em> Live per-store counts + the affected product list (~12–55s).
+   Narrate: <em>"The same graph that knows my store and product master is now reading the </em><em>event
+   stream</em><em> — these stockouts are landing right now, for the exact store I drilled into."</em>
+   Logistics variant tied to inbound flow: <em>"How many truck_arrived events for each dc_id?"</em></p>
+</li>
+<li>
+<p><strong>"Which stores sold the most in the last 15 minutes?"</strong> <em>(live revenue velocity)</em>
+   → <em>Lite ontology → live Eventhouse (the app auto-routes it; NOT the full ontology, NOT the
+   semantic-model Data Agent — say so).</em> The full ontology 500s on the unbounded <code>receipt_created</code>
+   scan and the Data Agent has no live data, so the app sends it to a <strong>lite ontology</strong> bound to the
+   live event tables, which returns the top stores by live sales (store number, location, amount).
+   Ask it by <strong>store</strong>, since the live receipt stream is keyed at the store level. Pair with the
+   <strong>KQL real-time dashboard</strong> in a second tab. Definitive raw-KQL fallback (live top stores, last
+   15 min — validated store 20 $8,130/77 txns):
+   <div class="language-kusto highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">receipt_created</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">|</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">ingestion_time</span><span class="p">()</span><span class="w"> </span><span class="p">&gt;</span><span class="w"> </span><span class="n">ago</span><span class="p">(</span><span class="mi">15</span><span class="n">m</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">|</span><span class="w"> </span><span class="k">summarize</span><span class="w"> </span><span class="n">sales</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">round</span><span class="p">(</span><span class="n">sum</span><span class="p">(</span><span class="n">total</span><span class="p">),</span><span class="w"> </span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="n">txns</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="k">count</span><span class="p">()</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">store_id</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">|</span><span class="w"> </span><span class="k">top</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">sales</span><span class="w"> </span><span class="n">desc</span>
+</span></code></pre></div>
+   Narrate: <em>"This isn't a refreshed report — it's the event stream, queried in place."</em></p>
+</li>
+</ol>
+<hr />
+<h3 id="act-4-what-we-should-do-about-it-operations-agents-recommend-approve">Act 4 — "What we should do about it" (Operations agents → recommend → approve)<a class="headerlink" href="#act-4-what-we-should-do-about-it-operations-agents-recommend-approve" title="Permanent link">&para;</a></h3>
+<p>The payoff, and the customer's exact ask: <strong>the agent states the situation, the variance
+vs. target, and the recommended action — then waits for a human.</strong></p>
+<ol>
+<li><strong>"Inventory is running low in some stores — what should we do?"</strong>
+   → <em>Inventory Replenishment agent.</em> It reads the live ML stockout rows (DAX shown in the
+   trace), applies its trigger rules, and responds in the customer's preferred shape:</li>
+</ol>
+<blockquote>
+<p><em>"</em><em>30 SKUs across 15 stores are at high stockout risk — ~$62K/day of sales exposed, and 8
+of them have no open reorder on record.</em><em> Recommended action: </em><em>draft 8 replenishment
+orders</em><em> sized to a 14-day cover target."</em></p>
+</blockquote>
+<p>A <strong>recommendation card</strong> appears: the worst SKUs (uncovered ones flagged red) and <strong>8
+   drafted reorders</strong>, each with <strong>Approve / Dismiss.</strong> <strong>Click Approve on one.</strong> The trace
+   shows the literal DAX the agent authored — this is the one path whose query we control.</p>
+<ol>
+<li><strong>"Churn is rising — can we launch a win-back campaign?"</strong>
+   → <em>Customer Retention agent.</em> It reads the churn + LTV rows, ranks by value, and responds:</li>
+</ol>
+<blockquote>
+<p><em>"</em><em>8,286 customers are predicted to churn ≈ $534M LTV at risk.</em><em> Recommended action:
+target the </em><em>top 50 by lifetime value (~$17.6M LTV)</em><em> with a win-back offer."</em></p>
+</blockquote>
+<p>A <strong>drafted campaign</strong> card appears with the targeted customers and the offer —
+   <strong>Approve / Dismiss.</strong> <strong>Approve it.</strong></p>
+<blockquote>
+<p><strong>Framing for the "variance" ask:</strong> the inventory agent's <em>"cover is below the 3-day
+target — exposure is $62K/day — recommended action: reorder to 14-day cover"</em> is exactly
+the <em>"the variance vs. plan is X, the recommended action is Y"</em> pattern the customer
+described, grounded in this dataset.</p>
+</blockquote>
+<hr />
+<h3 id="act-5-closed-loop-governed-eventhouse-write-back-agent-operations-dashboard">Act 5 — "Closed loop, governed" (Eventhouse write-back → Agent Operations dashboard)<a class="headerlink" href="#act-5-closed-loop-governed-eventhouse-write-back-agent-operations-dashboard" title="Permanent link">&para;</a></h3>
+<p>Open the <strong>Agent Operations</strong> tab. Every <strong>draft, approval, and dismissal</strong> from Acts 4 was
+<strong>written back into the Fabric Eventhouse</strong> (<code>agent_actions</code> table) and appears here in
+<strong>KPI cards, a per-minute timeline, a per-agent funnel, and a live feed</strong> (auto-refresh 5s).</p>
+<blockquote>
+<p><strong>Close:</strong> <em>"The AI isn't a black box bolted on the side. It reads governed Fabric data,
+recommends a specific action against numeric rules, requires a human approval, and logs
+every step back into Fabric where you can audit and report on it. That's a multi-agent
+application </em><em>powered by Fabric</em><em> — analytics, ML, real-time, and action in one fabric."</em></p>
+</blockquote>
+<hr />
+<h2 id="quick-reference-what-answers-what">Quick reference — what answers what<a class="headerlink" href="#quick-reference-what-answers-what" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Brain</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Net sales by department last quarter</td>
+<td>Data Agent / semantic model</td>
+<td>Aggregate over star schema</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Top-10 stockout-risk products</td>
+<td>Data Agent / semantic model</td>
+<td>ML Gold table, scalar scores</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Churn count + LTV at risk</td>
+<td>Data Agent / semantic model</td>
+<td>ML churn table</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Stores at risk of selling out White Truffle Powder (the #1 bar on the Stockout Probability chart)</td>
+<td><strong>Ontology</strong></td>
+<td>ML prediction as a graph <strong>relationship</strong> + store dim</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Customers in each churn risk category</td>
+<td><strong>Ontology</strong></td>
+<td>Customer → ChurnPrediction traversal (cohort on the report)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>stockout_detected events for store_id 28 (live)</td>
+<td><strong>Ontology</strong> → Eventhouse</td>
+<td>Live event drill-down for the drilled store</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Top stores by sales, last 15 min</td>
+<td><strong>Lite ontology → Eventhouse</strong></td>
+<td>Live sales velocity, store-level (NOT full ontology, NOT Data Agent)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Inventory low — what to do</td>
+<td><strong>Inventory agent</strong></td>
+<td>Recommend + draft + approve</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Churn rising — win-back</td>
+<td><strong>Retention agent</strong></td>
+<td>Recommend + draft + approve</td>
+</tr>
+</tbody>
+</table>
+<h2 id="keys-to-use-on-stage-read-them-off-the-report-dont-invent-them">Keys to use on stage — read them off the report, don't invent them<a class="headerlink" href="#keys-to-use-on-stage-read-them-off-the-report-dont-invent-them" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Store Number:</strong> any store shown on Executive Cockpit "top stores" or the Supply Chain
+  Control Tower (e.g. <strong>28</strong>). Drill through → Store Detail, then ask about that <code>store_id</code>.</li>
+<li><strong>Product:</strong> any product on the Supply Chain Control Tower / Product Detail (validated Grocery
+  ask by name — the ontology resolves it; IDs also work).. Stores 1–50, products ~1–2000.</li>
+<li><strong>Churn cohort:</strong> the <strong>Risk Category</strong> / <strong>Customers At Risk</strong> on Operations &amp; Marketing —
+  ask the ontology for the distribution, then let the Retention agent target individuals.</li>
+<li>⚠️ <strong>No loyalty-card field exists on this report</strong> — do not ask the chat about a specific
+  loyalty card on stage; keep customers at the cohort level.</li>
+</ul>
+<h2 id="do-not-ask-the-ontology-these-on-stage-they-failare-slow">Do NOT ask the ontology these on stage (they fail/are slow)<a class="headerlink" href="#do-not-ask-the-ontology-these-on-stage-they-failare-slow" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>receipt_created</code> sales/velocity</strong> — "total sales by store", "sales per minute" → too
+  high-volume, ~100s → 500. Route to the <strong>Data Agent</strong> ("last 15 minutes") or the <strong>KQL panel</strong>.</li>
+<li><strong>Cross-entity traversal <em>over events</em></strong> — "stockouts by store region", "category of
+  stocked-out products" → "not supported" / "data too large". Aggregate on the <strong>owning key</strong>
+  (store_id, dc_id) instead, then let an agent join.</li>
+<li><strong><code>store N</code> as a <em>Store entity</em></strong> — "what geography is store 10 in" → the display name is
+  <code>S000010</code>. (Note: filtering an <strong>event table</strong> by <code>store_id</code> 28 <em>does</em> work — that's a raw field.)</li>
+<li><strong>Open-ended "360 view"</strong> of an entity → times out (~100s → 500). Ask specific facets
+  (segment, churn, geography) instead.</li>
+<li><strong>Deep 2-hop traversals</strong> — customer → orders/receipts → products across channels; and
+  promotion → store/customer redemption traversals. Show these via the Data Agent.</li>
+</ul>
+<h2 id="caveats-to-frame-honestly">Caveats to frame honestly<a class="headerlink" href="#caveats-to-frame-honestly" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The <strong>churn model is aggressive</strong> (~16.6% flagged Very High at ~99% probability) and
+  <strong>LTV/sales totals are large</strong> (synthetic high prices/volumes). Frame retention impact
+  <strong>relatively</strong> ("target the top 50 by value"), not as precise dollars.</li>
+<li>After any ontology rebuild, wait for the <strong>graph model</strong> build to finish (monitor hub shows
+  <code>…_graph_… · In progress</code>) or early event questions intermittently 500.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Retail Demo contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.action.edit","content.action.view","content.code.copy","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.path","navigation.top","navigation.tracking","search.highlight"],"search":"../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.49251538.min.js"></script>
+      
+    
+  </body>
+</html>
