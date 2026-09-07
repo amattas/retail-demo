@@ -293,12 +293,12 @@
         relationship, real-time event, or a clearly labeled extension.
       </p>
       <div class="stats">
-        <div class="stat"><strong>40</strong><span>checked-in semantic tables</span></div>
-        <div class="stat"><strong>153</strong><span>checked-in curated measures</span></div>
-        <div class="stat"><strong>58</strong><span>checked-in model relationships</span></div>
+        <div class="stat"><strong>42</strong><span>checked-in semantic tables</span></div>
+        <div class="stat"><strong>180</strong><span>checked-in curated measures</span></div>
+        <div class="stat"><strong>62</strong><span>checked-in model relationships</span></div>
         <div class="stat"><strong>12</strong><span>checked-in ontology entities</span></div>
         <div class="stat"><strong>17</strong><span>checked-in ontology relationships</span></div>
-        <div class="stat"><strong>19</strong><span>defined real-time event types</span></div>
+        <div class="stat"><strong>18</strong><span>defined real-time event types</span></div>
       </div>
       <div class="scope-note">
         <strong>Current environment finding:</strong> the exact repository artifact
@@ -487,12 +487,12 @@
           ["Which customer segments hold the most monetary value and need reactivation?", "verified", "Data Agent", ["Segmented Monetary Value", "Segmented Customer Count", "Avg Recency (Days)"]],
           ["Which products should be bundled or cross-sold?", "verified", "Data Agent", ["Avg Recommendation Lift", "Avg Recommendation Confidence"]],
           ["Which stores can support a campaign without stocking out?", "current", "Data Agent", ["Avg Days of Inventory", "High Risk SKUs", "Total Units on Hand"]],
-          ["What incremental revenue and margin did each campaign cause?", "extension", "Attribution model", ["Marketing Spend (Channel)", "Net Sales", "Gross Profit"]]
+          ["What attributed revenue, ROAS, attribution rate, and spend did each campaign produce?", "current", "Data Agent", ["Campaign Attributed Revenue", "Campaign ROAS", "Attribution Rate %", "Campaign Spend"]]
         ],
         decisions: [
           ["Select campaign audience", "Prioritize valuable at-risk customer cohorts and relevant cross-sell products.", "Retention agent supports a top-50 win-back draft now."],
           ["Select activation stores", "Include stores with demand and coverage; explicitly exclude constrained stores.", "Supported in the flagship package."],
-          ["Reallocate spend", "Shift budget by marginal revenue or profit return.", "Requires campaign attribution / incrementality measure."]
+          ["Reallocate spend", "Shift budget using attributed revenue, ROAS, and reconciliation evidence.", "Implemented and contract-tested; confirm current Fabric freshness before presenting live."]
         ],
         actions: [
           ["Draft win-back campaign", "Target the highest-value predicted churn cohort with market-basket anchors.", "current"],
@@ -511,7 +511,7 @@
           ["Apply inventory truth", "Exclude stores with high stockout risk or thin cover.", "A campaign that will not create avoidable lost sales."],
           ["Draft the action", "Launch the retention agent or build the activation brief.", "A reviewable cohort/offer/store package."],
           ["Approve with safeguards", "Review customer count, LTV, exclusions, and evidence.", "Human-approved campaign draft."],
-          ["Measure the gap", "Compare spend and revenue now; explain that incrementality is the next model extension.", "An honest current-state close."]
+          ["Measure the outcome", "Compare campaign spend, attributed revenue, ROAS, attribution rate, and reconciliation variance.", "A seven-day last-touch result with its model and period stated explicitly."]
         ]
       },
       {
@@ -916,7 +916,7 @@
     function renderCapabilities() {
       document.getElementById("capabilities").innerHTML = `
         <section class="panel section">
-          <div class="section-heading"><div><h3>Current semantic model</h3><p>Direct Lake model with 40 tables, 153 measures, and 58 relationships.</p></div></div>
+          <div class="section-heading"><div><h3>Current semantic model</h3><p>Direct Lake model with 42 tables, 180 measures, and 62 relationships.</p></div></div>
           <div class="model-groups">${foundations.groups.map(item => `
             <article class="model-group"><h4>${escapeHtml(item[0])}</h4><p>${escapeHtml(item[1])}</p></article>`).join("")}</div>
         </section>
@@ -936,7 +936,7 @@
         <section class="panel section">
           <div class="section-heading"><div><h3>Previously validated behavior</h3><p>Documented repository test results from June 26, 2026; not re-verified against a discoverable exact model in the current inspection.</p></div></div>
           <div class="capability-grid">
-            <article class="capability-card"><h4>Strong</h4><ul><li>Semantic-model aggregates, trends, rankings, channel mix, segmentation, churn, forecast, stockout risk, recommendations, and elasticity.</li><li>Ontology single-relationship traversal, named-entity facets, stockout prediction relationships, and live event counts grouped by store, product, or DC key.</li><li>Draft replenishment and retention actions with human approval/dismissal and Eventhouse logging.</li></ul></article>
+            <article class="capability-card"><h4>Strong</h4><ul><li>Semantic-model aggregates, trends, rankings, channel mix, segmentation, churn, forecast, stockout risk, recommendations, elasticity, and seven-day last-touch marketing attribution.</li><li>Ontology single-relationship traversal, named-entity facets, stockout prediction relationships, and live event counts grouped by store, product, or DC key.</li><li>Draft replenishment and retention actions with human approval/dismissal and Eventhouse logging.</li></ul></article>
             <article class="capability-card"><h4>Use carefully</h4><ul><li>Deep or open-ended ontology traversals and high-volume receipt-event aggregations can fail or time out.</li><li>The full ontology should not be used for sales velocity; use the lite ontology or direct KQL path.</li><li>Semantic and ontology Data Agent instruction fields are currently null and should be authored before treating natural-language behavior as production-ready.</li></ul></article>
           </div>
         </section>
