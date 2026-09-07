@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retail Growth Persona & Journey Explorer</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--cp-bg); color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    button, input, select { font: inherit; }
+    a { color: var(--cp-link); }
+    .topbar {
+      position: sticky; top: 0; z-index: 20; display: flex; align-items: center;
+      justify-content: space-between; gap: 20px; padding: 14px clamp(20px, 4vw, 64px);
+      background: var(--cp-panel-strong); border-bottom: 1px solid var(--cp-border);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+    .brand-mark {
+      width: 30px; height: 30px; display: grid; place-items: center;
+      border-radius: 0.625rem; color: var(--cp-accent-fg); background: var(--cp-accent);
+    }
+    .topbar nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    .topbar a {
+      padding: 7px 10px; border-radius: 0.625rem; color: var(--cp-text-muted);
+      text-decoration: none; font-size: 13px; font-weight: 700;
+    }
+    .topbar a.active, .topbar a:hover { color: var(--cp-accent); background: var(--cp-accent-soft); }
+    .hero {
+      padding: 52px clamp(20px, 5vw, 80px) 30px;
+      background: var(--cp-bg-elevated); border-bottom: 1px solid var(--cp-border);
+    }
+    .hero-inner { width: min(1500px, 100%); margin: 0 auto; }
+    .eyebrow {
+      margin: 0 0 8px; color: var(--cp-accent); font-size: 11px;
+      font-weight: 900; letter-spacing: 1.1px; text-transform: uppercase;
+    }
+    h1 { max-width: 980px; margin: 0; font-size: clamp(36px, 5vw, 66px); line-height: 1; letter-spacing: -2.4px; }
+    .hero-copy { max-width: 940px; color: var(--cp-text-muted); font-size: 18px; line-height: 1.6; }
+    .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 28px; }
+    .stat {
+      padding: 14px; border: 1px solid var(--cp-border); border-radius: 0.625rem;
+      background: var(--cp-surface);
+      box-shadow: 0 0 2px var(--cp-border), 0 1px 2px var(--cp-border);
+    }
+    .stat strong { display: block; font-size: 24px; }
+    .stat span { color: var(--cp-text-muted); font-size: 11px; }
+    .scope-note {
+      margin-top: 16px; padding: 12px 14px; border-left: 4px solid var(--cp-warning);
+      background: var(--cp-surface); color: var(--cp-text-muted); font-size: 13px; line-height: 1.5;
+    }
+    .workspace {
+      width: min(1500px, 100%); margin: 0 auto; padding: 28px clamp(20px, 4vw, 64px) 80px;
+      display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 22px;
+    }
+    .sidebar { position: sticky; top: 76px; align-self: start; display: grid; gap: 12px; }
+    .panel {
+      background: var(--cp-surface); border: 1px solid var(--cp-border);
+      border-radius: 16px; box-shadow: 0 0 2px var(--cp-border), 0 1px 2px var(--cp-border);
+    }
+    .sidebar-panel { padding: 14px; }
+    .sidebar h2 { margin: 0 0 10px; font-size: 14px; }
+    .persona-nav { display: grid; gap: 5px; }
+    .persona-button {
+      width: 100%; display: grid; grid-template-columns: 32px 1fr; gap: 9px;
+      align-items: center; padding: 9px; border: 0; border-radius: 0.625rem;
+      background: transparent; color: var(--cp-text); cursor: pointer; text-align: left;
+    }
+    .persona-button:hover { background: var(--cp-surface-soft); }
+    .persona-button.active { color: var(--cp-accent); background: var(--cp-accent-soft); font-weight: 800; }
+    .persona-icon {
+      width: 32px; height: 32px; display: grid; place-items: center;
+      border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-surface);
+    }
+    .persona-button small { display: block; color: var(--cp-text-muted); font-size: 10px; font-weight: 500; }
+    .filter-group { display: grid; gap: 7px; }
+    .filter-group label { color: var(--cp-text-muted); font-size: 11px; font-weight: 800; }
+    .filter-group input, .filter-group select {
+      width: 100%; padding: 9px 10px; color: var(--cp-text); background: var(--cp-surface-soft);
+      border: 1px solid var(--cp-border); border-radius: 0.625rem;
+    }
+    .main { min-width: 0; display: grid; gap: 18px; }
+    .persona-hero { padding: 26px; }
+    .persona-hero-top { display: flex; justify-content: space-between; gap: 20px; }
+    .persona-hero h2 { margin: 0; font-size: 32px; letter-spacing: -1px; }
+    .persona-hero p { color: var(--cp-text-muted); line-height: 1.55; }
+    .outcome-badge {
+      flex: 0 0 auto; align-self: flex-start; padding: 8px 11px; border-radius: 0.625rem;
+      color: var(--cp-accent); background: var(--cp-accent-soft); font-size: 12px; font-weight: 900;
+    }
+    .priority-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 15px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px;
+      border: 1px solid var(--cp-border); border-radius: 0.625rem;
+      color: var(--cp-text-muted); background: var(--cp-surface-soft); font-size: 11px;
+    }
+    .tabs {
+      display: flex; gap: 5px; padding: 6px; overflow: auto;
+      background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: 0.625rem;
+    }
+    .tab {
+      padding: 9px 13px; white-space: nowrap; border: 0; border-radius: 0.625rem;
+      color: var(--cp-text-muted); background: transparent; cursor: pointer; font-weight: 750;
+    }
+    .tab.active { color: var(--cp-accent-fg); background: var(--cp-accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: grid; gap: 16px; }
+    .section { padding: 22px; }
+    .section-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; margin-bottom: 14px; }
+    .section h3 { margin: 0; font-size: 22px; }
+    .section-heading p { margin: 4px 0 0; color: var(--cp-text-muted); font-size: 13px; }
+    .question-list, .decision-list, .action-list { display: grid; gap: 10px; }
+    .question, .decision, .action {
+      padding: 15px; border: 1px solid var(--cp-border); border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+    }
+    .question-top, .decision-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+    .question h4, .decision h4, .action h4 { margin: 0; font-size: 14px; line-height: 1.4; }
+    .question p, .decision p, .action p { margin: 8px 0 0; color: var(--cp-text-muted); font-size: 12px; line-height: 1.5; }
+    .status {
+      flex: 0 0 auto; padding: 4px 7px; border-radius: 0.625rem;
+      font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .status.verified { color: var(--cp-success); border: 1px solid var(--cp-success); }
+    .status.current { color: var(--cp-link); border: 1px solid var(--cp-link); }
+    .status.extension { color: var(--cp-warning); border: 1px solid var(--cp-warning); }
+    .measure-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .measure {
+      padding: 4px 7px; border-radius: 0.625rem; color: var(--cp-accent);
+      background: var(--cp-accent-soft); font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: 10px;
+    }
+    .surface { color: var(--cp-text-soft); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .decision-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .decision strong { display: block; margin-top: 9px; font-size: 12px; }
+    .journey { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .journey-step { position: relative; padding: 14px; min-height: 150px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-bg-elevated); }
+    .journey-step b {
+      width: 24px; height: 24px; display: grid; place-items: center; margin-bottom: 10px;
+      border-radius: 0.625rem; color: var(--cp-accent-fg); background: var(--cp-accent);
+    }
+    .journey-step h4 { margin: 0; font-size: 13px; }
+    .journey-step p { color: var(--cp-text-muted); font-size: 11px; line-height: 1.45; }
+    .script-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .button {
+      padding: 9px 12px; border: 0; border-radius: 0.625rem; cursor: pointer; font-weight: 800;
+    }
+    .button.primary { color: var(--cp-accent-fg); background: var(--cp-accent); }
+    .button.primary:hover { background: var(--cp-accent-hover); }
+    .button.secondary { color: var(--cp-text); background: var(--cp-surface-soft); border: 1px solid var(--cp-border); }
+    .script { counter-reset: beat; display: grid; gap: 12px; }
+    .script-beat {
+      counter-increment: beat; display: grid; grid-template-columns: 36px minmax(0, 1fr);
+      gap: 12px; padding: 17px; border-left: 4px solid var(--cp-accent);
+      background: var(--cp-bg-elevated);
+    }
+    .script-beat::before {
+      content: counter(beat); width: 30px; height: 30px; display: grid; place-items: center;
+      border: 1px solid var(--cp-border-strong); border-radius: 0.625rem; font-weight: 900;
+    }
+    .script-beat h4 { margin: 0 0 8px; }
+    .script-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .script-cell { padding: 10px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-surface); }
+    .script-cell span { display: block; margin-bottom: 4px; color: var(--cp-accent); font-size: 9px; font-weight: 900; text-transform: uppercase; }
+    .script-cell p { margin: 0; color: var(--cp-text-muted); font-size: 11px; line-height: 1.5; }
+    .capability-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .capability-card { padding: 18px; }
+    .capability-card h4 { margin: 0 0 6px; }
+    .capability-card p, .capability-card li { color: var(--cp-text-muted); font-size: 12px; line-height: 1.55; }
+    .capability-card ul { margin: 8px 0 0; padding-left: 18px; }
+    .model-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .model-group { padding: 15px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-bg-elevated); }
+    .model-group h4 { margin: 0 0 8px; font-size: 13px; }
+    .model-group p { margin: 0; color: var(--cp-text-muted); font-size: 11px; line-height: 1.55; }
+    .ontology-map { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .entity { padding: 8px 10px; border: 1px solid var(--cp-accent); border-radius: 0.625rem; color: var(--cp-accent); font-weight: 800; font-size: 12px; }
+    .arrow { color: var(--cp-text-muted); }
+    .guardrail {
+      padding: 14px; border-left: 4px solid var(--cp-warning); background: var(--cp-surface-soft);
+      color: var(--cp-text-muted); font-size: 12px; line-height: 1.55;
+    }
+    .empty { padding: 30px; text-align: center; color: var(--cp-text-muted); }
+    footer { padding: 30px; border-top: 1px solid var(--cp-border); color: var(--cp-text-muted); text-align: center; font-size: 12px; }
+    @media (max-width: 1200px) {
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .journey { grid-template-columns: repeat(3, 1fr); }
+      .model-groups { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .persona-nav { grid-template-columns: repeat(2, 1fr); }
+      .decision-grid, .capability-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      h1 { letter-spacing: -1.4px; }
+      .stats, .persona-nav, .journey, .model-groups, .script-grid { grid-template-columns: 1fr; }
+      .persona-hero-top, .section-heading, .script-toolbar { flex-direction: column; }
+      .outcome-badge { align-self: auto; }
+    }
+    @media print {
+      .topbar, .sidebar, .tabs, .script-toolbar { display: none; }
+      .workspace { display: block; padding: 0; }
+      .tab-panel { display: block; }
+      .panel { box-shadow: none; break-inside: avoid; }
+      body { background: var(--cp-surface); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">R</span> Retail Growth Decision Studio</div>
+    <nav>
+      <a href="/studio.html">Flagship demo</a>
+      <a class="active" href="/personas.html">Persona journeys</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/walkthrough.html">Presenter guide</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Repository model + current Fabric discovery</p>
+      <h1>Who can use this data, what can they ask, and what decisions can they take?</h1>
+      <p class="hero-copy">
+        Explore revenue-first journeys for sales, inventory, merchandising, marketing,
+        operations, supply chain, omnichannel, customer growth, pricing, and executive
+        leadership. Every question maps to an existing semantic measure, ontology
+        relationship, real-time event, or a clearly labeled extension.
+      </p>
+      <div class="stats">
+        <div class="stat"><strong>40</strong><span>checked-in semantic tables</span></div>
+        <div class="stat"><strong>153</strong><span>checked-in curated measures</span></div>
+        <div class="stat"><strong>58</strong><span>checked-in model relationships</span></div>
+        <div class="stat"><strong>12</strong><span>checked-in ontology entities</span></div>
+        <div class="stat"><strong>17</strong><span>checked-in ontology relationships</span></div>
+        <div class="stat"><strong>19</strong><span>defined real-time event types</span></div>
+      </div>
+      <div class="scope-note">
+        <strong>Current environment finding:</strong> the exact repository artifact
+        <code>retail_model</code> was not discoverable with the current Fabric identity.
+        Similarly named accessible reports are older, structurally different samples.
+        The full journeys below are therefore grounded in the checked-in model and prior
+        documented validation, and require locating or deploying that exact model before a
+        live presentation. This guide uses the repository's synthetic
+        omnichannel retail data and revenue-growth priorities. It contains no customer
+        records, branding, tenant identifiers, or customer-specific operating assumptions.
+      </div>
+    </div>
+  </section>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <section class="panel sidebar-panel">
+        <h2>Choose your persona</h2>
+        <div id="persona-nav" class="persona-nav"></div>
+      </section>
+      <section class="panel sidebar-panel filter-group">
+        <label for="question-search">Search this persona's questions</label>
+        <input id="question-search" type="search" placeholder="sales, stockout, margin..." />
+        <label for="readiness-filter">Readiness</label>
+        <select id="readiness-filter">
+          <option value="all">Show everything</option>
+          <option value="verified">Previously validated questions</option>
+          <option value="current">Supported by current model</option>
+          <option value="extension">Needs an extension</option>
+        </select>
+      </section>
+    </aside>
+
+    <main class="main">
+      <section id="persona-hero" class="panel persona-hero"></section>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="questions">Questions to ask</button>
+        <button class="tab" data-tab="decisions">Decisions & actions</button>
+        <button class="tab" data-tab="journey">Journey map</button>
+        <button class="tab" data-tab="script">End-to-end script</button>
+        <button class="tab" data-tab="capabilities">Data foundation</button>
+      </div>
+
+      <section id="questions" class="tab-panel active"></section>
+      <section id="decisions" class="tab-panel"></section>
+      <section id="journey" class="tab-panel"></section>
+      <section id="script" class="tab-panel"></section>
+      <section id="capabilities" class="tab-panel"></section>
+    </main>
+  </div>
+
+  <footer>
+    Source of truth: checked-in retail_model TMDL, RetailOntology_AutoGen notebook,
+    Eventhouse event contracts, action-agent code, prior documented validation, and
+    current artifact discovery. The exact target model was not confirmed accessible live.
+  </footer>
+
+  <script>
+    const personas = [
+      {
+        id: "sales", icon: "↗", name: "Revenue & Sales Analyst", short: "Grow revenue",
+        outcome: "Find where revenue is growing, declining, and leaking",
+        mandate: "Explain performance quickly, isolate the drivers by channel, geography, store, and product, and turn variance into a focused growth recommendation.",
+        priorities: ["Net sales", "YoY / MoM / WoW growth", "Gross profit", "Basket size", "Sales per store", "Omnichannel mix"],
+        questions: [
+          ["What were net sales, gross profit, gross margin, and receipt count for the selected period?", "verified", "Data Agent", ["Net Sales", "Gross Profit", "Gross Margin %", "Receipt Count"]],
+          ["Which stores and regions drove the most revenue, and how did each compare with last year?", "verified", "Data Agent", ["Sales per Store", "Store Sales YoY %", "Net Sales"]],
+          ["Which departments are the biggest gainers and drainers versus last year?", "current", "Data Agent", ["Net Sales", "Store Sales PY", "Store Sales YoY %"]],
+          ["How are store and online revenue shares changing?", "verified", "Data Agent", ["Omnichannel Revenue", "Store Sales % of Omnichannel", "Online Sales % of Omnichannel"]],
+          ["Which stores have high traffic but weak conversion and basket size?", "current", "Data Agent", ["Foot Traffic Count", "Traffic Conversion Proxy %", "Average Basket Size"]],
+          ["Which stores sold the most in the last 15 minutes?", "verified", "Lite ontology / Eventhouse", ["Total Store Sales", "Total Store Receipts"]],
+          ["What intervention would close the revenue gap, and what is its expected lift?", "extension", "Decision agent", ["Net Sales", "Gross Profit", "Forecasted Units"]]
+        ],
+        decisions: [
+          ["Focus the growth review", "Select the region, store cluster, department, or product family responsible for the largest revenue variance.", "Supported now: evidence and ranked focus list."],
+          ["Protect a winner", "Hold promotion in constrained stores and activate only where inventory can support incremental demand.", "Supported now through the flagship decision package."],
+          ["Set a recovery target", "Assign an owner and target for a declining store or category.", "Requires a sales planning action tool."]
+        ],
+        actions: [
+          ["Create a performance brief", "Package the revenue variance, drivers, evidence period, and recommended focus.", "current"],
+          ["Draft inventory protection", "Invoke the inventory agent when revenue growth is exposed to stockout risk.", "current"],
+          ["Open a sales recovery plan", "Create owner, target, due date, and review cadence in a planning system.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Revenue or margin misses plan."], ["Ask", "Locate the variance by region, store, channel, and product."],
+          ["Diagnose", "Separate traffic, conversion, basket, price, mix, returns, and availability."],
+          ["Decide", "Choose the growth lever with the strongest evidence."], ["Act", "Build a brief or invoke inventory/retention action."],
+          ["Monitor", "Track sales growth, margin, and decision status."]
+        ],
+        script: [
+          ["Open with the business gap", "Open Executive Cockpit or ask the Data Agent for net sales, gross profit, margin, and YoY growth.", "Revenue performance with a governed comparison period."],
+          ["Find the source", "Ask which regions, stores, departments, and products account for the variance.", "A ranked driver list rather than a generic summary."],
+          ["Test the revenue lever", "Compare traffic, conversion, basket, omnichannel share, returns, and inventory risk.", "The reason revenue moved and the constraint on action."],
+          ["Make the decision", "Choose protect, activate, recover, or monitor and record the evidence.", "A narrow, explainable recommendation."],
+          ["Hand off", "Build the package or invoke the inventory/retention agent when applicable.", "A reviewable draft with a human owner."],
+          ["Close", "Show Agent Operations and the next KPI review date.", "A closed-loop revenue decision, not just an answer."]
+        ]
+      },
+      {
+        id: "inventory", icon: "▦", name: "Inventory & Replenishment Analyst", short: "Protect availability",
+        outcome: "Recover revenue at risk without overstocking",
+        mandate: "Balance store and DC inventory against demand velocity, forecast uncertainty, open reorders, and stockout probability.",
+        priorities: ["Units on hand", "Stockout probability", "Days of inventory", "Demand velocity", "Reorder fill gap", "Inventory value"],
+        questions: [
+          ["How many units are on hand across stores and DCs, and what is the inventory-to-sales ratio?", "verified", "Data Agent", ["Total Units on Hand", "DC Units on Hand", "Network Units on Hand", "Inventory to Sales Ratio"]],
+          ["Which store-product positions have the highest stockout probability and fewest days of inventory?", "verified", "Data Agent", ["High Risk SKUs", "Avg Stockout Probability", "Avg Days of Inventory"]],
+          ["Which high-risk positions have no open reorder?", "current", "Inventory agent", ["Reorder Events", "Reorder Fill Gap", "High Risk SKUs"]],
+          ["Where does forecast demand exceed current inventory?", "current", "Data Agent", ["Forecasted Units", "Forecast Lower Bound", "Total Units on Hand"]],
+          ["Which DC and trucks can serve the affected store?", "verified", "Ontology", ["DC Units on Hand", "Total Trucks"]],
+          ["What stockouts and reorders are happening right now by store?", "verified", "Ontology / Eventhouse", ["Stockout Events", "Reorder Events"]],
+          ["Which stores can donate compatible inventory without creating another stockout?", "extension", "Transfer agent", ["Total Units on Hand", "Avg Days of Inventory", "Avg Daily Demand Velocity"]]
+        ],
+        decisions: [
+          ["Draft replenishment", "Reorder enough to reach the configured 14-day cover target, prioritizing uncovered high-risk SKUs.", "Available now: up to 8 draft reorders per run."],
+          ["Escalate supply risk", "Flag positions with high probability, thin cover, and no open reorder.", "Available now through evidence and draft status."],
+          ["Approve inter-store transfer", "Choose donor and destination stores at compatible product grain.", "Flagship replay exists; live transfer tool is an extension."]
+        ],
+        actions: [
+          ["Draft priority reorders", "Inventory agent calculates quantity, DC, current cover, risk, and daily sales exposure.", "current"],
+          ["Approve or dismiss drafts", "Human review changes proposal status and logs the transition.", "current"],
+          ["Create transfer review", "Generate donor/destination/style-size candidates with guardrails.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Stockout risk or velocity spike appears."], ["Ask", "Rank exposed store-product positions."],
+          ["Diagnose", "Check on-hand, days cover, forecast, reorder coverage, DC stock, and truck path."],
+          ["Decide", "Reorder, transfer, hold promotion, or monitor."], ["Act", "Draft up to 8 replenishment orders."],
+          ["Monitor", "Track approval, incoming events, and declining risk."]
+        ],
+        script: [
+          ["Start with revenue exposure", "Ask for high-risk SKUs, days of inventory, and demand velocity.", "A ranked risk list tied to sales exposure."],
+          ["Check coverage", "Ask which positions have no open reorder and which DC has inventory.", "Covered versus uncovered positions."],
+          ["Use the ontology", "Trace the affected store to its geography, DC, trucks, and product.", "Connected operational context without inventing a store allocation."],
+          ["Invoke the action agent", "Ask: “Inventory is running low—what should we do?”", "Reorders sized to a 14-day cover target."],
+          ["Apply judgment", "Approve, dismiss, or override based on local events and constraints.", "Human accountability and rationale."],
+          ["Prove closure", "Open Agent Operations and then recheck stockout/reorder events.", "Action status and live monitoring."]
+        ]
+      },
+      {
+        id: "merch", icon: "◇", name: "Category & Merchandising Manager", short: "Grow product productivity",
+        outcome: "Grow profitable categories and protect winning products",
+        mandate: "Understand product, category, price, margin, promotion, recommendation, and availability performance together.",
+        priorities: ["Product revenue", "Units", "Gross margin", "Returns", "Elasticity", "Basket affinity"],
+        questions: [
+          ["Which products generate the most revenue and what is each product's gross margin?", "verified", "Data Agent", ["Line Revenue", "Gross Margin %", "Total Units Sold"]],
+          ["Which categories are growing while the parent department declines?", "current", "Data Agent", ["Net Sales", "Store Sales YoY %", "Gross Profit"]],
+          ["Which products have high revenue but low margin or high returns?", "current", "Data Agent", ["Line Revenue", "Gross Margin %", "Return Rate %"]],
+          ["What products are bought together with the strongest lift and confidence?", "verified", "Data Agent", ["Avg Recommendation Lift", "Avg Recommendation Confidence", "Recommendation Rules"]],
+          ["Which products are highly elastic or inelastic?", "verified", "Data Agent", ["Avg Price Elasticity", "Highly Elastic SKUs", "Inelastic SKUs"]],
+          ["Where are winning products at stockout risk?", "verified", "Data Agent / Ontology", ["High Risk SKUs", "Avg Stockout Probability", "Avg Daily Demand Velocity"]],
+          ["What assortment changes maximize revenue and margin by store format?", "extension", "Merchandising agent", ["Sales per Store", "Gross Margin %", "Total Units on Hand"]]
+        ],
+        decisions: [
+          ["Protect the winner", "Activate only stores with sufficient cover; replenish constrained stores.", "Available through current flagship workflow."],
+          ["Build a bundle", "Select high-lift cross-sell pairs that preserve margin and availability.", "Evidence supported now; activation tool needs extension."],
+          ["Change assortment", "Add, hold, or remove products by store format and region.", "Requires assortment planning integration."]
+        ],
+        actions: [
+          ["Build an activation brief", "Document products, included stores, exclusions, evidence, and review owners.", "current"],
+          ["Draft replenishment for a named product", "Inventory agent scopes risk and reorders to the product.", "current"],
+          ["Publish assortment or bundle change", "Write approved changes into merchandising systems.", "extension"]
+        ],
+        journey: [
+          ["Signal", "A category declines or a product accelerates."], ["Ask", "Find gainers, drainers, margin, and unit drivers."],
+          ["Diagnose", "Combine price, promotion, return, basket affinity, and inventory."],
+          ["Decide", "Protect, bundle, reprice, promote, or rationalize."], ["Act", "Build activation and inventory drafts."],
+          ["Monitor", "Track revenue, margin, units, and stockout risk."]
+        ],
+        script: [
+          ["Reveal the hidden winner", "Ask for product or category revenue, units, margin, and YoY growth.", "A product opportunity inside the broader result."],
+          ["Prove it is actionable", "Check store breadth, recommendation lift, elasticity, and returns.", "Evidence that demand is real and profitable."],
+          ["Expose the constraint", "Add stockout risk and inventory coverage by store.", "Where not to promote."],
+          ["Shape the choice", "Select activation stores, replenishment stores, and possible bundle items.", "A supply-aware merchandising recommendation."],
+          ["Record the exception", "Capture local context as an override.", "A recalculated, auditable plan."],
+          ["Build the package", "Generate activation brief, inventory review, and decision log.", "Ready for marketing and inventory review."]
+        ]
+      },
+      {
+        id: "marketing", icon: "◎", name: "Marketing & Promotions Analyst", short: "Improve revenue efficiency",
+        outcome: "Put spend behind demand that inventory can fulfill",
+        mandate: "Connect campaign spend, impressions, promotion usage, revenue, margin, customer value, and product availability.",
+        priorities: ["Marketing cost", "Impressions", "CPM", "Spend % of revenue", "Promo discount", "Customer segments"],
+        questions: [
+          ["What were marketing spend, impressions, and CPM by campaign and channel?", "verified", "Data Agent", ["Total Marketing Cost", "Total Marketing Impressions", "Marketing CPM"]],
+          ["What percentage of omnichannel revenue is being spent on marketing?", "current", "Data Agent", ["Marketing Spend % of Revenue", "Omnichannel Revenue"]],
+          ["Which promotions drove the most discount dollars and receipts?", "current", "Data Agent", ["Promotion Discount Amount", "Promotion Count"]],
+          ["Which customer segments hold the most monetary value and need reactivation?", "verified", "Data Agent", ["Segmented Monetary Value", "Segmented Customer Count", "Avg Recency (Days)"]],
+          ["Which products should be bundled or cross-sold?", "verified", "Data Agent", ["Avg Recommendation Lift", "Avg Recommendation Confidence"]],
+          ["Which stores can support a campaign without stocking out?", "current", "Data Agent", ["Avg Days of Inventory", "High Risk SKUs", "Total Units on Hand"]],
+          ["What incremental revenue and margin did each campaign cause?", "extension", "Attribution model", ["Marketing Spend (Channel)", "Net Sales", "Gross Profit"]]
+        ],
+        decisions: [
+          ["Select campaign audience", "Prioritize valuable at-risk customer cohorts and relevant cross-sell products.", "Retention agent supports a top-50 win-back draft now."],
+          ["Select activation stores", "Include stores with demand and coverage; explicitly exclude constrained stores.", "Supported in the flagship package."],
+          ["Reallocate spend", "Shift budget by marginal revenue or profit return.", "Requires campaign attribution / incrementality measure."]
+        ],
+        actions: [
+          ["Draft win-back campaign", "Target the highest-value predicted churn cohort with market-basket anchors.", "current"],
+          ["Build activation brief", "Include eligible stores and explicit inventory-based exclusions.", "current"],
+          ["Change campaign budget", "Push approved budget and targeting into a marketing platform.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Revenue softens or churn value rises."], ["Ask", "Find spend efficiency, segment value, and product opportunity."],
+          ["Diagnose", "Check promotion leakage, affinity, elasticity, and store availability."],
+          ["Decide", "Choose audience, product, offer, channel, and stores."], ["Act", "Draft campaign or activation brief."],
+          ["Monitor", "Track spend, impressions, revenue, margin, and inventory."]
+        ],
+        script: [
+          ["Start with growth economics", "Ask for marketing spend, CPM, spend as a percentage of revenue, and segment value.", "Where spend and customer value intersect."],
+          ["Choose the opportunity", "Select a segment or winning product and inspect recommendations and elasticity.", "A defensible audience-product pairing."],
+          ["Apply inventory truth", "Exclude stores with high stockout risk or thin cover.", "A campaign that will not create avoidable lost sales."],
+          ["Draft the action", "Launch the retention agent or build the activation brief.", "A reviewable cohort/offer/store package."],
+          ["Approve with safeguards", "Review customer count, LTV, exclusions, and evidence.", "Human-approved campaign draft."],
+          ["Measure the gap", "Compare spend and revenue now; explain that incrementality is the next model extension.", "An honest current-state close."]
+        ]
+      },
+      {
+        id: "storeops", icon: "⌂", name: "Store Operations Leader", short: "Improve conversion",
+        outcome: "Convert more traffic while protecting service and availability",
+        mandate: "Use store traffic, dwell, conversion, sales velocity, stockout events, payments, and operating events to prioritize daily interventions.",
+        priorities: ["Foot traffic", "Conversion proxy", "Zone dwell", "Sales velocity", "Payment declines", "Stockout events"],
+        questions: [
+          ["Which stores have high traffic but low conversion?", "current", "Data Agent", ["Foot Traffic Count", "Traffic Conversion Proxy %", "Receipt Count"]],
+          ["Where do customers dwell longest and where do journeys drop before checkout?", "verified", "Data Agent", ["Avg Foot Traffic Dwell Minutes", "Avg Zone Dwell", "Zone Customers"]],
+          ["Which stores are selling fastest in the current 15-minute window?", "verified", "Lite ontology / Eventhouse", ["Total Store Sales", "Total Store Receipts", "Avg Store Basket"]],
+          ["Are payment declines or processing time hurting checkout?", "current", "Data Agent", ["Payment Decline Rate %", "Avg Payment Processing MS"]],
+          ["Which stockout and reorder events are occurring in my store now?", "verified", "Ontology / Eventhouse", ["Stockout Events", "Reorder Events"]],
+          ["Did the store open and close as planned?", "current", "Data Agent / Eventhouse", ["Store Operation Events", "Store Operation Events per Store"]],
+          ["What task should the store manager execute first?", "extension", "Store operations agent", ["Traffic Conversion Proxy %", "Avg Zone Dwell", "Stockout Events"]]
+        ],
+        decisions: [
+          ["Prioritize floor intervention", "Choose availability, queue, staffing, or merchandising as the primary issue.", "Evidence supported now."],
+          ["Protect a local activation", "Hold marketing if live sales velocity and stockout events exceed safe limits.", "Decision policy exists in replay; live tool is an extension."],
+          ["Create store task", "Assign owner, due time, reason, and expected KPI effect.", "Requires store task integration."]
+        ],
+        actions: [
+          ["Escalate replenishment", "Hand named at-risk products to the inventory agent.", "current"],
+          ["Create operations brief", "Package traffic, dwell, conversion, payment, and availability evidence.", "current"],
+          ["Dispatch store task", "Send a queue, staffing, shelf, or checkout task to store operations.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Conversion or live velocity deviates."], ["Ask", "Locate store, zone, payment, and product issue."],
+          ["Diagnose", "Separate traffic quality, dwell, checkout, availability, and operations."],
+          ["Decide", "Replenish, redeploy staff, fix checkout, or hold activation."], ["Act", "Escalate inventory or create store brief/task."],
+          ["Monitor", "Watch event counts and conversion recovery."]
+        ],
+        script: [
+          ["Anchor on a store", "Drill from a visible Store Number on the report.", "One store context shared by report and agents."],
+          ["Explain conversion", "Ask for traffic, receipts, conversion proxy, basket, and zone dwell.", "The likely operational bottleneck."],
+          ["Move to live", "Ask for current stockout/reorder events and 15-minute sales velocity.", "What is happening now, not only historically."],
+          ["Choose intervention", "Decide availability, queue, payment, or floor execution.", "A prioritized local action."],
+          ["Hand off safely", "Invoke inventory for replenishment or prepare a store operations brief.", "Draft action with evidence."],
+          ["Recheck", "Monitor live events and next-period conversion.", "A measurable operations loop."]
+        ]
+      },
+      {
+        id: "omnichannel", icon: "⇄", name: "Omnichannel Fulfillment Analyst", short: "Grow digital profitably",
+        outcome: "Increase digital revenue while controlling fulfillment load",
+        mandate: "Compare store and online economics, channel mix, order value, units, fulfillment mode, payment performance, and node capacity.",
+        priorities: ["Online sales", "Digital share", "AOV", "Units per order", "Fulfillment mode", "Payment performance"],
+        questions: [
+          ["How do store and online AOV and units per order compare?", "verified", "Data Agent", ["Average Basket Size", "Average Online Order Value", "Units per Receipt", "Online Units per Order"]],
+          ["What is online revenue growth and digital share of omnichannel revenue?", "verified", "Data Agent", ["Online Sales YoY %", "Online Sales % of Omnichannel", "Omnichannel Revenue"]],
+          ["What is the mix of ship-from-DC, ship-from-store, and BOPIS?", "verified", "Data Agent", ["Online Order Count", "Total Online Sales", "Total Online Units"]],
+          ["Which stores are carrying the most ship-from-store or BOPIS load?", "current", "Data Agent", ["Online Order Count", "Online Line Revenue"]],
+          ["How do payment decline rates differ by channel?", "current", "Data Agent", ["Payment Decline Rate %", "Payment Count"]],
+          ["Which node has inventory for the online demand forecast?", "current", "Data Agent / Ontology", ["Forecasted Units", "Total Units on Hand", "DC Units on Hand"]],
+          ["How should an order be rerouted when a node is constrained?", "extension", "Fulfillment agent", ["Forecasted Units", "Avg Days of Inventory", "Avg Truck Dwell Minutes"]]
+        ],
+        decisions: [
+          ["Shift fulfillment mix", "Select DC, store, or BOPIS based on demand, inventory, and node load.", "Requires fulfillment optimization rules."],
+          ["Protect store inventory", "Limit ship-from-store when local demand is at stockout risk.", "Evidence supported now."],
+          ["Prioritize digital growth", "Choose regions and categories where online share can grow without margin erosion.", "Supported analytically now."]
+        ],
+        actions: [
+          ["Create node-capacity brief", "Package order demand, node inventory, and service constraints.", "current"],
+          ["Escalate inventory gap", "Invoke replenishment for store-product shortages.", "current"],
+          ["Reroute fulfillment", "Write approved node assignment back to order management.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Digital demand or fulfillment load changes."], ["Ask", "Compare channel economics and mode mix."],
+          ["Diagnose", "Check node inventory, payments, forecast, and store risk."],
+          ["Decide", "Grow, constrain, or reroute a fulfillment mode."], ["Act", "Brief owners or invoke inventory."],
+          ["Monitor", "Track online growth, AOV, units, and node pressure."]
+        ],
+        script: [
+          ["Establish channel economics", "Compare store versus online AOV, units, growth, and revenue share.", "Where digital is growing and how its economics differ."],
+          ["Inspect fulfillment", "Break orders into DC, store, and BOPIS modes.", "Which nodes carry the workload."],
+          ["Test capacity", "Compare forecast demand with store and DC inventory.", "Where growth would stress availability."],
+          ["Make the tradeoff", "Choose digital growth, store protection, or rerouting.", "A node-aware decision."],
+          ["Create the handoff", "Generate a capacity brief or inventory draft.", "Evidence for fulfillment and inventory owners."],
+          ["State the extension", "Explain that automated rerouting needs a typed OMS action tool.", "Credible boundary and next step."]
+        ]
+      },
+      {
+        id: "supply", icon: "▰", name: "Supply Chain & Logistics Manager", short: "Improve flow",
+        outcome: "Move inventory faster and protect selling capacity",
+        mandate: "Connect DC inventory, trucks, shipments, dwell, reorders, stockout risk, and forecast demand.",
+        priorities: ["DC inventory", "Truck dwell", "Breach days", "Reorders", "Forecast demand", "Store risk"],
+        questions: [
+          ["Which DC holds the most units and SKU breadth?", "current", "Data Agent", ["DC Units on Hand", "DC SKU Count", "Avg DC Units per SKU"]],
+          ["Which trucks are assigned to each distribution center?", "verified", "Ontology", ["# of Trucks", "# of Distribution Centers"]],
+          ["What is average truck dwell and how many breach days occurred?", "verified", "Data Agent", ["Avg Truck Dwell Minutes", "Truck Dwell Breach Days", "Total Trucks"]],
+          ["Which DCs are receiving truck-arrival events right now?", "verified", "Ontology / Eventhouse", ["Truck Move Count", "Avg Unload Duration"]],
+          ["Where does demand forecast exceed store inventory and require DC support?", "current", "Data Agent", ["Forecasted Units", "Total Units on Hand", "DC Units on Hand"]],
+          ["Which reorders have the largest fill gap?", "current", "Data Agent", ["Reorder Fill Gap", "High Priority Reorder Quantity"]],
+          ["Which shipment or transfer sequence maximizes protected revenue?", "extension", "Logistics optimization agent", ["Avg Daily Demand Velocity", "Avg Truck Dwell Minutes", "Gross Profit"]]
+        ],
+        decisions: [
+          ["Prioritize replenishment lanes", "Rank lanes by revenue exposure, days cover, and fill gap.", "Evidence supported now."],
+          ["Escalate dwell bottleneck", "Identify sites exceeding a 45-minute daily average.", "Supported now through measures."],
+          ["Reschedule shipment", "Change truck, route, quantity, or appointment.", "Requires TMS/WMS action tool."]
+        ],
+        actions: [
+          ["Build replenishment priority list", "Combine stockout risk, forecast, DC inventory, and reorders.", "current"],
+          ["Approve inventory reorders", "Review and approve drafts produced by the inventory agent.", "current"],
+          ["Dispatch or reschedule truck", "Write an approved move into logistics systems.", "extension"]
+        ],
+        journey: [
+          ["Signal", "A lane, site, or inventory position is at risk."], ["Ask", "Rank DC, truck, dwell, forecast, and reorder gaps."],
+          ["Diagnose", "Trace store to geography, DC, truck, and product."],
+          ["Decide", "Prioritize lane, quantity, appointment, or escalation."], ["Act", "Approve reorder or prepare logistics dispatch."],
+          ["Monitor", "Track arrivals, departures, dwell, and stockout risk."]
+        ],
+        script: [
+          ["Open the control tower", "Ask for DC inventory, high-priority reorder quantity, and truck dwell.", "Network pressure points."],
+          ["Tie supply to revenue", "Add stockout risk, demand velocity, and forecast at destination stores.", "Revenue exposure by lane."],
+          ["Traverse the network", "Use the ontology for Store → Geography and Truck → DC relationships.", "The physical entities behind the metric."],
+          ["Choose priority", "Rank replenishment or transfer candidates.", "A defensible execution order."],
+          ["Act within current scope", "Approve inventory drafts and produce a transfer/logistics review list.", "Human-reviewed supply action."],
+          ["Monitor live flow", "Ask for truck_arrived/departed events by DC and dwell metrics.", "Closed-loop supply visibility."]
+        ]
+      },
+      {
+        id: "customer", icon: "♡", name: "Customer Growth & Retention Analyst", short: "Protect customer value",
+        outcome: "Recover lifetime value and grow the next basket",
+        mandate: "Combine customer segments, recency, frequency, monetary value, churn probability, purchase behavior, and market-basket recommendations.",
+        priorities: ["Customers at risk", "Churn rate", "Monetary value", "Recency", "Frequency", "Recommendation lift"],
+        questions: [
+          ["How many customers are predicted to churn and what is their value at risk?", "verified", "Data Agent", ["Customers At Risk", "Predicted Churn Rate %", "Segmented Monetary Value"]],
+          ["Which segments hold the most value and have the worst recency?", "verified", "Data Agent", ["Segmented Monetary Value", "Avg Recency (Days)", "Avg Frequency"]],
+          ["Which high-value customers are also high churn risk?", "current", "Data Agent", ["High Risk Customers", "Segmented Monetary Value", "Avg Churn Probability"]],
+          ["What products should anchor a win-back cross-sell?", "current", "Data Agent", ["Avg Recommendation Lift", "Avg Recommendation Confidence"]],
+          ["How many customers are in each churn-risk category?", "verified", "Ontology", ["Customers At Risk", "High Risk Customers"]],
+          ["What is the recent purchase history for one named customer?", "extension", "Ontology decomposition", ["Receipt Count", "Online Order Count"]],
+          ["Which offer maximizes incremental retention revenue?", "extension", "Treatment-uplift model", ["Segmented Monetary Value", "Gross Margin %"]]
+        ],
+        decisions: [
+          ["Choose retention cohort", "Prioritize customers by churn prediction and lifetime value.", "Available now in retention agent."],
+          ["Select cross-sell anchors", "Use market-basket lift and confidence for the offer.", "Available now in retention agent."],
+          ["Choose offer treatment", "Set incentive and channel based on incremental uplift.", "Requires experimentation/uplift model."]
+        ],
+        actions: [
+          ["Draft top-50 win-back campaign", "Retention agent ranks predicted churners by monetary value and adds product anchors.", "current"],
+          ["Approve or dismiss campaign", "Human reviews cohort size, value, offer, and evidence.", "current"],
+          ["Activate in CRM", "Push approved audience and treatment to a customer platform.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Churn value or recency risk rises."], ["Ask", "Quantify cohort, value, segment, and probability."],
+          ["Diagnose", "Find the highest-value recoverable customers and relevant products."],
+          ["Decide", "Select cohort, offer, channel, and guardrails."], ["Act", "Draft and approve win-back campaign."],
+          ["Monitor", "Track campaign status and future retention KPIs."]
+        ],
+        script: [
+          ["Quantify the stakes", "Ask how many customers may churn and their total monetary value.", "A revenue-at-risk number."],
+          ["Prioritize", "Rank segments and customers by value, recency, and churn probability.", "A focused cohort, not a blast list."],
+          ["Design relevance", "Use product recommendations to choose cross-sell anchors.", "Evidence-based offer content."],
+          ["Invoke retention", "Ask to launch a win-back campaign.", "One draft targeting the top 50 by value."],
+          ["Review", "Inspect cohort, value, probability, and offer; approve or dismiss.", "Human-controlled activation."],
+          ["Close honestly", "Explain that true incremental lift needs an experiment/uplift model.", "A credible path from current demo to production."]
+        ]
+      },
+      {
+        id: "pricing", icon: "$", name: "Pricing & Margin Analyst", short: "Grow profitable revenue",
+        outcome: "Increase revenue without giving away margin",
+        mandate: "Use price, cost, gross margin, promotions, elasticity, units, inventory, and forecast to identify pricing power and discount leakage.",
+        priorities: ["Gross margin", "Average price", "Elasticity", "Promo discount", "Units", "Inventory margin"],
+        questions: [
+          ["Which products and categories have the strongest and weakest gross margin?", "current", "Data Agent", ["Gross Profit", "Gross Margin %", "Line Revenue"]],
+          ["Which products are highly elastic and which have pricing power?", "verified", "Data Agent", ["Avg Price Elasticity", "Highly Elastic SKUs", "Inelastic SKUs"]],
+          ["Where are promotions leaking the most margin?", "current", "Data Agent", ["Promotion Discount Amount", "Gross Profit", "Gross Margin %"]],
+          ["Which high-margin products also have strong demand and sufficient inventory?", "current", "Data Agent", ["Gross Margin %", "Avg Daily Demand Velocity", "Total Units on Hand"]],
+          ["How does current average sell price compare with regular price?", "current", "Data Agent", ["Average Unit Price", "Average Product Price"]],
+          ["What happens to revenue and margin if price changes by a given percentage?", "extension", "Pricing simulator", ["Avg Price Elasticity", "Gross Margin %", "Forecasted Units"]],
+          ["Which approved price should be written to commerce systems?", "extension", "Pricing approval agent", ["Avg Price Elasticity", "Gross Profit"]]
+        ],
+        decisions: [
+          ["Protect margin", "Stop discounting inelastic products when demand and inventory support full price.", "Analytical evidence supported now."],
+          ["Invest promo dollars", "Use promotions where products are elastic and incremental demand is supportable.", "Requires incrementality validation."],
+          ["Approve price change", "Choose price within floor, ceiling, margin, and brand guardrails.", "Approval tables exist in Eventhouse; action agent not wired."]
+        ],
+        actions: [
+          ["Create pricing review list", "Rank elasticity, margin, promotion leakage, demand, and inventory.", "current"],
+          ["Log pricing recommendation status", "Eventhouse contains pricing recommendation approval/rejection structures.", "current"],
+          ["Publish price", "Write approved price to pricing/commerce systems.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Margin leaks or demand changes."], ["Ask", "Find elasticity, price, discount, units, and margin."],
+          ["Diagnose", "Separate price sensitivity from mix, availability, and promotion."],
+          ["Decide", "Raise, hold, lower, or test price."], ["Act", "Create review and approval record."],
+          ["Monitor", "Track revenue, units, margin, and approval status."]
+        ],
+        script: [
+          ["Find the leak", "Ask for margin by category/product and promotion discount concentration.", "Where revenue is least profitable."],
+          ["Check pricing power", "Ask for highly elastic and inelastic products.", "Where price movement is risky or safe."],
+          ["Add commercial context", "Compare demand velocity, forecast, recommendations, and inventory.", "Whether a price decision can be fulfilled."],
+          ["Frame the choice", "Recommend hold, test, or change price with explicit constraints.", "A reviewable pricing hypothesis."],
+          ["Use governance", "Show pricing approval/rejection telemetry structures.", "Human approval pattern."],
+          ["State the gap", "Explain that scenario simulation and price publishing are the next extensions.", "No false claim of automated pricing."]
+        ]
+      },
+      {
+        id: "executive", icon: "★", name: "Regional GM / Executive", short: "Allocate growth",
+        outcome: "Choose the few actions that move revenue and profit",
+        mandate: "Connect enterprise performance, customer value, inventory exposure, store execution, marketing efficiency, and supply constraints into a prioritized portfolio.",
+        priorities: ["Omnichannel revenue", "YoY growth", "Gross profit", "Revenue at risk", "Inventory exposure", "Decision outcomes"],
+        questions: [
+          ["What are revenue, growth, gross profit, margin, and channel mix?", "verified", "Data Agent", ["Omnichannel Revenue", "Omnichannel Revenue YoY %", "Gross Profit", "Gross Margin %"]],
+          ["Which regions, stores, departments, and products explain the result?", "current", "Data Agent", ["Net Sales", "Sales per Store", "Store Sales YoY %"]],
+          ["How much revenue is exposed to stockout and churn risk?", "verified", "Data Agent / action agents", ["Avg Daily Demand Velocity", "Customers At Risk", "Segmented Monetary Value"]],
+          ["Which marketing, pricing, or operational lever has the best evidence?", "current", "Data Agent", ["Marketing Spend % of Revenue", "Avg Price Elasticity", "Traffic Conversion Proxy %"]],
+          ["What is happening in stores and logistics right now?", "verified", "Eventhouse", ["Total Store Sales", "Stockout Events", "Truck Move Count"]],
+          ["Which actions are drafted, approved, dismissed, and delivering value?", "current", "Agent Operations", ["Approved reorder units", "Approved campaigns"]],
+          ["What is the expected incremental revenue across the full action portfolio?", "extension", "Decision value model", ["Gross Profit", "Forecasted Units", "Marketing Spend % of Revenue"]]
+        ],
+        decisions: [
+          ["Protect revenue", "Fund replenishment and selective activation where high demand is constrained.", "Inventory action supported now."],
+          ["Protect customer value", "Approve targeted retention for valuable churn-risk customers.", "Retention action supported now."],
+          ["Allocate resources", "Choose stores, categories, campaigns, and supply lanes for intervention.", "Analytical prioritization now; portfolio optimization is an extension."]
+        ],
+        actions: [
+          ["Approve action portfolio", "Review inventory and retention drafts with evidence and owners.", "current"],
+          ["Resolve or reopen signals", "Track decision state and monitoring cadence.", "current"],
+          ["Commit budget and targets", "Write approved investment, owners, and targets to planning systems.", "extension"]
+        ],
+        journey: [
+          ["Signal", "Revenue, margin, or risk requires attention."], ["Ask", "Quantify result and biggest drivers."],
+          ["Diagnose", "Connect demand, supply, customer, marketing, pricing, and operations."],
+          ["Decide", "Choose the highest-value governed interventions."], ["Act", "Approve drafts and assign owners."],
+          ["Monitor", "Review outcomes and reopen signals when needed."]
+        ],
+        script: [
+          ["Open with enterprise value", "Ask for omnichannel revenue, growth, profit, margin, and channel share.", "A concise business scorecard."],
+          ["Expose revenue at risk", "Add stockout exposure and customer value at churn risk.", "Two actionable growth threats."],
+          ["Show connected context", "Use ontology relationships and live events for the named store/product/DC.", "Why the numbers are operationally connected."],
+          ["Choose interventions", "Invoke replenishment and retention drafts; use the flagship selective activation decision.", "A small action portfolio."],
+          ["Govern the action", "Approve, dismiss, or override and inspect the decision log.", "Human accountability."],
+          ["Close on outcomes", "Show Agent Operations and the measures that will prove revenue, margin, availability, and retention improvement.", "A closed-loop executive story."]
+        ]
+      }
+    ];
+
+    const foundations = {
+      groups: [
+        ["Revenue & profitability", "Net Sales, Total Sales, Line Revenue, Gross Profit, Gross Margin %, time intelligence, sales productivity, returns, and omnichannel revenue."],
+        ["Inventory & supply", "Store/DC units and value, inventory margin, inventory-to-sales ratio, reorders, fill gap, stockouts, demand forecast, and stockout probability."],
+        ["Customer growth", "RFM segments, recency, frequency, monetary value, churn probability, customer counts, and market-basket recommendations."],
+        ["Marketing & pricing", "Spend, impressions, CPM, promotions, discount amount, price elasticity, average price, product cost, and margin."],
+        ["Stores & real time", "Traffic, conversion proxy, zone dwell, per-minute store sales, top products, payment performance, operations events, and anomalies."],
+        ["Omnichannel & logistics", "Online revenue/orders/units, digital share, fulfillment attributes, DC inventory, truck moves, unload duration, and dwell breaches."]
+      ],
+      entities: ["Geography", "Store", "DistributionCenter", "Truck", "Customer", "Product", "Receipt", "OnlineOrder", "Promotion", "Payment", "CustomerSegment", "ChurnPrediction"],
+      relationships: [
+        "Store → Geography", "DistributionCenter → Geography", "Customer → Geography",
+        "Truck → DistributionCenter", "Receipt → Customer", "Receipt → Store",
+        "Receipt → Product", "OnlineOrder → Customer", "OnlineOrder → Product",
+        "Promotion → Receipt / Store / Customer", "Payment → Receipt / OnlineOrder",
+        "CustomerSegment → Customer", "ChurnPrediction → Customer",
+        "Store → Product stockout risk"
+      ]
+    };
+
+    let selected = "sales";
+    let activeTab = "questions";
+
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+
+    function readinessLabel(value) {
+      return value === "verified" ? "Documented pass" :
+        value === "current" ? "Current model" : "Extension";
+    }
+
+    function renderNav() {
+      document.getElementById("persona-nav").innerHTML = personas.map(persona => `
+        <button class="persona-button ${persona.id === selected ? "active" : ""}" data-persona="${persona.id}">
+          <span class="persona-icon">${persona.icon}</span>
+          <span>${escapeHtml(persona.name)}<small>${escapeHtml(persona.short)}</small></span>
+        </button>`).join("");
+      document.querySelectorAll("[data-persona]").forEach(button => {
+        button.onclick = () => {
+          selected = button.dataset.persona;
+          document.getElementById("question-search").value = "";
+          document.getElementById("readiness-filter").value = "all";
+          render();
+        };
+      });
+    }
+
+    function renderHero(persona) {
+      document.getElementById("persona-hero").innerHTML = `
+        <div class="persona-hero-top">
+          <div>
+            <p class="eyebrow">${escapeHtml(persona.short)}</p>
+            <h2>${escapeHtml(persona.name)}</h2>
+            <p>${escapeHtml(persona.mandate)}</p>
+          </div>
+          <div class="outcome-badge">${escapeHtml(persona.outcome)}</div>
+        </div>
+        <div class="priority-row">${persona.priorities.map(item => `<span class="chip">${escapeHtml(item)}</span>`).join("")}</div>`;
+    }
+
+    function filteredQuestions(persona) {
+      const search = document.getElementById("question-search").value.trim().toLowerCase();
+      const readiness = document.getElementById("readiness-filter").value;
+      return persona.questions.filter(question => {
+        const haystack = question.flat().join(" ").toLowerCase();
+        return (!search || haystack.includes(search)) && (readiness === "all" || question[1] === readiness);
+      });
+    }
+
+    function renderQuestions(persona) {
+      const questions = filteredQuestions(persona);
+      document.getElementById("questions").innerHTML = `
+        <section class="panel section">
+          <div class="section-heading">
+            <div><h3>Questions this persona can ask</h3><p>Use the status to choose a reliable demo path.</p></div>
+            <span class="chip">${questions.length} shown</span>
+          </div>
+          <div class="question-list">
+            ${questions.length ? questions.map(question => `
+              <article class="question">
+                <div class="question-top">
+                  <div><span class="surface">${escapeHtml(question[2])}</span><h4>${escapeHtml(question[0])}</h4></div>
+                  <span class="status ${question[1]}">${readinessLabel(question[1])}</span>
+                </div>
+                <div class="measure-row">${question[3].map(measure => `<span class="measure">${escapeHtml(measure)}</span>`).join("")}</div>
+              </article>`).join("") : `<div class="empty">No questions match the current filter.</div>`}
+          </div>
+        </section>
+        <div class="guardrail"><strong>Routing rule:</strong> use the Data Agent for metrics, trends, rankings, and most cross-entity calculations. Use the ontology for bounded entity relationships, ML predictions modeled as relationships, and live event counts grouped by an owning key. Avoid open-ended deep multi-hop ontology questions.</div>`;
+    }
+
+    function renderDecisions(persona) {
+      document.getElementById("decisions").innerHTML = `
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Decisions</h3><p>What changes after the analysis.</p></div></div>
+          <div class="decision-grid">${persona.decisions.map(item => `
+            <article class="decision"><h4>${escapeHtml(item[0])}</h4><p>${escapeHtml(item[1])}</p><strong>${escapeHtml(item[2])}</strong></article>`).join("")}</div>
+        </section>
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Actions</h3><p>Current drafts versus production extensions.</p></div></div>
+          <div class="action-list">${persona.actions.map(item => `
+            <article class="action"><div class="question-top"><h4>${escapeHtml(item[0])}</h4><span class="status ${item[2]}">${readinessLabel(item[2])}</span></div><p>${escapeHtml(item[1])}</p></article>`).join("")}</div>
+        </section>
+        <div class="guardrail"><strong>Current write boundary:</strong> the implemented live action agents draft replenishment orders and a retention campaign. Users approve or dismiss drafts, and state transitions are logged. Other action types are decision packages or explicitly labeled future typed integrations.</div>`;
+    }
+
+    function renderJourney(persona) {
+      document.getElementById("journey").innerHTML = `
+        <section class="panel section">
+          <div class="section-heading"><div><h3>${escapeHtml(persona.name)} journey</h3><p>One repeatable operating pattern across personas.</p></div></div>
+          <div class="journey">${persona.journey.map((item, index) => `
+            <article class="journey-step"><b>${index + 1}</b><h4>${escapeHtml(item[0])}</h4><p>${escapeHtml(item[1])}</p></article>`).join("")}</div>
+        </section>
+        <section class="panel section">
+          <h3>How Fabric makes this easier</h3>
+          <div class="capability-grid">
+            <article class="capability-card"><h4>Before</h4><p>Analysts reconcile dashboards, exports, event queries, ML outputs, and operational context manually before emailing another team for action.</p></article>
+            <article class="capability-card"><h4>With this pattern</h4><p>The semantic model quantifies the issue, the ontology adds bounded relationship context, Eventhouse adds live state, and specialized agents produce governed drafts for human review.</p></article>
+          </div>
+        </section>`;
+    }
+
+    function renderScript(persona) {
+      document.getElementById("script").innerHTML = `
+        <section class="panel section">
+          <div class="script-toolbar">
+            <div><h3>${escapeHtml(persona.name)} end-to-end demo script</h3><p>Six beats; use current report values rather than memorized placeholders.</p></div>
+            <div><button id="copy-script" class="button secondary">Copy script</button> <button onclick="window.print()" class="button primary">Print</button></div>
+          </div>
+          <div class="script">${persona.script.map(item => `
+            <article class="script-beat">
+              <div><h4>${escapeHtml(item[0])}</h4>
+                <div class="script-grid">
+                  <div class="script-cell"><span>Do / ask</span><p>${escapeHtml(item[1])}</p></div>
+                  <div class="script-cell"><span>Expected result</span><p>${escapeHtml(item[2])}</p></div>
+                  <div class="script-cell"><span>Presenter line</span><p>${escapeHtml(scriptLine(persona, item[0]))}</p></div>
+                </div>
+              </div>
+            </article>`).join("")}</div>
+        </section>`;
+      document.getElementById("copy-script").onclick = () => {
+        const text = persona.script.map((item, index) =>
+          `${index + 1}. ${item[0]}\nDO/ASK: ${item[1]}\nEXPECTED: ${item[2]}\nSAY: ${scriptLine(persona, item[0])}`
+        ).join("\n\n");
+        navigator.clipboard.writeText(text);
+        document.getElementById("copy-script").textContent = "Copied";
+      };
+    }
+
+    function scriptLine(persona, beat) {
+      const lines = {
+        Signal: "We begin with a business signal, not an AI prompt.",
+        Ask: "The governed model gives us the number and the comparison context.",
+        Diagnose: "Now we separate the symptom from the driver and constraint.",
+        Decide: "The value is not the answer; it is the decision we can defend.",
+        Act: "The system prepares a draft, while the human remains accountable.",
+        Monitor: "The decision stays measurable and can be reopened as conditions change."
+      };
+      const key = Object.keys(lines).find(item => beat.toLowerCase().includes(item.toLowerCase()));
+      return key ? lines[key] : `For the ${persona.short.toLowerCase()} journey, this turns evidence into the next controlled step.`;
+    }
+
+    function renderCapabilities() {
+      document.getElementById("capabilities").innerHTML = `
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Current semantic model</h3><p>Direct Lake model with 40 tables, 153 measures, and 58 relationships.</p></div></div>
+          <div class="model-groups">${foundations.groups.map(item => `
+            <article class="model-group"><h4>${escapeHtml(item[0])}</h4><p>${escapeHtml(item[1])}</p></article>`).join("")}</div>
+        </section>
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Current ontology</h3><p>Business entities over historical Lakehouse data with selected Eventhouse time-series bindings.</p></div></div>
+          <div class="ontology-map">${foundations.entities.map((entity, index) => `${index ? '<span class="arrow">·</span>' : ""}<span class="entity">${escapeHtml(entity)}</span>`).join("")}</div>
+          <div class="measure-row">${foundations.relationships.map(item => `<span class="chip">${escapeHtml(item)}</span>`).join("")}</div>
+        </section>
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Current environment readiness</h3><p>Discovery under the current identity did not locate an exact accessible deployment of the checked-in model.</p></div></div>
+          <div class="capability-grid">
+            <article class="capability-card"><h4>Repository-defined target</h4><p>The intended experience is the 40-table <code>retail_model</code>, its eight-page report, RetailOntology_AutoGen, Eventhouse streams, and the semantic and ontology Data Agents.</p></article>
+            <article class="capability-card"><h4>Accessible live candidates</h4><p>The discovered “Retail demo” and VanArsdel reports are older sales/inventory samples. They do not contain the repository's omnichannel, churn, forecast, stockout-risk, marketing, or operational structures and should not be substituted silently.</p></article>
+          </div>
+          <div class="guardrail"><strong>Before presenting live:</strong> locate the workspace containing the exact <code>retail_model</code>, grant the presenting identity access, or deploy this repository. Then rerun the validated questions and replace replay values with current results.</div>
+        </section>
+        <section class="panel section">
+          <div class="section-heading"><div><h3>Previously validated behavior</h3><p>Documented repository test results from June 26, 2026; not re-verified against a discoverable exact model in the current inspection.</p></div></div>
+          <div class="capability-grid">
+            <article class="capability-card"><h4>Strong</h4><ul><li>Semantic-model aggregates, trends, rankings, channel mix, segmentation, churn, forecast, stockout risk, recommendations, and elasticity.</li><li>Ontology single-relationship traversal, named-entity facets, stockout prediction relationships, and live event counts grouped by store, product, or DC key.</li><li>Draft replenishment and retention actions with human approval/dismissal and Eventhouse logging.</li></ul></article>
+            <article class="capability-card"><h4>Use carefully</h4><ul><li>Deep or open-ended ontology traversals and high-volume receipt-event aggregations can fail or time out.</li><li>The full ontology should not be used for sales velocity; use the lite ontology or direct KQL path.</li><li>Semantic and ontology Data Agent instruction fields are currently null and should be authored before treating natural-language behavior as production-ready.</li></ul></article>
+          </div>
+        </section>
+        <div class="guardrail"><strong>Decision-quality rule:</strong> every journey should display period, data grain, evidence source, observed facts, derived calculations, business rule, proposed action, owner, and limitation. Never imply that reserved or aggregated inventory is allocatable to a specific store without a certified relationship at the required grain.</div>`;
+    }
+
+    function setTab() {
+      document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === activeTab));
+      document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.id === activeTab));
+    }
+
+    function render() {
+      const persona = personas.find(item => item.id === selected);
+      renderNav();
+      renderHero(persona);
+      renderQuestions(persona);
+      renderDecisions(persona);
+      renderJourney(persona);
+      renderScript(persona);
+      renderCapabilities();
+      setTab();
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.onclick = () => { activeTab = tab.dataset.tab; setTab(); };
+    });
+    document.getElementById("question-search").addEventListener("input", () => renderQuestions(personas.find(item => item.id === selected)));
+    document.getElementById("readiness-filter").addEventListener("change", () => renderQuestions(personas.find(item => item.id === selected)));
+    render();
+  </script>
+</body>
+</html>

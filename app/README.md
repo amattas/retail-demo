@@ -50,15 +50,20 @@ It has five core pages:
    Select or resolve the signal, invoke each IQ independently, ask Fabric Data
    Agent questions that do not create decisions, trigger the action agents, and
    approve or dismiss the final draft.
-3. **Decision Canvas** (`/decision.html`) — the scenario's signal, diagnosis,
+3. **Persona Journeys** (`/personas.html`) — an interactive, evidence-grounded
+   catalog of ten retail personas. It maps questions to existing semantic
+   measures, ontology relationships, and realtime events; distinguishes
+   live-validated capabilities from extensions; and provides a six-beat
+   end-to-end demo script for each persona.
+4. **Decision Canvas** (`/decision.html`) — the scenario's signal, diagnosis,
    grain constraint, recommendation, human override, and action package.
-4. **Agent Operations** (`/actions.html`) — a **live approval-funnel dashboard** that
+5. **Agent Operations** (`/actions.html`) — a **live approval-funnel dashboard** that
    streams from the Eventhouse `agent_actions` table and auto-refreshes every ~5s.
    KPI cards (proposed / approved / pending / dismissed, reorder units approved,
    churn LTV addressed), an events-per-minute timeline, a per-agent funnel, and a
    live feed of every recommendation and approval. This is the closed loop made
    visible. Set `RETAIL_EVENTHOUSE_LOG=0` to disable the write-back for an offline demo.
-5. **Ontology Explorer** (`/ontology.html`) — a separate page showing entity
+6. **Ontology Explorer** (`/ontology.html`) — a separate page showing entity
    types (live from the Ontology MCP) and their relationships (lakehouse +
    telemetry) as an interactive graph. Click any entity to inspect its
    properties and telemetry signals. Navigate between the pages via the header.
