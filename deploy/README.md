@@ -82,6 +82,12 @@ Terraform provisions or resolves:
 - MLExperiment
 - DataAgent
 
+Staging writes same-workspace pipeline notebook references as logical IDs and
+uses Fabric's default-workspace sentinel. `fabric-cicd` resolves both natively,
+so generated parameter files do not need one rewrite rule per notebook.
+Bulk publish remains opt-in because its upstream API is experimental and the
+post-ontology phase still requires dynamic target-item resolution.
+
 Dashboard templates and rule definitions are explicitly manual source assets,
 not guaranteed publishable workspace items. See the canonical
 [workspace and profile inventory](../docs/guides/workspace-inventory.md).

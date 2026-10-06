@@ -216,10 +216,18 @@ resolution.
 Generated `parameter.yml` rules rewrite:
 
 - OneLake and Direct Lake source identifiers;
-- pipeline workspace and notebook IDs;
 - KQL database item IDs and query URIs;
 - semantic-model connection IDs where configured;
 - Data Agent workspace, semantic-model, and ontology item IDs.
+
+Pipeline staging replaces same-workspace notebook references with each
+notebook's deterministic logical ID and the default-workspace sentinel.
+`fabric-cicd` resolves those values natively during publication, avoiding
+generated per-notebook parameter rules.
+
+Bulk publish is not enabled by default. The upstream API remains experimental,
+and full-demo post-ontology publication still uses dynamic target-item
+resolution for Data Agents.
 
 ## KQL application
 

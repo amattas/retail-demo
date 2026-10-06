@@ -638,6 +638,34 @@ def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> 
     assert not (output / "Pipelines" / "machine-learning.DataPipeline").exists()
 
 
+def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
+    output = tmp_path / "workspace"
+    output.mkdir()
+
+    build_artifacts.stage_pipelines(
+        repo,
+        output,
+        ["streaming-data-load.DataPipeline"],
+        {"03-streaming-to-silver"},
+    )
+
+    content = json.loads(
+        (
+            output
+            / "Pipelines"
+            / "streaming-data-load.DataPipeline"
+            / "pipeline-content.json"
+        ).read_text(encoding="utf-8")
+    )
+    type_properties = content["properties"]["activities"][0]["typeProperties"]
+    assert type_properties["notebookId"] == build_artifacts._logical_id(
+        "Notebook", "03-streaming-to-silver"
+    )
+    assert type_properties["workspaceId"] == build_artifacts._CURRENT_WORKSPACE_ID
+
+
 def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "setup-pipeline", ["setup-01-seed-dictionaries", "setup-02-generate-dimensions"])

@@ -151,7 +151,7 @@ def test_render_fabric_cicd_config_uses_environment_workspace_id(
     assert rendered["unpublish"]["skip"][ENVIRONMENT] is True
 
 
-def test_render_parameter_file_uses_dynamic_item_references(
+def test_render_parameter_file_uses_native_pipeline_bindings(
     tmp_path: Path,
 ) -> None:
     config = _load_config(tmp_path, "full-demo")
@@ -172,24 +172,15 @@ def test_render_parameter_file_uses_dynamic_item_references(
     assert rendered["find_replace"][0]["replace_value"][ENVIRONMENT].endswith(
         "/22222222-2222-2222-2222-222222222222"
     )
-    assert {
-        "find_key": "$.properties.activities[*].typeProperties.workspaceId",
-        "replace_value": {ENVIRONMENT: "$workspace.$id"},
-        "item_type": "DataPipeline",
-    } in rendered["key_value_replace"]
-    # The single hardcoded notebookId key_value_replace was replaced by one
-    # find_replace per pipeline notebook, generated from fabric/pipelines.
-    assert not any(
-        "notebookId" in entry.get("find_key", "")
-        for entry in rendered["key_value_replace"]
-    )
-    notebook_replacements = {
+    assert "key_value_replace" not in rendered
+    dynamic_replacements = {
         entry["replace_value"][ENVIRONMENT]
         for entry in rendered["find_replace"]
         if isinstance(entry["replace_value"].get(ENVIRONMENT), str)
-        and entry["replace_value"][ENVIRONMENT].startswith("$items.Notebook.")
     }
-    assert "$items.Notebook.02-historical-data-load.$id" in notebook_replacements
+    assert not any(
+        value.startswith("$items.Notebook.") for value in dynamic_replacements
+    )
 
 
 def test_render_parameter_file_remaps_data_agent_references(
@@ -219,39 +210,6 @@ def test_render_parameter_file_remaps_data_agent_references(
         agent_rules[deploy_config.DATA_AGENT_ONTOLOGY_ID]
         == f"$items.Ontology.{deploy_config.ONTOLOGY_ITEM_NAME}.$id"
     )
-
-
-def test_collect_pipeline_notebook_refs_maps_notebook_ids(tmp_path: Path) -> None:
-    item = tmp_path / "fabric" / "pipelines" / "streaming-data-load.DataPipeline"
-    item.mkdir(parents=True)
-    (item / "pipeline-content.json").write_text(
-        json.dumps(
-            {
-                "properties": {
-                    "activities": [
-                        {
-                            "name": "03-streaming-to-silver",
-                            "type": "TridentNotebook",
-                            "typeProperties": {"notebookId": "guid-silver"},
-                        },
-                        {
-                            "name": "04-streaming-to-gold",
-                            "type": "TridentNotebook",
-                            "typeProperties": {"notebookId": "guid-gold"},
-                        },
-                    ]
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    refs = deploy_config.collect_pipeline_notebook_refs(tmp_path)
-
-    assert refs == {
-        "guid-silver": "03-streaming-to-silver",
-        "guid-gold": "04-streaming-to-gold",
-    }
 
 
 def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
@@ -334,33 +292,6 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
     assert experimental_activities["14-ml-dynamic-pricing"]["dependsOn"] == []
     assert not (required_producers & optional)
     assert not (required_producers & experimental)
-
-    # Every tier notebook GUID is mapped to its deployed notebook.
-    config = _load_config(tmp_path, "full-demo")
-    rendered = deploy_config.render_parameter_file(
-        config,
-        {
-            "workspace_id": "11111111-1111-1111-1111-111111111111",
-            "lakehouse_id": "22222222-2222-2222-2222-222222222222",
-            "lakehouse_name": "retail_lakehouse",
-        },
-    )
-    replacements = {
-        entry["find_value"]: entry["replace_value"][ENVIRONMENT]
-        for entry in rendered["find_replace"]
-        if isinstance(entry["replace_value"].get(ENVIRONMENT), str)
-    }
-    validator_id = validator["typeProperties"]["notebookId"]
-    assert (
-        replacements[validator_id]
-        == "$items.Notebook.15-validate-required-ml-contract.$id"
-    )
-    sample_ml = required["06-ml-demand-forecast"]
-    assert (
-        replacements[sample_ml["typeProperties"]["notebookId"]]
-        == "$items.Notebook.06-ml-demand-forecast.$id"
-    )
-
 
 def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
     config = _load_config(tmp_path)
