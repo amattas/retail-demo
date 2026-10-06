@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
+import tomllib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -125,6 +126,9 @@ def test_python_lockfiles_are_hash_complete() -> None:
             assert "--hash=sha256:" in block, (
                 f"{path}: requirement lacks a SHA-256 hash: {first_line!r}"
             )
+            assert not re.search(r"--hash=(?!sha256:)", block), (
+                f"{path}: requirement uses a non-SHA-256 hash: {first_line!r}"
+            )
 
 
 def test_workflow_pip_installs_are_locked_or_dependency_free() -> None:
@@ -163,6 +167,25 @@ def test_fabric_provider_is_exact_and_multi_platform_locked() -> None:
     assert f'constraints = "{version}"' in lock
     assert lock.count('"h1:') >= 6
     assert lock.count('"zh:') >= 6
+
+
+def test_fabric_cicd_is_exact_and_locked() -> None:
+    pyproject = tomllib.loads(
+        (REPO_ROOT / "utility" / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    deploy_requirements = pyproject["project"]["optional-dependencies"]["deploy"]
+    requirement = next(
+        value for value in deploy_requirements if value.startswith("fabric-cicd")
+    )
+    version_match = re.fullmatch(r"fabric-cicd==(\d+\.\d+\.\d+)", requirement)
+    assert version_match
+    version = version_match.group(1)
+
+    for lock_path in (
+        REPO_ROOT / "utility" / "requirements-deploy.txt",
+        REPO_ROOT / "utility" / "requirements-ci.txt",
+    ):
+        assert f"fabric-cicd=={version} \\" in lock_path.read_text(encoding="utf-8")
 
 
 def test_notebook_runtime_installs_are_exactly_pinned() -> None:

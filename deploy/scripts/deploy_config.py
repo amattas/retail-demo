@@ -465,37 +465,6 @@ def render_fabric_cicd_config(
     return rendered
 
 
-def collect_pipeline_notebook_refs(
-    repo_root: Path = REPO_ROOT,
-    pipeline_refs: tuple[str, ...] | list[str] | None = None,
-) -> dict[str, str]:
-    """Map each pipeline ``notebookId`` GUID to its notebook display name.
-
-    Scans ``fabric/pipelines/*.DataPipeline/pipeline-content.json``. The activity
-    ``name`` is the notebook display name, which is used to build
-    ``$items.Notebook.<name>.$id`` references that fabric-cicd resolves to the
-    deployed notebook's GUID at publish time.
-    """
-
-    pipelines_dir = repo_root / "fabric" / "pipelines"
-    refs: dict[str, str] = {}
-    if not pipelines_dir.is_dir():
-        return refs
-    selected = set(pipeline_refs) if pipeline_refs is not None else None
-    for content_path in sorted(pipelines_dir.glob("*.DataPipeline/pipeline-content.json")):
-        if selected is not None and content_path.parent.name not in selected:
-            continue
-        content = json.loads(content_path.read_text(encoding="utf-8"))
-        for activity in content.get("properties", {}).get("activities", []):
-            if activity.get("type") != "TridentNotebook":
-                continue
-            notebook_id = activity.get("typeProperties", {}).get("notebookId")
-            name = activity.get("name")
-            if notebook_id and name:
-                refs[str(notebook_id)] = str(name)
-    return refs
-
-
 def render_parameter_file(
     config: DeployConfig, terraform_outputs: dict[str, Any]
 ) -> dict[str, Any]:
@@ -509,10 +478,7 @@ def render_parameter_file(
         f"https://onelake.dfs.fabric.microsoft.com/{workspace_id}/{lakehouse_id}"
     )
 
-    parameters: dict[str, Any] = {
-        "find_replace": [],
-        "key_value_replace": [],
-    }
+    parameters: dict[str, Any] = {"find_replace": []}
     if config.profile.selects("asset.semantic-model"):
         parameters["find_replace"].extend(
             [
@@ -539,32 +505,6 @@ def render_parameter_file(
             },
             ]
         )
-    if config.profile.pipeline_refs:
-        parameters["key_value_replace"].append(
-            {
-                "find_key": "$.properties.activities[*].typeProperties.workspaceId",
-                "replace_value": {config.environment: "$workspace.$id"},
-                "item_type": "DataPipeline",
-            }
-        )
-
-    # Each pipeline activity references its notebook by the source workspace's
-    # notebookId GUID. Map every GUID to $items.Notebook.<name>.$id (resolved by
-    # fabric-cicd to the deployed notebook) via a string find_replace, since a
-    # single key_value_replace cannot map each activity to a different value.
-    for notebook_id, notebook_name in collect_pipeline_notebook_refs(
-        pipeline_refs=config.profile.pipeline_refs
-    ).items():
-        parameters["find_replace"].append(
-            {
-                "find_value": notebook_id,
-                "replace_value": {
-                    config.environment: f"$items.Notebook.{notebook_name}.$id"
-                },
-                "item_type": "DataPipeline",
-            }
-        )
-
     kql_database_id = terraform_outputs.get("kql_database_id")
     if config.profile.provisions_eventhouse and kql_database_id:
         parameters["find_replace"].append(
