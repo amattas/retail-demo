@@ -19,7 +19,7 @@ from deploy.scripts.build_artifacts import (
     NOTEBOOK_GROUPS,
     SETUP_NOTEBOOKS,
     STREAM_NOTEBOOKS,
-    _pipeline_notebook_refs,
+    pipeline_notebook_refs,
 )
 from deploy.scripts.deploy_config import (
     DeployConfig,
@@ -193,7 +193,7 @@ def _validate_pipeline_sources(
             errors.append(f"invalid selected pipeline {pipeline_ref}: {exc}")
             continue
         missing_notebooks = sorted(
-            _pipeline_notebook_refs(content) - selected_notebooks
+            pipeline_notebook_refs(content) - selected_notebooks
         )
         if missing_notebooks:
             errors.append(

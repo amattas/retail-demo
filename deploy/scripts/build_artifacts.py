@@ -628,9 +628,8 @@ def stage_pipelines(
         content_path = item_dir / "pipeline-content.json"
         if not item_dir.is_dir() or not content_path.is_file():
             raise FileNotFoundError(f"Selected pipeline source not found: {item_dir}")
-        refs = _pipeline_notebook_refs(
-            json.loads(content_path.read_text(encoding="utf-8"))
-        )
+        content = json.loads(content_path.read_text(encoding="utf-8"))
+        refs = pipeline_notebook_refs(content)
         missing = sorted(refs - deployed_notebooks)
         if missing:
             raise ValueError(
@@ -643,11 +642,29 @@ def stage_pipelines(
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
+        for activity in content.get("properties", {}).get("activities", []):
+            if activity.get("type") != "TridentNotebook":
+                continue
+            notebook_name = str(activity.get("name", ""))
+            if not notebook_name:
+                raise ValueError(
+                    f"Selected pipeline {pipeline_ref!r} has an unnamed "
+                    "TridentNotebook activity"
+                )
+            type_properties = activity.setdefault("typeProperties", {})
+            # fabric-cicd resolves repository logical IDs and the default
+            # workspace sentinel to target IDs before publishing the pipeline.
+            type_properties["notebookId"] = _logical_id("Notebook", notebook_name)
+            type_properties["workspaceId"] = _CURRENT_WORKSPACE_ID
+        (destination / "pipeline-content.json").write_text(
+            json.dumps(content, indent=2) + "\n",
+            encoding="utf-8",
+        )
         staged.append(destination)
     return staged
 
 
-def _pipeline_notebook_refs(pipeline_content: dict) -> set[str]:
+def pipeline_notebook_refs(pipeline_content: dict) -> set[str]:
     """Notebook display names a pipeline orchestrates (``TridentNotebook`` activities)."""
 
     refs: set[str] = set()
@@ -828,8 +845,8 @@ def build_workspace(
         )
     # Data Pipelines publish into a "Pipelines" workspace folder (except
     # setup-pipeline, which joins the setup notebooks under "Setup"), but only
-    # when every notebook they orchestrate is part of this deploy (so the
-    # pipeline's $items.Notebook.<name>.$id references resolve).
+    # when every notebook they orchestrate is part of this deploy. Staging writes
+    # native logical IDs so fabric-cicd resolves same-workspace dependencies.
     if stage_infrastructure and profile.pipeline_refs:
         staged_items.extend(
             item.name

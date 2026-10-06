@@ -23,10 +23,12 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
 from deploy.scripts.apply_kql import resolve_kql_database
-from deploy.scripts.build_artifacts import ML_EXPERIMENT_GROUPS
+from deploy.scripts.build_artifacts import (
+    ML_EXPERIMENT_GROUPS,
+    pipeline_notebook_refs,
+)
 from deploy.scripts.deploy_config import (
     DeployConfig,
-    collect_pipeline_notebook_refs,
     load_environment,
     load_terraform_outputs,
     validate_terraform_outputs,
@@ -1854,11 +1856,15 @@ class ReadinessRunner:
         references.extend(self.profile.post_reporting_pipeline_refs)
         mapping: dict[str, str] = {}
         for reference in references:
-            notebooks = collect_pipeline_notebook_refs(
-                self.context.repo_root,
-                (Path(reference).name,),
+            content_path = (
+                self.context.repo_root
+                / "fabric"
+                / "pipelines"
+                / Path(reference).name
+                / "pipeline-content.json"
             )
-            for name in notebooks.values():
+            content = json.loads(content_path.read_text(encoding="utf-8"))
+            for name in pipeline_notebook_refs(content):
                 mapping.setdefault(name, reference)
         self._producer_pipeline_ref_cache = mapping
         return mapping
