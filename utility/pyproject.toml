@@ -34,6 +34,10 @@ packages = ["src/retail_setup"]
 line-length = 100
 src = ["src", "tests"]
 
+[tool.ruff.lint]
+# Ruff 0.16 expanded its defaults substantially; preserve the existing gate.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
