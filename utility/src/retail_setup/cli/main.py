@@ -1208,6 +1208,25 @@ def _post_ontology_steps(
             cmd=[
                 py,
                 "-m",
+                "deploy.scripts.deploy_ontology",
+                "--repo-root",
+                str(repo_root),
+                "--environment",
+                env,
+            ],
+            description="Publish the ontology in the new TMDL format with business rules",
+            step_id="publish-ontology-tmdl",
+            required=False,
+            failure_message=(
+                "TMDL ontology publication failed; the existing ontology was kept. "
+                "Inspect ontology-report.json."
+            ),
+            evidence_path=f"deploy/.generated/{env}/ontology-report.json",
+        ),
+        DeployStep(
+            cmd=[
+                py,
+                "-m",
                 "deploy.scripts.build_artifacts",
                 "--repo-root",
                 str(repo_root),
@@ -1847,6 +1866,28 @@ def _deploy_plan(
                     "deployment continues. Inspect operations-planning-report.json."
                 ),
                 evidence_path=f"deploy/.generated/{env}/operations-planning-report.json",
+            )
+        )
+    if profile.selects("asset.semantic-model"):
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.deploy_fabric_app",
+                    "--repo-root",
+                    str(repo_root),
+                    "--environment",
+                    env,
+                ],
+                description="Deploy the Fabric Apps replenishment approvals app",
+                step_id="deploy-fabric-app",
+                required=False,
+                failure_message=(
+                    "Fabric App deployment failed; the rest of the deployment continues. "
+                    "Inspect fabric-app-report.json."
+                ),
+                evidence_path=f"deploy/.generated/{env}/fabric-app-report.json",
             )
         )
     if profile.selects("asset.data-agents"):

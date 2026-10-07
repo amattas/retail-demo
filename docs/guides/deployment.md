@@ -192,6 +192,22 @@ find the native items by their names in the workspace.
 
 See the [decision-experience boundary](../design/specifications/modules/ml-ai/decision-experience.md#native-availability-pack).
 
+### TMDL ontology and Fabric Apps approvals
+
+Two more non-required steps run by default. If either fails, the run is
+degraded but continues.
+
+- **`publish-ontology-tmdl`** (full-demo) republishes `RetailOntology_AutoGen`
+  in the new TMDL ontology format, with nine business rules, before the Data
+  Agents are published. Fabric retires the old format on Jan 31, 2027. An
+  old-format item is replaced only after a staged copy passes readback.
+  Evidence: `deploy/.generated/<env>/ontology-report.json`.
+- **`deploy-fabric-app`** (standard and full-demo) deploys the
+  `app/fabric-app` replenishment approvals app with the Rayfin CLI. It needs
+  Node.js 20+, the **Fabric Apps (preview)** tenant setting, and a capacity
+  region that supports Fabric Apps. The first run can open a browser for the
+  Rayfin sign-in. Evidence: `deploy/.generated/<env>/fabric-app-report.json`.
+
 ### Store, Warehouse, and Truck twins
 
 The connected twins are a separate, read-only Power BI report named

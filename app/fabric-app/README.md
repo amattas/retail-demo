@@ -49,6 +49,11 @@ npm run dev         # local backend (Docker) with mock sign-in
 
 ## Deploy and live test
 
+`retail-setup deploy` runs this deployment automatically for Reporting
+profiles, through the non-required `deploy-fabric-app` step
+(`deploy/scripts/deploy_fabric_app.py`). That step needs Node.js 20+. To
+deploy the app by itself:
+
 Prerequisites:
 - a tenant admin has enabled **Fabric Apps (preview)**;
 - the capacity is in a [supported region](https://learn.microsoft.com/fabric/admin/region-availability);

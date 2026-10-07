@@ -4,6 +4,11 @@
 
 ## FabCon follow-ups: Operations Agent and Fabric Apps (2026-10-07, offline)
 
+**Update:** full-demo deploys now include the non-required
+`publish-ontology-tmdl` and `deploy-fabric-app` steps, alongside the existing
+Operations Agent step. `ensure_ontology` skips the legacy notebook once the
+item is in TMDL format. None of this has been run live yet.
+
 `app/fabric-app` is a Rayfin Fabric Apps spike for SSO-bound, append-only
 proposal and approval records (7 Vitest tests, including a check on the
 generated DAB permissions). The Operations Agent definition matches the

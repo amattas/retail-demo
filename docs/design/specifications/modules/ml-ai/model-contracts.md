@@ -174,9 +174,12 @@ apply-and-verify sequence retries up to five times only for HTTP 404, 409,
 
 The notebook above publishes the old entity-type JSON format, which Fabric
 retires on Jan 31, 2027 (`ENH-010`). `deploy/scripts/deploy_ontology.py`
-publishes the replacement definition. It is implemented and tested offline
-but is **not yet wired into deployment**. The notebook stays the deployed path
-until live acceptance of the new publisher.
+publishes the replacement definition. Full-demo deployment runs it as the
+non-required `publish-ontology-tmdl` step, after `ensure-ontology` and before
+the Data Agents are published. A failure keeps the existing ontology and
+degrades the run instead of failing it. Once the ontology is in TMDL format,
+`ensure_ontology` no longer runs the legacy notebook, so the migration is not
+reverted. Live acceptance is still pending.
 
 `deploy/scripts/_ontology_model.py` renders the definition deterministically
 from the physical contracts, not from runtime inspection:

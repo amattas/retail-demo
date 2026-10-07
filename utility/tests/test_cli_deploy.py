@@ -182,6 +182,31 @@ def test_default_deploy_plan_never_publishes_twins(profile):
     assert all("deploy.scripts.deploy_twins" not in step.cmd for step in plan)
 
 
+def test_tmdl_ontology_publishes_before_data_agents_without_blocking():
+    plan = _deploy_plan("dev", True, profile=_profile("full-demo"), repo_root=REPO_ROOT)
+    ids = [step.step_id for step in plan]
+    index = ids.index("publish-ontology-tmdl")
+    assert ids.index("ensure-ontology") < index < ids.index("deploy-post-ontology")
+    step = plan[index]
+    assert step.required is False
+    assert step.cmd[2] == "deploy.scripts.deploy_ontology"
+    assert step.evidence_path == "deploy/.generated/dev/ontology-report.json"
+
+
+@pytest.mark.parametrize(("profile", "included"), [
+    ("core", False), ("standard", True), ("full-demo", True),
+])
+def test_fabric_app_deploys_with_reporting_profiles_without_blocking(profile, included):
+    plan = _deploy_plan("dev", True, profile=_profile(profile), repo_root=REPO_ROOT)
+    steps = [step for step in plan if step.step_id == "deploy-fabric-app"]
+    assert bool(steps) is included
+    if included:
+        assert steps[0].required is False
+        assert steps[0].cmd[2] == "deploy.scripts.deploy_fabric_app"
+        ids = [step.step_id for step in plan]
+        assert ids.index("validate-reporting") < ids.index("deploy-fabric-app")
+
+
 @pytest.mark.parametrize("profile", ["standard", "full-demo"])
 def test_native_pack_is_required_after_reporting_before_taskflow(profile):
     plan = _deploy_plan(
@@ -489,6 +514,7 @@ def test_operations_only_failure_warns_and_continues_deploy(monkeypatch, tmp_pat
         ("fabric", "twins", "retail-twins.Report", "definition.pbir"),
         ("deploy", "scripts", "deploy_operations_planning.py"),
         ("deploy", "scripts", "deploy_twins.py"),
+        ("app", "fabric-app", "rayfin", "data", "ApprovalDecision.ts"),
     ],
 )
 def test_resume_fingerprint_tracks_native_pack_sources(tmp_path, relative):
@@ -2293,3 +2319,18 @@ def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_
     # Steps after the failed one were never reached (still PENDING).
     kql_step = next(s for s in journal["steps"] if s["step_id"] == "apply-kql")
     assert kql_step["status"] == "PENDING"
+
+
+def test_resume_fingerprint_ignores_fabric_app_dependencies_and_local_state(tmp_path):
+    from retail_setup.cli._deploy_resume import fingerprint
+
+    app = tmp_path / "app" / "fabric-app"
+    for relative in ("node_modules/x/index.js", "dist/index.html", "rayfin/.env"):
+        (app / relative).parent.mkdir(parents=True, exist_ok=True)
+        (app / relative).write_text("before", encoding="utf-8")
+    generation = tmp_path / "generation.yml"
+    before = fingerprint(tmp_path, "dev", generation, [])
+    for relative in ("node_modules/x/index.js", "dist/index.html", "rayfin/.env"):
+        (app / relative).write_text("after", encoding="utf-8")
+
+    assert fingerprint(tmp_path, "dev", generation, []) == before

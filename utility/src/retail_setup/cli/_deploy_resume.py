@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,17 @@ def fingerprint(
                 for part in path.relative_to(directory).parts
             )
             and path.suffix not in {".pyc", ".tfstate", ".tfvars", ".tfplan"}
+        )
+    app_root = repo_root / "app" / "fabric-app"
+    for current, directories, files in os.walk(app_root):
+        directories[:] = [
+            name for name in directories
+            if name not in {"node_modules", "dist", ".temp", ".vite"}
+        ]
+        inputs.update(
+            Path(current) / name
+            for name in files
+            if not name.startswith(".env") and name != ".deployments.json"
         )
     digest = hashlib.sha256(json.dumps(commands).encode("utf-8"))
     for path in sorted(inputs):

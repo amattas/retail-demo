@@ -105,10 +105,22 @@ def wait_for_ontology(
         sleep(poll_interval_seconds)
 
 
+def is_tmdl_ontology(session: requests.Session, workspace_id: str, item_id: str) -> bool:
+    """True when the item already uses the new TMDL ontology experience."""
+
+    from deploy.scripts._native_items import get_definition
+    from deploy.scripts.deploy_ontology import is_old_format
+    from deploy.scripts.fabric_runtime import decode_definition_parts
+
+    definition = get_definition(session, workspace_id, "Ontology", item_id)
+    return not is_old_format(decode_definition_parts(definition))
+
+
 def ensure_ontology(
     session_factory: Callable[[], requests.Session],
     workspace_id: str,
     *,
+    tmdl_check: Callable[[requests.Session, str, str], bool] = is_tmdl_ontology,
     job_timeout_seconds: float = DEFAULT_JOB_TIMEOUT_SECONDS,
     discovery_timeout_seconds: float = DEFAULT_DISCOVERY_TIMEOUT_SECONDS,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
@@ -123,6 +135,10 @@ def ensure_ontology(
         ONTOLOGY_ITEM_NAME,
         "Ontology",
     )
+    # The legacy notebook writes the retiring JSON format; never run it over a
+    # migrated TMDL item, or each deploy would revert the migration.
+    if existing is not None and tmdl_check(session, workspace_id, str(existing["id"])):
+        return str(existing["id"]), False
 
     notebook = _unique_named_item(
         list_items(session, workspace_id, "Notebook"),

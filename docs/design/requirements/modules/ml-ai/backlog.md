@@ -70,7 +70,8 @@
   [ontology definition reference](https://learn.microsoft.com/rest/api/fabric/articles/item-management/definitions/ontology-definition).
 - **Progress:** The TMDL generator and the staged-cutover publisher
   (`deploy/scripts/_ontology_model.py`, `deploy_ontology.py`) are
-  implemented with offline tests. Remaining work:
+  implemented with offline tests and run as the non-required
+  `publish-ontology-tmdl` deploy step. Remaining work:
   - live acceptance, which needs a sign-in to the demo tenant, covering:
     - whether the service accepts Eventhouse time series bound through
       `cusn` shortcuts;
@@ -80,7 +81,8 @@
       relationship;
     - whether `fabric-cicd` can publish ontology items;
     - whether the MCP tools still work on the new item;
-  - replacing `30-create-ontology` in `ensure_ontology.py` and readiness;
+  - retiring the `30-create-ontology` notebook once the TMDL path is
+    proven (it is already skipped for TMDL-format items);
   - re-exporting the ontology Data Agent snapshots;
   - pointing `app/backend/ontology_graph.py` at the generator.
 
@@ -122,8 +124,9 @@
   reviewer decisions in a Fabric SQL database. It uses Fabric SSO
   identities, and DAB grants only read and create, with creates bound to the
   caller. Separation of duties and the decision timestamp are still enforced
-  only in the client. Live deployment and the negative API checks are
-  pending: see `context/plans/2026-10-07-fabcon-live-tests.md`.
+  only in the client. Reporting profiles deploy it through the non-required
+  `deploy-fabric-app` step, which needs Node.js 20+. Live deployment and the
+  negative API checks are pending: see `context/plans/2026-10-07-fabcon-live-tests.md`.
 - Validate the [living scenario and action contract](../../../specifications/modules/ml-ai/decision-experience.md)
   end to end; do not infer completion from `app/backend/replay.py`.
 - Retain replay/live parity, golden answers, scenario generation/checksums,
