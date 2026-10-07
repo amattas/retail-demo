@@ -1,10 +1,32 @@
 # Plan: ontology new-experience migration (ENH-010) and business rules (ENH-011)
 
-**Status:** Draft for review — 2026-10-07. Temporary planning artifact, not a
-system of record. Promote durable decisions into the
+**Status:** Offline execution complete — 2026-10-07. Live spikes and cutover
+are blocked on a sign-in to the demo tenant (`9d379b85-…`). Temporary planning
+artifact, not a system of record. Promote durable decisions into the
 [ML/AI contracts](../../docs/design/specifications/modules/ml-ai/model-contracts.md),
 [ML/AI backlog](../../docs/design/requirements/modules/ml-ai/backlog.md), and
 traceability before deleting this file.
+
+## 0. Execution log (2026-10-07)
+
+| Item | Outcome |
+| --- | --- |
+| S1 TMDL shapes | **Resolved from documentation.** The 35-part WindFarm example in the format reference round-trips, and its base64 payloads give exact whitespace. A time series is an `additionalBackingTable` joined by a TOM relationship plus `type: timeSeries` properties, all behind one `Sql.Database` DirectLake expression. Native Kusto bindings have no documented TMDL form, so Eventhouse data binds through the existing Bronze `cusn` Lakehouse shortcuts. **Live check still needed.** |
+| S2 projected metrics | **Resolved negative from documentation.** TMDL rejects `backingMeasure`. D4 option (c) applies: no metrics in automation, and no duplicated DAX. |
+| S3 graph materialization API | Not investigated live — blocked. |
+| S4 `fabric-cicd` ontology support | Not investigated — blocked. D1 chose a deploy script, `deploy/scripts/deploy_ontology.py`. |
+| S5 MCP tools on the new item | Blocked. |
+| Phase 1 generator | Done: `deploy/scripts/_ontology_model.py`; `tests/deploy/test_ontology_model.py`. |
+| Phase 2 publisher | Done offline: `deploy/scripts/deploy_ontology.py`, with staged create, verify, delete, and rename (strengthens D2); `tests/deploy/test_deploy_ontology.py`. **Not wired into deployment.** |
+| Rules (ENH-011) | Done offline: `deploy/scripts/_ontology_rules.py`, 9 rules; parity tests in `tests/deploy/test_ontology_rules.py`. |
+| Phase 3 consumers / Phase 4 live acceptance | Pending live validation. |
+
+Additional live risks found while building:
+- The Truck→DC TOM relationship joins `DCID` (`double`) to `ID` (`int64`);
+  the semantic model avoids it for this reason.
+- Inactive TOM relationships are used as additional backing tables, which
+  avoids ambiguous paths.
+- One event table backs several entities.
 
 ## 1. Why now
 

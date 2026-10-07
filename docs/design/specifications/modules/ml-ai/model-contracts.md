@@ -170,6 +170,66 @@ to HTTPS service URLs whose hosts end in `.analysis.windows.net` or
 apply-and-verify sequence retries up to five times only for HTTP 404, 409,
 429, 500, 502, 503, or 504; other failures fail immediately.
 
+### New-experience (TMDL) publisher
+
+The notebook above publishes the old entity-type JSON format, which Fabric
+retires on Jan 31, 2027 (`ENH-010`). `deploy/scripts/deploy_ontology.py`
+publishes the replacement definition. It is implemented and tested offline
+but is **not yet wired into deployment**. The notebook stays the deployed path
+until live acceptance of the new publisher.
+
+`deploy/scripts/_ontology_model.py` renders the definition deterministically
+from the physical contracts, not from runtime inspection:
+
+- Silver tables come from `utility/src/retail_setup/generation/schemas.py`,
+  Gold ML outputs from `ml_contracts` in `contracts/retail-demo.json`, and
+  Bronze event tables from `fabric/kql_database/01-create-tables.kql`.
+- All tables are DirectLake partitions behind one `Sql.Database` expression
+  for the Lakehouse SQL analytics endpoint, in schemas `ag`, `au`, and `cusn`.
+  Eventhouse time series bind through the Bronze `cusn` shortcuts. The
+  publisher lists `Tables/cusn` in OneLake, and missing shortcuts drop only
+  their bindings.
+- The model has the same 12 entities and 17 relationship names as the
+  notebook; three of the relationships use junction tables. Keys and
+  properties use `snake_case` column names, and time-series properties are
+  named `<event_table>_<column>` and ordered by `ingest_timestamp`.
+- TOM relationships that `retail_model` marks inactive are also inactive
+  here. Each event table has exactly one active outgoing relationship, so
+  the TOM graph has no ambiguous active paths.
+- Descriptions are native `///` comments, so the authoring-API workaround
+  and its token exchange are unnecessary in this path.
+- Lineage tags are UUIDv5 values of stable element names, so updates replace
+  elements in place.
+- Semantic-model DAX measures are **not** published as metrics. TMDL cannot
+  express `projected` metrics, and the definition does not duplicate DAX as
+  explicit metrics.
+
+Publication behavior:
+
+| Existing item | Action |
+| --- | --- |
+| None | Create `RetailOntology_AutoGen` |
+| TMDL format (`.platform` `config.version` `2.0`) | `updateDefinition` in place |
+| Old format (`definition.json` or `EntityTypes/` parts) | Create and verify `RetailOntology_AutoGen_tmdl`, then delete the old item and rename the staged item; a failed staging readback leaves the old item intact |
+
+Readback must be in TMDL format and contain every generated table, entity,
+and rule part. The service elides defaults, so readback compares element
+sets rather than text. Evidence is written to
+`deploy/.generated/<env>/ontology-report.json`. Run
+`python -m deploy.scripts.deploy_ontology --render <dir>` to inspect the
+definition without service calls.
+
+### Business rules
+
+`deploy/scripts/_ontology_rules.py` publishes nine natural-language rules
+(`ENH-011`): minimum margin, MSRP ceiling, price-change cadence, aged-inventory
+markdown, pricing approval, return window, stockout definition and risk
+bands, replenishment policy, and churn definition. Each numeric value is
+checked against the code that enforces it by
+`tests/deploy/test_ontology_rules.py`. Rules are guidance only; ontology does
+not execute them. Agents read them with the ontology MCP `list_ontology_rules`
+tool.
+
 ## Data Agents
 
 Source-controlled Data Agent definitions require target-specific rebinding.

@@ -63,6 +63,21 @@
   materialize a graph by default, and every ontology read, including MCP
   calls, is billed as Ontology Discovery. See the
   [ontology definition reference](https://learn.microsoft.com/rest/api/fabric/articles/item-management/definitions/ontology-definition).
+- **Progress:** The TMDL generator and the staged-cutover publisher
+  (`deploy/scripts/_ontology_model.py`, `deploy_ontology.py`) are
+  implemented with offline tests. Remaining work:
+  - live acceptance, which needs a sign-in to the demo tenant, covering:
+    - whether the service accepts Eventhouse time series bound through
+      `cusn` shortcuts;
+    - whether it accepts inactive relationships used as additional backing
+      tables;
+    - whether it accepts the `dim_trucks.DCID` (`double`) to `ID` (`int64`)
+      relationship;
+    - whether `fabric-cicd` can publish ontology items;
+    - whether the MCP tools still work on the new item;
+  - replacing `30-create-ontology` in `ensure_ontology.py` and readiness;
+  - re-exporting the ontology Data Agent snapshots;
+  - pointing `app/backend/ontology_graph.py` at the generator.
 
 ### ENH-011 - Add ontology business rules {#enh-011}
 
@@ -76,6 +91,9 @@
 - **Boundary:** Rules are guidance only; ontology does not execute them.
   The new experience has no Activator integration, so `fabric/rules/`
   remains separate.
+- **Progress:** Nine source-checked rules are generated into the `ENH-010`
+  definition (`deploy/scripts/_ontology_rules.py`). Live acceptance is
+  pending: `list_ontology_rules` must return every rule.
 
 ### ENH-012 - Publish Data Agents to Microsoft 365 Copilot {#enh-012}
 

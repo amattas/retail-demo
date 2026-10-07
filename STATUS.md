@@ -2,6 +2,15 @@
 
 **Updated**: 2026-10-06 | **Wave**: E — local implementation complete; native live acceptance blocked
 
+## Ontology TMDL migration and rules (2026-10-07, `dev` branch, offline)
+
+`ENH-010` and `ENH-011` are implemented offline: a contract-derived TMDL
+ontology generator, a staged-cutover publisher, and nine source-checked
+business rules, all with tests. The publisher is not wired into deployment;
+`30-create-ontology` remains the deployed path. Live spikes and acceptance are
+blocked on a sign-in to the demo tenant. See
+`context/plans/2026-10-07-ontology-new-experience-and-rules.md`.
+
 ## Deploy everything by default (2026-10-07, `dev` branch)
 
 `full-demo` is now the manifest default for every entry point. Twins and the

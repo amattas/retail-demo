@@ -21,6 +21,7 @@ COLLECTIONS = {
     "Plan": "plans",
     "Notebook": "notebooks",
     "Report": "reports",
+    "Ontology": "ontologies",
 }
 
 
