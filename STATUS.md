@@ -2,6 +2,15 @@
 
 **Updated**: 2026-10-06 | **Wave**: E — local implementation complete; native live acceptance blocked
 
+## FabCon follow-ups: Operations Agent and Fabric Apps (2026-10-07, offline)
+
+`app/fabric-app` is a Rayfin Fabric Apps spike for SSO-bound, append-only
+proposal and approval records (7 Vitest tests, including a check on the
+generated DAB permissions). The Operations Agent definition matches the
+June 2026 schema, so the HTTP 400 needs a live retry. Both live tests are
+blocked on demo-tenant sign-in; see
+`context/plans/2026-10-07-fabcon-live-tests.md`.
+
 ## Ontology TMDL migration and rules (2026-10-07, `dev` branch, offline)
 
 `ENH-010` and `ENH-011` are implemented offline: a contract-derived TMDL

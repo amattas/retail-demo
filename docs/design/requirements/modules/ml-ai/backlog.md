@@ -9,6 +9,11 @@
 - Investigate the Operations Agent create API's HTTP 400 `UnknownError`.
   Supporting signals/notebook were published; the native agent was not.
   Preserve the partial-publication report rather than retrying blindly.
+  As of 2026-10-07 the rendered definition matches the current (June 2026)
+  schema field for field, so the next step is a live retry, then a diff
+  against a UI-created agent. FabCon also announced pre-approved actions and
+  Investigator root-cause insights; these are UI-configured and not yet in the
+  definition schema.
 - The current environment prohibits fixed credentials. Keep native Planning
   unselected and SSO unchanged; operations-only deployment and human review
   do not require those Planning connections. Native Plan acceptance applies
@@ -113,6 +118,12 @@
 
 ### Decision experience acceptance — REQ-MLAI-005
 
+- A Fabric Apps spike in `app/fabric-app` stores proposals and append-only
+  reviewer decisions in a Fabric SQL database. It uses Fabric SSO
+  identities, and DAB grants only read and create, with creates bound to the
+  caller. Separation of duties and the decision timestamp are still enforced
+  only in the client. Live deployment and the negative API checks are
+  pending: see `context/plans/2026-10-07-fabcon-live-tests.md`.
 - Validate the [living scenario and action contract](../../../specifications/modules/ml-ai/decision-experience.md)
   end to end; do not infer completion from `app/backend/replay.py`.
 - Retain replay/live parity, golden answers, scenario generation/checksums,
