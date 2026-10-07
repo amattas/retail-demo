@@ -62,7 +62,10 @@ def _seed_real_profile_sources(repo: Path) -> None:
     for item_name in ("retail_model.SemanticModel", "retail_model.Report"):
         _write_json(
             repo / "fabric" / "powerbi" / item_name / ".platform",
-            {"metadata": {"type": item_name.rsplit(".", 1)[1]}},
+            {
+                "metadata": {"type": item_name.rsplit(".", 1)[1]},
+                "config": {"logicalId": build_artifacts._logical_id("fixture", item_name)},
+            },
         )
     for source in (REPO_ROOT / "fabric" / "querysets").glob("*.kql"):
         destination = repo / "fabric" / "querysets" / source.name
@@ -171,8 +174,14 @@ def test_notebook_lakehouse_binding_matches_staged_lakehouse_logical_id(tmp_path
 def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
     semantic = tmp_path / "fabric" / "powerbi" / "retail_model.SemanticModel"
     report = tmp_path / "fabric" / "powerbi" / "retail_model.Report"
-    _write_json(semantic / ".platform", {"metadata": {"type": "SemanticModel"}})
-    _write_json(report / ".platform", {"metadata": {"type": "Report"}})
+    _write_json(semantic / ".platform", {
+        "metadata": {"type": "SemanticModel"},
+        "config": {"logicalId": "11111111-1111-4111-8111-111111111111"},
+    })
+    _write_json(report / ".platform", {
+        "metadata": {"type": "Report"},
+        "config": {"logicalId": "22222222-2222-4222-8222-222222222222"},
+    })
     _write_json(report / ".pbi" / "localSettings.json", {"secret": "ignored"})
 
     output = tmp_path / "deploy" / "workspace"
@@ -672,6 +681,63 @@ def test_stage_pipelines_injects_configured_lakehouse_parameter(
         "value": "tenant_lakehouse",
         "type": "string",
     }
+
+
+def test_staged_pipelines_never_share_the_workspace_sentinel_logical_id(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
+    _write_pipeline(repo, "daily-maintenance", ["05-maintain-delta-tables"])
+    for name in ("streaming-data-load", "daily-maintenance"):
+        (repo / "fabric" / "pipelines" / f"{name}.DataPipeline" / ".platform").write_text(
+            json.dumps({"metadata": {"type": "DataPipeline", "displayName": name},
+                        "config": {"version": "2.0",
+                                   "logicalId": build_artifacts._CURRENT_WORKSPACE_ID}}),
+            encoding="utf-8",
+        )
+    output = tmp_path / "workspace"
+    output.mkdir()
+
+    staged = build_artifacts.stage_pipelines(
+        repo, output, ["streaming-data-load.DataPipeline", "daily-maintenance.DataPipeline"],
+        {"03-streaming-to-silver", "05-maintain-delta-tables"},
+    )
+
+    ids = [
+        json.loads((path / ".platform").read_text(encoding="utf-8"))["config"]["logicalId"]
+        for path in staged
+    ]
+    assert ids == [
+        build_artifacts._logical_id("DataPipeline", "streaming-data-load"),
+        build_artifacts._logical_id("DataPipeline", "daily-maintenance"),
+    ]
+    assert build_artifacts._CURRENT_WORKSPACE_ID not in ids
+    build_artifacts.validate_staged_logical_ids(output)
+
+
+@pytest.mark.parametrize("logical_ids", [
+    ["00000000-0000-0000-0000-000000000000"],
+    ["11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111"],
+])
+def test_staging_rejects_zero_or_duplicate_logical_ids(tmp_path: Path, logical_ids) -> None:
+    for index, logical_id in enumerate(logical_ids):
+        item = tmp_path / f"item{index}.DataPipeline"
+        item.mkdir()
+        (item / ".platform").write_text(
+            json.dumps({"config": {"logicalId": logical_id}}), encoding="utf-8"
+        )
+    with pytest.raises(ValueError, match="logicalId"):
+        build_artifacts.validate_staged_logical_ids(tmp_path)
+
+
+def test_repository_sources_stage_unique_logical_ids() -> None:
+    sources = sorted(REPO_ROOT.joinpath("fabric").rglob(".platform"))
+    assert sources
+    for directory in ("pipelines", "data-agents"):
+        for platform in REPO_ROOT.joinpath("fabric", directory).glob("*/.platform"):
+            name, item_type = platform.parent.name.rsplit(".", 1)
+            assert build_artifacts._logical_id(item_type, name) != (
+                build_artifacts._CURRENT_WORKSPACE_ID
+            )
 
 
 def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:

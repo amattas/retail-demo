@@ -66,6 +66,40 @@ def _logical_id(item_type: str, display_name: str) -> str:
 
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"retail-demo:{item_type}:{display_name}"))
 
+
+def _assign_logical_id(item_dir: Path, item_type: str, display_name: str) -> None:
+    """Give a copied source item its deterministic logicalId.
+
+    Source ``.platform`` files may carry the all-zero placeholder, which equals
+    the default-workspace sentinel in pipeline content; fabric-cicd would then
+    see every pipeline depend on every other and refuse to publish (cycle).
+    """
+
+    platform_path = item_dir / ".platform"
+    platform = json.loads(platform_path.read_text(encoding="utf-8"))
+    platform.setdefault("config", {})["logicalId"] = _logical_id(item_type, display_name)
+    platform_path.write_text(json.dumps(platform, indent=2), encoding="utf-8")
+
+
+def validate_staged_logical_ids(output_dir: Path) -> None:
+    """Fail staging when logicalIds are missing, duplicated, or the zero sentinel."""
+
+    seen: dict[str, Path] = {}
+    for platform_path in sorted(output_dir.rglob(".platform")):
+        logical_id = str(
+            json.loads(platform_path.read_text(encoding="utf-8"))
+            .get("config", {})
+            .get("logicalId", "")
+        )
+        item = platform_path.parent
+        if not logical_id or logical_id == _CURRENT_WORKSPACE_ID:
+            raise ValueError(f"Staged item {item.name} has no unique logicalId")
+        if logical_id in seen:
+            raise ValueError(
+                f"Staged items {seen[logical_id].name} and {item.name} share logicalId"
+            )
+        seen[logical_id] = item
+
 # Workspace folder names used to organize published items. fabric-cicd maps the
 # staged directory structure to Fabric workspace folders, so staging an item
 # under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
@@ -645,6 +679,7 @@ def stage_pipelines(
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
+        _assign_logical_id(destination, "DataPipeline", item_dir.stem)
         for activity in content.get("properties", {}).get("activities", []):
             if activity.get("type") != "TridentNotebook":
                 continue
@@ -738,6 +773,7 @@ def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
+        _assign_logical_id(destination, "DataAgent", item_dir.stem)
         staged.append(destination)
     return staged
 
@@ -936,6 +972,7 @@ def build_workspace(
         )
     if not canonical_profile:
         expected_item_count = len(item_dirs)
+    validate_staged_logical_ids(output_dir)
     return BuildResult(
         output_dir=output_dir,
         profile=profile.deployment_name,
