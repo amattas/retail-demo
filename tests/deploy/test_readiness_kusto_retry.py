@@ -120,7 +120,7 @@ def test_inventory_failure_does_not_mix_old_unknowns_with_a_later_snapshot():
     expected = parse_kql_inventory(ROOT, scripts)
     getter = Mock(side_effect=[KustoNetworkError("https://unit.invalid"), expected])
     runner = object.__new__(ReadinessRunner)
-    runner.context = SimpleNamespace(repo_root=ROOT)
+    runner.context = SimpleNamespace(repo_root=ROOT, config=SimpleNamespace())
     runner.profile = SimpleNamespace(provisions_eventhouse=True, kql_scripts=scripts)
     runner.adapter = SimpleNamespace(get_kql_inventory=getter)
     runner.kql_inventory = None
@@ -143,7 +143,7 @@ def test_complete_inventory_is_reused_without_hiding_missing_objects(missing_tab
     observed = replace(expected, tables=frozenset()) if missing_tables else expected
     getter = Mock(return_value=observed)
     runner = object.__new__(ReadinessRunner)
-    runner.context = SimpleNamespace(repo_root=ROOT)
+    runner.context = SimpleNamespace(repo_root=ROOT, config=SimpleNamespace())
     runner.profile = SimpleNamespace(provisions_eventhouse=True, kql_scripts=scripts)
     runner.adapter = SimpleNamespace(get_kql_inventory=getter)
     runner.kql_inventory = None
