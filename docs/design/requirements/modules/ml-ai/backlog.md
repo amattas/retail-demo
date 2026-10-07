@@ -43,6 +43,56 @@
 - **Preserved quality concern:** Validate market-basket coverage/diversity,
   not just nonempty output; bounded product selection can concentrate rules.
 
+### ENH-010 - Migrate the ontology to the new TMDL experience {#enh-010}
+
+- **Priority / effort:** High / L
+- **Deadline:** The old ontology experience retires on Jan 31, 2027. The UI
+  can no longer create it; only the APIs can.
+- **Current state:** `fabric/lakehouse/30-create-ontology.ipynb` publishes
+  the old entity-type JSON definition (`EntityTypes/.../definition.json`).
+  It relies on an automatically derived graph and on the Digital Operations
+  authoring API for field descriptions.
+- **Outcome:** `RetailOntology_AutoGen` is published in the new TMDL
+  definition format, preserves the current entities, relationships, keys, and
+  Eventhouse time-series bindings, and carries descriptions natively. It
+  surfaces `retail_model` DAX measures as ontology metrics where Fabric allows
+  this in automation. Data Agent, task flow, readiness, and app consumers
+  keep working.
+- **Known constraints:** Semantic-model measures surface only as `projected`
+  metrics, which TMDL cannot yet express. The new experience does not
+  materialize a graph by default, and every ontology read, including MCP
+  calls, is billed as Ontology Discovery. See the
+  [ontology definition reference](https://learn.microsoft.com/rest/api/fabric/articles/item-management/definitions/ontology-definition).
+
+### ENH-011 - Add ontology business rules {#enh-011}
+
+- **Priority / effort:** Medium / S
+- **Depends on:** `ENH-010`. Rules exist only in the new experience.
+- **Outcome:** Natural-language rules for pricing constraints, stockout
+  status, return windows, and replenishment policy are published in
+  `rules/*.tmdl`. Every statement comes from the source that enforces it, and
+  each rule links to the entities and properties it governs. Agents can
+  retrieve them through the ontology MCP `list_ontology_rules` tool.
+- **Boundary:** Rules are guidance only; ontology does not execute them.
+  The new experience has no Activator integration, so `fabric/rules/`
+  remains separate.
+
+### ENH-012 - Publish Data Agents to Microsoft 365 Copilot {#enh-012}
+
+- **Priority / effort:** Medium / S
+- **Outcome:** A documented manual post-deploy step publishes the
+  semantic-model Data Agent to Microsoft 365 Copilot (Agent Store) and adds
+  co-publishers. `publish_info.json` descriptions are written as
+  orchestrator guidance, because the publish description becomes
+  `description_for_model`.
+- **Prerequisites:** A Microsoft 365 Copilot licence, Copilot extensibility
+  enabled for the account, and the tenant settings for cross-geo processing
+  and consuming Data Agents from non-Fabric services. Responses may then
+  leave the Fabric compliance boundary.
+- **Boundary:** No public API automates this publication. Copilot Studio
+  tool integration is an optional alternative, not a replacement. See
+  [Consume a Data Agent in Microsoft 365 Copilot](https://learn.microsoft.com/fabric/data-science/data-agent-microsoft-365-copilot).
+
 ### Decision experience acceptance — REQ-MLAI-005
 
 - Validate the [living scenario and action contract](../../../specifications/modules/ml-ai/decision-experience.md)
