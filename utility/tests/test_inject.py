@@ -1,3 +1,4 @@
+import ast
 import json
 from pathlib import Path
 
@@ -56,3 +57,50 @@ def test_originals_untouched(tmp_path):
     render_notebooks(VALUES, output_dir=tmp_path)
     for n, b in before.items():
         assert (UTILITY / "notebooks" / f"{n}.ipynb").read_bytes() == b
+
+
+@pytest.mark.parametrize(
+    "ref",
+    ['feature/"quoted"', 'x"); INJECTED = 1; #', "a\\b\nnew line", "\u00e9'quoted"],
+)
+def test_render_encodes_ref_as_literal_not_executable_code(tmp_path, ref):
+    written = render_notebooks(
+        {**VALUES, "DICTIONARY_REF": ref},
+        output_dir=tmp_path,
+        notebook_names=["setup-01-seed-dictionaries"],
+    )
+    notebook = json.loads(written[0].read_text(encoding="utf-8"))
+    parameter_source = next(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code" and "DICTIONARY_REF =" in "".join(cell["source"])
+    )
+    tree = ast.parse(parameter_source)
+    reference = next(
+        node for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "DICTIONARY_REF"
+                for target in node.targets)
+    )
+    assert isinstance(reference.value, ast.Call)
+    assert ast.literal_eval(reference.value.args[0]) == ref
+    assert not any(
+        isinstance(node, ast.Name) and node.id == "INJECTED" for node in ast.walk(tree)
+    )
+
+
+def test_render_rejects_tokens_outside_literals_without_partial_output(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    for index, name in enumerate(NOTEBOOKS[:2]):
+        (source / f"{name}.ipynb").write_text(json.dumps({
+            "cells": [{
+                "cell_type": "code",
+                "source": ['x = "{{SEED}}"\n' if index == 0 else "x = {{SEED}}\n"],
+            }],
+            "metadata": {},
+        }), encoding="utf-8")
+    output = tmp_path / "rendered"
+    with pytest.raises(ValueError, match="outside supported string literals"):
+        render_notebooks(VALUES, output, source, NOTEBOOKS[:2])
+    assert not output.exists()

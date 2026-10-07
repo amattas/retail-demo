@@ -451,15 +451,16 @@ def stage_setup_notebooks(
     repo_root: Path,
     output_dir: Path,
     lakehouse_name: str = "retail_lakehouse",
+    rendered_dir: Path | None = None,
 ) -> list[Path]:
-    """Stage rendered setup notebooks from utility/out/ as Fabric .Notebook items.
+    """Stage rendered setup notebooks as Fabric .Notebook items.
 
     The notebooks must already have been rendered by `retail-setup render` before
     calling this function.  Raises FileNotFoundError if any expected notebook is
-    absent in utility/out/.
+    absent in the selected render directory.
     """
 
-    rendered_dir = repo_root / "utility" / "out"
+    rendered_dir = rendered_dir or repo_root / "utility" / "out"
     missing = [
         name
         for name in SETUP_NOTEBOOKS
@@ -468,7 +469,7 @@ def stage_setup_notebooks(
     if missing:
         raise FileNotFoundError(
             f"setup notebooks not rendered — run `retail-setup render` first "
-            f"(expected at utility/out/): {missing}"
+            f"(expected at {rendered_dir}): {missing}"
         )
 
     staged: list[Path] = []
@@ -488,16 +489,17 @@ def stage_stream_notebooks(
     output_dir: Path,
     lakehouse_name: str = "retail_lakehouse",
     kql_database_name: str = _DEFAULT_KQL_DATABASE_NAME,
+    rendered_dir: Path | None = None,
 ) -> list[Path]:
     """Stage the rendered streaming-generator notebook(s) as Fabric `.Notebook` items.
 
     Like the setup notebooks, ``stream-events`` is rendered to
-    ``utility/out/`` by ``retail-setup render`` before staging. It is the live
+    the selected render directory by ``retail-setup render`` before staging. It is the live
     driver, so it publishes into the "Streaming" folder and is never added to the
     setup pipeline — it is started/stopped manually.
     """
 
-    rendered_dir = repo_root / "utility" / "out"
+    rendered_dir = rendered_dir or repo_root / "utility" / "out"
     missing = [
         name
         for name in STREAM_NOTEBOOKS
@@ -506,7 +508,7 @@ def stage_stream_notebooks(
     if missing:
         raise FileNotFoundError(
             f"stream notebooks not rendered — run `retail-setup render` first "
-            f"(expected at utility/out/): {missing}"
+            f"(expected at {rendered_dir}): {missing}"
         )
 
     staged: list[Path] = []
@@ -599,6 +601,7 @@ def stage_pipelines(
     output_dir: Path,
     selected_pipelines: tuple[str, ...] | list[str],
     deployed_notebooks: set[str],
+    lakehouse_name: str = "retail_lakehouse",
 ) -> list[Path]:
     """Stage ``fabric/pipelines/*.DataPipeline`` items into the workspace output.
 
@@ -656,6 +659,12 @@ def stage_pipelines(
             # workspace sentinel to target IDs before publishing the pipeline.
             type_properties["notebookId"] = _logical_id("Notebook", notebook_name)
             type_properties["workspaceId"] = _CURRENT_WORKSPACE_ID
+            if notebook_name in SETUP_NOTEBOOKS:
+                continue
+            type_properties.setdefault("parameters", {})["LAKEHOUSE_NAME"] = {
+                "value": lakehouse_name,
+                "type": "string",
+            }
         (destination / "pipeline-content.json").write_text(
             json.dumps(content, indent=2) + "\n",
             encoding="utf-8",
@@ -748,6 +757,7 @@ def build_workspace(
         "post-ontology",
     ] = "all",
     report_default_date: date | None = None,
+    rendered_dir: Path | None = None,
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -797,7 +807,10 @@ def build_workspace(
         staged_items.extend(
             item.name
             for item in stage_setup_notebooks(
-                repo_root, setup_dir, lakehouse_name=lakehouse_name
+                repo_root,
+                setup_dir,
+                lakehouse_name=lakehouse_name,
+                rendered_dir=rendered_dir,
             )
         )
 
@@ -814,6 +827,7 @@ def build_workspace(
                 streaming_dir,
                 lakehouse_name=lakehouse_name,
                 kql_database_name=kql_database_name,
+                rendered_dir=rendered_dir,
             )
         )
 
@@ -855,6 +869,7 @@ def build_workspace(
                 output_dir,
                 profile.pipeline_refs,
                 _deployed_notebook_names(notebook_groups),
+                lakehouse_name=lakehouse_name,
             )
         )
     # MLflow experiments bootstrap alongside their selected ML tier notebooks.
@@ -1076,6 +1091,11 @@ def main() -> int:
             "sets staged report date slicers."
         ),
     )
+    parser.add_argument(
+        "--rendered-dir",
+        type=Path,
+        help="Directory containing environment-scoped rendered notebooks.",
+    )
     args = parser.parse_args()
     if args.notebook_groups:
         parser.error(
@@ -1090,6 +1110,10 @@ def main() -> int:
             manifest_path = args.repo_root / manifest_path
         report_default_date = _load_report_default_date(manifest_path)
 
+    rendered_dir = args.rendered_dir
+    if rendered_dir is not None and not rendered_dir.is_absolute():
+        rendered_dir = args.repo_root / rendered_dir
+
     result = build_workspace(
         args.repo_root,
         args.output_dir,
@@ -1100,6 +1124,7 @@ def main() -> int:
         args.report_name,
         args.publication_phase,
         report_default_date,
+        rendered_dir,
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

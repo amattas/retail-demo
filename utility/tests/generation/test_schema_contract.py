@@ -40,13 +40,41 @@ def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
         sc = re.search(r"sourceColumn:\s*(\S+)", block)
         name = block.splitlines()[0].strip().strip("'")
         if dt is None:
-            continue
+            raise ValueError(f"TMDL column {name!r} is missing dataType")
+        data_type = dt.group(1)
+        if data_type not in TYPE_COMPAT:
+            raise ValueError(
+                f"TMDL column {name!r} has unsupported dataType {data_type!r}"
+            )
         # DAX calculated columns have no physical sourceColumn — skip them
         if sc is None and re.search(r"^\t\t(?:expression\s*=|\s*=)", block, re.MULTILINE):
             continue
         source = sc.group(1).strip("'\"") if sc else name
-        out.append((source, dt.group(1)))
+        out.append((source, data_type))
     return out
+
+
+def test_parse_tmdl_columns_rejects_missing_data_type():
+    text = (
+        "table Example\n"
+        "\tcolumn MissingType\n"
+        "\t\tsourceColumn: MissingType\n"
+    )
+
+    with pytest.raises(ValueError, match="MissingType.*missing dataType"):
+        parse_tmdl_columns(text)
+
+
+def test_parse_tmdl_columns_rejects_unknown_data_type():
+    text = (
+        "table Example\n"
+        "\tcolumn UnknownType\n"
+        "\t\tdataType: geography\n"
+        "\t\tsourceColumn: UnknownType\n"
+    )
+
+    with pytest.raises(ValueError, match="UnknownType.*unsupported dataType.*geography"):
+        parse_tmdl_columns(text)
 
 
 @pytest.mark.parametrize("table", sorted(TABLES))
@@ -59,13 +87,13 @@ def test_schema_covers_tmdl_bindings(table):
     for source_col, tmdl_type in parse_tmdl_columns(tmdl_path.read_text()):
         if source_col not in ours:
             missing.append(source_col)
-        elif tmdl_type in TYPE_COMPAT and ours[source_col] not in TYPE_COMPAT[tmdl_type]:
+        elif ours[source_col] not in TYPE_COMPAT[tmdl_type]:
             mismatched.append((source_col, tmdl_type, ours[source_col]))
     assert not missing, f"{table}: TMDL binds columns we don't generate: {missing}"
     assert not mismatched, f"{table}: type mismatches (col, tmdl, ours): {mismatched}"
 
 
-def test_spark_schema_builds(spark):
+def test_spark_schema_builds():
     from retail_setup.generation.schemas import spark_schema
 
     for table in TABLES:

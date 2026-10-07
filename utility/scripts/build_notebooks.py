@@ -37,9 +37,13 @@ ENGINE_MODULES = [
     "config/generation.py",
     "generation/schemas.py",
     "generation/runtime.py",
+    "generation/behavior.py",
+    "generation/traffic.py",
     "generation/dims.py",
     "generation/receipts.py",
     "generation/returns.py",
+    "generation/inventory_policy.py",
+    "generation/fulfillment.py",
     "generation/store_activity.py",
     "generation/online_orders.py",
     "generation/promotions.py",
@@ -81,6 +85,17 @@ TEMPLATE_FOR = {
 
 # Notebooks that do NOT embed the batch engine cell (self-contained logic).
 NO_ENGINE = {"setup-01-seed-dictionaries", "stream-events"}
+STREAM_MODULES = [
+    "dictionaries/models.py",
+    "dictionaries/loader.py",
+    "config/generation.py",
+    "generation/schemas.py",
+    "generation/runtime.py",
+    "generation/behavior.py",
+    "generation/traffic.py",
+    "generation/receipts.py",
+    "generation/stream_baskets.py",
+]
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 
@@ -156,6 +171,9 @@ def parse_template(text: str) -> list[tuple[str, str]]:
         elif stripped == "# %% [engine]":
             current = ("engine", [])
             cells.append(current)
+        elif stripped == "# %% [behavior]":
+            current = ("behavior", [])
+            cells.append(current)
         elif stripped == "# %% [parameters]":
             current = ("parameters", [])
             cells.append(current)
@@ -184,6 +202,13 @@ def _source_lines(source: str) -> list[str]:
 def render_notebook(template_path: Path, engine_source: str | None) -> dict:
     cells = []
     for index, (kind, body) in enumerate(parse_template(template_path.read_text(encoding="utf-8"))):
+        if kind == "behavior":
+            kind = "code"
+            body = "\n\n".join(
+                strip_package_imports((SRC / rel).read_text(encoding="utf-8"))
+                for rel in STREAM_MODULES
+            )
+            compile(body, "<stream-behavior>", "exec")
         if kind == "engine":
             if engine_source is None:
                 raise ValueError(f"{template_path.name} has an engine cell but no engine source")

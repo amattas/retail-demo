@@ -59,7 +59,7 @@ separately with the operator identity.
 | --- | --- |
 | Workspace root | Lakehouse shell, bundled KQL queryset |
 | `Setup` | Rendered setup notebooks, `setup-pipeline` |
-| `Notebooks` | Core, ML, ontology, and reset notebooks |
+| `Notebooks` | Selected core, ML, ontology, and utility notebooks; reset excluded |
 | `Streaming` | `stream-events` |
 | `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
 | `Reporting` | Semantic model and report |
@@ -96,9 +96,12 @@ separately with the operator identity.
 Each workspace name derives a local environment key. Its ignored environment
 overlay, Terraform input, backend state, Terraform data directory,
 `fabric-cicd` configuration, live outputs, and run journal stay under that
-key. Parallel Terraform operations therefore do not share state. Full
-publication still uses one ignored `deploy/workspace/` staging tree, so run
-concurrent full deploys from separate checkouts.
+key. Generation configuration lives at
+`utility/config/environments/<env>.yaml`, rendered notebooks at
+`utility/out/<env>/`, and every publication phase stages under
+`deploy/.generated/<env>/workspace/`. Different environments do not share
+these local paths. Operators must still serialize runs for the same Fabric
+target; path isolation is not a distributed lock.
 
 ## Current constraints
 
@@ -108,8 +111,9 @@ concurrent full deploys from separate checkouts.
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate
   profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
-  surfaces. Required full-demo evidence has been exercised live; optional
-  stream evidence remains environment- and run-specific.
+  surfaces. Prior full-demo evidence is a baseline, not proof of the current
+  remediation; fresh required-path and optional-stream evidence remains
+  environment- and run-specific.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).

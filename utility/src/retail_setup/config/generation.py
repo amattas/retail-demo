@@ -49,7 +49,7 @@ class GenerationConfig(BaseModel):
     dictionary_root: str | None = None
 
     # scale knobs; None -> derived from store_count in the validator below
-    dc_count: int | None = Field(default=None, gt=0)
+    dc_count: int | None = Field(default=None, gt=0, le=999)
     customer_count: int | None = Field(default=None, gt=0)
     # base in-store transactions per store-day at multiplier 1.0; profiles'
     # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it

@@ -1,0 +1,136 @@
+{
+  "metrics": [
+    {
+      "table": "dim_stores",
+      "name": "Twin Store State",
+      "data_type": "String",
+      "description": "Latest recorded opened/closed operation at or before UTC current time for one selected store; returns not observed with no source evidence and BLANK for ties or multi-store context."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store State As Of",
+      "data_type": "DateTime",
+      "description": "Timestamp of the latest recorded store operation event at or before UTC current time for one selected store in the current filter context."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store Signed Stock",
+      "data_type": "Int64",
+      "description": "Signed sum of known store/product current balances; negative balances are retained and missing balances remain BLANK."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store Available Stock",
+      "data_type": "Int64",
+      "description": "Sum of max(0, known balance) at store/SKU grain without fabricating missing SKU balances."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store Inventory As Of",
+      "data_type": "DateTime",
+      "description": "Conservative timestamp for in-context store inventory: the oldest source as-of among known store/SKU balances."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store Stockout Risk",
+      "data_type": "Double",
+      "description": "Maximum recorded stockout probability in the current store/product context; no fixed horizon is imposed."
+    },
+    {
+      "table": "dim_stores",
+      "name": "Twin Store Zone Activity",
+      "data_type": "Int64",
+      "description": "Observed foot-traffic activity count from sensor-zone events; not occupancy and not unique people."
+    },
+    {
+      "table": "dim_distribution_centers",
+      "name": "Twin Warehouse Signed Stock",
+      "data_type": "Int64",
+      "description": "Signed sum of known DC/product current balances; negative balances are retained and missing balances remain BLANK."
+    },
+    {
+      "table": "dim_distribution_centers",
+      "name": "Twin Warehouse Available Stock",
+      "data_type": "Int64",
+      "description": "Sum of max(0, known balance) at DC/SKU grain; reservations and available-to-promise are not modeled."
+    },
+    {
+      "table": "dim_distribution_centers",
+      "name": "Twin Warehouse Inventory As Of",
+      "data_type": "DateTime",
+      "description": "Conservative timestamp for in-context warehouse inventory: the oldest source as-of among known DC/SKU balances."
+    },
+    {
+      "table": "dim_distribution_centers",
+      "name": "Twin Warehouse Shipment Count",
+      "data_type": "Int64",
+      "description": "Distinct source-recorded shipments in the trailing 14 days ending at the latest recorded truck-move timestamp at or before UTC current time in context; preserves Store/DC filters."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Last Status",
+      "data_type": "String",
+      "description": "Latest recorded truck status at or before UTC current time for one selected truck; returns not observed with no source evidence and BLANK for ties or multi-truck context."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck State As Of",
+      "data_type": "DateTime",
+      "description": "Timestamp of the latest recorded truck-move event at or before UTC current time for one selected truck in the current source-grounded Store/DC filter context."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Last Shipment",
+      "data_type": "String",
+      "description": "Shipment ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Last Store",
+      "data_type": "Int64",
+      "description": "Store ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Last DC",
+      "data_type": "Int64",
+      "description": "Distribution center ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Recorded ETA",
+      "data_type": "DateTime",
+      "description": "Recorded planned ETA from the single latest observed truck-move row for one selected truck; value may be future and is never scenario-adjusted."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Recorded ETD",
+      "data_type": "DateTime",
+      "description": "Recorded planned ETD from the single latest observed truck-move row for one selected truck; value may be future and is never scenario-adjusted."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Cargo Balance",
+      "data_type": "Int64",
+      "description": "Observed net cargo at or before UTC current time for the latest source-recorded truck/shipment pair using source action semantics: LOAD adds quantity and UNLOAD removes quantity."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Cargo As Of",
+      "data_type": "DateTime",
+      "description": "Latest observed cargo event timestamp at or before UTC current time for the latest source-recorded truck/shipment pair; product filters preserve source evidence."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Delay Scenario ETA",
+      "data_type": "DateTime",
+      "description": "What-if ETA equal to recorded ETA plus 60 minutes; actual recorded ETA is not overwritten."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Delay Minutes",
+      "data_type": "Int64",
+      "description": "What-if delay amount. Returns 60 only when source evidence includes a recorded ETA."
+    }
+  ]
+}

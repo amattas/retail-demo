@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,12 +19,14 @@ from retail_setup.cli.main import (
     _validate_terraform_auth_boundary,
     _DELETION_WAIT_TIMEOUT_SECONDS,
     _PIPELINE_TRIGGER_ATTEMPTS,
+    _resume_succeeded_prefix,
     _run_setup_pipeline,
 )
 from retail_setup.contracts import load_repository_manifest, resolve_profile
 
 runner = CliRunner()
 TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+PLAN_CONNECTION_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _MANIFEST, _VALIDATION = load_repository_manifest(REPO_ROOT)
 
@@ -36,6 +39,8 @@ def _seed_deploy_config(
     root: Path,
     env: str = "dev",
     profile: str = "core",
+    operations_planning_enabled: bool = False,
+    twins_enabled: bool = False,
 ) -> None:
     """Write a minimal deploy config so CLI tests don't touch the real repo."""
     base = root / "deploy" / "config"
@@ -44,6 +49,14 @@ def _seed_deploy_config(
         yaml.safe_dump(
             {
                 "auth": {"mode": "azure_cli"},
+                "operations_planning": {
+                    "enabled": operations_planning_enabled,
+                    "plan_connection_id": (
+                        PLAN_CONNECTION_ID if operations_planning_enabled else None
+                    ),
+                    "plan_billing_acknowledged": operations_planning_enabled,
+                },
+                "twins": {"enabled": twins_enabled},
                 "workspace": {"description": "Retail demo"},
                 "lakehouse": {
                     "name": "retail_lakehouse",
@@ -129,10 +142,13 @@ def _always_ok(*_args, **_kwargs) -> SimpleNamespace:
     return SimpleNamespace(returncode=0)
 
 
-def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
+def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path)
     calls = []
     monkeypatch.setattr("subprocess.run", lambda *a, **k: calls.append(a))
-    result = runner.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--dry-run"]
+    )
     assert result.exit_code == 0, result.output
     assert calls == []
     out = result.output
@@ -145,6 +161,311 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch):
     assert "reset" not in out
     assert "deploy_items" in out and "apply_kql" not in out
     assert "validate_deployment" in out
+
+
+@pytest.mark.parametrize("profile", ["core", "standard", "full-demo"])
+def test_default_deploy_plan_never_publishes_native_pack(profile):
+    plan = _deploy_plan(
+        "dev", True, profile=_profile(profile), repo_root=REPO_ROOT
+    )
+
+    assert all("deploy.scripts.deploy_operations_planning" not in step.cmd for step in plan)
+
+
+@pytest.mark.parametrize("profile", ["core", "standard", "full-demo"])
+def test_default_deploy_plan_never_publishes_twins(profile):
+    plan = _deploy_plan(
+        "dev", True, profile=_profile(profile), repo_root=REPO_ROOT
+    )
+
+    assert all("deploy.scripts.deploy_twins" not in step.cmd for step in plan)
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_native_pack_is_required_after_reporting_before_taskflow(profile):
+    plan = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile(profile),
+        repo_root=REPO_ROOT,
+        operations_planning_enabled=True,
+        plan_connection_id=PLAN_CONNECTION_ID,
+        plan_billing_acknowledged=True,
+    )
+    ids = [step.step_id for step in plan]
+    native_index = ids.index("deploy-operations-planning")
+    native = plan[native_index]
+
+    assert ids.index("required-ml-reporting-gate") < ids.index("deploy-reporting")
+    assert ids.index("deploy-reporting") < ids.index("validate-reporting") < native_index
+    if profile == "full-demo":
+        assert native_index < ids.index("deploy-post-ontology-taskflow")
+    assert native.required is True
+    assert native.evidence_path == "deploy/.generated/dev/operations-planning-report.json"
+    assert native.cmd == [
+        sys.executable,
+        "-m",
+        "deploy.scripts.deploy_operations_planning",
+        "--environment",
+        "dev",
+        "--repo-root",
+        str(REPO_ROOT),
+    ]
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_twins_plan_is_required_after_reporting_before_native_and_taskflow(profile):
+    plan = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile(profile),
+        repo_root=REPO_ROOT,
+        operations_planning_enabled=True,
+        include_native_plan=False,
+        twins_enabled=True,
+    )
+    ids = [step.step_id for step in plan]
+    twins_index = ids.index("deploy-twins")
+    native_index = ids.index("deploy-operations-planning")
+    twins = plan[twins_index]
+
+    assert ids.index("deploy-reporting") < ids.index("validate-reporting") < twins_index
+    assert twins_index < native_index
+    if profile == "full-demo":
+        assert twins_index < ids.index("deploy-post-ontology-taskflow")
+    assert twins.required is True
+    assert twins.evidence_path == "deploy/.generated/dev/twins-report.json"
+    assert twins.cmd == [
+        sys.executable,
+        "-m",
+        "deploy.scripts.deploy_twins",
+        "--environment",
+        "dev",
+        "--repo-root",
+        str(REPO_ROOT),
+    ]
+
+
+def test_twins_plan_rejects_core_profile():
+    with pytest.raises(ValueError, match="Reporting profile"):
+        _deploy_plan(
+            "dev",
+            True,
+            profile=_profile("core"),
+            repo_root=REPO_ROOT,
+            twins_enabled=True,
+        )
+
+
+def test_twins_dry_run_displays_command_without_execution(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="standard", twins_enabled=True)
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--dry-run"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "deploy.scripts.deploy_twins" in result.output
+    assert "deploy.scripts.deploy_operations_planning" not in result.output
+    assert calls == []
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_twins_config_errors_abort_before_any_command(monkeypatch, tmp_path, dry_run):
+    _seed_deploy_config(tmp_path, profile="standard", twins_enabled=True)
+    config_path = tmp_path / "deploy" / "config" / "deploy.yml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["twins"]["enabled"] = "true"
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    commands = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: commands.append(args))
+    arguments = [
+        "deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform", "--yes"
+    ]
+    if dry_run:
+        arguments.append("--dry-run")
+
+    result = runner.invoke(app, arguments)
+
+    assert result.exit_code == 1, result.output
+    assert "twins.enabled" in result.output
+    assert commands == []
+    assert not _deploy_journal.journal_path(tmp_path, "dev").exists()
+
+
+def test_native_pack_dry_run_displays_command_without_execution(monkeypatch, tmp_path):
+    _seed_deploy_config(
+        tmp_path, profile="standard", operations_planning_enabled=True
+    )
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--dry-run"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "deploy.scripts.deploy_operations_planning" in result.output
+    assert calls == []
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_operations_only_plan_skips_planning_prerequisites(profile):
+    plan = _deploy_plan(
+        "dev", True, profile=_profile(profile), repo_root=REPO_ROOT,
+        operations_planning_enabled=True, include_native_plan=False,
+    )
+    native = next(step for step in plan if step.step_id == "deploy-operations-planning")
+    assert native.cmd[-1] == "--operations-only"
+    assert native.required
+    assert native.description == "Publish stopped Operations Agent"
+
+
+def test_operations_only_cli_dry_run_respects_policy_without_plan_credentials(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="standard", operations_planning_enabled=True)
+    path = tmp_path / "deploy" / "config" / "deploy.yml"
+    data = yaml.safe_load(path.read_text())
+    data["operations_planning"].update(
+        include_plan=False, plan_connection_id=None, plan_billing_acknowledged=False,
+    )
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: calls.append(a))
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--dry-run"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "--operations-only" in result.output
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("connection_id", "billing_acknowledged", "missing_field"),
+    [
+        (None, True, "plan_connection_id"),
+        (" ", True, "plan_connection_id"),
+        (PLAN_CONNECTION_ID, False, "plan_billing_acknowledged"),
+        (None, False, "plan_connection_id"),
+    ],
+)
+def test_complete_native_plan_rejects_missing_plan_prerequisites(
+    connection_id, billing_acknowledged, missing_field
+):
+    with pytest.raises(ValueError, match=missing_field):
+        _deploy_plan(
+            "dev",
+            True,
+            profile=_profile("standard"),
+            repo_root=REPO_ROOT,
+            operations_planning_enabled=True,
+            plan_connection_id=connection_id,
+            plan_billing_acknowledged=billing_acknowledged,
+        )
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize(
+    ("missing_field", "value"),
+    [("plan_connection_id", None), ("plan_billing_acknowledged", False)],
+)
+def test_complete_native_deploy_rejects_incomplete_pack_before_any_command(
+    monkeypatch, tmp_path, profile, dry_run, missing_field, value
+):
+    _seed_deploy_config(
+        tmp_path, profile=profile, operations_planning_enabled=True
+    )
+    config_path = tmp_path / "deploy" / "config" / "deploy.yml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["operations_planning"][missing_field] = value
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    commands = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: commands.append(args))
+    arguments = [
+        "deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform", "--yes"
+    ]
+    if dry_run:
+        arguments.append("--dry-run")
+
+    result = runner.invoke(app, arguments)
+
+    assert result.exit_code == 1, result.output
+    assert missing_field in result.output
+    assert "--operations-only" in result.output
+    assert commands == []
+    assert not _deploy_journal.journal_path(tmp_path, "dev").exists()
+
+
+@pytest.mark.parametrize(
+    ("failure_module", "failure_pipeline"),
+    [
+        ("deploy.scripts.deploy_operations_planning", None),
+        ("deploy.scripts.run_pipeline", "ml-required"),
+    ],
+)
+def test_native_pack_failure_or_failed_prerequisite_aborts_deploy(
+    monkeypatch, tmp_path, failure_module, failure_pipeline
+):
+    _seed_deploy_config(
+        tmp_path, profile="full-demo", operations_planning_enabled=True
+    )
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_: None)
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        failed = failure_module in command and (
+            failure_pipeline is None or failure_pipeline in command
+        )
+        return SimpleNamespace(returncode=7 if failed else 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    result = runner.invoke(
+        app,
+        ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform", "--yes"],
+    )
+
+    assert result.exit_code == 7, result.output
+    assert "Deploy complete" not in result.output
+    assert not any("deploy.scripts.taskflow" in command for command in commands)
+    assert not any("deploy.scripts.verify_readiness" in command for command in commands)
+    journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
+    native = next(
+        step for step in journal["steps"] if step["step_id"] == "deploy-operations-planning"
+    )
+    assert journal["status"] == "FAILED"
+    assert native["classification"] == "required"
+    assert native["status"] == ("PENDING" if failure_pipeline else "FAILED")
+    if failure_pipeline:
+        assert not any(
+            "deploy.scripts.deploy_operations_planning" in command for command in commands
+        )
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        ("fabric", "operations", "01-availability-tables.kql"),
+        ("fabric", "planning", "plan.json"),
+        ("fabric", "twins", "retail-twins.Report", "definition.pbir"),
+        ("deploy", "scripts", "deploy_operations_planning.py"),
+        ("deploy", "scripts", "deploy_twins.py"),
+    ],
+)
+def test_resume_fingerprint_tracks_native_pack_sources(tmp_path, relative):
+    from retail_setup.cli._deploy_resume import fingerprint
+
+    path = tmp_path.joinpath(*relative)
+    path.parent.mkdir(parents=True)
+    path.write_text("before", encoding="utf-8")
+    generation = tmp_path / "generation.yml"
+    before = fingerprint(tmp_path, "dev", generation, [])
+
+    path.write_text("after", encoding="utf-8")
+
+    assert fingerprint(tmp_path, "dev", generation, []) != before
 
 
 def test_dry_run_uses_azure_powershell_for_python_clients_when_terraform_skips(
@@ -452,7 +773,11 @@ def test_plan_uses_exact_profile_and_never_stages_reset_group():
     assert "--notebook-groups" not in cmd
     assert "reset" not in cmd
     manifest_idx = cmd.index("--render-manifest")
-    assert cmd[manifest_idx + 1] == "utility/out/render-manifest.json"
+    assert cmd[manifest_idx + 1] == "utility/out/dev/render-manifest.json"
+    rendered_idx = cmd.index("--rendered-dir")
+    assert cmd[rendered_idx + 1] == "utility/out/dev"
+    output_idx = cmd.index("--output-dir")
+    assert cmd[output_idx + 1] == "deploy/.generated/dev/workspace"
 
 
 def test_plan_renders_before_artifact_builds_and_passes_manifest():
@@ -483,7 +808,11 @@ def test_plan_renders_before_artifact_builds_and_passes_manifest():
         ):
             continue
         manifest_idx = command.index("--render-manifest")
-        assert command[manifest_idx + 1] == "utility/out/render-manifest.json"
+        assert command[manifest_idx + 1] == "utility/out/dev/render-manifest.json"
+        rendered_idx = command.index("--rendered-dir")
+        assert command[rendered_idx + 1] == "utility/out/dev"
+        output_idx = command.index("--output-dir")
+        assert command[output_idx + 1] == "deploy/.generated/dev/workspace"
 
 
 def test_plan_orders_steps_and_gates_apply():
@@ -500,8 +829,12 @@ def test_plan_orders_steps_and_gates_apply():
         i for i, c in enumerate(cmds) if "validate_target_access" in c
     )
     assert plan[apply_idx].needs_confirmation
-    # The redundant `terraform plan` step was removed; apply previews + confirms.
-    assert not any(" plan " in f" {c} " for c in cmds)
+    guard_idx = next(
+        i for i, step in enumerate(plan) if step.step_id == "terraform-plan-guard"
+    )
+    assert guard_idx < apply_idx
+    assert plan[guard_idx].action is not None
+    assert "../.generated/dev/terraform.tfplan" in plan[apply_idx].cmd
     build_idx = next(i for i, c in enumerate(cmds) if "build_artifacts" in c)
     deploy_idx = next(i for i, c in enumerate(cmds) if "deploy_items" in c)
     assert (
@@ -580,6 +913,15 @@ def test_interactive_plan_allows_admin_setting_recheck():
     assert access[access.index("--tenant-id") + 1] == TENANT_ID
 
 
+def test_deployment_requests_capacity_resume_before_terraform_and_publication():
+    plan = _deploy_plan("dev", skip_terraform=False)
+    preflight = next(step for step in plan if step.step_id == "live-profile-preflight")
+    assert "--resume-capacity" in preflight.cmd
+    assert plan.index(preflight) < next(
+        index for index, step in enumerate(plan) if step.step_id == "terraform-apply"
+    )
+
+
 def test_plan_isolates_terraform_state_and_data_directory():
     dev_plan = _deploy_plan("demo-east", skip_terraform=False)
     west_plan = _deploy_plan("demo-west", skip_terraform=False)
@@ -614,8 +956,7 @@ def test_recreate_inserts_destroy_and_deletion_wait_before_apply():
     assert wait_step.action is not None
     assert wait_step.required is True
     assert str(_DELETION_WAIT_TIMEOUT_SECONDS) in wait_step.description
-    cmds = [" ".join(map(str, s.cmd)) for s in plan]
-    assert not any(" plan " in f" {c} " for c in cmds)
+    assert step_ids.index("terraform-plan-guard") > wait_idx
 
 
 def test_deletion_wait_action_calls_helper_with_workspace_and_auth_mode(monkeypatch):
@@ -930,7 +1271,8 @@ def test_deploy_records_degraded_readiness_without_claiming_success(
     )
 
     assert result.exit_code == 0, result.output
-    assert "readiness is degraded" in result.output
+    assert "Required deployment checks passed" in result.output
+    assert "non-critical step was skipped or failed" not in result.output
     journal = json.loads(
         _deploy_journal.journal_path(tmp_path, "dev").read_text()
     )
@@ -1250,9 +1592,75 @@ def test_journal_write_is_atomic_via_temp_file_and_replace(tmp_path, monkeypatch
 
     path = _deploy_journal.journal_path(tmp_path, "dev")
     assert path.is_file()
-    assert seen_tmp_names and seen_tmp_names[0] != path.name  # wrote to a temp name first
-    # No leftover temp files after a successful write.
+    assert seen_tmp_names and seen_tmp_names[0] != path.name
     assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_journal_round_trips_for_resume(tmp_path):
+    journal = _deploy_journal.start_run(
+        "dev",
+        targets={"workspace_name": "retail-demo-dev"},
+        manifest={"hash": "abc", "plan_step_ids": ["a"]},
+    )
+    _deploy_journal.add_step(journal, "a", "A", required=True)
+    _deploy_journal.mark_succeeded(journal, "a")
+    _deploy_journal.write(tmp_path, journal)
+
+    loaded = _deploy_journal.read(tmp_path, "dev")
+
+    assert loaded.to_dict() == journal.to_dict()
+
+
+def test_resume_copies_only_contiguous_succeeded_prefix():
+    metadata = {
+        "hash": "abc",
+        "input_fingerprint": "inputs",
+        "profile_id": "profile.core",
+        "profile_name": "core",
+        "plan_step_ids": ["a", "b", "c"],
+    }
+    previous = _deploy_journal.start_run(
+        "dev", targets={"workspace_name": "retail-demo-dev"}, manifest=metadata
+    )
+    current = _deploy_journal.start_run(
+        "dev", targets={"workspace_name": "retail-demo-dev"}, manifest=metadata
+    )
+    for journal in (previous, current):
+        for step_id in ("a", "b", "c"):
+            _deploy_journal.add_step(journal, step_id, step_id.upper(), required=True)
+    _deploy_journal.mark_succeeded(previous, "a")
+    _deploy_journal.mark_failed(previous, "b", exit_code=1)
+    _deploy_journal.mark_succeeded(previous, "c")
+
+    resumed = _resume_succeeded_prefix(previous, current)
+
+    assert resumed == 1
+    assert [step.status for step in current.steps] == [
+        "SUCCEEDED",
+        "PENDING",
+        "PENDING",
+    ]
+
+
+def test_resume_rejects_changed_plan_or_targets():
+    previous = _deploy_journal.start_run(
+        "dev",
+        targets={"workspace_name": "old"},
+        manifest={
+            "hash": "abc",
+            "profile_id": "profile.core",
+            "profile_name": "core",
+            "plan_step_ids": ["a"],
+        },
+    )
+    current = _deploy_journal.start_run(
+        "dev",
+        targets={"workspace_name": "new"},
+        manifest=dict(previous.manifest),
+    )
+
+    with pytest.raises(ValueError, match="targets changed"):
+        _resume_succeeded_prefix(previous, current)
 
 
 def test_journal_retries_transient_windows_replace_denial(tmp_path, monkeypatch):
@@ -1809,6 +2217,8 @@ def test_optional_ml_failure_does_not_block_published_reporting(
     assert optional["classification"] == "optional"
     assert experimental["status"] == "SUCCEEDED"
     assert journal["status"] == "DEGRADED"
+    assert "Optional steps failed:" in result.output
+    assert optional["description"] in result.output
 
 
 def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_path):

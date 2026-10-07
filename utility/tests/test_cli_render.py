@@ -1,13 +1,16 @@
 import json
 import shutil
+import subprocess
 from datetime import date
 from pathlib import Path
 
 import yaml
+import pytest
+import typer
 from typer.testing import CliRunner
 
 import retail_setup.config.generation as generation_config
-from retail_setup.cli.main import app
+from retail_setup.cli.main import _resolve_dictionary_ref, app
 
 runner = CliRunner()
 
@@ -30,9 +33,9 @@ def _seed(root: Path, profile: str = "core") -> None:
         "workspace:\n"
         "  name: retail-demo-dev\n"
     )
-    (root / "utility").mkdir(exist_ok=True)
+    (root / "utility/config/environments").mkdir(parents=True, exist_ok=True)
     start_date = "2023-09-01" if profile != "core" else "2025-01-01"
-    (root / "utility/config.yaml").write_text(yaml.safe_dump({
+    (root / "utility/config/environments/dev.yaml").write_text(yaml.safe_dump({
         "store_type": "grocery", "start_date": start_date,
         "end_date": "2025-02-28", "store_count": 5, "seed": 3}))
     # Copy committed inputs because Windows CI does not grant symlink privileges.
@@ -45,7 +48,7 @@ def test_render_writes_rendered_notebooks(tmp_path):
     result = runner.invoke(app, ["render", "--repo-root", str(tmp_path),
                                  "--env", "dev", "--ref", "deadbeef"])
     assert result.exit_code == 0, result.output
-    out = tmp_path / "utility" / "out"
+    out = tmp_path / "utility" / "out" / "dev"
     files = sorted(p.name for p in out.glob("*.ipynb"))
     assert files == [
         "setup-01-seed-dictionaries.ipynb",
@@ -84,12 +87,12 @@ def test_render_standard_adds_stream_notebook(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert (tmp_path / "utility" / "out" / "stream-events.ipynb").is_file()
+    assert (tmp_path / "utility" / "out" / "dev" / "stream-events.ipynb").is_file()
 
 
 def test_render_rejects_stale_short_history_for_standard(tmp_path):
     _seed(tmp_path, "standard")
-    (tmp_path / "utility/config.yaml").write_text(
+    (tmp_path / "utility/config/environments/dev.yaml").write_text(
         yaml.safe_dump(
             {
                 "store_type": "grocery",
@@ -116,7 +119,7 @@ def test_render_rejects_stale_short_history_for_standard(tmp_path):
 
     assert result.exit_code == 1
     assert "requires at least 540 days of history" in result.output
-    assert not (tmp_path / "utility/out").exists()
+    assert not (tmp_path / "utility/out/dev").exists()
 
 
 def test_render_requires_configure_first(tmp_path):
@@ -133,7 +136,7 @@ def test_render_manifest_uses_months_resolved_setup_window(
     monkeypatch, tmp_path
 ):
     _seed(tmp_path)
-    (tmp_path / "utility" / "config.yaml").write_text(
+    (tmp_path / "utility" / "config" / "environments" / "dev.yaml").write_text(
         yaml.safe_dump(
             {
                 "store_type": "grocery",
@@ -158,9 +161,62 @@ def test_render_manifest_uses_months_resolved_setup_window(
 
     assert result.exit_code == 0, result.output
     manifest = json.loads(
-        (tmp_path / "utility" / "out" / "render-manifest.json").read_text()
+        (tmp_path / "utility" / "out" / "dev" / "render-manifest.json").read_text()
     )
     assert manifest["generation"] == {
         "start_date": "2026-04-22",
         "end_date": "2026-07-22",
     }
+
+
+def test_render_isolates_generation_config_and_output_by_environment(tmp_path):
+    _seed(tmp_path)
+    (tmp_path / "deploy/config/environments/prod.yml").write_text(
+        "tenant_id: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\n"
+        "workspace:\n"
+        "  name: retail-demo-prod\n"
+        "lakehouse:\n"
+        "  name: lh_prod\n"
+    )
+    (tmp_path / "utility/config/environments/prod.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "store_type": "grocery",
+                "start_date": "2024-01-01",
+                "end_date": "2024-12-31",
+                "store_count": 7,
+                "seed": 11,
+            }
+        )
+    )
+
+    dev = runner.invoke(
+        app,
+        ["render", "--repo-root", str(tmp_path), "--env", "dev", "--ref", "deadbeef"],
+    )
+    prod = runner.invoke(
+        app,
+        ["render", "--repo-root", str(tmp_path), "--env", "prod", "--ref", "deadbeef"],
+    )
+
+    assert dev.exit_code == 0, dev.output
+    assert prod.exit_code == 0, prod.output
+    dev_notebook = (
+        tmp_path / "utility/out/dev/setup-02-generate-dimensions.ipynb"
+    ).read_text()
+    prod_notebook = (
+        tmp_path / "utility/out/prod/setup-02-generate-dimensions.ipynb"
+    ).read_text()
+    assert "lh_x" in dev_notebook
+    assert "lh_prod" in prod_notebook
+    assert dev_notebook != prod_notebook
+
+
+def test_missing_git_metadata_does_not_fall_back_to_mutable_main(tmp_path, monkeypatch):
+    def missing(*args, **kwargs):
+        raise subprocess.CalledProcessError(128, "git")
+
+    monkeypatch.setattr(subprocess, "run", missing)
+    with pytest.raises(typer.Exit):
+        _resolve_dictionary_ref(tmp_path, None)
+    assert _resolve_dictionary_ref(tmp_path, "explicit-revision") == "explicit-revision"

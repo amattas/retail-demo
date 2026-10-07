@@ -465,7 +465,7 @@ def test_cleanup_failure_after_success_is_not_reported_as_completed():
     outcome = PublicationCoordinator(backend, log).publish(targets)
 
     assert outcome.state == COMPLETED_CLEANUP_FAILED
-    assert not outcome.ok
+    assert outcome.ok
     # the promotion itself fully succeeded — the cleanup failure never
     # touches the data outcome.
     assert outcome.promoted == ["a", "b", "c"]

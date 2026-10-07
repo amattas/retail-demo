@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 
 def _load_setup_module():
@@ -342,3 +346,184 @@ def test_section_prints_linear_divider(capsys):
     out = capsys.readouterr().out
     assert "Step 3 of 4: Configuring the project" in out
     assert "==" in out
+
+
+class _LoginProcess:
+    def __init__(self, stderr, returncode):
+        self.stderr = io.StringIO(stderr)
+        self.returncode = returncode
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        self.stderr.close()
+
+    def wait(self):
+        return self.returncode
+
+
+def test_windows_broker_failure_retries_browser_without_global_changes(monkeypatch, capsys):
+    error = (
+        "An attempt was made to import or load a key under an incorrect storage parent.. "
+        "Status: Response_Status.Status_InteractionRequired, Error code: 2150171662\n"
+    )
+    calls = []
+    original = dict(os.environ)
+    monkeypatch.setattr(setup.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: r"C:\Azure CLI\az.cmd")
+
+    def popen(command, **kwargs):
+        calls.append((command, kwargs))
+        return _LoginProcess(error, 1)
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        if kwargs.get("env", {}).get("AZURE_CORE_ENABLE_BROKER_ON_WINDOWS") != "false":
+            raise subprocess.CalledProcessError(1, command, stderr=error)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(setup.subprocess, "Popen", popen)
+    monkeypatch.setattr(setup.subprocess, "run", run)
+
+    overrides = setup.ensure_azure_login("dev", dry_run=False)
+
+    assert overrides == {"AZURE_CORE_ENABLE_BROKER_ON_WINDOWS": "false"}
+    assert len(calls) == 2
+    assert all(command == [r"C:\Azure CLI\az.cmd", "login", "--tenant", "TENANT"]
+               for command, _ in calls)
+    fallback_env = calls[1][1]["env"]
+    assert fallback_env["AZURE_CORE_ENABLE_BROKER_ON_WINDOWS"] == "false"
+    assert dict(os.environ) == original
+    output = capsys.readouterr()
+    assert "incorrect storage parent" in output.err
+    assert "browser" in output.out.lower()
+
+
+@pytest.mark.parametrize(
+    "error",
+    ["AADSTS53003: Blocked by Conditional Access\n", "The user canceled authentication\n"],
+)
+def test_login_policy_errors_and_cancellations_are_not_retried(monkeypatch, error):
+    calls = []
+    monkeypatch.setattr(setup.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+
+    def popen(command, **kwargs):
+        calls.append(command)
+        return _LoginProcess(error, 1)
+
+    def run(command, **kwargs):
+        calls.append(command)
+        raise subprocess.CalledProcessError(1, command, stderr=error)
+
+    monkeypatch.setattr(setup.subprocess, "Popen", popen)
+    monkeypatch.setattr(setup.subprocess, "run", run)
+    with pytest.raises(SystemExit):
+        setup.ensure_azure_login("dev", dry_run=False)
+    assert len(calls) == 1
+
+
+def test_failed_browser_retry_propagates_without_a_third_login(monkeypatch):
+    calls = []
+    monkeypatch.setattr(setup.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+
+    def popen(command, **kwargs):
+        calls.append(command)
+        return _LoginProcess("Error code: 2150171662\n", 1)
+
+    def run(command, **kwargs):
+        calls.append(command)
+        raise subprocess.CalledProcessError(9, command)
+
+    monkeypatch.setattr(setup.subprocess, "Popen", popen)
+    monkeypatch.setattr(setup.subprocess, "run", run)
+    with pytest.raises(SystemExit, match="exit code 9"):
+        setup.ensure_azure_login("dev", dry_run=False)
+    assert len(calls) == 2
+
+
+def test_successful_windows_login_keeps_default_authentication(monkeypatch):
+    calls = []
+    monkeypatch.setattr(setup.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+
+    def popen(command, **kwargs):
+        calls.append((command, kwargs))
+        return _LoginProcess("", 0)
+
+    monkeypatch.setattr(setup.subprocess, "Popen", popen)
+    monkeypatch.setattr(
+        setup.subprocess, "run",
+        lambda *_args, **_kwargs: pytest.fail("successful login must not retry"),
+    )
+    setup.ensure_azure_login("dev", dry_run=False)
+    assert len(calls) == 1
+    assert calls[0][1]["env"] is None
+    assert "stdin" not in calls[0][1] and "stdout" not in calls[0][1]
+
+
+def test_non_windows_login_does_not_change_broker_settings(monkeypatch):
+    calls = []
+    monkeypatch.setattr(setup.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        raise subprocess.CalledProcessError(1, command, stderr="2150171662")
+
+    monkeypatch.setattr(setup.subprocess, "run", run)
+    with pytest.raises(SystemExit):
+        setup.ensure_azure_login("dev", dry_run=False)
+    assert len(calls) == 1
+    assert "env" not in calls[0][1]
+
+
+def test_login_dry_run_never_starts_authentication(monkeypatch):
+    monkeypatch.setattr(setup.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(setup, "read_deploy_auth", lambda _: ("azure_cli", "TENANT"))
+    monkeypatch.setattr(setup, "_resolve_az", lambda: "az")
+    monkeypatch.setattr(
+        setup.subprocess, "Popen",
+        lambda *_args, **_kwargs: pytest.fail("dry run must not start a login"),
+    )
+    setup.ensure_azure_login("dev", dry_run=True)
+
+
+def test_stderr_tee_preserves_visible_prompts_and_bounded_failure_diagnostics(capsys):
+    message = "x" * 9000 + "prompt without newline"
+    with pytest.raises(setup.CommandFailed) as failed:
+        setup.run_command(
+            [sys.executable, "-c",
+             f"import sys; sys.stderr.write({message!r}); sys.exit(4)"],
+            capture_stderr=True,
+        )
+    assert failed.value.stderr == message[-8192:]
+    assert capsys.readouterr().err == message
+
+
+def test_recovered_login_environment_follows_deployment_only(monkeypatch):
+    calls = []
+    overrides = {"AZURE_CORE_ENABLE_BROKER_ON_WINDOWS": "false"}
+    monkeypatch.setattr(
+        setup, "run_command",
+        lambda command, **kwargs: calls.append((command, kwargs)),
+    )
+    monkeypatch.setattr(setup, "ensure_azure_login", lambda *_args, **_kwargs: overrides)
+    environment = setup.PythonEnv(Path(sys.executable), "test")
+
+    setup.run_retail_setup(
+        environment, workspace_name="retail-demo", profile="core",
+        dry_run=False, assume_yes=True, deploy_requested=True,
+    )
+
+    assert [call[1].get("environment_overrides") for call in calls] == [
+        None, None, overrides
+    ]
+    assert "deploy" in calls[-1][0]

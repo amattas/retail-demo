@@ -54,7 +54,11 @@ from retail_setup.generation.marketing import (
     DEVICE_MULTIPLIERS,
     DEVICE_WEIGHTS,
 )
-from retail_setup.generation.runtime import legacy_index, seeded_draws
+from retail_setup.generation.runtime import (
+    fixed_width_decimal,
+    legacy_index,
+    seeded_draws,
+)
 from retail_setup.generation.schemas import column_names
 
 ATTRIBUTION_MODEL = "LAST_TOUCH_7D"
@@ -377,7 +381,9 @@ def generate_attribution(
             F.concat(
                 F.lit("CAMP"),
                 F.date_format("_campaign_start", "yyyyMMdd"),
-                F.lpad(F.col("_campaign_index").cast("string"), 2, "0"),
+                fixed_width_decimal(
+                    F.col("_campaign_index"), 2, "campaign archetype index"
+                ),
             ),
         )
     )

@@ -7,6 +7,8 @@ import json
 import re
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -120,6 +122,26 @@ def test_stream_identity_persists_with_checkpoint_metadata() -> None:
     assert namespace["_resolve_stream_id"]("Files/checkpoint", "") == exception_winner
 
 
+@pytest.mark.parametrize("count", [0, 5])
+def test_live_driver_requires_nonempty_real_dimensions(count) -> None:
+    spark = Mock()
+    spark.table.return_value.count.return_value = count
+    namespace = _exec_nodes(
+        ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8")),
+        {"_count"},
+        {"spark": spark, "LAKEHOUSE_NAME": "lh", "SILVER_DB": "ag"},
+    )
+    if count:
+        assert namespace["_count"]("dim_stores") == count
+    else:
+        with pytest.raises(ValueError, match="Required streaming dimension"):
+            namespace["_count"]("dim_stores")
+    spark.table.assert_called_once_with("lh.ag.dim_stores")
+    spark.table.side_effect = RuntimeError("permission denied")
+    with pytest.raises(RuntimeError, match="permission denied"):
+        namespace["_count"]("dim_stores")
+
+
 def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
@@ -150,20 +172,72 @@ def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     assert '"sparkIngestionProperties", ingestion_properties' not in write_source
 
 
-def test_eventhouse_batch_fails_before_checkpoint_commit() -> None:
+@pytest.mark.parametrize("failure", ["none", "partial", "unmapped", "credentials"])
+def test_eventhouse_sink_returns_only_after_every_required_write(failure) -> None:
+    tree = ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8"))
+    batch = Mock()
+    batch.persist.return_value = batch
+    event_types = ["receipt_created", "inventory_updated"]
+    if failure == "unmapped":
+        event_types.append("unknown")
+    batch.select.return_value.distinct.return_value.collect.return_value = [
+        {"event_type": event_type} for event_type in event_types
+    ]
+    token = Mock(return_value="test-token")
+    if failure == "credentials":
+        token.side_effect = RuntimeError("token unavailable")
+    attempted = []
+
+    def write(frame, event_type, batch_id, credential):
+        assert frame is batch
+        assert batch_id == 17
+        assert credential == "test-token"
+        attempted.append(event_type)
+        if failure == "partial" and event_type == "inventory_updated":
+            raise RuntimeError("injected sink error")
+
+    namespace = _exec_nodes(
+        tree,
+        {"write_to_eventhouse"},
+        {
+            "_write_event_table": write,
+            "_WRITE_PARALLELISM": 2,
+            "EVENT_PAYLOADS": {"receipt_created": [], "inventory_updated": []},
+            "notebookutils": SimpleNamespace(
+                credentials=SimpleNamespace(getToken=token)
+            ),
+            "kusto_uri": "https://unit-test.invalid",
+        },
+    )
+    if failure == "none":
+        namespace["write_to_eventhouse"](batch, 17)
+    else:
+        expected = ValueError if failure == "unmapped" else RuntimeError
+        with pytest.raises(expected):
+            namespace["write_to_eventhouse"](batch, 17)
+    if failure in {"none", "partial"}:
+        assert set(attempted) == {"receipt_created", "inventory_updated"}
+    else:
+        assert not attempted
+    batch.unpersist.assert_called_once()
+
+
+def test_generator_dedupe_ids_include_persistent_stream_and_row_identity() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    sink = _function(tree, "write_to_eventhouse")
-
-    raises = [node for node in ast.walk(sink) if isinstance(node, ast.Raise)]
-    assert len(raises) >= 2
-    assert "unmapped event_types" in source
-    assert "failed required Eventhouse writes" in source
-
     slot_source = ast.get_source_segment(source, _function(tree, "slot"))
+
     assert slot_source is not None
-    assert "F.lit(STREAM_ID)" in slot_source
-    assert "stream_prefix" in source
+    assert "F.xxhash64(F.lit(STREAM_ID), trace_seed, et)" in slot_source
+    assert 'stream_prefix = F.lit(f"{STREAM_ID}-")' in source
+    assert (
+        'F.concat(F.lit("TXN-"), stream_prefix, '
+        'F.col("v").cast("string")).alias("transaction_id")'
+    ) in source
+    assert (
+        'F.concat(F.lit("TXN-ONL-"), stream_prefix, '
+        'F.col("v").cast("string")).alias("transaction_id")'
+    ) in source
 
 
 def test_silver_replay_uses_complete_dedupe_key_contract() -> None:
@@ -225,3 +299,12 @@ def test_silver_transforms_preserve_contract_trace_id(function_name: str) -> Non
 
     assert function_source is not None
     assert 'F.col("trace_id")' in function_source
+
+
+def test_silver_replay_dedupe_requires_persisted_keys_to_remain_unique() -> None:
+    code = _notebook_code(SILVER_NOTEBOOK)
+    tree = ast.parse(code)
+    merge_source = ast.get_source_segment(code, _function(tree, "merge_new_rows"))
+
+    assert merge_source is not None
+    assert "validate_target_key_uniqueness" in merge_source

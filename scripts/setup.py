@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import platform
 import re
 import shutil
@@ -70,6 +71,14 @@ DEFAULT_PROFILE = next(
 # plain-language progress line instead of the raw command. The raw command is
 # always shown if a step fails, so troubleshooting never loses information.
 VERBOSE = False
+
+
+class CommandFailed(SystemExit):
+    """A failed command with transient stderr available for targeted recovery."""
+
+    def __init__(self, message: str, stderr: str = "") -> None:
+        super().__init__(message)
+        self.stderr = stderr
 
 
 def _emit(text: str = "") -> None:
@@ -259,6 +268,8 @@ def run_command(
     dry_run: bool = False,
     label: str | None = None,
     interactive: bool = False,
+    capture_stderr: bool = False,
+    environment_overrides: dict[str, str] | None = None,
 ) -> None:
     """Run a subprocess linearly with a clear divider and command label."""
 
@@ -272,13 +283,35 @@ def run_command(
     _divider("-")
     if dry_run:
         return
-    _run_inherit(command, cwd, rendered, show_raw=True)
+    _run_inherit(
+        command, cwd, rendered, show_raw=True,
+        capture_stderr=capture_stderr,
+        environment_overrides=environment_overrides,
+    )
 
 
-def _run_inherit(command: list[str], cwd: Path, rendered: str, show_raw: bool) -> None:
+def _run_inherit(
+    command: list[str],
+    cwd: Path,
+    rendered: str,
+    show_raw: bool,
+    *,
+    capture_stderr: bool = False,
+    environment_overrides: dict[str, str] | None = None,
+) -> None:
     """Run a command with inherited stdio so output stays linear."""
     try:
-        subprocess.run(command, cwd=cwd, check=True)
+        environment = (
+            {**os.environ, **environment_overrides}
+            if environment_overrides is not None
+            else None
+        )
+        if capture_stderr:
+            _run_with_stderr_tee(command, cwd, environment)
+        elif environment is not None:
+            subprocess.run(command, cwd=cwd, check=True, env=environment)
+        else:
+            subprocess.run(command, cwd=cwd, check=True)
     except FileNotFoundError:
         if not show_raw:
             _emit(f"    (command: {rendered})")
@@ -289,9 +322,30 @@ def _run_inherit(command: list[str], cwd: Path, rendered: str, show_raw: bool) -
     except subprocess.CalledProcessError as exc:
         if not show_raw:
             _emit(f"    (command: {rendered})")
-        raise SystemExit(
-            f"That step failed (exit code {exc.returncode}). Command: {rendered}"
+        raise CommandFailed(
+            f"That step failed (exit code {exc.returncode}). Command: {rendered}",
+            stderr=exc.stderr or "",
         ) from None
+
+
+def _run_with_stderr_tee(
+    command: list[str], cwd: Path, environment: dict[str, str] | None,
+) -> None:
+    """Keep interactive prompts visible while retaining a bounded error tail."""
+
+    error_tail = ""
+    with subprocess.Popen(
+        command, cwd=cwd, env=environment, stderr=subprocess.PIPE, text=True,
+    ) as process:
+        assert process.stderr is not None
+        # Device/browser prompts can arrive without a terminating newline.
+        while character := process.stderr.read(1):
+            sys.stderr.write(character)
+            sys.stderr.flush()
+            error_tail = (error_tail + character)[-8192:]
+        returncode = process.wait()
+    if returncode:
+        raise subprocess.CalledProcessError(returncode, command, stderr=error_tail)
 
 
 def install_prerequisites(
@@ -458,12 +512,16 @@ def _powershell_login_command(tenant_id: str) -> list[str] | None:
     return [pwsh, "-NoProfile", "-Command", f"Connect-AzAccount -Tenant {tenant_id}"]
 
 
-def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
+def ensure_azure_login(
+    deploy_env: str, *, dry_run: bool,
+) -> dict[str, str] | None:
     """Sign in to the configured Azure tenant before deploy.
 
     Always runs the login command so deploy never proceeds under the wrong
     account or tenant. Supports `auth.mode: azure_cli` (`az login`) and
     `auth.mode: azure_powershell` (`Connect-AzAccount`).
+    Returns child-process overrides when broker recovery is needed, so token
+    acquisition during deployment uses the same authentication path.
     """
 
     auth_mode, tenant_id = read_deploy_auth(deploy_env)
@@ -488,7 +546,31 @@ def ensure_azure_login(deploy_env: str, *, dry_run: bool) -> None:
             "Install Azure CLI, or set deploy config auth.mode to azure_powershell."
         )
     _emit(f"Signing in to Azure tenant {tenant_id}.")
-    run_command([az, "login", "--tenant", tenant_id], dry_run=dry_run, interactive=True)
+    login = [az, "login", "--tenant", tenant_id]
+    windows = platform.system() == "Windows"
+    try:
+        run_command(
+            login, dry_run=dry_run, interactive=True, capture_stderr=windows,
+        )
+    except CommandFailed as exc:
+        broker_key_error = (
+            "incorrect storage parent" in exc.stderr.lower()
+            or re.search(r"\b2150171662\b", exc.stderr) is not None
+        )
+        if not windows or not broker_key_error:
+            raise
+        _emit(
+            "Windows account broker key storage failed. Retrying once with "
+            "browser-based Azure sign-in (no global CLI settings or caches changed)."
+        )
+        browser_environment = {"AZURE_CORE_ENABLE_BROKER_ON_WINDOWS": "false"}
+        run_command(
+            login,
+            dry_run=dry_run,
+            interactive=True,
+            environment_overrides=browser_environment,
+        )
+        return browser_environment
 
 
 def run_retail_setup(
@@ -532,7 +614,7 @@ def run_retail_setup(
         _emit("You can also do it later with: retail-setup deploy --env " + deploy_env)
         deploy = prompt_yes_no("Deploy to Microsoft Fabric now?", default=False)
     if deploy:
-        ensure_azure_login(deploy_env, dry_run=dry_run)
+        login_environment = ensure_azure_login(deploy_env, dry_run=dry_run)
         if not dry_run:
             _emit("")
             _emit("Starting deploy. Each command prints below its own divider.")
@@ -548,7 +630,10 @@ def run_retail_setup(
             deploy_command.append("--recreate")
         if assume_yes:
             deploy_command.append("--yes")
-        run_command(deploy_command, dry_run=dry_run, interactive=True)
+        run_command(
+            deploy_command, dry_run=dry_run, interactive=True,
+            environment_overrides=login_environment,
+        )
     else:
         _emit("")
         _emit("Skipping deploy for now. When you're ready:")

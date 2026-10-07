@@ -27,13 +27,22 @@ HIDDEN_DATE_KEYS = {
     "fact_foot_traffic": "Event Date",
     "fact_marketing_attribution": "Event Date",
     "fact_online_order_headers": "Event Date",
+    "fact_payments": "Event Date",
     "fact_receipts": "Event Date",
+    "fact_reorders": "Event Date",
+    "fact_stockouts": "Event Date",
     "fact_store_ops": "Event Date",
     "campaign_performance_daily": "Day",
     "marketing_cost_daily": "Day",
     "online_sales_daily": "Day",
     "tender_mix_daily": "Day",
     "truck_dwell_daily": "Day",
+}
+
+REQUIRED_ACTIVE_DATE_RELATIONSHIPS = {
+    "Payments to Date": ("fact_payments", "Event Date"),
+    "Reorders to Date": ("fact_reorders", "Event Date"),
+    "Stockouts to Date": ("fact_stockouts", "Event Date"),
 }
 
 
@@ -51,6 +60,18 @@ def _column_block(table: str, column: str) -> list[str]:
     raise AssertionError(f"column {column!r} not found in {table}.tmdl")
 
 
+def _relationship_block(name: str) -> str:
+    path = TABLES_DIR.parent / "relationships.tmdl"
+    text = path.read_text(encoding="utf-8")
+    match = re.search(
+        rf"^relationship '{re.escape(name)}'\n(?P<body>(?:\t.+\n)+)",
+        text,
+        re.MULTILINE,
+    )
+    assert match, f"relationship {name!r} not found"
+    return match.group("body")
+
+
 def test_redundant_date_keys_hidden() -> None:
     missing = []
     for table, column in HIDDEN_DATE_KEYS.items():
@@ -58,3 +79,20 @@ def test_redundant_date_keys_hidden() -> None:
         if not any(line.strip() == "isHidden" for line in block):
             missing.append(f"{table}.{column}")
     assert not missing, f"Redundant date-FK columns must be hidden: {missing}"
+
+
+def test_event_facts_have_active_date_relationships() -> None:
+    for relationship, (table, column) in REQUIRED_ACTIVE_DATE_RELATIONSHIPS.items():
+        column_block = _column_block(table, column)
+        assert any(
+            line.strip() == "dataType: dateTime" for line in column_block
+        )
+        assert any(
+            line.strip() == "sourceColumn: event_date" for line in column_block
+        )
+        assert any(line.strip().startswith("lineageTag: ") for line in column_block)
+
+        block = _relationship_block(relationship)
+        assert "\tisActive: false\n" not in block
+        assert f"\tfromColumn: {table}.'{column}'\n" in block
+        assert "\ttoColumn: dim_date.Date\n" in block

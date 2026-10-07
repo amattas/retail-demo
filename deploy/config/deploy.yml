@@ -1,10 +1,22 @@
 subscription_id: null
+# Native public API publication only; never included in fabric-cicd's item scope.
+operations_planning:
+  enabled: false
+  include_plan: true
+  # Shared Power BI Semantic Model connection; used only when include_plan is true.
+  plan_connection_id: null
+  # Explicit consent: Planning can start a non-cancellable 30-day billable session.
+  plan_billing_acknowledged: false
+  recipient: null
+twins:
+  enabled: false
 auth:
   mode: azure_cli
 workspace:
   description: Microsoft Fabric retail demo workspace
   existing_id: null
   capacity_id: null
+  capacity_resource_id: null
   skip_capacity_state_validation: false
   role_assignments: []
 lakehouse:

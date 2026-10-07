@@ -13,16 +13,27 @@ reorder_triggered
 // Truck dwell breach: completed lifecycle exceeds the 90-minute SLA
 let threshold_minutes = 90.0;
 fn_truck_sla()
-| where arrival_ingest_timestamp > ago(5m)
+| where departure_ingest_timestamp > ago(5m)
+| where departure_ingest_timestamp <= now()
+| where departure_time <= now()
 | where dwell_minutes > threshold_minutes
 | project truck_id, dc_id, store_id, shipment_id, site,
           arrival_time, departure_time, dwell_minutes, threshold_minutes
 
-// Zone overcrowded: rolling 5-min window
+// Zone arrival surge or long expected dwell: this is not an occupancy estimate.
 customer_entered
 | where ingest_timestamp > ago(5m)
-| summarize customers=sum(customer_count), avg_dwell=avg(dwell_time) by store_id, zone
-| where customers > 50 or avg_dwell > 600
+| summarize arrivals = sum(customer_count),
+            dwell_seconds_weighted =
+                sum(todouble(dwell_time) * todouble(customer_count))
+    by store_id, zone
+| extend avg_arrival_dwell_seconds = iif(
+             arrivals == 0,
+             real(null),
+             dwell_seconds_weighted / todouble(arrivals)
+         )
+| where arrivals > 50 or avg_arrival_dwell_seconds > 600
+| project store_id, zone, arrivals, avg_arrival_dwell_seconds
 
 // High-value receipt: threshold on total
 receipt_created

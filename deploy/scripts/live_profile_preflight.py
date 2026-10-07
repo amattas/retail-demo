@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
 from deploy.scripts.export_items import build_session
-from deploy.scripts.fabric_runtime import paginated_get
+from deploy.scripts.fabric_runtime import FabricPaginationError, paginated_get
 
 if TYPE_CHECKING:
     import requests
@@ -105,7 +107,9 @@ def _inside_us_or_eu_data_boundary(region: str) -> bool:
 def _resolve_capacity(
     capacities: list[dict[str, Any]],
     config: DeployConfig,
-) -> dict[str, Any]:
+    *,
+    allow_missing: bool = False,
+) -> dict[str, Any] | None:
     capacity_id = config.workspace.capacity_id
     capacity_name = config.workspace.capacity_name
     if capacity_id:
@@ -129,6 +133,8 @@ def _resolve_capacity(
             "`retail-setup configure` and select an active Fabric capacity."
         )
 
+    if not matches and allow_missing:
+        return None
     if len(matches) != 1:
         available = ", ".join(
             sorted(
@@ -272,6 +278,8 @@ def validate_live_profile_preflight(
             "operator has Capacity.Read.All access."
         ) from exc
     capacity = _resolve_capacity(capacities, config)
+    if capacity is None:
+        raise LiveProfilePreflightError("The configured capacity could not be resolved.")
     errors = _validate_capacity(capacity, config)
     region = str(capacity.get("region", ""))
     required_settings = _required_tenant_setting_names(config, region)
@@ -315,6 +323,11 @@ def validate_live_profile_preflight(
 def main() -> int:
     """Run live profile preflight and optionally recheck admin changes."""
 
+    from deploy.scripts.capacity_resume import (
+        CapacityResumeError,
+        build_arm_session,
+        ensure_capacity_active,
+    )
     from deploy.scripts.deploy_config import load_environment
 
     parser = argparse.ArgumentParser(
@@ -325,21 +338,74 @@ def main() -> int:
     parser.add_argument(
         "--auth-mode",
         choices=("azure_cli", "azure_powershell"),
-        default="azure_cli",
+        default=None,
     )
     parser.add_argument("--tenant-id")
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument(
+        "--resume-capacity", action="store_true",
+        help="Resume the configured paused Azure F capacity before validation (restarts billing).",
+    )
+    parser.add_argument("--capacity-timeout-seconds", type=float, default=600)
     args = parser.parse_args()
+    if not math.isfinite(args.capacity_timeout_seconds) or args.capacity_timeout_seconds <= 0:
+        parser.error("--capacity-timeout-seconds must be a positive finite number")
 
     config = load_environment(
         args.environment,
         config_path=args.repo_root / "deploy" / "config" / "deploy.yml",
         environments_root=args.repo_root / "deploy" / "config" / "environments",
     )
+    tenant_id = config.tenant_id
+    auth_mode = args.auth_mode or config.auth_mode
+    if tenant_id is None:
+        console.error("Capacity preflight requires the configured tenant_id.")
+        return 1
+    if args.tenant_id and args.tenant_id.casefold() != tenant_id.casefold():
+        console.error("Capacity preflight tenant must match the configured tenant.")
+        return 1
     session = build_session(
-        auth_mode=args.auth_mode,
-        tenant_id=args.tenant_id,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
     )
+    if args.resume_capacity:
+        deadline = time.monotonic() + args.capacity_timeout_seconds
+
+        def get_capacity():
+            import requests
+
+            try:
+                capacities = paginated_get(
+                    session, CAPACITIES_URL, timeout=30, deadline=deadline,
+                )
+            except requests.RequestException as exc:
+                raise LiveProfilePreflightError(
+                    "Could not read the configured Fabric capacity. "
+                    "Ensure the operator has Capacity.Read.All access."
+                ) from exc
+            except FabricPaginationError as exc:
+                raise LiveProfilePreflightError(
+                    f"Configured capacity discovery is incomplete: {exc}"
+                ) from exc
+            return _resolve_capacity(
+                capacities,
+                config,
+                allow_missing=True,
+            )
+
+        try:
+            ensure_capacity_active(
+                get_capacity,
+                resource_id=config.workspace.capacity_resource_id,
+                expected_name=config.workspace.capacity_name,
+                subscription_id=config.subscription_id,
+                tenant_id=tenant_id,
+                arm_session_factory=lambda: build_arm_session(auth_mode, tenant_id),
+                timeout_seconds=args.capacity_timeout_seconds,
+            )
+        except (CapacityResumeError, LiveProfilePreflightError) as exc:
+            console.error(str(exc))
+            return 1
     while True:
         try:
             report = validate_live_profile_preflight(session, config)

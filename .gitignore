@@ -120,3 +120,4 @@ fabric/powerbi/retail_model.SemanticModel/.pbi/localSettings.json
 # Setup utility — rendered notebooks and local config (contain env-specific values)
 utility/out/
 utility/config.yaml
+utility/config/environments/

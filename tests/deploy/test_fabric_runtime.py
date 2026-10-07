@@ -82,6 +82,37 @@ def test_paginated_get_fails_closed_on_repeated_token() -> None:
         paginated_get(session, "https://api.fabric.microsoft.com/v1/items")
 
 
+@pytest.mark.parametrize("elapsed", [6, 11])
+def test_paginated_get_applies_one_deadline_across_all_pages(monkeypatch, elapsed):
+    from deploy.scripts import fabric_runtime
+
+    clock = [0]
+    timeouts = []
+    monkeypatch.setattr(fabric_runtime.time, "monotonic", lambda: clock[0])
+
+    class TimedSession:
+        def get(self, _url, **kwargs):
+            timeouts.append(kwargs["timeout"])
+            clock[0] += elapsed
+            return _Response(
+                {"value": [{"id": "one"}], "continuationToken": "next"}
+                if len(timeouts) == 1 else {"value": [{"id": "two"}]}
+            )
+
+    if elapsed == 11:
+        with pytest.raises(FabricPaginationError, match="deadline expired"):
+            paginated_get(TimedSession(), "https://api.fabric.microsoft.com/v1/capacities",
+                          timeout=30, deadline=10)
+        assert timeouts == [10]
+    else:
+        result = paginated_get(
+            TimedSession(), "https://api.fabric.microsoft.com/v1/capacities",
+            timeout=30, deadline=10,
+        )
+        assert len(result) == 2
+        assert timeouts == [10, 4]
+
+
 @pytest.mark.parametrize("payload", [{}, {"value": {}}, {"value": [1]}])
 def test_paginated_get_rejects_malformed_collection(payload: object) -> None:
     with pytest.raises(FabricPaginationError):

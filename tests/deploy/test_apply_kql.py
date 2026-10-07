@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 import sys
 from pathlib import Path
 
@@ -63,6 +64,127 @@ def test_build_database_script_starts_with_dot_command(tmp_path: Path) -> None:
     _write_scripts(tmp_path)
     script = apply_kql.build_database_script(apply_kql.collect_kql_scripts(tmp_path))
     assert script.lstrip().startswith(".execute database script")
+
+
+def test_build_database_script_flattens_real_kql_sources() -> None:
+    script = apply_kql.build_database_script(apply_kql.collect_kql_scripts())
+    wrappers = re.findall(
+        r"(?im)^[ \t]*\.execute[ \t]+database[ \t]+script\b",
+        script,
+    )
+
+    assert len(wrappers) == 1
+    assert script.startswith(".execute database script with (ThrowOnErrors=true) <|")
+    assert "ContinueOnErrors" not in script
+
+
+def test_build_database_script_strips_leading_wrapper_after_comments(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "01-wrapped.kql"
+    source.write_text(
+        "// Standalone script\n"
+        "\n"
+        ".execute database script with (ThrowOnErrors=true) <|\n"
+        ".create-merge table receipts (id:string)\n",
+        encoding="utf-8",
+    )
+
+    script = apply_kql.build_database_script([source])
+
+    assert len(re.findall(r"(?im)^\.execute database script\b", script)) == 1
+    assert ".create-merge table receipts" in script
+
+
+def test_build_database_script_strips_source_bom(tmp_path: Path) -> None:
+    source = tmp_path / "01-bom.kql"
+    source.write_text(
+        ".execute database script <|\n"
+        ".create-merge table receipts (id:string)\n",
+        encoding="utf-8-sig",
+    )
+
+    script = apply_kql.build_database_script([source])
+
+    assert "\ufeff" not in script
+    assert script.count(".execute database script") == 1
+    assert ".create-merge table receipts" in script
+
+
+def test_build_database_script_accepts_newline_before_wrapper_pipe(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "01-newline-wrapper.kql"
+    source.write_text(
+        ".execute\tdatabase script with (ThrowOnErrors=true)\n"
+        "  <|\n"
+        ".create-merge table receipts (id:string)\n",
+        encoding="utf-8",
+    )
+
+    script = apply_kql.build_database_script([source])
+
+    assert script.count(".execute database script") == 1
+    assert ".create-merge table receipts" in script
+
+
+def test_build_database_script_handles_thousands_of_leading_comments(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "01-many-comments.kql"
+    source.write_text(
+        "".join(f"// comment {index}\n" for index in range(2_500))
+        + ".execute database script <|\n"
+        + ".create-merge table receipts (id:string)\n",
+        encoding="utf-8",
+    )
+
+    script = apply_kql.build_database_script([source])
+
+    assert script.count(".execute database script") == 1
+    assert ".create-merge table receipts" in script
+
+
+def test_build_database_script_rejects_embedded_wrapper(tmp_path: Path) -> None:
+    source = tmp_path / "01-invalid.kql"
+    source.write_text(
+        ".create-merge table receipts (id:string)\n"
+        ".execute database script with (ThrowOnErrors=true) <|\n"
+        ".show tables\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"01-invalid\.kql.*embedded"):
+        apply_kql.build_database_script([source])
+
+
+def test_build_database_script_rejects_wrapper_after_leading_wrapper(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "01-double-wrapped.kql"
+    source.write_text(
+        ".execute database script with (ThrowOnErrors=true) <|\n"
+        ".create-merge table receipts (id:string)\n"
+        ".execute database script with (ThrowOnErrors=true) <|\n"
+        ".show tables\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"01-double-wrapped\.kql.*embedded"):
+        apply_kql.build_database_script([source])
+
+
+def test_repo_kql_sources_are_standalone_fail_fast_scripts() -> None:
+    wrapper_re = re.compile(
+        r"(?im)^[^\S\r\n]*\.execute\s+database\s+script"
+        r"\s+with\s*\(\s*ThrowOnErrors\s*=\s*true\s*\)\s*<\|"
+    )
+
+    for path in apply_kql.collect_kql_scripts():
+        text = path.read_text(encoding="utf-8")
+        wrappers = wrapper_re.findall(text)
+        assert len(wrappers) == 1, f"{path.name} must have one fail-fast wrapper"
+        assert "ContinueOnErrors" not in text
 
 
 def test_collect_kql_scripts_orders_and_validates(tmp_path: Path) -> None:

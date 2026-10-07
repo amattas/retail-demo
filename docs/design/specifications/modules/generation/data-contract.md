@@ -41,6 +41,23 @@ Terminal publication states distinguish data recovery from staging cleanup:
 `COMPLETED`, `FAILED`, `ROLLED_BACK`, `ROLLBACK_FAILED`,
 `COMPLETED_CLEANUP_FAILED`, and `ROLLED_BACK_CLEANUP_FAILED`.
 
+`COMPLETED_CLEANUP_FAILED` means data promotion succeeded: the writer returns
+success with a warning and logs retained staging artifacts. Readiness reports
+cleanup as degradation, not failed historical data. Rollback states still
+represent failed publication attempts even when restoration succeeded.
+
+Historical Silver replacement is blocked once the configured
+`<lakehouse>.<silver_db>._watermarks` table exists, even if it has no rows.
+Stop writers and use coordinated Silver/checkpoint recovery before rebuilding
+history; deleting watermarks alone would allow replay to corrupt rebuilt data.
+The writer guard is not a distributed lock, so operators must serialize
+historical and streaming writers.
+
+The retained historical loader must materialize the exact ordered `TABLES`
+field names and types, not sampled/inferred Parquet schemas. Synthetic fixture
+data must not silently stand in for a missing or incompatible historical
+source.
+
 ## Gold output
 
 - `sales_minute_store`
@@ -66,12 +83,114 @@ mixed-case compatibility.
 
 ## Generation order
 
-The engine creates dimensions and date context before dependent facts, then
-builds sales, returns, online orders, payments, promotions, marketing,
-deterministic attribution, store activity, sensors, inventory, replenishment,
-stockouts, trucks, and Gold output.
+The engine creates dimensions and date context, then candidate store demand.
+It resolves inventory-constrained fulfillment before publishing sales, returns,
+payments, promotions, attribution, sensors, and stock ledgers. Online orders,
+marketing, store activity, and Gold output retain their related contracts.
 Reusable intermediate data is cached where repeated calculations would
 otherwise recompute it.
+
+### Retail behavior and calibration
+
+Historical store demand starts with open-hour visitors. A seeded
+negative-binomial count controls arrival variability; each visitor has a
+purchase decision using store/hour conversion propensity. Footfall uses this
+same visitor grid, not receipts divided by a fixed conversion percentage.
+The existing five zone counts conserve hourly visitors exactly. These are
+allocated sensor counts, not a physical trajectory model.
+
+Customer selection has persistent, long-tailed visit propensities and
+geography affinity. Continuous customer spending propensity and quick,
+regular, family, and bulk shopping missions shape basket sizes. Most lines
+share the trip's department preference; others permit cross-department
+shopping. Product popularity is persistent, price-sensitive, and uneven.
+Catalog selection excludes products not yet launched.
+
+`avg_ticket_target` calibrates expected line counts against actual eligible
+catalog prices, category quantities, tax, and expected discounts.
+`basket_lambda` limits the nominal mean line count; neither setting changes
+catalog prices or forces every ticket to the target. One-line minimums and
+expensive catalogs can make a target unattainable. Report distributions and
+calibration error rather than truncating individual tickets. Consumables and
+durables use different geometric quantity distributions, with single units
+most common and no artificial four-unit maximum.
+
+Promotion exposure precedes basket-size sampling and raises additional-item
+demand. Discounts still precede tax, and receipt/payment amounts reconcile in
+integer cents. This models coupon-driven basket expansion, not fitted causal
+price elasticity or a market-basket model learned from real transactions.
+
+The shared draw implementation uses Box-Muller normal draws and an exact
+integer-shape negative-binomial distribution (sum of geometric draws).
+All decisions retain stable key/seed salts, independent of Spark partitioning.
+The changed simulation intentionally produces different data from older code
+with the same seed; reproducibility requires the same code, dictionaries,
+configuration, and date window.
+
+### Inventory feedback and unfulfilled demand
+
+Every selling store/SKU participates in inventory-position replenishment,
+not only a daily top-five cohort. The chronological policy learns from past
+attempted demand, considers on-hand and pending deliveries/accepted restocks,
+and orders case-pack quantities against coverage and safety-stock targets.
+Opening stock is seeded independently of future transactions. Deterministic
+delivery delays allow depletion and recovery rather than permanent negative
+balances or a blanket zero floor.
+
+A candidate line is fulfilled in full only when its stock is available.
+Rejected lines are omitted from realized receipts; empty receipts disappear.
+Receipt totals, discounts, tax, payments, and refunds are reconciled against
+fulfilled lines. The return plan preserves sampled dates and identities while
+only actual fulfilled/refunded units can be restocked. Dependent promotions
+and attribution consume realized sales, not attempted demand.
+
+`fact_store_inventory_txn` appends two `long` audit columns after the existing
+schema: `requested_quantity` and `unfulfilled_quantity`. `LOST_SALE` rows
+record rejected demand with zero physical `quantity`; they must not decrement
+stock. Store/DC/truck transfers share the fulfillment plan, and inventory
+positions exclude deliveries outside the requested history. Physical-stock
+invariants verify nonnegative balances, running-sum conservation, opening
+stock, receipt/refund mirrors, demand accounting, and transfer conservation.
+
+Streaming replay preserves historical demand-audit fields. Older ledgers
+without these columns derive fulfilled requested quantities from negative
+`SALE` movements and use zero unfulfilled demand, because the older producer
+did not record lost sales. This is read-side compatibility only: writes still
+require the declared target schema. Regenerate historical setup or explicitly
+migrate the target before resuming streaming against an older table.
+Live deltas have zero unfulfilled demand; this is
+not evidence of measured lost demand in the live scenario generator.
+
+The current baseline assumes unlimited just-in-time supply at the DC and
+SKU-specific shipments. It does not optimize fleet routing or simulate
+supplier capacity constraints. Historical online orders retain their separate
+synthetic fulfillment model; do not interpret its statuses as reservations
+against the store policy.
+
+### Historical/live boundary
+
+The stream notebook embeds the shared basket/catalog/quantity code at build
+time. It emits a variable-length receipt-line array with matching item counts,
+promotion products, line discounts, tax, header totals, and payments. Online
+live headers retain their existing no-discount contract. Missing store tax or
+an empty/missing eligible catalog is an error, not a synthetic `$9.99` price.
+
+Live catalog launch eligibility is snapshotted when the stream starts; restart
+the stream to pick up newly launched products or changed catalog/profile data.
+The rate source remains an operator-controlled demonstration pace, not the
+historical visitor-arrival process. Live event scenarios and historical online
+fulfillment retain their explicitly synthetic scheduling assumptions; shared
+basket behavior does not imply a persistent live supply-chain simulator.
+
+### Statistical acceptance
+
+Use multiple seeds and short and multi-year windows. Check ticket and basket
+percentiles, customer purchase-frequency dispersion, SKU concentration,
+conversion variability, stockout duration/recovery, inventory conservation,
+and historical/live basket distributions. Keep legitimate price points,
+integer quantities, business constraints, and calibrated model-score plateaus;
+do not add jitter to hide them. Local synthetic calibration targets are demo
+assumptions, not claims about measured industry distributions.
 
 ## Invariants
 
@@ -84,6 +203,7 @@ Current invariant checks include:
 - seven-day last-touch uniqueness and impression/purchase linkage;
 - attributed revenue, discount, tax, total, and payment reconciliation;
 - stockout location exclusivity;
+- physical stock, transfer conservation, and explicit unfulfilled-demand accounting;
 - truck timing and inventory relationships;
 - sales only within each store's operating hours;
 - no receipt line sold before its product's launch date;

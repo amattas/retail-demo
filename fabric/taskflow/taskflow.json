@@ -181,7 +181,7 @@
       "description": "Serve the validated 40-table Direct Lake semantic model and Power BI report.",
       "items": [
         {
-          "artifactUniqueId": "3:4416500",
+          "artifactUniqueId": "dataset:07e6f51e-aaac-4594-bf50-94db9c1daf89",
           "artifactType": "dataset",
           "artifactObjectId": null,
           "artifactName": "retail_model"

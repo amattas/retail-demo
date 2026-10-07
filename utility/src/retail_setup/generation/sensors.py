@@ -8,9 +8,9 @@ Derives from SALE receipts (one BLE visit per receipt):
 
 Per visit, 2-5 zones are selected (uniform draw over n_zones, then zone selection
 without replacement via per-zone draw + window rank over the 5-zone array using
-posexplode). Each zone gets 2-5 pings. Ping event_ts = receipt event_ts +
-offset minutes ((zone_rank - 1) * 7 + ping_seq + u) - 15, spreading the visit
-±15 min around the receipt timestamp.
+posexplode). Each zone gets 2-5 pings. Ping event_ts is based on the receipt
+timestamp plus a deterministic visit offset, then bounded to that store-day's
+open interval and the requested history.
 
 Deviation from spec's "pandas-UDF island" suggestion: uses Spark-native window
 functions instead. The correlation between zones is mild enough for this approach
@@ -51,7 +51,38 @@ def generate_ble(
     d = seeded_draws(cfg.seed)
 
     # --- filter to SALE receipts (defensively; receipts may already be SALE-only)
-    visits = receipts.filter(F.col("receipt_type") == "SALE")
+    visits = receipts.filter(
+        (F.col("receipt_type") == "SALE")
+        & F.col("event_date").between(
+            F.lit(cfg.start_date), F.lit(cfg.end_date)
+        )
+    )
+
+    store_hours = dims["dim_stores"].select(
+        F.col("ID").alias("store_id"),
+        "operating_hours",
+    )
+    visits = visits.join(store_hours, "store_id")
+    is_24h = F.col("operating_hours") == "24h"
+    hour_parts = F.split(F.col("operating_hours"), "-")
+    open_hour = F.when(is_24h, 0).otherwise(
+        hour_parts.getItem(0).cast("int")
+    )
+    close_hour = F.when(is_24h, 24).otherwise(
+        hour_parts.getItem(1).cast("int")
+    )
+    day_epoch = F.unix_timestamp(F.col("event_date").cast("timestamp"))
+    visits = (
+        visits
+        .withColumn(
+            "_open_epoch",
+            day_epoch + F.coalesce(open_hour, F.lit(6)) * F.lit(3600),
+        )
+        .withColumn(
+            "_close_epoch",
+            day_epoch + F.coalesce(close_hour, F.lit(22)) * F.lit(3600),
+        )
+    )
 
     # --- 30% known (u < 0.3): join dim_customers for BLEId; 70% anonymous
     customers = dims["dim_customers"].select(
@@ -108,6 +139,7 @@ def generate_ble(
     visits_with_zones = visits.select(
         "receipt_id_ext", "store_id", "event_ts", "event_date",
         "customer_ble_id", "visit_customer_id", "n_zones",
+        "_open_epoch", "_close_epoch",
         F.posexplode(zone_array).alias("zone_pos", "zone"),
     )
 
@@ -146,6 +178,7 @@ def generate_ble(
     pings = selected_zones.select(
         "receipt_id_ext", "store_id", "event_ts", "event_date",
         "customer_ble_id", "visit_customer_id", "zone_rank", "zone", "n_pings",
+        "_open_epoch", "_close_epoch",
         F.explode(F.sequence(F.lit(1), F.col("n_pings"))).alias("ping_seq"),
     )
 
@@ -168,9 +201,25 @@ def generate_ble(
         + d.u(ping_key, "ts_offset")
         - F.lit(15.0)
     )
-    ping_ts = F.timestamp_seconds(
+    raw_ping_epoch = (
         F.unix_timestamp("event_ts") + (offset_min * F.lit(60.0)).cast("long")
     )
+    history_start = F.unix_timestamp(
+        F.to_timestamp(F.lit(f"{cfg.start_date.isoformat()} 00:00:00"))
+    )
+    history_end = F.unix_timestamp(
+        F.to_timestamp(F.lit(f"{cfg.end_date.isoformat()} 23:59:59"))
+    )
+    ping_epoch = F.greatest(
+        F.col("_open_epoch"),
+        history_start,
+        F.least(
+            raw_ping_epoch,
+            F.col("_close_epoch") - F.lit(1),
+            history_end,
+        ),
+    )
+    ping_ts = F.timestamp_seconds(ping_epoch)
 
     # rssi uniform [-80, -29] (integer long)
     rssi = (
@@ -214,10 +263,11 @@ def generate_ble(
     # ordered by ping event_ts; lag(zone); keep where zone changed
     w_visit_ts = Window.partitionBy(
         "store_id", "customer_ble_id", "receipt_id_ext"
-    ).orderBy("ping_ts")
+    ).orderBy("ping_ts", "ping_visit_seq")
 
     zc_base = pings.select(
-        "store_id", "customer_ble_id", "receipt_id_ext", "ping_ts", "zone",
+        "store_id", "customer_ble_id", "receipt_id_ext", "ping_ts",
+        "ping_visit_seq", "zone",
     ).withColumn("prev_zone", F.lag("zone").over(w_visit_ts))
 
     zc_base = zc_base.filter(
@@ -225,7 +275,9 @@ def generate_ble(
     )
 
     # trace_id sequence per visit
-    w_zc_seq = Window.partitionBy("store_id", "customer_ble_id", "receipt_id_ext").orderBy("ping_ts")
+    w_zc_seq = Window.partitionBy(
+        "store_id", "customer_ble_id", "receipt_id_ext"
+    ).orderBy("ping_ts", "ping_visit_seq")
     zc_base = zc_base.withColumn("zc_seq", F.row_number().over(w_zc_seq).cast("long"))
 
     zc_out = zc_base.select(

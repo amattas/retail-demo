@@ -1,5 +1,9 @@
 from datetime import date
 
+import pytest
+from pyspark.sql import functions as F
+
+from retail_setup.generation import runtime
 from retail_setup.generation.runtime import derive_seed, store_day_grid
 
 
@@ -27,6 +31,50 @@ def test_store_day_grid(spark):
     cols = set(grid.columns)
     assert {"store_id", "day"} <= cols
     assert "partition_seed" not in cols
+
+
+def test_store_day_grid_builds_dates_with_spark_range(spark):
+    grid = store_day_grid(
+        spark,
+        store_ids=[1, 2],
+        start=date(2025, 1, 1),
+        end=date(2025, 1, 3),
+        global_seed=42,
+        section="receipts",
+    )
+    plan = grid._jdf.queryExecution().logical().toString()
+    assert "Range" in plan
+
+
+def test_fixed_width_decimal_pads_without_truncating(spark):
+    formatter = getattr(runtime, "fixed_width_decimal", None)
+    assert formatter is not None
+    value = spark.range(1).select(
+        formatter(F.lit(7), 3, "sample_id").alias("formatted")
+    ).first()[0]
+    assert value == "007"
+
+
+def test_fixed_width_decimal_fails_on_overflow(spark):
+    formatter = getattr(runtime, "fixed_width_decimal", None)
+    assert formatter is not None
+    overflow = spark.range(1).select(
+        formatter(F.lit(1000), 3, "sample_id").alias("formatted")
+    )
+    with pytest.raises(Exception) as exc_info:
+        overflow.collect()
+    assert "sample_id exceeds 3 digits" in str(exc_info.value)
+
+
+def test_minimum_width_decimal_never_truncates(spark):
+    formatter = getattr(runtime, "minimum_width_decimal", None)
+    assert formatter is not None
+    values = spark.range(1).select(
+        formatter(F.lit(7), 3).alias("padded"),
+        formatter(F.lit(1000), 3).alias("overflow"),
+    ).first()
+    assert values.padded == "007"
+    assert values.overflow == "1000"
 
 
 def test_seeded_draws_uniform_properties(spark):

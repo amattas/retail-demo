@@ -25,8 +25,7 @@
 # KQL database — rows that fail schema/type validation are reported there, not lost
 # silently.
 #
-# This notebook is self-contained (no engine cell); it reuses the same
-# deterministic-hash and event-envelope conventions as the batch engine.
+# This notebook embeds the shared shopping behavior used by the batch engine.
 
 # %% [parameters]
 # Fabric parameters — override per run via the pipeline/parameterization.
@@ -52,6 +51,8 @@ kql_database = "retail_eventhouse"  # KQL database name (the Eventhouse's databa
 delta_landing_table = ""       # default derived from LAKEHOUSE_NAME below if blank
 
 checkpoint_path = "Files/setup/stream/checkpoint"
+
+# %% [behavior]
 
 # %%
 # PARAMETERS — rendered by `retail-setup render`; defaults work unrendered.
@@ -126,49 +127,41 @@ print(f"stream identity: {STREAM_ID}")
 
 # %%
 # Dimension ID ranges — read from the Silver dims that setup-02 wrote, so events
-# carry valid foreign keys. Falls back to defaults if the dims are not present.
-def _count(table: str, default: int) -> int:
-    try:
-        return spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{table}").count()
-    except Exception as exc:  # noqa: BLE001 - dims optional; default on any read error
-        print(f"  {table} not found ({exc}); using default {default}")
-        return default
+# carry valid foreign keys. Missing/empty dimensions cannot produce a valid stream.
+def _count(table: str) -> int:
+    count = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{table}").count()
+    if count < 1:
+        raise ValueError(f"Required streaming dimension {table} is empty; run setup first")
+    return count
 
-STORE_COUNT = _count("dim_stores", 50)
-CUSTOMER_COUNT = _count("dim_customers", 5000)
-PRODUCT_COUNT = _count("dim_products", 1000)
-DC_COUNT = _count("dim_distribution_centers", 5)
-TRUCK_COUNT = _count("dim_trucks", 15)
+STORE_COUNT = _count("dim_stores")
+CUSTOMER_COUNT = _count("dim_customers")
+PRODUCT_COUNT = _count("dim_products")
+DC_COUNT = _count("dim_distribution_centers")
+TRUCK_COUNT = _count("dim_trucks")
 print(f"ranges: stores={STORE_COUNT} customers={CUSTOMER_COUNT} products={PRODUCT_COUNT} "
       f"dcs={DC_COUNT} trucks={TRUCK_COUNT}")
 
 # Dimension ATTRIBUTES (not just counts) as small broadcast frames for
 # stream-static joins, so the live feed's money matches the historical batch:
-# real product prices/taxability and the store's real tax rate. Synthetic
-# fallback when the dims are absent. Customer geography affinity is not applied
+# real product prices/taxability and the store's real tax rate. Customer geography affinity is not applied
 # in the stream (the customer base is too large to broadcast and a fixed-rate
 # stream has no per-store demand signal) — a documented live-feed approximation.
 from pyspark.sql import functions as _F
-import random as _rnd
+import json
 
-try:
-    PROD_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products")
-                 .select(_F.col("ID").alias("ap_id"),
-                         _F.round(_F.col("SalePrice"), 2).alias("ap_price"),
-                         _F.col("taxability").alias("ap_taxa")))
-    STORE_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
-                  .select(_F.col("ID").alias("as_id"),
-                          _F.round(_F.col("tax_rate") * 10000).cast("long").alias("as_bps")))
-    print("attrs: using real dim_products / dim_stores prices+tax")
-except Exception as exc:  # noqa: BLE001 - attrs optional; synthetic fallback
-    print(f"  dim attrs unavailable ({exc}); using synthetic prices/tax")
-    _g = _rnd.Random(SEED)
-    PROD_ATTR = spark.createDataFrame(
-        [(i + 1, round(_g.uniform(1.0, 60.0), 2), "TAXABLE")
-         for i in range(min(PRODUCT_COUNT, 2000))],
-        "ap_id long, ap_price double, ap_taxa string")
-    STORE_ATTR = spark.createDataFrame(
-        [(i + 1, 800) for i in range(max(STORE_COUNT, 1))], "as_id long, as_bps long")
+STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
+    mssparkutils.fs.head(f"Files/setup/dictionaries/{STORE_TYPE}/profile.json", 65536)
+))
+STREAM_PRODUCTS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").select(
+    _F.col("ID").alias("product_id"), "SalePrice", "taxability",
+    _F.col("Department").alias("department"), _F.to_date("LaunchDate").alias("launch_date"),
+)
+
+STORE_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
+              .select(_F.col("ID").alias("as_id"),
+                      _F.round(_F.col("tax_rate") * 10000).cast("long").alias("as_bps")))
+print("attrs: using real dim_products / dim_stores prices+tax")
 
 # %%
 # ruff: noqa: F821, E402  (Fabric-injected globals; imports live in notebook cells)
@@ -313,36 +306,23 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
       .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
-      .withColumn("tender", _pick(F.col("v"), "tender", TENDERS))
-      # two real line products (joined to dim_products below for price+tax)
-      .withColumn("l1_pid", _id(F.concat(F.col("v"), F.lit("-1")), "pidx", PRODUCT_COUNT))
-      .withColumn("l2_pid", _id(F.concat(F.col("v"), F.lit("-2")), "pidx", PRODUCT_COUNT))
-      .withColumn("l1_qty", (_h(F.concat(F.col("v"), F.lit("-1")), "qty", 3) + F.lit(1)).cast("long"))
-      .withColumn("l2_qty", (_h(F.concat(F.col("v"), F.lit("-2")), "qty", 3) + F.lit(1)).cast("long")))
-
-# stream-static broadcast joins for real store tax + line prices/taxability
-_p1 = PROD_ATTR.select(F.col("ap_id").alias("p1id"),
-                       F.col("ap_price").alias("l1_unit"), F.col("ap_taxa").alias("l1_taxa"))
-_p2 = PROD_ATTR.select(F.col("ap_id").alias("p2id"),
-                       F.col("ap_price").alias("l2_unit"), F.col("ap_taxa").alias("l2_taxa"))
-
+      .withColumn("tender", _pick(F.col("v"), "tender", TENDERS)))
+b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").withColumn(
+    "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps")).otherwise(
+        F.raise_error("Live purchase references a missing store tax rate")
+    )
+)
+b0 = attach_stream_baskets(spark, b0, STREAM_PRODUCTS, STREAM_PROFILE, SEED)
 b = (b0
-     .join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left")
-     .join(_bcast(_p1), F.col("l1_pid") == F.col("p1id"), "left")
-     .join(_bcast(_p2), F.col("l2_pid") == F.col("p2id"), "left")
-     .withColumn("store_bps", F.coalesce(F.col("as_bps"), F.lit(800)))
-     .withColumn("l1_unit", F.coalesce(F.col("l1_unit"), F.lit(9.99)))
-     .withColumn("l1_taxa", F.coalesce(F.col("l1_taxa"), F.lit("TAXABLE")))
-     .withColumn("l2_unit", F.coalesce(F.col("l2_unit"), F.lit(9.99)))
-     .withColumn("l2_taxa", F.coalesce(F.col("l2_taxa"), F.lit("TAXABLE")))
-     .withColumn("l1_ext", F.round(F.col("l1_unit") * F.col("l1_qty"), 2))
-     .withColumn("l2_ext", F.round(F.col("l2_unit") * F.col("l2_qty"), 2))
-     # real money: subtotal = sum of line exts; tax via the store's real rate
-     .withColumn("subtotal", F.round(F.col("l1_ext") + F.col("l2_ext"), 2))
-     .withColumn("tax", F.round(
-         (F.col("l1_ext") * _taxmult(F.col("l1_taxa"))
-          + F.col("l2_ext") * _taxmult(F.col("l2_taxa")))
-         * F.col("store_bps") / F.lit(10000.0), 2))
+     .withColumn("subtotal", F.aggregate(
+         "basket_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["gross_cents"]
+     ) / 100.0)
+     .withColumn("tax", F.aggregate(
+         "basket_lines", F.lit(0).cast("long"),
+         lambda acc, line: acc + F.floor(
+             line["gross_cents"] * _taxmult(line["taxability"]) * F.col("store_bps") / 10000.0 + 0.5
+         ).cast("long")
+     ) / 100.0)
      .withColumn("total", F.round(F.col("subtotal") + F.col("tax"), 2))
      # named promo (month-eligible + min-purchase + BOGO), evergreen fallback
      .withColumn("_pidx", _h(F.col("v"), "promoidx", len(NAMED_PROMOS)))
@@ -365,21 +345,16 @@ shop = F.col("scenario").isin("shopping", "store_attributed")
 store_pkey = F.col("pkey")
 
 
-def _line(idx):
-    lk = F.concat(F.col("v"), F.lit(f"-{idx}"))
-    # Line 1 is the only promotable line: its extended_price is NET of any
-    # discount (discount before tax) and it carries promo_code when a promo
-    # applies; line 2 is never discounted (unit_price/extended_price unchanged).
-    ext_price = l1_net_ext if idx == 1 else F.col(f"l{idx}_ext")
-    line_promo_code = F.when(has_promo, F.col("promo_code")) if idx == 1 else F.lit(None).cast("string")
+def _line(line):
+    lk = F.concat(F.col("v"), F.lit("-"), line["line_num"])
     payload = F.struct(
         F.col("receipt_id"),
-        F.lit(idx).cast("long").alias("line_number"),
-        F.col(f"l{idx}_pid").alias("product_id"),
-        F.col(f"l{idx}_qty").alias("quantity"),
-        F.col(f"l{idx}_unit").alias("unit_price"),
-        ext_price.alias("extended_price"),
-        line_promo_code.alias("promo_code"),
+        line["line_num"].cast("long").alias("line_number"),
+        line["product_id"].alias("product_id"),
+        line["quantity"].cast("long").alias("quantity"),
+        (line["unit_cents"] / 100.0).alias("unit_price"),
+        (line["net_cents"] / 100.0).alias("extended_price"),
+        F.when(line["discount_cents"] > 0, F.col("promo_code")).alias("promo_code"),
     )
     return slot(shop, "receipt_line_added", payload, F.col("ts"), store_pkey, lk,
                 session=F.col("session_id"), parent=F.col("receipt_id"))
@@ -407,29 +382,38 @@ store_attr = F.col("scenario") == "store_attributed"
 online_attr = F.col("scenario") == "online_attributed"
 attr = store_attr | online_attr
 
-# --- IMP-007 (live mirror): promo discount applied to the promoted line
-# (line 1) BEFORE tax, so the store's net subtotal/tax/total reflect the
-# discount — same "discount before tax" contract as receipts.py. Applies to
-# every store purchase (normal "shopping" and "store_attributed" alike); a
-# non-promoted row has discount_cents == 0. Online orders never discount
-# here (gross == net, discount_cents == 0), per requirement.
-has_promo = _u(F.col("v"), "haspromo") < F.lit(0.3)
-l1_ext_cents = F.round(F.col("l1_ext") * F.lit(100)).cast("long")
-l2_ext_cents = F.round(F.col("l2_ext") * F.lit(100)).cast("long")
-gross_subtotal_cents = l1_ext_cents + l2_ext_cents
-store_discount_cents = F.when(
-    has_promo,
-    F.floor(l1_ext_cents * F.col("_ppct") / F.lit(100.0) + F.lit(0.5)).cast("long"),
-).otherwise(F.lit(0).cast("long"))
-l1_net_cents = l1_ext_cents - store_discount_cents
-l1_net_ext = F.round(l1_net_cents.cast("double") / F.lit(100.0), 2)
-# net subtotal = gross subtotal - discount (promoted line net + untouched line 2)
+# Discounts apply to variable-length baskets before per-line tax.
+def _price_live_line(line):
+    discount = F.when(
+        F.col("_offer"),
+        F.floor(
+            F.when(
+                F.col("promo_type") == "BOGO",
+                F.floor(line["quantity"] / 2) * line["unit_cents"],
+            ).otherwise(line["gross_cents"]) * F.col("_ppct") / 100.0 + 0.5
+        ).cast("long"),
+    ).otherwise(F.lit(0).cast("long"))
+    net = line["gross_cents"] - discount
+    tax = F.floor(
+        net * _taxmult(line["taxability"]) * F.col("store_bps") / 10000.0 + 0.5
+    ).cast("long")
+    return line.withField("discount_cents", discount).withField("net_cents", net).withField(
+        "tax_cents", tax
+    )
+
+
+b = b.withColumn("priced_lines", F.transform("basket_lines", _price_live_line))
+gross_subtotal_cents = F.aggregate(
+    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["gross_cents"]
+)
+store_discount_cents = F.aggregate(
+    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["discount_cents"]
+)
+has_promo = store_discount_cents > 0
 store_subtotal_cents = gross_subtotal_cents - store_discount_cents
-store_tax_cents = F.round(
-    (l1_net_cents.cast("double") * _taxmult(F.col("l1_taxa"))
-     + l2_ext_cents.cast("double") * _taxmult(F.col("l2_taxa")))
-    * F.col("store_bps") / F.lit(10000.0)
-).cast("long")
+store_tax_cents = F.aggregate(
+    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["tax_cents"]
+)
 store_total_cents = store_subtotal_cents + store_tax_cents
 store_subtotal = F.round(store_subtotal_cents.cast("double") / F.lit(100.0), 2)
 store_tax = F.round(store_tax_cents.cast("double") / F.lit(100.0), 2)
@@ -565,7 +549,7 @@ events_arr = F.array(
         # existing real-valued fields (kept for compatibility): now NET of any
         # line-1 promo discount, computed before tax (discount-before-tax).
         store_subtotal.alias("subtotal"), store_tax.alias("tax"), store_total.alias("total"),
-        F.col("tender").alias("tender_type"), F.lit(2).cast("long").alias("item_count"),
+        F.col("tender").alias("tender_type"), F.col("basket_n").cast("long").alias("item_count"),
         attr_receipt_campaign_id.alias("campaign_id"),
         attr_receipt_impression_id.alias("impression_id"),
         gross_subtotal_cents.alias("gross_subtotal_cents"),
@@ -575,7 +559,6 @@ events_arr = F.array(
         store_total_cents.alias("total_cents"),
     ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
         correlation=attr_correlation_store),
-    _line(1), _line(2),
     slot(shop, "payment_processed", F.struct(
         F.col("receipt_id"), F.lit(None).cast("string").alias("order_id"),
         F.col("tender").alias("payment_method"), store_total.alias("amount"),
@@ -591,8 +574,15 @@ events_arr = F.array(
         F.col("receipt_id"), F.col("promo_code"),
         F.round(store_discount_cents.cast("double") / F.lit(100.0), 2).alias("discount_amount"),
         store_discount_cents.alias("discount_cents"),
-        F.col("promo_type").alias("discount_type"), F.lit(1).cast("long").alias("product_count"),
-        F.array(F.col("l1_pid")).alias("product_ids"),
+        F.col("promo_type").alias("discount_type"),
+        F.size(F.array_distinct(F.transform(
+            F.filter("priced_lines", lambda line: line["discount_cents"] > 0),
+            lambda line: line["product_id"],
+        ))).cast("long").alias("product_count"),
+        F.array_distinct(F.transform(
+            F.filter("priced_lines", lambda line: line["discount_cents"] > 0),
+            lambda line: line["product_id"],
+        )).alias("product_ids"),
         F.col("store_id"), F.col("customer_id"),
     ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
         correlation=attr_correlation_store),
@@ -661,7 +651,7 @@ events_arr = F.array(
         F.col("order_id"), F.col("customer_id"),
         _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
         node_type.alias("node_type"), node_id.alias("node_id"),
-        F.lit(2).cast("long").alias("item_count"),
+        F.col("basket_n").cast("long").alias("item_count"),
         F.col("subtotal"), F.col("tax"), F.col("total"), F.col("tender").alias("tender_type"),
         attr_order_campaign_id.alias("campaign_id"),
         attr_order_impression_id.alias("impression_id"),
@@ -701,6 +691,7 @@ events_arr = F.array(
         correlation=attr_correlation_online),
 )
 
+events_arr = F.concat(events_arr, F.transform("priced_lines", _line))
 events = (b.select(F.explode(events_arr).alias("e"))
           .where(F.col("e").isNotNull())
           .select(F.col("e.key").alias("key"), F.col("e.value").alias("value"),
@@ -761,9 +752,7 @@ EVENT_PAYLOADS = {
 # between the payload block and the envelope block in the table schema (see
 # 01-create-tables.kql), so they must be written as explicit nulls in that
 # position to keep the positional ingestion aligned.
-TABLE_EXTRA_NULLS = {
-    "receipt_created": [("campaign_id", "string")],
-}
+TABLE_EXTRA_NULLS = {}
 
 KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
 # flushImmediately tells the Kusto data-management service to flush each ingestion

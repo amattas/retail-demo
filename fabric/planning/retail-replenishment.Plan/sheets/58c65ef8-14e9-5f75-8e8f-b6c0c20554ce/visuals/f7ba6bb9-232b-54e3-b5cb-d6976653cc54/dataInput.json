@@ -1,0 +1,105 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Planning/DataInput/1.0.0/schema.json",
+  "columns": [
+    {
+      "measureGuid": "whatif-stock",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Total Units on Hand", "dataInputType": 6, "disableWriteAccess": true,
+      "description": "Read-only signed store ledger balance, not approved supply.",
+      "columnMeta": {
+        "id": "whatif-stock", "label": "Total Units on Hand",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "whatif-forecast",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Forecasted Units Next 7 Days", "dataInputType": 6, "disableWriteAccess": true,
+      "description": "Read-only baseline model forecast. Assumption edits do not retrain or change this measure.",
+      "columnMeta": {
+        "id": "whatif-forecast", "label": "Forecasted Units Next 7 Days",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "whatif-transfer",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Transfer units (assumption)", "dataInputType": 6, "disableWriteAccess": false,
+      "description": "Synthetic assumption per store-SKU for the seven-day window. Starts at zero. Not observed DC stock, a reservation, approved transfer or ERP instruction. Keep zero in Baseline and Expedite.",
+      "columnMeta": {
+        "id": "whatif-transfer", "label": "Transfer units (assumption)", "data_type": "Number",
+        "measure_type": {
+          "DataInput": {
+            "id": "CALC_weekend_transfer",
+            "column_type": {"Number": {
+              "min_value": 0, "max_value": 100000, "default_value": 0,
+              "distribute_parent_value_to_children": false
+            }},
+            "title": "Transfer units (assumption)",
+            "disable_write_access": false, "allow_input": "ReadAndEdit"
+          }
+        }
+      }
+    },
+    {
+      "measureGuid": "whatif-expedite",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Expedite units (assumption)", "dataInputType": 6, "disableWriteAccess": false,
+      "description": "Synthetic assumption per store-SKU for the seven-day window. Starts at zero. No supplier commitment, purchasing or delivery guarantee. Keep zero in Baseline and Transfer.",
+      "columnMeta": {
+        "id": "whatif-expedite", "label": "Expedite units (assumption)", "data_type": "Number",
+        "measure_type": {
+          "DataInput": {
+            "id": "CALC_weekend_expedite",
+            "column_type": {"Number": {
+              "min_value": 0, "max_value": 100000, "default_value": 0,
+              "distribute_parent_value_to_children": false
+            }},
+            "title": "Expedite units (assumption)",
+            "disable_write_access": false, "allow_input": "ReadAndEdit"
+          }
+        }
+      }
+    },
+    {
+      "measureGuid": "whatif-budget",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Budget per store-SKU (assumption)", "dataInputType": 6, "disableWriteAccess": false,
+      "description": "Synthetic assumption in demo currency units per store-SKU, not an approved spend. Starts at zero. Do not repeat a whole-case budget on every row; agree currency and reconcile totals manually.",
+      "columnMeta": {
+        "id": "whatif-budget", "label": "Budget per store-SKU (assumption)", "data_type": "Number",
+        "measure_type": {
+          "DataInput": {
+            "id": "CALC_weekend_budget",
+            "column_type": {"Number": {
+              "min_value": 0, "max_value": 1000000, "default_value": 0,
+              "distribute_parent_value_to_children": false
+            }},
+            "title": "Budget per store-SKU (assumption)",
+            "disable_write_access": false, "allow_input": "ReadAndEdit"
+          }
+        }
+      }
+    },
+    {
+      "measureGuid": "whatif-uplift",
+      "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+      "name": "Demand uplift % (assumption)", "dataInputType": 6, "disableWriteAccess": false,
+      "description": "Synthetic assumption per store-SKU: enter 10 for ten percent, range 0-100. Starts at zero. Not additive across rows and not applied automatically to the baseline model forecast.",
+      "columnMeta": {
+        "id": "whatif-uplift", "label": "Demand uplift % (assumption)", "data_type": "Number",
+        "measure_type": {
+          "DataInput": {
+            "id": "CALC_weekend_uplift",
+            "column_type": {"Number": {
+              "min_value": 0, "max_value": 100, "default_value": 0,
+              "distribute_parent_value_to_children": false
+            }},
+            "title": "Demand uplift % (assumption)",
+            "disable_write_access": false, "allow_input": "ReadAndEdit"
+          }
+        }
+      }
+    }
+  ]
+}

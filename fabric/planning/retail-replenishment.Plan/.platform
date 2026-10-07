@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Plan",
+    "displayName": "${DISPLAY_NAME}",
+    "description": "Protect weekend availability: human-governed synthetic planning for stores 1-5, SKUs 1-20, DC 1 and a seven-day forecast horizon. Proposals are assumptions, not available stock or purchasing authority. No writeback or external execution."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "72755aff-fa7c-5b71-9402-8c80185b9f32"
+  }
+}

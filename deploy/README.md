@@ -20,7 +20,8 @@ recreate, post-deploy work, and troubleshooting.
 ## Ordered deploy plan
 
 1. Run local profile/source and live tenant/capacity preflight.
-2. Generate inputs and apply Terraform unless `--skip-terraform` is selected.
+2. Generate inputs, save and validate a Terraform plan, then apply that exact
+   plan unless `--skip-terraform` is selected.
 3. Stage and publish selected infrastructure without Reporting.
 4. Build and execute the ordered KQL database script.
 5. For Reporting profiles, wait for setup and required ML validation.
@@ -33,9 +34,11 @@ recreate, post-deploy work, and troubleshooting.
 10. For standard/full-demo, run read-only live readiness verification over the
     complete selected profile.
 
-The CLI confirmation occurs before Terraform apply. Apply then prints the
-change preview and proceeds with `-auto-approve`; there is no separate
-Terraform plan gate.
+The CLI saves and validates the plan before apply confirmation. Review the
+saved `terraform.tfplan` with `terraform show` before accepting apply. The plan guard rejects
+implicit deletion or replacement of the workspace, Lakehouse, or Eventhouse.
+`--yes` bypasses prompts, not this safeguard. Intentional destruction requires
+the explicit `--recreate` workflow.
 
 ## Authentication
 
@@ -99,14 +102,16 @@ not guaranteed publishable workspace items. See the canonical
 | `config/environments/<env>.yml` | Local workspace target overlay | No |
 | `.generated/<env>/terraform.tfvars` | Generated Terraform input | No |
 | `.generated/<env>/terraform.tfstate` | Isolated local Terraform state | No |
+| `.generated/<env>/terraform.tfplan` | Saved plan validated before apply | No |
 | `.generated/<env>/fabric-cicd/config.yml` | Publication configuration | No |
 | `.generated/<env>/fabric-cicd/parameter.yml` | Binding rewrites | No |
 | `.generated/<env>/terraform-output.json` | Captured live item identifiers | No |
 | `.generated/<env>/database.kql` | Combined ordered KQL script | No |
 | `.generated/<env>/deploy-run.json` | Atomic deployment step journal | No |
+| `.generated/<env>/run-history/<hashed-run-id>.json` | Prior journal archived before a different run replaces latest | No |
 | `.generated/<env>/artifact-inventory-<phase>.json` | Manifest/version/profile-aware staged item evidence | No |
 | `.generated/<env>/readiness-report.json` | Atomic redacted live readiness and freshness evidence | No |
-| `workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
+| `.generated/<env>/workspace/` | Environment-local staged items, including post-ontology | No |
 
 The environment key is derived from the normalized workspace name. The
 `retail-demo-` prefix is omitted, so workspace `retail-demo-alice` uses
@@ -120,9 +125,14 @@ identifiers are local-only and isolated by that key.
 | `--dry-run` | Validates existing configuration and the authentication boundary, then prints the plan without live access; with `--skip-terraform`, validates captured outputs too. |
 | `--yes` | Pre-confirms interactive gates; required setup/ML pipeline gates still run. |
 | `--skip-terraform` | Skips provisioning only after prior outputs match the configured environment, workspace, resource names, and non-placeholder IDs. |
+| `--resume` | Reuses only the contiguous succeeded prefix of an incomplete compatible journal; refreshes pending consumers' saved plan or staged artifacts. |
 | `--recreate` | Destroys the workspace, polls for name release for up to 180 seconds, and rebuilds it. |
 
 `--recreate` and `--skip-terraform` cannot be combined.
+`--resume` cannot be combined with `--dry-run` or `--recreate`. Source/config,
+ordered-plan fingerprint, profile, and target identity must match. A completed
+run is not resumable. An interrupted destructive recreate phase must be
+reviewed and explicitly restarted, not silently resumed.
 
 ## Post-deploy behavior
 

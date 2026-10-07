@@ -10,8 +10,8 @@ The demo supports several retail stories, but their current maturity differs.
 | Omnichannel fulfillment | Online-order headers, lines, picked, and shipped events | Implemented with documented live/history differences |
 | Supply-chain dwell | Paired truck lifecycle, Eventhouse SLA function, Silver/Gold dwell, queryset and rule | Cross-layer contract tested; live Fabric validation pending |
 | Marketing attribution and promotion ROI | Seven-day last-touch journeys, reconciled promotions/payments, campaign return on ad spend (ROAS), and purchase-level audit | Implemented and contract-tested |
-| Machine-learning insights | Required forecast/churn/segmentation/stockout plus optional delivery and experimental pricing outputs | Required Reporting outputs are contract-gated and live-validated in `standard`/`full-demo` |
-| Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Optional, capability-gated, and live-validated for `full-demo` |
+| Machine-learning insights | Six required outputs: forecast, churn, segmentation, stockout risk, recommendations, and elasticity; optional/experimental outputs remain separate | Required Reporting outputs are contract-gated in `standard`/`full-demo`; current repairs still need fresh live proof |
+| Ontology and conversational agents | Business-entity ontology and semantic/ontology agents | Preview/capability-gated in `full-demo`; verify the current environment before presenting |
 
 ## Core presentation journeys
 

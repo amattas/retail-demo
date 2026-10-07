@@ -19,6 +19,7 @@ from retail_setup.generation import (
     sensors,
     store_activity,
 )
+from retail_setup.generation.fulfillment import resolve_fulfillment
 
 
 @dataclass
@@ -51,7 +52,11 @@ def generate_all(
     # one: realism is unchanged, only the redundant recomputation is removed.
     sales["fact_receipts"] = sales["fact_receipts"].cache()
     sales["fact_receipt_lines"] = sales["fact_receipt_lines"].cache()
-    rets = returns_mod.generate_returns(spark, sales, t, cfg)
+    fulfilled = resolve_fulfillment(sales, t, cfg)
+    sales = {name: frame.cache() for name, frame in fulfilled.sales.items()}
+    rets = returns_mod.generate_returns(
+        spark, sales, t, cfg, return_headers=fulfilled.return_headers,
+    )
     t["fact_receipts"] = sales["fact_receipts"].unionByName(rets["fact_receipts"])
     t["fact_receipt_lines"] = sales["fact_receipt_lines"].unionByName(
         rets["fact_receipt_lines"])
@@ -83,7 +88,9 @@ def generate_all(
         spark, sales["fact_receipts"], t, cfg)
     pings, zc = sensors.generate_ble(spark, sales["fact_receipts"], t, cfg)
     t["fact_ble_pings"], t["fact_customer_zone_changes"] = pings, zc
-    t.update(inventory.generate_inventory_chain(spark, sales, rets, t, cfg))
+    t.update(inventory.generate_inventory_chain(
+        spark, sales, rets, t, cfg, fulfillment=fulfilled,
+    ))
     # Downstream the driver runs run_invariants (50+ count/join/distinct actions
     # over these frames) and then write_all (one write + count per table).
     # Without caching, every one of those actions re-executes the full generation

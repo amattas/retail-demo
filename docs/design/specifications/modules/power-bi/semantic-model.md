@@ -59,7 +59,7 @@ and mark the deployment journal as degraded.
 The gated Reporting phase stages the semantic model and report under
 `Reporting`.
 During artifact staging, deployment sets every saved report date filter to the
-month containing `end_date` from `utility/out/render-manifest.json`. The
+month containing `end_date` from `utility/out/<env>/render-manifest.json`. The
 checked-in PBIP remains a reusable template, while each deployed report opens
 on the latest period generated for that environment.
 

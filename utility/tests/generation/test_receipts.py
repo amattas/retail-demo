@@ -31,7 +31,11 @@ def dicts():
 @pytest.fixture(scope="module")
 def group(spark, cfg, dicts):
     dims = generate_dimensions(spark, dicts, cfg)
-    return generate_receipts_group(spark, dims, dicts.profile, cfg)
+    tables = {name: frame.cache() for name, frame in
+              generate_receipts_group(spark, dims, dicts.profile, cfg).items()}
+    yield tables
+    for frame in tables.values():
+        frame.unpersist()
 
 
 def test_contract_columns(group):

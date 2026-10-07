@@ -14,7 +14,7 @@ Deliberate decisions (vs the legacy notebooks):
 - Legacy quirks preserved: truck_dwell_daily derives ``site`` as
   ``STORE_<id>`` / ``DC_<id>`` and filters ``dwell_min > 0``; the two
   inventory positions take the latest balance per key via a row_number
-  window over ``event_ts`` descending.
+  window over ``event_ts`` and ``trace_id`` descending.
 """
 
 from pyspark.sql import DataFrame, SparkSession
@@ -40,6 +40,30 @@ GOLD_TABLES: list[str] = [
 def _money(col: str):
     """Explicit double cast for the legacy formatted string money columns."""
     return F.col(col).cast("double")
+
+
+def _latest_inventory_position(
+    transactions: DataFrame,
+    node_column: str,
+    gold_table: str,
+) -> DataFrame:
+    """Select the final deterministic balance for each node/product key."""
+    latest = Window.partitionBy(node_column, "product_id").orderBy(
+        F.desc("event_ts"),
+        F.desc("trace_id"),
+    )
+    return (
+        transactions
+        .withColumn("rn", F.row_number().over(latest))
+        .filter(F.col("rn") == 1)
+        .select(
+            node_column,
+            "product_id",
+            F.col("balance").alias("on_hand"),
+            F.col("event_ts").alias("as_of"),
+        )
+        .select(*column_names(gold_table))
+    )
 
 
 def generate_campaign_performance(
@@ -140,34 +164,18 @@ def generate_gold(
         _top15 = _top15.filter(F.col("computed_at") == F.lit(_latest_15m))
     gold["top_products_15m"] = _top15.select(*column_names("top_products_15m"))
 
-    # Current store inventory position (latest balance per store/product)
-    store_pos_window = Window.partitionBy("store_id", "product_id").orderBy(
-        F.desc("event_ts"))
-    gold["inventory_position_current"] = (
-        tables["fact_store_inventory_txn"]
-        .withColumn("rn", F.row_number().over(store_pos_window))
-        .filter(F.col("rn") == 1)
-        .select(
-            "store_id", "product_id",
-            F.col("balance").alias("on_hand"),
-            F.col("event_ts").alias("as_of"),
-        )
-        .select(*column_names("inventory_position_current"))
+    # Current store inventory position (latest balance per store/product).
+    gold["inventory_position_current"] = _latest_inventory_position(
+        tables["fact_store_inventory_txn"],
+        "store_id",
+        "inventory_position_current",
     )
 
-    # DC inventory position (latest balance per dc/product)
-    dc_pos_window = Window.partitionBy("dc_id", "product_id").orderBy(
-        F.desc("event_ts"))
-    gold["dc_inventory_position_current"] = (
-        tables["fact_dc_inventory_txn"]
-        .withColumn("rn", F.row_number().over(dc_pos_window))
-        .filter(F.col("rn") == 1)
-        .select(
-            "dc_id", "product_id",
-            F.col("balance").alias("on_hand"),
-            F.col("event_ts").alias("as_of"),
-        )
-        .select(*column_names("dc_inventory_position_current"))
+    # DC inventory position (latest balance per dc/product).
+    gold["dc_inventory_position_current"] = _latest_inventory_position(
+        tables["fact_dc_inventory_txn"],
+        "dc_id",
+        "dc_inventory_position_current",
     )
 
     # Truck dwell time daily

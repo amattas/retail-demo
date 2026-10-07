@@ -79,6 +79,11 @@ def test_determinism(spark, small_cfg, dicts):
            sorted(map(tuple, b["dim_customers"].collect()))
 
 
+def test_customers_are_generated_from_a_spark_range(dims):
+    plan = dims["dim_customers"]._jdf.queryExecution().logical().toString()
+    assert "Range" in plan
+
+
 def test_dim_date(spark):
     df = generate_dim_date(spark, date(2025, 1, 1), date(2025, 12, 31))
     assert df.columns == column_names("dim_date")
@@ -89,3 +94,9 @@ def test_dim_date(spark):
     assert r.fiscal_year == 2025 and r.fiscal_quarter == 1  # July = FY start
     sat = rows[20250705]
     assert sat.is_weekend == 1
+
+
+def test_dim_date_is_generated_from_a_spark_range(spark):
+    df = generate_dim_date(spark, date(2025, 1, 1), date(2035, 12, 31))
+    plan = df._jdf.queryExecution().logical().toString()
+    assert "Range" in plan

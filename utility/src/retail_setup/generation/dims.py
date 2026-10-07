@@ -1,4 +1,4 @@
-"""Dimension generation: driver-side numpy/pandas -> Spark DataFrames.
+"""Dimension generation using bounded driver metadata and Spark-native rows.
 
 Semantics ported from datagen master_generators (ID schemes, tax lookup,
 pricing rules); column names/types from schemas.TABLES, which the TMDL
@@ -9,10 +9,18 @@ from datetime import date, datetime, timedelta
 
 import numpy as np
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
-from retail_setup.generation.runtime import derive_seed
+from retail_setup.generation.runtime import (
+    date_grid,
+    derive_seed,
+    fixed_width_decimal,
+    minimum_width_decimal,
+    minimum_width_text,
+    seeded_draws,
+)
 from retail_setup.generation.schemas import spark_schema
 
 # datagen StoreProfiler equivalents (volume class -> traffic multiplier range).
@@ -28,6 +36,13 @@ VOLUME_CLASSES = [
 # Five formats incl. EXPRESS (datagen's StoreFormat.EXPRESS). store_activity
 # carries a matching express zone-share row.
 STORE_FORMATS = ["hypermarket", "superstore", "standard", "neighborhood", "express"]
+VOLUME_FORMATS = {
+    "flagship": ["hypermarket", "superstore"],
+    "high_volume": ["hypermarket", "superstore", "standard"],
+    "standard": ["superstore", "standard", "neighborhood"],
+    "low_volume": ["standard", "neighborhood", "express"],
+    "kiosk": ["express"],
+}
 OPERATING_HOURS = ["6-22", "7-22", "7-23", "24h"]
 DEFAULT_TAX_RATE = 0.07407  # datagen receipts_mixin fallback
 REFRIGERATED_CATEGORIES = {"Produce", "Dairy & Eggs", "Dairy & Alternatives",
@@ -76,14 +91,16 @@ def compute_pricing(base_price: float, rng: np.random.Generator) -> tuple[float,
 
     Always guarantees ``Cost < SalePrice <= MSRP``.
     """
-    msrp = max(0.01, round(base_price * (1.0 + rng.uniform(-0.15, 0.15)), 2))
+    # A positive cost and a strict one-cent margin require a minimum sale price
+    # of two cents. This keeps the documented Cost < SalePrice invariant even
+    # for adversarial one-cent source prices.
+    msrp = max(0.02, round(base_price * (1.0 + rng.uniform(-0.15, 0.15)), 2))
     if rng.random() < 0.60:
         sale = msrp
     else:
-        sale = max(0.01, round(msrp * (1.0 - rng.uniform(0.05, 0.35)), 2))
-    cost = sale * rng.uniform(0.50, 0.85)
-    cost = min(cost, sale - 0.01)
-    cost = max(0.01, round(cost, 2))
+        sale = max(0.02, round(msrp * (1.0 - rng.uniform(0.05, 0.35)), 2))
+    cost = round(sale * rng.uniform(0.50, 0.85), 2)
+    cost = max(0.01, min(cost, round(sale - 0.01, 2)))
     return float(cost), float(msrp), float(sale)
 
 
@@ -167,7 +184,7 @@ def generate_dimensions(
             gi + 1,
             tax_for(g.State, g.City),
             vc,
-            str(rng.choice(STORE_FORMATS)),
+            str(rng.choice(VOLUME_FORMATS[vc])),
             str(rng.choice(OPERATING_HOURS)),
             float(np.round(rng.uniform(lo, hi), 2)),
         ))
@@ -184,28 +201,109 @@ def generate_dimensions(
         truck_rows.append((tid, plate, refrig, dcid))
     out["dim_trucks"] = spark.createDataFrame(truck_rows, spark_schema("dim_trucks"))
 
-    # --- customers; ~70% placed in a store's geography (datagen home-store
-    #     locality) so receipts can resolve a same-geography "local" shopper.
+    # --- customers; use Spark range + deterministic hashes so customer scale
+    #     does not materialize one Python tuple per customer on the driver.
+    #     ~70% are placed in a store's geography (datagen home-store locality).
     first = [n.Name for n in dicts.first_names]
     last = [n.Name for n in dicts.last_names]
-    cust_rows = []
-    for cid in range(1, cfg.customer_count + 1):
-        if store_geo_indices and rng.random() < CUSTOMER_HOME_AFFINITY:
-            gi = int(rng.choice(store_geo_indices))
-        else:
-            gi = int(rng.integers(0, n_geo))
-        cust_rows.append((
-            cid,
-            str(rng.choice(first)),
-            str(rng.choice(last)),
-            _addr(rng),
-            gi + 1,
-            f"LC{cid:06d}{int(rng.integers(0, 1000)):03d}",
-            f"555-{int(rng.integers(200, 999))}-{int(rng.integers(1000, 9999))}",
-            "BLE" + np.base_repr(cid, 36).rjust(6, "0"),
-            f"AD{cid:08d}",
-        ))
-    out["dim_customers"] = spark.createDataFrame(cust_rows, spark_schema("dim_customers"))
+    customer_draws = seeded_draws(cfg.seed)
+    customers = spark.range(1, cfg.customer_count + 1).select(
+        F.col("id").cast("long").alias("ID")
+    )
+    first_names = F.array(*[F.lit(str(name)) for name in first])
+    last_names = F.array(*[F.lit(str(name)) for name in last])
+    store_geographies = F.array(
+        *[F.lit(index + 1).cast("long") for index in store_geo_indices]
+    )
+    global_geography = (
+        customer_draws.h64(["ID"], "customer-global-geo") % F.lit(n_geo) + 1
+    ).cast("long")
+    if store_geo_indices:
+        local_geography = F.element_at(
+            store_geographies,
+            (
+                customer_draws.h64(["ID"], "customer-local-geo")
+                % F.lit(len(store_geo_indices))
+                + 1
+            ).cast("int"),
+        )
+        geography = F.when(
+            customer_draws.u(["ID"], "customer-home-affinity")
+            < F.lit(CUSTOMER_HOME_AFFINITY),
+            local_geography,
+        ).otherwise(global_geography)
+    else:
+        geography = global_geography
+
+    street_names = F.array(
+        *[F.lit(name) for name in ["Main", "Oak", "Maple", "Market", "Commerce", "Liberty"]]
+    )
+    street_types = F.array(*[F.lit(name) for name in ["St", "Ave", "Blvd", "Rd"]])
+    first_index = (
+        customer_draws.h64(["ID"], "customer-first") % F.lit(len(first)) + 1
+    ).cast("long")
+    last_index = (
+        customer_draws.h64(["ID"], "customer-last") % F.lit(len(last)) + 1
+    ).cast("long")
+    street_number = (
+        customer_draws.h64(["ID"], "customer-street-number") % F.lit(9900) + 100
+    ).cast("long")
+    street_name = F.element_at(
+        street_names,
+        (
+            customer_draws.h64(["ID"], "customer-street-name")
+            % F.lit(6)
+            + 1
+        ).cast("int"),
+    )
+    street_type = F.element_at(
+        street_types,
+        (
+            customer_draws.h64(["ID"], "customer-street-type")
+            % F.lit(4)
+            + 1
+        ).cast("int"),
+    )
+    loyalty_suffix = (
+        customer_draws.h64(["ID"], "customer-loyalty") % F.lit(1000)
+    ).cast("long")
+    phone_exchange = (
+        customer_draws.h64(["ID"], "customer-phone-exchange") % F.lit(799) + 200
+    ).cast("long")
+    phone_line = (
+        customer_draws.h64(["ID"], "customer-phone-line") % F.lit(8999) + 1000
+    ).cast("long")
+    ble_id = F.upper(F.conv(F.col("ID").cast("string"), 10, 36))
+
+    customers = (
+        customers
+        .select(
+            "ID",
+            F.element_at(first_names, first_index.cast("int")).alias("FirstName"),
+            F.element_at(last_names, last_index.cast("int")).alias("LastName"),
+            F.format_string(
+                "%d %s %s", street_number, street_name, street_type
+            ).alias("Address"),
+            geography.alias("GeographyID"),
+            F.concat(
+                F.lit("LC"),
+                minimum_width_decimal(F.col("ID"), 6),
+                fixed_width_decimal(loyalty_suffix, 3, "loyalty suffix"),
+            ).alias("LoyaltyCard"),
+            F.format_string(
+                "555-%03d-%04d", phone_exchange, phone_line
+            ).alias("Phone"),
+            F.concat(
+                F.lit("BLE"), minimum_width_text(ble_id, 6)
+            ).alias("BLEId"),
+            F.concat(
+                F.lit("AD"), minimum_width_decimal(F.col("ID"), 8)
+            ).alias("AdId"),
+        )
+    )
+    out["dim_customers"] = customers.select(
+        *[field.name for field in spark_schema("dim_customers").fields]
+    )
 
     # --- products: each base product is offered by up to brands_per_product
     #     category-matched brands (datagen combinatorial SKUs). Pricing/launch
@@ -278,23 +376,37 @@ def generate_dimensions(
 
 def generate_dim_date(spark: SparkSession, start: date, end: date) -> DataFrame:
     """Exact port of 02-historical-data-load's dim_date (fiscal year starts July)."""
-    rows = []
-    d = start
-    while d <= end:
-        rows.append((
-            int(d.strftime("%Y%m%d")),
-            d,
-            d.year,
-            (d.month - 1) // 3 + 1,
-            d.month,
-            d.strftime("%B"),
-            d.day,
-            d.isoweekday(),
-            d.strftime("%A"),
-            int(d.strftime("%U")),
-            1 if d.isoweekday() >= 6 else 0,
-            d.year if d.month >= 7 else d.year - 1,
-            ((d.month - 7) % 12) // 3 + 1,
-        ))
-        d += timedelta(days=1)
-    return spark.createDataFrame(rows, spark_schema("dim_date"))
+    dates = date_grid(spark, start, end, "date")
+    month = F.month("date")
+    iso_day = F.pmod(F.dayofweek("date") + F.lit(5), F.lit(7)) + F.lit(1)
+    week_of_year = F.floor(
+        (
+            F.dayofyear("date")
+            + F.lit(7)
+            - F.dayofweek("date")
+        )
+        / F.lit(7)
+    )
+    return dates.select(
+        F.date_format("date", "yyyyMMdd").cast("long").alias("date_key"),
+        "date",
+        F.year("date").cast("long").alias("year"),
+        F.quarter("date").cast("long").alias("quarter"),
+        month.cast("long").alias("month"),
+        F.date_format("date", "MMMM").alias("month_name"),
+        F.dayofmonth("date").cast("long").alias("day"),
+        iso_day.cast("long").alias("day_of_week"),
+        F.date_format("date", "EEEE").alias("day_name"),
+        week_of_year.cast("long").alias("week_of_year"),
+        F.when(iso_day >= 6, 1).otherwise(0).cast("long").alias("is_weekend"),
+        F.when(month >= 7, F.year("date"))
+        .otherwise(F.year("date") - 1)
+        .cast("long")
+        .alias("fiscal_year"),
+        (
+            F.floor(F.pmod(month - F.lit(7), F.lit(12)) / F.lit(3))
+            + F.lit(1)
+        )
+        .cast("long")
+        .alias("fiscal_quarter"),
+    )

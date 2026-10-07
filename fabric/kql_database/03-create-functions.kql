@@ -3,15 +3,16 @@
 // Run this entire script at once using .execute database script
 // ============================================================================
 
-.execute database script with (ContinueOnErrors=true) <|
+.execute database script with (ThrowOnErrors=true) <|
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
-// One row per correlated store or online purchase. The function derives the
-// latest impression deterministically (timestamp, then impression id), then
-// reconciles promotion, receipt/order, and approved payment cents.
+// One row per correlated store or online purchase with a valid candidate touch.
+// Candidate touches are filtered to the inclusive seven-day lookback before the
+// latest touch is selected deterministically (timestamp, then impression id).
+// The result retains reconciliation status for operational diagnostics.
 .create-or-alter function with (folder = "marketing") fn_marketing_attribution()
 {
     let touches =
@@ -24,16 +25,19 @@
                      "|",
                      impression_id
                  )
-        | summarize arg_max(touch_rank, *) by attribution_journey_id
         | project attribution_journey_id, touch_ts, impression_id,
+                  touch_rank,
                   campaign_id, creative_id, channel, customer_ad_id,
                   touch_customer_id = customer_id;
     let store_purchases =
         receipt_created
         | where isnotempty(correlation_id)
         | summarize arg_max(ingest_timestamp, *) by correlation_id
-        | project attribution_journey_id = correlation_id,
+        | extend attribution_journey_id = correlation_id,
                   purchase_type = "STORE",
+                  attribution_id = strcat("ATTR-STORE-", receipt_id)
+        | project attribution_id, attribution_journey_id,
+                  purchase_type,
                   receipt_id,
                   order_id = "",
                   purchase_ts = ingest_timestamp,
@@ -48,8 +52,11 @@
         online_order_created
         | where isnotempty(correlation_id)
         | summarize arg_max(ingest_timestamp, *) by correlation_id
-        | project attribution_journey_id = correlation_id,
+        | extend attribution_journey_id = correlation_id,
                   purchase_type = "ONLINE",
+                  attribution_id = strcat("ATTR-ONLINE-", order_id)
+        | project attribution_id, attribution_journey_id,
+                  purchase_type,
                   receipt_id = "",
                   order_id,
                   purchase_ts = ingest_timestamp,
@@ -74,32 +81,28 @@
         | summarize promotion_discount_cents = sum(discount_cents)
             by attribution_journey_id = correlation_id;
     union store_purchases, online_purchases
-    | join kind=leftouter touches on attribution_journey_id
+    | join kind=inner touches on attribution_journey_id
+    | extend lag_seconds = datetime_diff("second", purchase_ts, touch_ts)
+    | where touch_ts <= purchase_ts
+    | where lag_seconds between (0 .. 604800)
+    | summarize arg_max(touch_rank, *) by attribution_id
     | join kind=leftouter payments on attribution_journey_id
     | join kind=leftouter promotions on attribution_journey_id
-    | extend lag_seconds = datetime_diff("second", purchase_ts, touch_ts),
-             promotion_discount_cents = coalesce(promotion_discount_cents, long(0))
-    | extend window_valid = isnotnull(touch_ts)
-                            and lag_seconds between (0 .. 604800),
+    | extend promotion_discount_cents = coalesce(
+                 promotion_discount_cents, long(0)
+             ),
              payment_reconciled = payment_status == "APPROVED"
                                   and payment_cents == total_cents,
              promotion_reconciled = promotion_discount_cents == discount_cents,
              money_reconciled = gross_subtotal_cents - discount_cents == subtotal_cents
                                 and subtotal_cents + tax_cents == total_cents
     | extend attribution_status = case(
-                 not(window_valid), "OUTSIDE_WINDOW",
                  not(payment_reconciled), "RECONCILIATION_FAILED",
                  not(promotion_reconciled), "PROMOTION_MISMATCH",
                  not(money_reconciled), "MONEY_MISMATCH",
                  "ATTRIBUTED"
              )
-    | extend attribution_id = strcat(
-                 "ATTR-",
-                 purchase_type,
-                 "-",
-                 iff(isnotempty(receipt_id), receipt_id, order_id)
-             ),
-             attribution_model = "LAST_TOUCH_7D",
+    | extend attribution_model = "LAST_TOUCH_7D",
              attribution_window_days = 7,
              attributed_revenue_cents = iff(
                  attribution_status == "ATTRIBUTED", subtotal_cents, long(0)
@@ -115,19 +118,25 @@
               attributed_revenue_cents
 }
 
-.create-or-alter function with (folder = "helpers") fn_attribution_window(target_campaign_id:string, windowHours:int)
+.create-or-alter function with (folder = "marketing") fn_attribution()
 {
     fn_marketing_attribution()
+    | where attribution_status == "ATTRIBUTED"
+}
+
+.create-or-alter function with (folder = "helpers") fn_attribution_window(target_campaign_id:string, windowHours:int)
+{
+    fn_attribution()
     | where campaign_id == target_campaign_id
+    | where lag_seconds >= 0
     | where lag_seconds <= windowHours * 3600
 }
 
 .create-or-alter function with (folder = "marketing") fn_campaign_performance(lookback:timespan)
 {
     let attributed =
-        fn_marketing_attribution()
-        | where purchase_ts > ago(lookback)
-        | where attribution_status == "ATTRIBUTED";
+        fn_attribution()
+        | where purchase_ts > ago(lookback);
     let converted_impressions =
         attributed
         | project impression_id;

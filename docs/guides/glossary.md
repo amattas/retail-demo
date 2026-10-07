@@ -93,7 +93,7 @@ every feature the Microsoft Fabric product supports.
 | Term | Plain-language meaning |
 | --- | --- |
 | **Model output** | A table containing a prediction, segment, forecast, or recommendation produced by a machine-learning notebook. |
-| **Required model** | One of the four outputs needed by the Power BI report: demand forecast, customer segments, churn predictions, or stockout risk. Reporting is not published until these pass validation. |
+| **Required model** | One of the six outputs needed by the Power BI report: demand forecast, customer segments, churn predictions, stockout risk, product recommendations, or price elasticity. Reporting is not published until these pass validation. |
 | **Optional model** | A useful extension that runs after Reporting in `full-demo`. Its failure does not remove the required report. |
 | **Experimental model** | A preview output with stronger limitations. Treat it as an exploration, not an automated business decision. |
 

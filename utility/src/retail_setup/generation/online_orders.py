@@ -2,7 +2,7 @@
 
 Mirrors `receipts.py`: all randomness flows through `runtime.seeded_draws`
 (xxhash64-based, partition-arrangement independent), money is integer cents,
-and daily volume is a clamped-normal approximation of Poisson.
+and daily volume is negative-binomial, allowing overdispersed counts and zero days.
 
 Documented decisions (per plan 2b, Task 5):
 - Tax uses the exact integer basis-point formula from receipts. Store/BOPIS
@@ -11,22 +11,34 @@ Documented decisions (per plan 2b, Task 5):
 - Backorders: a small fraction of non-BOPIS lines ship but are not yet
   delivered (fulfillment_status SHIPPED, delivered_ts NULL), mirroring
   datagen's ``"DELIVERED" if not is_backordered else "SHIPPED"``.
-- Product pick is uniform over the full catalog — online ignores the profile's
+- Product picks use the shared launch-eligible popularity model and seasonal
   department weights.
 - CANCELLED orders get NO payment row (no pay-then-refund), which preserves
   the `payment.amount == header.total` invariant.
 """
 
-from datetime import timedelta
-
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.generation.behavior import (
+    pick_retail_product,
+    retail_catalog,
+    retail_quantity,
+)
 from retail_setup.dictionaries.models import StoreTypeProfile
-from retail_setup.generation.receipts import BASE_DECLINE, DECLINE_REASONS, _fmt
-from retail_setup.generation.runtime import legacy_index, seeded_draws
+from retail_setup.generation.receipts import (
+    BASE_DECLINE,
+    DECLINE_REASONS,
+    _fmt,
+    _with_seasonal_department,
+)
+from retail_setup.generation.runtime import (
+    date_grid,
+    fixed_width_decimal,
+    legacy_index,
+    seeded_draws,
+)
 from retail_setup.generation.schemas import column_names
 
 # Online tender mix per plan: 60% CC / 25% DC / 10% PAYPAL / 5% OTHER.
@@ -91,15 +103,10 @@ def generate_online_orders(
     # --- day grid: network-wide daily volume, monthly-weight scaled, clamped normal
     mw = profile.monthly_weights
     m_mean = sum(mw) / 12.0
-    day_list = [
-        cfg.start_date + timedelta(days=i)
-        for i in range((cfg.end_date - cfg.start_date).days + 1)
-    ]
-    days = spark.createDataFrame([(day,) for day in day_list], "day date")
+    days = date_grid(spark, cfg.start_date, cfg.end_date)
     monthly_w = F.element_at(F.array(*[F.lit(w / m_mean) for w in mw]), F.month("day"))
     lam = F.lit(float(cfg.online_orders_per_day)) * monthly_w
-    n_orders = F.greatest(
-        F.lit(1), F.round(lam + d.gauss(["day"], "onl_n") * F.sqrt(lam))).cast("int")
+    n_orders = d.negative_binomial(["day"], "onl_n", lam, 24).cast("int")
 
     # --- orders: ids, timestamps, customer, tender, cancellation, basket size
     bucket = d.pick_by_weights(
@@ -112,7 +119,7 @@ def generate_online_orders(
         ).otherwise(basket_n)
 
     orders = (
-        days.withColumn("n_orders", n_orders)
+        days.withColumn("n_orders", n_orders).filter(F.col("n_orders") > 0)
         .withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_orders"))))
         .withColumn("hour", (d.h64(["day", "seq"], "onl_hour") % 24).cast("int"))
         .withColumn("minute", (d.h64(["day", "seq"], "onl_min") % 60).cast("int"))
@@ -123,11 +130,14 @@ def generate_online_orders(
         .withColumn("event_date", F.col("day"))
         # ONL + yyyyMMdd + 5-digit seq + 3-digit draw; unique because (day, seq)
         # is a key within the grid.
-        # NOTE: lpad(seq, 5) collides above 99,999 orders/day; config max ~16k so safe.
         .withColumn("order_id_ext", F.concat(
             F.lit("ONL"), F.date_format("day", "yyyyMMdd"),
-            F.lpad(F.col("seq").cast("string"), 5, "0"),
-            F.lpad((d.h64(["day", "seq"], "onl_rand") % 1000).cast("string"), 3, "0")))
+            fixed_width_decimal(F.col("seq"), 5, "daily online-order sequence"),
+            fixed_width_decimal(
+                d.h64(["day", "seq"], "onl_rand") % 1000,
+                3,
+                "online-order random suffix",
+            )))
         .withColumn("customer_id", (d.h64(["order_id_ext"], "onl_cust")
                                     % F.lit(cfg.customer_count) + 1).cast("long"))
         .withColumn("tender_type", d.pick_by_weights(
@@ -144,16 +154,18 @@ def generate_online_orders(
         .withColumn("rate_bps", F.coalesce(F.col("rate_bps"), F.lit(mean_bps)))
     )
 
-    # --- lines: uniform product over the full catalog (no department weights)
+    # --- lines: shared popularity over products launched by the order date
     products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"), F.col("SalePrice"), F.col("taxability"))
-    n_products = products.count()
-    products_ranked = products.withColumn(
-        "cat_rank", F.row_number().over(Window.orderBy("product_id")))
+        F.col("ID").alias("product_id"),
+        F.col("SalePrice"),
+        F.col("taxability"),
+        F.col("Department").alias("department"),
+        F.to_date("LaunchDate").alias("launch_date"),
+    )
+    order_dates = orders.select("event_date").distinct()
+    catalog = retail_catalog(products, order_dates, d)
 
-    qty = d.pick_by_weights(
-        ["order_id_ext", "line_num"], "onl_qty",
-        [("1", 0.70), ("2", 0.25), ("3", 0.05)]).cast("int")
+    qty = retail_quantity(d, ["order_id_ext", "line_num"], F.col("department"))
 
     promo_idx = (d.h64(["order_id_ext", "line_num"], "onl_pidx") % len(PROMOS)).cast("int")
     promo_code_arr = F.array(*[F.lit(c) for c, _ in PROMOS])
@@ -169,13 +181,22 @@ def generate_online_orders(
         F.col("ID").alias("_snid"),
         F.round(F.col("tax_rate") * 10000).cast("long").alias("_store_bps"))
 
-    lines = (
+    candidates = (
         orders.select("order_id_ext", "event_ts", "event_date", "is_cancelled",
                       "promo_rate", "basket_n", "rate_bps")
         .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
-        .withColumn("cat_rank", (d.h64(["order_id_ext", "line_num"], "onl_prod")
-                                 % F.lit(n_products) + 1).cast("int"))
-        .join(products_ranked, "cat_rank")
+    )
+    candidates = _with_seasonal_department(
+        candidates, d.u(["order_id_ext", "line_num"], "onl-department"),
+        profile.department_weights,
+    )
+    lines = (
+        candidates.join(catalog, ["event_date", "department"])
+        .withColumn("_product", pick_retail_product(
+            F.col("_catalog"), d.u(["order_id_ext", "line_num"], "onl_prod")
+        ))
+        .select("*", "_product.product_id", "_product.SalePrice", "_product.taxability")
+        .drop("_product", "_catalog")
         .withColumn("quantity", qty.cast("long"))
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
@@ -329,8 +350,11 @@ def generate_online_orders(
         .withColumn("amount_cents", F.col("total_cents"))
         .withColumn("transaction_id", F.concat(
             F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            F.lpad((d.h64(["order_id_ext"], "onl_txn") % 1_000_000).cast("string"),
-                   6, "0")))
+            fixed_width_decimal(
+                d.h64(["order_id_ext"], "onl_txn") % 1_000_000,
+                6,
+                "online transaction suffix",
+            )))
         .withColumn("status",
                     F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
         .withColumn("decline_reason", F.when(

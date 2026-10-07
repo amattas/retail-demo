@@ -1,0 +1,9 @@
+// Recent stockout detections by store; no resolution event exists to infer open state.
+let window = 24h;
+stockout_detected
+| where ingest_timestamp > ago(window)
+| summarize detections = count(),
+            affected_products = dcount(product_id),
+            latest_detection = max(detection_time)
+    by store_id
+| order by detections desc

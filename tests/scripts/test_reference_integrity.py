@@ -406,10 +406,10 @@ def test_pbip_semantic_and_report_references_are_valid() -> None:
 
     for table_path in sorted((SEMANTIC_DEFINITION / "tables").glob("*.tmdl")):
         content = table_path.read_text(encoding="utf-8")
-        assert "RELATED(" not in content and "RELATEDTABLE(" not in content, (
-            f"{table_path.relative_to(REPO_ROOT)} uses relationship-dependent DAX "
-            "row navigation; prefer explicit LOOKUPVALUE/TREATAS patterns in this "
-            "Direct Lake model."
+        assert "LOOKUPVALUE(" not in content, (
+            f"{table_path.relative_to(REPO_ROOT)} uses row-wise LOOKUPVALUE; "
+            "prefer relationship-based grouped aggregation or an upstream column "
+            "for this Direct Lake model."
         )
         table_name = _strip_identifier(
             re.search(r"^table (.+)$", content, re.MULTILINE).group(1)  # type: ignore[union-attr]

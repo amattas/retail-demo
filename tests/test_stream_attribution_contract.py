@@ -275,7 +275,7 @@ def test_receipt_created_carries_the_new_imp007_fields() -> None:
     source = _source()
     receipt_block = source[
         source.index('slot(shop, "receipt_created"') : source.index(
-            "_line(1), _line(2)"
+            'slot(shop, "payment_processed"'
         )
     ]
     for expected in (
@@ -351,40 +351,37 @@ def test_event_payloads_project_new_fields_for_kql() -> None:
 
 def test_store_discount_is_applied_before_tax_in_expression_order() -> None:
     source = _source()
-    idx_discount = source.index("store_discount_cents = F.when(")
-    idx_l1_net = source.index("l1_net_cents = l1_ext_cents - store_discount_cents")
+    idx_discount = source.index("discount = F.when(")
+    idx_line_net = source.index('net = line["gross_cents"] - discount')
     idx_subtotal = source.index(
         "store_subtotal_cents = gross_subtotal_cents - store_discount_cents"
     )
-    idx_tax = source.index("store_tax_cents = F.round(")
+    idx_tax = source.index("store_tax_cents = F.aggregate(")
     idx_total = source.index(
         "store_total_cents = store_subtotal_cents + store_tax_cents"
     )
 
-    # discount computed first, then applied to line 1 net, then subtotal,
-    # THEN tax (computed from the already-net amounts), then total.
-    assert idx_discount < idx_l1_net < idx_subtotal < idx_tax < idx_total
-
-    tax_block = source[idx_tax:idx_total]
-    assert 'l1_net_cents.cast("double")' in tax_block
-    assert 'l1_ext_cents.cast("double")' not in tax_block  # tax uses NET, not gross
+    assert idx_discount < idx_line_net < idx_subtotal < idx_tax < idx_total
+    pricing = ast.get_source_segment(source, _function(_tree(), "_price_live_line"))
+    assert 'net * _taxmult(line["taxability"])' in pricing
+    assert 'lambda acc, line: acc + line["tax_cents"]' in source[idx_tax:idx_total]
 
 
 def test_promoted_line_ext_price_is_net_and_carries_promo_code() -> None:
     line_fn_source = ast.get_source_segment(_source(), _function(_tree(), "_line"))
     assert line_fn_source is not None
     assert (
-        'ext_price = l1_net_ext if idx == 1 else F.col(f"l{idx}_ext")' in line_fn_source
+        '(line["net_cents"] / 100.0).alias("extended_price")' in line_fn_source
     )
     assert (
-        'line_promo_code = F.when(has_promo, F.col("promo_code")) if idx == 1 else F.lit(None).cast("string")'
+        'F.when(line["discount_cents"] > 0, F.col("promo_code")).alias("promo_code")'
         in line_fn_source
     )
 
 
 def test_non_promoted_rows_have_zero_discount() -> None:
     source = _source()
-    assert "store_discount_cents = F.when(\n    has_promo," in source
+    assert 'discount = F.when(\n        F.col("_offer"),' in source
     assert ').otherwise(F.lit(0).cast("long"))' in source
 
 
@@ -400,7 +397,7 @@ def test_promotion_applied_discount_cents_equals_receipt_discount_cents() -> Non
     assert 'store_discount_cents.alias("discount_cents")' in promo_block
     receipt_block = source[
         source.index('slot(shop, "receipt_created"') : source.index(
-            "_line(1), _line(2)"
+            'slot(shop, "payment_processed"'
         )
     ]
     assert 'store_discount_cents.alias("discount_cents")' in receipt_block

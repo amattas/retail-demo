@@ -376,6 +376,9 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("product_id", "long"), ("quantity", "long"), ("balance", "long"),
         ("txn_type", "string"), ("source", "string"), ("event_date", "date"),
         ("__index_level_0__", "long"),
+        # Attempted demand is retained even when a whole line cannot be filled.
+        # LOST_SALE changes no stock (quantity=0); all non-demand rows use zero.
+        ("requested_quantity", "long"), ("unfulfilled_quantity", "long"),
     ],
     "fact_stockouts": [
         # PascalCase IS the contract: TMDL binds StoreID (double), DCID (double),

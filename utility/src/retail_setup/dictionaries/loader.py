@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass, field
+from importlib.resources import files
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
@@ -31,22 +32,17 @@ class DictionarySet:
 
 
 def default_dictionary_root() -> Path:
-    """Return utility/data/dictionaries, resolved relative to this package.
+    """Return the packaged dictionary root, with a source-tree fallback."""
+    packaged_root = files("retail_setup").joinpath("resources", "dictionaries")
+    if packaged_root.is_dir():
+        if not isinstance(packaged_root, Path):
+            raise RuntimeError("Packaged dictionaries are not available as filesystem paths.")
+        return packaged_root
 
-    Assumes the editable-install src layout where parents[3] == utility/.
-    This path resolution breaks under a wheel install (the package is buried
-    inside site-packages, not alongside data/).  If you encounter a
-    RuntimeError here, pass an explicit ``root`` to ``load_dictionaries``
-    instead of relying on this function.
-    """
-    root = Path(__file__).resolve().parents[3] / "data" / "dictionaries"
-    if not root.is_dir():
-        raise RuntimeError(
-            f"Default dictionary root {root} does not exist. "
-            "This function assumes an editable install (src layout) and does not "
-            "work under a wheel install. Pass an explicit root to load_dictionaries()."
-        )
-    return root
+    source_root = Path(__file__).resolve().parents[3] / "data" / "dictionaries"
+    if source_root.is_dir():
+        return source_root
+    raise RuntimeError("Default dictionaries are missing from the installed package.")
 
 
 def available_store_types(root: Path) -> list[str]:

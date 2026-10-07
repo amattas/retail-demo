@@ -283,6 +283,15 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
     assert model_tables == set(tables) | set(gold_tables) | required_ml
     assert tier_counts == {"required": 6, "optional": 5, "experimental": 3}
 
+    glossary = (ROOT / "docs" / "guides" / "glossary.md").read_text(
+        encoding="utf-8"
+    )
+    required_model_row = next(
+        line for line in glossary.splitlines() if line.startswith("| **Required model**")
+    )
+    assert "six outputs" in required_model_row
+    assert all(table.replace("_", " ") in required_model_row for table in required_ml)
+
     guide = GUIDE_PATH.read_text(encoding="utf-8")
     for claim in (
         "**7 dimensions**",
@@ -366,7 +375,22 @@ def test_platform_and_taskflow_descriptions_match_manifest_ownership() -> None:
     }
     platform_paths = list((ROOT / "fabric").rglob(".platform"))
     assert platform_paths
+    agent_descriptions: set[str] = set()
     for platform_path in platform_paths:
+        if platform_path.parent == ROOT / "fabric" / "twins" / "retail-twins.Report":
+            metadata = json.loads(platform_path.read_text(encoding="utf-8"))["metadata"]
+            assert metadata["type"] == "Report"
+            assert metadata["displayName"] == "retail-twins"
+            assert metadata.get("description", "").strip()
+            continue
+        if platform_path.parent == ROOT / "fabric" / "planning" / "retail-replenishment.Plan":
+            # Native Plan publication is explicitly outside fabric-cicd profiles.
+            metadata = json.loads(platform_path.read_text(encoding="utf-8"))["metadata"]
+            assert metadata["type"] == "Plan"
+            assert metadata["displayName"] == "${DISPLAY_NAME}"
+            assert isinstance(metadata.get("description"), str)
+            assert metadata["description"].strip()
+            continue
         matches = [
             asset_id
             for root, asset_id in roots.items()
@@ -374,7 +398,16 @@ def test_platform_and_taskflow_descriptions_match_manifest_ownership() -> None:
         ]
         assert len(matches) == 1
         metadata = json.loads(platform_path.read_text(encoding="utf-8"))["metadata"]
-        assert metadata["description"] == descriptions[matches[0]]
+        if matches[0] == "asset.data-agents":
+            assert metadata["type"] == "DataAgent"
+            description = metadata.get("description")
+            assert isinstance(description, str) and description.strip()
+            description = description.strip()
+            assert description != descriptions[matches[0]]
+            assert description not in agent_descriptions
+            agent_descriptions.add(description)
+        else:
+            assert metadata["description"] == descriptions[matches[0]]
 
     taskflow = json.loads(
         (ROOT / "fabric" / "taskflow" / "taskflow.json").read_text(

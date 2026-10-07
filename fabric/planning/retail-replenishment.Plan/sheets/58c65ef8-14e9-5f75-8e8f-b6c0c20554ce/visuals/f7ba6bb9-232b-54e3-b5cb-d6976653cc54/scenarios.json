@@ -1,0 +1,44 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/planning/scenarios/1.0.0/schema.json",
+  "scenarios": [
+    {
+      "name": "Baseline",
+      "status": "LOCK",
+      "autoWritebackEnabled": "INACTIVE",
+      "meta": {
+        "measureIds": [
+          "whatif-stock", "whatif-forecast", "whatif-transfer",
+          "whatif-expedite", "whatif-budget", "whatif-uplift"
+        ],
+        "scenarioGuid": "a4c3210d-9763-5722-830a-74ed817e2323",
+        "order": 0
+      }
+    },
+    {
+      "name": "Transfer",
+      "status": "ACTIVE",
+      "autoWritebackEnabled": "INACTIVE",
+      "meta": {
+        "measureIds": [
+          "whatif-stock", "whatif-forecast", "whatif-transfer",
+          "whatif-budget", "whatif-uplift"
+        ],
+        "scenarioGuid": "03939011-78a9-5073-af8a-1d6d8f0809fe",
+        "order": 1
+      }
+    },
+    {
+      "name": "Expedite",
+      "status": "ACTIVE",
+      "autoWritebackEnabled": "INACTIVE",
+      "meta": {
+        "measureIds": [
+          "whatif-stock", "whatif-forecast", "whatif-expedite",
+          "whatif-budget", "whatif-uplift"
+        ],
+        "scenarioGuid": "97fe81a2-ef3f-50c1-8a91-e6dcee9cb509",
+        "order": 2
+      }
+    }
+  ]
+}

@@ -20,14 +20,14 @@ table fact_receipts
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000003
 
-	/// Count of store receipts.
-	measure 'Receipt Count' = COUNTROWS('fact_receipts')
+	/// Distinct store receipts represented by the filtered receipt lines, so product and category filters reach the denominator.
+	measure 'Receipt Count' = DISTINCTCOUNT('fact_receipt_lines'[Receipt ID])
 		formatString: #,0
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000004
 
-	/// Average store receipt value.
-	measure 'Average Basket Size' = DIVIDE([Total Sales], [Receipt Count], 0)
+	/// Average store receipt value in the current product and category context.
+	measure 'Average Basket Size' = DIVIDE([Net Sales], [Receipt Count], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000005
@@ -86,8 +86,23 @@ table fact_receipts
 		displayFolder: Core Metrics\Productivity
 		lineageTag: c1010001-0000-0000-0000-000000000007
 
-	/// Store sales normalized by active customers in the filter context.
-	measure 'Sales per Customer' = DIVIDE([Net Sales], [# of Customers], 0)
+	/// Customers with at least one store purchase in the current date, store, and product context.
+	measure 'Purchasing Customers' = ```
+			VAR _ReceiptIds =
+				VALUES('fact_receipt_lines'[Receipt ID])
+			RETURN
+				CALCULATE(
+					DISTINCTCOUNT('fact_receipts'[Customer ID]),
+					KEEPFILTERS('fact_receipts'[Customer ID] <> BLANK()),
+					TREATAS(_ReceiptIds, 'fact_receipts'[Receipt ID])
+				)
+			```
+		formatString: #,0
+		displayFolder: Core Metrics\Productivity
+		lineageTag: a34939d7-9fcf-4a82-92ed-3a4c8a82ffae
+
+	/// Store sales normalized by customers who purchased in the current filter context.
+	measure 'Sales per Customer' = DIVIDE([Net Sales], [Purchasing Customers], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Productivity
 		lineageTag: c1010001-0000-0000-0000-000000000008
@@ -396,4 +411,3 @@ table fact_receipts
 			entityName: fact_receipts
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

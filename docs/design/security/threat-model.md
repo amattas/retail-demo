@@ -1,58 +1,66 @@
 # Threat model
 
-This document owns the security threats for the Microsoft Fabric Retail Demo. The
-related controls are defined in [controls.md](controls.md), and implementation
-evidence is tracked in
-[requirements traceability](../requirements/traceability.md).
+This document owns the security threats for the Microsoft Fabric Retail Demo.
+Controls live in [controls.md](controls.md); implementation and verification
+evidence lives in [traceability](../requirements/traceability.md).
 
 ## Scope and assumptions
 
 - Microsoft Entra ID is the identity plane for Fabric access.
-- Operators authenticate with Azure CLI or Azure PowerShell.
-- GitHub Actions builds documentation and may run other privileged automation.
-- The supported dataset is generated synthetic data. Loading production
-  customer data is outside the demo boundary.
-- Preview Fabric features are not assumed to exist in every tenant.
-- Generated files, local configuration, and deployment output are not trusted
-  as durable sources of truth.
+- Operators use Azure CLI or Azure PowerShell for Python clients; Terraform
+  requires a provider-supported identity.
+- GitHub Actions builds documentation and can run privileged automation.
+- Supported records are generated synthetic data. Production customer data is
+  outside the demo boundary.
+- Preview Fabric features are not available in every tenant.
+- Generated configuration and output are not durable sources of truth.
+- The optional local app is a separate operator/browser boundary, not a hosted
+  multi-user service secured solely by Fabric permissions. Live embedding
+  sends an operator-derived Power BI token to the browser. Replay is not live
+  query evidence.
 
 ## Assets
 
-- Fabric workspace roles, item permissions, and resource bindings.
-- Lakehouse, Eventhouse, semantic-model, ontology, and data-agent data access.
+- Workspace roles, item permissions, and resource bindings.
+- Lakehouse, Eventhouse, semantic-model, ontology, and Data Agent access.
 - Deployment credentials, tokens, and environment-specific identifiers.
-- Audit, run-history, freshness, and verification evidence.
+- Run-history, freshness, approval, and verification evidence.
 - Canonical documentation and the public static site.
 
 ## Trust boundaries
 
 ```mermaid
 flowchart LR
-    Contributor[Contributor] --> GitHub[GitHub repository and Actions]
-    Operator[Deploy operator] --> Auth[Azure CLI or PowerShell]
-    GitHub --> Fabric[Microsoft Fabric workspace]
+    Contributor[Contributor] --> GitHub[Repository and Actions]
+    Operator[Deploy operator] --> Auth[Azure identity]
+    GitHub --> Fabric[Fabric workspace]
     Auth --> Fabric
-    Fabric --> Data[(Lakehouse and Eventhouse)]
-    Data --> BI[Power BI, ontology, and data agents]
-    BI --> Consumer[Demo consumers]
-    GitHub --> Pages[Public GitHub Pages site]
+    Fabric --> Data[Lakehouse and Eventhouse]
+    Data --> BI[Power BI, ontology, and agents]
+    BI --> Consumer[Authorized consumers]
+    Operator --> App[Local app]
+    App --> Fabric
+    App --> Browser[Operator browser and embed token]
+    GitHub --> Pages[Public Pages site]
 ```
 
 ## Threats
 
 | ID | Threat | Impact | Required controls | Residual risk |
 | --- | --- | --- | --- | --- |
-| `THREAT-001` | Retired: workspace or model access exposes row-level generated customer-like data. | The records are synthetic and demo-only. | `SEC-001`, `SEC-002` | Row-level privacy controls for generated demo records are outside the release scope. |
-| `THREAT-002` | Credentials or bearer tokens are committed, logged, masked incorrectly, or sent to the wrong endpoint. | Unauthorized Fabric or Azure access and failed deployment. | `SEC-001`, `SEC-003`, `SEC-009` | Bearer requests, configured-tenant propagation, and tenant-free journals are contract-tested; live Azure PowerShell and renamed-target smoke verification remain under `IMP-001`. |
-| `THREAT-003` | Retired: a data agent or ontology answers beyond its intended persona or retrieves generated row-level detail. | The records are synthetic and demo-only. | — | Mandatory persona and prohibited-detail controls are outside the default release; richer agent experiences remain optional under `ENH-003`. |
-| `THREAT-004` | Mutable workflow actions, plugins, or dependencies execute with privileged tokens. | Supply-chain compromise or unreviewed behavior changes. | `SEC-007` | Repository-executed references and dependency sets are immutable and contract-tested; package registries, OS package managers, and hosted runner images remain external trust roots. |
-| `THREAT-005` | Security-relevant activity, deployment state, or data freshness is not centrally observable. | Incidents and stale demo output can go undetected. | `SEC-008` | The bounded readiness report unifies selected signals and has live required-path evidence; manually started streaming still needs its own recent evidence. |
-| `THREAT-006` | Environment misbinding or an unsafe reset targets the wrong tenant, workspace, or state. | Cross-environment modification or destructive data loss. | `SEC-001`, `SEC-009` | Terraform state isolation and live target validation are implemented; destructive operations still depend on correct operator confirmation. |
-| `THREAT-007` | Required streaming or post-deploy failures are treated as success. | Integrity loss, advanced checkpoints, and false operational confidence. | `SEC-008`, `SEC-011` | Required writes, deploy steps, and readiness evidence fail closed. Optional manual streaming remains clearly separated as `DEGRADED` until recent evidence exists. |
-| `THREAT-008` | Public documentation publishes secrets, tenant-specific values, or temporary internal evidence. | Information disclosure and stale operational guidance. | `SEC-003`, `SEC-010` | Review is still required for every newly public document. |
+| `THREAT-001` | Retired: workspace/model access exposes generated row-level customer-like data. | Records are synthetic and demo-only. | `SEC-001`, `SEC-002` | Row-level privacy controls for generated records are outside the release scope. |
+| `THREAT-002` | Credentials or tokens are committed, logged, masked incorrectly, or sent to the wrong endpoint. | Unauthorized access or failed deployment. | `SEC-001`, `SEC-003`, `SEC-009` | Request headers, tenant propagation, and redacted journals have local contracts; alternate-auth/renamed-target live proof remains `IMP-001`. |
+| `THREAT-003` | Retired: an agent answers beyond its persona or returns generated row-level detail. | Records are synthetic and demo-only. | — | Mandatory persona/prohibited-detail controls are outside the default release; richer experiences remain optional under `ENH-003`. |
+| `THREAT-004` | Mutable actions, plugins, or dependencies run with privileged tokens. | Supply-chain compromise or unreviewed changes. | `SEC-007` | Immutable repository references and locks have contracts; registries, OS package managers, and hosted runner images remain external trust roots. |
+| `THREAT-005` | Activity, deployment state, or freshness is not observable. | Incidents or stale demo output go undetected. | `SEC-008` | Readiness has historical baseline evidence; current cleanup/degradation consistency and fresh required/optional execution remain open. |
+| `THREAT-006` | Misbinding or unsafe reset targets the wrong tenant, workspace, or state. | Cross-environment modification or destructive loss. | `SEC-001`, `SEC-009` | Environment-local paths, fingerprinted resume, target validation, and saved-plan guards exist. They do not lock concurrent remote writers or replace operator review; live recovery drills remain outstanding. |
+| `THREAT-007` | Required streaming or deploy failures are treated as success. | Lost integrity, advanced checkpoints, or false readiness. | `SEC-008`, `SEC-011` | Required writes and progress fail closed in source; fresh Fabric failure/recovery proof remains open. Successful promotion with cleanup warnings must degrade, not falsely fail, readiness. |
+| `THREAT-008` | Public docs publish secrets, target-specific values, or temporary internal evidence. | Disclosure and stale guidance. | `SEC-003`, `SEC-010` | Review source and built files, not just navigation. Zensical publishes non-nav files; old tagged sites require separate inspection. |
+| `THREAT-009` | The optional app presents replay, local approval, or lossy telemetry as authenticated production action/audit evidence. | False operational assurance, unauthorized future actions, or lost evidence. | `SEC-003`, `SEC-008`, `SEC-012` | Proposals are local drafts and Eventhouse logging is best-effort. Per-user authorization, production adapters, durable audit, evidence validation, idempotency, and scope limits are not established by an approval button. |
+| `THREAT-010` | Notebook substitution executes configuration strings, or unverified/mismatched dictionary content is reused. | Unintended statements or irreproducible data. | `SEC-007`, `SEC-013` | Literal/JSON encoding, ref and cache checks, mutable refresh, and manifest-last publication are implemented; notebooks were rebuilt and drift checked. Explicit refs/fork overrides remain caller-selected; fresh live execution remains open. |
 
 ## Review triggers
 
-Review this model when authentication changes, new public endpoints or agents
-are added, data classification changes, a preview feature becomes part of the
-default profile, or the documentation publishing boundary changes.
+Review when identities, public endpoints, agents, data classification, preview
+defaults, external action adapters, or documentation publication boundaries
+change. No fresh Fabric deployment was performed in this repair session.

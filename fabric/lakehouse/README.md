@@ -22,7 +22,9 @@ current historical bootstrap:
   tables for the optional live projection path.
 - `02-historical-data-load.ipynb` is the retained legacy historical loader.
   The supported path now uses setup notebooks 01 through 04 rendered from
-  `utility/`.
+  `utility/`. If the retained loader is used, it requires each parquet input to
+  match `generation.schemas.TABLES` exactly and fails the run before replacing
+  Silver when a source schema differs.
 
 Do not run the retained historical loader as a substitute for
 `retail-setup deploy` or the ordered setup notebooks. The current path includes
@@ -33,7 +35,9 @@ Notable groups in this directory:
 
 - `03-streaming-to-silver` and `04-streaming-to-gold`: optional Eventhouse to
   Lakehouse projection
-- `05-maintain-delta-tables`: maintenance
+- `05-maintain-delta-tables`: maintenance, including the owned streaming-only
+  `fact_online_order_status` and `ag._watermarks` processing/reconciliation
+  state
 - `06` through `14`: ML and advanced analytics
 - `30-create-ontology`: ontology creation and Eventhouse TimeSeries bindings
 - `90` and `99`: manual augmentation/reset utilities

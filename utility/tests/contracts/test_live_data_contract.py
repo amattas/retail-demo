@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -49,6 +50,63 @@ FIXTURES = {
     for event in scenario.events
     if event.event_type in EVENTS
 }
+
+
+class _ProjectedColumn:
+    def getField(self, _name: str) -> _ProjectedColumn:
+        return self
+
+    def alias(self, name: str) -> str:
+        return name
+
+    def cast(self, _data_type: str) -> _ProjectedColumn:
+        return self
+
+
+class _SparkFunctions:
+    @staticmethod
+    def col(_name: str) -> _ProjectedColumn:
+        return _ProjectedColumn()
+
+    @staticmethod
+    def lit(_value: object) -> _ProjectedColumn:
+        return _ProjectedColumn()
+
+    @staticmethod
+    def to_timestamp(column: _ProjectedColumn, _format: str) -> _ProjectedColumn:
+        return column
+
+
+def _kusto_writer_columns(event_type: str) -> list[str]:
+    driver_path = (
+        REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
+    )
+    tree = ast.parse(driver_path.read_text(encoding="utf-8"), filename=str(driver_path))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_kusto_columns"
+    )
+    namespace = {
+        "ENVELOPE": python_symbol(driver_path, "ENVELOPE"),
+        "EVENT_PAYLOADS": python_symbol(driver_path, "EVENT_PAYLOADS"),
+        "TABLE_EXTRA_NULLS": python_symbol(driver_path, "TABLE_EXTRA_NULLS"),
+        "F": _SparkFunctions,
+        "_ISO_FMT": "",
+        "_SPARK_TYPE": {
+            data_type: data_type
+            for data_type in ("string", "long", "real", "int", "datetime", "dynamic")
+        },
+    }
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[])),
+            str(driver_path),
+            "exec",
+        ),
+        namespace,
+    )
+    return namespace["_kusto_columns"](event_type)
 
 
 @pytest.mark.parametrize("event_type", sorted(EVENTS))
@@ -116,6 +174,20 @@ def test_all_event_wire_route_and_terminal_contracts(event_type: str) -> None:
         assert silver_target in exception.target_names
 
 
+@pytest.mark.parametrize("event_type", sorted(EVENTS))
+def test_kusto_writer_projection_matches_table_and_mapping_order(
+    event_type: str,
+) -> None:
+    writer_columns = _kusto_writer_columns(event_type)
+    table_columns = list(SNAPSHOT.kql_tables[event_type])
+    mapping_columns = list(SNAPSHOT.kql_mappings[event_type])
+
+    assert len(writer_columns) == len(set(writer_columns))
+    assert len(writer_columns) == len(table_columns) == len(mapping_columns)
+    assert writer_columns == table_columns
+    assert writer_columns == mapping_columns
+
+
 def test_envelope_kql_and_fixture_counts_are_exact() -> None:
     assert VALIDATION.event_count == 18
     assert VALIDATION.envelope_field_count == 9
@@ -178,6 +250,49 @@ def test_named_boundaries_match_only_source_derived_differences() -> None:
         )
         assert exception.rationale
         assert exception.verification_owner
+
+
+def test_streaming_state_tables_have_owned_contract_and_maintenance_path() -> None:
+    exception = EXCEPTIONS["exception.streaming.online-order-status"]
+    paths = {
+        path.id: path
+        for path in MANIFEST.event_paths
+        if path.terminal_exception_id == exception.id
+    }
+    notebook_source = notebook_python_source(
+        REPO_ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
+    )
+    maintenance_source = notebook_python_source(
+        REPO_ROOT / "fabric" / "lakehouse" / "05-maintain-delta-tables.ipynb"
+    )
+    maintenance_tree = ast.parse(maintenance_source)
+    silver_tables = ast.literal_eval(
+        next(
+            node.value
+            for node in maintenance_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "silver_tables"
+                for target in node.targets
+            )
+        )
+    )
+    maintenance_tables = dict(silver_tables)
+
+    assert set(paths) == {
+        "event-path.online-order-picked",
+        "event-path.online-order-shipped",
+    }
+    assert exception.target_names == ("fact_online_order_status",)
+    assert exception.verification_owner == "owner.streaming"
+    assert exception.tracking_issue is None
+    assert "maintain" in exception.description.lower()
+    assert "fact_online_order_status" in notebook_source
+    assert maintenance_tables["fact_online_order_status"] == [
+        "event_ts",
+        "order_id_ext",
+    ]
+    assert maintenance_tables["_watermarks"] == ["source_table"]
 
 
 def test_nullable_and_unknown_fixtures_cover_intentional_boundaries() -> None:

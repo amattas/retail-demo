@@ -1,17 +1,18 @@
 // Pipeline counts across created → picked → shipped in last 24h
 let window = 24h;
-let created = online_order_created 
-    | where ingest_timestamp > ago(window) 
-    | summarize created = count();
-let picked = online_order_picked 
-    | where ingest_timestamp > ago(window) 
-    | summarize picked = count();
-let shipped = online_order_shipped 
-    | where ingest_timestamp > ago(window) 
-    | summarize shipped = count();
-created 
-| join kind=fullouter picked on 1==1 
-| join kind=fullouter shipped on 1==1
-| extend created = coalesce(created, 0), picked = coalesce(picked, 0), shipped = coalesce(shipped, 0)
-| project created, picked, shipped
-
+let created_count = toscalar(
+    online_order_created
+    | where ingest_timestamp > ago(window)
+    | summarize count()
+);
+let picked_count = toscalar(
+    online_order_picked
+    | where ingest_timestamp > ago(window)
+    | summarize count()
+);
+let shipped_count = toscalar(
+    online_order_shipped
+    | where ingest_timestamp > ago(window)
+    | summarize count()
+);
+print created = created_count, picked = picked_count, shipped = shipped_count

@@ -57,6 +57,14 @@ generated customer-like records.
   the default release. Persona-specific behavior remains optional under
   `ENH-003`.
 
+The optional local app has a different identity boundary: its live embedding
+endpoint returns an operator-derived Power BI access token to the browser.
+Do not expose it as a shared authenticated service without separate hosting
+and delegated-identity controls. Approvals change local proposal records,
+not production systems; Eventhouse action logging is best-effort.
+See [decision experience](../ml-ai/decision-experience.md), `THREAT-009`, and
+`SEC-012`.
+
 ## Documentation publication boundary
 
 Public docs must not contain tenant IDs, workspace IDs, credentials, internal

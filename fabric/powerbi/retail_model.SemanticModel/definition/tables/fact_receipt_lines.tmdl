@@ -26,8 +26,18 @@ table fact_receipt_lines
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000004
 
-	/// Estimated cost of goods sold for store receipt lines using product standard cost.
-	measure 'Line Cost' = SUMX('fact_receipt_lines', VAR ProductCost = LOOKUPVALUE('dim_products'[Cost], 'dim_products'[ID], 'fact_receipt_lines'[Product ID]) RETURN 'fact_receipt_lines'[Quantity] * COALESCE(ProductCost, 0))
+	/// Estimated cost of goods sold, aggregated at product grain through the active product relationship.
+	measure 'Line Cost' = ```
+			SUMX(
+				VALUES('dim_products'[ID]),
+				VAR _Quantity =
+					CALCULATE(SUM('fact_receipt_lines'[Quantity]))
+				VAR _UnitCost =
+					COALESCE(CALCULATE(MAX('dim_products'[Cost])), 0)
+				RETURN
+					_Quantity * _UnitCost
+			)
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Profitability
 		lineageTag: c1020001-0000-0000-0000-000000000001
@@ -182,4 +192,3 @@ table fact_receipt_lines
 			entityName: fact_receipt_lines
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

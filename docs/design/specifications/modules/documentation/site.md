@@ -78,6 +78,25 @@ The prior `docs/superpowers/` implementation plans were removed after durable
 content was promoted. Temporary planning material must remain outside the
 published source tree.
 
+The pinned Zensical version does not support `exclude_docs` or `draft_docs`
+([upstream tracking](https://github.com/zensical/backlog/issues/65)).
+Omitting a page from `nav` does **not** prevent publication or indexing.
+Do not add an unsupported exclusion setting as a security control.
+
+Root-level action/CX drafts were reconciled into the
+[decision experience](../ml-ai/decision-experience.md), ML/AI backlog, and
+`THREAT-009` / `SEC-012`. Routing and the evaluation question bank now have
+specification/guide owners; presenter guidance lives in the CIO walkthrough.
+Raw response logs and generated HTML/diagram exports were removed after
+preserving unresolved ontology, model-quality, action, and security concerns.
+The action-framework URL remains a pointer for existing component links.
+No old response count, latency, or deployment claim is current verification.
+
+`tests/docs/test_documentation_boundary.py` checks source publication
+boundaries, navigation, links, and requirement/threat ownership. Review the
+built output as well. Immutable historical versions use their tag's source;
+changing current docs does not retroactively validate or sanitize those sites.
+
 ## Build
 
 ```powershell
@@ -144,13 +163,13 @@ fail before publication.
 
 ## External Pages setting
 
-GitHub repository settings currently select:
+The required GitHub repository settings are:
 
 - Source: **Deploy from a branch**
 - Branch: `gh-pages`
 - Folder: `/ (root)`
 
-GitHub reports the site as built, the root redirects to `/latest/`, and the
-published selector metadata contains **Latest** plus the selected stable minor
-lines. Recheck the Pages API, the latest Docs workflow run, and the live site
-after changing the workflow, branch, or repository Pages settings.
+After publishing, verify the Pages API and Docs workflow, the root redirect
+to `/latest/`, and selector metadata for **Latest** plus the selected stable
+minor lines. These external checks were not performed as part of this local
+documentation repair; a clean build does not establish their current state.

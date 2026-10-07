@@ -22,3 +22,15 @@ consumers, docs, and supported platforms equal or stronger coverage than
 retired paths.
 
 See [the operations runbook](../../../specifications/modules/operations/runbook.md).
+
+### REQ-OPS-005 - Connected SSO operational twins
+
+The optional demo shall expose connected Store, Warehouse/DC, and Truck
+views grounded in recorded entity/shipment/SKU relationships. It shall
+preserve signed-in-user authorization, expose source time and uncertainty,
+and distinguish read-only what-if values from observed state. It shall not
+depend on fixed credentials or claim unsupported geometry, telemetry,
+reservations, or execution. Deployment shall be independently selectable and
+retain verifiable artifact, binding, and data evidence.
+
+See [connected twins](../../../specifications/modules/operations/connected-twins.md).

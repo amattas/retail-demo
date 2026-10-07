@@ -69,6 +69,7 @@ def test_load_environment_merges_defaults_and_environment(tmp_path: Path) -> Non
     assert config.notebooks.include == ["setup"]
     assert config.eventhouse.enabled is False
     assert config.spark.use_custom_pool is False
+    assert config.twins == deploy_config.TwinsConfig()
     assert config.spark.node_size == "Medium"
     assert config.spark.max_node_count == 10
     assert config.deployment.item_types_in_scope == [
@@ -80,6 +81,194 @@ def test_load_environment_merges_defaults_and_environment(tmp_path: Path) -> Non
 def test_load_environment_rejects_unknown_environment() -> None:
     with pytest.raises(FileNotFoundError, match="Environment config not found"):
         deploy_config.load_environment("missing")
+
+
+def _load_native_config(
+    tmp_path: Path, native: object, profile: str = "standard"
+) -> deploy_config.DeployConfig:
+    _load_config(tmp_path, profile)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["operations_planning"] = native
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+def _load_twins_config(
+    tmp_path: Path, twins: object, profile: str = "standard"
+) -> deploy_config.DeployConfig:
+    _load_config(tmp_path, profile)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["twins"] = twins
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+@pytest.mark.parametrize("profile", ["core", "standard", "full-demo"])
+def test_native_pack_defaults_do_not_change_profile_inventory(tmp_path, profile):
+    config = _load_config(tmp_path, profile)
+
+    assert config.operations_planning == deploy_config.OperationsPlanningConfig()
+    assert "OperationsAgent" not in config.deployment.item_types_in_scope
+    assert "Plan" not in config.deployment.item_types_in_scope
+    assert "operations" not in config.notebooks.include
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_native_pack_loads_explicit_settings_outside_fabric_cicd(tmp_path, profile):
+    connection_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    config = _load_native_config(
+        tmp_path,
+        {
+            "enabled": True,
+            "plan_connection_id": connection_id,
+            "plan_billing_acknowledged": True,
+            "recipient": "  operator@example.invalid  ",
+        },
+        profile,
+    )
+
+    assert config.operations_planning == deploy_config.OperationsPlanningConfig(
+        enabled=True,
+        plan_connection_id=connection_id,
+        plan_billing_acknowledged=True,
+        recipient="operator@example.invalid",
+    )
+    assert "OperationsAgent" not in config.deployment.item_types_in_scope
+    assert "Plan" not in config.deployment.item_types_in_scope
+    assert "01-availability-tables.kql" not in config.eventhouse.kql_scripts
+    assert "operations_planning" not in deploy_config.render_tfvars(config)
+
+
+def test_native_pack_rejects_core_without_eventhouse_and_model(tmp_path):
+    with pytest.raises(ValueError, match="Eventhouse.*semantic model"):
+        _load_native_config(tmp_path, {"enabled": True}, "core")
+
+
+@pytest.mark.parametrize(
+    "native",
+    [
+        [],
+        None,
+        {"enabled": "false"},
+        {"enabled": 1},
+        {"plan_billing_acknowledged": "true"},
+        {"plan_billing_acknowledged": 1},
+        {"include_plan": "false"},
+        {"plan_connection_id": "not-a-guid"},
+        {"plan_connection_id": "00000000-0000-0000-0000-000000000000"},
+        {"recipient": {"email": "operator@example.invalid"}},
+    ],
+)
+def test_native_pack_rejects_invalid_settings(tmp_path, native):
+    with pytest.raises(ValueError, match="operations_planning"):
+        _load_native_config(tmp_path, native)
+
+
+def test_native_pack_allows_missing_connection_until_publication(tmp_path):
+    config = _load_native_config(
+        tmp_path, {"enabled": True, "plan_connection_id": " ", "recipient": ""}
+    )
+
+    assert config.operations_planning.plan_connection_id is None
+    assert config.operations_planning.recipient is None
+    assert config.operations_planning.plan_billing_acknowledged is False
+
+
+def test_operations_only_configuration_needs_no_plan_credentials(tmp_path):
+    config = _load_native_config(tmp_path, {"enabled": True, "include_plan": False})
+    assert config.operations_planning.enabled
+    assert config.operations_planning.include_plan is False
+    assert config.operations_planning.plan_connection_id is None
+    assert config.operations_planning.plan_billing_acknowledged is False
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_twins_loads_explicit_opt_in_without_fabric_cicd_scope_changes(
+    tmp_path, profile
+):
+    config = _load_twins_config(tmp_path, {"enabled": True}, profile)
+
+    assert config.twins == deploy_config.TwinsConfig(enabled=True)
+    assert "Report" in config.deployment.item_types_in_scope
+    assert "twins" not in deploy_config.render_tfvars(config)
+
+
+def test_twins_rejects_core_profile_without_reporting(tmp_path):
+    with pytest.raises(ValueError, match="standard or full-demo"):
+        _load_twins_config(tmp_path, {"enabled": True}, "core")
+
+
+@pytest.mark.parametrize(
+    "twins",
+    [
+        [],
+        None,
+        {"enabled": "false"},
+        {"enabled": 1},
+    ],
+)
+def test_twins_rejects_invalid_settings(tmp_path, twins):
+    with pytest.raises(ValueError, match="twins"):
+        _load_twins_config(tmp_path, twins)
+
+
+def test_twins_rejects_reporting_deselection(tmp_path):
+    _load_config(tmp_path, "standard")
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["twins"] = {"enabled": True}
+    data["deployment"]["item_types_in_scope"] = ["Lakehouse", "Notebook"]
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="item_types_in_scope"):
+        deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+def test_capacity_arm_id_is_loaded_without_replacing_fabric_capacity_id(tmp_path):
+    _load_config(tmp_path)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["workspace"]["capacity_id"] = "22222222-2222-4222-8222-222222222222"
+    data["workspace"]["capacity_resource_id"] = (
+        "/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/demo"
+        "/providers/Microsoft.Fabric/capacities/demo-capacity"
+    )
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    config = deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+    assert config.workspace.capacity_resource_id == data["workspace"]["capacity_resource_id"]
+    assert config.workspace.capacity_id == data["workspace"]["capacity_id"]
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_phased_deploy_rejects_unpublish_of_disjoint_inventory(tmp_path, profile):
+    _load_config(tmp_path, profile)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config["deployment"]["unpublish_skip"] = False
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unpublish_skip must remain true"):
+        deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+@pytest.mark.parametrize("flag", ["publish_skip", "unpublish_skip"])
+def test_deploy_rejects_string_values_for_publication_flags(tmp_path, flag):
+    _load_config(tmp_path)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config["deployment"][flag] = "false"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must be a boolean"):
+        deploy_config.load_environment(ENVIRONMENT, environments_root=root)
 
 
 def test_load_environment_rejects_workspace_name_mismatch(tmp_path: Path) -> None:
@@ -293,6 +482,7 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
     assert not (required_producers & optional)
     assert not (required_producers & experimental)
 
+
 def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
     config = _load_config(tmp_path)
     terraform_outputs = _resolved_outputs(config)
@@ -308,7 +498,7 @@ def test_write_generated_configs_creates_expected_files(tmp_path: Path) -> None:
     )
     fabric_config = paths.fabric_config.read_text(encoding="utf-8")
     assert "core:" in fabric_config
-    assert "repository_directory: ../../../workspace" in fabric_config
+    assert "repository_directory: ../workspace" in fabric_config
     assert "find_replace:" in paths.parameter.read_text(encoding="utf-8")
 
 

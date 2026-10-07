@@ -1,4 +1,5 @@
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from pyspark.sql import functions as F
@@ -8,6 +9,7 @@ from retail_setup.dictionaries.loader import default_dictionary_root, load_dicti
 from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.returns import build_return_headers, generate_returns
+import retail_setup.generation.returns as returns_module
 from retail_setup.generation.schemas import column_names
 
 
@@ -44,6 +46,24 @@ def test_return_semantics(setup):
     assert r.select("receipt_id_ext").distinct().count() == n
     overlap = r.join(sales["fact_receipts"], "receipt_id_ext", "inner")
     assert overlap.count() == 0
+
+
+def test_returns_skip_christmas(setup):
+    _, _, rets = setup
+    assert (
+        rets["fact_receipts"]
+        .filter(F.col("event_date") == date(2025, 12, 25))
+        .count()
+        == 0
+    )
+
+
+def test_return_discount_amount_matches_cents(setup):
+    _, _, rets = setup
+    headers = rets["fact_receipts"]
+    assert headers.filter(F.col("discount_cents") != 0).count() > 0
+    expected = F.format_string("%.2f", F.col("discount_cents") / F.lit(100.0))
+    assert headers.filter(F.col("discount_amount") != expected).count() == 0
 
 
 def test_return_lines_negative_and_linked(setup):
@@ -89,3 +109,85 @@ def test_return_payment_negative_approved(setup):
     assert pay.count() == rets["fact_receipts"].count()
     assert pay.filter(F.col("amount_cents") >= 0).count() == 0
     assert pay.filter(F.col("status") != "APPROVED").count() == 0
+
+
+def test_low_volume_returns_accumulate_fractional_daily_rates(spark):
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 31),
+        store_count=1,
+        customer_count=5000,
+        seed=31,
+        return_rate=0.05,
+    )
+    rows = [
+        (
+            f"RCP-LOW-{offset:02d}",
+            date(2025, 1, 1 + offset),
+            1,
+            100,
+            8,
+            108,
+            0,
+            "SALE",
+        )
+        for offset in range(20)
+    ]
+    sales = {
+        "fact_receipts": spark.createDataFrame(
+            rows,
+            "receipt_id_ext string, event_date date, store_id long, "
+            "subtotal_cents long, tax_cents long, total_cents long, "
+            "discount_cents long, receipt_type string",
+        )
+    }
+
+    first = build_return_headers(sales, cfg)
+    second = build_return_headers(sales, cfg)
+
+    assert first.count() == 1
+    assert (
+        first.select("orig_receipt_id_ext").first()[0]
+        == second.select("orig_receipt_id_ext").first()[0]
+    )
+
+
+@pytest.mark.parametrize(
+    ("sale_date", "end_date", "expected"),
+    [
+        (date(2025, 12, 11), date(2025, 12, 30), date(2025, 12, 24)),
+        (date(2025, 12, 12), date(2025, 12, 30), date(2025, 12, 26)),
+        (date(2025, 12, 20), date(2025, 12, 25), date(2025, 12, 24)),
+        (date(2025, 12, 24), date(2025, 12, 25), None),
+    ],
+)
+def test_christmas_adjustment_stays_within_purchase_and_history_window(
+    spark, monkeypatch, sale_date, end_date, expected,
+):
+    max_delay = min(returns_module.RETURN_WINDOW_DAYS, (end_date - sale_date).days)
+    holiday_delay = (date(2025, 12, 25) - sale_date).days
+    draw = (holiday_delay - 0.5) / max_delay
+    monkeypatch.setattr(
+        returns_module, "seeded_draws",
+        lambda _: SimpleNamespace(u=lambda _columns, _salt: F.lit(draw)),
+    )
+    cfg = GenerationConfig(
+        store_type="grocery", start_date=sale_date, end_date=end_date,
+        store_count=1, seed=1, return_rate=0.1,
+    )
+    sales = spark.range(10).select(
+        F.concat(F.lit("R"), F.col("id")).alias("receipt_id_ext"),
+        F.lit(sale_date).alias("event_date"),
+        F.lit(1).cast("long").alias("store_id"),
+        F.lit(100).cast("long").alias("subtotal_cents"),
+        F.lit(10).cast("long").alias("tax_cents"),
+        F.lit(110).cast("long").alias("total_cents"),
+        F.lit(0).cast("long").alias("discount_cents"),
+        F.lit("SALE").alias("receipt_type"),
+    )
+    dates = [
+        row.event_date for row in build_return_headers({"fact_receipts": sales}, cfg).collect()
+    ]
+    assert dates == ([] if expected is None else [expected])
+    assert all(0 < (value - sale_date).days <= 14 and value <= end_date for value in dates)

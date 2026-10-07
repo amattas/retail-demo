@@ -103,8 +103,8 @@ class StoreTypeProfile(BaseModel):
 
     store_type: str = Field(..., min_length=1)
     display_name: str = Field(..., min_length=1)
-    basket_lambda: float = Field(..., gt=0, description="Poisson mean items per basket")
-    avg_ticket_target: float = Field(..., gt=0, description="Sanity target, USD")
+    basket_lambda: float = Field(..., gt=0, description="Nominal mean basket-line ceiling")
+    avg_ticket_target: float = Field(..., gt=0, description="Basket calibration target, USD")
     hourly_weights: list[float] = Field(..., description="24 relative traffic weights")
     daily_weights: list[float] = Field(..., description="7 weights, Monday first")
     monthly_weights: list[float] = Field(..., description="12 seasonality weights, Jan first")

@@ -125,6 +125,42 @@ def test_preflight_requires_rendered_setup_notebooks(
         )
 
 
+def test_preflight_uses_environment_scoped_renders_not_other_environments(tmp_path):
+    profile = _config().profile
+    directory = tmp_path / "utility" / "out" / "dev"
+    directory.mkdir(parents=True)
+    for name in profile_preflight.SETUP_NOTEBOOKS:
+        (directory / f"{name}.ipynb").write_text("{}", encoding="utf-8")
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=True, rendered_dir=directory,
+    )
+    assert not errors
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=True,
+        rendered_dir=directory.parent / "prod",
+    )
+    assert errors
+
+
+def test_preflight_before_render_checks_committed_notebooks(tmp_path):
+    profile = _config().profile
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=False,
+    )
+    assert errors
+    directory = tmp_path / "utility" / "notebooks"
+    directory.mkdir(parents=True)
+    for name in profile_preflight.SETUP_NOTEBOOKS:
+        (directory / f"{name}.ipynb").write_text("{}", encoding="utf-8")
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=False,
+    )
+    assert not errors
+
+
 def test_standard_preflight_is_internally_coherent() -> None:
     report = validate_profile_preflight(
         REPO_ROOT,

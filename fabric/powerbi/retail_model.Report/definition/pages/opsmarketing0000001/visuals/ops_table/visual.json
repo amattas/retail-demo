@@ -97,11 +97,11 @@
                       "Entity": "fact_payments"
                     }
                   },
-                  "Property": "Payment Decline Rate %"
+                  "Property": "Store Payment Decline Rate %"
                 }
               },
-              "queryRef": "fact_payments.Payment Decline Rate %",
-              "nativeQueryRef": "Payment Decline Rate %",
+              "queryRef": "fact_payments.Store Payment Decline Rate %",
+              "nativeQueryRef": "Store Payment Decline Rate %",
               "active": true
             }
           ]

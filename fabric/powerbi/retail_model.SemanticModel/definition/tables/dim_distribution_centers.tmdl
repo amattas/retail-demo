@@ -6,6 +6,116 @@ table dim_distribution_centers
 		formatString: #,0
 		lineageTag: 01a1a1b4-0001-0001-0001-000000000001
 
+	/// Signed known distribution-center on-hand balance at the DC/SKU grain. Missing positions remain BLANK.
+	measure 'Twin Warehouse Signed Stock' = ```
+			VAR _KnownBalances =
+				ADDCOLUMNS(
+					SUMMARIZE(
+						'dc_inventory_position_current',
+						'dc_inventory_position_current'[DC ID],
+						'dc_inventory_position_current'[Product ID]
+					),
+					"_KnownBalance",
+						CALCULATE(SUM('dc_inventory_position_current'[On Hand]))
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownBalances),
+					BLANK(),
+					SUMX(
+						_KnownBalances,
+						VAR _KnownBalance = [_KnownBalance]
+						RETURN
+							_KnownBalance
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Warehouse\Inventory
+		lineageTag: c2200002-0000-0000-0000-000000000001
+
+	/// Available warehouse stock from known balances only: sum max(0, balance) at DC/SKU grain. Reservations/ATP are not modeled.
+	measure 'Twin Warehouse Available Stock' = ```
+			VAR _KnownBalances =
+				ADDCOLUMNS(
+					SUMMARIZE(
+						'dc_inventory_position_current',
+						'dc_inventory_position_current'[DC ID],
+						'dc_inventory_position_current'[Product ID]
+					),
+					"_KnownBalance",
+						CALCULATE(SUM('dc_inventory_position_current'[On Hand]))
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownBalances),
+					BLANK(),
+					SUMX(
+						_KnownBalances,
+						VAR _KnownBalance = [_KnownBalance]
+						RETURN
+							IF(ISBLANK(_KnownBalance), BLANK(), IF(_KnownBalance > 0, _KnownBalance, 0))
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Warehouse\Inventory
+		lineageTag: c2200002-0000-0000-0000-000000000002
+
+	/// Conservative warehouse inventory snapshot timestamp: oldest as-of among known in-context DC/SKU balances.
+	measure 'Twin Warehouse Inventory As Of' = ```
+			VAR _KnownPositions =
+				FILTER(
+					'dc_inventory_position_current',
+					NOT ISBLANK('dc_inventory_position_current'[As Of])
+						&& NOT ISBLANK('dc_inventory_position_current'[On Hand])
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownPositions),
+					BLANK(),
+					MINX(_KnownPositions, 'dc_inventory_position_current'[As Of])
+				)
+			```
+		formatString: General Date
+		displayFolder: Connected Twins\Warehouse\Inventory
+		lineageTag: c2200002-0000-0000-0000-000000000003
+
+	/// Distinct source-recorded shipments in a source-anchored trailing 14-day window ending at the latest recorded truck-move timestamp at or before UTC current time in context.
+	measure 'Twin Warehouse Shipment Count' = ```
+			VAR _VisibleStoreIds =
+				VALUES('dim_stores'[ID])
+			VAR _VisibleDCIds =
+				VALUES('dim_distribution_centers'[ID])
+			VAR _ObservationCutoff =
+				UTCNOW()
+			VAR _SourceAnchor =
+				CALCULATE(
+					MAX('fact_truck_moves'[Event Timestamp]),
+					KEEPFILTERS(TREATAS(_VisibleStoreIds, 'fact_truck_moves'[Store ID])),
+					KEEPFILTERS(TREATAS(_VisibleDCIds, 'fact_truck_moves'[DC ID])),
+					KEEPFILTERS('fact_truck_moves'[Event Timestamp] <= _ObservationCutoff)
+				)
+			VAR _WindowStart =
+				_SourceAnchor - 14
+			RETURN
+				IF(
+					ISBLANK(_SourceAnchor),
+					BLANK(),
+					CALCULATE(
+						DISTINCTCOUNT('fact_truck_moves'[Shipment ID]),
+						KEEPFILTERS(TREATAS(_VisibleStoreIds, 'fact_truck_moves'[Store ID])),
+						KEEPFILTERS(TREATAS(_VisibleDCIds, 'fact_truck_moves'[DC ID])),
+						KEEPFILTERS('fact_truck_moves'[Shipment ID] <> BLANK()),
+						KEEPFILTERS('fact_truck_moves'[Event Timestamp] > _WindowStart),
+						KEEPFILTERS('fact_truck_moves'[Event Timestamp] <= _SourceAnchor)
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Warehouse\Shipments
+		lineageTag: c2200002-0000-0000-0000-000000000004
+
 	column ID
 		dataType: int64
 		isHidden
@@ -63,4 +173,3 @@ table dim_distribution_centers
 			entityName: dim_distribution_centers
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

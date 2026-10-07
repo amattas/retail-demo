@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 
 @dataclass
@@ -218,8 +219,155 @@ def run_invariants(spark: SparkSession, t: dict[str, DataFrame]) -> InvariantRep
                    "attribution_journey_id", "full_outer")
                .filter(F.col("n").isNull()
                        | F.col("attribution_journey_id").isNull()).count())
+    _run_inventory_invariants(r, t)
     _run_business_invariants(r, t)
     return r
+
+
+def _inventory_balance_checks(
+    report: InvariantReport, table: str, transactions: DataFrame, node: str,
+) -> None:
+    ordered = Window.partitionBy(node, "product_id").orderBy("event_ts", "trace_id")
+    running = ordered.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    checked = (
+        transactions.withColumn("_expected_balance", F.sum("quantity").over(running))
+        .withColumn("_position", F.row_number().over(ordered))
+        .withColumn(
+            "_initial_count",
+            F.sum(F.when(F.col("txn_type") == "INITIAL", 1).otherwise(0))
+            .over(Window.partitionBy(node, "product_id")),
+        )
+    )
+    invalid = (
+        F.col(node).isNull() | F.col("product_id").isNull() | F.col("event_ts").isNull()
+        | F.col("trace_id").isNull() | F.col("quantity").isNull()
+        | F.col("balance").isNull() | (F.col("balance") < 0)
+    )
+    counts = checked.agg(
+        F.count(F.when(invalid, 1)).alias("physical"),
+        F.count(F.when(~F.col("balance").eqNullSafe(F.col("_expected_balance")), 1))
+        .alias("conservation"),
+        F.count(F.when(
+            (F.col("_initial_count") != 1)
+            | ((F.col("_position") == 1) & ~F.col("txn_type").eqNullSafe(F.lit("INITIAL"))),
+            1,
+        )).alias("opening"),
+        (F.count("*") - F.countDistinct("trace_id")).alias("duplicate_traces"),
+    ).first()
+    _check(report, f"{table} nonnegative physical balances", counts.physical)
+    _check(report, f"{table} running quantity conservation", counts.conservation)
+    _check(report, f"{table} exactly one opening INITIAL", counts.opening)
+    _check(report, f"{table}.trace_id unique", counts.duplicate_traces)
+
+
+def _inventory_mirror_violations(actual: DataFrame, expected: DataFrame) -> int:
+    """Compare both directions as multisets, so duplicates cannot cancel out."""
+    return actual.exceptAll(expected).unionByName(expected.exceptAll(actual)).count()
+
+
+def _run_inventory_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> None:
+    """Check physical stock only; independent online fulfillment is not reserved here."""
+    store = t["fact_store_inventory_txn"]
+    dc = t["fact_dc_inventory_txn"]
+    truck = t["fact_truck_inventory"]
+    _inventory_balance_checks(r, "fact_store_inventory_txn", store, "store_id")
+    _inventory_balance_checks(r, "fact_dc_inventory_txn", dc, "dc_id")
+
+    requested, unfulfilled = F.col("requested_quantity"), F.col("unfulfilled_quantity")
+    valid_demand = (
+        F.when(
+            F.col("txn_type") == "SALE",
+            (F.col("quantity") < 0) & (requested == -F.col("quantity")) & (unfulfilled == 0),
+        )
+        .when(
+            F.col("txn_type") == "LOST_SALE",
+            (F.col("quantity") == 0) & (requested > 0) & (unfulfilled == requested)
+            & (requested > F.col("balance")),
+        )
+        .otherwise((requested == 0) & (unfulfilled == 0))
+    )
+    _check(r, "store requested = fulfilled + unfulfilled quantity",
+           store.filter(~F.coalesce(valid_demand, F.lit(False))).count())
+
+    receipt_stock = (
+        t["fact_receipt_lines"]
+        .join(t["fact_receipts"].select("receipt_id_ext", "store_id", "receipt_type"),
+              "receipt_id_ext")
+        .select(
+            F.concat(F.lit("TRC-INV-"), "receipt_id_ext", F.lit("-"), "line_num")
+            .alias("trace_id"),
+            "store_id", "product_id", "event_ts",
+            (-F.col("quantity")).cast("long").alias("quantity"), "receipt_type",
+        )
+    )
+    receipt_keys = ["trace_id", "store_id", "product_id", "event_ts", "quantity"]
+    _check(r, "fulfilled receipt lines <-> store SALE conservation",
+           _inventory_mirror_violations(
+               store.filter(F.col("txn_type") == "SALE").select(*receipt_keys),
+               receipt_stock.filter(F.col("receipt_type") == "SALE").select(*receipt_keys),
+           ))
+    # Refunds may be destroyed rather than restocked. Every actual add-back
+    # must match a refunded line, but not every refund must add stock.
+    _check(r, "store RETURN backed by refunded lines",
+           store.filter(F.col("txn_type") == "RETURN").select(*receipt_keys)
+           .exceptAll(receipt_stock.filter(F.col("receipt_type") == "RETURN")
+                      .select(*receipt_keys)).count())
+
+    for action, ledger, kind, node, source, sign in [
+        ("LOAD", dc, "OUTBOUND_SHIPMENT", "dc_id", "Source", -1),
+        ("UNLOAD", store, "INBOUND_SHIPMENT", "store_id", "source", 1),
+    ]:
+        expected = truck.filter(F.col("action") == action).select(
+            F.col("location_id").alias("node_id"), "product_id", "event_ts",
+            (F.col("quantity") * sign).alias("quantity"), "shipment_id",
+        )
+        actual = ledger.filter(F.col("txn_type") == kind).select(
+            F.col(node).alias("node_id"), "product_id", "event_ts", "quantity",
+            F.col(source).alias("shipment_id"),
+        )
+        _check(r, f"truck {action} <-> {node} ledger conservation",
+               _inventory_mirror_violations(actual, expected))
+
+    valid_cargo = (
+        F.col("quantity").isNotNull() & (F.col("quantity") > 0)
+        & F.col("shipment_id").isNotNull() & F.col("truck_id").isNotNull()
+        & F.col("product_id").isNotNull() & F.col("event_ts").isNotNull()
+        & F.col("location_id").isNotNull() & F.col("trace_id").isNotNull()
+        & (((F.col("action") == "LOAD") & (F.col("location_type") == "DC"))
+           | ((F.col("action") == "UNLOAD") & (F.col("location_type") == "STORE")))
+    )
+    cargo_order = (
+        Window.partitionBy("shipment_id", "product_id", "truck_id")
+        .orderBy("event_ts", "trace_id")
+        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    )
+    cargo_counts = truck.withColumn(
+        "_cargo_balance",
+        F.sum(F.when(F.col("action") == "LOAD", F.col("quantity"))
+              .otherwise(-F.col("quantity"))).over(cargo_order),
+    ).agg(
+        F.count(F.when(~F.coalesce(valid_cargo, F.lit(False)), 1)).alias("invalid"),
+        F.count(F.when(F.col("_cargo_balance") < 0, 1)).alias("negative"),
+        (F.count("*") - F.countDistinct("trace_id")).alias("duplicate_traces"),
+        (F.count("*") - F.countDistinct("shipment_id", "product_id", "action"))
+        .alias("duplicate_actions"),
+    ).first()
+    _check(r, "truck cargo positive with valid action and location", cargo_counts.invalid)
+    _check(r, "truck nonnegative cargo balances", cargo_counts.negative)
+    _check(r, "fact_truck_inventory.trace_id unique", cargo_counts.duplicate_traces)
+    _check(r, "truck shipment/product actions unique", cargo_counts.duplicate_actions)
+    loads = truck.filter(F.col("action") == "LOAD").select(
+        "shipment_id", "product_id", "truck_id",
+        F.col("quantity").alias("_loaded"), F.col("event_ts").alias("_loaded_at"),
+    )
+    # A final-day LOAD may still be in transit; only UNLOAD requires a prior LOAD.
+    _check(r, "truck UNLOAD backed by prior equal LOAD",
+           truck.filter(F.col("action") == "UNLOAD")
+           .join(loads, ["shipment_id", "product_id", "truck_id"], "left")
+           .filter(
+               F.col("_loaded").isNull() | ~F.col("quantity").eqNullSafe(F.col("_loaded"))
+               | (F.col("event_ts") < F.col("_loaded_at")),
+           ).count())
 
 
 def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> None:

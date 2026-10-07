@@ -12,10 +12,17 @@ Default order:
 5. `06-ml-anomaly-detection.kql`
 6. `07-pricing-approval-tables.kql`
 
-`retail-setup deploy` combines them into an
-`.execute database script with (ThrowOnErrors=true)` payload and applies it with
-the operator identity. The generated payload remains at
-`deploy\.generated\<env>\database.kql`.
+Each file keeps a standalone
+`.execute database script with (ThrowOnErrors=true)` wrapper.
+`retail-setup deploy` removes exactly that leading wrapper from each selected
+file, rejects any embedded wrapper, and combines the commands into one flat
+fail-fast payload applied with the operator identity. The generated payload
+remains at `deploy\.generated\<env>\database.kql`.
+
+Core KPI materialized views use deterministic aggregation queries plus
+seven-day materialized-view retention policies. Current pending pricing state
+is exposed by `fn_pending_recommendations()` because it must reconcile creation,
+approval, and rejection event tables at query time.
 
 The live stream targets eighteen typed business event tables. `unknown_event`
 is a catch-all KQL table, not a nineteenth generated business event.

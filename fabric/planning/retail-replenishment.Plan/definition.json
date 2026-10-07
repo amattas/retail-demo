@@ -1,0 +1,58 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Definition/1.0.0/schema.json",
+  "workloadItemName": "${DISPLAY_NAME}",
+  "semanticModelReference": {
+    "connectionId": "${CONNECTION_ID}",
+    "semanticModelId": "${SEMANTIC_MODEL_ID}",
+    "semanticModelName": "${SEMANTIC_MODEL_NAME}",
+    "semanticModelWorkspaceId": "${WORKSPACE_ID}",
+    "semanticModelWorkspaceName": "${WORKSPACE_NAME}",
+    "directLakeMode": true,
+    "directQueryMode": false,
+    "sourceType": "WORKLOAD"
+  },
+  "sheets": [
+    {
+      "recordGuid": "47d461aa-ca63-5176-bfb2-b0549a377307",
+      "displayName": "Availability analysis",
+      "sheetType": "PLANNING",
+      "isHidden": false,
+      "order": 0,
+      "workloadItemEntityVisuals": [
+        {
+          "visualType": "PLANNING",
+          "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+          "isEmbedded": false
+        }
+      ]
+    },
+    {
+      "recordGuid": "58c65ef8-14e9-5f75-8e8f-b6c0c20554ce",
+      "displayName": "Replenishment what-if - assumptions",
+      "sheetType": "PLANNING",
+      "isHidden": false,
+      "order": 1,
+      "workloadItemEntityVisuals": [
+        {
+          "visualType": "PLANNING",
+          "visualId": "f7ba6bb9-232b-54e3-b5cb-d6976653cc54",
+          "isEmbedded": false
+        }
+      ]
+    },
+    {
+      "recordGuid": "a75a89f1-5984-57ed-8291-5867159e9e43",
+      "displayName": "DC stock evidence - not allocated supply",
+      "sheetType": "PLANNING",
+      "isHidden": false,
+      "order": 2,
+      "workloadItemEntityVisuals": [
+        {
+          "visualType": "PLANNING",
+          "visualId": "972fa921-fe11-5ca1-bd8a-d4b9c39f30d0",
+          "isEmbedded": false
+        }
+      ]
+    }
+  ]
+}

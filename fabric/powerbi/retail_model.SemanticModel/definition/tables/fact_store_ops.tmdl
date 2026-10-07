@@ -60,6 +60,20 @@ table fact_store_ops
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Source event timestamp for store operation events; hidden but bound for connected-twin measures.
+	column 'Event Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200101-0000-0000-0000-000000000001
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_store_ops = entity
 		mode: directLake
 		source

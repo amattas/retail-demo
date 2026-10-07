@@ -3272,7 +3272,7 @@
       "name": "Streaming-only online order status",
       "owner": "owner.streaming",
       "support_status": "optional",
-      "description": "Picked and shipped events intentionally stop at a streaming-only Silver status table.",
+      "description": "Picked and shipped events intentionally stop at an owned streaming-only Silver status table maintained by the Delta maintenance notebook.",
       "sources": [
         {
           "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
@@ -3295,7 +3295,7 @@
         }
       ],
       "kind": "streaming-only",
-      "rationale": "The active transform records operational PICKED/SHIPPED state, but no historical schema or semantic table currently owns that status grain.",
+      "rationale": "The active transform records and maintains operational PICKED/SHIPPED state, but no historical schema or semantic table owns that status grain.",
       "verification_owner": "owner.streaming",
       "event_ids": [
         "event.online-order-picked",
@@ -5047,6 +5047,7 @@
         "dim_products",
         "fact_store_inventory_txn",
         "fact_receipt_lines",
+        "fact_receipts",
         "price_elasticity"
       ],
       "output": {
@@ -5129,6 +5130,7 @@
         "dim_products",
         "fact_store_inventory_txn",
         "fact_receipt_lines",
+        "fact_receipts",
         "price_elasticity"
       ],
       "output": {

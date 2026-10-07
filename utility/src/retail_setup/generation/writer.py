@@ -14,13 +14,15 @@ tests don't need delta-spark.
 
 import re
 import shutil
+import warnings
 from pathlib import Path
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.publication import (
+    COMPLETED_CLEANUP_FAILED,
     PublicationBackend,
     PublicationCoordinator,
     TableTarget,
@@ -38,6 +40,20 @@ def sanitize_identifier(value: str) -> str:
     an unquoted identifier segment).
     """
     return _UNSAFE_IDENTIFIER.sub("_", value)
+
+
+def assert_historical_replacement_safe(
+    spark: SparkSession, lakehouse: str, silver_db: str
+) -> None:
+    """Refuse to replace shared Silver data after streaming has initialized."""
+
+    checkpoint_table = f"{lakehouse}.{silver_db}._watermarks"
+    if spark.catalog.tableExists(checkpoint_table):
+        raise RuntimeError(
+            f"Historical replacement is blocked because {checkpoint_table} exists. "
+            "Stop streaming and use the documented coordinated Silver/checkpoint "
+            "reset before rebuilding history; never delete checkpoints alone."
+        )
 
 
 def write_table(df: DataFrame, location: str, fmt: str = "delta") -> None:
@@ -264,6 +280,8 @@ def write_all(
     if first_df is None:
         raise ValueError("write_all requires at least one table in tables or gold")
     spark = first_df.sparkSession
+    if lakehouse is not None and tables:
+        assert_historical_replacement_safe(spark, lakehouse, cfg.silver_db)
 
     log_name = "setup_run_log"
     log_table = f"{lakehouse}.{cfg.silver_db}.{log_name}" if lakehouse is not None else None
@@ -344,6 +362,13 @@ def write_all(
     if not outcome.ok:
         raise RuntimeError(
             f"setup publication {outcome.state} for run_id={run_id!r}: {outcome.error}"
+        )
+    if outcome.state == COMPLETED_CLEANUP_FAILED:
+        warnings.warn(
+            f"setup publication completed but staging cleanup needs attention: "
+            f"{outcome.error}",
+            RuntimeWarning,
+            stacklevel=2,
         )
 
     return outcome.promoted

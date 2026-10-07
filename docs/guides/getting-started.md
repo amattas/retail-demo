@@ -251,7 +251,7 @@ Configuration writes:
 | --- | --- | --- |
 | `deploy/config/deploy.yml` | Shared deployment defaults | Tracked |
 | `deploy/config/environments/<env>.yml` | Workspace target overlay | Ignored |
-| `utility/config.yaml` | Local generation settings | Ignored |
+| `utility/config/environments/<env>.yaml` | Environment-specific generation settings; legacy `utility/config.yaml` is a read fallback | Ignored |
 
 `configure` prints the derived environment key. Keep the local overlay out of
 source control, and never add credentials or bearer tokens to configuration.
@@ -270,7 +270,7 @@ The command validates all substitutions before writing:
 4. `setup-04-build-gold.ipynb`
 5. `stream-events.ipynb`
 
-Output is written to `utility/out/`. The first four notebooks are the ordered
+Output is written to `utility/out/<env>/`. The first four notebooks are the ordered
 historical path. The stream notebook is optional and deployed separately.
 
 Rendering also records the configured history end date. During deployment, the

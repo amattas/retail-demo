@@ -44,7 +44,9 @@ retained for existing TMDL bindings.
 - `pricing_recommendation_approved`
 - `pricing_recommendation_rejected`
 
-The KQL scripts define five core and three pricing materialized views.
+The KQL scripts define five core and two pricing decision metric materialized
+views. `fn_pending_recommendations()` derives current pending state across the
+recommendation, approval, and rejection event tables.
 
 ## Lakehouse Silver (`ag`)
 
@@ -67,10 +69,13 @@ The KQL scripts define five core and three pricing materialized views.
 
 - `setup_run_log`
 - streaming-only `ag._watermarks`
-- current divergent streaming output `fact_online_order_status`
+- owned streaming-only output `fact_online_order_status`
 
 `fact_online_order_status` is not part of the base contract or active semantic
-model.
+model. Its schema and PICKED/SHIPPED routes are declared by the streaming
+Silver notebook, its named terminal exception is validated by the solution
+manifest, and the Delta maintenance notebook inventories the table.
+That maintenance inventory also owns the `ag._watermarks` control table.
 
 ## Lakehouse Gold (`au`)
 

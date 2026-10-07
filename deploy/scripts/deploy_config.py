@@ -70,6 +70,7 @@ class WorkspaceConfig:
     capacity_name: str | None
     skip_capacity_state_validation: bool
     role_assignments: list[dict[str, Any]]
+    capacity_resource_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,24 @@ class DeploymentConfig:
 
 
 @dataclass(frozen=True)
+class OperationsPlanningConfig:
+    """Opt-in native decision experience; credentials are never stored here."""
+
+    enabled: bool = False
+    include_plan: bool = True
+    plan_connection_id: str | None = None
+    plan_billing_acknowledged: bool = False
+    recipient: str | None = None
+
+
+@dataclass(frozen=True)
+class TwinsConfig:
+    """Opt-in connected operational twins report publication."""
+
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class DeployConfig:
     """Canonical deployment configuration for one environment."""
 
@@ -154,6 +173,8 @@ class DeployConfig:
     spark: SparkConfig
     deployment: DeploymentConfig
     profile: ResolvedProfile
+    operations_planning: OperationsPlanningConfig = OperationsPlanningConfig()
+    twins: TwinsConfig = TwinsConfig()
 
 
 @dataclass(frozen=True)
@@ -256,6 +277,32 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     spark = data.get("spark", {})
     deployment = data.get("deployment", {})
     auth = data.get("auth", {})
+    native = data.get("operations_planning", {})
+    twins = data.get("twins", {})
+    if not isinstance(native, dict):
+        raise ValueError("operations_planning must be a mapping")
+    if not isinstance(twins, dict):
+        raise ValueError("twins must be a mapping")
+    for flag in ("enabled", "include_plan", "plan_billing_acknowledged"):
+        if flag in native and not isinstance(native[flag], bool):
+            raise ValueError(f"operations_planning.{flag} must be a boolean")
+    if "enabled" in twins and not isinstance(twins["enabled"], bool):
+        raise ValueError("twins.enabled must be a boolean")
+    connection_id = _optional_string(native.get("plan_connection_id"))
+    if connection_id is not None:
+        try:
+            if uuid.UUID(connection_id).int == 0:
+                raise ValueError("A nil connection ID cannot identify a real connection.")
+        except ValueError as exc:
+            raise ValueError(
+                "operations_planning.plan_connection_id must be a UUID"
+            ) from exc
+    recipient = native.get("recipient")
+    if recipient is not None and not isinstance(recipient, str):
+        raise ValueError("operations_planning.recipient must be a string")
+    for flag in ("publish_skip", "unpublish_skip"):
+        if flag in deployment and not isinstance(deployment[flag], bool):
+            raise ValueError(f"deployment.{flag} must be a boolean")
     if "include" in notebooks:
         raise ValueError(
             "notebooks.include is no longer supported; select deployment.profile "
@@ -290,18 +337,54 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             "spark.use_custom_pool is profile-controlled; select "
             "deployment.profile: full-demo instead of using the legacy override"
         )
+    if (
+        profile.reporting_gate_pipeline_ref is not None
+        and not deployment.get("unpublish_skip", True)
+    ):
+        raise ValueError(
+            "deployment.unpublish_skip must remain true for phased profiles; "
+            "unpublishing a partial stage can delete existing Reporting items"
+        )
+    if native.get("enabled") and (
+        not profile.provisions_eventhouse or not profile.selects("asset.semantic-model")
+    ):
+        raise ValueError(
+            "Operations/Planning requires Eventhouse and a selected semantic model "
+            "(standard or full-demo deployment)."
+        )
+    if twins.get("enabled") and (
+        not profile.selects("asset.semantic-model")
+        or not profile.selects("asset.report")
+    ):
+        raise ValueError(
+            "Connected twins require a selected semantic model and Report "
+            "(standard or full-demo deployment)."
+        )
+    if twins.get("enabled") and str(powerbi.get("report_name", "retail_model")).casefold() == "retail-twins":
+        raise ValueError("twins requires a report name distinct from the primary report.")
 
     return DeployConfig(
         environment=str(data["environment"]),
         tenant_id=_optional_string(data.get("tenant_id")),
         subscription_id=_optional_string(data.get("subscription_id")),
         auth_mode=str(auth.get("mode", "azure_cli")),
+        twins=TwinsConfig(enabled=bool(twins.get("enabled", False))),
+        operations_planning=OperationsPlanningConfig(
+            enabled=bool(native.get("enabled", False)),
+            include_plan=bool(native.get("include_plan", True)),
+            plan_connection_id=connection_id,
+            plan_billing_acknowledged=bool(
+                native.get("plan_billing_acknowledged", False)
+            ),
+            recipient=_optional_string(recipient),
+        ),
         workspace=WorkspaceConfig(
             name=str(workspace["name"]),
             description=str(workspace.get("description", "")),
             existing_id=_optional_string(workspace.get("existing_id")),
             capacity_id=_optional_string(workspace.get("capacity_id")),
             capacity_name=_optional_string(workspace.get("capacity_name")),
+            capacity_resource_id=_optional_string(workspace.get("capacity_resource_id")),
             skip_capacity_state_validation=bool(
                 workspace.get("skip_capacity_state_validation", False)
             ),
@@ -666,7 +749,7 @@ def write_generated_configs(
         render_fabric_cicd_config(
             config,
             terraform_outputs,
-            repository_directory="../../../workspace",
+            repository_directory="../workspace",
         ),
     )
     _write_yaml(parameter_path, render_parameter_file(config, terraform_outputs))

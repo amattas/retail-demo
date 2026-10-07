@@ -1,7 +1,9 @@
 # Real-time rule scenarios
 
 This directory records candidate operational actions such as stockout,
-replenishment, truck-dwell, queue, and customer-arrival alerts.
+replenishment, truck-dwell, queue, and customer-arrival alerts. The customer
+rule is an arrival-surge/expected-dwell signal, not an occupancy rule, because
+the current event contract does not include customer-exit events.
 
 These are design inputs, not guaranteed deployed Fabric Activator or rule
 artifacts. Do not present them as active automations until deployment and runtime

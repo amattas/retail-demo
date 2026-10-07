@@ -39,7 +39,8 @@ The current deploy plan:
 2. runs local and live tenant/capacity preflight before Terraform
    destroy/apply, publication, or KQL;
 3. generates profile-aware Terraform and `fabric-cicd` inputs;
-4. initializes and applies Terraform unless skipped;
+4. initializes Terraform, saves and validates a plan, then applies that exact
+   plan after confirmation unless Terraform is skipped;
 5. captures the selected Terraform-owned identifiers;
 6. stages and publishes infrastructure without Reporting;
 7. executes only the selected ordered KQL scripts and validates infrastructure;
@@ -73,6 +74,162 @@ The final journal status is:
   feature.
 - **`FAILED`:** a required capability failed or could not provide evidence.
   Do not present the workspace as ready.
+
+### Optional native Operations Agent and Planning
+
+The availability decision pack is separate from `fabric-cicd` publication and
+is **off by default**, including in `full-demo`. It requires a Reporting
+profile (`standard` or `full-demo`) and the existing Eventhouse and required
+ML outputs.
+
+**For SSO-only environments where IT blocks fixed credentials**, deploy only
+Operations Agent. Leave the existing model's SSO binding untouched:
+
+```yaml
+operations_planning:
+  enabled: true
+  include_plan: false
+```
+
+This configuration works with the normal deployment and the targeted publisher.
+It does not require a Plan connection, Planning billing acknowledgement, or
+fixed credentials. Readiness requires the Operations Agent and draft notebook,
+not a Plan. Human planning uses the Lakehouse draft-case table and existing
+report through SSO; it is not presented as the native Planning product.
+Operations Agent remains stopped until reviewed and explicitly activated.
+
+Native Planning does not support the current Direct Lake SSO path. Do not
+bypass organizational policy with an alternate identity or connection type.
+Only where fixed credentials are permitted, enable both components in
+`deploy/config/environments/<env>.yml`:
+
+```yaml
+operations_planning:
+  enabled: true
+  include_plan: true
+  plan_connection_id: <shared-Power-BI-Semantic-Model-connection-UUID>
+  plan_billing_acknowledged: true
+  recipient: <optional-Teams-user-principal-name>
+```
+
+Remove `recipient` if notifications will be configured later. Never put a
+password or access token in this block. For the connection, use **Manage
+connections and gateways** in Fabric to create a **Cloud / Power BI Semantic
+Model** connection, authenticated with OAuth2 or a properly provisioned service
+principal. The public connector type is `PowerBIDatasets`; its connection is
+identity-based, while the Plan definition separately binds `retail_model`.
+A personal, Analysis Services/XMLA, or Lakehouse SQL connection is not a
+substitute. WorkspaceIdentity is not supported on this Plan-to-model hop.
+Public connection creation does not expose an OAuth2 credential payload, so
+create/share that connection in the Fabric UI. The connection owner needs
+workspace Member/Admin and the required model access.
+
+Separately, open `retail_model` **Settings / Gateway and cloud connections**,
+create/select a fixed-credential data-source connection, and apply it instead
+of the default Automatic/SSO binding. This **model-to-OneLake** hop is distinct
+from `plan_connection_id`. The publisher inspects both hops and never silently
+rebinds the existing model. See Microsoft's
+[Planning connection setup](https://learn.microsoft.com/fabric/iq/plan/planning-how-to-create-semantic-model-connection).
+
+!!! warning "Planning has a separate billing boundary"
+
+    Creating, opening, or saving a Plan can start a 30-day billable Planning
+    session. It cannot be manually ended; pausing or deleting capacity does
+    not cancel that session. Set the acknowledgement only after accepting
+    this cost. See [Planning billing](https://learn.microsoft.com/fabric/iq/plan/resources/billing-fabric-plan).
+
+Once configured, `retail-setup deploy --env <env>` publishes the pack after
+Reporting. To add/update it in an already deployed workspace without rerunning
+historical generation, run from the repository root:
+
+```powershell
+python -m deploy.scripts.deploy_operations_planning --environment retail-demo
+```
+
+`--dry-run` makes no service calls. `--operations-only` explicitly publishes
+only the Operations Agent and its supporting assets, without creating a Plan
+or requiring a Plan connection/billing acknowledgement. Set `include_plan: false`
+for a persistent operations-only deployment/readiness selection. A one-off
+`--operations-only` run does not satisfy a configuration that still requests
+both components.
+
+Disabling the pack stops its publication; it does not delete its items or stop
+an agent that an operator previously activated. Stop monitoring explicitly in
+Fabric before opting out. Readiness tolerates only the source-declared
+Operations tables left behind by an unselected pack, not arbitrary extra KQL
+objects, and never treats them as evidence of a running retail stream.
+
+The model publication includes additive `Next 7 Days` forecast/bound measures;
+existing full-horizon measures remain unchanged. When including the Plan, publish
+the updated Reporting model before using the targeted command against an older deployment.
+
+The pack publishes `retail-availability-operations` **stopped** and
+`prepare-replenishment-case`, seeds at most 100 current store/product signals,
+and publishes the native `retail-replenishment` Plan when requested. The
+standalone command also refreshes signals; it does not install a continuous
+forecast-to-Eventhouse feed. Source data older than seven days requires fresh
+historical inputs and a required-ML rerun before seeding; rerunning ML over
+unchanged old data does not advance its source time. The targeted publisher
+also uses capacity auto-resume. Plan prerequisites apply only when including
+the Plan; operations-only publication uses the configured operator login.
+
+Inspect `deploy/.generated/<env>/operations-planning-report.json` for persisted
+item identities and remaining acceptance steps. In Fabric, review/generate
+the agent playbook, configure Teams notifications, and confirm human approval
+before explicitly starting monitoring. If selected, open the Plan to confirm its shared
+model connection and application database, then configure and accept any
+approval/writeback workflow in-product. Item publication is not proof those
+interactive capabilities have been accepted.
+
+The notebook creates a durable **DRAFT** in the new Lakehouse `ops` schema.
+It never places a purchase order or moves stock. There is no invented
+agent-to-Plan Optimize API, ERP adapter, or automatic Plan writeback bridge.
+The existing workspace task flow retains its supported artifact bindings;
+find the native items by their names in the workspace.
+
+See the [decision-experience boundary](../design/specifications/modules/ml-ai/decision-experience.md#opt-in-native-availability-pack).
+
+### Optional Store, Warehouse, and Truck twins
+
+The connected twins are a separate, read-only Power BI report named
+`retail-twins`. They use the existing semantic model's **Automatic/SSO**
+binding and are independent of native Planning and Operations Agent.
+
+Enable them in `deploy/config/environments/<env>.yml`:
+
+```yaml
+twins:
+  enabled: true
+```
+
+The normal deployment publishes the report after Reporting. For an existing
+workspace, use the targeted publisher without regenerating historical data:
+
+```powershell
+python -m deploy.scripts.deploy_twins --environment retail-demo
+```
+
+`--dry-run` makes no service calls. The targeted publisher discovers a real,
+bounded route/cargo cohort, adds only the required twin model objects,
+preserves SSO, and publishes the report. It does not change credentials,
+create a native Digital Twin Builder item, start an agent, or execute orders.
+Capacity auto-resume uses the existing deployment mechanism.
+
+The pilot contains one DC, two trucks, up to five connected stores, and up
+to twenty cargo SKUs. Selection follows recorded relationships rather than
+assuming that the first numbered entities are connected. Historical source
+time, signed stock, and the separate +60 minute delay what-if are visible.
+Warehouse on-hand is not confirmed available supply; truck state is not GPS.
+
+Open the report link recorded in
+`deploy/.generated/<env>/twins-report.json` using your Fabric/Power BI login.
+That file also retains source/cohort evidence, model changes and their backup,
+and the publication outcome. The publisher refreshes Direct Lake framing
+without changing SSO. Use the network's entity fields to drill through to
+Store, Warehouse or Truck views; the page tabs remain available.
+Inspect page rendering and navigation before
+presenting the demo. See the
+[connected-twin specification](../design/specifications/modules/operations/connected-twins.md).
 
 ### Profiles
 
@@ -136,6 +293,59 @@ The operator must be able to:
 Use a dedicated workspace. Review workspace and item roles before sharing the
 demo, because synthetic customer-like fields still require governance.
 
+### Resume a paused Azure Fabric capacity
+
+Deployment automatically resumes a paused or suspended **Azure F-SKU capacity**
+using its configured name in `deploy/config/environments/<env>.yml`:
+
+```yaml
+workspace:
+  capacity_name: myfabriccapacity
+```
+
+The preflight discovers the matching Azure resource through ARM. If
+`subscription_id` is configured, only that subscription is searched;
+otherwise it searches accessible subscriptions owned by the configured
+tenant. Subscription and capacity pagination must complete, and the name
+must identify exactly one Azure Fabric capacity. Missing, duplicate, or
+incomplete results fail before any resume request.
+
+An optional `workspace.capacity_resource_id` bypasses name discovery when
+you need to select an exact resource. Copy **Resource ID** from Azure portal
+properties; it has the form
+`/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Fabric/capacities/myfabriccapacity`.
+This is not the Fabric GUID in `capacity_id`. The Azure resource name must
+agree with the configured Fabric capacity, and its subscription must match
+`subscription_id` when that value is set.
+
+Active capacity is left unchanged and does not require Azure management
+permissions. Otherwise, the operator needs Azure RBAC permission to discover
+the relevant subscriptions/capacities, read and resume the capacity, and track
+its operation; Fabric workspace roles alone are insufficient. An explicit
+resource ID avoids subscription discovery. The same configured tenant and authentication mode are
+used with separate Fabric and Azure management tokens.
+
+**Resuming restarts capacity billing**, even if a later deployment check fails.
+The preflight submits at most one resume request per attempt, waits for Azure and Fabric
+to report `Active` (up to ten minutes by default), and stops on permission
+errors, failed operations, unsupported states, or timeout. It does not scale,
+create, reassign, or automatically pause capacity. Throttled GET requests
+honor `Retry-After` within the same deadline; resume POSTs are not blindly
+retried. Inactive trial and Premium
+capacities must be resumed manually.
+
+The live preflight is repeated on `deploy --resume` because capacity may have
+been paused between attempts. Dry runs and read-only readiness verification
+do not resume capacity. To run only this preparation step:
+
+```powershell
+python -m deploy.scripts.live_profile_preflight --environment <env> --resume-capacity
+```
+
+Set `--capacity-timeout-seconds` on that command to change its wait limit.
+See Microsoft's [capacity pause/resume guidance](https://learn.microsoft.com/fabric/enterprise/pause-resume)
+for permissions and billing details.
+
 ## Authentication
 
 ### Azure CLI
@@ -157,6 +367,54 @@ auth:
 
 `retail-setup deploy` rejects a configured tenant that differs from the active
 Azure CLI tenant.
+
+### Windows sign-in key-storage failures
+
+An `az login` failure containing `incorrect storage parent` or error
+`2150171662` comes from Windows account-broker key storage, before Fabric
+deployment. The guided bootstrap retries this specific failure once using
+browser sign-in. It retains the same tenant and passes
+`AZURE_CORE_ENABLE_BROKER_ON_WINDOWS=false` only to the retry and the
+subsequent deployment process. It does not run `az logout`, clear account
+caches, change persisted CLI configuration, or modify the caller's environment.
+
+Rerun the original setup command and complete the browser sign-in.
+Cancellations, Conditional Access denials, and unrelated failures are not
+retried; an unsuccessful retry stops deployment.
+
+To continue an already configured deployment manually without rerunning setup:
+
+```powershell
+$previousBroker = $env:AZURE_CORE_ENABLE_BROKER_ON_WINDOWS
+try {
+    $env:AZURE_CORE_ENABLE_BROKER_ON_WINDOWS = "false"
+    az login --tenant 00000000-0000-0000-0000-000000000000
+    if ($LASTEXITCODE -ne 0) { throw "Azure sign-in failed; deployment not started." }
+    retail-setup deploy --env <env>
+} finally {
+    $env:AZURE_CORE_ENABLE_BROKER_ON_WINDOWS = $previousBroker
+}
+```
+
+Replace the tenant and environment placeholders with the configured target.
+If browser sign-in is denied by organizational policy, ask the tenant/device
+administrator to resolve the broker or device-registration problem rather
+than weakening that policy. See Microsoft's
+[Windows broker and browser sign-in guidance](https://learn.microsoft.com/cli/azure/authenticate-azure-cli-interactively)
+and [configuration precedence](https://learn.microsoft.com/cli/azure/azure-cli-configuration).
+
+### PowerShell launcher fails on a repeat run
+
+`The expression after '&' ... was not valid` can occur when an earlier
+Conda shell hook left an alias whose executable environment variable was
+subsequently restored or removed. Older launchers also mistook the alias's
+module `Source` (`Conda`) for a native executable path.
+
+The launcher now resolves the actual Conda executable and activates through
+its native command, without importing persistent aliases or prompt hooks.
+Rerun `.\scripts\setup.ps1` with the original arguments in the same window.
+This launcher repair does not sign in to Azure or deploy resources by itself;
+those remain later setup steps.
 
 ### Azure PowerShell
 
@@ -226,8 +484,11 @@ Important configuration boundaries:
 | --- | --- | --- |
 | `deploy/config/deploy.yml` | Shared deployment defaults | Yes |
 | `deploy/config/environments/<env>.yml` | Workspace-specific target overlay | No |
-| `utility/config.yaml` | Local generation scale and seed | No |
-| `utility/out/` | Rendered workspace-specific notebooks | No |
+| `utility/config/environments/<env>.yaml` | Environment-specific generation scale and seed | No |
+| `utility/out/<env>/` | Rendered workspace-specific notebooks and render manifest | No |
+
+Legacy `utility/config.yaml` is a read fallback only when the environment's
+generation file is absent. Configure writes the new environment-specific path.
 
 Keep the Eventhouse and KQL database display names aligned. The Eventhouse
 creates one default KQL database with the Eventhouse display name; provisioning
@@ -262,15 +523,20 @@ not execute subprocesses or:
 With `--skip-terraform`, dry-run validates the existing captured outputs just
 like a live run. Malformed or invalid existing YAML always fails; the default
 core fallback applies only when a legacy environment overlay is genuinely
-absent. The CLI asks for confirmation before invoking Terraform apply. Terraform then
-prints its change preview and proceeds with `-auto-approve`; there is no
-separate plan review before the confirmation.
+absent. On an actual deployment, the CLI saves and validates the Terraform plan
+before apply confirmation. Review it with
+`terraform show deploy/.generated/<env>/terraform.tfplan` before accepting;
+the current guard captures rather than displays the plan output.
+Apply consumes that exact saved plan. The plan
+guard blocks implicit workspace, Lakehouse, or Eventhouse deletion/replacement,
+including with `--yes`; use the explicit `--recreate` workflow for intentional
+destruction.
 
 ## Preflight
 
 Preflight means “check before making changes.” On a live run, local profile
 preflight checks manifest/source pointers,
-rendered notebooks, selected pipeline references, KQL sources, selected Power
+committed notebook inputs, selected pipeline references, KQL sources, selected Power
 BI/agent/task-flow sources, custom-pool configuration, prior local Terraform
 state and captured profile outputs, and blockers. A second read-only live
 preflight checks the selected capacity's identity, active state, capacity
@@ -281,6 +547,10 @@ After Terraform (or immediately when `--skip-terraform` is selected), target
 access validation requires captured workspace IDs to match managed resource
 IDs in state and a live workspace with the configured name that the operator
 can read.
+
+The orchestrator's source-only check runs before rendering. If rendered
+validation is explicitly requested, it reads `utility/out/<env>/`; stale
+notebooks from another environment are not valid input evidence.
 
 Correct environments proceed without prompts. If a required tenant switch is
 disabled, interactive deploy prints the exact Admin Portal setting and offers
@@ -327,16 +597,19 @@ Deployment writes or refreshes:
 | --- | --- | --- |
 | `deploy/.generated/<env>/terraform.tfvars` | Terraform input generated from merged YAML | Ignored |
 | `deploy/.generated/<env>/terraform.tfstate` | Environment-local Terraform state | Ignored |
+| `deploy/.generated/<env>/terraform.tfplan` | Saved and guarded plan consumed by apply | Ignored |
 | `deploy/.generated/<env>/.terraform/` | Environment-local Terraform data directory | Ignored |
 | `deploy/.generated/<env>/fabric-cicd/config.yml` | `fabric-cicd` environment and item scope | Ignored |
 | `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | Ignored |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live Fabric item identifiers | Ignored |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | Ignored |
-| `deploy/workspace/` | Staged Fabric item folders | Ignored except `.gitkeep` |
+| `deploy/.generated/<env>/workspace/` | Staged Fabric item folders, including post-ontology | Ignored |
 
 Terraform operations for different environments use different backend and data
-paths. Full publication still shares `deploy/workspace/` staging; use separate
-checkouts for concurrent full deploys. Never commit local target overlays,
+paths. Generation configuration, rendered notebooks, and staged publication
+also use environment-local paths. Do not run concurrent deploys for the same
+environment or assume different environment keys lock a shared Fabric target.
+Never commit local target overlays,
 credentials, tokens, or generated bindings.
 
 If an older checkout left state at `deploy/terraform/terraform.tfstate`, deploy
@@ -384,12 +657,43 @@ retail-setup deploy --env alice --recreate
 
 The current sequence is profile preflight, configuration generation, Terraform
 initialization, Terraform destroy, bounded polling until the workspace name is
-absent, Terraform apply, and normal publication. Preflight therefore cannot
+absent, saved-plan validation and apply, and normal publication. Preflight therefore cannot
 destroy the workspace on failure. Preserve run evidence before retrying if
 Fabric does not release the workspace within the documented timeout.
 
 Do not use `99-reset-lakehouse` as part of normal deployment. It is a manual,
 destructive data reset asset.
+
+## Resume an interrupted deployment
+
+```powershell
+retail-setup deploy --env alice --resume
+```
+
+Resume requires an incomplete `deploy-run.json` whose environment, targets,
+profile, manifest, ordered plan, and source/config fingerprint still match.
+Only the contiguous `SUCCEEDED` prefix is reused. A changed working tree or
+target requires a newly reviewed run, not journal edits to force compatibility.
+Completed runs cannot be resumed; `--resume` cannot be combined with
+`--dry-run` or `--recreate`.
+
+Pending Terraform apply regenerates and checks its saved plan. Pending item
+publication rebuilds its staging first, including Reporting and post-ontology
+phases. An unfinished destructive recreate phase requires explicit review and
+restart. Resume does not convert old local evidence into fresh Fabric proof.
+Prior recreate identity is retained only after all steps through the
+workspace-deletion wait succeeded; it is not permission to replay an
+unfinished destroy automatically.
+
+The compatibility fingerprint includes sources, configuration, dictionaries,
+and ordered commands. Old journals without the required compatibility fields
+are not resumable. A different new/resumed run first archives the prior journal
+atomically at `deploy/.generated/<env>/run-history/<hashed-run-id>.json`,
+then replaces `deploy-run.json`; preserve both for diagnosis.
+
+For phased Reporting profiles, leave `deployment.unpublish_skip` enabled.
+Setting it to `false` is rejected because unpublishing a partial stage could
+delete healthy Reporting items.
 
 ## Post-deploy work
 
@@ -587,6 +891,9 @@ state and output evidence must survive cleanup.
 `IMP-*` identifiers are named improvement items in the technical backlogs.
 Open a linked item to see its exact remaining acceptance criteria.
 
+- No fresh live deployment was performed in this repair session. Current
+  generator, notebook packaging, batch ML, ancillary assets, Power BI, and
+  readiness consistency changes need fresh combined and remote validation.
 - Live alternate-authentication and renamed-target smoke verification:
   [IMP-001](../design/requirements/modules/deployment/backlog.md#imp-001)
 - Separate live `core` and `standard` profile proof keeps

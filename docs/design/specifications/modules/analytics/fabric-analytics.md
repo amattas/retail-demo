@@ -11,10 +11,10 @@ Deployment applies numbered scripts in repository order:
 5. `06-ml-anomaly-detection.kql`
 6. `07-pricing-approval-tables.kql`
 
-`apply_kql.py` wraps the concatenated content in an outer database script with
-`ThrowOnErrors=true`. Some source files contain their own database-script
-wrappers. A live full-demo deployment successfully executed all 135 resulting
-commands, proving the current nested-script behavior for the default target.
+Each source file is a standalone, fail-fast
+`.execute database script with (ThrowOnErrors=true)` batch. `apply_kql.py`
+removes that one leading wrapper from each selected source and emits one flat
+outer fail-fast script; embedded or repeated wrappers are rejected.
 
 ## KQL object inventory
 
@@ -23,8 +23,14 @@ commands, proving the current nested-script behavior for the default target.
 - `anomaly_alerts`
 - 3 pricing recommendation/decision tables
 - 5 core materialized views
-- 3 pricing approval materialized views
+- 2 pricing decision metric materialized views
+- `fn_pending_recommendations()` for latest cross-event workflow state
 - functions for attribution, truck SLA, anomaly detection, and related queries
+
+Core materialized-view definitions are time-independent; seven-day retention is
+applied as a materialized-view policy. Anomaly functions build explicitly
+bounded hourly series with zero-value defaults, then sort severity through a
+numeric rank while preserving the public result schema.
 
 The direct live path writes typed tables and does not use the JSON ingestion
 mappings.
@@ -62,9 +68,22 @@ Only its pipeline's terminal success permits Reporting publication.
 
 ## Streaming-to-Silver behavior
 
-`03-streaming-to-silver.ipynb` reads Eventhouse shortcuts, filters by per-source
-watermarks in `ag._watermarks`, appends transformed output, then advances the
-watermark.
+`03-streaming-to-silver.ipynb` reads Eventhouse shortcuts and replays a
+configurable interval from each per-source checkpoint in `ag._watermarks`. The
+default overlap is three hours to cover normal Eventhouse OneLake visibility
+latency. Once per day by default, a distinct per-source reconciliation
+checkpoint permits a bounded-cadence scan of older history. That scan
+anti-joins source dedupe keys against Silver and adds only missing rows to the
+same idempotent merge. Processing and reconciliation checkpoints advance only
+after the merge succeeds; null checkpoint timestamps still fail closed.
+Override the defaults with the `REPLAY_OVERLAP_SECONDS` and
+`DEEP_RECONCILIATION_INTERVAL_SECONDS` notebook parameters or environment
+variables.
+
+The pipeline passes Lakehouse/schema notebook parameters and uses
+`concurrency = 1` to prevent overlapping runs of that pipeline. Manual
+notebook execution is not protected by that pipeline setting. The daily
+deep scan is cadence-gated, not a scan of all source history on every run.
 
 Truck arrival/departure is handled as one lifecycle: Silver joins the two
 sources on truck, distribution center, store, and shipment before appending a
@@ -73,14 +92,29 @@ anti-joins completed Silver lifecycle keys so delayed counterparts are not lost
 behind a watermark. `tests/test_truck_dwell_contract.py` verifies the
 cross-layer source contract; live Fabric execution remains a separate gate.
 
-Known divergences:
+Live-specific behavior and divergences:
 
-- `inventory_updated` populates store inventory transactions with incomplete
-  current-balance semantics;
+- `inventory_updated` deterministically continues prior balances, orders deltas
+  by event time and trace ID, and repairs legacy null-balance suffixes for
+  affected store/product keys;
 - picked and shipped events populate `ag.fact_online_order_status`;
-- `fact_online_order_status` is not in `schemas.py` or the active semantic
-  model and is declared as the streaming-only terminal exception;
+- `fact_online_order_status` is an owned streaming-only Silver contract: its
+  exact schema and routes are declared in the Silver notebook, its terminal
+  exception is validated from `contracts/retail-demo.json`, and
+  `05-maintain-delta-tables.ipynb` includes it and `ag._watermarks` in routine
+  maintenance;
+- it is intentionally absent from `schemas.py` and the active semantic model
+  because `TABLES` remains the historical contract;
 - live coverage is not equivalent for every historical fact.
+
+Inventory has runtime evidence beyond source/AST contracts:
+`utility/tests/generation/test_streaming_inventory_runtime.py` executes the
+actual notebook transformation functions with real Spark DataFrames and
+windows. It covers prior-balance continuation, legacy-null repair,
+same-timestamp ordering by `trace_id`, and idempotent replay. The parent reports
+this test passed on Spark 4.2 with a checksum-verified session-local JDK 17.
+Target-table lookup is stubbed; no live Delta `MERGE`, full Spark suite, or
+Fabric execution is proven by this test.
 
 Watermark/replay behavior is fail-closed and contract-tested. The manifest
 declares all 18 emitted paths and derives the physical transform inventory from
@@ -122,3 +156,29 @@ Current-state tables are overwrite snapshots. KQL and DAX use producer-aligned
 status labels, shared date slicing, source-correct grain, volume-weighted
 rollups, and hidden non-aggregatable technical fields. Repository contract
 tests guard those semantics.
+
+## Receipt repair utility
+
+`90-augment-and-dedupe-receipts.ipynb` materializes and validates candidates
+and backups before replacing receipt-grain targets. It records each attempted
+promotion before issuing the replacement statement. A server commit followed
+by a client exception therefore includes that target in reverse-order
+rollback, rather than silently restoring only earlier targets.
+`tests/test_lakehouse_batch_ml_fixes.py` exercises this failure window with
+executable mocks. The offline batch wave is complete; actual Fabric/Delta
+rollback execution remains a separate live gate.
+
+## Maintenance
+
+`05-maintain-delta-tables.ipynb` skips genuinely absent optional tables,
+including optional ML/streaming state; missing required historical tables
+fail its base-inventory check. Checks and maintenance statements use
+fully qualified configured Lakehouse/schema/table names. Only genuine table
+absence is skipped: permission, catalog, and other real `AnalysisException`
+failures propagate rather than being reclassified as optional absence.
+Operation failures fail the notebook. Deployment supplies configured
+Lakehouse/schema parameters to pipeline notebook activities.
+
+The current remediation is locally implemented, not freshly live-verified.
+Remote KQL, Silver/Gold, pipeline concurrency, and maintenance smoke tests
+remain release gates.

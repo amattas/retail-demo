@@ -1,0 +1,57 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Planning/Properties/1.0.0/schema.json",
+  "visuals": {
+    "972fa921-fe11-5ca1-bd8a-d4b9c39f30d0": {
+      "schema": "0.0.1",
+      "properties": {
+        "pivotAssignments": [
+          {
+            "id": "dim_products[ID]", "sourceId": "dim_products[ID]",
+            "bucketId": "rows", "columnName": "ID", "tableName": "dim_products",
+            "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI",
+            "customName": "SKU ID", "order": 0
+          },
+          {
+            "id": "dc_inventory_position_current[DC Units on Hand]", "sourceId": "dc_inventory_position_current[DC Units on Hand]",
+            "bucketId": "ameasure", "columnName": "DC Units on Hand", "tableName": "dc_inventory_position_current",
+            "dataType": "Int64", "columnType": "Measure", "sourceType": "PowerBI",
+            "measureGuid": "dc-stock", "order": 0
+          }
+        ],
+        "sortingConfig": [],
+        "superFilterAssignments": [
+          {
+            "id": "dc-product-scope",
+            "pivotAssignments": [{
+              "id": "dim_products[ID]", "sourceId": "dim_products[ID]",
+              "bucketId": "rows", "columnName": "ID", "tableName": "dim_products",
+              "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI"
+            }],
+            "configuration": {
+              "name": "Synthetic cohort: SKUs 1-20", "hide": false, "locked": true,
+              "filterMode": "advanced", "visualType": "NUMERIC",
+              "filterOperator": "between", "selectAll": false,
+              "alphaNumericValues": {"minValue": 1, "maxValue": 20}
+            },
+            "filterLevel": "visual", "position": "RIGHT"
+          },
+          {
+            "id": "dc-scope",
+            "pivotAssignments": [{
+              "id": "dc_inventory_position_current[DC ID]", "sourceId": "dc_inventory_position_current[DC ID]",
+              "bucketId": "rows", "columnName": "DC ID", "tableName": "dc_inventory_position_current",
+              "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI"
+            }],
+            "configuration": {
+              "name": "Synthetic cohort: DC 1", "hide": false, "locked": true,
+              "filterMode": "advanced", "visualType": "NUMERIC",
+              "filterOperator": "equals", "selectAll": false,
+              "alphaNumericValues": {"equalValue": 1}
+            },
+            "filterLevel": "visual", "position": "RIGHT"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -73,7 +73,9 @@ retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice --yes
 ```
 
-Rendering produces five workspace-specific notebooks in `utility\out\`:
+Configuration is stored in `utility\config\environments\<env>.yaml` (legacy
+`utility\config.yaml` remains a read fallback). Rendering produces five
+workspace-specific notebooks in `utility\out\<env>\`:
 setup 01 through 04 and `stream-events.ipynb`.
 
 The guided `full-demo` path runs setup and required ML gates automatically,
@@ -112,8 +114,8 @@ For technical readers, the historical Lakehouse uses a cleaned Silver layer
 (`ag`, with seven dimensions and nineteen facts) and a business-ready Gold
 layer (`au`, with ten aggregates). Eventhouse contains eighteen emitted
 business-event tables plus an `unknown_event` safety table. Power BI uses a
-40-table Direct Lake semantic model, which reads Lakehouse tables directly
-without importing another copy.
+42-table Direct Lake semantic model: 36 historical tables plus six required ML
+outputs. It reads Lakehouse tables directly without importing another copy.
 
 The setup notebooks generate historical data directly in Fabric. The optional
 stream notebook writes small groups of typed events directly to Eventhouse

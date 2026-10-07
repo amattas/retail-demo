@@ -55,6 +55,14 @@ normally reports three optional unknowns:
 - no recent Eventhouse ingestion; and
 - no checkpoint identity attached to Eventhouse ingestion.
 
+A recent watermark alone is no longer enough for a green streaming check.
+The verifier also samples settled receipt/inventory keys and Gold sales
+against Silver, checking orphan keys and null balances. Missing or empty
+samples remain `UNKNOWN`; observed mismatches are `FAIL`. Both are optional
+streaming degradation. This bounded sample is not proof of every table or
+all historical data. See the
+[sampling contract](../design/specifications/modules/operations/runbook.md#bounded-streaming-consistency).
+
 The report contains bounded counts, timestamps, the canonical manifest
 version/hash, resolved profile support and asset boundaries, target identities,
 and freshness lineage. It never stores access tokens, item-definition payloads,
@@ -171,9 +179,11 @@ rather than ingestion time.
 | Rendered notebooks missing | Run `retail-setup render --env <env>`. |
 | Fabric publication fails | Inspect the failing item type and generated `deploy/.generated/<env>/fabric-cicd/parameter.yml`. |
 | KQL objects missing | Inspect and rerun the generated ordered `database.kql` against the intended database. |
+| KQL readiness reports `KustoNetworkError` | The read-only checker retries transient network errors. If retries are exhausted, restore Eventhouse connectivity and rerun readiness; this does not by itself indicate missing schema objects or require redeployment. |
 | Setup pipeline not started | Start `setup-pipeline` manually and retain its run ID. |
 | Setup pipeline failed | Resume from the first failed activity only after validating upstream tables. |
 | Required ML gate failed | Inspect producer/validator errors; Reporting is intentionally unpublished until a new exact run succeeds. |
+| `freshness.setup_run_log` reports `ProgrammingError` after deployment | Update the local verifier to query setup data and staging catalog metadata separately, then rerun read-only readiness. Fabric error 15816 rejects a mixed catalog/data query; do not regenerate setup data for this checker error. |
 | Ontology, Data Agent, or task-flow links missing | Run `retail-setup post-ontology --env <env>` to recreate any missing ontology, republish agents, and verify the exact persisted graph. |
 | Live rows absent | Verify notebook parameters, resolved Query URI, KQL permissions, connector errors, and ingestion timestamps. |
 | Silver data stale | Inspect Eventhouse shortcuts, transform run history, source timestamps, and `ag._watermarks`. |
@@ -183,6 +193,20 @@ rather than ingestion time.
 | Local validation passed but live assets fail | Treat the deploy as not ready and perform item, binding, KQL, run, and data checks. |
 | Verifier reports `UNKNOWN` | Restore the missing permission, locked dependency, output, journal, or live evidence; required unknowns are failures. |
 | Verifier reports stale evidence | Run only the owning workload, retain its exact run evidence, and rerun the read-only verifier. |
+
+### Negative stockout inventory at the required ML gate
+
+If notebook 15 rejects negative `stockout_risk.current_inventory` or
+`days_of_inventory`, update notebook 12's available-inventory calculation:
+known negative ledger balances represent zero available units, while unknown
+balances must still fail. Update notebook 15 for per-rule violation counts.
+
+Republish the corrected notebooks and regenerate `stockout_risk` with
+`12-ml-stockout-prediction`, then run `15-validate-required-ml-contract`.
+Historical setup tables do not need regeneration for this derived-output
+repair. Reporting publication still requires a successful exact
+`ml-required` pipeline run; standalone notebook results do not replace that
+pipeline evidence. Do not weaken the gate or mark its failed run successful.
 
 ## Rerun safely
 
@@ -196,9 +220,10 @@ For a normal update:
 6. rerun only affected data workloads;
 7. compare row counts, timestamps, and bindings with the prior known-good run.
 
-Each workspace environment has isolated Terraform state and backend data.
-Concurrent full publication still requires separate checkouts because artifact
-staging uses one `deploy/workspace/` tree.
+Each workspace environment has isolated generation configuration, rendered
+output, Terraform state/data, and `deploy/.generated/<env>/workspace/`
+staging, including post-ontology. Serialize runs for the same environment or
+Fabric target; local path isolation does not prevent concurrent remote writes.
 
 ## Reset and recreate
 
@@ -229,3 +254,8 @@ The required historical, Reporting, ontology, Data Agent, and task-flow paths
 have live deployment evidence. The stream remains intentionally manual. Until
 a bounded `stream-events` run completes, the three optional streaming
 freshness checks remain `UNKNOWN` and overall readiness remains `DEGRADED`.
+This does not mean deployment failed. The console says **Required deployment
+READY** and presents missing initial stream evidence as informational rather
+than `ERROR`. There is no need to redeploy to clear that notice. Run the
+optional stream only when live-event functionality is needed; genuine stream
+failures and partial evidence still produce warnings.

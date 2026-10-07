@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "retail-twins",
+    "description": "Native Power BI connected store, warehouse, and truck operational-twin demo; SSO semantic model binding, no fixed credentials."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "3c2d19fb-2608-5154-8adb-e1fb5248854b"
+  }
+}

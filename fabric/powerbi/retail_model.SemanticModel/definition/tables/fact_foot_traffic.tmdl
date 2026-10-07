@@ -90,6 +90,20 @@ table fact_foot_traffic
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Source event timestamp for observed foot-traffic activity; hidden but available to connected-twin measures.
+	column 'Event Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200102-0000-0000-0000-000000000001
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_foot_traffic = entity
 		mode: directLake
 		source

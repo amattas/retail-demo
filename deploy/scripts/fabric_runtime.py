@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import time
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +30,8 @@ def paginated_get(
     *,
     params: dict[str, Any] | None = None,
     max_pages: int = _MAX_PAGES,
+    timeout: float | None = None,
+    deadline: float | None = None,
 ) -> list[dict[str, Any]]:
     """Exhaust a Fabric ``value`` collection, failing closed on malformed loops."""
 
@@ -43,10 +46,17 @@ def paginated_get(
     values: list[dict[str, Any]] = []
 
     for _ in range(max_pages):
-        if next_params is None:
-            response = session.get(next_url)
-        else:
-            response = session.get(next_url, params=next_params)
+        request_options: dict[str, Any] = {}
+        if next_params is not None:
+            request_options["params"] = next_params
+        if timeout is not None:
+            request_options["timeout"] = timeout
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise FabricPaginationError("Fabric collection deadline expired.")
+            request_options["timeout"] = min(timeout or 30, remaining)
+        response = session.get(next_url, **request_options)
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict) or not isinstance(payload.get("value"), list):

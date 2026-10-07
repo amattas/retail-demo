@@ -7,7 +7,7 @@ sequenceDiagram
     participant User
     participant CLI as retail-setup
     participant Config as Deploy and generation config
-    participant Render as utility/out
+    participant Render as utility/out/env
     participant Deploy as deploy/scripts
     participant Fabric as Fabric workspace
 
@@ -73,8 +73,10 @@ flowchart LR
 ```
 
 This path uses `ag._watermarks`. Its committed pipeline schedule is disabled.
-It contains known contract divergence, including streaming-only
-`fact_online_order_status`.
+Its streaming-only `fact_online_order_status` output is explicitly inventoried:
+the Silver notebook owns its schema and routes, the manifest owns its terminal
+exception, and the Delta maintenance notebook includes the table.
+The same maintenance inventory owns the `ag._watermarks` control table.
 
 ## Consumption
 

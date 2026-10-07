@@ -13,13 +13,19 @@ costed, approvable decisions — and finally **close the loop** by watching thos
 back into Fabric as real-time telemetry. No ETL pipelines on stage, no black boxes — every answer
 shows its work.
 
+This is a presentation procedure, not a live acceptance record. No fresh
+Fabric deployment was performed in the current repair session. Rehearse
+against the selected environment and read its readiness report first.
+Replay is synthetic fixture output; approvals create local demo state, not
+production orders or campaigns. Eventhouse action telemetry is best-effort.
+
 ---
 
 ## Before we start — what's deployed, and why it's useful
 
-Before the demo, let's level-set on what this is. Everything lives in **one Fabric workspace** —
-one security boundary, one billing meter, one copy of the data in OneLake. Four capabilities sit
-on that single foundation:
+The data platform is organized in **one Fabric workspace**. The local app,
+operator browser, identity provider, and optional router are additional trust
+and cost boundaries. Four data capabilities share that Fabric foundation:
 
 | Layer | Fabric component | Answers questions about… |
 |---|---|---|
@@ -86,7 +92,7 @@ which brain answered and why.
 |---|---|---|---|
 | 1 | *"What were total net sales and gross margin company-wide?"* | **Semantic model** | The chat reads the *same* curated truth as the report |
 | 2 | *"What are the top products by revenue last month, and each one's gross margin %?"* | **Semantic model** | Ranked list + a second measure, instantly |
-| 3 | *"What segment is the customer with loyalty card LC012304678 in, and what is their churn probability?"* | **Ontology** | The question a dashboard **can't** answer cleanly — fuses a profile with two ML predictions in one hop |
+| 3 | *"What segment and churn probability belong to loyalty card \<observed-card\>?"* | **Ontology** | Use an authorized synthetic key actually present in the selected environment |
 | 4 | *"How many customers are predicted to churn, and their total lifetime value?"* | **Semantic model over the ML churn table** | Moves from "what happened" to "what *will* happen" |
 | 5 | *"What were the top-selling products in the last 15 minutes?"* | **Real-time (Eventhouse)** | Proves it's **live**, not yesterday's extract |
 
@@ -103,16 +109,16 @@ and **drafts an approvable action**.
 **Agent 1 — Inventory & Replenishment.** Ask: *"What products are at risk of stockout — and what
 should we do about it?"*
 
-The audience sees the answer quantify the exposure (**~30 SKUs across 15 stores, ~$62K/day of
-sales exposed**, **8 with no open reorder**), the trace show the agent read the ML stockout-risk
-table → cross-check `fact_reorders` → join `dim_products` for price → apply a "14-day cover" rule,
-and a **recommendation card** with an evidence table and **8 drafted reorders**, each with
-**Approve / Dismiss**. Narrate, then **click Approve on one.**
+Inspect the exposure count and assumptions from the actual response, then the
+trace: stockout risk → covering reorders → product prices → coverage rule.
+Review the recommendation card's evidence before approving one local draft.
+Do not repeat counts or dollar amounts from an older workspace.
 
 **Agent 2 — Customer Retention.** Ask: *"Customer churn is rising — what can we do to retain them?"*
 
-The audience sees **8,286 customers predicted to churn = ~$534M of lifetime value at risk**, the
-trace show the agent read the ML churn table → join `customer_segments` for LTV → select the top
+Use the current response's cohort count and modeled lifetime-value estimate;
+these are synthetic risk indicators, not guaranteed recoverable revenue. The
+trace should show the agent read the ML churn table → join `customer_segments` for LTV → select the top
 cohort → pull cross-sell anchors from the market-basket model, and a **drafted win-back campaign**
 with Approve / Dismiss.
 
@@ -124,13 +130,15 @@ layer**, not a chatbot."*
 
 ## Validate it — close the loop
 
-Now let's prove it's a **system**, not a demo toy. Every agent decision and every human approval
-is **written back into the Fabric Eventhouse** as an event in the `agent_actions` table — the
-same real-time store that streams live sales.
+Inspect whether each expected draft/decision reached `agent_actions`.
+The app attempts Eventhouse logging asynchronously and can lose events
+without failing the chat or approval. Local approval success is not proof of
+telemetry delivery or an immutable audit record.
 
 Switch to the **Agent Operations** tab after Act 3. The CIO watches, in real time: how many actions
 the agents proposed, how many operators approved, the dollar value of approved replenishments and
-addressed churn LTV — each new draft and approval appearing within ~2 seconds. Behind it, it's plain
+addressed churn LTV. Confirm the actual delivery time instead of promising a
+fixed latency. Behind it, it's plain
 KQL anyone can put on a Fabric Real-Time Dashboard:
 
 ```kusto
@@ -149,8 +157,8 @@ measurable, and ready to drive the next dashboard or the next automation.
 
 In this walkthrough we showed a living digital twin of a national retailer on **one Fabric
 workspace**, with a team of AI agents on top of it that don't just answer questions — they
-recommend and execute the next best action, with a human in the loop, and write every decision
-back into the platform as real-time telemetry. To tell it in five beats:
+recommend and locally review a next action, with a human in the loop, and
+attempt to send decisions back as telemetry. To tell it in five beats:
 
 1. **"One platform."** Sales history, the relationship graph, the live event stream, and the ML
    models are all in one Fabric workspace, one copy of the data.
@@ -158,9 +166,8 @@ back into the platform as real-time telemetry. To tell it in five beats:
    English and an **orchestrator picks the right brain** — and tells you which one.
 3. **"From answers to actions."** Specialized **operations agents** turn an insight into a
    specific, costed, approvable action — with a human in the loop.
-4. **"Closed loop, governed."** Every recommendation and approval is **logged back into the
-   Eventhouse** and visible on a real-time dashboard — measurable and auditable, not a science
-   project.
+4. **"Observe the loop."** Check recommendation/approval telemetry in Eventhouse;
+   delivery is best-effort, not a production audit guarantee.
 5. **"This scales."** The same pattern adds a Pricing agent, a Logistics agent, a Marketing agent —
    each reading the same Fabric foundation. *Fabric is the operating system for a multi-agent
    retail business.*
@@ -172,19 +179,40 @@ back into the platform as real-time telemetry. To tell it in five beats:
 These deliberately span the semantic model **+** ontology **+** ML in one ask:
 
 - **Revenue-at-risk:** *"Quantify the total lifetime value tied to high-churn-risk customers —
-  dollars on the table if we do nothing."* → the Retention agent's $534M headline, with a drafted
-  campaign.
+  dollars on the table if we do nothing."* → inspect modeled LTV and limitations,
+  with a local draft campaign.
 - **Stockout → sales impact:** *"For products at high stockout risk, estimate the at-risk daily
-  sales."* → the Inventory agent's ~$62K/day, with drafted reorders.
+  sales."* → inspect the response's assumptions, with local draft reorders.
 - **Best next action per store:** *"For each underperforming store, surface its top stockout risk,
   top churn-risk customers, and top cross-sell — one prioritized action list."* → the roadmap slide:
   where the agent fleet is going.
 
 ## Appendix — pre-flight checklist
 
-- [ ] Fabric capacity **Active** (F64 auto-pauses overnight — resume before the demo).
-- [ ] Local app running at **http://127.0.0.1:8080**; `az login` as the workspace admin.
+- [ ] Fabric capacity **Active**; check the environment's actual pause policy.
+- [ ] Local app on loopback; signed in as an operator with only necessary permissions.
 - [ ] Streaming notebook running so "last 15 minutes" returns fresh data.
-- [ ] `agent_actions` table and the proposals store cleared for a clean approval funnel (so the
-      live numbers start at zero in front of the audience).
+- [ ] Preserve prior telemetry and proposal evidence; do not clear shared state
+      merely to make presentation counters start at zero.
 - [ ] One dry run of the Inventory and Retention questions (the first DAX reads take a few seconds).
+
+## Report-to-chat handoff and fallback
+
+Use Executive, Sales, Supply Chain, store/product drillthrough, Omnichannel,
+and Operations/Marketing pages to identify the period, store, product, or
+cohort before asking. A report slicer is not automatically chat context:
+include the observed key/name and period in the question. Do not invent a
+loyalty-card field on report pages that do not expose one.
+
+Prefer named-entity, single-relationship graph questions. Break broad
+multi-hop/event traversals into smaller questions or use semantic-model
+aggregation. Inspect source, grain, window, fallback, and empty/error results;
+the current live-sales shortcut has a fixed store-sales window and does not
+prove arbitrary product/window answers. See [routing](../design/specifications/modules/ml-ai/routing.md).
+
+If a service stalls, stop promising the expected answer: show a previously
+validated report view or explicitly labeled replay and retain the failure for
+follow-up. Explore broader prompts with the
+[evaluation question bank](sample-retail-questions.md), not fixed old results.
+Pricing, logistics, merchandising, and composed per-store actions remain
+[proposals](../design/specifications/modules/ml-ai/decision-experience.md).

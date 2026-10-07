@@ -1,0 +1,69 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Planning/Properties/1.0.0/schema.json",
+  "visuals": {
+    "f7ba6bb9-232b-54e3-b5cb-d6976653cc54": {
+      "schema": "0.0.1",
+      "properties": {
+        "pivotAssignments": [
+          {
+            "id": "dim_stores[ID]", "sourceId": "dim_stores[ID]",
+            "bucketId": "rows", "columnName": "ID", "tableName": "dim_stores",
+            "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI",
+            "customName": "Store ID", "order": 0
+          },
+          {
+            "id": "dim_products[ID]", "sourceId": "dim_products[ID]",
+            "bucketId": "rows", "columnName": "ID", "tableName": "dim_products",
+            "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI",
+            "customName": "SKU ID", "order": 1
+          },
+          {
+            "id": "inventory_position_current[Total Units on Hand]", "sourceId": "inventory_position_current[Total Units on Hand]",
+            "bucketId": "ameasure", "columnName": "Total Units on Hand", "tableName": "inventory_position_current",
+            "dataType": "Int64", "columnType": "Measure", "sourceType": "PowerBI",
+            "measureGuid": "whatif-stock", "order": 0
+          },
+          {
+            "id": "demand_forecast[Forecasted Units Next 7 Days]", "sourceId": "demand_forecast[Forecasted Units Next 7 Days]",
+            "bucketId": "ameasure", "columnName": "Forecasted Units Next 7 Days", "tableName": "demand_forecast",
+            "dataType": "Double", "columnType": "Measure", "sourceType": "PowerBI",
+            "measureGuid": "whatif-forecast", "order": 1
+          }
+        ],
+        "sortingConfig": [],
+        "superFilterAssignments": [
+          {
+            "id": "whatif-store-scope",
+            "pivotAssignments": [{
+              "id": "dim_stores[ID]", "sourceId": "dim_stores[ID]",
+              "bucketId": "rows", "columnName": "ID", "tableName": "dim_stores",
+              "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI"
+            }],
+            "configuration": {
+              "name": "Synthetic cohort: stores 1-5", "hide": false, "locked": true,
+              "filterMode": "advanced", "visualType": "NUMERIC",
+              "filterOperator": "between", "selectAll": false,
+              "alphaNumericValues": {"minValue": 1, "maxValue": 5}
+            },
+            "filterLevel": "visual", "position": "RIGHT"
+          },
+          {
+            "id": "whatif-product-scope",
+            "pivotAssignments": [{
+              "id": "dim_products[ID]", "sourceId": "dim_products[ID]",
+              "bucketId": "rows", "columnName": "ID", "tableName": "dim_products",
+              "dataType": "Int64", "columnType": "Column", "sourceType": "PowerBI"
+            }],
+            "configuration": {
+              "name": "Synthetic cohort: SKUs 1-20", "hide": false, "locked": true,
+              "filterMode": "advanced", "visualType": "NUMERIC",
+              "filterOperator": "between", "selectAll": false,
+              "alphaNumericValues": {"minValue": 1, "maxValue": 20}
+            },
+            "filterLevel": "visual", "position": "RIGHT"
+          }
+        ]
+      }
+    }
+  }
+}

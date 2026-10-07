@@ -64,6 +64,20 @@ table fact_stockouts
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Date of the stockout event. Hidden because report date slicing is provided by dim_date.
+	column 'Event Date'
+		dataType: dateTime
+		formatString: Short Date
+		isHidden
+		lineageTag: 5712c164-a103-4717-881a-c346b55c8f51
+		sourceLineageTag: event_date
+		summarizeBy: none
+		sourceColumn: event_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	column __index_level_0__
 		dataType: int64
 		formatString: 0
@@ -81,4 +95,3 @@ table fact_stockouts
 			entityName: fact_stockouts
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

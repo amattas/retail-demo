@@ -11,6 +11,9 @@ def test_write_table_parquet_roundtrip(spark, tmp_path):
     write_table(df, location=str(tmp_path / "t_demo"), fmt="parquet")
     back = spark.read.parquet(str(tmp_path / "t_demo"))
     assert back.count() == 5
+    assert back.schema.simpleString() == df.schema.simpleString()
+    assert back.exceptAll(df).isEmpty()
+    assert df.exceptAll(back).isEmpty()
 
 
 def test_write_table_to_catalog_signature():
@@ -50,6 +53,14 @@ def test_write_all_writes_everything_and_run_log(spark, tmp_path):
     assert (tmp_path / "ag" / "fact_receipts").exists()
     assert (tmp_path / "au" / "tender_mix_daily").exists()
     assert (tmp_path / "ag" / "dim_date").exists()
+    for database, name, source in (
+        ("ag", "fact_receipts", result.tables["fact_receipts"]),
+        ("au", "tender_mix_daily", gold["tender_mix_daily"]),
+    ):
+        restored = spark.read.parquet(str(tmp_path / database / name))
+        assert restored.schema.simpleString() == source.schema.simpleString()
+        assert restored.exceptAll(source).isEmpty()
+        assert source.exceptAll(restored).isEmpty()
     log = spark.read.parquet(str(tmp_path / "ag" / "setup_run_log"))
     completed = log.filter("run_id = 'testrun' AND status = 'COMPLETED'")
     assert completed.filter("table_name != '__run__'").count() == len(written)

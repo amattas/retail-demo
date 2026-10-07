@@ -13,6 +13,7 @@ leaves a half-written, unparseable journal behind.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import tempfile
@@ -192,6 +193,12 @@ def _find_step(journal: DeployJournal, step_id: str) -> JournalStep:
     raise KeyError(f"Unknown journal step_id: {step_id!r}")
 
 
+def get_step(journal: DeployJournal, step_id: str) -> JournalStep:
+    """Return one journal step by stable identifier."""
+
+    return _find_step(journal, step_id)
+
+
 def mark_required(journal: DeployJournal, step_id: str) -> None:
     """Promote a step to required (e.g. once the operator requests it)."""
     _find_step(journal, step_id).classification = "required"
@@ -277,8 +284,7 @@ def compute_status(journal: DeployJournal) -> RunStatus:
     if any(s.status in ("PENDING", "RUNNING") for s in journal.steps):
         return "RUNNING"
     if any(
-        s.status == "DEGRADED"
-        or (s.status == "FAILED" and s.classification == "optional")
+        s.status == "DEGRADED" or (s.status == "FAILED" and s.classification == "optional")
         for s in journal.steps
     ):
         return "DEGRADED"
@@ -290,11 +296,20 @@ def write(repo_root: Path, journal: DeployJournal) -> None:
     journal.status = compute_status(journal)
     journal.updated_at = _utc_now()
     path = journal_path(repo_root, journal.environment)
+    if path.is_file():
+        previous = read(repo_root, journal.environment)
+        if previous.run_id != journal.run_id:
+            archive_id = hashlib.sha256(previous.run_id.encode("utf-8")).hexdigest()
+            _write_atomic(path.parent / "run-history" / f"{archive_id}.json", previous.to_dict())
+    _write_atomic(path, journal.to_dict())
+
+
+def _write_atomic(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".deploy-run-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(journal.to_dict(), handle, indent=2, sort_keys=False)
+            json.dump(payload, handle, indent=2, sort_keys=False)
             handle.write("\n")
         for attempt in range(1, _REPLACE_ATTEMPTS + 1):
             try:
@@ -307,3 +322,46 @@ def write(repo_root: Path, journal: DeployJournal) -> None:
     finally:
         if os.path.exists(tmp_name):
             os.remove(tmp_name)
+
+
+def read(repo_root: Path, env: str) -> DeployJournal:
+    """Load and validate the latest durable journal for an environment."""
+
+    path = journal_path(repo_root, env)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"invalid deploy journal at {path}: expected an object")
+    if payload.get("environment") != env:
+        raise ValueError(
+            f"deploy journal environment mismatch: expected {env!r}, "
+            f"found {payload.get('environment')!r}"
+        )
+    try:
+        steps = [JournalStep(**step) for step in payload["steps"]]
+        statuses = {"PENDING", "RUNNING", "SUCCEEDED", "DEGRADED", "SKIPPED", "FAILED"}
+        if (
+            payload["status"] not in {"RUNNING", "SUCCEEDED", "DEGRADED", "FAILED"}
+            or len({step.step_id for step in steps}) != len(steps)
+            or any(
+                not step.step_id
+                or step.status not in statuses
+                or step.classification not in {"required", "optional"}
+                or (step.status == "SUCCEEDED" and step.exit_code != 0)
+                for step in steps
+            )
+            or not isinstance(payload.get("manifest"), dict)
+            or not isinstance(payload.get("targets"), dict)
+        ):
+            raise ValueError("journal statuses, identity or step inventory are invalid")
+        return DeployJournal(
+            run_id=str(payload["run_id"]),
+            environment=str(payload["environment"]),
+            status=payload["status"],
+            started_at=str(payload["started_at"]),
+            updated_at=str(payload["updated_at"]),
+            targets=dict(payload.get("targets", {})),
+            manifest=dict(payload.get("manifest", {})),
+            steps=steps,
+        )
+    except (KeyError, TypeError) as exc:
+        raise ValueError(f"invalid deploy journal at {path}: {exc}") from exc

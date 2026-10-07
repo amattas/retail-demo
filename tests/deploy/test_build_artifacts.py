@@ -638,7 +638,9 @@ def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> 
     assert not (output / "Pipelines" / "machine-learning.DataPipeline").exists()
 
 
-def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
+def test_stage_pipelines_injects_configured_lakehouse_parameter(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
     output = tmp_path / "workspace"
@@ -649,6 +651,7 @@ def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
         output,
         ["streaming-data-load.DataPipeline"],
         {"03-streaming-to-silver"},
+        lakehouse_name="tenant_lakehouse",
     )
 
     content = json.loads(
@@ -664,6 +667,11 @@ def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
         "Notebook", "03-streaming-to-silver"
     )
     assert type_properties["workspaceId"] == build_artifacts._CURRENT_WORKSPACE_ID
+    parameters = type_properties["parameters"]
+    assert parameters["LAKEHOUSE_NAME"] == {
+        "value": "tenant_lakehouse",
+        "type": "string",
+    }
 
 
 def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
@@ -758,6 +766,29 @@ def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     item = out_dir / "setup-03-generate-facts.Notebook"
     assert (item / ".platform").exists()
     assert (item / "notebook-content.ipynb").exists()
+
+
+def test_setup_group_uses_explicit_environment_render_directory(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    out_dir = tmp_path / "workspace"
+    rendered = repo / "utility" / "out" / "dev"
+    rendered.mkdir(parents=True)
+    for name in build_artifacts.SETUP_NOTEBOOKS:
+        _write_json(
+            rendered / f"{name}.ipynb",
+            {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
+        )
+
+    staged = build_artifacts.stage_setup_notebooks(
+        repo_root=repo,
+        output_dir=out_dir,
+        lakehouse_name="lh",
+        rendered_dir=rendered,
+    )
+
+    assert len(staged) == len(build_artifacts.SETUP_NOTEBOOKS)
 
 
 def test_setup_group_requires_rendered_notebooks(tmp_path: Path) -> None:

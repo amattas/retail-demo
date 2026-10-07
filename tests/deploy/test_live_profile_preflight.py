@@ -81,7 +81,7 @@ def _settings(*, ontology_enabled: bool = True):
 
 
 def _stub_collections(monkeypatch, capacities, settings):
-    def get(_session, url):
+    def get(_session, url, **_kwargs):
         if url == live_profile_preflight.CAPACITIES_URL:
             return capacities
         if url == live_profile_preflight.TENANT_SETTINGS_URL:
@@ -162,3 +162,98 @@ def test_security_group_scoped_setting_fails_closed(monkeypatch) -> None:
 
     with pytest.raises(LiveProfilePreflightError, match="security-group scoped"):
         validate_live_profile_preflight(object(), _config())
+
+
+def test_read_only_preflight_does_not_resume_inactive_capacity(monkeypatch):
+    capacity = {**_capacity(), "state": "Inactive"}
+    _stub_collections(monkeypatch, [capacity], _settings())
+    with pytest.raises(LiveProfilePreflightError, match="not Active"):
+        validate_live_profile_preflight(object(), _config())
+
+
+def test_missing_capacity_may_wait_but_ambiguous_capacity_never_resumes():
+    config = _config()
+    assert live_profile_preflight._resolve_capacity([], config, allow_missing=True) is None
+    with pytest.raises(LiveProfilePreflightError, match="found 2"):
+        live_profile_preflight._resolve_capacity(
+            [_capacity(), _capacity()], config, allow_missing=True,
+        )
+
+
+@pytest.mark.parametrize("resume", [False, True])
+@pytest.mark.parametrize("explicit_resource", [False, True])
+def test_cli_resumes_only_when_requested_and_uses_configured_target(
+    monkeypatch, resume, explicit_resource,
+):
+    from deploy.scripts import capacity_resume, deploy_config
+
+    config = _config()
+    resource = (
+        "/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/demo"
+        "/providers/Microsoft.Fabric/capacities/demo-capacity"
+    )
+    resource = resource if explicit_resource else None
+    config = replace(config, workspace=replace(config.workspace, capacity_resource_id=resource))
+    monkeypatch.setattr(deploy_config, "load_environment", lambda *args, **kwargs: config)
+    _stub_collections(monkeypatch, [_capacity()], _settings())
+    sessions = []
+    monkeypatch.setattr(
+        live_profile_preflight, "build_session",
+        lambda **kwargs: sessions.append(kwargs) or object(),
+    )
+    requests = []
+
+    def ensure(get_capacity, **kwargs):
+        assert get_capacity()["id"] == "capacity-id"
+        requests.append(kwargs)
+
+    monkeypatch.setattr(capacity_resume, "ensure_capacity_active", ensure)
+    monkeypatch.setattr(
+        live_profile_preflight.sys, "argv",
+        ["live_profile_preflight", "--environment", "dev",
+         "--auth-mode", "azure_powershell", *(["--resume-capacity"] if resume else [])],
+    )
+    assert live_profile_preflight.main() == 0
+    assert sessions == [{"auth_mode": "azure_powershell", "tenant_id": config.tenant_id}]
+    assert len(requests) == int(resume)
+    if resume:
+        assert requests[0]["resource_id"] == resource
+        assert requests[0]["expected_name"] == config.workspace.capacity_name
+        assert requests[0]["tenant_id"] == config.tenant_id
+
+
+def test_cli_stops_when_resume_fails(monkeypatch):
+    from deploy.scripts import capacity_resume, deploy_config
+
+    monkeypatch.setattr(deploy_config, "load_environment", lambda *args, **kwargs: _config())
+    monkeypatch.setattr(live_profile_preflight, "build_session", lambda **kwargs: object())
+    monkeypatch.setattr(live_profile_preflight, "validate_live_profile_preflight",
+                        lambda *args: pytest.fail("must not proceed after failed resume"))
+
+    def fail(*args, **kwargs):
+        raise capacity_resume.CapacityResumeError("permission denied")
+
+    monkeypatch.setattr(capacity_resume, "ensure_capacity_active", fail)
+    monkeypatch.setattr(
+        live_profile_preflight.sys, "argv",
+        ["live_profile_preflight", "--environment", "dev", "--resume-capacity"],
+    )
+    assert live_profile_preflight.main() == 1
+
+
+def test_standalone_preflight_defaults_to_configured_authentication(monkeypatch):
+    from deploy.scripts import deploy_config
+
+    config = replace(_config(), auth_mode="azure_powershell")
+    monkeypatch.setattr(deploy_config, "load_environment", lambda *args, **kwargs: config)
+    _stub_collections(monkeypatch, [_capacity()], _settings())
+    sessions = []
+    monkeypatch.setattr(
+        live_profile_preflight, "build_session",
+        lambda **kwargs: sessions.append(kwargs) or object(),
+    )
+    monkeypatch.setattr(
+        live_profile_preflight.sys, "argv", ["live_profile_preflight", "--environment", "dev"],
+    )
+    assert live_profile_preflight.main() == 0
+    assert sessions == [{"auth_mode": "azure_powershell", "tenant_id": config.tenant_id}]

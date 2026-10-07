@@ -83,6 +83,23 @@ current production inference selects its cohort independently. Churn and
 stockout partition on label-availability dates and purge 90-day and three-day
 forward-label horizons, respectively.
 
+### Stockout inventory semantics
+
+The inventory ledger retains signed balances; a deficit is not a negative
+number of available units. Notebook 12 selects the latest inventory event
+per store/product/day, then derives model `current_inventory` as
+`max(balance, 0)` for known balances. Both training and current inference use
+that same snapshot function, so derived `days_of_inventory` and inventory
+ratios remain nonnegative. This does not rewrite the underlying ledger.
+
+Unknown balances remain null, and the producer rejects any null inventory
+balance before training. A null must never be converted to zero by Spark's
+`greatest` null-skipping behavior. Notebook 15 continues to reject negative
+inventory/demand/coverage, invalid classes/horizons/ranks, and inconsistent
+as-of timestamps. Its stockout error reports per-rule violation counts.
+`utility/tests/generation/test_stockout_contract_runtime.py` executes the
+producer feature functions and the downstream domain validator together.
+
 Churn retains hidden nullable `is_churned_actual` solely as a deprecated
 compatibility projection and always writes it as null. All formerly exposed
 required columns remain present, so a failed required-ML gate can leave the
@@ -147,7 +164,7 @@ persisted.
 
 ## Data Agents
 
-Source-controlled Data Agent definitions reference authoring-workspace GUIDs.
+Source-controlled Data Agent definitions require target-specific rebinding.
 They are staged after ontology creation in the same `full-demo` deployment.
 That completion phase rewrites:
 
@@ -155,10 +172,14 @@ That completion phase rewrites:
 - semantic-model `artifactId`
 - ontology `artifactId`
 
-Current datasource files leave `dataSourceInstructions` and `userDescription`
-unset. Mandatory per-agent governance metadata is outside the default release.
-Persona-specific instructions and approved-question packs remain optional under
-`ENH-003`.
+Current draft and published datasource snapshots include
+`dataSourceInstructions` and `userDescription`; `.platform` descriptions
+distinguish semantic-model and ontology scope. Source schema validation and
+matching local draft/published snapshots do not prove remote publication,
+permissions, or behavior. Rebind and verify the deployed agents in Fabric.
+Mandatory per-agent governance metadata remains outside the default release;
+richer persona-specific instructions and approved-question packs remain
+optional under `ENH-003`.
 
 ## Preview and support boundary
 

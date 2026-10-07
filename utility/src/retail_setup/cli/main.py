@@ -1,7 +1,7 @@
 """retail-setup CLI.
 
 `configure` collects environment values (written to deploy/config/) and
-generation values (validated via GenerationConfig, written to utility/config.yaml).
+environment-scoped generation values (validated via GenerationConfig).
 `render` injects configured values into the committed setup notebooks.
 """
 
@@ -23,7 +23,7 @@ import typer
 import yaml
 from pydantic import ValidationError
 
-from retail_setup.cli import _deploy_journal
+from retail_setup.cli import _deploy_journal, _deploy_resume
 from retail_setup.config.generation import GenerationConfig, load_generation_config
 from retail_setup.dictionaries.loader import (
     available_store_types,
@@ -86,6 +86,27 @@ def _default_repo_root() -> Path:
         if (candidate / "deploy" / "config").is_dir():
             return candidate
     return cwd
+
+
+def _generation_config_path(repo_root: Path, env: str) -> Path:
+    """Return the environment-scoped generation configuration path."""
+
+    return repo_root / "utility" / "config" / "environments" / f"{env}.yaml"
+
+
+def _resolve_generation_config_path(repo_root: Path, env: str) -> Path:
+    """Prefer environment-scoped generation config, with a legacy fallback."""
+
+    scoped = _generation_config_path(repo_root, env)
+    if scoped.is_file():
+        return scoped
+    return repo_root / "utility" / "config.yaml"
+
+
+def _render_output_dir(repo_root: Path, env: str) -> Path:
+    """Return the isolated render directory for one deployment environment."""
+
+    return repo_root / "utility" / "out" / env
 
 
 def _set_by_path(data: dict[str, Any], dotted: str, value: Any) -> None:
@@ -587,11 +608,6 @@ def configure(
         raise typer.Exit(code=1)
 
     base_config = _load_yaml_mapping(deploy_yml)
-    gen_path = repo_root / "utility" / "config.yaml"
-    existing_generation: dict[str, Any] = {}
-    if gen_path.is_file():
-        existing_generation = _load_yaml_mapping(gen_path)
-
     store_types = _available_store_types()
     store_type_prompt = (
         f"Store type (available: {', '.join(store_types)})" if store_types else "Store type"
@@ -623,6 +639,11 @@ def configure(
     )
     env = _environment_name_for_workspace(repo_root, workspace_name)
     env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    gen_path = _generation_config_path(repo_root, env)
+    existing_generation_path = _resolve_generation_config_path(repo_root, env)
+    existing_generation: dict[str, Any] = {}
+    if existing_generation_path.is_file():
+        existing_generation = _load_yaml_mapping(existing_generation_path)
     env_config = _load_yaml_mapping(env_yml) if env_yml.is_file() else {}
     existing_workspace = _get_by_path(env_config, "workspace.name")
     if existing_workspace is not None and str(existing_workspace) != workspace_name:
@@ -891,8 +912,62 @@ def _wait_for_workspace_deletion(
     )
 
 
+def _terraform_plan_guard(repo_root: Path, env: str) -> None:
+    """Create a plan and reject implicit destruction of data-bearing resources."""
+
+    generated = f"../.generated/{env}"
+    plan_file = f"{generated}/terraform.tfplan"
+    process_environment = os.environ.copy()
+    process_environment["TF_DATA_DIR"] = str(
+        (repo_root / "deploy" / ".generated" / env / ".terraform").resolve()
+    )
+    plan = subprocess.run(
+        [
+            "terraform",
+            "-chdir=deploy/terraform",
+            "plan",
+            "-detailed-exitcode",
+            f"-out={plan_file}",
+            f"-var-file={generated}/terraform.tfvars",
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        env=process_environment,
+    )
+    if plan.returncode not in {0, 2}:
+        raise RuntimeError(plan.stderr.strip() or "terraform plan failed")
+    shown = subprocess.run(
+        [
+            "terraform",
+            "-chdir=deploy/terraform",
+            "show",
+            "-json",
+            plan_file,
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        env=process_environment,
+    )
+    if shown.returncode != 0:
+        raise RuntimeError(shown.stderr.strip() or "terraform show failed")
+    plan_payload = json.loads(shown.stdout)
+    destructive = _deploy_resume.validate_plan_changes(plan_payload)
+    if destructive:
+        raise RuntimeError(
+            "Terraform plan would destroy or replace data-bearing resources: "
+            + ", ".join(sorted(destructive))
+            + ". Use --recreate for an explicit clean-slate deployment."
+        )
+    for resource in plan_payload.get("resource_changes", []):
+        actions = resource["change"]["actions"]
+        if actions != ["no-op"]:
+            typer.echo(f"  {resource['address']}: {', '.join(actions)}")
+
+
 def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
-    """Pin the dictionary ref: explicit --ref, else HEAD SHA, else 'main' with a warning."""
+    """Use the explicit ref or require a resolvable immutable checkout revision."""
     if ref:
         return ref
     try:
@@ -903,13 +978,18 @@ def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
             text=True,
             check=True,
         )
-        return result.stdout.strip()
+        revision = result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         typer.echo(
-            "warning: could not resolve git HEAD; using dictionary ref 'main'",
+            "Could not resolve git HEAD; pass --ref with an immutable commit "
+            "revision instead of silently using mutable 'main'.",
             err=True,
         )
-        return "main"
+        raise typer.Exit(code=1) from None
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", revision):
+        typer.echo("git HEAD did not resolve to a commit revision; pass --ref.", err=True)
+        raise typer.Exit(code=1)
+    return revision
 
 
 @app.command()
@@ -922,15 +1002,20 @@ def render(
         None, "--ref", help="Git ref to pin dictionaries to (default: current HEAD)."
     ),
     output_dir: Optional[Path] = typer.Option(
-        None, "--output-dir", help="Directory for rendered notebooks (default: utility/out)."
+        None,
+        "--output-dir",
+        help="Directory for rendered notebooks (default: utility/out/<env>).",
     ),
 ) -> None:
     """Render the setup notebooks with configured values."""
     repo_root = repo_root.resolve()
 
-    gen_path = repo_root / "utility" / "config.yaml"
+    gen_path = _resolve_generation_config_path(repo_root, env)
     if not gen_path.is_file():
-        typer.echo(f"{gen_path} not found; run `retail-setup configure` first")
+        typer.echo(
+            f"No generation config found for environment {env!r}; "
+            "run `retail-setup configure` first"
+        )
         raise typer.Exit(code=1)
     try:
         generation = load_generation_config(gen_path)
@@ -970,7 +1055,7 @@ def render(
     }
 
     target_dir = (
-        output_dir if output_dir is not None else repo_root / "utility" / "out"
+        output_dir if output_dir is not None else _render_output_dir(repo_root, env)
     )
     written = render_notebooks(
         values,
@@ -1138,6 +1223,8 @@ def _post_ontology_steps(
                 report_name,
                 "--publication-phase",
                 "post-ontology",
+                "--output-dir",
+                f"deploy/.generated/{env}/workspace",
                 "--inventory-output",
                 f"deploy/.generated/{env}/artifact-inventory-post-ontology.json",
             ],
@@ -1205,6 +1292,29 @@ def _post_ontology_steps(
     return steps
 
 
+def _validate_operations_planning_prerequisites(
+    enabled: bool,
+    plan_connection_id: str | None,
+    plan_billing_acknowledged: bool,
+    include_plan: bool = True,
+) -> None:
+    """Reject incomplete full-pack requests before any deployment commands."""
+    if not enabled or not include_plan:
+        return
+    missing = []
+    if not plan_connection_id or not plan_connection_id.strip():
+        missing.append("operations_planning.plan_connection_id")
+    if plan_billing_acknowledged is not True:
+        missing.append("operations_planning.plan_billing_acknowledged=true")
+    if missing:
+        raise ValueError(
+            "The complete Operations/Planning pack requires "
+            + " and ".join(missing)
+            + ". For explicit partial setup, use the standalone "
+            "deploy.scripts.deploy_operations_planning publisher with --operations-only."
+        )
+
+
 def _deploy_plan(
     env: str,
     skip_terraform: bool,
@@ -1219,10 +1329,31 @@ def _deploy_plan(
     profile: ResolvedProfile | None = None,
     interactive_preflight: bool = False,
     repo_root: Path | None = None,
+    operations_planning_enabled: bool = False,
+    include_native_plan: bool = True,
+    plan_connection_id: str | None = None,
+    plan_billing_acknowledged: bool = False,
+    twins_enabled: bool = False,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     repo_root = (repo_root or _default_repo_root()).resolve()
     profile = profile or _default_deployment_profile(repo_root)
+    if operations_planning_enabled and (
+        not profile.provisions_eventhouse or not profile.selects("asset.semantic-model")
+    ):
+        raise ValueError("Operations/Planning requires Eventhouse and a semantic model.")
+    if twins_enabled and (
+        not profile.selects("asset.semantic-model") or not profile.selects("asset.report")
+    ):
+        raise ValueError("Connected twins require a Reporting profile with a semantic model.")
+    if twins_enabled and report_name.casefold() == "retail-twins":
+        raise ValueError("Connected twins cannot replace the primary report.")
+    _validate_operations_planning_prerequisites(
+        operations_planning_enabled,
+        plan_connection_id,
+        plan_billing_acknowledged,
+        include_native_plan,
+    )
     py = sys.executable
     tf_output = f"deploy/.generated/{env}/terraform-output.json"
     tenant_args = ["--tenant-id", tenant_id] if tenant_id else []
@@ -1243,6 +1374,7 @@ def _deploy_plan(
         str(repo_root),
         "--environment",
         env,
+        "--source-only",
     ]
     if recreate:
         preflight_command.append("--recreate")
@@ -1258,6 +1390,7 @@ def _deploy_plan(
         env,
         "--auth-mode",
         auth_mode,
+        "--resume-capacity",
     ]
     if tenant_id:
         live_preflight_command.extend(["--tenant-id", tenant_id])
@@ -1284,7 +1417,7 @@ def _deploy_plan(
         ),
         DeployStep(
             cmd=live_preflight_command,
-            description="Validate live tenant and capacity prerequisites",
+            description="Ensure capacity is active and validate tenant prerequisites",
             step_id="live-profile-preflight",
         ),
         DeployStep(
@@ -1363,12 +1496,26 @@ def _deploy_plan(
                 cmd=[
                     "terraform",
                     "-chdir=deploy/terraform",
-                    "apply",
-                    "-auto-approve",
+                    "plan",
+                    "-detailed-exitcode",
+                    f"-out={generated_root}/terraform.tfplan",
                     f"-var-file={var_file}",
                 ],
+                description="Plan and validate Terraform changes",
+                step_id="terraform-plan-guard",
+                action=lambda root: _terraform_plan_guard(root, env),
+                process_environment=terraform_environment,
+            ),
+            DeployStep(
+                cmd=[
+                    "terraform",
+                    "-chdir=deploy/terraform",
+                    "apply",
+                    "-auto-approve",
+                    f"{generated_root}/terraform.tfplan",
+                ],
                 needs_confirmation=True,
-                description="Terraform apply (previews changes; auto-approved after you confirm)",
+                description="Apply the reviewed Terraform plan (after confirmation)",
                 step_id="terraform-apply",
                 process_environment=terraform_environment,
             ),
@@ -1417,6 +1564,7 @@ def _deploy_plan(
     reporting_is_gated = profile.reporting_gate_pipeline_ref is not None
 
     def build_step(phase: str, step_id: str, description: str) -> DeployStep:
+        rendered_dir = f"utility/out/{env}"
         return DeployStep(
             cmd=[
                 py,
@@ -1436,10 +1584,14 @@ def _deploy_plan(
                 report_name,
                 "--publication-phase",
                 phase,
+                "--output-dir",
+                f"deploy/.generated/{env}/workspace",
                 "--inventory-output",
                 f"deploy/.generated/{env}/artifact-inventory-{phase}.json",
                 "--render-manifest",
-                f"utility/out/{_RENDER_MANIFEST}",
+                f"{rendered_dir}/{_RENDER_MANIFEST}",
+                "--rendered-dir",
+                rendered_dir,
             ],
             description=description,
             step_id=step_id,
@@ -1646,6 +1798,54 @@ def _deploy_plan(
                 step_id="validate-reporting",
             )
         )
+    if twins_enabled:
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.deploy_twins",
+                    "--environment",
+                    env,
+                    "--repo-root",
+                    str(repo_root),
+                ],
+                description="Publish connected Store, Warehouse and Truck twins report",
+                step_id="deploy-twins",
+                required=True,
+                failure_message=(
+                    "Requested connected twins report failed. Inspect "
+                    "twins-report.json before retrying."
+                ),
+                evidence_path=f"deploy/.generated/{env}/twins-report.json",
+            )
+        )
+    if operations_planning_enabled:
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.deploy_operations_planning",
+                    "--environment",
+                    env,
+                    "--repo-root",
+                    str(repo_root),
+                    *([] if include_native_plan else ["--operations-only"]),
+                ],
+                description=(
+                    "Publish stopped Operations Agent and native replenishment Plan"
+                    if include_native_plan else "Publish stopped Operations Agent"
+                ),
+                step_id="deploy-operations-planning",
+                required=True,
+                failure_message=(
+                    "Requested Operations/Planning pack failed; native publication "
+                    "is incomplete. Inspect operations-planning-report.json before retrying."
+                ),
+                evidence_path=f"deploy/.generated/{env}/operations-planning-report.json",
+            )
+        )
     if profile.selects("asset.data-agents"):
         steps.extend(
             _post_ontology_steps(
@@ -1831,6 +2031,66 @@ def _journal_abort(
     _deploy_journal.write(repo_root, journal)
 
 
+def _resume_succeeded_prefix(
+    previous: _deploy_journal.DeployJournal,
+    current: _deploy_journal.DeployJournal,
+) -> int:
+    """Copy only a compatible, contiguous succeeded prefix into a new run."""
+
+    if previous.environment != current.environment:
+        raise ValueError("deploy journal belongs to a different environment")
+    if previous.status in {"SUCCEEDED", "DEGRADED"}:
+        raise ValueError("the prior deployment already completed")
+    if previous.targets != current.targets:
+        raise ValueError("deploy targets changed since the journaled run")
+    compatibility_keys = (
+        "hash", "profile_id", "profile_name", "plan_step_ids", "input_fingerprint"
+    )
+    for key in compatibility_keys:
+        if (
+            key not in previous.manifest
+            or previous.manifest.get(key) != current.manifest.get(key)
+        ):
+            raise ValueError(f"deploy plan changed since the journaled run ({key})")
+    previous_steps = {step.step_id: step for step in previous.steps}
+    resumed = 0
+    for step in current.steps:
+        old = previous_steps.get(step.step_id)
+        if old is None or old.status != "SUCCEEDED":
+            break
+        _deploy_journal.mark_succeeded(
+            current,
+            step.step_id,
+            exit_code=old.exit_code or 0,
+            started_at=old.started_at,
+            ended_at=old.ended_at,
+            evidence_id=old.evidence_id,
+        )
+        resumed += 1
+    pending = next(
+        (step.step_id for step in current.steps if step.status != "SUCCEEDED"), None
+    )
+    # Recreate ephemeral prerequisites if their consuming step will be retried.
+    prerequisites = {
+        "terraform-apply": "terraform-plan-guard",
+        "deploy-items": "build-artifacts",
+        "deploy-infrastructure": "build-infrastructure",
+        "deploy-reporting": "build-reporting",
+        "deploy-post-ontology": "build-post-ontology",
+    }
+    # Capacity can be paused between attempts, even after an earlier preflight passed.
+    restart_steps = {"live-profile-preflight"}
+    if pending in prerequisites:
+        restart_steps.add(prerequisites[pending])
+    for step in current.steps:
+        if step.step_id in restart_steps and step.status == "SUCCEEDED":
+            step.status = "PENDING"
+            step.started_at = step.ended_at = None
+            step.exit_code = None
+            resumed -= 1
+    return resumed
+
+
 def _run_plan_plain(
     repo_root: Path,
     env: str,
@@ -1847,6 +2107,9 @@ def _run_plan_plain(
     """
     _ = env
     for i, step in enumerate(plan, start=1):
+        if _deploy_journal.get_step(journal, step.step_id).status == "SUCCEEDED":
+            typer.echo(f"Skipping completed step {i}/{total}: {step.description}")
+            continue
         _echo_step(i, total, step)
         _command_divider(f"Running step {i}/{total}: {step.description}", step.cmd)
         if step.needs_confirmation and not yes:
@@ -1964,6 +2227,11 @@ def deploy(
         "--recreate",
         help="Destroy the existing workspace and recreate it (clean slate).",
     ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Resume the compatible succeeded prefix from the last deploy journal.",
+    ),
 ) -> None:
     """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
 
@@ -1977,6 +2245,12 @@ def deploy(
     optional.
     """
     repo_root = repo_root.resolve()
+    if resume and dry_run:
+        typer.echo("--resume cannot be combined with --dry-run.", err=True)
+        raise typer.Exit(code=1)
+    if resume and recreate:
+        typer.echo("--resume cannot be combined with --recreate.", err=True)
+        raise typer.Exit(code=1)
     if recreate and skip_terraform:
         typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
         raise typer.Exit(code=1)
@@ -2051,7 +2325,22 @@ def deploy(
             )
             raise typer.Exit(code=1) from exc
     else:
-        deploy_config = _load_deploy_environment(repo_root, env)
+        try:
+            deploy_config = _load_deploy_environment(repo_root, env)
+        except (
+            ImportError,
+            typer.Exit,
+            OSError,
+            KeyError,
+            TypeError,
+            ValueError,
+            yaml.YAMLError,
+        ) as exc:
+            typer.echo(
+                f"Invalid deployment config: {exc}",
+                err=True,
+            )
+            raise typer.Exit(code=1) from exc
         lakehouse = deploy_config.lakehouse.name
         auth_mode = deploy_config.auth_mode
         ws_name = deploy_config.workspace.name
@@ -2060,6 +2349,20 @@ def deploy(
         semantic_model = deploy_config.powerbi.semantic_model_name
         report_name = deploy_config.powerbi.report_name
         profile = deploy_config.profile
+
+    native = deploy_config.operations_planning if deploy_config is not None else None
+    twins = deploy_config.twins if deploy_config is not None else None
+    if native is not None:
+        try:
+            _validate_operations_planning_prerequisites(
+                native.enabled,
+                native.plan_connection_id,
+                native.plan_billing_acknowledged,
+                native.include_plan,
+            )
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=1) from exc
 
     try:
         if deploy_config is not None:
@@ -2086,11 +2389,19 @@ def deploy(
             typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
 
+    previous_journal = None
+    if resume:
+        try:
+            previous_journal = _deploy_journal.read(repo_root, env)
+            recreate = _deploy_resume.recreate_mode(previous_journal)
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+            typer.echo(f"Cannot resume deployment: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
     if not dry_run:
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.
-        if not recreate and not skip_terraform and not yes:
+        if not resume and not recreate and not skip_terraform and not yes:
             if _workspace_exists(repo_root, ws_name):
                 typer.echo("")
                 typer.echo(f"Workspace '{ws_name}' already exists from a previous deploy.")
@@ -2116,6 +2427,13 @@ def deploy(
         profile=profile,
         interactive_preflight=sys.stdin.isatty() and not yes,
         repo_root=repo_root,
+        operations_planning_enabled=native.enabled if native is not None else False,
+        include_native_plan=native.include_plan if native is not None else True,
+        plan_connection_id=native.plan_connection_id if native is not None else None,
+        plan_billing_acknowledged=(
+            native.plan_billing_acknowledged if native is not None else False
+        ),
+        twins_enabled=twins.enabled if twins is not None else False,
     )
     total = len(plan)
 
@@ -2127,60 +2445,65 @@ def deploy(
             _echo_step(i, total, step)
         return
 
+    journal_targets = {
+        "workspace_name": ws_name,
+        "lakehouse_name": lakehouse,
+        "auth_mode": auth_mode,
+        "recreate": str(recreate),
+        "profile": profile.deployment_name,
+        "asset_count": str(len(profile.assets)),
+        "asset_ids": ",".join(profile.asset_ids),
+        "notebook_groups": ",".join(profile.notebook_groups),
+        "pipeline_count": str(len(profile.pipeline_refs)),
+        "pipeline_refs": ",".join(profile.pipeline_refs),
+        "kql_script_count": str(len(profile.kql_scripts)),
+        "kql_scripts": ",".join(profile.kql_scripts),
+        "item_types": ",".join(profile.item_types_in_scope),
+        "twins_enabled": str(twins.enabled if twins is not None else False),
+    }
+    journal_manifest = {
+        "version": profile.manifest_version,
+        "hash": profile.manifest_hash,
+        "input_fingerprint": _deploy_resume.fingerprint(
+            repo_root,
+            env,
+            _resolve_generation_config_path(repo_root, env),
+            [step.cmd for step in plan],
+        ),
+        "profile_id": profile.id,
+        "profile_name": profile.deployment_name,
+        "profile_support_status": profile.support_status,
+        "expected_item_counts": {
+            "infrastructure": profile.publication.infrastructure_item_count,
+            "reporting": profile.publication.reporting_item_count,
+            "all": profile.publication.all_item_count,
+        },
+        "workspace_folders": {
+            "infrastructure": list(profile.publication.infrastructure_folders),
+            "reporting": list(profile.publication.reporting_folders),
+            "all": list(profile.publication.all_folders),
+        },
+        "asset_boundaries": {
+            "core": [asset.id for asset in profile.assets if asset.support_status == "core"],
+            "optional": [
+                asset.id for asset in profile.assets if asset.support_status == "optional"
+            ],
+            "preview": list(profile.preview_asset_ids),
+            "manual": list(profile.manual_asset_ids),
+        },
+        "boundaries": {
+            **profile.boundaries.model_dump(mode="json"),
+            "supported": profile.boundaries.supported,
+        },
+        "plan_step_ids": [
+            *[step.step_id for step in plan],
+            *(["verify-readiness"] if profile.post_deploy_pipeline_ref is not None else []),
+        ],
+    }
     run_journal = _deploy_journal.start_run(
         env,
-        targets={
-            "workspace_name": ws_name,
-            "lakehouse_name": lakehouse,
-            "auth_mode": auth_mode,
-            "recreate": str(recreate),
-            "profile": profile.deployment_name,
-            "asset_count": str(len(profile.assets)),
-            "asset_ids": ",".join(profile.asset_ids),
-            "notebook_groups": ",".join(profile.notebook_groups),
-            "pipeline_count": str(len(profile.pipeline_refs)),
-            "pipeline_refs": ",".join(profile.pipeline_refs),
-            "kql_script_count": str(len(profile.kql_scripts)),
-            "kql_scripts": ",".join(profile.kql_scripts),
-            "item_types": ",".join(profile.item_types_in_scope),
-        },
-        manifest={
-            "version": profile.manifest_version,
-            "hash": profile.manifest_hash,
-            "profile_id": profile.id,
-            "profile_name": profile.deployment_name,
-            "profile_support_status": profile.support_status,
-            "expected_item_counts": {
-                "infrastructure": profile.publication.infrastructure_item_count,
-                "reporting": profile.publication.reporting_item_count,
-                "all": profile.publication.all_item_count,
-            },
-            "workspace_folders": {
-                "infrastructure": list(
-                    profile.publication.infrastructure_folders
-                ),
-                "reporting": list(profile.publication.reporting_folders),
-                "all": list(profile.publication.all_folders),
-            },
-            "asset_boundaries": {
-                "core": [
-                    asset.id
-                    for asset in profile.assets
-                    if asset.support_status == "core"
-                ],
-                "optional": [
-                    asset.id
-                    for asset in profile.assets
-                    if asset.support_status == "optional"
-                ],
-                "preview": list(profile.preview_asset_ids),
-                "manual": list(profile.manual_asset_ids),
-            },
-            "boundaries": {
-                **profile.boundaries.model_dump(mode="json"),
-                "supported": profile.boundaries.supported,
-            },
-        },
+        targets=journal_targets,
+        manifest=journal_manifest,
     )
     for step in plan:
         _deploy_journal.add_step(
@@ -2200,6 +2523,21 @@ def deploy(
                 f"deploy/.generated/{env}/readiness-report.json"
             ),
         )
+    if resume:
+        try:
+            assert previous_journal is not None
+            resumed_steps = _resume_succeeded_prefix(previous_journal, run_journal)
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
+            typer.echo(f"Cannot resume deployment: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        if resumed_steps == 0:
+            typer.echo(
+                "Cannot resume deployment: the prior journal has no compatible "
+                "succeeded prefix.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        typer.echo(f"Resuming after {resumed_steps} completed deployment steps.")
     _deploy_journal.write(repo_root, run_journal)
 
     _run_plan_plain(repo_root, env, plan, total, yes=yes, journal=run_journal)
@@ -2217,10 +2555,15 @@ def deploy(
     _hr("=")
     typer.echo(f"  Deploy complete for environment '{env}'.")
     if run_journal.status == "DEGRADED":
-        typer.echo(
-            "  Note: a non-critical step was skipped or failed; see "
-            f"{_deploy_journal.journal_path(repo_root, env)} for details."
-        )
+        optional_failures = [
+            step.description for step in run_journal.steps
+            if step.classification == "optional" and step.status == "FAILED"
+        ]
+        if optional_failures:
+            typer.echo("  Optional steps failed: " + "; ".join(optional_failures), err=True)
+        else:
+            typer.echo("  Required deployment is ready; non-blocking readiness notices remain.")
+        typer.echo(f"  Details: {_deploy_journal.journal_path(repo_root, env)}")
     _hr("=")
 
 
@@ -2423,8 +2766,8 @@ def _verify_readiness_after_deploy(
         )
         _deploy_journal.write(repo_root, journal)
         typer.echo(
-            "Live readiness is degraded; see the linked readiness report.",
-            err=True,
+            "Required deployment checks passed. Remaining readiness notices "
+            "are non-blocking; see the linked report."
         )
         return
     _journal_abort(

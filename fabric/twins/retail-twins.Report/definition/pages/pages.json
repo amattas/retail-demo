@@ -1,0 +1,10 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/pagesMetadata/1.1.0/schema.json",
+  "pageOrder": [
+    "networkoverview01",
+    "storetwin00000001",
+    "warehousetwin001",
+    "trucktwin00000001"
+  ],
+  "activePageName": "networkoverview01"
+}

@@ -1,0 +1,329 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.5.0/schema.json",
+  "name": "truck_movement_table",
+  "position": {
+    "x": 40,
+    "y": 290,
+    "z": 1,
+    "height": 380,
+    "width": 1200
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "License Plate"
+                }
+              },
+              "queryRef": "dim_trucks.License Plate",
+              "nativeQueryRef": "License Plate",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_truck_moves"
+                    }
+                  },
+                  "Property": "Shipment ID"
+                }
+              },
+              "queryRef": "fact_truck_moves.Shipment ID",
+              "nativeQueryRef": "Shipment ID",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_truck_moves"
+                    }
+                  },
+                  "Property": "DC ID"
+                }
+              },
+              "queryRef": "fact_truck_moves.DC ID",
+              "nativeQueryRef": "DC ID",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_truck_moves"
+                    }
+                  },
+                  "Property": "Store ID"
+                }
+              },
+              "queryRef": "fact_truck_moves.Store ID",
+              "nativeQueryRef": "Store ID",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_truck_moves"
+                    }
+                  },
+                  "Property": "Status"
+                }
+              },
+              "queryRef": "fact_truck_moves.Status",
+              "nativeQueryRef": "Status",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck Last Shipment"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck Last Shipment",
+              "nativeQueryRef": "Twin Truck Last Shipment",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck Last DC"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck Last DC",
+              "nativeQueryRef": "Twin Truck Last DC",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck Last Store"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck Last Store",
+              "nativeQueryRef": "Twin Truck Last Store",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck Recorded ETD"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck Recorded ETD",
+              "nativeQueryRef": "Twin Truck Recorded ETD",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck State As Of"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck State As Of",
+              "nativeQueryRef": "Twin Truck State As Of",
+              "active": true
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_trucks"
+                    }
+                  },
+                  "Property": "Twin Truck Cargo As Of"
+                }
+              },
+              "queryRef": "dim_trucks.Twin Truck Cargo As Of",
+              "nativeQueryRef": "Twin Truck Cargo As Of",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "grid": [
+        {
+          "properties": {
+            "gridVertical": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "gridHorizontal": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "columnHeaders": [
+        {
+          "properties": {
+            "bold": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "fontColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#1F2A44'"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "border": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#DCE3F0'"
+                    }
+                  }
+                }
+              }
+            },
+            "radius": {
+              "expr": {
+                "Literal": {
+                  "Value": "10D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#FFFFFF'"
+                    }
+                  }
+                }
+              }
+            },
+            "transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "0D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Recorded movement, source IDs and as-of timestamps'"
+                }
+              }
+            },
+            "fontColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#1F2A44'"
+                    }
+                  }
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "10D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

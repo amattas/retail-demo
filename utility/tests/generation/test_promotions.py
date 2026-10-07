@@ -34,17 +34,23 @@ def test_promo_lines_match_discounted_receipt_lines(setup):
     discounted = sales["fact_receipt_lines"].filter(
         F.col("promo_code").isNotNull()
         & (F.col("unit_cents") * F.col("quantity") - F.col("ext_cents") > 0))
-    assert promo_lines.count() == discounted.count()
+    discounted_count = discounted.count()
+    promo_line_count = promo_lines.count()
+    assert discounted_count > 0
+    assert promo_line_count > 0
+    assert promo_line_count == discounted_count
     assert promo_lines.filter(F.col("discount_cents") <= 0).count() == 0
 
 
 def test_promotions_aggregate(setup):
     _, promos, promo_lines = setup
+    promo_count = promos.count()
+    assert promo_count > 0
     agg = promo_lines.groupBy("receipt_id_ext", "promo_code").agg(
         F.sum("discount_cents").alias("d"),
         F.countDistinct("product_id").alias("pc"))
     j = promos.join(agg, ["receipt_id_ext", "promo_code"])
-    assert j.count() == promos.count()
+    assert j.count() == promo_count
     assert j.filter(F.col("discount_cents") != F.col("d")).count() == 0
     assert j.filter(F.col("product_count") != F.col("pc")).count() == 0
 
