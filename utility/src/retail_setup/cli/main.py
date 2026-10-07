@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -350,6 +351,90 @@ def _active_azure_cli_tenant() -> str:
     return result.stdout.strip()
 
 
+def _azure_cli_login(tenant_id: str) -> bool:
+    """Run an interactive ``az login`` for the configured tenant."""
+    az = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if not az:
+        return False
+    return subprocess.run([az, "login", "--tenant", tenant_id], check=False).returncode == 0
+
+
+_WINDOWS_BROKER_OVERRIDE = "AZURE_CORE_ENABLE_BROKER_ON_WINDOWS"
+
+
+def _run_tee_stderr(command: list[str]) -> tuple[int, str]:
+    """Run interactively while keeping a bounded stderr tail for diagnosis."""
+    tail = ""
+    with subprocess.Popen(command, stderr=subprocess.PIPE, text=True) as process:
+        assert process.stderr is not None
+        # Browser and device prompts can arrive without a trailing newline.
+        while character := process.stderr.read(1):
+            sys.stderr.write(character)
+            sys.stderr.flush()
+            tail = (tail + character)[-8192:]
+        return process.wait(), tail
+
+
+def _interactive_terminal() -> bool:
+    return sys.stdin.isatty()
+
+
+def _sign_in_configured_tenant(repo_root: Path, env: str) -> None:
+    """Sign in to the configured tenant, as the guided setup does before deploy.
+
+    Always signs in so a deploy never proceeds under the wrong account. A
+    Windows account-broker key-storage failure is retried once with browser
+    sign-in, and that setting is exported so every deploy step uses it.
+    """
+    try:
+        config = _load_deploy_environment(repo_root, env)
+    except ImportError:
+        return
+    if not config.tenant_id:
+        return
+    typer.echo("Signing in to the configured Azure tenant...")
+    if config.auth_mode == "azure_powershell":
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if pwsh is None:
+            typer.echo("PowerShell is required for auth.mode=azure_powershell.", err=True)
+            raise typer.Exit(code=127)
+        command = [pwsh, "-NoProfile", "-Command", f"Connect-AzAccount -Tenant {config.tenant_id}"]
+        if subprocess.run(command, check=False).returncode != 0:
+            typer.echo("Azure PowerShell sign-in failed.", err=True)
+            raise typer.Exit(code=1)
+        return
+    az = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if az is None:
+        typer.echo(
+            "Azure CLI is required for auth.mode=azure_cli but `az` was not found on PATH.",
+            err=True,
+        )
+        raise typer.Exit(code=127)
+    command = [az, "login", "--tenant", config.tenant_id]
+    if platform.system() != "Windows":
+        if subprocess.run(command, check=False).returncode != 0:
+            typer.echo("Azure CLI sign-in failed.", err=True)
+            raise typer.Exit(code=1)
+        return
+    returncode, stderr = _run_tee_stderr(command)
+    if returncode == 0:
+        return
+    broker_error = "incorrect storage parent" in stderr.lower() or re.search(
+        r"\b2150171662\b", stderr
+    )
+    if not broker_error:
+        typer.echo("Azure CLI sign-in failed.", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        "Windows account broker key storage failed. Retrying once with "
+        "browser-based Azure sign-in for this deployment."
+    )
+    os.environ[_WINDOWS_BROKER_OVERRIDE] = "false"
+    if subprocess.run(command, check=False).returncode != 0:
+        typer.echo("Azure CLI sign-in failed.", err=True)
+        raise typer.Exit(code=1)
+
+
 def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
     try:
         config = _load_deploy_environment(repo_root, env)
@@ -370,21 +455,26 @@ def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
             typer.echo(
                 "Install Azure CLI or set deploy config auth.mode to azure_powershell.", err=True
             )
-        else:
-            typer.echo("Azure CLI is not logged in.", err=True)
-            typer.echo("Run: az login --tenant <configured-tenant>", err=True)
-        raise
+            raise
+        active_tenant = ""
+        typer.echo("Azure CLI is not logged in.", err=True)
 
-    if active_tenant.lower() != config.tenant_id.lower():
-        typer.echo(
-            "Azure CLI tenant does not match deploy config tenant_id.",
-            err=True,
-        )
-        typer.echo(
-            "Run: az login --tenant <configured-tenant>",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    if active_tenant.lower() == config.tenant_id.lower():
+        return
+    if active_tenant:
+        typer.echo("Azure CLI tenant does not match deploy config tenant_id.", err=True)
+    if sys.stdin.isatty() and typer.confirm(
+        "Sign in to the configured tenant with Azure CLI now?", default=True
+    ):
+        if _azure_cli_login(config.tenant_id):
+            try:
+                if _active_azure_cli_tenant().lower() == config.tenant_id.lower():
+                    return
+            except typer.Exit:
+                pass
+        typer.echo("Azure CLI sign-in did not select the configured tenant.", err=True)
+    typer.echo("Run: az login --tenant <configured-tenant>", err=True)
+    raise typer.Exit(code=1)
 
 
 def _first_environment_value(
@@ -2276,6 +2366,11 @@ def deploy(
         "--resume",
         help="Resume the compatible succeeded prefix from the last deploy journal.",
     ),
+    skip_login: bool = typer.Option(
+        False,
+        "--skip-login",
+        help="Use the current Azure sign-in instead of signing in to the configured tenant.",
+    ),
 ) -> None:
     """Run the full deployment: configs, Terraform, artifacts, Fabric items, KQL.
 
@@ -2442,6 +2537,8 @@ def deploy(
             typer.echo(f"Cannot resume deployment: {exc}", err=True)
             raise typer.Exit(code=1) from exc
     if not dry_run:
+        if not skip_login and _interactive_terminal():
+            _sign_in_configured_tenant(repo_root, env)
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.

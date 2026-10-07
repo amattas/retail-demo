@@ -625,6 +625,8 @@ def run_retail_setup(
             "deploy",
             "--env",
             deploy_env,
+            # Already signed in above; avoid a second sign-in prompt.
+            "--skip-login",
         ]
         if recreate:
             deploy_command.append("--recreate")

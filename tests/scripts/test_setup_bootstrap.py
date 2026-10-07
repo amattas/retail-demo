@@ -255,6 +255,7 @@ def test_run_retail_setup_deploy_flag_runs_deploy(monkeypatch):
         "deploy",
         "--env",
         "qa",
+        "--skip-login",
         "--yes",
     ]
 

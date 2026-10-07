@@ -374,6 +374,14 @@ for permissions and billing details.
 Azure CLI is the default and the only mode the guided bootstrap installs and
 checks automatically.
 
+In an interactive terminal, both the guided setup and `retail-setup deploy`
+sign in to the configured tenant before deploying (`az login --tenant`, or
+`Connect-AzAccount` for `auth.mode: azure_powershell`). If the Windows account
+broker fails to store keys, sign-in is retried once in the browser. Pass
+`--skip-login` to reuse your current sign-in. Non-interactive runs, such as
+CI, don't sign in; they only check that the active tenant matches. To sign in
+manually:
+
 ```powershell
 az login --tenant 00000000-0000-0000-0000-000000000000
 az account show --query tenantId -o tsv
@@ -886,7 +894,7 @@ state and output evidence must survive cleanup.
 
 | Symptom | Action |
 | --- | --- |
-| Azure CLI tenant mismatch | Run `az login --tenant <configured-tenant>` and confirm `az account show`. |
+| Azure CLI tenant mismatch | Rerun `retail-setup deploy` interactively without `--skip-login`, or run `az login --tenant <configured-tenant>` and confirm `az account show`. |
 | Azure PowerShell Terraform boundary | Use validated `--skip-terraform` outputs, switch to Azure CLI, or configure exactly one provider-supported service-principal, OIDC, or managed-identity credential. |
 | Capacity not found or inactive | Confirm the capacity display name, state, tenant, and operator access. |
 | Custom Spark pool fails | Select `core` or `standard`, or use an active F64-or-larger capacity that passes live vCore sizing. Legacy pool overrides are unsupported. |

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -1590,6 +1591,124 @@ def test_azure_cli_tenant_preflight_accepts_matching_tenant(monkeypatch):
     monkeypatch.setattr("retail_setup.cli.main._active_azure_cli_tenant", lambda: "tenant")
 
     _validate_azure_cli_tenant(Path("."), "dev")
+
+
+@pytest.mark.parametrize(
+    ("initial", "confirmed", "login_ok", "after", "succeeds"),
+    [
+        ("other", True, True, "TENANT", True),
+        (None, True, True, "tenant", True),
+        ("other", False, True, "TENANT", False),
+        ("other", True, False, "other", False),
+        ("other", True, True, "still-other", False),
+    ],
+)
+def test_azure_cli_tenant_preflight_offers_interactive_sign_in(
+    monkeypatch, initial, confirmed, login_ok, after, succeeds
+):
+    monkeypatch.setattr(
+        "retail_setup.cli.main._load_deploy_environment",
+        lambda *_: SimpleNamespace(auth_mode="azure_cli", tenant_id="TENANT"),
+    )
+    state = {"tenant": initial, "logins": []}
+
+    def active():
+        if state["tenant"] is None:
+            raise typer.Exit(code=1)
+        return state["tenant"]
+
+    def login(tenant_id):
+        state["logins"].append(tenant_id)
+        state["tenant"] = after
+        return login_ok
+
+    monkeypatch.setattr("retail_setup.cli.main._active_azure_cli_tenant", active)
+    monkeypatch.setattr("retail_setup.cli.main._azure_cli_login", login)
+    monkeypatch.setattr("retail_setup.cli.main.sys.stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr("retail_setup.cli.main.typer.confirm", lambda *_a, **_k: confirmed)
+
+    if succeeds:
+        _validate_azure_cli_tenant(Path("."), "dev")
+    else:
+        with pytest.raises(typer.Exit):
+            _validate_azure_cli_tenant(Path("."), "dev")
+    assert state["logins"] == (["TENANT"] if confirmed else [])
+
+
+def _sign_in_env(monkeypatch, system="Linux", auth_mode="azure_cli"):
+    monkeypatch.setattr(
+        "retail_setup.cli.main._load_deploy_environment",
+        lambda *_: SimpleNamespace(auth_mode=auth_mode, tenant_id="TENANT"),
+    )
+    monkeypatch.setattr("retail_setup.cli.main.platform.system", lambda: system)
+    monkeypatch.setattr("retail_setup.cli.main.shutil.which", lambda name: f"/bin/{name}")
+    monkeypatch.delenv("AZURE_CORE_ENABLE_BROKER_ON_WINDOWS", raising=False)
+
+
+def test_sign_in_runs_az_login_for_the_configured_tenant(monkeypatch):
+    _sign_in_env(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, **_: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0),
+    )
+    cli._sign_in_configured_tenant(Path("."), "dev")
+    assert calls == [["/bin/az", "login", "--tenant", "TENANT"]]
+
+
+def test_sign_in_retries_windows_broker_failure_with_browser(monkeypatch):
+    _sign_in_env(monkeypatch, system="Windows")
+    monkeypatch.setattr(
+        "retail_setup.cli.main._run_tee_stderr",
+        lambda cmd: (1, "AADSTS error 2150171662 key storage"),
+    )
+    retried = []
+
+    def run(cmd, **_):
+        retried.append(os.environ.get("AZURE_CORE_ENABLE_BROKER_ON_WINDOWS"))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("subprocess.run", run)
+    cli._sign_in_configured_tenant(Path("."), "dev")
+    assert retried == ["false"]
+    assert os.environ["AZURE_CORE_ENABLE_BROKER_ON_WINDOWS"] == "false"
+
+
+def test_sign_in_does_not_retry_other_windows_failures(monkeypatch):
+    _sign_in_env(monkeypatch, system="Windows")
+    monkeypatch.setattr("retail_setup.cli.main._run_tee_stderr", lambda cmd: (1, "User canceled"))
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: pytest.fail("no retry expected"))
+    with pytest.raises(typer.Exit):
+        cli._sign_in_configured_tenant(Path("."), "dev")
+
+
+def test_sign_in_uses_azure_powershell_mode(monkeypatch):
+    _sign_in_env(monkeypatch, auth_mode="azure_powershell")
+    calls = []
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, **_: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0),
+    )
+    cli._sign_in_configured_tenant(Path("."), "dev")
+    assert calls[0][-1] == "Connect-AzAccount -Tenant TENANT"
+
+
+@pytest.mark.parametrize(("tty", "flags", "expected"), [
+    (True, [], 1), (True, ["--skip-login"], 0), (False, [], 0),
+])
+def test_deploy_signs_in_like_guided_setup(monkeypatch, tmp_path, tty, flags, expected):
+    _seed_deploy_config(tmp_path)
+    signed_in = []
+    monkeypatch.setattr(cli, "_sign_in_configured_tenant", lambda *a: signed_in.append(a))
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_: (_ for _ in ()).throw(
+        typer.Exit(code=3)))
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: tty)
+    result = runner.invoke(
+        app, ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--yes",
+              "--skip-terraform", *flags],
+    )
+    assert result.exit_code == 3, result.output
+    assert len(signed_in) == expected
 
 
 def test_active_azure_cli_tenant_uses_resolved_az_path(monkeypatch):
