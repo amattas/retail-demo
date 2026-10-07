@@ -122,8 +122,19 @@ therefore remain string data rather than executable statements.
 
 Without `--ref`, render requires Git metadata resolving the checkout's full
 commit revision. Missing Git metadata fails closed instead of falling back
-to mutable `main`. An explicit `--ref` remains accepted; operators should use
-an immutable revision for reproducibility.
+to mutable `main`. Setup 01 downloads dictionaries from GitHub at that
+revision, so it must exist on GitHub:
+
+- If HEAD is on a remote-tracking branch, render uses HEAD.
+- If HEAD isn't pushed, render uses the newest pushed ancestor and prints a
+  note. This happens only when `utility/data/dictionaries` in the working
+  tree, including uncommitted and untracked files, is identical to that
+  ancestor.
+- Unpushed dictionary changes fail with a message to push or pass `--ref`.
+- A clone with no remote-tracking refs keeps HEAD.
+
+An explicit `--ref` remains accepted; operators should use an immutable
+revision for reproducibility.
 
 ### Dictionary source and cache
 

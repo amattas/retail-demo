@@ -220,3 +220,57 @@ def test_missing_git_metadata_does_not_fall_back_to_mutable_main(tmp_path, monke
     with pytest.raises(typer.Exit):
         _resolve_dictionary_ref(tmp_path, None)
     assert _resolve_dictionary_ref(tmp_path, "explicit-revision") == "explicit-revision"
+
+
+def _git_repo(tmp_path):
+    def git(*args):
+        return subprocess.run(
+            ["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "test")
+    git("config", "commit.gpgsign", "false")
+    dictionaries = tmp_path / "utility" / "data" / "dictionaries"
+    dictionaries.mkdir(parents=True)
+    (dictionaries / "stores.json").write_text("[1]", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    return git
+
+
+def test_pushed_head_is_used_for_dictionary_downloads(tmp_path):
+    git = _git_repo(tmp_path)
+    head = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/main", head)
+    assert _resolve_dictionary_ref(tmp_path, None) == head
+
+
+def test_unpushed_head_uses_pushed_commit_with_identical_dictionaries(tmp_path):
+    git = _git_repo(tmp_path)
+    pushed = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/main", pushed)
+    (tmp_path / "README.md").write_text("local change", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "local only")
+    assert git("rev-parse", "HEAD") != pushed
+    assert _resolve_dictionary_ref(tmp_path, None) == pushed
+
+
+@pytest.mark.parametrize("commit_change", [True, False])
+def test_unpushed_dictionary_changes_fail_closed(tmp_path, commit_change):
+    git = _git_repo(tmp_path)
+    git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD"))
+    (tmp_path / "utility" / "data" / "dictionaries" / "stores.json").write_text(
+        "[2]", encoding="utf-8"
+    )
+    if commit_change:
+        git("commit", "-qam", "dictionary change")
+    with pytest.raises(typer.Exit):
+        _resolve_dictionary_ref(tmp_path, None)
+
+
+def test_repository_without_remotes_keeps_head(tmp_path):
+    git = _git_repo(tmp_path)
+    assert _resolve_dictionary_ref(tmp_path, None) == git("rev-parse", "HEAD")

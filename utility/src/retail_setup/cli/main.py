@@ -1056,19 +1056,54 @@ def _terraform_plan_guard(repo_root: Path, env: str) -> None:
             typer.echo(f"  {resource['address']}: {', '.join(actions)}")
 
 
+_DICTIONARY_PATH = "utility/data/dictionaries"
+
+
+def _git(repo_root: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=repo_root, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def _published_dictionary_revision(repo_root: Path, head: str) -> str | None:
+    """Return the newest pushed ancestor whose dictionaries match HEAD.
+
+    Setup01 downloads dictionaries from GitHub at this revision, so a local,
+    unpushed commit would 404. Any pushed ancestor with identical dictionary
+    content (and no uncommitted dictionary edits) is equivalent.
+    """
+    if not _git(repo_root, "rev-list", head, "--not", "--remotes"):
+        return head if _dictionaries_match(repo_root, head) else None
+    remote_heads = _git(repo_root, "for-each-ref", "refs/remotes", "--format=%(objectname)")
+    if not remote_heads:
+        return head
+    bases = set()
+    for remote_head in remote_heads.split():
+        try:
+            bases.add(_git(repo_root, "merge-base", head, remote_head))
+        except subprocess.CalledProcessError:
+            continue
+    if not bases:
+        return None
+    newest = max(bases, key=lambda base: int(_git(repo_root, "show", "-s", "--format=%ct", base)))
+    return newest if _dictionaries_match(repo_root, newest) else None
+
+
+def _dictionaries_match(repo_root: Path, revision: str) -> bool:
+    """True when the working-tree dictionaries equal ``revision``'s, untracked included."""
+    unchanged = subprocess.run(
+        ["git", "diff", "--quiet", revision, "--", _DICTIONARY_PATH], cwd=repo_root, check=False
+    ).returncode == 0
+    untracked = _git(repo_root, "ls-files", "--others", "--exclude-standard", "--", _DICTIONARY_PATH)
+    return unchanged and not untracked
+
+
 def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
-    """Use the explicit ref or require a resolvable immutable checkout revision."""
+    """Use the explicit ref or require a resolvable immutable published revision."""
     if ref:
         return ref
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        revision = result.stdout.strip()
+        revision = _git(repo_root, "rev-parse", "HEAD")
     except (OSError, subprocess.CalledProcessError):
         typer.echo(
             "Could not resolve git HEAD; pass --ref with an immutable commit "
@@ -1079,7 +1114,24 @@ def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
     if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", revision):
         typer.echo("git HEAD did not resolve to a commit revision; pass --ref.", err=True)
         raise typer.Exit(code=1)
-    return revision
+    try:
+        published = _published_dictionary_revision(repo_root, revision)
+    except (OSError, subprocess.CalledProcessError):
+        published = revision
+    if published is None:
+        typer.echo(
+            "utility/data/dictionaries has local changes (committed or not) that "
+            "are not pushed, so Fabric cannot download them. Push the branch or "
+            "pass --ref with a pushed commit.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    if published != revision:
+        typer.echo(
+            f"note: HEAD is not pushed; using pushed commit {published[:12]} for "
+            "dictionary downloads (dictionaries are identical)."
+        )
+    return published
 
 
 @app.command()
