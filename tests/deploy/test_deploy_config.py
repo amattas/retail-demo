@@ -107,11 +107,17 @@ def _load_twins_config(
     return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
 
 
-@pytest.mark.parametrize("profile", ["core", "standard", "full-demo"])
-def test_native_pack_defaults_do_not_change_profile_inventory(tmp_path, profile):
+@pytest.mark.parametrize(
+    ("profile", "supported"), [("core", False), ("standard", True), ("full-demo", True)]
+)
+def test_native_pack_defaults_follow_profile_support(tmp_path, profile, supported):
     config = _load_config(tmp_path, profile)
 
-    assert config.operations_planning == deploy_config.OperationsPlanningConfig()
+    assert config.operations_planning == deploy_config.OperationsPlanningConfig(
+        enabled=supported
+    )
+    assert config.twins.enabled is supported
+    assert config.operations_planning.include_plan is False
     assert "OperationsAgent" not in config.deployment.item_types_in_scope
     assert "Plan" not in config.deployment.item_types_in_scope
     assert "operations" not in config.notebooks.include

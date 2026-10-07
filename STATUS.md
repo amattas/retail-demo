@@ -2,6 +2,18 @@
 
 **Updated**: 2026-10-06 | **Wave**: E — local implementation complete; native live acceptance blocked
 
+## Deploy everything by default (2026-10-07, `dev` branch)
+
+`full-demo` is now the manifest default for every entry point. Twins and the
+native Operations Agent default on for Reporting profiles; the
+operations-only step and the agent's readiness item are non-required, so the
+known HTTP 400 agent rejection degrades instead of failing deployment.
+Native Planning stays excluded (`include_plan: false`): Microsoft documents a
+730-hour Planning billing session that cannot be ended manually, and it needs
+fixed credentials. The stream, schedules, and reset remain manual. The local
+`retail-demo` environment overlay now enables the Operations Agent.
+No live deployment was run for this change.
+
 ## Documentation reconciliation (2026-10-06, `dev` branch)
 
 Living docs were reconciled against merged PRs #384 (decision demo app),

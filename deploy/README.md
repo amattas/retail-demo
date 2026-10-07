@@ -7,7 +7,7 @@ offline validation.
 Use the high-level CLI for normal operation:
 
 ```powershell
-retail-setup configure --workspace-name retail-demo-alice --profile core
+retail-setup configure --workspace-name retail-demo-alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice
 retail-setup verify --env alice

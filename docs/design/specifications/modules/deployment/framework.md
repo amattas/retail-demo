@@ -195,9 +195,9 @@ notebook references. All profiles exclude the destructive `reset` group.
 
 | Profile | Assets | Groups | Pipelines | KQL scripts | Publication behavior |
 | --- | ---: | --- | ---: | ---: | --- |
-| `core` (manifest/direct-CLI default) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
+| `core` (explicit selection) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
 | `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview surfaces |
-| `full-demo` | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
+| `full-demo` (manifest default for every entry point) | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
 
 The exact initial infrastructure/Reporting counts are `5+0`, `30+2`, and `40+2`
 respectively. They and the workspace-folder sets are validated while staging;
@@ -214,9 +214,13 @@ switches with the admin tenant-settings API and validates the selected
 capacity with the capacities API. Settings changes remain administrator-owned
 because Fabric publishes no tenant-settings update API.
 
-The guided `setup.ps1` and `setup.sh` entry points default to `full-demo`.
-Direct `retail-setup` commands and the manifest retain the conservative `core`
-default.
+The manifest marks `full-demo` as the default, so the guided wrappers,
+`scripts/setup.py`, and direct `retail-setup` commands all deploy it unless
+`core` or `standard` is selected explicitly. Configuration enables the
+connected twins report and the native Operations Agent by default for any
+Reporting profile; native Planning stays excluded unless `include_plan` is
+set. The operations-only publication step is non-required, so a Fabric
+rejection of the agent degrades the deployment instead of failing it.
 
 No profile enables schedules or starts the live stream. The source
 daily-maintenance schedule remains present but disabled. Dashboard templates

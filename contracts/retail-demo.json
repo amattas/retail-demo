@@ -227,9 +227,7 @@
           "retail-setup",
           "configure",
           "--workspace-name",
-          "retail-demo-dev",
-          "--profile",
-          "core"
+          "retail-demo-dev"
         ]
       ]
     },
@@ -872,7 +870,7 @@
       "name": "Core",
       "owner": "owner.deployment",
       "support_status": "core",
-      "description": "Default GA-safe historical deployment with no preview, live, ML, reporting, or destructive surfaces.",
+      "description": "Reduced GA-safe historical deployment with no preview, live, ML, reporting, or destructive surfaces; select explicitly.",
       "sources": [
         {
           "path": "deploy/config/deploy.yml",
@@ -891,7 +889,7 @@
       ],
       "implementation": "executable",
       "deployment_name": "core",
-      "default": true,
+      "default": false,
       "available_group_inventory_id": "inventory.deployment.notebook-groups",
       "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
       "group_refs": [
@@ -1011,7 +1009,7 @@
       "name": "Full demo",
       "owner": "owner.deployment",
       "support_status": "preview",
-      "description": "All advanced and preview demo surfaces, with optional and experimental ML isolated from the required Reporting gate.",
+      "description": "Default deployment of every advanced and preview demo surface, with optional and experimental ML isolated from the required Reporting gate.",
       "sources": [
         {
           "path": "deploy/config/deploy.yml",
@@ -1037,7 +1035,7 @@
       ],
       "implementation": "executable",
       "deployment_name": "full-demo",
-      "default": false,
+      "default": true,
       "available_group_inventory_id": "inventory.deployment.notebook-groups",
       "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
       "group_refs": [

@@ -21,14 +21,14 @@ that this guide does not become a second, outdated schema definition.
 
 ```powershell
 python scripts/setup.py
-retail-setup configure --workspace-name retail-demo-dev --profile core
+retail-setup configure --workspace-name retail-demo-dev
 retail-setup render --env dev
 retail-setup deploy --env dev --dry-run
 retail-setup verify --env dev
 ```
 
-The guided wrappers default to `full-demo`; direct `scripts/setup.py` and
-`retail-setup` commands retain the manifest-default `core` profile. Render,
+Every entry point, including direct `scripts/setup.py` and `retail-setup`
+commands, defaults to the manifest-default `full-demo` profile. Render,
 deploy, and verify resolve the stored profile from the `--env` environment.
 
 <!-- manifest-contract:prerequisites -->
@@ -54,9 +54,9 @@ both that constraint and Terraform's constraint in
 
 | Profile | Support | Logical assets | Groups | Pipelines | KQL scripts | Infrastructure | Reporting | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `core` | core/default | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
-| `standard` | supported opt-in | 8 | 4 | 5 | 6 | 30 | 2 | 32 |
-| `full-demo` | preview/live-preflight | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
+| `core` | core/explicit | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
+| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 30 | 2 | 32 |
+| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
 
 The logical asset selections are:
 

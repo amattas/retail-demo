@@ -75,15 +75,17 @@ The final journal status is:
 - **`FAILED`:** a required capability failed or could not provide evidence.
   Do not present the workspace as ready.
 
-### Optional native Operations Agent and Planning
+### Native Operations Agent and Planning
 
-The availability decision pack is separate from `fabric-cicd` publication and
-is **off by default**, including in `full-demo`. It requires a Reporting
-profile (`standard` or `full-demo`) and the existing Eventhouse and required
-ML outputs.
+The availability decision pack is separate from `fabric-cicd` publication.
+Its Operations Agent deploys **by default** with every Reporting profile
+(`standard` or `full-demo`, the default) after Reporting; `core` cannot select
+it. If Fabric rejects agent creation, the deploy step and readiness report a
+warning and the rest of the deployment continues. Native Planning stays
+**excluded** (`include_plan: false`) unless you explicitly include it.
 
-**For SSO-only environments where IT blocks fixed credentials**, deploy only
-Operations Agent. Leave the existing model's SSO binding untouched:
+The default selection deploys only the Operations Agent and leaves the existing
+model's SSO binding untouched. It is equivalent to:
 
 ```yaml
 operations_planning:
@@ -91,10 +93,11 @@ operations_planning:
   include_plan: false
 ```
 
+Set `enabled: false` only to skip the pack in a specific environment.
 This configuration works with the normal deployment and the targeted publisher.
 It does not require a Plan connection, Planning billing acknowledgement, or
-fixed credentials. Readiness requires the Operations Agent and draft notebook,
-not a Plan. Human planning uses the Lakehouse draft-case table and existing
+fixed credentials. Readiness requires the draft notebook and reports a missing
+Operations Agent as a warning, not a failure; it does not expect a Plan. Human planning uses the Lakehouse draft-case table and existing
 report through SSO; it is not presented as the native Planning product.
 Operations Agent remains stopped until reviewed and explicitly activated.
 
@@ -187,19 +190,21 @@ agent-to-Plan Optimize API, ERP adapter, or automatic Plan writeback bridge.
 The existing workspace task flow retains its supported artifact bindings;
 find the native items by their names in the workspace.
 
-See the [decision-experience boundary](../design/specifications/modules/ml-ai/decision-experience.md#opt-in-native-availability-pack).
+See the [decision-experience boundary](../design/specifications/modules/ml-ai/decision-experience.md#native-availability-pack).
 
-### Optional Store, Warehouse, and Truck twins
+### Store, Warehouse, and Truck twins
 
 The connected twins are a separate, read-only Power BI report named
 `retail-twins`. They use the existing semantic model's **Automatic/SSO**
 binding and are independent of native Planning and Operations Agent.
 
-Enable them in `deploy/config/environments/<env>.yml`:
+They deploy **by default** with every Reporting profile (`standard` or
+`full-demo`). To skip them in one environment, set this in
+`deploy/config/environments/<env>.yml`:
 
 ```yaml
 twins:
-  enabled: true
+  enabled: false
 ```
 
 The normal deployment publishes the report after Reporting. For an existing
@@ -233,11 +238,11 @@ presenting the demo. See the
 
 ### Profiles
 
-`core` is the conservative default for direct `retail-setup` commands,
-`standard` is the supported opt-in Reporting path, and `full-demo` contains
-live-checked preview/manual surfaces. The guided `setup.ps1` and `setup.sh`
-wrappers default to `full-demo` so that a first-time guided run offers the
-complete demo. The
+`full-demo` is the default for every entry point: the guided wrappers,
+`scripts/setup.py`, and direct `retail-setup` commands. It deploys every
+publishable surface, including live-checked preview items, the connected twins
+report, and the Operations Agent. `standard` and `core` are reduced inventories
+you must select explicitly with `--profile`. The
 [workspace and profile inventory](workspace-inventory.md) is the single
 canonical guide for exact asset IDs, groups, pipelines, KQL scripts, staged
 counts, folders, and support status.
@@ -467,7 +472,7 @@ directory, state, outputs, and run journal.
 Run:
 
 ```powershell
-retail-setup configure --workspace-name retail-demo-alice --profile core
+retail-setup configure --workspace-name retail-demo-alice
 retail-setup render --env alice
 ```
 
@@ -475,7 +480,7 @@ retail-setup render --env alice
 create another local environment without replacing the first.
 
 Valid profiles are `core`, `standard`, and `full-demo`. Omitting `--profile`
-prompts with `core` as the default. The selected value is stored in the
+prompts with `full-demo` as the default. The selected value is stored in the
 workspace environment overlay as `deployment.profile`.
 
 Important configuration boundaries:

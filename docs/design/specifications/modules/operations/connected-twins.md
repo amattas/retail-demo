@@ -71,8 +71,9 @@ observed delay, recompute stockout probabilities, or place an order.
 
 ## Deployment and authorization
 
-`twins.enabled` is independent and false by default. Selected twins require
-a Reporting profile (`standard` or `full-demo`) and publish after Reporting.
+`twins.enabled` is independent and defaults to true whenever the profile
+selects the semantic model and Report (`standard` or `full-demo`); `core`
+cannot select twins. Selected twins publish after Reporting.
 The targeted `deploy.scripts.deploy_twins` command can update an existing
 workspace without rerunning historical generation.
 

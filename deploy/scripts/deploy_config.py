@@ -141,10 +141,15 @@ class DeploymentConfig:
 
 @dataclass(frozen=True)
 class OperationsPlanningConfig:
-    """Opt-in native decision experience; credentials are never stored here."""
+    """Native decision experience; credentials are never stored here.
+
+    Configuration parsing enables the Operations Agent whenever the profile
+    supports it. Planning stays excluded unless explicitly included because it
+    needs a fixed-credential connection and starts non-cancellable billing.
+    """
 
     enabled: bool = False
-    include_plan: bool = True
+    include_plan: bool = False
     plan_connection_id: str | None = None
     plan_billing_acknowledged: bool = False
     recipient: str | None = None
@@ -152,7 +157,7 @@ class OperationsPlanningConfig:
 
 @dataclass(frozen=True)
 class TwinsConfig:
-    """Opt-in connected operational twins report publication."""
+    """Connected operational twins report publication; on when supported."""
 
     enabled: bool = False
 
@@ -327,7 +332,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     profile = resolve_profile(
         manifest,
         validation,
-        str(deployment.get("profile", "core")),
+        _optional_string(deployment.get("profile")),
         available_item_types=available_item_types,
         configured_kql_scripts=configured_kql_scripts,
     )
@@ -345,22 +350,25 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             "deployment.unpublish_skip must remain true for phased profiles; "
             "unpublishing a partial stage can delete existing Reporting items"
         )
-    if native.get("enabled") and (
-        not profile.provisions_eventhouse or not profile.selects("asset.semantic-model")
-    ):
+    native_supported = profile.provisions_eventhouse and profile.selects(
+        "asset.semantic-model"
+    )
+    twins_supported = profile.selects("asset.semantic-model") and profile.selects(
+        "asset.report"
+    )
+    native_enabled = bool(native.get("enabled", native_supported))
+    twins_enabled = bool(twins.get("enabled", twins_supported))
+    if native_enabled and not native_supported:
         raise ValueError(
             "Operations/Planning requires Eventhouse and a selected semantic model "
             "(standard or full-demo deployment)."
         )
-    if twins.get("enabled") and (
-        not profile.selects("asset.semantic-model")
-        or not profile.selects("asset.report")
-    ):
+    if twins_enabled and not twins_supported:
         raise ValueError(
             "Connected twins require a selected semantic model and Report "
             "(standard or full-demo deployment)."
         )
-    if twins.get("enabled") and str(powerbi.get("report_name", "retail_model")).casefold() == "retail-twins":
+    if twins_enabled and str(powerbi.get("report_name", "retail_model")).casefold() == "retail-twins":
         raise ValueError("twins requires a report name distinct from the primary report.")
 
     return DeployConfig(
@@ -368,10 +376,10 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         tenant_id=_optional_string(data.get("tenant_id")),
         subscription_id=_optional_string(data.get("subscription_id")),
         auth_mode=str(auth.get("mode", "azure_cli")),
-        twins=TwinsConfig(enabled=bool(twins.get("enabled", False))),
+        twins=TwinsConfig(enabled=twins_enabled),
         operations_planning=OperationsPlanningConfig(
-            enabled=bool(native.get("enabled", False)),
-            include_plan=bool(native.get("include_plan", True)),
+            enabled=native_enabled,
+            include_plan=bool(native.get("include_plan", False)),
             plan_connection_id=connection_id,
             plan_billing_acknowledged=bool(
                 native.get("plan_billing_acknowledged", False)

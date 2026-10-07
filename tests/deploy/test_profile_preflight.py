@@ -34,6 +34,8 @@ def _config(profile: str = "core"):
     data["environment"] = "dev"
     data["tenant_id"] = "11111111-1111-4111-8111-111111111111"
     data["workspace"].update({"name": "dev", "capacity_name": "F64"})
+    if profile == "core":
+        data["deployment"]["profile"] = "core"
     config = _to_deploy_config(data)
     if profile == "core":
         return config

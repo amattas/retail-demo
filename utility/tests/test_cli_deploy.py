@@ -51,6 +51,7 @@ def _seed_deploy_config(
                 "auth": {"mode": "azure_cli"},
                 "operations_planning": {
                     "enabled": operations_planning_enabled,
+                    "include_plan": operations_planning_enabled,
                     "plan_connection_id": (
                         PLAN_CONNECTION_ID if operations_planning_enabled else None
                     ),
@@ -189,6 +190,7 @@ def test_native_pack_is_required_after_reporting_before_taskflow(profile):
         profile=_profile(profile),
         repo_root=REPO_ROOT,
         operations_planning_enabled=True,
+        include_native_plan=True,
         plan_connection_id=PLAN_CONNECTION_ID,
         plan_billing_acknowledged=True,
     )
@@ -319,7 +321,8 @@ def test_operations_only_plan_skips_planning_prerequisites(profile):
     )
     native = next(step for step in plan if step.step_id == "deploy-operations-planning")
     assert native.cmd[-1] == "--operations-only"
-    assert native.required
+    assert native.required is False
+    assert "continues" in native.failure_message
     assert native.description == "Publish stopped Operations Agent"
 
 
@@ -360,6 +363,7 @@ def test_complete_native_plan_rejects_missing_plan_prerequisites(
             profile=_profile("standard"),
             repo_root=REPO_ROOT,
             operations_planning_enabled=True,
+            include_native_plan=True,
             plan_connection_id=connection_id,
             plan_billing_acknowledged=billing_acknowledged,
         )
@@ -442,6 +446,39 @@ def test_native_pack_failure_or_failed_prerequisite_aborts_deploy(
         assert not any(
             "deploy.scripts.deploy_operations_planning" in command for command in commands
         )
+
+
+def test_operations_only_failure_warns_and_continues_deploy(monkeypatch, tmp_path):
+    _seed_deploy_config(tmp_path, profile="full-demo", operations_planning_enabled=True)
+    config_path = tmp_path / "deploy" / "config" / "deploy.yml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["operations_planning"].update(
+        include_plan=False, plan_connection_id=None, plan_billing_acknowledged=False
+    )
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    monkeypatch.setattr(cli, "_validate_azure_cli_tenant", lambda *_: None)
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        failed = "deploy.scripts.deploy_operations_planning" in command
+        return SimpleNamespace(returncode=7 if failed else 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    result = runner.invoke(
+        app,
+        ["deploy", "--repo-root", str(tmp_path), "--env", "dev", "--skip-terraform", "--yes"],
+    )
+
+    assert "Continuing because this post-Reporting step is optional." in result.output
+    assert any("deploy.scripts.taskflow" in command for command in commands)
+    journal = json.loads(_deploy_journal.journal_path(tmp_path, "dev").read_text())
+    native = next(
+        step for step in journal["steps"] if step["step_id"] == "deploy-operations-planning"
+    )
+    assert native["classification"] == "optional"
+    assert native["status"] == "FAILED"
+    assert journal["status"] != "FAILED"
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@
 The shell wrappers converge on the Python guided setup.
 When `--profile` is omitted, both wrappers prepend `--profile full-demo`;
 a later explicit `--profile` argument overrides it. Direct `scripts/setup.py`
-and `retail-setup` commands retain the manifest-default `core` profile.
+and `retail-setup` commands use the same manifest-default `full-demo` profile.
 
 Before dependencies are installed, `scripts/solution_manifest.py` reads the
 manifest version/hash, prerequisites, canonical examples, and profile

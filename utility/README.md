@@ -8,7 +8,7 @@ engine, notebook templates, dictionaries, and tests.
 ```powershell
 python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
 python -m pip install --no-deps -e .\utility
-retail-setup configure --workspace-name retail-demo-alice --profile core --months 3 --store-count 50 --seed 42
+retail-setup configure --workspace-name retail-demo-alice --months 18 --store-count 50 --seed 42
 retail-setup render --env alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice
@@ -42,9 +42,10 @@ post-ontology publication. `deploy --resume` reuses only a compatible,
 contiguous succeeded journal prefix; changed sources, plan, or targets reject
 reuse. See the deployment specification before retrying a failed run.
 
-Direct `retail-setup` commands use the conservative `core` profile unless a
-profile is supplied or stored for the environment. The guided
-`scripts/setup.ps1` and `scripts/setup.sh` wrappers default to `full-demo`.
+Every entry point, including direct `retail-setup` commands, uses the
+manifest-default `full-demo` profile unless another profile is supplied or
+stored for the environment. Reporting profiles also publish the connected twins
+report and the native Operations Agent by default.
 
 ## Contract owners
 

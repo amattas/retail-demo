@@ -35,11 +35,13 @@ the complete scenario and failure paths, not merely the presence of UI or
 replay code. See the
 [decision experience](../../../specifications/modules/ml-ai/decision-experience.md).
 
-### REQ-MLAI-006 - Opt-in native availability decisions
+### REQ-MLAI-006 - Native availability decisions
 
-An optional Operations Agent and native Plan shall use explicit source
-evidence for bounded replenishment planning. Normal deployments shall remain
-unchanged unless the pack is selected. Publish monitoring stopped, require
+An Operations Agent and optional native Plan shall use explicit source
+evidence for bounded replenishment planning. Reporting deployments shall
+publish the Operations Agent by default; a service rejection of the agent
+shall be reported as a warning without failing the rest of the deployment.
+Native Planning shall remain excluded unless explicitly included. Publish monitoring stopped, require
 human approval for draft preparation, and prohibit real purchasing or
 historical-data mutations. Native Planning shall require a supported shared
 model connection and explicit billing acknowledgement. Source publication,

@@ -60,6 +60,11 @@
 - The supported Eventhouse topology uses its automatically created default KQL
   database with the same display name.
 - Destructive reset assets are never part of an automatic normal run.
+- `full-demo` is the manifest default for every entry point. Reporting
+  profiles publish the connected twins report and the native Operations Agent
+  by default; `core` and `standard` are explicit reductions. Native Planning
+  stays excluded unless explicitly included because it needs fixed credentials
+  and starts non-cancellable billing.
 - Same-workspace pipeline notebook references use deterministic logical IDs
   and the default-workspace sentinel resolved natively by `fabric-cicd`, not
   generated per-notebook parameter rules.

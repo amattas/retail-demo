@@ -19,12 +19,20 @@ order, send a campaign, or call an ERP, CRM, pricing, or workforce system.
 ingestion errors. It is best-effort telemetry, not a guaranteed audit trail.
 These limitations are tracked by `THREAT-009` and `SEC-012`.
 
-## Opt-in native availability pack
+## Native availability pack
 
-`REQ-MLAI-006` covers a separate optional native experience, not a claim that
+`REQ-MLAI-006` covers a separate native experience, not a claim that
 the full proposed CX application is implemented. The deployment entry point
 is `deploy/scripts/deploy_operations_planning.py`; configuration and operator
-steps live in the [deployment guide](../../../../guides/deployment.md#optional-native-operations-agent-and-planning).
+steps live in the [deployment guide](../../../../guides/deployment.md#native-operations-agent-and-planning).
+
+Configuration enables the pack by default whenever the profile provisions
+Eventhouse and a semantic model, with `include_plan=false`. Because Fabric can
+reject Operations Agent creation, an operations-only deployment step is
+non-required: its failure is journaled and the deployment continues. Readiness
+expects the Operations Agent as a non-required item, so its absence degrades
+rather than fails readiness. Explicitly including the Plan restores a
+required, fail-closed step.
 
 `operations_planning.include_plan=false` selects Operations Agent and its
 draft notebook independently. It bypasses only unselected Planning prerequisites,

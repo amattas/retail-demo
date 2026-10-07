@@ -105,8 +105,9 @@ target; path isolation is not a distributed lock.
 
 ## Current constraints
 
-- The default `core` inventory is preview-free; `full-demo` is the
-  live-preflight-validated preview/manual boundary.
+- The default `full-demo` inventory includes live-preflight-validated preview
+  surfaces; explicitly selected `core` and `standard` inventories are
+  preview-free.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate

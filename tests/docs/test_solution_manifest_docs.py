@@ -318,10 +318,14 @@ def test_profile_inventory_safety_and_guide_rows_match_manifest() -> None:
     )
     guide = GUIDE_PATH.read_text(encoding="utf-8")
     support_labels = {
-        "core": "core/default",
-        "standard": "supported opt-in",
-        "full-demo": "preview/live-preflight",
+        "core": "core/explicit",
+        "standard": "supported/explicit",
+        "full-demo": "preview/default",
     }
+    defaults = [
+        profile["deployment_name"] for profile in document["profiles"] if profile["default"]
+    ]
+    assert defaults == ["full-demo"]
     configured_kql_scripts = tuple(
         path.name
         for path in sorted((ROOT / "fabric" / "kql_database").glob("*.kql"))

@@ -745,7 +745,7 @@ def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
-    profile: ResolvedProfile | str = "core",
+    profile: ResolvedProfile | str = "full-demo",
     lakehouse_name: str = "retail_lakehouse",
     kql_database_name: str = "retail_eventhouse",
     semantic_model_name: str = "retail_model",
@@ -1059,7 +1059,7 @@ def main() -> int:
     )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--profile", default="core")
+    parser.add_argument("--profile", default="full-demo")
     parser.add_argument(
         "--notebook-groups",
         nargs="+",

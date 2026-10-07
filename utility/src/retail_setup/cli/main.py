@@ -574,7 +574,7 @@ def configure(
     profile: Optional[str] = typer.Option(
         None,
         "--profile",
-        help="Deployment profile: core (default), standard, or full-demo.",
+        help="Deployment profile: full-demo (default), standard, or core.",
     ),
     use_custom_spark_pool: Optional[bool] = typer.Option(
         None,
@@ -679,10 +679,10 @@ def configure(
         default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
     )
     profile = _prompt_str(
-        "Deployment profile (core, standard, or full-demo)",
+        "Deployment profile (full-demo, standard, or core)",
         profile,
         default=_config_default(base_config, env_config, "deployment.profile")
-        or "core",
+        or _default_deployment_profile(repo_root).deployment_name,
     )
     available_profiles = _available_deployment_profiles(repo_root)
     if profile not in available_profiles:
@@ -1296,7 +1296,7 @@ def _validate_operations_planning_prerequisites(
     enabled: bool,
     plan_connection_id: str | None,
     plan_billing_acknowledged: bool,
-    include_plan: bool = True,
+    include_plan: bool = False,
 ) -> None:
     """Reject incomplete full-pack requests before any deployment commands."""
     if not enabled or not include_plan:
@@ -1330,7 +1330,7 @@ def _deploy_plan(
     interactive_preflight: bool = False,
     repo_root: Path | None = None,
     operations_planning_enabled: bool = False,
-    include_native_plan: bool = True,
+    include_native_plan: bool = False,
     plan_connection_id: str | None = None,
     plan_billing_acknowledged: bool = False,
     twins_enabled: bool = False,
@@ -1838,10 +1838,13 @@ def _deploy_plan(
                     if include_native_plan else "Publish stopped Operations Agent"
                 ),
                 step_id="deploy-operations-planning",
-                required=True,
+                required=include_native_plan,
                 failure_message=(
-                    "Requested Operations/Planning pack failed; native publication "
-                    "is incomplete. Inspect operations-planning-report.json before retrying."
+                    "Operations/Planning pack failed; native publication is "
+                    "incomplete. Inspect operations-planning-report.json before retrying."
+                    if include_native_plan
+                    else "Operations Agent publication failed; the rest of the "
+                    "deployment continues. Inspect operations-planning-report.json."
                 ),
                 evidence_path=f"deploy/.generated/{env}/operations-planning-report.json",
             )
@@ -2308,7 +2311,7 @@ def deploy(
             report_name = "retail_model"
             typer.echo(
                 "note: legacy environment config is absent; plan shows the "
-                "default core profile"
+                f"default {profile.deployment_name} profile"
             )
         except (
             ImportError,
@@ -2428,7 +2431,7 @@ def deploy(
         interactive_preflight=sys.stdin.isatty() and not yes,
         repo_root=repo_root,
         operations_planning_enabled=native.enabled if native is not None else False,
-        include_native_plan=native.include_plan if native is not None else True,
+        include_native_plan=native.include_plan if native is not None else False,
         plan_connection_id=native.plan_connection_id if native is not None else None,
         plan_billing_acknowledged=(
             native.plan_billing_acknowledged if native is not None else False

@@ -1068,7 +1068,7 @@ def _twins_context(enabled: bool = True) -> ReadinessContext:
     return context
 
 
-def test_native_items_are_required_only_when_explicitly_enabled():
+def test_native_items_are_expected_only_when_enabled():
     baseline = expected_live_items(_native_context(False))
     native = expected_live_items(_native_context())
     added = {item.key for item in native} - {item.key for item in baseline}
@@ -1078,7 +1078,12 @@ def test_native_items_are_required_only_when_explicitly_enabled():
         ("Notebook", "prepare-replenishment-case"),
         ("Plan", "retail-replenishment"),
     }
-    assert all(item.required for item in native if item.key in added)
+    required = {item.key: item.required for item in native if item.key in added}
+    assert required == {
+        ("OperationsAgent", "retail-availability-operations"): False,
+        ("Notebook", "prepare-replenishment-case"): True,
+        ("Plan", "retail-replenishment"): True,
+    }
 
 
 def test_twins_report_is_required_only_when_explicitly_enabled():

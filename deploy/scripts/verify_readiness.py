@@ -942,7 +942,8 @@ def _native_expected_items(config: DeployConfig) -> list[ExpectedItem]:
     if not native.enabled:
         return []
     items = [
-        ExpectedItem("OperationsAgent", "retail-availability-operations"),
+        # Fabric can reject agent creation; the deploy step and readiness both warn.
+        ExpectedItem("OperationsAgent", "retail-availability-operations", required=False),
         ExpectedItem("Notebook", "prepare-replenishment-case"),
     ]
     if native.include_plan:

@@ -30,24 +30,20 @@ recovery, use the [deployment guide](deployment.md).
 
 ## What the supported path creates
 
-The manifest-default `core` profile creates the smallest supported path: a
-Fabric workspace, an empty Lakehouse ready to receive tables, and four
-historical setup notebooks. The operator runs setup 01 through 04 in order.
+Every entry point deploys the complete `full-demo` profile by default:
+Eventhouse for live events, automated pipelines, required and extended
+machine-learning outputs, the Power BI semantic model and report, the connected
+twins report, Ontology, Data Agents, task flow, and the native Operations
+Agent. After live tenant and capacity checks pass, the deployment creates or
+validates the ontology and publishes those items automatically. Native
+Planning stays excluded because it needs fixed credentials and starts billing
+that cannot be cancelled. No profile deploys the destructive reset notebook or
+starts the long-running stream automatically.
 
-`standard` adds Eventhouse for optional live events, automated pipelines,
-required machine-learning outputs, a Power BI semantic model, and a report.
-`full-demo` adds preview experiences such as Ontology, Data Agents, and task
-flow. After live tenant and capacity checks pass, the guided deployment creates
-or validates the ontology and publishes those items automatically. No profile
-deploys the destructive reset notebook
-or starts the long-running stream automatically. Choose with `--profile`; see the
-[canonical workspace and profile inventory](workspace-inventory.md) before
-selecting an opt-in profile.
-
-The guided `setup.ps1` and `setup.sh` wrappers intentionally select
-`full-demo` when `--profile` is omitted. This makes the guided path a complete
-demo install while keeping direct `retail-setup` commands on the conservative
-manifest default.
+`standard` (no preview surfaces) and `core` (Lakehouse and four historical
+setup notebooks only) are reduced inventories that you must select explicitly
+with `--profile`. See the
+[canonical workspace and profile inventory](workspace-inventory.md).
 
 ## 1. Check prerequisites
 
@@ -190,7 +186,7 @@ Use this path when you want to run each command explicitly.
 Interactive configuration:
 
 ```powershell
-retail-setup configure --workspace-name retail-demo-alice --profile core
+retail-setup configure --workspace-name retail-demo-alice
 ```
 
 Review these choices:
@@ -209,7 +205,7 @@ Review these choices:
 
 The CLI shows an estimated record count before writing configuration.
 
-Non-interactive starter-pool example:
+Non-interactive example:
 
 === "Windows PowerShell"
 
@@ -217,13 +213,12 @@ Non-interactive starter-pool example:
     retail-setup configure `
       --tenant-id 00000000-0000-0000-0000-000000000000 `
       --workspace-name retail-demo-alice `
-      --profile core `
       --capacity-name my-fabric-capacity `
       --lakehouse-name retail_lakehouse `
       --eventhouse-name retail_eventhouse `
       --kql-database-name retail_eventhouse `
       --store-type supercenter `
-      --months 1 `
+      --months 18 `
       --store-count 10 `
       --seed 42
     ```
@@ -234,13 +229,12 @@ Non-interactive starter-pool example:
     retail-setup configure \
       --tenant-id 00000000-0000-0000-0000-000000000000 \
       --workspace-name retail-demo-alice \
-      --profile core \
       --capacity-name my-fabric-capacity \
       --lakehouse-name retail_lakehouse \
       --eventhouse-name retail_eventhouse \
       --kql-database-name retail_eventhouse \
       --store-type supercenter \
-      --months 1 \
+      --months 18 \
       --store-count 10 \
       --seed 42
     ```

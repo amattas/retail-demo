@@ -48,8 +48,8 @@ cd retail-demo
 ```
 
 The bootstrap prepares Python, configures the target, renders notebooks, and
-offers to deploy. The shell wrappers default to the complete `full-demo`
-profile; pass `--profile core` or `--profile standard` to select a smaller
+offers to deploy. Every entry point defaults to the complete `full-demo`
+profile; pass `--profile core` or `--profile standard` only to select a smaller
 inventory. To proceed directly to deployment:
 
 ```powershell
@@ -67,7 +67,7 @@ For a manually managed Python environment:
 ```powershell
 python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
 python -m pip install --no-deps -e .\utility
-retail-setup configure --workspace-name retail-demo-alice --profile core --months 3 --store-count 50 --seed 42
+retail-setup configure --workspace-name retail-demo-alice --months 18 --store-count 50 --seed 42
 retail-setup render --env alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice --yes
