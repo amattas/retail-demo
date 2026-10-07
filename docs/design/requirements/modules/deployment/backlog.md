@@ -60,3 +60,9 @@
 - The supported Eventhouse topology uses its automatically created default KQL
   database with the same display name.
 - Destructive reset assets are never part of an automatic normal run.
+- Same-workspace pipeline notebook references use deterministic logical IDs
+  and the default-workspace sentinel resolved natively by `fabric-cicd`, not
+  generated per-notebook parameter rules.
+- `fabric-cicd` bulk publish stays opt-in while its upstream API is
+  experimental and post-ontology Data Agent publication needs dynamic
+  target-item resolution.

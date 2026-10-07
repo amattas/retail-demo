@@ -9,6 +9,7 @@
 | Fabric Terraform provider | Azure CLI or explicit service-principal, OIDC, or managed identity; never Azure PowerShell session state |
 | KQL schema application | Local deploy process with Eventhouse permissions |
 | Streaming notebook | Fabric notebook runtime identity |
+| Ontology notebook | Fabric notebook runtime identity; Power BI token exchanged for a Digital Operations workload token sent only to allowlisted Fabric HTTPS hosts |
 | Report/KQL/agent consumption | Assigned Fabric/Power BI consumer identity |
 
 Every context must target the configured tenant, workspace, and data item.

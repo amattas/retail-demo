@@ -1,6 +1,16 @@
 # Status: Local Remediation and Native Decision Pack
 
-**Updated**: 2026-09-23 | **Wave**: E — local implementation complete; native live acceptance blocked
+**Updated**: 2026-10-06 | **Wave**: E — local implementation complete; native live acceptance blocked
+
+## Documentation reconciliation (2026-10-06, `dev` branch)
+
+Living docs were reconciled against merged PRs #384 (decision demo app),
+#385 (ontology field descriptions), and #400 (Fabric provider 1.14.0,
+`fabric-cicd` 1.3.0, native logical-ID pipeline bindings). Updates landed in
+the ontology model contract, access control, security controls, threat model,
+traceability, and the deployment/security backlogs. #384's dated root drafts
+were already promoted to living owners. Open follow-up: a regression test for
+ontology-notebook token-host allowlisting (security backlog).
 
 ## Retail realism revision (2026-09-23, locally implemented)
 

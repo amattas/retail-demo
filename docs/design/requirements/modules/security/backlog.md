@@ -12,6 +12,9 @@
   evidence-bound actions, idempotency, and fan-out limits (`SEC-012`,
   `THREAT-009`). These proposed controls do not reopen retired row-level RLS
   or mandatory Data Agent persona requirements.
+- Add a regression test that the ontology notebook rejects non-HTTPS and
+  non-allowlisted Fabric service hosts before sending Power BI or workload
+  tokens (`THREAT-002`).
 
 ## Settled — do not reopen
 

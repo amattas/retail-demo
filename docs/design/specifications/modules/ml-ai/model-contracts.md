@@ -162,6 +162,14 @@ API as the Fabric UI to apply descriptions to every regular and time-series
 property, then reads the entity types back and fails if any description wasn't
 persisted.
 
+Descriptions come from source metadata when available, otherwise from
+deterministic field context. The notebook identity obtains a Power BI token,
+exchanges it for a Digital Operations workload token, and sends credentials only
+to HTTPS service URLs whose hosts end in `.analysis.windows.net` or
+`.pbidedicated.windows.net`; any other Fabric-returned URL fails the run. The
+apply-and-verify sequence retries up to five times only for HTTP 404, 409,
+429, 500, 502, 503, or 504; other failures fail immediately.
+
 ## Data Agents
 
 Source-controlled Data Agent definitions require target-specific rebinding.
