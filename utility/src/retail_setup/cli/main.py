@@ -1973,10 +1973,10 @@ def _deploy_plan(
                 ],
                 description="Publish connected Store, Warehouse and Truck twins report",
                 step_id="deploy-twins",
-                required=True,
+                required=False,
                 failure_message=(
-                    "Requested connected twins report failed. Inspect "
-                    "twins-report.json before retrying."
+                    "Connected twins report failed; the rest of the deployment "
+                    "continues. Inspect twins-report.json before retrying."
                 ),
                 evidence_path=f"deploy/.generated/{env}/twins-report.json",
             )

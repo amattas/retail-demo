@@ -32,9 +32,12 @@ reservations, or warehouse-bin data.
 
 `deploy/scripts/_twin_cohort.py` selects from
 `ag.fact_truck_moves`, anchored to the newest event no later than the
-observation time, with a fourteen-day lookback. Discovery is bounded to
-10,000 route rows and fails on missing, ambiguous, or inconsistent shipment
-identity. Both trucks must belong to the same recorded DC network. Each
+observation time, with a fourteen-day lookback. Discovery reads at most
+10,000 route rows, and the selected network keeps at most 1,000 shipments.
+When a bound is exceeded, the cohort keeps the newest rows. It drops every
+row at the boundary timestamp and moves `window_start` just past it, so
+cargo and report queries cover a complete window. Missing, ambiguous, or
+inconsistent shipment identity still fails. Both trucks must belong to the same recorded DC network. Each
 truck's latest recorded destination is included before filling the store set.
 
 `ag.fact_truck_inventory` supplies observed cargo product IDs, joined using
@@ -73,7 +76,9 @@ observed delay, recompute stockout probabilities, or place an order.
 
 `twins.enabled` is independent and defaults to true whenever the profile
 selects the semantic model and Report (`standard` or `full-demo`); `core`
-cannot select twins. Selected twins publish after Reporting.
+cannot select twins. Selected twins publish after Reporting through the
+non-required `deploy-twins` step: a failure degrades the run, and later steps
+still run.
 The targeted `deploy.scripts.deploy_twins` command can update an existing
 workspace without rerunning historical generation.
 

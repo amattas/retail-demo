@@ -261,7 +261,7 @@ def test_twins_plan_is_required_after_reporting_before_native_and_taskflow(profi
     assert twins_index < native_index
     if profile == "full-demo":
         assert twins_index < ids.index("deploy-post-ontology-taskflow")
-    assert twins.required is True
+    assert twins.required is False
     assert twins.evidence_path == "deploy/.generated/dev/twins-report.json"
     assert twins.cmd == [
         sys.executable,

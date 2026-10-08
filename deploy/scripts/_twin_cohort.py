@@ -8,6 +8,7 @@ from itertools import combinations
 from typing import Any
 
 MAX_ROUTE_ROWS = 10_000
+MAX_SHIPMENTS = 1_000
 WINDOW_DAYS = 14
 
 ROUTES_SQL = """
@@ -46,13 +47,37 @@ def utc_time(value: Any) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
+def _newest_complete(
+    rows: list[dict[str, Any]], limit: int, key: str = "event_ts",
+) -> tuple[list[dict[str, Any]], datetime | None]:
+    """Keep at most ``limit`` newest rows without splitting a boundary timestamp.
+
+    Returns the kept rows and the exclusive cutoff, or ``None`` when nothing was
+    dropped. Rows sharing the boundary timestamp are all dropped so the window
+    stays complete for every source row inside it.
+    """
+    if len(rows) <= limit:
+        return rows, None
+    ordered = sorted(rows, key=lambda row: utc_time(row[key]), reverse=True)
+    cutoff = utc_time(ordered[limit - 1][key])
+    kept = [row for row in ordered if utc_time(row[key]) > cutoff]
+    if not kept:
+        raise ValueError("Twin source rows share one timestamp beyond the bounded size.")
+    return kept, cutoff
+
+
 def select_cohort(
     routes: list[dict[str, Any]], *, as_of: datetime,
 ) -> dict[str, Any]:
-    if not routes or len(routes) > MAX_ROUTE_ROWS:
-        raise ValueError("Twin route discovery requires 1-10000 bounded source rows.")
+    if not routes:
+        raise ValueError("Twin route discovery requires recorded source rows.")
     as_of = utc_time(as_of)
     start = as_of - timedelta(days=WINDOW_DAYS)
+    # Discovery reads one extra row; when the window is busier than the bound,
+    # narrow it to the newest complete rows rather than failing.
+    routes, cutoff = _newest_complete(routes, MAX_ROUTE_ROWS)
+    if cutoff is not None:
+        start = cutoff + timedelta(microseconds=1)
     groups: dict[int, dict[int, list[dict[str, Any]]]] = defaultdict(
         lambda: defaultdict(list)
     )
@@ -98,8 +123,11 @@ def select_cohort(
             break
         stores.add(row["store_id"])
     selected = [row for row in selected if row["store_id"] in stores]
-    if len(selected) > 1000:
-        raise ValueError("The selected twin network exceeds 1000 recorded shipments.")
+    selected, cutoff = _newest_complete(selected, MAX_SHIPMENTS)
+    if cutoff is not None:
+        start = max(start, cutoff + timedelta(microseconds=1))
+        selected.sort(key=lambda row: (-row["event_ts"].timestamp(), row["shipment_id"]))
+        stores = {row["store_id"] for row in selected}
     return {
         "dc_id": dc,
         "truck_ids": [first, second],
