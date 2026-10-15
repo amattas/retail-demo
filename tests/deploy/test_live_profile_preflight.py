@@ -99,6 +99,8 @@ def test_full_demo_live_preflight_passes_without_operator_acknowledgements(
     report = validate_live_profile_preflight(object(), _config())
 
     assert report.capacity_sku == "F64"
+    assert report.capacity_sizing is not None
+    assert report.capacity_sizing.max_node_count == 2
     assert report.checked_tenant_settings == (
         "OntologyPreview",
         "EnableAOAI",
@@ -150,7 +152,7 @@ def test_full_demo_rejects_capacity_smaller_than_f64(monkeypatch) -> None:
         validate_live_profile_preflight(object(), _config())
 
     assert not exc_info.value.tenant_settings_fixable
-    assert "require F64 or larger" in str(exc_info.value)
+    assert "driver and one Medium executor" in str(exc_info.value)
 
 
 def test_security_group_scoped_setting_fails_closed(monkeypatch) -> None:
@@ -183,7 +185,7 @@ def test_missing_capacity_may_wait_but_ambiguous_capacity_never_resumes():
 @pytest.mark.parametrize("resume", [False, True])
 @pytest.mark.parametrize("explicit_resource", [False, True])
 def test_cli_resumes_only_when_requested_and_uses_configured_target(
-    monkeypatch, resume, explicit_resource,
+    monkeypatch, tmp_path, resume, explicit_resource,
 ):
     from deploy.scripts import capacity_resume, deploy_config
 
@@ -211,9 +213,18 @@ def test_cli_resumes_only_when_requested_and_uses_configured_target(
     monkeypatch.setattr(
         live_profile_preflight.sys, "argv",
         ["live_profile_preflight", "--environment", "dev",
-         "--auth-mode", "azure_powershell", *(["--resume-capacity"] if resume else [])],
+         "--auth-mode", "azure_powershell",
+         "--capacity-sizing-output", str(tmp_path / "capacity-sizing.json"),
+         *(["--resume-capacity"] if resume else [])],
     )
     assert live_profile_preflight.main() == 0
+    evidence_path = tmp_path / "capacity-sizing.json"
+    assert evidence_path.is_file()
+    evidence = yaml.safe_load(evidence_path.read_text(encoding="utf-8"))
+    assert evidence["environment"] == "dev"
+    assert evidence["capacity_id"] == "capacity-id"
+    assert evidence["producer_concurrency"] == 6
+    assert evidence["max_node_count"] == 2
     assert sessions == [{"auth_mode": "azure_powershell", "tenant_id": config.tenant_id}]
     assert len(requests) == int(resume)
     if resume:
@@ -241,7 +252,10 @@ def test_cli_stops_when_resume_fails(monkeypatch):
     assert live_profile_preflight.main() == 1
 
 
-def test_standalone_preflight_defaults_to_configured_authentication(monkeypatch):
+def test_standalone_preflight_defaults_to_configured_authentication(
+    monkeypatch,
+    tmp_path,
+):
     from deploy.scripts import deploy_config
 
     config = replace(_config(), auth_mode="azure_powershell")
@@ -253,7 +267,15 @@ def test_standalone_preflight_defaults_to_configured_authentication(monkeypatch)
         lambda **kwargs: sessions.append(kwargs) or object(),
     )
     monkeypatch.setattr(
-        live_profile_preflight.sys, "argv", ["live_profile_preflight", "--environment", "dev"],
+        live_profile_preflight.sys,
+        "argv",
+        [
+            "live_profile_preflight",
+            "--environment",
+            "dev",
+            "--capacity-sizing-output",
+            str(tmp_path / "capacity-sizing.json"),
+        ],
     )
     assert live_profile_preflight.main() == 0
     assert sessions == [{"auth_mode": "azure_powershell", "tenant_id": config.tenant_id}]

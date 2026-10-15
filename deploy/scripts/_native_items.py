@@ -6,14 +6,13 @@ import base64
 import json
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
+import requests
 
-if TYPE_CHECKING:
-    import requests
+from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
 
 API = "https://api.fabric.microsoft.com/v1"
 COLLECTIONS = {
@@ -62,14 +61,21 @@ def _operation_url(value: str) -> str:
 
 def _error(response: requests.Response, operation: str) -> NativeItemError:
     code = ""
+    message = ""
+    request_id = ""
     try:
         body = response.json()
         if isinstance(body, dict):
             code = str(body.get("errorCode", ""))[:100]
+            message = " ".join(str(body.get("message", "")).split())[:300]
+            request_id = str(body.get("requestId", ""))[:100]
     except ValueError:
         pass
+    details = ": ".join(value for value in (code, message) if value)
+    request = f" (request {request_id})" if request_id else ""
     return NativeItemError(
-        f"{operation} failed: HTTP {response.status_code} {code}".strip()
+        f"{operation} failed: HTTP {response.status_code}"
+        f"{' ' + details if details else ''}{request}"
     )
 
 
@@ -162,6 +168,14 @@ def get_definition(
 
 
 def _contains(expected: Any, actual: Any, path: tuple[str, ...] = ()) -> bool:
+    if (
+        len(path) == 4
+        and path[:2] == ("configuration", "dataSources")
+        and path[-1] == "id"
+        and isinstance(expected, str)
+        and actual in (None, "00000000-0000-0000-0000-000000000000")
+    ):
+        return True
     if path == ("datasetReference", "byConnection", "connectionString"):
         if not isinstance(expected, str) or not isinstance(actual, str):
             return False
@@ -224,6 +238,52 @@ def definition_matches(expected: dict[str, Any], actual: dict[str, Any]) -> bool
     return True
 
 
+def _update_definition(
+    session: requests.Session,
+    *,
+    item_type: str,
+    collection_url: str,
+    item_id: str,
+    definition: dict[str, Any],
+) -> None:
+    update_definition = definition
+    update_params = None
+    if item_type == "OperationsAgent":
+        update_definition = {
+            key: value for key, value in definition.items() if key != "format"
+        }
+        if any(
+            part.get("path") == ".platform"
+            for part in definition.get("parts", [])
+        ):
+            update_params = {"updateMetadata": "true"}
+    response = session.post(
+        f"{collection_url}/{item_id}/updateDefinition",
+        params=update_params,
+        json={"definition": update_definition},
+        timeout=30,
+        allow_redirects=False,
+    )
+    complete_operation(session, response, operation_name=f"Update {item_type}")
+
+
+def _delete_created_item(
+    session: requests.Session,
+    *,
+    collection_url: str,
+    item_id: str,
+) -> None:
+    response = session.delete(
+        f"{collection_url}/{item_id}", timeout=30, allow_redirects=False
+    )
+    if response.status_code == 202:
+        complete_operation(
+            session, response, operation_name="Clean up incomplete OperationsAgent"
+        )
+    elif response.status_code not in (200, 204, 404):
+        raise _error(response, "Clean up incomplete OperationsAgent")
+
+
 def ensure_native_item(
     session: requests.Session,
     *,
@@ -248,6 +308,7 @@ def ensure_native_item(
     if len(matches) > 1:
         raise NativeItemError(f"Multiple {item_type} items match {display_name!r}.")
     decode_definition_parts(definition)
+    created_item = False
     if matches:
         item_id = _guid(matches[0]["id"])
         actual = get_definition(
@@ -255,20 +316,21 @@ def ensure_native_item(
         )
         if definition_matches(definition, actual):
             return item_id
-        response = session.post(
-            f"{collection_url}/{item_id}/updateDefinition",
-            json={"definition": definition},
-            timeout=30,
-            allow_redirects=False,
+        _update_definition(
+            session,
+            item_type=item_type,
+            collection_url=collection_url,
+            item_id=item_id,
+            definition=definition,
         )
-        complete_operation(session, response, operation_name=f"Update {item_type}")
     else:
+        create_with_definition = item_type != "OperationsAgent"
         response = session.post(
             collection_url,
             json={
                 "displayName": display_name,
                 "description": description,
-                "definition": definition,
+                **({"definition": definition} if create_with_definition else {}),
             },
             timeout=30,
             allow_redirects=False,
@@ -298,6 +360,27 @@ def ensure_native_item(
                 raise NativeItemError(
                     f"Created {item_type} is not visible; inspect before retrying."
                 )
+        created_item = True
+        if not create_with_definition:
+            try:
+                _update_definition(
+                    session,
+                    item_type=item_type,
+                    collection_url=collection_url,
+                    item_id=item_id,
+                    definition=definition,
+                )
+            except (NativeItemError, requests.RequestException) as error:
+                try:
+                    _delete_created_item(
+                        session, collection_url=collection_url, item_id=item_id
+                    )
+                except (NativeItemError, requests.RequestException) as cleanup_error:
+                    raise NativeItemError(
+                        f"{error}; incomplete OperationsAgent {item_id} could not "
+                        f"be removed: {cleanup_error}"
+                    ) from error
+                raise
     for attempt in range(5):
         actual = get_definition(
             session, workspace_id, item_type, item_id, definition.get("format")
@@ -306,6 +389,17 @@ def ensure_native_item(
             return item_id
         if attempt < 4:
             time.sleep(2)
-    raise NativeItemError(
+    error = NativeItemError(
         f"{item_type} readback does not match the requested definition."
     )
+    if created_item and item_type == "OperationsAgent":
+        try:
+            _delete_created_item(
+                session, collection_url=collection_url, item_id=item_id
+            )
+        except (NativeItemError, requests.RequestException) as cleanup_error:
+            raise NativeItemError(
+                f"{error}; incomplete OperationsAgent {item_id} could not be "
+                f"removed: {cleanup_error}"
+            ) from error
+    raise error

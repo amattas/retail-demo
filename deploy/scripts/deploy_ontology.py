@@ -47,6 +47,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ONELAKE = "https://onelake.dfs.fabric.microsoft.com"
 STORAGE_SCOPE = "https://storage.azure.com/.default"
 BRONZE_SCHEMA = "cusn"
+# The current V4 service rejects multiple anonymous additionalBackingTable
+# declarations. Keep discovery evidence, but publish only supported core tables.
+_ENABLE_EVENT_BACKING_TABLES = False
 
 
 def is_old_format(parts: dict[str, bytes]) -> bool:
@@ -191,6 +194,34 @@ def _wait_for_single(
     raise NativeItemError(f"Ontology {display_name!r} is not visible after publication.")
 
 
+def _replace(
+    session: requests.Session,
+    *,
+    workspace_id: str,
+    item_id: str,
+    display_name: str,
+    definition: dict[str, Any],
+    expected_parts: dict[str, str],
+    sleep: Callable[[float], None],
+) -> str:
+    """Publish and verify a staging item before replacing an existing ontology."""
+
+    staging = f"{display_name}_tmdl"[:256]
+    for item in _matching(session, workspace_id, staging):
+        _delete(session, workspace_id, _guid(item["id"]))
+    _create(session, workspace_id, staging, definition, sleep=sleep)
+    staged_id = _wait_for_single(session, workspace_id, staging, sleep)
+    _verify(
+        expected_parts,
+        decode_definition_parts(
+            get_definition(session, workspace_id, "Ontology", staged_id)
+        ),
+    )
+    _delete(session, workspace_id, item_id)
+    _rename(session, workspace_id, staged_id, display_name, sleep=sleep)
+    return staged_id
+
+
 def _verify(expected: dict[str, str], actual: dict[str, bytes]) -> None:
     """The service elides defaults, so compare element sets, not exact text."""
     wanted = {path for path in expected if path.startswith(("entities/", "rules/", "tables/"))}
@@ -214,7 +245,10 @@ def publish_ontology(
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     host, database = sql_endpoint(session, workspace_id, lakehouse_id)
-    available = set(list_bronze(workspace_id, lakehouse_id, storage_token))
+    discovered_bronze = set(
+        list_bronze(workspace_id, lakehouse_id, storage_token)
+    )
+    available = discovered_bronze if _ENABLE_EVENT_BACKING_TABLES else set()
     parts = build_definition(
         sql_endpoint=host, sql_database_id=database,
         available_bronze_tables=available, display_name=display_name,
@@ -231,17 +265,15 @@ def publish_ontology(
         )
         if is_old_format(current):
             action = "migrated"
-            staging = f"{display_name}_tmdl"[:256]
-            stale = _matching(session, workspace_id, staging)
-            for item in stale:
-                _delete(session, workspace_id, _guid(item["id"]))
-            _create(session, workspace_id, staging, definition, sleep=sleep)
-            staged_id = _wait_for_single(session, workspace_id, staging, sleep)
-            _verify(parts, decode_definition_parts(
-                get_definition(session, workspace_id, "Ontology", staged_id)
-            ))
-            _delete(session, workspace_id, item_id)
-            _rename(session, workspace_id, staged_id, display_name, sleep=sleep)
+            _replace(
+                session,
+                workspace_id=workspace_id,
+                item_id=item_id,
+                display_name=display_name,
+                definition=definition,
+                expected_parts=parts,
+                sleep=sleep,
+            )
         else:
             action = "updated"
             response = session.post(
@@ -249,8 +281,28 @@ def publish_ontology(
                 "/updateDefinition?updateMetadata=true",
                 json={"definition": definition}, timeout=60, allow_redirects=False,
             )
-            complete_operation(session, response, timeout_seconds=1800,
-                               operation_name="Update ontology")
+            merge_failure = (
+                response.status_code == 400
+                and "TMDL objects cannot be merged" in response.text
+            )
+            if merge_failure:
+                action = "recreated"
+                _replace(
+                    session,
+                    workspace_id=workspace_id,
+                    item_id=item_id,
+                    display_name=display_name,
+                    definition=definition,
+                    expected_parts=parts,
+                    sleep=sleep,
+                )
+            else:
+                complete_operation(
+                    session,
+                    response,
+                    timeout_seconds=1800,
+                    operation_name="Update ontology",
+                )
     else:
         _create(session, workspace_id, display_name, definition, sleep=sleep)
     item_id = _wait_for_single(session, workspace_id, display_name, sleep)
@@ -259,6 +311,7 @@ def publish_ontology(
         "action": action,
         "ontology_id": item_id,
         "bronze_tables": sorted(available),
+        "discovered_bronze_tables": sorted(discovered_bronze),
         "skipped_bronze_tables": sorted({b.table for b in EVENT_BINDINGS} - available),
         "entities": sorted(p.split("/", 1)[1][:-5] for p in parts if p.startswith("entities/")),
         "rules": sorted(p.split("/", 1)[1][:-5] for p in parts if p.startswith("rules/")),
@@ -331,6 +384,10 @@ def main(argv: list[str] | None = None) -> int:
         console.error(str(exc))
     (generated / "ontology-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     if report["status"] != "SUCCEEDED":
+        return 1
+    from deploy.scripts.workspace_folders import organize_after_publish
+
+    if not organize_after_publish(args.repo_root, args.environment):
         return 1
     console.info(f"Ontology {report['action']}: {report['ontology_id']}.")
     return 0

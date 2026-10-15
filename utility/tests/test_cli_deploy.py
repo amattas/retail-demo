@@ -2,6 +2,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,6 +29,17 @@ from retail_setup.contracts import load_repository_manifest, resolve_profile
 
 runner = CliRunner()
 TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+@pytest.fixture(autouse=True)
+def _stub_live_capacity_sizing_record(monkeypatch):
+    """Subprocess fakes do not execute preflight or create its evidence file."""
+
+    def record(_repo_root, _env, journal):
+        if journal.targets.get("spark_pool") == "custom":
+            journal.manifest["capacity_sizing"] = {"sha256": "test-sizing"}
+
+    monkeypatch.setattr(cli, "_record_capacity_sizing_after_preflight", record)
 PLAN_CONNECTION_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _MANIFEST, _VALIDATION = load_repository_manifest(REPO_ROOT)
@@ -34,6 +47,14 @@ _MANIFEST, _VALIDATION = load_repository_manifest(REPO_ROOT)
 
 def _profile(name: str):
     return resolve_profile(_MANIFEST, _VALIDATION, name)
+
+
+@pytest.mark.parametrize("profile_name", ["core", "standard", "full-demo"])
+def test_deploy_plan_finishes_with_object_type_folder_organization(profile_name):
+    plan = _deploy_plan("dev", True, profile=_profile(profile_name))
+    assert plan[-1].step_id == "organize-workspace-folders"
+    assert plan[-1].required is True
+    assert "deploy.scripts.workspace_folders" in plan[-1].cmd
 
 
 def _seed_deploy_config(
@@ -194,6 +215,41 @@ def test_tmdl_ontology_publishes_before_data_agents_without_blocking():
     assert step.evidence_path == "deploy/.generated/dev/ontology-report.json"
 
 
+def test_streaming_shortcuts_run_after_kql_and_do_not_block_deploy():
+    plan = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+        streaming_shortcuts_enabled=True,
+    )
+    ids = [step.step_id for step in plan]
+    step = plan[ids.index("ensure-eventhouse-shortcuts")]
+
+    assert ids.index("apply-kql") < ids.index("ensure-eventhouse-shortcuts")
+    assert step.required is False
+    assert step.cmd[2] == "deploy.scripts.ensure_eventhouse_shortcuts"
+    assert step.evidence_path == "deploy/.generated/dev/eventhouse-shortcuts-report.json"
+
+
+@pytest.mark.parametrize("profile", ["standard", "full-demo"])
+def test_pipeline_gates_attach_durable_exact_run_evidence(profile):
+    plan = _deploy_plan("dev", True, profile=_profile(profile), repo_root=REPO_ROOT)
+    pipeline_steps = [
+        step
+        for step in plan
+        if "deploy.scripts.run_pipeline" in step.cmd
+    ]
+
+    assert pipeline_steps
+    for step in pipeline_steps:
+        assert step.evidence_path == (
+            f"deploy/.generated/dev/pipeline-evidence/{step.step_id}.json"
+        )
+        output_index = step.cmd.index("--evidence-output")
+        assert step.cmd[output_index + 1] == step.evidence_path
+
+
 @pytest.mark.parametrize(("profile", "included"), [
     ("core", False), ("standard", True), ("full-demo", True),
 ])
@@ -272,6 +328,52 @@ def test_twins_plan_is_required_after_reporting_before_native_and_taskflow(profi
         "--repo-root",
         str(REPO_ROOT),
     ]
+
+
+def test_post_reporting_plan_uses_explicit_dependencies_and_one_spark_lane():
+    plan = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile("full-demo"),
+        repo_root=REPO_ROOT,
+        operations_planning_enabled=True,
+        include_native_plan=False,
+        twins_enabled=True,
+    )
+    by_id = {step.step_id: step for step in plan}
+
+    assert by_id["required-ml-reporting-gate"].depends_on == (
+        "setup-pipeline-gate",
+    )
+    assert by_id["deploy-reporting"].depends_on == ("build-reporting",)
+    for step_id in (
+        "post-reporting-ml-optional",
+        "post-reporting-ml-experimental",
+        "ensure-ontology",
+    ):
+        assert by_id[step_id].resource == "spark"
+        assert "deploy-reporting" in by_id[step_id].depends_on
+    for step_id in (
+        "deploy-twins",
+        "deploy-operations-planning",
+        "deploy-fabric-app",
+    ):
+        assert by_id[step_id].resource == "non-spark"
+        assert by_id[step_id].depends_on == ("deploy-reporting",)
+    taskflow_dependencies = set(
+        by_id["deploy-post-ontology-taskflow"].depends_on
+    )
+    assert {
+        "post-reporting-ml-optional",
+        "post-reporting-ml-experimental",
+        "validate-reporting",
+        "deploy-twins",
+        "deploy-operations-planning",
+        "deploy-fabric-app",
+    } <= taskflow_dependencies
+    assert by_id["organize-workspace-folders"].depends_on == (
+        "deploy-post-ontology-taskflow",
+    )
 
 
 def test_twins_plan_rejects_core_profile():
@@ -467,7 +569,7 @@ def test_native_pack_failure_or_failed_prerequisite_aborts_deploy(
     )
     assert journal["status"] == "FAILED"
     assert native["classification"] == "required"
-    assert native["status"] == ("PENDING" if failure_pipeline else "FAILED")
+    assert native["status"] == ("SKIPPED" if failure_pipeline else "FAILED")
     if failure_pipeline:
         assert not any(
             "deploy.scripts.deploy_operations_planning" in command for command in commands
@@ -981,9 +1083,26 @@ def test_deployment_requests_capacity_resume_before_terraform_and_publication():
     plan = _deploy_plan("dev", skip_terraform=False)
     preflight = next(step for step in plan if step.step_id == "live-profile-preflight")
     assert "--resume-capacity" in preflight.cmd
+    assert "--capacity-sizing-output" in preflight.cmd
+    generate = next(step for step in plan if step.step_id == "generate-configs")
+    assert "--capacity-sizing-evidence" in generate.cmd
     assert plan.index(preflight) < next(
         index for index, step in enumerate(plan) if step.step_id == "terraform-apply"
     )
+
+
+def test_starter_pool_plan_does_not_use_capacity_sizing_evidence():
+    plan = _deploy_plan(
+        "dev",
+        skip_terraform=True,
+        profile=_profile("standard"),
+        repo_root=REPO_ROOT,
+    )
+    live = next(step for step in plan if step.step_id == "live-profile-preflight")
+    generate = next(step for step in plan if step.step_id == "generate-configs")
+
+    assert "--capacity-sizing-output" not in live.cmd
+    assert "--capacity-sizing-evidence" not in generate.cmd
 
 
 def test_plan_isolates_terraform_state_and_data_directory():
@@ -1096,6 +1215,21 @@ def test_recreate_rejects_skip_terraform(monkeypatch):
     result = runner.invoke(app, ["deploy", "--env", "dev", "--recreate", "--skip-terraform"])
     assert result.exit_code == 1, result.output
     assert "--recreate cannot be combined with --skip-terraform" in result.output
+
+
+def test_adopt_pipeline_run_requires_resume():
+    result = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--env",
+            "dev",
+            "--adopt-pipeline-run",
+            "ml-required=33333333-3333-4333-8333-333333333333",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "--adopt-pipeline-run requires --resume" in result.output
 
 
 def test_recreate_dry_run_shows_destroy_step():
@@ -1212,16 +1346,12 @@ def test_workspace_name_prefers_environment_overlay(tmp_path):
     assert _workspace_name(tmp_path, "dev") == "retail-demo-dev"
 
 
-def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys):
-    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
-    attempts = {"n": 0}
+def test_run_setup_pipeline_warns_and_submits_only_once(monkeypatch, capsys):
     commands = []
 
     def fake_run(cmd, cwd=None):
         commands.append(cmd)
-        attempts["n"] += 1
-        # Fail the first trigger, succeed on the retry.
-        return SimpleNamespace(returncode=1 if attempts["n"] == 1 else 0)
+        return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr("subprocess.run", fake_run)
     _run_setup_pipeline(
@@ -1233,7 +1363,8 @@ def test_run_setup_pipeline_warns_takes_a_while_and_retries(monkeypatch, capsys)
 
     out = capsys.readouterr().out
     assert "can take a while" in out
-    assert attempts["n"] == 2  # retried once after the initial failure
+    assert len(commands) == 1
+    assert "--evidence-output" in commands[0]
     assert all(
         command[command.index("--auth-mode") + 1] == "azure_powershell" for command in commands
     )
@@ -1424,8 +1555,7 @@ def test_deploy_taskflow_passes_selected_auth_mode(monkeypatch, tmp_path):
     assert "--workspace" not in calls[0]
 
 
-def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
-    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
+def test_run_setup_pipeline_fails_closed_without_retrying_post(monkeypatch, capsys):
     runs = {"n": 0}
 
     def fake_run(_cmd, cwd=None):
@@ -1433,8 +1563,6 @@ def test_run_setup_pipeline_gives_up_after_max_attempts(monkeypatch, capsys):
         return SimpleNamespace(returncode=1)
 
     monkeypatch.setattr("subprocess.run", fake_run)
-    # The pipeline trigger is only ever called once the operator requested it,
-    # so exhausting all retries now fails the deploy instead of just warning.
     with pytest.raises(typer.Exit) as exc_info:
         _run_setup_pipeline(Path("."), "dev")
 
@@ -1800,6 +1928,15 @@ def test_resume_copies_only_contiguous_succeeded_prefix():
         "profile_id": "profile.core",
         "profile_name": "core",
         "plan_step_ids": ["a", "b", "c"],
+        "plan_graph": [
+            {
+                "step_id": step_id,
+                "depends_on": [],
+                "resource": "non-spark",
+                "required": True,
+            }
+            for step_id in ("a", "b", "c")
+        ],
     }
     previous = _deploy_journal.start_run(
         "dev", targets={"workspace_name": "retail-demo-dev"}, manifest=metadata
@@ -2190,7 +2327,6 @@ def test_setup_pipeline_failure_is_required_and_raises_nonzero(
 ):
     _seed_deploy_config(tmp_path, profile="full-demo")
     monkeypatch.setattr("retail_setup.cli.main._validate_azure_cli_tenant", lambda *_: None)
-    monkeypatch.setattr(cli.time, "sleep", lambda *_a: None)
 
     def fake_run(cmd, cwd=None):
         if "deploy.scripts.run_pipeline" in cmd:
@@ -2265,11 +2401,11 @@ def test_required_ml_failure_leaves_reporting_unpublished(monkeypatch, tmp_path)
     reporting = next(
         s for s in journal["steps"] if s["step_id"] == "build-reporting"
     )
-    assert reporting["status"] == "PENDING"
+    assert reporting["status"] == "SKIPPED"
     publish_reporting = next(
         s for s in journal["steps"] if s["step_id"] == "deploy-reporting"
     )
-    assert publish_reporting["status"] == "PENDING"
+    assert publish_reporting["status"] == "SKIPPED"
     assert not any(
         "deploy.scripts.build_artifacts" in command
         and "--publication-phase" in command
@@ -2403,6 +2539,163 @@ def test_optional_ml_failure_does_not_block_published_reporting(
     assert optional["description"] in result.output
 
 
+def test_parallel_executor_bounds_resources_and_joins_dependencies(
+    monkeypatch, tmp_path
+):
+    lock = threading.Lock()
+    active = {"spark": 0, "non-spark": 0}
+    maximum = {"spark": 0, "non-spark": 0}
+
+    def fake_run(command, **_kwargs):
+        resource = command[0]
+        with lock:
+            active[resource] += 1
+            maximum[resource] = max(maximum[resource], active[resource])
+        time.sleep(0.04)
+        with lock:
+            active[resource] -= 1
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    roots = [
+        *[
+            cli.DeployStep(
+                cmd=["spark", str(index)],
+                step_id=f"spark-{index}",
+                resource="spark",
+            )
+            for index in range(3)
+        ],
+        *[
+            cli.DeployStep(
+                cmd=["non-spark", str(index)],
+                step_id=f"non-spark-{index}",
+            )
+            for index in range(6)
+        ],
+    ]
+    plan = [
+        *roots,
+        cli.DeployStep(
+            cmd=["non-spark", "join"],
+            step_id="join",
+            depends_on=tuple(step.step_id for step in roots),
+        ),
+    ]
+    journal = _deploy_journal.start_run("dev", targets={})
+    for step in plan:
+        _deploy_journal.add_step(
+            journal,
+            step.step_id,
+            step.step_id,
+            required=True,
+        )
+
+    cli._run_plan_plain(
+        tmp_path,
+        "dev",
+        plan,
+        len(plan),
+        yes=True,
+        journal=journal,
+    )
+
+    assert maximum["spark"] == 1
+    assert 1 < maximum["non-spark"] <= cli._DEFAULT_NON_SPARK_WORKERS
+    assert _deploy_journal.get_step(journal, "join").status == "SUCCEEDED"
+
+
+def test_required_failure_skips_descendants_but_not_independent_siblings(
+    monkeypatch, tmp_path
+):
+    commands = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command[0])
+        return SimpleNamespace(returncode=9 if command[0] == "required" else 0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    plan = [
+        cli.DeployStep(cmd=["required"], step_id="required"),
+        cli.DeployStep(
+            cmd=["descendant"],
+            step_id="descendant",
+            depends_on=("required",),
+        ),
+        cli.DeployStep(cmd=["independent"], step_id="independent"),
+    ]
+    journal = _deploy_journal.start_run("dev", targets={})
+    for step in plan:
+        _deploy_journal.add_step(
+            journal,
+            step.step_id,
+            step.step_id,
+            required=step.required,
+        )
+
+    with pytest.raises(typer.Exit) as exc:
+        cli._run_plan_plain(
+            tmp_path,
+            "dev",
+            plan,
+            len(plan),
+            yes=True,
+            journal=journal,
+        )
+
+    assert exc.value.exit_code == 9
+    assert "independent" in commands
+    assert "descendant" not in commands
+    assert _deploy_journal.get_step(journal, "descendant").status == "SKIPPED"
+
+
+def test_optional_failure_allows_join_and_independent_sibling(
+    monkeypatch, tmp_path
+):
+    commands = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command[0])
+        return SimpleNamespace(returncode=7 if command[0] == "optional" else 0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    plan = [
+        cli.DeployStep(
+            cmd=["optional"],
+            step_id="optional",
+            required=False,
+        ),
+        cli.DeployStep(cmd=["independent"], step_id="independent"),
+        cli.DeployStep(
+            cmd=["join"],
+            step_id="join",
+            depends_on=("optional", "independent"),
+        ),
+    ]
+    journal = _deploy_journal.start_run("dev", targets={})
+    for step in plan:
+        _deploy_journal.add_step(
+            journal,
+            step.step_id,
+            step.step_id,
+            required=step.required,
+        )
+
+    cli._run_plan_plain(
+        tmp_path,
+        "dev",
+        plan,
+        len(plan),
+        yes=True,
+        journal=journal,
+    )
+
+    assert set(commands) == {"optional", "independent", "join"}
+    assert _deploy_journal.get_step(journal, "optional").status == "FAILED"
+    assert _deploy_journal.get_step(journal, "join").status == "SUCCEEDED"
+    assert _deploy_journal.compute_status(journal) == "DEGRADED"
+
+
 def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_path):
     """The 'Deploy complete' banner never prints before required work finishes."""
     _seed_deploy_config(tmp_path, profile="full-demo")
@@ -2435,9 +2728,9 @@ def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_
         s for s in journal["steps"] if s["step_id"] == "build-infrastructure"
     )
     assert build_step["status"] == "FAILED"
-    # Steps after the failed one were never reached (still PENDING).
+    # Required descendants are explicitly prevented from running.
     kql_step = next(s for s in journal["steps"] if s["step_id"] == "apply-kql")
-    assert kql_step["status"] == "PENDING"
+    assert kql_step["status"] == "SKIPPED"
 
 
 def test_resume_fingerprint_ignores_fabric_app_dependencies_and_local_state(tmp_path):

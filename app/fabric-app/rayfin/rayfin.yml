@@ -10,6 +10,8 @@ services:
       enabled: true
     allowedRedirectUris:
       - http://localhost:5173
+      - http://127.0.0.1:5173
+      - https://crisp-hill-4bee4bcc42-westus3.webapp.fabricapps.net
   data:
     enabled: true
     dialect: mssql
@@ -19,3 +21,7 @@ services:
     buildCommand: npm run build:fabric
     indexDocument: index.html
     assetAccess: protected
+  storage:
+    enabled: false
+  functions:
+    enabled: false

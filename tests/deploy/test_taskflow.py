@@ -348,6 +348,8 @@ def test_committed_taskflow_covers_every_full_demo_artifact() -> None:
             semantic_model_name="retail_model",
             report_name="retail_model",
         ),
+        twins=SimpleNamespace(enabled=True),
+        operations_planning=SimpleNamespace(enabled=True),
     )
 
     errors = taskflow.taskflow_source_coverage_errors(
@@ -361,6 +363,32 @@ def test_committed_taskflow_covers_every_full_demo_artifact() -> None:
         for task in data["tasks"]
         for item in task["items"]
     )
+    task_names = {task["name"] for task in data["tasks"]}
+    assert {
+        "Prepare Eventhouse Shortcuts",
+        "Fabric App Approvals",
+        "Operations Case Preparation",
+    } <= task_names
+
+
+def test_optional_taskflow_assets_follow_live_publication_state() -> None:
+    selected = {
+        ("Report", "retail_model"),
+        ("Report", "retail-twins"),
+        ("AppBackend", "retail-approvals"),
+        ("SynapseNotebook", "prepare-replenishment-case"),
+    }
+    live = [
+        {"type": "Report", "displayName": "retail_model"},
+        {"type": "Report", "displayName": "retail-twins"},
+        {"type": "Notebook", "displayName": "prepare-replenishment-case"},
+    ]
+
+    assert taskflow.available_taskflow_artifacts(selected, live) == {
+        ("Report", "retail_model"),
+        ("Report", "retail-twins"),
+        ("SynapseNotebook", "prepare-replenishment-case"),
+    }
 
 
 def test_committed_taskflow_places_reporting_after_required_ml() -> None:

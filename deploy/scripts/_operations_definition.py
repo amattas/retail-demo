@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import UUID
 
 from deploy.scripts._native_items import json_part
 
@@ -11,30 +11,38 @@ AGENT_NAME = "retail-availability-operations"
 ACTION_NAME = "prepare-replenishment-case"
 
 
+def render_operations_instructions(*, include_plan: bool = True) -> str:
+    """Render the operator-reviewed instructions shared by both APIs."""
+
+    return (
+        ROOT / "fabric" / "operations" / "availability.instructions.md"
+    ).read_text(encoding="utf-8").replace(
+        "{{PLANNING_HANDOFF}}",
+        (
+            "After preparation, direct the planner to the retail-replenishment "
+            "Plan in this workspace."
+            if include_plan
+            else
+            "After preparation, ask the planner to review "
+            "ops.replenishment_cases in the Lakehouse and use the existing "
+            "retail report through SSO. Native Planning is not deployed. Do "
+            "not request fixed credentials or direct users to a native Plan."
+        ),
+    )
+
+
 def render_operations_definition(
     *,
     workspace_id: str,
     kql_database_id: str,
-    notebook_id: str,
     recipient: str | None = None,
     include_plan: bool = True,
 ) -> dict[str, Any]:
-    workspace_id, kql_database_id, notebook_id = (
-        str(UUID(value)) for value in (workspace_id, kql_database_id, notebook_id)
+    workspace_id, kql_database_id = (
+        str(UUID(value)) for value in (workspace_id, kql_database_id)
     )
     configuration: dict[str, Any] = {
-        "instructions": (
-            ROOT / "fabric" / "operations" / "availability.instructions.md"
-        ).read_text(encoding="utf-8").replace(
-            "{{PLANNING_HANDOFF}}",
-            (
-                "After preparation, direct the planner to the retail-replenishment Plan in this workspace."
-                if include_plan else
-                "After preparation, ask the planner to review ops.replenishment_cases in the Lakehouse "
-                "and use the existing retail report through SSO. Native Planning is not deployed. "
-                "Do not request fixed credentials or direct users to a native Plan."
-            ),
-        ),
+        "instructions": render_operations_instructions(include_plan=include_plan),
         "dataSources": {
             "availability": {
                 "id": kql_database_id,
@@ -42,26 +50,8 @@ def render_operations_definition(
                 "type": "KustoDatabase",
             },
         },
-        "actions": {
-            "prepareCase": {
-                "id": str(uuid5(NAMESPACE_URL, "retail-demo:operations:prepare-case")),
-                "displayName": "Prepare replenishment case",
-                "description": "Create a draft planning case after human approval; never place an order.",
-                "kind": "FabricJobAction",
-                "connection": {
-                    "jobArtifactId": notebook_id,
-                    "jobWorkspaceId": workspace_id,
-                    "itemType": "Notebook",
-                    "jobType": "RunNotebook",
-                },
-                "parameters": [
-                    {
-                        "name": "CASE_ID",
-                        "description": "case_id of the selected availability signal",
-                    }
-                ],
-            },
-        },
+        # Fabric's current REST preview rejects FabricJobAction definitions.
+        "actions": {},
     }
     if recipient:
         if "@" not in recipient or any(character.isspace() for character in recipient):
@@ -73,14 +63,12 @@ def render_operations_definition(
             "recipient": recipient,
         }
     return {
+        "format": "OperationsAgentV1",
         "parts": [
             json_part(
                 "Configurations.json",
-                {
-                    "configuration": configuration,
-                    "playbook": {},
-                    "shouldRun": False,
-                },
+                # Fabric rejects an empty playbook; it must be generated in the UI.
+                {"configuration": configuration, "shouldRun": False},
             )
         ]
     }

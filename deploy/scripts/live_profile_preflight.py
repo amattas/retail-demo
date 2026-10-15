@@ -12,6 +12,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
+from deploy.scripts.capacity_sizing import (
+    CapacitySizingError,
+    CapacitySizingEvidence,
+    derive_capacity_sizing,
+    write_capacity_sizing_evidence,
+)
 from deploy.scripts.export_items import build_session
 from deploy.scripts.fabric_runtime import FabricPaginationError, paginated_get
 
@@ -41,13 +47,6 @@ _TENANT_SETTING_TITLES = {
         "Data sent to Azure OpenAI can be stored outside your capacity's "
         "geographic region, compliance boundary, or national cloud instance"
     ),
-}
-_NODE_VCORES = {
-    "Small": 4,
-    "Medium": 8,
-    "Large": 16,
-    "XLarge": 32,
-    "XXLarge": 64,
 }
 _EU_DATA_BOUNDARY_REGIONS = {
     "austria east",
@@ -88,13 +87,7 @@ class LiveProfilePreflightReport:
     capacity_sku: str
     capacity_region: str
     checked_tenant_settings: tuple[str, ...]
-
-
-def _capacity_units(sku: str) -> int | None:
-    """Return Fabric capacity units for F/FTL SKUs."""
-
-    match = re.fullmatch(r"(?:F|FTL)(\d+)", sku, flags=re.IGNORECASE)
-    return int(match.group(1)) if match else None
+    capacity_sizing: CapacitySizingEvidence | None = None
 
 
 def _inside_us_or_eu_data_boundary(region: str) -> bool:
@@ -154,11 +147,12 @@ def _resolve_capacity(
 def _validate_capacity(
     capacity: dict[str, Any],
     config: DeployConfig,
-) -> list[str]:
+    repo_root: Path,
+) -> tuple[list[str], CapacitySizingEvidence | None]:
     errors: list[str] = []
+    sizing = None
     name = str(capacity.get("displayName", ""))
     state = str(capacity.get("state", ""))
-    sku = str(capacity.get("sku", ""))
     if state != "Active":
         errors.append(
             f"Capacity {name!r} is {state or 'unknown'}, not Active. Resume it "
@@ -166,35 +160,17 @@ def _validate_capacity(
         )
 
     if not config.profile.uses_custom_pool:
-        return errors
+        return errors, sizing
 
-    units = _capacity_units(sku)
-    if units is None or units < 64:
-        alternatives = "F64 or larger (or FTL64 or larger)"
-        errors.append(
-            f"Full-demo custom Spark defaults require {alternatives}; capacity "
-            f"{name!r} uses SKU {sku or 'unknown'}. Select a suitable capacity "
-            "or use `--profile standard` for the starter Spark pool."
+    try:
+        sizing = derive_capacity_sizing(
+            environment=config.environment,
+            capacity=capacity,
+            repo_root=repo_root,
         )
-        return errors
-
-    node_vcores = _NODE_VCORES.get(config.spark.node_size)
-    if node_vcores is None:
-        errors.append(
-            f"Cannot size unsupported Spark node {config.spark.node_size!r}."
-        )
-        return errors
-    available_vcores = units * 2
-    requested_vcores = config.spark.max_node_count * node_vcores
-    if requested_vcores > available_vcores:
-        max_nodes = available_vcores // node_vcores
-        errors.append(
-            f"Spark pool requests {requested_vcores} base vCores "
-            f"({config.spark.max_node_count} {config.spark.node_size} nodes), "
-            f"but {sku} provides {available_vcores}. Set spark.max_node_count "
-            f"to {max_nodes} or less, or select a larger capacity."
-        )
-    return errors
+    except CapacitySizingError as exc:
+        errors.append(str(exc))
+    return errors, sizing
 
 
 def _required_tenant_setting_names(
@@ -267,6 +243,8 @@ def _validate_tenant_settings(
 def validate_live_profile_preflight(
     session: requests.Session,
     config: DeployConfig,
+    *,
+    repo_root: Path = Path(__file__).resolve().parents[2],
 ) -> LiveProfilePreflightReport:
     """Validate live capacity and tenant prerequisites without mutation."""
 
@@ -280,7 +258,7 @@ def validate_live_profile_preflight(
     capacity = _resolve_capacity(capacities, config)
     if capacity is None:
         raise LiveProfilePreflightError("The configured capacity could not be resolved.")
-    errors = _validate_capacity(capacity, config)
+    errors, capacity_sizing = _validate_capacity(capacity, config, repo_root)
     region = str(capacity.get("region", ""))
     required_settings = _required_tenant_setting_names(config, region)
 
@@ -317,6 +295,7 @@ def validate_live_profile_preflight(
         capacity_sku=str(capacity.get("sku", "")),
         capacity_region=region,
         checked_tenant_settings=required_settings,
+        capacity_sizing=capacity_sizing,
     )
 
 
@@ -347,6 +326,11 @@ def main() -> int:
         help="Resume the configured paused Azure F capacity before validation (restarts billing).",
     )
     parser.add_argument("--capacity-timeout-seconds", type=float, default=600)
+    parser.add_argument(
+        "--capacity-sizing-output",
+        type=Path,
+        help="Write validated custom-pool sizing evidence to this path.",
+    )
     args = parser.parse_args()
     if not math.isfinite(args.capacity_timeout_seconds) or args.capacity_timeout_seconds <= 0:
         parser.error("--capacity-timeout-seconds must be a positive finite number")
@@ -408,7 +392,11 @@ def main() -> int:
             return 1
     while True:
         try:
-            report = validate_live_profile_preflight(session, config)
+            report = validate_live_profile_preflight(
+                session,
+                config,
+                repo_root=args.repo_root,
+            )
         except LiveProfilePreflightError as exc:
             console.error(str(exc))
             if (
@@ -424,6 +412,25 @@ def main() -> int:
             if response.strip().casefold() != "r":
                 return 1
             continue
+
+        if config.profile.uses_custom_pool:
+            if args.capacity_sizing_output is None:
+                console.error(
+                    "Custom-pool preflight requires --capacity-sizing-output."
+                )
+                return 1
+            if report.capacity_sizing is None:
+                console.error("Custom-pool capacity sizing evidence was not derived.")
+                return 1
+            output = args.capacity_sizing_output
+            if not output.is_absolute():
+                output = args.repo_root / output
+            write_capacity_sizing_evidence(output, report.capacity_sizing)
+        elif args.capacity_sizing_output is not None:
+            console.error(
+                "Starter-pool profiles must not request capacity sizing evidence."
+            )
+            return 1
 
         settings = (
             ", ".join(report.checked_tenant_settings)

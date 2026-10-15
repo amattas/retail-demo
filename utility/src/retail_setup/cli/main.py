@@ -14,9 +14,11 @@ import re
 import shutil
 import subprocess
 import sys
-import time
+import threading
 from collections.abc import Callable, Mapping
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -73,11 +75,13 @@ _DELETION_WAIT_TIMEOUT_SECONDS = 180
 _DELETION_WAIT_INTERVAL_SECONDS = 10
 
 # The setup pipeline runs asynchronously in Fabric; the CLI only needs to start
-# it. Retry the start a few times so a single transient failure (e.g. a cold az
-# token right after a long Terraform/publish step) doesn't leave it untriggered.
-_PIPELINE_TRIGGER_ATTEMPTS = 3
-_PIPELINE_TRIGGER_RETRY_WAIT = 10
+# Pipeline POSTs are never blindly retried. The runner reconciles an ambiguous
+# response against an exact request window and otherwise fails closed.
+_PIPELINE_TRIGGER_ATTEMPTS = 1
 _PROVIDER_TENANT_VARIABLES = ("FABRIC_TENANT_ID", "ARM_TENANT_ID")
+_DEFAULT_NON_SPARK_WORKERS = 4
+_DEFAULT_SPARK_WORKERS = 1
+_PIPELINE_MONITOR_DETACHED_EXIT_CODE = 4
 
 
 def _default_repo_root() -> Path:
@@ -1305,10 +1309,14 @@ class DeployStep:
     process_environment: dict[str, str] = field(default_factory=dict)
     failure_message: str | None = None
     evidence_path: str | None = None
+    depends_on: tuple[str, ...] = ()
+    resource: str = "non-spark"
 
     def __post_init__(self) -> None:
         if not self.step_id:
             self.step_id = _slugify(self.description)
+        if self.resource not in {"non-spark", "spark"}:
+            raise ValueError(f"Unsupported deploy resource class: {self.resource!r}")
 
 
 def _post_ontology_steps(
@@ -1345,6 +1353,7 @@ def _post_ontology_steps(
             ],
             description="Create or validate the full-demo ontology",
             step_id="ensure-ontology",
+            resource="spark",
         ),
         DeployStep(
             cmd=[
@@ -1358,6 +1367,7 @@ def _post_ontology_steps(
             ],
             description="Publish the ontology in the new TMDL format with business rules",
             step_id="publish-ontology-tmdl",
+            depends_on=("ensure-ontology",),
             required=False,
             failure_message=(
                 "TMDL ontology publication failed; the existing ontology was kept. "
@@ -1391,6 +1401,7 @@ def _post_ontology_steps(
             ],
             description="Stage post-ontology Data Agents",
             step_id="build-post-ontology",
+            depends_on=("publish-ontology-tmdl",),
             evidence_path=(
                 f"deploy/.generated/{env}/artifact-inventory-post-ontology.json"
             ),
@@ -1410,6 +1421,7 @@ def _post_ontology_steps(
             ],
             description="Publish post-ontology Data Agents",
             step_id="deploy-post-ontology",
+            depends_on=("build-post-ontology",),
         ),
         DeployStep(
             cmd=[
@@ -1429,9 +1441,13 @@ def _post_ontology_steps(
             ],
             description="Publish and verify the complete workspace task flow",
             step_id="deploy-post-ontology-taskflow",
+            depends_on=("deploy-post-ontology",),
         ),
     ]
     if include_verify:
+        folder_step = _workspace_folder_step(repo_root, env)
+        folder_step.depends_on = ("deploy-post-ontology-taskflow",)
+        steps.append(folder_step)
         steps.append(
             DeployStep(
                 cmd=[
@@ -1445,12 +1461,137 @@ def _post_ontology_steps(
                 ],
                 description="Verify complete post-ontology readiness",
                 step_id="verify-post-ontology",
+                depends_on=("organize-workspace-folders",),
                 evidence_path=(
                     f"deploy/.generated/{env}/readiness-report.json"
                 ),
             )
         )
     return steps
+
+
+def _workspace_folder_step(repo_root: Path, env: str) -> DeployStep:
+    return DeployStep(
+        cmd=[
+            sys.executable, "-m", "deploy.scripts.workspace_folders",
+            "--repo-root", str(repo_root), "--environment", env,
+        ],
+        description="Organize workspace items by object type for demo navigation",
+        step_id="organize-workspace-folders",
+        evidence_path=f"deploy/.generated/{env}/workspace-folder-report.json",
+    )
+
+
+def _wire_deploy_plan(steps: list[DeployStep]) -> None:
+    """Attach explicit dependencies to the full deployment DAG."""
+
+    by_id = {step.step_id: step for step in steps}
+    if len(by_id) != len(steps):
+        raise ValueError("Deploy step IDs must be unique.")
+
+    def depend(step_id: str, *dependency_ids: str) -> None:
+        step = by_id.get(step_id)
+        if step is None:
+            return
+        missing = [name for name in dependency_ids if name not in by_id]
+        if missing:
+            raise ValueError(
+                f"Deploy step {step_id!r} has unknown dependencies: {missing}"
+            )
+        step.depends_on = tuple(dict.fromkeys((*step.depends_on, *dependency_ids)))
+
+    depend("live-profile-preflight", "profile-preflight")
+    depend("generate-configs", "live-profile-preflight")
+    if "terraform-init" in by_id:
+        depend("terraform-init", "generate-configs")
+        terraform_predecessor = "terraform-init"
+        if "terraform-destroy-recreate" in by_id:
+            depend("terraform-destroy-recreate", "terraform-init")
+            depend("deletion-wait", "terraform-destroy-recreate")
+            terraform_predecessor = "deletion-wait"
+        depend("terraform-plan-guard", terraform_predecessor)
+        depend("terraform-apply", "terraform-plan-guard")
+        depend("terraform-output", "terraform-apply")
+        depend("regenerate-configs", "terraform-output")
+        depend("validate-target-access", "regenerate-configs")
+    else:
+        depend("validate-target-access", "generate-configs")
+
+    depend("render-notebooks", "validate-target-access")
+    build_id = (
+        "build-infrastructure"
+        if "build-infrastructure" in by_id
+        else "build-artifacts"
+    )
+    deploy_id = (
+        "deploy-infrastructure"
+        if "deploy-infrastructure" in by_id
+        else "deploy-items"
+    )
+    validate_id = (
+        "validate-infrastructure"
+        if "validate-infrastructure" in by_id
+        else "validate-deployment"
+    )
+    depend(build_id, "render-notebooks")
+    depend(deploy_id, build_id)
+    infrastructure_tail = deploy_id
+    if "apply-kql" in by_id:
+        depend("apply-kql", deploy_id)
+        infrastructure_tail = "apply-kql"
+    depend(validate_id, infrastructure_tail)
+    depend("ensure-eventhouse-shortcuts", validate_id)
+
+    if "setup-pipeline-gate" in by_id:
+        depend("setup-pipeline-gate", validate_id)
+        depend("required-ml-reporting-gate", "setup-pipeline-gate")
+        depend("build-reporting", "required-ml-reporting-gate")
+        depend("deploy-reporting", "build-reporting")
+        reporting_root = "deploy-reporting"
+        for step in steps:
+            if step.step_id.startswith("post-reporting-"):
+                depend(step.step_id, reporting_root)
+        depend("refresh-sql-endpoint", reporting_root)
+        depend("validate-reporting", "refresh-sql-endpoint")
+        for branch_id in (
+            "deploy-twins",
+            "deploy-operations-planning",
+            "deploy-fabric-app",
+            "ensure-ontology",
+        ):
+            depend(branch_id, reporting_root)
+
+    taskflow_id = "deploy-post-ontology-taskflow"
+    branch_terminals = [
+        step.step_id
+        for step in steps
+        if step.step_id.startswith("post-reporting-")
+        or step.step_id
+        in {
+            "ensure-eventhouse-shortcuts",
+            "validate-reporting",
+            "deploy-twins",
+            "deploy-operations-planning",
+            "deploy-fabric-app",
+        }
+    ]
+    if taskflow_id in by_id:
+        depend(taskflow_id, *branch_terminals)
+
+    folder_id = "organize-workspace-folders"
+    if folder_id in by_id:
+        depended_on = {
+            dependency
+            for step in steps
+            if step.step_id != folder_id
+            for dependency in step.depends_on
+        }
+        leaves = [
+            step.step_id
+            for step in steps
+            if step.step_id != folder_id and step.step_id not in depended_on
+        ]
+        depend(folder_id, *leaves)
 
 
 def _validate_operations_planning_prerequisites(
@@ -1495,6 +1636,7 @@ def _deploy_plan(
     plan_connection_id: str | None = None,
     plan_billing_acknowledged: bool = False,
     twins_enabled: bool = False,
+    streaming_shortcuts_enabled: bool = False,
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     repo_root = (repo_root or _default_repo_root()).resolve()
@@ -1509,6 +1651,8 @@ def _deploy_plan(
         raise ValueError("Connected twins require a Reporting profile with a semantic model.")
     if twins_enabled and report_name.casefold() == "retail-twins":
         raise ValueError("Connected twins cannot replace the primary report.")
+    if streaming_shortcuts_enabled and not profile.provisions_eventhouse:
+        raise ValueError("Eventhouse shortcuts require a profile that provisions Eventhouse.")
     _validate_operations_planning_prerequisites(
         operations_planning_enabled,
         plan_connection_id,
@@ -1517,6 +1661,11 @@ def _deploy_plan(
     )
     py = sys.executable
     tf_output = f"deploy/.generated/{env}/terraform-output.json"
+    capacity_sizing_evidence = (
+        f"deploy/.generated/{env}/capacity-sizing.json"
+        if profile.uses_custom_pool
+        else None
+    )
     tenant_args = ["--tenant-id", tenant_id] if tenant_id else []
     generate_config_command = [
         py,
@@ -1527,6 +1676,10 @@ def _deploy_plan(
     ]
     if skip_terraform:
         generate_config_command.extend(["--terraform-output", tf_output])
+    if capacity_sizing_evidence:
+        generate_config_command.extend(
+            ["--capacity-sizing-evidence", capacity_sizing_evidence]
+        )
     preflight_command = [
         py,
         "-m",
@@ -1557,6 +1710,10 @@ def _deploy_plan(
         live_preflight_command.extend(["--tenant-id", tenant_id])
     if interactive_preflight:
         live_preflight_command.append("--interactive")
+    if capacity_sizing_evidence:
+        live_preflight_command.extend(
+            ["--capacity-sizing-output", capacity_sizing_evidence]
+        )
     target_access_command = [
         py,
         "-m",
@@ -1580,6 +1737,7 @@ def _deploy_plan(
             cmd=live_preflight_command,
             description="Ensure capacity is active and validate tenant prerequisites",
             step_id="live-profile-preflight",
+            evidence_path=capacity_sizing_evidence,
         ),
         DeployStep(
             cmd=generate_config_command,
@@ -1696,6 +1854,14 @@ def _deploy_plan(
                     env,
                     "--terraform-output",
                     tf_output,
+                    *(
+                        [
+                            "--capacity-sizing-evidence",
+                            capacity_sizing_evidence,
+                        ]
+                        if capacity_sizing_evidence
+                        else []
+                    ),
                 ],
                 description="Regenerate configs with Terraform outputs",
                 step_id="regenerate-configs",
@@ -1838,6 +2004,30 @@ def _deploy_plan(
             ),
         )
     )
+    if streaming_shortcuts_enabled:
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.ensure_eventhouse_shortcuts",
+                    "--repo-root",
+                    str(repo_root),
+                    "--environment",
+                    env,
+                ],
+                description="Enable OneLake mirroring and create Eventhouse Lakehouse shortcuts",
+                step_id="ensure-eventhouse-shortcuts",
+                required=False,
+                failure_message=(
+                    "Eventhouse shortcuts could not be validated; the optional "
+                    "streaming projection remains unavailable."
+                ),
+                evidence_path=(
+                    f"deploy/.generated/{env}/eventhouse-shortcuts-report.json"
+                ),
+            )
+        )
     if reporting_is_gated:
         assert profile.post_deploy_pipeline_ref is not None
         setup_name = Path(profile.post_deploy_pipeline_ref).stem
@@ -1851,6 +2041,9 @@ def _deploy_plan(
             required: bool,
             failure_message: str,
         ) -> DeployStep:
+            evidence_path = (
+                f"deploy/.generated/{env}/pipeline-evidence/{step_id}.json"
+            )
             return DeployStep(
                 cmd=[
                     py,
@@ -1864,11 +2057,15 @@ def _deploy_plan(
                     auth_mode,
                     *tenant_args,
                     "--wait",
+                    "--evidence-output",
+                    evidence_path,
                 ],
                 description=description,
                 step_id=step_id,
                 required=required,
                 failure_message=failure_message,
+                evidence_path=evidence_path,
+                resource="spark",
             )
 
         steps.extend(
@@ -2047,6 +2244,8 @@ def _deploy_plan(
                 include_verify=False,
             )
         )
+    steps.append(_workspace_folder_step(repo_root, env))
+    _wire_deploy_plan(steps)
     return steps
 
 
@@ -2183,6 +2382,41 @@ def _is_terraform_apply(step: DeployStep) -> bool:
     return bool(step.cmd) and step.cmd[0] == "terraform" and "apply" in step.cmd
 
 
+def _record_capacity_sizing_after_preflight(
+    repo_root: Path,
+    env: str,
+    journal: _deploy_journal.DeployJournal,
+) -> None:
+    """Validate live sizing evidence and bind it to the durable run identity."""
+
+    if journal.targets.get("spark_pool") != "custom":
+        return
+    from deploy.scripts.capacity_sizing import (
+        load_capacity_sizing_evidence,
+        sizing_identity,
+    )
+
+    config = _load_deploy_environment(repo_root, env)
+    evidence = load_capacity_sizing_evidence(
+        repo_root / "deploy" / ".generated" / env / "capacity-sizing.json",
+        config=config,
+        repo_root=repo_root,
+    )
+    observed_identity = sizing_identity(evidence)
+    expected_identity = journal.manifest.get("capacity_sizing")
+    if journal.manifest.get("capacity_sizing_match_required") is True:
+        if (
+            not isinstance(expected_identity, dict)
+            or expected_identity.get("sha256") != observed_identity["sha256"]
+        ):
+            raise ValueError(
+                "Live capacity sizing changed after Terraform was already applied. "
+                "A resumed run cannot reuse the applied custom-pool plan; start a "
+                "new deployment so Terraform generates and applies a new plan."
+            )
+    journal.manifest["capacity_sizing"] = observed_identity
+
+
 def _cleanup_destroy_step(env: str) -> DeployStep:
     """A `terraform destroy` step used before recreate."""
     var_file = f"../.generated/{env}/terraform.tfvars"
@@ -2220,6 +2454,8 @@ def _journal_abort(
 def _resume_succeeded_prefix(
     previous: _deploy_journal.DeployJournal,
     current: _deploy_journal.DeployJournal,
+    *,
+    allow_runner_file_change: bool = False,
 ) -> int:
     """Copy only a compatible, contiguous succeeded prefix into a new run."""
 
@@ -2229,14 +2465,33 @@ def _resume_succeeded_prefix(
         raise ValueError("the prior deployment already completed")
     if previous.targets != current.targets:
         raise ValueError("deploy targets changed since the journaled run")
-    compatibility_keys = (
-        "hash", "profile_id", "profile_name", "plan_step_ids", "input_fingerprint"
-    )
+    compatibility_keys = [
+        "hash",
+        "profile_id",
+        "profile_name",
+        "plan_step_ids",
+        "plan_graph",
+        "input_fingerprint",
+    ]
+    if previous.targets.get("spark_pool") == "custom":
+        compatibility_keys.append("capacity_sizing")
     for key in compatibility_keys:
         if (
             key not in previous.manifest
             or previous.manifest.get(key) != current.manifest.get(key)
         ):
+            if key == "input_fingerprint" and allow_runner_file_change:
+                changed = _deploy_resume.changed_fingerprint_inputs(
+                    previous.manifest.get("input_fingerprints"),
+                    current.manifest.get("input_fingerprints"),
+                )
+                if changed == {"deploy/scripts/run_pipeline.py"}:
+                    continue
+                raise ValueError(
+                    "Exact-run adoption permits only a change to "
+                    "deploy/scripts/run_pipeline.py; changed inputs: "
+                    + (", ".join(sorted(changed)) or "(fingerprint details differ)")
+                )
             raise ValueError(f"deploy plan changed since the journaled run ({key})")
     previous_steps = {step.step_id: step for step in previous.steps}
     resumed = 0
@@ -2264,8 +2519,19 @@ def _resume_succeeded_prefix(
         "deploy-reporting": "build-reporting",
         "deploy-post-ontology": "build-post-ontology",
     }
-    # Capacity can be paused between attempts, even after an earlier preflight passed.
+    # Capacity can be paused or resized between attempts, even after an earlier
+    # preflight passed.
     restart_steps = {"live-profile-preflight"}
+    if previous.targets.get("spark_pool") == "custom":
+        terraform_apply = previous_steps.get("terraform-apply")
+        if terraform_apply is None or terraform_apply.status != "SUCCEEDED":
+            restart_steps.update(
+                {
+                    "generate-configs",
+                    "terraform-init",
+                    "terraform-plan-guard",
+                }
+            )
     if pending in prerequisites:
         restart_steps.add(prerequisites[pending])
     for step in current.steps:
@@ -2277,6 +2543,211 @@ def _resume_succeeded_prefix(
     return resumed
 
 
+def _adopt_completed_required_pipeline(
+    previous: _deploy_journal.DeployJournal,
+    pipeline_run_spec: str,
+    *,
+    repo_root: Path,
+    env: str,
+    deploy_config: Any,
+) -> Any:
+    """Verify and adopt the exact run for the failed required-ML gate."""
+
+    from deploy.scripts.adopt_pipeline_runs import (
+        PipelineAdoptionError,
+        adopt_pipeline_runs,
+    )
+    from deploy.scripts.deploy_config import (
+        load_terraform_outputs,
+        validate_terraform_outputs,
+    )
+    from deploy.scripts.export_items import build_session
+    from deploy.scripts.validate_target_access import (
+        TargetAccessError,
+        validate_target_access,
+    )
+    from requests.exceptions import RequestException
+
+    pipeline_name, separator, run_id = pipeline_run_spec.partition("=")
+    expected_name = (
+        Path(deploy_config.profile.reporting_gate_pipeline_ref).stem
+        if deploy_config.profile.reporting_gate_pipeline_ref
+        else None
+    )
+    if (
+        not separator
+        or not pipeline_name.strip()
+        or not run_id.strip()
+        or pipeline_name.strip() != expected_name
+    ):
+        raise ValueError(
+            "Adoption requires the selected required-ML pipeline as "
+            "PIPELINE=RUN_ID."
+        )
+
+    steps = {step.step_id: step for step in previous.steps}
+    failed_step = steps.get("required-ml-reporting-gate")
+    setup_step = steps.get("setup-pipeline-gate")
+    if failed_step is None or failed_step.status not in {"FAILED", "SUCCEEDED"}:
+        raise ValueError(
+            "The prior journal has no failed or previously adopted required-ML "
+            "gate to verify."
+        )
+    if (
+        failed_step.status == "SUCCEEDED"
+        and failed_step.evidence_id != run_id.strip()
+    ):
+        raise ValueError(
+            "The requested run ID does not match the required-ML run already "
+            "recorded in the journal."
+        )
+    if setup_step is None or setup_step.status != "SUCCEEDED" or not setup_step.ended_at:
+        raise ValueError(
+            "The prior journal does not prove successful completion of setup."
+        )
+    failed_index = previous.steps.index(failed_step)
+    if any(
+        step.status != "SUCCEEDED"
+        for step in previous.steps[:failed_index]
+    ):
+        raise ValueError(
+            "The required-ML gate is not the first incomplete deployment step."
+        )
+    if any(step.status != "PENDING" for step in previous.steps[failed_index + 1 :]):
+        raise ValueError(
+            "Later deployment steps have started; exact-run adoption is unsafe."
+        )
+
+    outputs_path = (
+        repo_root / "deploy" / ".generated" / env / "terraform-output.json"
+    )
+    outputs = load_terraform_outputs(outputs_path)
+    validate_terraform_outputs(deploy_config, outputs)
+    session = build_session(
+        auth_mode=deploy_config.auth_mode,
+        tenant_id=deploy_config.tenant_id,
+    )
+    try:
+        target = validate_target_access(session, deploy_config, outputs)
+    except (RequestException, TargetAccessError) as exc:
+        raise ValueError(str(exc)) from exc
+    try:
+        adopted = adopt_pipeline_runs(
+            session,
+            target.workspace_id,
+            {pipeline_name.strip(): (failed_step.step_id, True)},
+            {pipeline_name.strip(): run_id.strip()},
+        )[0]
+    except PipelineAdoptionError as exc:
+        raise ValueError(str(exc)) from exc
+    except RequestException as exc:
+        raise ValueError(
+            f"Could not verify the requested Fabric pipeline run: {exc}"
+        ) from exc
+
+    setup_ended = datetime.fromisoformat(setup_step.ended_at.replace("Z", "+00:00"))
+    if setup_ended.tzinfo is None:
+        setup_ended = setup_ended.replace(tzinfo=UTC)
+    pipeline_started = datetime.fromisoformat(
+        adopted.started_at.replace("Z", "+00:00")
+    )
+    if pipeline_started.tzinfo is None:
+        pipeline_started = pipeline_started.replace(tzinfo=UTC)
+    if pipeline_started < setup_ended:
+        raise ValueError(
+            "The adopted required-ML run started before the journaled setup "
+            "pipeline completed."
+        )
+
+    _deploy_journal.mark_succeeded(
+        previous,
+        failed_step.step_id,
+        started_at=adopted.started_at,
+        ended_at=adopted.ended_at,
+        evidence_id=adopted.run_id,
+    )
+    return adopted
+
+
+def _pipeline_step_evidence(
+    repo_root: Path,
+    step: DeployStep,
+) -> dict[str, str] | None:
+    """Load exact pipeline evidence for a run_pipeline deploy step."""
+
+    if (
+        not step.evidence_path
+        or "deploy.scripts.run_pipeline" not in step.cmd
+    ):
+        return None
+    path = repo_root / step.evidence_path
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid pipeline evidence at {step.evidence_path}")
+    required = {
+        "workspace_id",
+        "pipeline_name",
+        "pipeline_id",
+        "run_id",
+        "location",
+        "submitted_at",
+        "status",
+    }
+    if any(not isinstance(payload.get(key), str) or not payload[key] for key in required):
+        raise ValueError(f"Incomplete pipeline evidence at {step.evidence_path}")
+    pipeline_index = step.cmd.index("--pipeline") + 1
+    if payload["pipeline_name"] != step.cmd[pipeline_index]:
+        raise ValueError(
+            f"Pipeline evidence at {step.evidence_path} belongs to a different pipeline"
+        )
+    return {key: str(value) for key, value in payload.items() if value is not None}
+
+
+def _reattach_running_pipeline_steps(
+    previous: _deploy_journal.DeployJournal,
+    current: _deploy_journal.DeployJournal,
+    plan: list[DeployStep],
+    *,
+    repo_root: Path,
+) -> list[str]:
+    """Prepare exact reattachment for compatible RUNNING pipeline steps."""
+
+    previous_steps = {step.step_id: step for step in previous.steps}
+    current_steps = {step.step_id: step for step in current.steps}
+    reattached = []
+    for step in plan:
+        old = previous_steps.get(step.step_id)
+        if old is None or old.status != "RUNNING":
+            continue
+        if "deploy.scripts.run_pipeline" not in step.cmd or not old.evidence_path:
+            continue
+        if old.evidence_path != step.evidence_path:
+            raise ValueError(
+                f"Pipeline evidence path changed for {step.step_id!r}"
+            )
+        evidence = _pipeline_step_evidence(repo_root, step)
+        if evidence is None:
+            raise ValueError(
+                f"RUNNING pipeline step {step.step_id!r} has no exact evidence"
+            )
+        if old.evidence_id and old.evidence_id != evidence["run_id"]:
+            raise ValueError(
+                f"Journal and file evidence disagree for {step.step_id!r}"
+            )
+        current_step = current_steps[step.step_id]
+        _deploy_journal.attach_evidence(
+            current,
+            current_step.step_id,
+            evidence_id=evidence["run_id"],
+            started_at=evidence.get("started_at") or evidence["submitted_at"],
+        )
+        step.cmd.extend(["--reattach-location", evidence["location"]])
+        reattached.append(step.step_id)
+    return reattached
+
+
 def _run_plan_plain(
     repo_root: Path,
     env: str,
@@ -2286,25 +2757,39 @@ def _run_plan_plain(
     yes: bool,
     journal: _deploy_journal.DeployJournal,
 ) -> None:
-    """Execute the deploy plan linearly with clear command dividers.
-
-    Journals each step's RUNNING/SUCCEEDED/FAILED transition (never the raw
-    command output) so a durable record survives even an interrupted process.
-    """
+    """Execute the dependency plan with bounded Spark and non-Spark workers."""
     _ = env
-    for i, step in enumerate(plan, start=1):
-        if _deploy_journal.get_step(journal, step.step_id).status == "SUCCEEDED":
-            typer.echo(f"Skipping completed step {i}/{total}: {step.description}")
-            continue
-        _echo_step(i, total, step)
-        _command_divider(f"Running step {i}/{total}: {step.description}", step.cmd)
-        if step.needs_confirmation and not yes:
-            if not typer.confirm(f"Proceed with: {step.description}?"):
-                typer.echo("Aborted by user.")
-                _journal_abort(repo_root, journal, step.step_id, error="Aborted by user")
-                raise typer.Exit(code=1)
-        _deploy_journal.mark_running(journal, step.step_id)
-        _deploy_journal.write(repo_root, journal)
+    positions = {step.step_id: index for index, step in enumerate(plan, start=1)}
+    by_id = {step.step_id: step for step in plan}
+    if len(by_id) != len(plan):
+        raise ValueError("Deploy step IDs must be unique.")
+    for step in plan:
+        missing = set(step.depends_on) - set(by_id)
+        if missing:
+            raise ValueError(
+                f"Deploy step {step.step_id!r} has unknown dependencies: "
+                + ", ".join(sorted(missing))
+            )
+
+    journal_lock = threading.RLock()
+    monitor_detached_steps: set[str] = set()
+    pending = {
+        step.step_id: step
+        for step in plan
+        if _deploy_journal.get_step(journal, step.step_id).status != "SUCCEEDED"
+    }
+    for step in plan:
+        if step.step_id not in pending:
+            typer.echo(
+                f"Skipping completed step {positions[step.step_id]}/{total}: "
+                f"{step.description}"
+            )
+
+    def execute(step: DeployStep) -> int:
+        index = positions[step.step_id]
+        with journal_lock:
+            _deploy_journal.mark_running(journal, step.step_id)
+            _deploy_journal.write(repo_root, journal)
         result: subprocess.CompletedProcess[Any] | None = None
         process_environment: dict[str, str] | None = None
         if step.process_environment:
@@ -2312,87 +2797,269 @@ def _run_plan_plain(
             process_environment.update(step.process_environment)
             terraform_data_dir = process_environment.get("TF_DATA_DIR")
             if terraform_data_dir and not Path(terraform_data_dir).is_absolute():
-                process_environment["TF_DATA_DIR"] = str((repo_root / terraform_data_dir).resolve())
+                process_environment["TF_DATA_DIR"] = str(
+                    (repo_root / terraform_data_dir).resolve()
+                )
         try:
             if step.action is not None:
                 step.action(repo_root)
             elif step.output_file:
                 out_path = repo_root / step.output_file
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                if process_environment is None:
-                    result = subprocess.run(
-                        step.cmd,
-                        cwd=repo_root,
-                        capture_output=True,
-                        text=True,
-                    )
-                else:
-                    result = subprocess.run(
-                        step.cmd,
-                        cwd=repo_root,
-                        capture_output=True,
-                        text=True,
-                        env=process_environment,
-                    )
+                result = subprocess.run(
+                    step.cmd,
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                    **({"env": process_environment} if process_environment else {}),
+                )
                 if result.returncode == 0:
-                    out_path.write_text(result.stdout)
+                    out_path.write_text(result.stdout, encoding="utf-8")
                     typer.echo(f"Wrote output to {step.output_file}")
                 elif result.stderr:
                     typer.echo(result.stderr, err=True)
             else:
-                if process_environment is None:
-                    result = subprocess.run(step.cmd, cwd=repo_root)
-                else:
-                    result = subprocess.run(step.cmd, cwd=repo_root, env=process_environment)
+                result = subprocess.run(
+                    step.cmd,
+                    cwd=repo_root,
+                    **({"env": process_environment} if process_environment else {}),
+                )
+            if (
+                result is not None
+                and result.returncode == 0
+                and step.step_id == "live-profile-preflight"
+            ):
+                _record_capacity_sizing_after_preflight(
+                    repo_root,
+                    env,
+                    journal,
+                )
         except FileNotFoundError:
             executable = step.cmd[0] if step.cmd else "<unknown>"
             typer.echo(
-                f"Deploy failed at step {i}/{total}: {step.description}",
+                f"Deploy failed at step {index}/{total}: {step.description}",
                 err=True,
             )
             typer.echo(_missing_executable_message(executable), err=True)
-            _journal_abort(
-                repo_root, journal, step.step_id, error=f"executable not found: {executable}"
-            )
-            raise typer.Exit(code=127) from None
+            with journal_lock:
+                _deploy_journal.mark_failed(
+                    journal,
+                    step.step_id,
+                    exit_code=127,
+                    error=f"executable not found: {executable}",
+                )
+                _deploy_journal.write(repo_root, journal)
+            return 127
         except Exception as exc:
-            # Action-based steps (e.g. the deletion-wait poll) call into the
-            # Azure/Fabric SDKs, which can raise varied exception types (auth
-            # failures, network errors, our own deletion timeout); any of them
-            # aborts the deploy, so they're handled the same way as a
-            # nonzero subprocess exit rather than left to crash with a
-            # traceback.
             typer.echo(
-                f"Deploy failed at step {i}/{total}: {step.description}",
+                f"Deploy failed at step {index}/{total}: {step.description}",
                 err=True,
             )
             typer.echo(str(exc), err=True)
-            _journal_abort(repo_root, journal, step.step_id, error=str(exc))
-            raise typer.Exit(code=1) from exc
-        if result is not None and result.returncode != 0:
-            typer.echo(
-                f"Deploy failed at step {i}/{total} "
-                f"(exit {result.returncode}): {_display_command(step.cmd)}",
-                err=True,
-            )
-            _deploy_journal.mark_failed(
-                journal,
-                step.step_id,
-                exit_code=result.returncode,
-                error=step.failure_message,
-            )
+            with journal_lock:
+                _deploy_journal.mark_failed(
+                    journal,
+                    step.step_id,
+                    exit_code=1,
+                    error=str(exc),
+                )
+                _deploy_journal.write(repo_root, journal)
+            return 1
+
+        return_code = result.returncode if result is not None else 0
+        with journal_lock:
+            try:
+                evidence = _pipeline_step_evidence(repo_root, step)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                _deploy_journal.mark_failed(
+                    journal,
+                    step.step_id,
+                    exit_code=1,
+                    error=str(exc),
+                )
+                _deploy_journal.write(repo_root, journal)
+                typer.echo(str(exc), err=True)
+                return 1
+            evidence_id = evidence.get("run_id") if evidence else None
+            if return_code == 0:
+                _deploy_journal.mark_succeeded(
+                    journal,
+                    step.step_id,
+                    exit_code=0,
+                    started_at=(
+                        evidence.get("started_at") or evidence.get("submitted_at")
+                        if evidence
+                        else None
+                    ),
+                    ended_at=evidence.get("ended_at") if evidence else None,
+                    evidence_id=evidence_id,
+                )
+            elif (
+                return_code == _PIPELINE_MONITOR_DETACHED_EXIT_CODE
+                and evidence
+                and evidence.get("status") in {"Submitted", "NotStarted", "InProgress"}
+            ):
+                _deploy_journal.attach_evidence(
+                    journal,
+                    step.step_id,
+                    evidence_id=evidence["run_id"],
+                    started_at=evidence.get("started_at") or evidence["submitted_at"],
+                )
+                monitor_detached_steps.add(step.step_id)
+            else:
+                _deploy_journal.mark_failed(
+                    journal,
+                    step.step_id,
+                    exit_code=return_code,
+                    error=step.failure_message,
+                    evidence_id=evidence_id,
+                )
             _deploy_journal.write(repo_root, journal)
-            if step.required:
-                raise typer.Exit(code=result.returncode)
+        if return_code != 0:
             typer.echo(
-                "Continuing because this post-Reporting step is optional.",
+                f"Deploy failed at step {index}/{total} "
+                f"(exit {return_code}): {_display_command(step.cmd)}",
                 err=True,
             )
-            continue
-        _deploy_journal.mark_succeeded(
-            journal, step.step_id, exit_code=result.returncode if result is not None else 0
+            if not step.required:
+                typer.echo(
+                    "Continuing because this post-Reporting step is optional.",
+                    err=True,
+                )
+        return return_code
+
+    running: dict[Future[int], DeployStep] = {}
+    required_failure_code: int | None = None
+    terminal = {"SUCCEEDED", "DEGRADED", "SKIPPED", "FAILED"}
+    with (
+        ThreadPoolExecutor(
+            max_workers=_DEFAULT_NON_SPARK_WORKERS,
+            thread_name_prefix="deploy",
+        ) as non_spark_executor,
+        ThreadPoolExecutor(
+            max_workers=_DEFAULT_SPARK_WORKERS,
+            thread_name_prefix="deploy-spark",
+        ) as spark_executor,
+    ):
+        while pending or running:
+            progressed = False
+            for step_id, step in list(pending.items()):
+                with journal_lock:
+                    blocked_by = []
+                    for dependency in step.depends_on:
+                        dependency_step = _deploy_journal.get_step(
+                            journal,
+                            dependency,
+                        )
+                        if dependency_step.status == "SKIPPED" or (
+                            dependency_step.classification == "required"
+                            and dependency_step.status == "FAILED"
+                        ) or dependency in monitor_detached_steps:
+                            blocked_by.append(dependency)
+                    live_preflight = next(
+                        (
+                            candidate
+                            for candidate in journal.steps
+                            if candidate.step_id == "live-profile-preflight"
+                        ),
+                        None,
+                    )
+                    if (
+                        step_id not in {"profile-preflight", "live-profile-preflight"}
+                        and live_preflight is not None
+                        and live_preflight.status == "FAILED"
+                    ):
+                        blocked_by.append("live-profile-preflight")
+                if blocked_by:
+                    with journal_lock:
+                        _deploy_journal.mark_skipped(
+                            journal,
+                            step_id,
+                            reason=(
+                                "required prerequisite did not succeed: "
+                                + ", ".join(blocked_by)
+                            ),
+                        )
+                        _deploy_journal.write(repo_root, journal)
+                    del pending[step_id]
+                    progressed = True
+
+            with journal_lock:
+                live_preflight = next(
+                    (
+                        candidate
+                        for candidate in journal.steps
+                        if candidate.step_id == "live-profile-preflight"
+                    ),
+                    None,
+                )
+                ready = [
+                    step
+                    for step in pending.values()
+                    if (
+                        step.step_id in {"profile-preflight", "live-profile-preflight"}
+                        or live_preflight is None
+                        or live_preflight.status == "SUCCEEDED"
+                    )
+                    if all(
+                        _deploy_journal.get_step(journal, dependency).status
+                        in terminal
+                        for dependency in step.depends_on
+                    )
+                ]
+            for step in sorted(ready, key=lambda item: positions[item.step_id]):
+                index = positions[step.step_id]
+                _echo_step(index, total, step)
+                _command_divider(
+                    f"Running step {index}/{total}: {step.description}",
+                    step.cmd,
+                )
+                if step.needs_confirmation and not yes:
+                    if not typer.confirm(f"Proceed with: {step.description}?"):
+                        typer.echo("Aborted by user.")
+                        with journal_lock:
+                            _deploy_journal.mark_failed(
+                                journal,
+                                step.step_id,
+                                exit_code=1,
+                                error="Aborted by user",
+                            )
+                            _deploy_journal.write(repo_root, journal)
+                        raise typer.Exit(code=1)
+                executor = (
+                    spark_executor if step.resource == "spark" else non_spark_executor
+                )
+                running[executor.submit(execute, step)] = step
+                del pending[step.step_id]
+                progressed = True
+
+            if running:
+                done, _ = wait(running, return_when=FIRST_COMPLETED)
+                for future in done:
+                    step = running.pop(future)
+                    return_code = future.result()
+                    if (
+                        return_code != 0
+                        and step.required
+                        and step.step_id not in monitor_detached_steps
+                    ):
+                        required_failure_code = required_failure_code or return_code
+                continue
+            if pending and not progressed:
+                unresolved = ", ".join(sorted(pending))
+                raise ValueError(
+                    f"Deploy dependency graph cannot make progress: {unresolved}"
+                )
+
+    if required_failure_code is not None:
+        raise typer.Exit(code=required_failure_code)
+    if monitor_detached_steps:
+        typer.echo(
+            "Local monitoring ended while Fabric pipeline work remains active. "
+            "Resume the deployment to reattach to the exact recorded run.",
+            err=True,
         )
-        _deploy_journal.write(repo_root, journal)
+        raise typer.Exit(code=_PIPELINE_MONITOR_DETACHED_EXIT_CODE)
 
 
 @app.command()
@@ -2418,6 +3085,15 @@ def deploy(
         "--resume",
         help="Resume the compatible succeeded prefix from the last deploy journal.",
     ),
+    adopt_pipeline_run: Optional[str] = typer.Option(
+        None,
+        "--adopt-pipeline-run",
+        metavar="PIPELINE=RUN_ID",
+        help=(
+            "On resume, verify and adopt the exact completed required-ML run "
+            "instead of starting it again."
+        ),
+    ),
     skip_login: bool = typer.Option(
         False,
         "--skip-login",
@@ -2441,6 +3117,9 @@ def deploy(
         raise typer.Exit(code=1)
     if resume and recreate:
         typer.echo("--resume cannot be combined with --recreate.", err=True)
+        raise typer.Exit(code=1)
+    if adopt_pipeline_run and not resume:
+        typer.echo("--adopt-pipeline-run requires --resume.", err=True)
         raise typer.Exit(code=1)
     if recreate and skip_terraform:
         typer.echo("--recreate cannot be combined with --skip-terraform.", err=True)
@@ -2627,6 +3306,10 @@ def deploy(
             native.plan_billing_acknowledged if native is not None else False
         ),
         twins_enabled=twins.enabled if twins is not None else False,
+        streaming_shortcuts_enabled=(
+            deploy_config.streaming_shortcuts.enabled
+            if deploy_config is not None else False
+        ),
     )
     total = len(plan)
 
@@ -2653,16 +3336,20 @@ def deploy(
         "kql_scripts": ",".join(profile.kql_scripts),
         "item_types": ",".join(profile.item_types_in_scope),
         "twins_enabled": str(twins.enabled if twins is not None else False),
+        "spark_pool": "custom" if profile.uses_custom_pool else "starter",
     }
+    command_plan = [step.cmd for step in plan]
+    input_fingerprint, input_fingerprints = _deploy_resume.fingerprint_record(
+        repo_root,
+        env,
+        _resolve_generation_config_path(repo_root, env),
+        command_plan,
+    )
     journal_manifest = {
         "version": profile.manifest_version,
         "hash": profile.manifest_hash,
-        "input_fingerprint": _deploy_resume.fingerprint(
-            repo_root,
-            env,
-            _resolve_generation_config_path(repo_root, env),
-            [step.cmd for step in plan],
-        ),
+        "input_fingerprint": input_fingerprint,
+        "input_fingerprints": input_fingerprints,
         "profile_id": profile.id,
         "profile_name": profile.deployment_name,
         "profile_support_status": profile.support_status,
@@ -2692,7 +3379,39 @@ def deploy(
             *[step.step_id for step in plan],
             *(["verify-readiness"] if profile.post_deploy_pipeline_ref is not None else []),
         ],
+        "plan_graph": [
+            {
+                "step_id": step.step_id,
+                "depends_on": list(step.depends_on),
+                "resource": step.resource,
+                "required": step.required,
+            }
+            for step in plan
+        ],
     }
+    if profile.uses_custom_pool:
+        prior_sizing = (
+            previous_journal.manifest.get("capacity_sizing")
+            if previous_journal is not None
+            else None
+        )
+        prior_apply = (
+            _deploy_journal.get_step(previous_journal, "terraform-apply")
+            if previous_journal is not None
+            and any(
+                step.step_id == "terraform-apply"
+                for step in previous_journal.steps
+            )
+            else None
+        )
+        journal_manifest["capacity_sizing"] = prior_sizing
+        journal_manifest["capacity_sizing_match_required"] = bool(
+            resume
+            and (
+                skip_terraform
+                or (prior_apply is not None and prior_apply.status == "SUCCEEDED")
+            )
+        )
     run_journal = _deploy_journal.start_run(
         env,
         targets=journal_targets,
@@ -2717,13 +3436,53 @@ def deploy(
             ),
         )
     if resume:
+        adopted_run = None
         try:
             assert previous_journal is not None
-            resumed_steps = _resume_succeeded_prefix(previous_journal, run_journal)
+            if adopt_pipeline_run:
+                source_changes = _deploy_resume.changed_fingerprint_inputs(
+                    previous_journal.manifest.get("input_fingerprints"),
+                    run_journal.manifest.get("input_fingerprints"),
+                )
+                if source_changes != {"deploy/scripts/run_pipeline.py"}:
+                    raise ValueError(
+                        "Exact-run adoption permits only a change to "
+                        "deploy/scripts/run_pipeline.py; changed inputs: "
+                        + (", ".join(sorted(source_changes)) or "(fingerprint details differ)")
+                    )
+                adopted_run = _adopt_completed_required_pipeline(
+                    previous_journal,
+                    adopt_pipeline_run,
+                    repo_root=repo_root,
+                    env=env,
+                    deploy_config=deploy_config,
+                )
+                run_journal.manifest["adopted_pipeline_run"] = {
+                    "pipeline": adopted_run.name,
+                    "run_id": adopted_run.run_id,
+                    "accepted_source_changes": sorted(source_changes),
+                    "previous_input_fingerprint": previous_journal.manifest.get(
+                        "input_fingerprint"
+                    ),
+                    "current_input_fingerprint": run_journal.manifest.get(
+                        "input_fingerprint"
+                    ),
+                }
+            resumed_steps = _resume_succeeded_prefix(
+                previous_journal,
+                run_journal,
+                allow_runner_file_change=adopted_run is not None,
+            )
+            reattached_steps = _reattach_running_pipeline_steps(
+                previous_journal,
+                run_journal,
+                plan,
+                repo_root=repo_root,
+            )
         except (FileNotFoundError, json.JSONDecodeError, ValueError) as exc:
             typer.echo(f"Cannot resume deployment: {exc}", err=True)
             raise typer.Exit(code=1) from exc
-        if resumed_steps == 0:
+        if resumed_steps == 0 and not reattached_steps:
             typer.echo(
                 "Cannot resume deployment: the prior journal has no compatible "
                 "succeeded prefix.",
@@ -2731,6 +3490,19 @@ def deploy(
             )
             raise typer.Exit(code=1)
         typer.echo(f"Resuming after {resumed_steps} completed deployment steps.")
+        for step_id in reattached_steps:
+            evidence_id = _deploy_journal.get_step(
+                run_journal, step_id
+            ).evidence_id
+            typer.echo(
+                f"Reattaching {step_id!r} to exact Fabric run {evidence_id}; "
+                "no replacement run will be submitted."
+            )
+        if adopted_run is not None:
+            typer.echo(
+                f"Adopted terminal-success run {adopted_run.run_id} for "
+                f"{adopted_run.name!r}; it will not be started again."
+            )
     _deploy_journal.write(repo_root, run_journal)
 
     _run_plan_plain(repo_root, env, plan, total, yes=yes, journal=run_journal)
@@ -2983,11 +3755,8 @@ def _run_setup_pipeline(
 ) -> None:
     """Start an on-demand run of the deployed setup pipeline.
 
-    Prints a heads-up that generation can take a while (it runs asynchronously in
-    Fabric) and retries the trigger a few times so a transient failure doesn't
-    leave the pipeline unstarted. Only ever called once the operator has
-    requested it, which makes the trigger required for this run: exhausting
-    all retry attempts raises `typer.Exit` with the last nonzero exit code.
+    The runner submits at most once. If the POST response is lost, it reconciles
+    one exact-window Fabric run or fails closed rather than replaying the mutation.
     """
 
     typer.echo("")
@@ -3012,27 +3781,32 @@ def _run_setup_pipeline(
     ]
     if tenant_id:
         cmd.extend(["--tenant-id", tenant_id])
+    evidence_path = (
+        repo_root
+        / "deploy"
+        / ".generated"
+        / env
+        / "pipeline-evidence"
+        / "setup-pipeline-trigger.json"
+    )
+    cmd.extend(["--evidence-output", str(evidence_path)])
     typer.echo("    " + _display_command(cmd))
     if journal is not None:
         _deploy_journal.mark_running(journal, "setup-pipeline-trigger")
         _deploy_journal.write(repo_root, journal)
-    result = None
-    for attempt in range(1, _PIPELINE_TRIGGER_ATTEMPTS + 1):
-        result = subprocess.run(cmd, cwd=repo_root)
-        if result.returncode == 0:
-            if journal is not None:
-                _deploy_journal.mark_succeeded(
-                    journal, "setup-pipeline-trigger", exit_code=result.returncode
-                )
-                _deploy_journal.write(repo_root, journal)
-            return
-        if attempt < _PIPELINE_TRIGGER_ATTEMPTS:
-            typer.echo(
-                f"  Trigger attempt {attempt} failed (exit {result.returncode}); "
-                f"retrying in {_PIPELINE_TRIGGER_RETRY_WAIT}s...",
-                err=True,
+    result = subprocess.run(cmd, cwd=repo_root)
+    if result.returncode == 0:
+        if journal is not None:
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            _deploy_journal.mark_succeeded(
+                journal,
+                "setup-pipeline-trigger",
+                exit_code=result.returncode,
+                started_at=evidence.get("submitted_at"),
+                evidence_id=evidence.get("run_id"),
             )
-            time.sleep(_PIPELINE_TRIGGER_RETRY_WAIT)
+            _deploy_journal.write(repo_root, journal)
+        return
     typer.echo(
         "Could not start the setup pipeline automatically. Open the workspace "
         "in Fabric and run 'setup-pipeline' manually.",
@@ -3043,10 +3817,10 @@ def _run_setup_pipeline(
             repo_root,
             journal,
             "setup-pipeline-trigger",
-            error=f"trigger exhausted {_PIPELINE_TRIGGER_ATTEMPTS} attempts",
-            exit_code=result.returncode if result is not None else None,
+            error="pipeline trigger failed closed without retrying the POST",
+            exit_code=result.returncode,
         )
-    raise typer.Exit(code=result.returncode if result is not None else 1)
+    raise typer.Exit(code=result.returncode)
 
 
 if __name__ == "__main__":

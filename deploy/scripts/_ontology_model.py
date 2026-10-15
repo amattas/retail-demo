@@ -117,6 +117,7 @@ ENTITIES: tuple[Entity, ...] = (
     Entity("Payment", "fact_payments", "silver", "transaction_id"),
     Entity("CustomerSegment", "customer_segments", "gold", "customer_id"),
     Entity("ChurnPrediction", "churn_predictions", "gold", "customer_id"),
+    Entity("StockoutRisk", "stockout_risk", "gold", "ranking"),
 )
 
 # Inactive flags mirror retail_model relationships.tmdl so the TOM graph has
@@ -152,6 +153,10 @@ RELATIONSHIPS: tuple[Relationship, ...] = (
                  "customer_segments", "customer_id", "dim_customers", "ID"),
     Relationship("CustomerHasChurnPrediction", "ChurnPrediction", "Customer",
                  "churn_predictions", "customer_id", "dim_customers", "ID"),
+    Relationship("StockoutRiskAtStore", "StockoutRisk", "Store",
+                 "stockout_risk", "store_id", "dim_stores", "ID"),
+    Relationship("StockoutRiskForProduct", "StockoutRisk", "Product",
+                 "stockout_risk", "product_id", "dim_products", "ID"),
 )
 
 JUNCTIONS: tuple[JunctionRelationship, ...] = (
@@ -159,8 +164,6 @@ JUNCTIONS: tuple[JunctionRelationship, ...] = (
                          "fact_receipt_lines", "silver", "receipt_id_ext", "product_id"),
     JunctionRelationship("OnlineOrderContainsProduct", "OnlineOrder", "Product",
                          "fact_online_order_lines", "silver", "order_id", "product_id"),
-    JunctionRelationship("StoreHasStockoutRiskForProduct", "Store", "Product",
-                         "stockout_risk", "gold", "store_id", "product_id"),
 )
 
 # The first binding of each event table is its only active TOM relationship.

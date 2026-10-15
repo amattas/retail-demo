@@ -22,6 +22,7 @@ EXPECTED_BUSINESS_ENTITIES = {
     "Payment",
     "CustomerSegment",
     "ChurnPrediction",
+    "StockoutRisk",
 }
 
 EXPECTED_EVENTHOUSE_BINDINGS = {

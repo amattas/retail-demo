@@ -252,6 +252,10 @@ def main() -> int:
         console.error(str(exc))
         return 1
 
+    from deploy.scripts.workspace_folders import organize_after_publish
+
+    if not organize_after_publish(args.repo_root, args.environment):
+        return 1
     if ontology_created:
         console.info(
             f"Ontology notebook completed and {ONTOLOGY_ITEM_NAME!r} is available "

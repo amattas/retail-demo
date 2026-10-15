@@ -67,6 +67,7 @@ def test_create_uses_returned_identity_and_reads_definition(monkeypatch):
     monkeypatch.setattr(native, "paginated_get", lambda *a, **k: [])
     session.post.side_effect = [
         response(201, {"id": ITEM}),
+        response(200),
         response(body={"definition": definition()}),
     ]
     assert (
@@ -80,7 +81,72 @@ def test_create_uses_returned_identity_and_reads_definition(monkeypatch):
         )
         == ITEM
     )
-    assert session.post.call_count == 2
+    assert session.post.call_count == 3
+    assert session.post.call_args_list[0].kwargs["json"] == {
+        "displayName": "Agent",
+        "description": "Stopped",
+    }
+    assert session.post.call_args_list[1].kwargs["json"] == {
+        "definition": definition()
+    }
+
+
+def test_agent_definition_failure_removes_only_new_blank_shell(monkeypatch):
+    session = Mock()
+    monkeypatch.setattr(native, "paginated_get", lambda *a, **k: [])
+    session.post.side_effect = [
+        response(201, {"id": ITEM}),
+        response(
+            400,
+            {
+                "errorCode": "InvalidInput",
+                "message": "Rejected",
+                "requestId": OP,
+            },
+        ),
+    ]
+    session.delete.return_value = response(204)
+
+    with pytest.raises(native.NativeItemError, match="Rejected") as exc_info:
+        native.ensure_native_item(
+            session,
+            workspace_id=WS,
+            item_type="OperationsAgent",
+            display_name="Agent",
+            description="Stopped",
+            definition=definition(),
+        )
+    assert OP in str(exc_info.value)
+
+    session.delete.assert_called_once_with(
+        f"{native.API}/workspaces/{WS}/operationsAgents/{ITEM}",
+        timeout=30,
+        allow_redirects=False,
+    )
+
+
+def test_agent_readback_mismatch_removes_new_shell(monkeypatch):
+    session = Mock()
+    monkeypatch.setattr(native, "paginated_get", lambda *a, **k: [])
+    monkeypatch.setattr(native.time, "sleep", lambda _: None)
+    session.post.side_effect = [
+        response(201, {"id": ITEM}),
+        response(200),
+        *[response(body={"definition": definition(True)}) for _ in range(5)],
+    ]
+    session.delete.return_value = response(204)
+
+    with pytest.raises(native.NativeItemError, match="readback does not match"):
+        native.ensure_native_item(
+            session,
+            workspace_id=WS,
+            item_type="OperationsAgent",
+            display_name="Agent",
+            description="Stopped",
+            definition=definition(),
+        )
+
+    session.delete.assert_called_once()
 
 
 def test_live_agent_definition_is_stopped_on_publication(monkeypatch):
@@ -102,6 +168,46 @@ def test_live_agent_definition_is_stopped_on_publication(monkeypatch):
         definition=definition(),
     )
     assert session.post.call_args_list[1].kwargs["json"] == {"definition": definition()}
+
+
+def test_agent_update_uses_documented_platform_metadata_contract(monkeypatch):
+    expected = {
+        "format": "OperationsAgentV1",
+        "parts": [
+            native.json_part("Configurations.json", {"shouldRun": False}),
+            native.json_part(".platform", {"metadata": {"displayName": "Agent"}}),
+        ],
+    }
+    stale = {
+        "parts": [
+            native.json_part("Configurations.json", {"shouldRun": True}),
+            native.json_part(".platform", {"metadata": {"displayName": "Agent"}}),
+        ],
+    }
+    session = Mock()
+    monkeypatch.setattr(
+        native, "paginated_get", lambda *a, **k: [{"id": ITEM, "displayName": "Agent"}]
+    )
+    session.post.side_effect = [
+        response(body={"definition": stale}),
+        response(200),
+        response(body={"definition": expected}),
+    ]
+
+    assert native.ensure_native_item(
+        session,
+        workspace_id=WS,
+        item_type="OperationsAgent",
+        display_name="Agent",
+        description="Stopped",
+        definition=expected,
+    ) == ITEM
+
+    update = session.post.call_args_list[1]
+    assert update.kwargs["params"] == {"updateMetadata": "true"}
+    assert update.kwargs["json"] == {
+        "definition": {"parts": expected["parts"]}
+    }
 
 
 def test_notebook_readback_requests_ipynb_format():
@@ -209,6 +315,40 @@ def test_operations_readback_rejects_extra_actions_and_sources(collection):
     expected = {"configuration": {collection: {"allowed": {"id": ITEM}}}}
     actual = {"configuration": {collection: {"allowed": {"id": ITEM}, "extra": {"id": OP}}}}
     assert not native.definition_matches(
+        {"parts": [native.json_part("Configurations.json", expected)]},
+        {"parts": [native.json_part("Configurations.json", actual)]},
+    )
+
+
+@pytest.mark.parametrize(
+    "service_id",
+    [None, "00000000-0000-0000-0000-000000000000"],
+)
+def test_operations_readback_accepts_service_normalized_source_id(service_id):
+    expected = {
+        "configuration": {
+            "dataSources": {
+                "availability": {
+                    "id": ITEM,
+                    "workspaceId": WS,
+                    "type": "KustoDatabase",
+                }
+            }
+        }
+    }
+    actual = {
+        "configuration": {
+            "dataSources": {
+                "availability": {
+                    "id": service_id,
+                    "workspaceId": WS,
+                    "type": "KustoDatabase",
+                }
+            }
+        }
+    }
+
+    assert native.definition_matches(
         {"parts": [native.json_part("Configurations.json", expected)]},
         {"parts": [native.json_part("Configurations.json", actual)]},
     )

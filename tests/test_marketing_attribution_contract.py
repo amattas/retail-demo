@@ -184,6 +184,18 @@ def test_silver_persists_only_complete_reconciled_journeys() -> None:
         assert expected in source
 
 
+def test_blank_eventhouse_correlations_are_normalized_before_attribution() -> None:
+    source = _notebook_code(SILVER_NOTEBOOK)
+    compile(source, "<03-streaming-to-silver>", "exec")
+
+    assert "def _normalized_attribution_journey_id(column_name):" in source
+    assert source.count(
+        '_normalized_attribution_journey_id("correlation_id")'
+    ) == 5
+    assert "length(trim(attribution_journey_id)) = 0 THEN CAST(NULL AS STRING)" in source
+    assert '_normalized_attribution_journey_id("attribution_journey_id")' in source
+
+
 def test_gold_contract_exists_in_batch_and_streaming_paths() -> None:
     schema_source = SCHEMAS.read_text(encoding="utf-8")
     gold_source = GOLD.read_text(encoding="utf-8")

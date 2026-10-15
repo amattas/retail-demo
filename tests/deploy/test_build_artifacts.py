@@ -188,11 +188,11 @@ def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
     staged = build_artifacts.stage_powerbi_items(tmp_path / "fabric" / "powerbi", output)
 
     assert staged == [
-        output / "retail_model.Report",
-        output / "retail_model.SemanticModel",
+        output / "Reports" / "retail_model.Report",
+        output / "Semantic Models" / "retail_model.SemanticModel",
     ]
-    assert (output / "retail_model.Report" / ".platform").exists()
-    assert not (output / "retail_model.Report" / ".pbi").exists()
+    assert (output / "Reports" / "retail_model.Report" / ".platform").exists()
+    assert not (output / "Reports" / "retail_model.Report" / ".pbi").exists()
 
 
 def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
@@ -215,7 +215,7 @@ def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
 
     staged_slicers = sorted(
         output.glob(
-            "*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
+            "Reports/*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
         )
     )
     assert len(staged_slicers) == 5
@@ -294,11 +294,12 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_eventhouse.Eventhouse" not in result.staged_items
     assert "retail_kql.KQLDatabase" not in result.staged_items
 
-    assert (output / "Setup" / "setup-01-seed-dictionaries.Notebook").is_dir()
-    assert not (output / "Reporting").exists()
+    assert (output / "Notebooks" / "setup-01-seed-dictionaries.Notebook").is_dir()
+    assert not (output / "Reports").exists()
+    assert not (output / "Semantic Models").exists()
     assert not (output / "Data Agents").exists()
     assert not (output / "retail_querysets.KQLQueryset").exists()
-    assert (output / "retail_lakehouse.Lakehouse").is_dir()
+    assert (output / "Lakehouses" / "retail_lakehouse.Lakehouse").is_dir()
 
 
 @pytest.mark.parametrize(
@@ -360,7 +361,8 @@ def test_reporting_items_are_absent_from_infrastructure_phase(
 
     assert "retail_model.SemanticModel" not in result.staged_items
     assert "retail_model.Report" not in result.staged_items
-    assert not (result.output_dir / "Reporting").exists()
+    assert not (result.output_dir / "Reports").exists()
+    assert not (result.output_dir / "Semantic Models").exists()
     assert "ml-required.DataPipeline" in result.staged_items
 
 
@@ -548,7 +550,7 @@ def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path
     without_ml = build_artifacts.build_workspace(
         repo, tmp_path / "ws1", _profile("core")
     )
-    assert not (tmp_path / "ws1" / "ML").exists()
+    assert not (tmp_path / "ws1" / "ML Experiments").exists()
     assert "demand_forecast.MLExperiment" not in without_ml.staged_items
 
     ml_profile = replace(
@@ -560,7 +562,7 @@ def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path
     with_ml = build_artifacts.build_workspace(
         repo, tmp_path / "ws2", ml_profile
     )
-    assert (tmp_path / "ws2" / "ML" / "demand_forecast.MLExperiment").is_dir()
+    assert (tmp_path / "ws2" / "ML Experiments" / "demand_forecast.MLExperiment").is_dir()
     assert {
         "demand_forecast.MLExperiment",
         "market_basket.MLExperiment",
@@ -597,7 +599,7 @@ def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:
 
     assert "retail_querysets.KQLQueryset" in result.staged_items
     definition = json.loads(
-        (output / "retail_querysets.KQLQueryset" / "RealTimeQueryset.json").read_text(
+        (output / "KQL Querysets" / "retail_querysets.KQLQueryset" / "RealTimeQueryset.json").read_text(
             encoding="utf-8"
         )
     )
@@ -740,7 +742,7 @@ def test_repository_sources_stage_unique_logical_ids() -> None:
             )
 
 
-def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
+def test_stage_pipelines_groups_setup_with_other_pipelines(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "setup-pipeline", ["setup-01-seed-dictionaries", "setup-02-generate-dimensions"])
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
@@ -758,9 +760,8 @@ def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -
         deployed,
     )
 
-    # setup-pipeline joins the setup notebooks under "Setup"; others stay in "Pipelines".
-    assert (output / "Setup" / "setup-pipeline.DataPipeline").is_dir()
-    assert not (output / "Pipelines" / "setup-pipeline.DataPipeline").exists()
+    assert (output / "Pipelines" / "setup-pipeline.DataPipeline").is_dir()
+    assert not (output / "Setup").exists()
     assert (output / "Pipelines" / "streaming-data-load.DataPipeline").is_dir()
     assert {p.name for p in staged} == {
         "setup-pipeline.DataPipeline",
@@ -933,7 +934,7 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
     # Every staged setup notebook must carry the custom lakehouse name in its metadata
     for name in build_artifacts.SETUP_NOTEBOOKS:
         notebook_path = (
-            out_dir / "Setup" / f"{name}.Notebook" / "notebook-content.ipynb"
+            out_dir / "Notebooks" / f"{name}.Notebook" / "notebook-content.ipynb"
         )
         assert notebook_path.exists(), f"Missing staged notebook: {notebook_path}"
         notebook = json.loads(notebook_path.read_text(encoding="utf-8"))

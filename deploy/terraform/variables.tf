@@ -118,7 +118,7 @@ variable "eventhouse_minimum_consumption_units" {
 variable "spark_custom_pool_enabled" {
   type        = bool
   default     = false
-  description = "Create an F64-optimized custom Spark pool and set it as the workspace default pool so the setup pipeline runs on it. When false, setup uses the workspace starter pool."
+  description = "Create a capacity-sized custom Spark pool and set it as the workspace default pool. When false, setup uses the workspace starter pool."
 }
 
 variable "spark_custom_pool_name" {
@@ -140,12 +140,22 @@ variable "spark_node_size" {
 
 variable "spark_min_node_count" {
   type        = number
-  default     = 1
-  description = "Custom Spark pool autoscale minimum node count."
+  default     = 2
+  description = "Capacity-derived custom Spark pool autoscale minimum node count."
+
+  validation {
+    condition     = floor(var.spark_min_node_count) == var.spark_min_node_count && var.spark_min_node_count >= 2 && var.spark_min_node_count <= 16
+    error_message = "spark_min_node_count must be an integer between 2 and 16."
+  }
 }
 
 variable "spark_max_node_count" {
   type        = number
-  default     = 10
-  description = "Custom Spark pool autoscale maximum node count. The F64 default of 10 Medium (8 vCore) nodes = 80 vCores, inside an F64's 128 base Spark vCores (no bursting)."
+  default     = 16
+  description = "Capacity-derived custom Spark pool autoscale maximum node count."
+
+  validation {
+    condition     = floor(var.spark_max_node_count) == var.spark_max_node_count && var.spark_max_node_count >= 2 && var.spark_max_node_count <= 16
+    error_message = "spark_max_node_count must be an integer between 2 and 16."
+  }
 }

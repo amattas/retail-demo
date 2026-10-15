@@ -64,11 +64,18 @@ stream watermarks, ingestion, or checkpoint freshness. Consumers select the
 latest monitoring event per case. Historical reorder rows do not establish
 open commitments, confirmed inbound, reservations, or shared DC availability.
 
-`retail-availability-operations` binds one KQL database and an approved
-notebook action. Publication requires a successful definition readback with
-`shouldRun=false`. Teams notification/recipient setup, generated playbook
-review, and deliberate activation remain operator steps. Deployment does
-not silently enable autonomous purchasing.
+`retail-availability-operations` publishes stopped with its KQL database and
+instructions. The REST publisher omits the empty `playbook` object so the UI
+can generate it. The public definition API rejects `FabricJobAction`, so the
+publisher follows item creation with the UI-native OA workload call and binds
+`prepare-replenishment-case` using `itemArtifactId`, `itemWorkspaceId`, and
+`RunNotebook`. It requires exact workload-service readback of one KQL source
+and one action. The public service may normalize a KQL source ID to all zeroes
+in definition readback; the workload readback is authoritative for configured
+source/action details. Successful publication requires `shouldRun=false`.
+Teams destination setup, playbook generation/review, and deliberate activation
+remain operator steps. Deployment does not silently enable autonomous
+purchasing.
 
 The `prepare-replenishment-case` action validates a selected case against
 live signals, freezes the inspected snapshot, and merges a DRAFT into

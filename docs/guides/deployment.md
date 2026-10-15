@@ -44,9 +44,12 @@ The current deploy plan:
 5. captures the selected Terraform-owned identifiers;
 6. stages and publishes infrastructure without Reporting;
 7. executes only the selected ordered KQL scripts and validates infrastructure;
-8. for gated profiles, waits for setup and required ML validation to complete;
+8. for gated profiles, waits for setup, then runs the six independent required
+   ML producers concurrently and waits for their shared validator;
 9. stages and publishes Reporting only after required ML terminal success;
-10. runs selected optional/experimental ML after Reporting;
+10. runs selected optional/experimental ML through a single Spark lane while
+    independent Reporting validation and API publication branches run through
+    a bounded non-Spark worker pool;
 11. tells the Lakehouse SQL endpoint about newly created tables so Power BI and
     readiness queries can find them;
 12. for `full-demo`, runs the deployed ontology notebook to create or
@@ -84,6 +87,29 @@ it. If Fabric rejects agent creation, the deploy step and readiness report a
 warning and the rest of the deployment continues. Native Planning stays
 **excluded** (`include_plan: false`) unless you explicitly include it.
 
+Before publication, use a non-trial Fabric capacity, provide an Eventhouse or
+ontology (plus its KQL database when using Eventhouse), and ensure the creator
+has a Teams account. A Fabric administrator must enable Operations Agent,
+Copilot, and Azure OpenAI permissions. The API publisher uses a **user**
+identity with Contributor-or-higher workspace access and `Item.ReadWrite.All`;
+service principals and managed identities aren't supported for Operations
+Agent creation. If the capacity is outside the US/EU, enable the documented
+Azure OpenAI cross-geo processing/storage settings as well. The current tenant
+settings index has no separate Operations Agent creation toggle; its
+Operations Agent observability and insights settings are optional.
+
+The deployment preflight checks the configured capacity and the Copilot/Azure
+OpenAI tenant settings it can inspect. It does not prove that a Teams account
+exists or that the Operations Agent preview is enabled for the creator's
+tenant/security group. The publisher creates the Agent stopped with its KQL
+source and instructions. The public definition API rejects
+`FabricJobAction`, so publication then uses the same OA workload endpoint as
+the Fabric UI to bind
+`prepare-replenishment-case` and requires exact source/action readback. It
+omits an empty `playbook` because Fabric rejects it with
+`No rule definitions available`; generate and review the playbook and Teams
+destination, then explicitly start only after review.
+
 The default selection deploys only the Operations Agent and leaves the existing
 model's SSO binding untouched. It is equivalent to:
 
@@ -100,6 +126,11 @@ fixed credentials. Readiness requires the draft notebook and reports a missing
 Operations Agent as a warning, not a failure; it does not expect a Plan. Human planning uses the Lakehouse draft-case table and existing
 report through SSO; it is not presented as the native Planning product.
 Operations Agent remains stopped until reviewed and explicitly activated.
+
+The publisher creates the supporting KQL tables and bound draft notebook
+before validating monitoring signals. Stale or invalid source evidence still
+blocks signal seeding and agent creation, but leaves those supporting assets
+published and records the failure in the current environment's report.
 
 Native Planning does not support the current Direct Lake SSO path. Do not
 bypass organizational policy with an alternate identity or connection type.
@@ -156,6 +187,21 @@ for a persistent operations-only deployment/readiness selection. A one-off
 `--operations-only` run does not satisfy a configuration that still requests
 both components.
 
+If verified availability signals and the action notebook are already
+published but agent creation failed, retry only the stopped Agent without
+reingesting duplicate signal rows:
+
+```powershell
+python -m deploy.scripts.deploy_operations_planning `
+  --environment retail-demo `
+  --agent-only
+```
+
+The publisher uses metadata-only creation, a public stopped definition update,
+and a delegated UI-native workload configuration call. An HTTP 400
+`UnknownError` from a public `FabricJobAction` update is distinct from tenant
+enablement and is not retried through that incompatible contract.
+
 Disabling the pack stops its publication; it does not delete its items or stop
 an agent that an operator previously activated. Stop monitoring explicitly in
 Fabric before opting out. Readiness tolerates only the source-declared
@@ -166,9 +212,11 @@ The model publication includes additive `Next 7 Days` forecast/bound measures;
 existing full-horizon measures remain unchanged. When including the Plan, publish
 the updated Reporting model before using the targeted command against an older deployment.
 
-The pack publishes `retail-availability-operations` **stopped** and
-`prepare-replenishment-case`, seeds at most 100 current store/product signals,
-and publishes the native `retail-replenishment` Plan when requested. The
+The pack publishes `retail-availability-operations` **stopped**, the separate
+`prepare-replenishment-case` notebook, and at most 100 current store/product
+signals. It binds the notebook as a human-approved Agent action through the
+UI-native OA workload endpoint. It publishes the native
+`retail-replenishment` Plan when requested. The
 standalone command also refreshes signals; it does not install a continuous
 forecast-to-Eventhouse feed. Source data older than seven days requires fresh
 historical inputs and a required-ML rerun before seeding; rerunning ML over
@@ -246,7 +294,9 @@ Open the report link recorded in
 `deploy/.generated/<env>/twins-report.json` using your Fabric/Power BI login.
 That file also retains source/cohort evidence, model changes and their backup,
 and the publication outcome. The publisher refreshes Direct Lake framing
-without changing SSO. Use the network's entity fields to drill through to
+without changing SSO. Status reads retry transient connection errors against
+the exact accepted refresh request; they never start a duplicate refresh.
+Use the network's entity fields to drill through to
 Store, Warehouse or Truck views; the page tabs remain available.
 Inspect page rendering and navigation before
 presenting the demo. See the
@@ -274,6 +324,14 @@ manual boundaries for the resolved profile. A live `full-demo` run reads
 Fabric tenant settings and capacity metadata before mutation. Reporting
 remains absent unless the current required ML pipeline run, including the
 runtime contract validator, finishes successfully.
+
+The deploy runner uses an explicit dependency graph rather than treating the
+plan as one serial list. Spark-heavy deployment steps default to one concurrent
+lane, while up to four independent non-Spark/API steps can overlap. Required
+failures block only their descendants; optional failures degrade the run
+without cancelling independent siblings. Task flow, folder reconciliation, and
+readiness remain final joins and start only after every selected branch is
+terminal.
 
 ## Prerequisites
 
@@ -526,11 +584,33 @@ a separately named database is not a supported topology.
 ### Starter pool or custom pool
 
 `core` and `standard` use the workspace starter pool. Only `full-demo` selects
-the custom pool. Live preflight requires an active F64-or-larger capacity and
-checks configured node vCores against the capacity's base vCores. Legacy
+the custom pool. Live preflight resolves the target capacity's current `F<n>` or
+`FTL<n>` SKU and derives the pool before Terraform configuration is generated.
+The supported calculation uses base capacity only:
+
+- Spark base capacity is 2 vCores per capacity unit (CU).
+- The deploy reserves 25% headroom:
+  `usable_vcores = floor(CU * 2 * 0.75)`.
+- The required-ML pipeline's root notebook producer count is authoritative
+  (currently six concurrent sessions).
+- Medium nodes use 8 vCores. Each session receives
+  `floor(usable_vcores / (producer_count * 8))` nodes, clamped to 2–16.
+- The minimum is `min(2, max_nodes)`. Preflight fails if every producer cannot
+  receive at least two Medium nodes (one driver and one executor).
+
+This yields 2 nodes per session on F64, 4 on F128, 8 on F256, and the 16-node
+cap on F512 and larger. The calculation does not use or claim burst capacity.
+Live preflight writes bounded, non-secret evidence to
+`deploy/.generated/<env>/capacity-sizing.json`; custom-pool config generation
+requires fresh evidence for the configured environment and capacity. Starter
+pool profiles neither create nor consume this file. Legacy
 `--use-custom-spark-pool` and
 `spark.use_custom_pool` overrides fail clearly; select the profile instead.
-Review the source-defined pool configuration against the target capacity.
+
+On resume, live sizing is observed again. Before Terraform apply, a sizing
+change forces config regeneration and a new Terraform plan. After Terraform
+apply, a sizing change fails the resumed run and requires a new deployment plan
+instead of silently reusing the applied pool.
 
 ## Preview the plan
 
@@ -706,6 +786,45 @@ target requires a newly reviewed run, not journal edits to force compatibility.
 Completed runs cannot be resumed; `--resume` cannot be combined with
 `--dry-run` or `--recreate`.
 
+Every orchestrated setup, required-ML, optional-ML, and experimental-ML step
+writes bounded correlation evidence under
+`deploy/.generated/<env>/pipeline-evidence/`. The file records the exact
+workspace, pipeline item ID, job ID, Fabric `Location`, submission time,
+observed status, and start/end timestamps. It is written immediately after
+Fabric accepts the POST, before status polling begins.
+
+When a compatible journal contains a `RUNNING` pipeline step and that exact
+evidence file is present, `--resume` reattaches to the recorded `Location`.
+It never POSTs a replacement automatically. A completed run is adopted, an
+active run is awaited, and a failed/cancelled run remains failed. Missing,
+mismatched, duplicate, or source-incompatible evidence fails closed.
+
+The runner separates the Fabric execution budget from local monitor
+availability. `--monitor-timeout-seconds` may end the local wait while the
+remote run remains active; the journal stays `RUNNING` and is resumable. The
+runner does not cancel the Fabric job. Resume with the same compatible sources
+to reattach.
+
+If the local wait for the required ML pipeline fails but Fabric later records
+that exact run as successful, adopt it while resuming instead of launching the
+pipeline again:
+
+```powershell
+retail-setup deploy --env alice --resume `
+  --adopt-pipeline-run ml-required=<job-id>
+```
+
+This recovery verifies the exact completed run against the configured
+workspace and pipeline, checks that it started after the journaled setup run,
+and records its job ID in the new deployment journal. It continues with
+Reporting and later steps without repeating setup or required ML. The explicit
+adoption permits the source fingerprint to differ (for example, when the
+polling code was fixed after the deployment started); the environment,
+targets, profile, manifest, and ordered plan must still match. For a recreate
+deployment, both workspace destruction and the deletion wait must already have
+succeeded. This option only adopts the required-ML gate; it does not adopt
+setup or post-Reporting pipeline runs.
+
 Pending Terraform apply regenerates and checks its saved plan. Pending item
 publication rebuilds its staging first, including Reporting and post-ontology
 phases. An unfinished destructive recreate phase requires explicit review and
@@ -725,6 +844,25 @@ Setting it to `false` is rejected because unpublishing a partial stage could
 delete healthy Reporting items.
 
 ## Post-deploy work
+
+### Demo folder organization
+
+Items are organized by object type, not by deployment phase: all notebooks
+are in **Notebooks**, all pipelines in **Pipelines**, reports in **Reports**,
+semantic models in **Semantic Models**, and experiments in **ML Experiments**.
+Native add-ons use their own type folders, including **Fabric Apps** and
+**Ontologies**. Service-managed children stay with their parent as required
+by Fabric.
+
+Normal deployment and standalone publishers preserve this layout. To
+reorganize an existing demo without rerunning data generation or publication:
+
+```powershell
+python -m deploy.scripts.workspace_folders --environment retail-demo
+```
+
+The command preserves item IDs and removes only empty obsolete lifecycle
+folders. Its live readback is saved to `workspace-folder-report.json`.
 
 ### Understand local validation
 
@@ -755,7 +893,14 @@ python -m deploy.scripts.run_pipeline `
 ```
 
 `--wait` polls the exact submitted run to a bounded terminal state. Omit it
-only for an intentional asynchronous manual trigger.
+only for an intentional asynchronous manual trigger. Use `--evidence-output`
+to select the durable JSON path. Use `--reattach-location` or
+`--reattach-run-id` to monitor an existing exact run without POSTing.
+
+Pipeline submission is attempted once. If the POST response is lost, the
+runner lists runs for that exact workspace and pipeline and adopts only one
+known-state run in the bounded request window. Zero or multiple candidates
+fail closed; the runner does not retry the POST.
 
 If a deployment stopped but every selected setup/ML pipeline was later
 recovered manually, adopt the exact successful Fabric job IDs instead of

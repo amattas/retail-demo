@@ -6,22 +6,40 @@
 
 - Accept the stopped Operations Agent definition and generated playbook in
   the target tenant, including Teams destination and approved notebook action.
-- Investigate the Operations Agent create API's HTTP 400 `UnknownError`.
-  Supporting signals/notebook were published; the native agent was not.
-  Preserve the partial-publication report rather than retrying blindly.
-  As of 2026-10-07 the rendered definition matches the current (June 2026)
-  schema field for field, so the next step is a live retry, then a diff
-  against a UI-created agent. FabCon also announced pre-approved actions and
-  Investigator root-cause insights; these are UI-configured and not yet in the
-  definition schema.
-- The current environment prohibits fixed credentials. Keep native Planning
-  unselected and SSO unchanged; operations-only deployment and human review
-  do not require those Planning connections. Native Plan acceptance applies
-  only to environments whose policies permit its documented prerequisites.
+- The base `retail-availability-operations` Agent is now published in
+  `retail-demo` as item `40d42195-9488-4ca1-8ba7-a15fc29648e6`, stopped, with
+  its KQL source and instructions. Existing verified evidence includes 80
+  availability signals and the separate `prepare-replenishment-case` notebook.
+- Complete the UI acceptance: generate/review the playbook, verify the KQL
+  source on the Build page, configure the Teams destination, and explicitly
+  activate only after review. The publisher omits an empty `playbook` object
+  because Fabric returned `No rule definitions available in the playbook`;
+  the UI must generate it.
+- The public definition API returns HTTP 400 `UnknownError` for
+  `FabricJobAction`, including Notebook and DataPipeline probes
+  (`d60c1ef9-fafc-4500-84d6-48f6d54d00d5`,
+  `c4cc969c-eaee-410a-9e66-84ac1672ccaa`,
+  `28e32f8c-d4d4-45cc-96ab-aae5509160fb`). Temporary probe items were deleted.
+  The shipped UI uses a separate OA workload endpoint. The publisher now
+  scripts that endpoint and live readback verifies one KQL source plus the
+  `prepare-replenishment-case` Notebook action with `CASE_ID`.
+- Scripted playbook generation reaches the same UI endpoint but is not accepted
+  yet. `RetailOntology_AutoGen` now contains the live `StockoutRisk` entity,
+  store/product relationships, and required properties; the delegated Teams
+  recipient is also configured. The generator still returns generic
+  `BehaviorModelGenerationFailed`, including for a simple established Product
+  rule. Successful generation/review and activation therefore remain a Fabric
+  service gate rather than missing repository modeling.
+- Live prerequisites remain satisfied: non-trial F64 West US 3, user identity,
+  Copilot/Azure OpenAI settings, KQL database, and `Item.ReadWrite.All`.
+  Service principals and managed identities are unsupported; the tenant
+  settings index lists no separate creation toggle.
+- Keep native Planning excluded under fixed-credential policy and leave SSO
+  unchanged; operations-only deployment and human review do not require those
+  Planning connections. Native Plan acceptance applies only to environments
+  whose policies permit its documented prerequisites.
 - Configure and accept native approvals/SQL writeback in-product before any
   simulated execution bridge is added. No real ERP execution is in scope.
-- Preserve baseline task-flow bindings until native item-type support is
-  established. Native item existence alone does not close these gates.
 
 ### ENH-003 - Ground semantic-model agents and gate ontology agents {#enh-003}
 

@@ -91,6 +91,73 @@ def test_item_inventory_reports_missing_duplicates_and_id_mismatch() -> None:
     assert comparison["mismatched_ids"][0]["expected_id"] == LAKEHOUSE_ID
 
 
+def test_failed_inventory_check_retains_the_specific_missing_items() -> None:
+    runner = object.__new__(ReadinessRunner)
+    runner._items_error = None
+    runner.items = []
+    runner.checks = []
+    expected = [
+        ExpectedItem("Report", "retail-twins"),
+        ExpectedItem("Notebook", "prepare-replenishment-case"),
+    ]
+
+    runner._check(
+        "items.required",
+        "inventory",
+        selected=True,
+        required=True,
+        function=lambda: runner._item_inventory(expected),
+    )
+
+    result = runner.checks[0].to_dict()
+    assert result["status"] == "FAIL"
+    assert result["evidence"]["missing"] == [
+        "Report:retail-twins",
+        "Notebook:prepare-replenishment-case",
+    ]
+    assert result["evidence"]["duplicates"] == []
+
+
+def test_failed_notebook_check_retains_the_binding_error(monkeypatch) -> None:
+    context = _native_context()
+    runner = ReadinessRunner(context, object())
+    definition = _definition(
+        "notebook-content.ipynb",
+        {
+            "metadata": {
+                "dependencies": {
+                    "lakehouse": {
+                        "default_lakehouse": LAKEHOUSE_ID,
+                        "default_lakehouse_name": "retail_lakehouse",
+                        "default_lakehouse_workspace_id": WORKSPACE_ID,
+                    }
+                }
+            }
+        },
+    )
+
+    def notebook_definition(_item_type, name):
+        if name == "prepare-replenishment-case":
+            raise CheckFailed(f"Expected one Notebook:{name} item; found 0.")
+        return definition
+
+    monkeypatch.setattr(runner, "_definition", notebook_definition)
+    runner._check(
+        "bindings.notebooks",
+        "binding",
+        selected=True,
+        required=True,
+        function=runner._notebook_bindings,
+    )
+
+    result = runner.checks[0].to_dict()
+    assert result["status"] == "FAIL"
+    assert result["evidence"]["errors"] == [
+        "prepare-replenishment-case: "
+        "Expected one Notebook:prepare-replenishment-case item; found 0."
+    ]
+
+
 def test_notebook_definition_requires_exact_lakehouse_binding() -> None:
     definition = _definition(
         "notebook-content.ipynb",
@@ -605,6 +672,82 @@ def test_sql_connection_falls_back_to_bundled_driver(monkeypatch) -> None:
     assert "Authentication=" not in calls[0][0][0]
     assert calls[0][1]["timeout"] == 60
     assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
+
+
+def test_sql_connection_retries_refused_handshake_then_connects(monkeypatch) -> None:
+    from deploy.scripts import _retry
+
+    waits: list[float] = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+
+    class OperationalError(Exception):
+        pass
+
+    connection = object()
+    outcomes = [OperationalError("handshake"), OperationalError("handshake"), connection]
+
+    def connect(*_args, **_kwargs):
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(
+            drivers=lambda: ["ODBC Driver 17 for SQL Server"],
+            connect=connect,
+            OperationalError=OperationalError,
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com", "retail_lakehouse", credential
+    )
+
+    assert result is connection
+    assert waits == [2.0, 4.0]
+
+
+def test_sql_connection_does_not_retry_other_driver_errors(monkeypatch) -> None:
+    from deploy.scripts import _retry
+
+    monkeypatch.setattr(_retry.time, "sleep", lambda _s: pytest.fail("must not wait"))
+
+    class OperationalError(Exception):
+        pass
+
+    class ProgrammingError(Exception):
+        pass
+
+    attempts = []
+
+    def connect(*_args, **_kwargs):
+        attempts.append(1)
+        raise ProgrammingError("bad login")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(
+            drivers=lambda: ["ODBC Driver 17 for SQL Server"],
+            connect=connect,
+            OperationalError=OperationalError,
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    with pytest.raises(ProgrammingError):
+        _connect_lakehouse_sql(
+            "server.fabric.microsoft.com", "retail_lakehouse", credential
+        )
+    assert len(attempts) == 1
 
 
 def test_terminal_pipeline_evidence_requires_complete_ordered_timestamps() -> None:
@@ -1285,9 +1428,14 @@ def test_native_seed_inventory_does_not_supply_optional_stream_freshness(
             stream_tables
         )
         assert "ops_" not in query
+        assert "ingestion_time()" in query
         return (
             [
-                {"table_name": name, "latest": context.observed_at, "row_count": 1}
+                {
+                    "table_name": name,
+                    "latest_ingestion": context.observed_at,
+                    "row_count": 1,
+                }
                 for name in stream_tables
             ]
             if live_stream_observed

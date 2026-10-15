@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from requests import ConnectionError, Timeout
 
-from deploy.scripts import run_pipeline
+from deploy.scripts import _retry, run_pipeline
 
 TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
@@ -31,7 +33,7 @@ class _StatusSession:
         self._statuses = iter(statuses)
         self.urls: list[str] = []
 
-    def get(self, url: str) -> _StatusResponse:
+    def get(self, url: str, **_kwargs: object) -> _StatusResponse:
         self.urls.append(url)
         return _StatusResponse(next(self._statuses))
 
@@ -132,7 +134,10 @@ def test_main_passes_selected_auth_mode_to_session(monkeypatch) -> None:
     monkeypatch.setattr(
         run_pipeline,
         "run_pipeline",
-        lambda *_args: "https://api.fabric.microsoft.com/v1/jobs/instances/run-id",
+        lambda *_args: (
+            "https://api.fabric.microsoft.com/v1/workspaces/ws/items/"
+            "pipeline-id/jobs/instances/run-id"
+        ),
     )
 
     def fake_wait(_session, _location, **kwargs):
@@ -174,7 +179,7 @@ def test_wait_for_pipeline_run_refreshes_expired_token() -> None:
         status_code = 401
 
     class _ExpiredSession:
-        def get(self, _url: str) -> _UnauthorizedResponse:
+        def get(self, _url: str, **_kwargs: object) -> _UnauthorizedResponse:
             return _UnauthorizedResponse()
 
     replacement = _StatusSession(["Completed"])
@@ -220,10 +225,17 @@ def test_wait_for_pipeline_run_rejects_missing_current_run_location() -> None:
         run_pipeline.wait_for_pipeline_run(_StatusSession([]), "")
 
 
-def test_wait_for_pipeline_run_times_out_in_progress(monkeypatch) -> None:
-    times = iter([10.0, 12.0])
-    monkeypatch.setattr(run_pipeline.time, "monotonic", lambda: next(times))
-    session = _StatusSession(["InProgress"])
+def test_wait_for_pipeline_run_times_out_during_status_request(monkeypatch) -> None:
+    now = [10.0]
+    monkeypatch.setattr(run_pipeline.time, "monotonic", lambda: now[0])
+
+    class _SlowSession:
+        def get(self, _url: str, **kwargs: object) -> _StatusResponse:
+            assert kwargs["timeout"] == 1.0
+            now[0] += 1.0
+            return _StatusResponse("InProgress")
+
+    session = _SlowSession()
 
     with pytest.raises(run_pipeline.PipelineRunError, match="did not complete"):
         run_pipeline.wait_for_pipeline_run(
@@ -232,6 +244,28 @@ def test_wait_for_pipeline_run_times_out_in_progress(monkeypatch) -> None:
             timeout_seconds=1,
             poll_interval_seconds=0,
         )
+
+
+def test_network_retry_stops_before_overshooting_deadline(monkeypatch) -> None:
+    now = [0.0]
+    calls = []
+    monkeypatch.setattr(run_pipeline.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(_retry.time, "sleep", lambda _seconds: None)
+
+    class _SlowFailureSession:
+        def get(self, _url: str, **kwargs: object) -> _StatusResponse:
+            calls.append(kwargs["timeout"])
+            now[0] += float(kwargs["timeout"])
+            raise Timeout("read consumed the wait deadline")
+
+    with pytest.raises(run_pipeline.PipelineRunError, match="did not complete"):
+        run_pipeline.wait_for_pipeline_run(
+            _SlowFailureSession(),
+            "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+            timeout_seconds=7,
+            poll_interval_seconds=1,
+        )
+    assert calls == [7.0]
 
 
 def test_latest_pipeline_run_rejects_unknown_state_and_missing_time() -> None:
@@ -256,7 +290,7 @@ def test_wait_for_pipeline_job_rejects_mismatched_location_correlation() -> None
             }
 
     class _MismatchedSession:
-        def get(self, _url: str) -> _MismatchedResponse:
+        def get(self, _url: str, **_kwargs: object) -> _MismatchedResponse:
             return _MismatchedResponse()
 
     with pytest.raises(run_pipeline.PipelineRunError, match="Location correlation"):
@@ -265,5 +299,303 @@ def test_wait_for_pipeline_job_rejects_mismatched_location_correlation() -> None
             "https://api.fabric.microsoft.com/v1/jobs/instances/exact-run",
             pipeline_id="pipeline-id",
             timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+
+
+@pytest.mark.parametrize("error_cls", [ConnectionError, Timeout])
+def test_wait_for_pipeline_run_retries_transient_network_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    error_cls: type[Exception],
+) -> None:
+    waits: list[float] = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+
+    calls = 0
+
+    class _FlakySession:
+        def get(self, _url: str, **_kwargs: object) -> _StatusResponse:
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise error_cls("transient failure")
+            return _StatusResponse("Completed")
+
+    status = run_pipeline.wait_for_pipeline_run(
+        _FlakySession(),
+        "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+        timeout_seconds=60,
+        poll_interval_seconds=0,
+    )
+    assert status == "Completed"
+    assert calls == 3
+    assert len(waits) == 2
+
+
+def test_wait_for_pipeline_run_fails_after_exceeding_max_network_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_retry.time, "sleep", lambda _s: None)
+
+    class _BrokenSession:
+        def get(self, _url: str, **_kwargs: object) -> _StatusResponse:
+            raise Timeout("permanent network timeout")
+
+    with pytest.raises(
+        run_pipeline.PipelineRunError, match="consecutive network errors"
+    ):
+        run_pipeline.wait_for_pipeline_run(
+            _BrokenSession(),
+            "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+            timeout_seconds=60,
+            poll_interval_seconds=0,
+        )
+
+
+def test_wait_for_pipeline_job_passes_timeout_to_session_get() -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class _CaptureSession:
+        def get(self, _url: str, **kwargs: object) -> _StatusResponse:
+            captured_kwargs.update(kwargs)
+            return _StatusResponse("Completed")
+
+    run_pipeline.wait_for_pipeline_job(
+        _CaptureSession(),
+        "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+        timeout_seconds=60,
+        poll_interval_seconds=0,
+    )
+    assert captured_kwargs.get("timeout") == 30.0
+
+
+def test_main_writes_exact_evidence_before_first_status_get(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    evidence_path = tmp_path / "pipeline.json"
+    location = (
+        "https://api.fabric.microsoft.com/v1/workspaces/ws/items/"
+        "pipeline-id/jobs/instances/11111111-1111-4111-8111-111111111111"
+    )
+
+    class _Session:
+        def post(self, *_args: object, **_kwargs: object):
+            return type(
+                "Response",
+                (),
+                {
+                    "headers": {"Location": location},
+                    "raise_for_status": lambda self: None,
+                },
+            )()
+
+        def get(self, _url: str, **_kwargs: object) -> _StatusResponse:
+            payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+            assert payload["pipeline_id"] == "pipeline-id"
+            assert payload["run_id"] == "11111111-1111-4111-8111-111111111111"
+            assert payload["location"] == location
+            assert payload["status"] == "Submitted"
+            assert payload["submitted_at"]
+            return _StatusResponse("Completed")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline",
+            "--environment",
+            "dev",
+            "--pipeline",
+            "setup-pipeline",
+            "--wait",
+            "--poll-interval-seconds",
+            "0",
+            "--evidence-output",
+            str(evidence_path),
+        ],
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.load_environment",
+        lambda _env: type(
+            "Config", (), {"tenant_id": TENANT_ID, "auth_mode": "azure_cli"}
+        )(),
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.load_terraform_outputs",
+        lambda _path: {"workspace_id": "ws"},
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.validate_terraform_outputs",
+        lambda *_args: None,
+    )
+    session = _Session()
+    monkeypatch.setattr(run_pipeline, "build_session", lambda **_kwargs: session)
+    monkeypatch.setattr(run_pipeline, "find_pipeline_id", lambda *_args: "pipeline-id")
+
+    assert run_pipeline.main() == 0
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert evidence["status"] == "Completed"
+    assert evidence["status_observed_at"]
+
+
+def test_main_reattaches_without_posting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    run_id = "22222222-2222-4222-8222-222222222222"
+    location = (
+        "https://api.fabric.microsoft.com/v1/workspaces/ws/items/"
+        f"pipeline-id/jobs/instances/{run_id}"
+    )
+    evidence_path = tmp_path / "pipeline.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "workspace_id": "ws",
+                "pipeline_name": "setup-pipeline",
+                "pipeline_id": "pipeline-id",
+                "run_id": run_id,
+                "location": location,
+                "submitted_at": "2026-10-15T12:00:00+00:00",
+                "status": "InProgress",
+                "status_observed_at": "2026-10-15T12:01:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _Session:
+        def post(self, *_args: object, **_kwargs: object):
+            raise AssertionError("reattachment must not POST")
+
+        def get(self, _url: str, **_kwargs: object) -> _StatusResponse:
+            return _StatusResponse("Completed")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pipeline",
+            "--environment",
+            "dev",
+            "--pipeline",
+            "setup-pipeline",
+            "--wait",
+            "--reattach-location",
+            location,
+            "--evidence-output",
+            str(evidence_path),
+            "--poll-interval-seconds",
+            "0",
+        ],
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.load_environment",
+        lambda _env: type(
+            "Config", (), {"tenant_id": TENANT_ID, "auth_mode": "azure_cli"}
+        )(),
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.load_terraform_outputs",
+        lambda _path: {"workspace_id": "ws"},
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.deploy_config.validate_terraform_outputs",
+        lambda *_args: None,
+    )
+    session = _Session()
+    monkeypatch.setattr(run_pipeline, "build_session", lambda **_kwargs: session)
+    monkeypatch.setattr(run_pipeline, "find_pipeline_id", lambda *_args: "pipeline-id")
+
+    assert run_pipeline.main() == 0
+    assert json.loads(evidence_path.read_text(encoding="utf-8"))["submitted_at"] == (
+        "2026-10-15T12:00:00+00:00"
+    )
+
+
+def test_ambiguous_submission_reconciles_one_candidate_without_second_post(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_at = datetime.now(UTC)
+
+    class _Session:
+        post_calls = 0
+
+        def post(self, *_args: object, **_kwargs: object):
+            self.post_calls += 1
+            raise Timeout("response lost")
+
+    session = _Session()
+    candidate = {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "itemId": "pipeline-id",
+        "status": "InProgress",
+        "startTimeUtc": requested_at.isoformat(),
+    }
+    monkeypatch.setattr(run_pipeline, "list_pipeline_runs", lambda *_args: [candidate])
+    location, submission = run_pipeline.submit_pipeline_run(
+        session,
+        "ws",
+        "pipeline-id",
+        request_started_at=requested_at,
+    )
+
+    assert session.post_calls == 1
+    assert location.endswith(candidate["id"])
+    assert submission == "reconciled"
+
+
+def test_ambiguous_submission_with_duplicate_candidates_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_at = datetime.now(UTC)
+
+    class _Session:
+        post_calls = 0
+
+        def post(self, *_args: object, **_kwargs: object):
+            self.post_calls += 1
+            raise Timeout("response lost")
+
+    candidates = [
+        {
+            "id": str(index),
+            "itemId": "pipeline-id",
+            "status": "InProgress",
+            "startTimeUtc": requested_at.isoformat(),
+        }
+        for index in (1, 2)
+    ]
+    monkeypatch.setattr(run_pipeline, "list_pipeline_runs", lambda *_args: candidates)
+    session = _Session()
+
+    with pytest.raises(run_pipeline.PipelineRunError, match="found 2"):
+        run_pipeline.submit_pipeline_run(
+            session,
+            "ws",
+            "pipeline-id",
+            request_started_at=requested_at,
+        )
+    assert session.post_calls == 1
+
+
+def test_monitor_timeout_is_distinct_from_remote_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(run_pipeline.time, "monotonic", lambda: now[0])
+
+    class _ActiveSession:
+        def get(self, _url: str, **_kwargs: object) -> _StatusResponse:
+            now[0] += 2
+            return _StatusResponse("InProgress")
+
+    with pytest.raises(run_pipeline.PipelineMonitorTimeout):
+        run_pipeline.wait_for_pipeline_job(
+            _ActiveSession(),
+            "https://api.fabric.microsoft.com/v1/jobs/instances/current-run",
+            timeout_seconds=100,
+            monitor_timeout_seconds=1,
             poll_interval_seconds=0,
         )

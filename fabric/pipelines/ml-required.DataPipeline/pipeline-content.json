@@ -1,5 +1,6 @@
 {
   "properties": {
+    "concurrency": 1,
     "activities": [
       {
         "name": "06-ml-demand-forecast",
@@ -20,14 +21,7 @@
       {
         "name": "08-ml-customer-segmentation",
         "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "06-ml-demand-forecast",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -43,14 +37,7 @@
       {
         "name": "09-ml-churn-prediction",
         "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "08-ml-customer-segmentation",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -66,14 +53,7 @@
       {
         "name": "12-ml-stockout-prediction",
         "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "09-ml-churn-prediction",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -89,14 +69,7 @@
       {
         "name": "07-ml-market-basket",
         "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "12-ml-stockout-prediction",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -112,14 +85,7 @@
       {
         "name": "10-ml-promotion-effectiveness",
         "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "07-ml-market-basket",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -174,9 +140,9 @@
           }
         ],
         "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 0,
-          "retryIntervalInSeconds": 30,
+          "timeout": "0.01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
           "secureOutput": false,
           "secureInput": false
         },

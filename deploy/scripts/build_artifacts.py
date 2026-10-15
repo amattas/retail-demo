@@ -18,6 +18,7 @@ from retail_setup.contracts import (
 )
 
 from deploy.scripts import _output as console
+from deploy.scripts.workspace_folders import ITEM_FOLDERS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "deploy" / "workspace"
@@ -100,23 +101,11 @@ def validate_staged_logical_ids(output_dir: Path) -> None:
             )
         seen[logical_id] = item
 
-# Workspace folder names used to organize published items. fabric-cicd maps the
-# staged directory structure to Fabric workspace folders, so staging an item
-# under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
-# Demo/pipeline notebooks go under "Notebooks"; one-time setup notebooks (and
-# other setup artifacts) go under "Setup"; the semantic model and report go under
-# "Reporting"; MLflow experiments go under "ML". The Lakehouse shell and
-# KQLQueryset stay at the workspace root.
-NOTEBOOKS_FOLDER = "Notebooks"
-SETUP_FOLDER = "Setup"
-POWERBI_FOLDER = "Reporting"
-PIPELINES_FOLDER = "Pipelines"
-ML_FOLDER = "ML"
-DATA_AGENTS_FOLDER = "Data Agents"
-# The live streaming generator notebook publishes under "Streaming". Kept out of
-# "Setup" because stream-events is the optional long-running driver, not part of
-# the ordered one-time setup pipeline.
-STREAMING_FOLDER = "Streaming"
+# Staged directories and native publishers use the same object-type folders.
+NOTEBOOKS_FOLDER = ITEM_FOLDERS["Notebook"]
+PIPELINES_FOLDER = ITEM_FOLDERS["DataPipeline"]
+ML_FOLDER = ITEM_FOLDERS["MLExperiment"]
+DATA_AGENTS_FOLDER = ITEM_FOLDERS["DataAgent"]
 
 # MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
 # them as MLExperiment shell items so they exist (and are organized under the "ML"
@@ -189,16 +178,14 @@ SETUP_NOTEBOOKS = [
 ]
 
 # The live streaming generator. Rendered alongside the setup notebooks (shares
-# the same {{TOKEN}} substitution) but staged separately under "Streaming" and
+# the same {{TOKEN}} substitution) but staged under "Notebooks" and
 # deliberately NOT added to the setup pipeline — it runs continuously and is
 # started/stopped manually.
 STREAM_NOTEBOOKS = [
     "stream-events",
 ]
 
-# The one Data Pipeline that orchestrates the setup notebooks. It publishes into
-# the "Setup" workspace folder (alongside those notebooks) rather than the
-# general "Pipelines" folder.
+# The one Data Pipeline that orchestrates the setup notebooks.
 SETUP_PIPELINE = "setup-pipeline"
 
 
@@ -471,7 +458,7 @@ def stage_powerbi_items(
         item_dir = available[name]
         if not item_dir.is_dir() or item_dir.suffix not in {".Report", ".SemanticModel"}:
             continue
-        destination = output_dir / item_dir.name
+        destination = output_dir / ITEM_FOLDERS[item_dir.suffix[1:]] / item_dir.name
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(item_dir, destination, ignore=_ignore_powerbi_local_state)
@@ -529,7 +516,7 @@ def stage_stream_notebooks(
 
     Like the setup notebooks, ``stream-events`` is rendered to
     the selected render directory by ``retail-setup render`` before staging. It is the live
-    driver, so it publishes into the "Streaming" folder and is never added to the
+    driver, so it publishes into the "Notebooks" folder and is never added to the
     setup pipeline — it is started/stopped manually.
     """
 
@@ -643,9 +630,8 @@ def stage_pipelines(
     be present in ``deployed_notebooks``. Nothing is inferred from notebook
     references: the profile supplies the exact pipeline inventory.
 
-    Each pipeline publishes into the "Pipelines" workspace folder, except
-    ``setup-pipeline`` which joins the setup notebooks under "Setup". Returns an
-    empty list when no pipeline sources exist.
+    Every pipeline publishes into the "Pipelines" object-type folder. Returns
+    an empty list when no pipeline sources exist.
     """
 
     source_dir = repo_root / "fabric" / "pipelines"
@@ -673,8 +659,7 @@ def stage_pipelines(
                 f"Selected pipeline {pipeline_ref!r} references unselected "
                 f"notebooks: {missing}"
             )
-        folder = SETUP_FOLDER if item_dir.stem == SETUP_PIPELINE else PIPELINES_FOLDER
-        destination = output_dir / folder / item_dir.name
+        destination = output_dir / PIPELINES_FOLDER / item_dir.name
         if destination.exists():
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -739,7 +724,7 @@ def stage_ml_experiments(
     fabric-cicd publishes MLExperiment shell-only (no definition), so each name
     becomes a `<name>.MLExperiment` shell. Pre-creating them lets the ML
     notebooks reuse the experiments rather than creating them on first run, and
-    groups them under the "ML" workspace folder.
+    groups them under the "ML Experiments" workspace folder.
     """
 
     return [
@@ -819,7 +804,9 @@ def build_workspace(
     # contain the .platform file only"), and Terraform already owns it.
     if stage_infrastructure and profile.selects("asset.lakehouse"):
         staged_items.append(
-            stage_shell_item(output_dir, lakehouse_name, "Lakehouse").name
+            stage_shell_item(
+                output_dir / ITEM_FOLDERS["Lakehouse"], lakehouse_name, "Lakehouse"
+            ).name
         )
 
     # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
@@ -835,11 +822,11 @@ def build_workspace(
                 ).name
             )
 
-    # One-time setup notebooks publish into a separate "Setup" workspace folder.
+    # Setup notebooks share the object-type folder without changing execution order.
     # The Eventhouse KQL schema is applied separately by `deploy.scripts.apply_kql
     # --execute` (using the operator's credentials), not by a Fabric notebook.
     if stage_infrastructure and "setup" in notebook_groups:
-        setup_dir = output_dir / SETUP_FOLDER
+        setup_dir = notebooks_dir
         staged_items.extend(
             item.name
             for item in stage_setup_notebooks(
@@ -850,12 +837,11 @@ def build_workspace(
             )
         )
 
-    # The live streaming generator notebook publishes into a separate "Streaming"
-    # folder. Opt-in via the "stream" group so a default deploy is unaffected. The
+    # The live streaming generator is selected through the "stream" group. The
     # notebook writes events straight to the Eventhouse KQL tables via the Spark
     # connector (no Eventstream).
     if stage_infrastructure and "stream" in notebook_groups:
-        streaming_dir = output_dir / STREAMING_FOLDER
+        streaming_dir = notebooks_dir
         staged_items.extend(
             item.name
             for item in stage_stream_notebooks(
@@ -867,7 +853,7 @@ def build_workspace(
             )
         )
 
-    # Power BI items publish into the "Reporting" workspace folder.
+    # Reports and semantic models publish into separate object-type folders.
     powerbi_items: list[str] = []
     if stage_reporting and profile.selects("asset.semantic-model"):
         powerbi_items.append(f"{semantic_model_name}.SemanticModel")
@@ -878,7 +864,7 @@ def build_workspace(
             item.name
             for item in stage_powerbi_items(
                 repo_root / "fabric" / "powerbi",
-                output_dir / POWERBI_FOLDER,
+                output_dir,
                 powerbi_items,
                 report_default_date=report_default_date,
             )
@@ -890,11 +876,12 @@ def build_workspace(
         staged_items.extend(
             item.name
             for item in stage_querysets(
-                repo_root, output_dir, kql_database_name=kql_database_name
+                repo_root,
+                output_dir / ITEM_FOLDERS["KQLQueryset"],
+                kql_database_name=kql_database_name,
             )
         )
-    # Data Pipelines publish into a "Pipelines" workspace folder (except
-    # setup-pipeline, which joins the setup notebooks under "Setup"), but only
+    # Data Pipelines publish into a "Pipelines" workspace folder, but only
     # when every notebook they orchestrate is part of this deploy. Staging writes
     # native logical IDs so fabric-cicd resolves same-workspace dependencies.
     if stage_infrastructure and profile.pipeline_refs:

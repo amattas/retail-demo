@@ -10,9 +10,11 @@ import pytest
 import yaml
 
 from deploy.scripts import deploy_config
+from deploy.scripts.capacity_sizing import derive_capacity_sizing
 
 ENVIRONMENT = "dev"
 WORKSPACE_NAME = "retail-demo-dev"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _load_config(
@@ -52,6 +54,18 @@ def _resolved_outputs(config: deploy_config.DeployConfig) -> dict[str, str]:
     }
 
 
+def _capacity_sizing(sku: str = "F128"):
+    return derive_capacity_sizing(
+        environment=ENVIRONMENT,
+        capacity={
+            "id": "capacity-id",
+            "displayName": "demo-capacity",
+            "sku": sku,
+        },
+        repo_root=REPO_ROOT,
+    )
+
+
 def test_environment_name_is_derived_from_workspace_name() -> None:
     assert (
         deploy_config.environment_name_for_workspace("Retail Demo - Alice") == "alice"
@@ -71,7 +85,7 @@ def test_load_environment_merges_defaults_and_environment(tmp_path: Path) -> Non
     assert config.spark.use_custom_pool is False
     assert config.twins == deploy_config.TwinsConfig()
     assert config.spark.node_size == "Medium"
-    assert config.spark.max_node_count == 10
+    assert config.spark.max_node_count == 16
     assert config.deployment.item_types_in_scope == [
         "Lakehouse",
         "Notebook",
@@ -105,6 +119,43 @@ def _load_twins_config(
     data["twins"] = twins
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+def _load_streaming_shortcuts_config(
+    tmp_path: Path, streaming_shortcuts: object, profile: str = "standard"
+) -> deploy_config.DeployConfig:
+    _load_config(tmp_path, profile)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["streaming_shortcuts"] = streaming_shortcuts
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+def test_streaming_shortcuts_are_disabled_by_default(tmp_path):
+    config = _load_config(tmp_path, "standard")
+    assert config.streaming_shortcuts == deploy_config.StreamingShortcutsConfig()
+
+
+def test_streaming_shortcuts_can_be_enabled_for_eventhouse_profiles(tmp_path):
+    config = _load_streaming_shortcuts_config(
+        tmp_path, {"enabled": True}, "full-demo"
+    )
+    assert config.streaming_shortcuts.enabled is True
+
+
+def test_streaming_shortcuts_reject_profiles_without_eventhouse(tmp_path):
+    with pytest.raises(ValueError, match="provisions Eventhouse"):
+        _load_streaming_shortcuts_config(tmp_path, {"enabled": True}, "core")
+
+
+@pytest.mark.parametrize(
+    "streaming_shortcuts", [[], None, {"enabled": "false"}, {"enabled": 1}]
+)
+def test_streaming_shortcuts_reject_invalid_settings(tmp_path, streaming_shortcuts):
+    with pytest.raises(ValueError, match="streaming_shortcuts"):
+        _load_streaming_shortcuts_config(tmp_path, streaming_shortcuts)
 
 
 @pytest.mark.parametrize(
@@ -146,7 +197,8 @@ def test_native_pack_loads_explicit_settings_outside_fabric_cicd(tmp_path, profi
     assert "OperationsAgent" not in config.deployment.item_types_in_scope
     assert "Plan" not in config.deployment.item_types_in_scope
     assert "01-availability-tables.kql" not in config.eventhouse.kql_scripts
-    assert "operations_planning" not in deploy_config.render_tfvars(config)
+    sizing = _capacity_sizing() if profile == "full-demo" else None
+    assert "operations_planning" not in deploy_config.render_tfvars(config, sizing)
 
 
 def test_native_pack_rejects_core_without_eventhouse_and_model(tmp_path):
@@ -200,7 +252,8 @@ def test_twins_loads_explicit_opt_in_without_fabric_cicd_scope_changes(
 
     assert config.twins == deploy_config.TwinsConfig(enabled=True)
     assert "Report" in config.deployment.item_types_in_scope
-    assert "twins" not in deploy_config.render_tfvars(config)
+    sizing = _capacity_sizing() if profile == "full-demo" else None
+    assert "twins" not in deploy_config.render_tfvars(config, sizing)
 
 
 def test_twins_rejects_core_profile_without_reporting(tmp_path):
@@ -315,17 +368,50 @@ def test_render_tfvars_spark_pool_toggle(tmp_path: Path) -> None:
     assert "spark_custom_pool_enabled = false" in off_tfvars
     assert "spark_node_size" not in off_tfvars
 
-    tfvars = deploy_config.render_tfvars(enabled)
+    tfvars = deploy_config.render_tfvars(enabled, _capacity_sizing())
     assert "spark_custom_pool_enabled = true" in tfvars
     assert 'spark_node_size = "Medium"' in tfvars
-    assert "spark_min_node_count = 1" in tfvars
-    assert "spark_max_node_count = 10" in tfvars
+    assert "spark_min_node_count = 2" in tfvars
+    assert "spark_max_node_count = 4" in tfvars
     assert 'spark_custom_pool_name = "retail_setup_pool"' in tfvars
     assert "eventhouse_enabled = true" in tfvars
 
     invalid = replace(disabled, spark=replace(disabled.spark, use_custom_pool=True))
     with pytest.raises(ValueError, match="deployment.profile"):
         deploy_config.render_tfvars(invalid)
+
+
+@pytest.mark.parametrize(
+    "spark",
+    [
+        {"min_node_count": 1},
+        {"max_node_count": 17},
+        {"min_node_count": 2.0},
+        {"min_node_count": 4, "max_node_count": 2},
+    ],
+)
+def test_load_environment_rejects_invalid_spark_node_bounds(
+    tmp_path: Path,
+    spark: dict[str, object],
+) -> None:
+    environments = tmp_path / "config" / "environments"
+    environments.mkdir(parents=True)
+    (environments / f"{ENVIRONMENT}.yml").write_text(
+        yaml.safe_dump(
+            {
+                "workspace": {"name": WORKSPACE_NAME},
+                "deployment": {"profile": "full-demo"},
+                "spark": spark,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="spark\\."):
+        deploy_config.load_environment(
+            ENVIRONMENT,
+            environments_root=environments,
+        )
 
 
 def test_render_fabric_cicd_config_uses_environment_workspace_id(
@@ -444,30 +530,11 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         "10-ml-promotion-effectiveness",
     }
     validator = required["15-validate-required-ml-contract"]
-    # 07 and 10 produce required-tier outputs (product_recommendations and
-    # price_elasticity), so they run inside the required serial chain.
-    required_chain = (
-        ("06-ml-demand-forecast", None),
-        ("08-ml-customer-segmentation", "06-ml-demand-forecast"),
-        ("09-ml-churn-prediction", "08-ml-customer-segmentation"),
-        ("12-ml-stockout-prediction", "09-ml-churn-prediction"),
-        ("07-ml-market-basket", "12-ml-stockout-prediction"),
-        ("10-ml-promotion-effectiveness", "07-ml-market-basket"),
-    )
-    for activity_name, predecessor in required_chain:
-        dependencies = required[activity_name]["dependsOn"]
-        if predecessor is None:
-            assert dependencies == []
-        else:
-            assert dependencies == [
-                {
-                    "activity": predecessor,
-                    "dependencyConditions": ["Succeeded"],
-                }
-            ]
+    assert all(required[name]["dependsOn"] == [] for name in required_producers)
     assert {
         dependency["activity"] for dependency in validator["dependsOn"]
     } == required_producers
+    assert len(validator["dependsOn"]) == len(required_producers)
     assert all(
         dependency["dependencyConditions"] == ["Succeeded"]
         for dependency in validator["dependsOn"]

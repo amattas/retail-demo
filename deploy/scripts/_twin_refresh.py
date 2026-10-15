@@ -8,7 +8,10 @@ from typing import Any
 from urllib.parse import urlsplit
 from uuid import UUID
 
+from requests import Response
+
 from deploy.scripts._native_items import NativeItemError, _guid
+from deploy.scripts.fabric_runtime import retry_read
 from deploy.scripts.taskflow import PBI_SCOPE, _session, _token
 
 
@@ -21,8 +24,19 @@ def wait_for_refresh(
         f"{_guid(workspace_id)}/datasets/{_guid(model_id)}/refreshes/{_guid(request_id)}"
     )
     deadline = time.monotonic() + timeout_seconds
+
+    def read_status() -> Response:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise NativeItemError(
+                f"Direct Lake refresh timed out; inspect {request_id} before retrying."
+            )
+        return session.get(
+            url, timeout=min(30, remaining), allow_redirects=False
+        )
+
     while time.monotonic() < deadline:
-        response = session.get(url, timeout=30, allow_redirects=False)
+        response = retry_read(read_status, deadline=deadline)
         if response.status_code not in (200, 202):
             response.raise_for_status()
             raise NativeItemError("Unexpected model refresh response.")

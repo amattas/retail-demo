@@ -32,7 +32,6 @@ _TERRAFORM_ASSETS = {
     "asset.eventhouse",
     "asset.custom-spark-pool",
 }
-_SPARK_NODE_SIZES = {"Small", "Medium", "Large", "XLarge", "XXLarge"}
 _STATE_RESOURCE_ASSETS = {
     "fabric_eventhouse": "asset.eventhouse",
     "fabric_spark_custom_pool": "asset.custom-spark-pool",
@@ -267,12 +266,14 @@ def _validate_selected_assets(
 def _validate_spark_config(config: DeployConfig, errors: list[str]) -> None:
     if not config.profile.uses_custom_pool:
         return
-    if config.spark.node_size not in _SPARK_NODE_SIZES:
+    if config.spark.node_size != "Medium":
         errors.append(
-            f"unsupported custom Spark node size: {config.spark.node_size!r}"
+            "capacity-aware custom Spark pools require Medium nodes"
         )
-    if config.spark.min_node_count < 1:
-        errors.append("spark.min_node_count must be at least 1")
+    if not 2 <= config.spark.min_node_count <= 16:
+        errors.append("spark.min_node_count must be between 2 and 16")
+    if not 2 <= config.spark.max_node_count <= 16:
+        errors.append("spark.max_node_count must be between 2 and 16")
     if config.spark.max_node_count < config.spark.min_node_count:
         errors.append(
             "spark.max_node_count must be greater than or equal to min_node_count"

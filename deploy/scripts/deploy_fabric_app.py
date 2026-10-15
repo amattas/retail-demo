@@ -70,7 +70,16 @@ def deploy_app(
         raise RuntimeError("Node.js 20+ (npm and npx) is required to deploy the Fabric App.")
     app_dir = repo_root / APP_DIR
     env = {**os.environ, "RAYFIN_TELEMETRY_OPTOUT": "1"}
-    commands: list[Sequence[str]] = [[npm, "ci", "--no-audit", "--no-fund"]]
+    commands: list[Sequence[str]] = [
+        [npm, "ci", "--no-audit", "--no-fund"],
+        [
+            npm,
+            "run",
+            "install",
+            "--prefix",
+            str(app_dir / "node_modules" / "keytar"),
+        ],
+    ]
     up = [npx, "rayfin", "up", "--workspace-id", workspace_id, "--yes", "--json"]
     if tenant_id:
         up += ["--tenant", tenant_id]
@@ -132,6 +141,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     if report["status"] != "SUCCEEDED":
         return 1
+    if not args.dry_run:
+        from deploy.scripts.workspace_folders import organize_after_publish
+
+        if not organize_after_publish(args.repo_root, args.environment):
+            return 1
     console.info("Fabric App approvals spike deployed." if not args.dry_run
                  else "Fabric App deployment validated (dry run).")
     return 0

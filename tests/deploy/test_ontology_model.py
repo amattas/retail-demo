@@ -78,6 +78,21 @@ def test_entities_keys_and_bindings_resolve_to_declared_columns(parts):
     assert "__index_level_0__" not in "".join(parts.values())
 
 
+def test_stockout_risk_is_generator_discoverable_entity(parts):
+    entity = parts["entities/StockoutRisk.tmdl"]
+    assert "\tkeyProperty: ranking\n" in entity
+    for property_name in (
+        "store_id",
+        "product_id",
+        "inventory_as_of",
+        "current_inventory",
+        "days_of_inventory",
+        "stockout_probability",
+        "forecast_horizon_days",
+    ):
+        assert f"\tproperty {property_name}\n" in entity
+
+
 def test_time_series_properties_are_ordered_by_ingest_timestamp(parts):
     store = parts["entities/Store.tmdl"]
     blocks = re.findall(r"dataType: TimeSeries<\w+>.*?(?=\n\t///|\n\tadditionalBackingTable|\Z)",
@@ -92,7 +107,7 @@ def test_time_series_properties_are_ordered_by_ingest_timestamp(parts):
 def test_relationships_reference_existing_tom_relationships(parts):
     model.validate_definition(parts)
     names = re.findall(r"^entityRelationship (\S+)$", parts["entityRelationships.tmdl"], re.M)
-    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 17
+    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 18
 
 
 def test_relationship_names_match_the_legacy_notebook():

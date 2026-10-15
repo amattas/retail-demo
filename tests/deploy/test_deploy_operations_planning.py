@@ -147,6 +147,11 @@ def publication(monkeypatch):
     monkeypatch.setattr(deploy, "_verify_signals", Mock())
     publish_item = Mock(return_value=ID)
     monkeypatch.setattr(deploy, "ensure_native_item", publish_item)
+    monkeypatch.setattr(
+        deploy,
+        "ensure_operations_ui_configuration",
+        Mock(return_value={"dataSources": {ID: {}}, "actions": {"prepareCase": {}}}),
+    )
     return session, publish_item
 
 
@@ -185,6 +190,39 @@ def test_operations_only_persists_stopped_items_without_plan_or_action_execution
     session.post.assert_not_called()
 
 
+def test_invalid_source_retains_supporting_assets_without_seeding_or_agent_creation(
+    publication, monkeypatch, tmp_path
+):
+    session, publish_item = publication
+    monkeypatch.setattr(
+        deploy,
+        "scenario_signals",
+        Mock(side_effect=ValueError("Availability source is stale or future-dated")),
+    )
+
+    with pytest.raises(ValueError, match="stale or future-dated"):
+        deploy.publish(
+            repo_root=tmp_path,
+            config=config(include_plan=False),
+            outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+        )
+
+    deploy.execute_database_script.assert_called_once_with(
+        "https://kusto.test", "retail", "DDL", deploy.build_credential.return_value
+    )
+    publish_item.assert_called_once()
+    assert publish_item.call_args.kwargs["item_type"] == "Notebook"
+    deploy._verify_signals.assert_not_called()
+    session.post.assert_not_called()
+    path = tmp_path / "deploy" / ".generated" / "dev" / "operations-planning-report.json"
+    report = json.loads(path.read_text())
+    assert report["action_notebook"]["id"] == ID
+    assert report["signal_count"] is None
+    assert report["operations_agent"]["state"] == "PUBLICATION_FAILED"
+    assert report["operations_agent"]["failure_type"] == "ValueError"
+    assert report["plan"]["state"] == "NOT_SELECTED"
+
+
 def test_plan_failure_retains_real_operations_evidence_and_records_failure(
     publication, monkeypatch, tmp_path
 ):
@@ -221,6 +259,73 @@ def test_agent_rejection_preserves_supporting_asset_evidence(publication, tmp_pa
     assert report["action_notebook"]["id"] == ID
     assert report["operations_agent"]["state"] == "PUBLICATION_FAILED"
     assert report["plan"]["state"] == "NOT_SELECTED"
+
+
+def test_agent_only_recovery_does_not_reingest_verified_signals(
+    monkeypatch, tmp_path
+):
+    generated = tmp_path / "deploy" / ".generated" / "dev"
+    generated.mkdir(parents=True)
+    report_path = generated / "operations-planning-report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "environment": "dev",
+                "workspace_id": ID,
+                "signal_count": 80,
+                "operations_agent": {
+                    "name": deploy.AGENT_NAME,
+                    "state": "PUBLICATION_FAILED",
+                },
+                "action_notebook": {
+                    "id": ID,
+                    "name": deploy.ACTION_NAME,
+                },
+                "plan": {"state": "NOT_SELECTED"},
+                "acceptance": "Review draft cases.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    session = Mock()
+    monkeypatch.setattr(deploy, "validate_terraform_outputs", Mock())
+    monkeypatch.setattr(deploy, "build_credential", Mock())
+    monkeypatch.setattr(deploy, "build_session", lambda *_args: session)
+    monkeypatch.setattr(
+        deploy, "list_items", lambda *_args: [{"id": ID, "displayName": deploy.ACTION_NAME}]
+    )
+    monkeypatch.setattr(deploy, "_ensure_native_capacity", Mock())
+    monkeypatch.setattr(
+        deploy,
+        "resolve_kql_database",
+        lambda *_args: ("https://kusto.test", "retail"),
+    )
+    ensure = Mock(return_value=ID)
+    monkeypatch.setattr(deploy, "ensure_native_item", ensure)
+    configure = Mock(
+        return_value={"dataSources": {ID: {}}, "actions": {"prepareCase": {}}}
+    )
+    monkeypatch.setattr(deploy, "ensure_operations_ui_configuration", configure)
+
+    report = deploy.publish_existing_agent(
+        repo_root=tmp_path,
+        config=config(include_plan=False),
+        outputs={"workspace_id": ID, "kql_database_id": ID},
+    )
+
+    assert report["signal_count"] == 80
+    assert report["operations_agent"] == {
+        "id": ID,
+        "state": "STOPPED",
+        "name": deploy.AGENT_NAME,
+        "source_count": 1,
+        "action_count": 1,
+    }
+    assert json.loads(report_path.read_text(encoding="utf-8")) == report
+    assert ensure.call_args.kwargs["item_type"] == "OperationsAgent"
+    assert ensure.call_args.kwargs["definition"]["parts"]
+    assert configure.call_args.kwargs["notebook_id"] == ID
+    session.post.assert_not_called()
 
 
 @pytest.mark.parametrize("bindings", [

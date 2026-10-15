@@ -205,6 +205,8 @@ def publish_twins(repo_root: Path, config: Any, outputs: dict[str, Any]) -> dict
 
 
 def main(argv: list[str] | None = None) -> int:
+    from deploy.scripts.workspace_folders import organize_after_publish
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--environment", required=True)
@@ -227,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
         report = publish_twins(args.repo_root, config, outputs)
     except (NativeItemError, CapacityResumeError, RequestException, ValueError) as exc:
         console.error(str(exc))
+        return 1
+    if not organize_after_publish(args.repo_root, args.environment):
         return 1
     console.info("Published connected retail twins; existing SSO preserved.")
     console.detail(report["report_url"])

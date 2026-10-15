@@ -102,8 +102,21 @@ RULES: tuple[Rule, ...] = (
         f"{FORECAST_HORIZON_DAYS} days and is HIGH at a probability of "
         f"{STOCKOUT_HIGH_PROBABILITY:g} or more, MEDIUM at "
         f"{STOCKOUT_MEDIUM_PROBABILITY:g} or more, and LOW otherwise.",
-        (RuleReference("Store"), RuleReference("Product")),
-        ("StoreHasStockoutRiskForProduct",),
+        (
+            RuleReference("Store"),
+            RuleReference("Product"),
+            RuleReference(
+                "StockoutRisk",
+                (
+                    "current_inventory",
+                    "days_of_inventory",
+                    "stockout_probability",
+                    "forecast_horizon_days",
+                    "risk_level",
+                ),
+            ),
+        ),
+        ("StockoutRiskAtStore", "StockoutRiskForProduct"),
     ),
     Rule(
         "ReplenishmentPolicy",

@@ -39,8 +39,8 @@ spark:
   use_custom_pool: false
   custom_pool_name: retail_setup_pool
   node_size: Medium
-  min_node_count: 1
-  max_node_count: 10
+  min_node_count: 2
+  max_node_count: 16
 notebooks:
   default_lakehouse_name: retail_lakehouse
 powerbi:

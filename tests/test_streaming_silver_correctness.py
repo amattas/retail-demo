@@ -1669,10 +1669,12 @@ def test_inventory_replay_excludes_existing_trace_ids_and_dedupes_idempotently()
     dedupe_operations = [
         operation for operation in deduped.operations if operation[0] == "dropDuplicates"
     ]
-    assert dedupe_operations == [
-        ("dropDuplicates", ("event_ts", "trace_id", "quantity")),
-        ("dropDuplicates", ("trace_id",)),
-    ]
+    assert dedupe_operations == []
+    assert any(
+        operation[:2] == ("withColumn", "_dedupe_row")
+        for operation in deduped.operations
+    )
+    assert ("drop", ("_dedupe_row",)) in deduped.operations
 
 
 def test_inventory_running_balance_uses_prior_plus_ordered_cumulative_quantity() -> None:

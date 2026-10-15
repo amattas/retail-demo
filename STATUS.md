@@ -1,6 +1,303 @@
 # Status: Local Remediation and Native Decision Pack
 
-**Updated**: 2026-10-06 | **Wave**: E — local implementation complete; native live acceptance blocked
+**Updated**: 2026-10-15 | **Wave**: E — pipeline retry/rerun safeguards implemented and targeted verification passing
+
+## Pipeline retry and rerun safeguards (2026-10-15)
+
+The pipeline runner now atomically writes bounded exact-run evidence
+immediately after Fabric accepts a submission and before polling. Evidence
+includes workspace and pipeline item IDs, run ID, Location, submission time,
+observed/terminal status, and timestamps. It supports exact Location/run-ID
+reattachment without POSTing and reconciles a lost POST response only when one
+exact-pipeline run exists in the bounded request window; duplicate or missing
+candidates fail closed.
+
+Deployment pipeline gates now link their evidence paths and IDs. Compatible
+`RUNNING` setup, required-ML, optional-ML, and experimental-ML steps resume by
+polling the same exact run. Completed runs are adopted, active runs are
+awaited, and failed runs remain failed. A local monitor timeout leaves the
+journal `RUNNING` and resumable without cancelling or relaunching Fabric work.
+The legacy setup trigger no longer retries POSTs blindly.
+
+The four expensive deployment pipelines now declare `concurrency: 1`.
+Required-ML producers retain `retry: 0`; only the contract validator retries
+twice at 120-second intervals with a one-hour timeout. Cohort-based notebook
+staging remains explicitly out of scope for this change.
+
+Focused runner, resume/CLI, and pipeline-contract tests pass. Documentation
+now describes exact-run evidence, automatic reattachment, ambiguous mutation
+handling, and monitor-timeout recovery.
+
+## Deployment parallelism follow-up (2026-10-15)
+
+Deployment timing showed that setup plus required ML consumed about 77% of a
+complete run and did not use the larger Fabric SKU effectively. The six
+independent required-ML producers now fan out concurrently; the existing
+validator still joins all six successful activities before Reporting can
+publish.
+
+The CLI plan is now an explicit dependency graph. Spark-heavy orchestration
+defaults to one concurrent lane, while up to four independent API/publication
+steps can overlap after Reporting. Required failures block descendants;
+optional failures degrade without cancelling independent siblings. Task flow,
+object-type folder reconciliation, and readiness remain final joins.
+
+The deployment journal serializes concurrent transitions and includes the
+execution graph in resume identity, preserving atomic writes and fingerprint
+safety. Focused verification passed: 247 deployment CLI/resume/contract tests
+and Ruff.
+
+## Capacity-aware Spark pool sizing (2026-10-15)
+
+`full-demo` custom-pool sizing is now derived from the live Fabric capacity SKU
+instead of fixed `Medium` 1-10 settings. The policy reserves 25% of base Spark
+capacity, sizes for all six concurrent required-ML producer sessions, uses
+Medium nodes, and does not rely on burst capacity. Per-session limits are F64:
+2 nodes, F128: 4, F256: 8, and F512 or larger: 16.
+
+Live preflight writes bounded capacity-sizing evidence before config generation.
+Terraform generation validates the environment, capacity identity, evidence
+freshness, required-ML producer count, and aggregate vCore budget. Starter-pool
+profiles ignore this evidence. Capacity or topology changes are included in
+resume identity; a change after Terraform apply fails closed and requires a new
+reviewed plan.
+
+Verification passed: 277 focused sizing/config/preflight/CLI/resume tests,
+Ruff, and Terraform format/validation.
+
+## Latest recovery, streaming, and Agent follow-up (2026-10-14)
+
+Safe deployment recovery now records per-file fingerprints and limits exact-run
+adoption to the polling-runner source change; bounded polling retries transient
+network failures without replaying mutations. The updated task flow was deployed
+to `retail-demo`. Optional live-app, twins-report, and case-preparation references
+are profile-filtered against published workspace items.
+
+The opt-in `streaming_shortcuts.enabled` setting is enabled for `retail-demo`.
+The deployment provisions OneLake mirroring with historical backfill and
+idempotently creates or verifies the 18 Eventhouse shortcuts. The live readback
+report is `deploy/.generated/retail-demo/eventhouse-shortcuts-report.json`.
+
+The first two `streaming-data-load` attempts found empty Kusto string correlations
+being treated as valid attribution journey IDs. The Silver notebook now
+normalizes blank correlations to null, cleans existing persisted blank values,
+and deduplicates replayed events that have the same stable payload/trace but a
+different timestamp; conflicting payloads still fail closed. The live
+`streaming-data-load` pipeline subsequently reached `Completed`
+(job instance `64b87b95-985c-4662-b1c3-8c9753d9f3c8`).
+
+The stream producer retains its deterministic rate-source timestamp so replayed
+event IDs stay idempotent. Readiness now measures Eventhouse freshness with the
+Kusto system `ingestion_time()` rather than trusting that replayable payload
+timestamp.
+
+`retail-availability-operations` is now published as item
+`40d42195-9488-4ca1-8ba7-a15fc29648e6`, state `STOPPED`, with its KQL source and
+instructions. The agent-only deployment reused the 80 verified availability
+signals and confirmed object-type folders for all 58 workspace items. The
+`prepare-replenishment-case` Notebook action is configured and read back with
+its `CASE_ID` parameter; it remains guarded by human approval.
+
+The public definition API rejected a `FabricJobAction` definition with HTTP 400
+`UnknownError` for both Notebook and DataPipeline job targets (requests
+`d60c1ef9-fafc-4500-84d6-48f6d54d00d5`,
+`c4cc969c-eaee-410a-9e66-84ac1672ccaa`, and
+`28e32f8c-d4d4-45cc-96ab-aae5509160fb`). Temporary probe items were removed.
+The shipped `pbiopa` frontend revealed that the UI instead uses the OA workload
+service and an `itemArtifactId`/`itemWorkspaceId` action contract. The publisher
+now exchanges the delegated Power BI token for an OA workload token, posts that
+UI-native configuration, and requires exact readback. Live report evidence is
+one KQL source and one configured action.
+
+The publisher still omits an empty `playbook`; Fabric rejected one with
+`No rule definitions available` (request
+`bc41e1eb-0756-4bf5-b280-9054c2fe34ff`). Scripted playbook generation reaches
+the UI service. The ontology was extended and published with a physical
+`StockoutRisk` entity, its store/product relationships, and the required risk
+properties. The generator no longer reports missing modeling, but still ends
+in generic `BehaviorModelGenerationFailed`; even a simple rule over the
+long-established Product entity fails the same way. The delegated user's Teams
+destination is configured. Successful playbook generation/review and explicit
+activation remain blocked in the Fabric generation service, not in the
+publisher or source model. A UI-created `OperationsAgent_1` shell remains
+untouched.
+
+Live prerequisites remain satisfied: F64 West US 3, a user identity,
+Copilot/Azure OpenAI settings, KQL database, and `Item.ReadWrite.All`. Fabric
+normalizes the source ID to all zeroes in API readback; the publisher accounts
+for this and the portal Build page remains authoritative. The tenant-settings
+index lists no separate creation toggle.
+
+Readiness refreshed at `2026-10-14T16:14:58Z` is `FAILED` (17 passed, 3
+failed, 6 unknown). The three failures are optional Eventhouse/watermark/
+checkpoint evidence that is now stale. The six unknowns are missing deploy
+journal correlations for setup, required/optional ML pipelines, and their
+model outputs. Readiness now passes task-flow bindings: an extra
+`OperationsAgent_1` reference in the live historical-bootstrap task was removed
+by redeploying the source-controlled graph; the user-created Agent itself was
+left untouched. Exact live readback is 51 references and 13 edges.
+
+Microsoft's current [Operations Agent prerequisites](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/operations-agent)
+and [create API](https://learn.microsoft.com/en-us/rest/api/fabric/operationsagent/items/create-operations-agent)
+were reviewed. They require a non-trial Fabric capacity, an Eventhouse or
+ontology (plus KQL database for Eventhouse), a Teams account, and Fabric admin
+enablement for Operations Agent/Copilot/Azure OpenAI. The create API requires a
+user identity, Contributor-or-higher workspace access, and `Item.ReadWrite.All`;
+service principals and managed identities are unsupported. The live preflight
+passes on F64 West US 3 with `EnableAOAI` and Copilot-capacity setup enabled,
+and the active Azure CLI identity is a user. Cross-geo AI settings aren't
+required for this US capacity. The current tenant-settings index lists only
+optional Operations Agent observability/insights settings, not a separate
+creation toggle. After creation, the agent still needs its playbook reviewed
+and generated in the UI, then explicitly started; the deployed definition keeps
+`shouldRun: false`.
+
+Direct checks after the successful stream projection found all 18 Eventhouse
+tables with recent ingestion, including `store_opened`; the latest ingestion
+was `2026-10-13T23:08:22Z`. `ag._watermarks` has 17 sources and was updated at
+`2026-10-13T23:38:07Z`; the latest tagged checkpoint extent was
+`2026-10-13T23:05:49Z`. The watermark SQL read now succeeds. Temporary bounded
+stream settings were restored to the original unbounded notebook default, and
+no stream job was left running.
+
+Latest affected test set: 140 replay, attribution, Silver, and readiness tests
+passed. Earlier targeted deployment/recovery/task-flow tests (169) and utility
+CLI/resume tests (188) also passed. Ruff checks, the documentation build, and
+the generated-notebook sync check passed.
+
+## Demo object-type folders (2026-10-13, `retail-demo`)
+
+All 56 live workspace items are now inside object-type folders: Notebooks (23),
+Pipelines (7), Reports (2), Semantic Models (1), ML Experiments (9), Data Agents
+(2), KQL Querysets (1), Lakehouses (2), Eventhouses (2), Ontologies (4), and
+Fabric Apps (3). Counts include service-managed children. Nothing remains at
+workspace root. Empty Setup, Streaming, Reporting and ML folders were removed.
+
+All item IDs are unchanged. At the time of the folder move, the persisted task
+flow had 11 tasks, 48 item references and 11 edges; the folder operation did
+not change it. The task-flow source was subsequently expanded and published.
+The current exact live readback is 51 item references and 13 edges, recorded in
+`readiness-report.json`. `workspace-folder-validation-report.json` holds the
+folder readback.
+
+Fabric requires child items to stay beside their parents: the Lakehouse SQL
+endpoint, Eventhouse KQL database, approvals app SQL backing items, and the
+ontology-owned graph/Eventhouse/KQL helpers moved together. No child was
+detached, and no notebook, pipeline, stream or ML job was rerun.
+
+The object-type policy is shared by staging and
+`deploy.scripts.workspace_folders`. Normal deployment ends with reconciliation,
+and successful standalone publishers do the same. Profile folder contracts
+and demo navigation documentation now use the new layout.
+
+## Optional surface follow-up (2026-10-13, `retail-demo`)
+
+The Fabric App approvals spike is now published successfully as
+`retail-approvals` (`cf4807df-5e3f-41f6-9539-e6baa197b6f4`) at
+`https://crisp-hill-4bee4bcc42-westus3.webapp.fabricapps.net`. Rayfin initially
+could not load the native `keytar.node` dependency, so the Windows DPAPI
+keychain was unavailable. Building keytar's signed N-API prebuilt binding
+restored secure sign-in; no plaintext token fallback was enabled. The deploy
+wrapper now reinstalls that binding after `npm ci`. App tests and production
+build pass; lint has one existing Fast Refresh warning.
+
+At the 2026-10-13 check, Operations Agent publication still failed with HTTP
+400 `UnknownError` (request `6aea4314-39f0-4d91-8063-183d58cfdc95`). The
+stopped base Agent and its UI-native Notebook action were subsequently
+published on 2026-10-14; the remaining playbook and activation gates are
+recorded above.
+
+Two bounded Eventhouse stream notebook jobs (60 and 180 seconds) completed
+using a per-run timeout; the notebook's unbounded default was not changed.
+Recent ingestion and checkpoint evidence now exist for 17 of the 18 event
+tables; `store_opened` is still missing.
+
+At this initial check, `streaming-data-load` correctly failed closed because all
+18 Eventhouse-to-Lakehouse shortcuts under `Tables/cusn/` were absent; the
+then-current validator directed operators to create them in Fabric Portal.
+The shortcuts have since been provisioned and verified, and the projection
+pipeline has reached terminal success. The initial `DEGRADED` readiness
+snapshot (23 passed, two optional failures, one optional unknown) is historical;
+see the latest readiness result at the top of this file for current gaps.
+Checkpoint identity was observed at this initial check. No stream job was left
+running.
+
+The Fabric App publish report is successful; browser-level approval-flow and
+second-viewer access acceptance remain outstanding.
+
+## Resumed deployment and readiness recovery (2026-10-13, `retail-demo`)
+
+The adopted-run resume completed Reporting, ontology, Data Agents and the task
+flow. The first readiness snapshot was blocked by a missing `retail-twins`
+report (a direct publisher rerun resumed capacity and published it) and
+intermittently refused SQL/Fabric read connections.
+
+Readiness now retries only the SQL connection handshake (`OperationalError`) and
+the KQL-database and task-flow reads (connection errors and timeouts), never a
+mutation. A live rerun logged handshake retries and returned `DEGRADED` with
+all required checks passing. The subsequent optional surface run is recorded
+above. The deployment journal preserves the original failed readiness step;
+the current readiness snapshot is in `readiness-report.json`.
+
+## Pipeline status polling timeout recovery (2026-10-12, `retail-demo`)
+
+Step 18 (`ml-required` pipeline wait) failed locally with `ReadTimeout` /
+`WinError 10060` when Microsoft Fabric dropped the keep-alive connection during
+status polling. The underlying pipeline run in Fabric (`29ab84d6-948b-483b-9388-a4d159ccc84e`)
+continued executing and reached terminal success (`Completed`) at 21:27:45 UTC.
+
+`deploy.scripts.run_pipeline.wait_for_pipeline_job` now uses 30-second bounded
+HTTP timeouts, wraps status polling in `retry_read` for transient `ConnectionError`
+and `Timeout` retries, and tolerates up to five consecutive polling network
+interruptions before failing. The verified terminal-success evidence was confirmed directly against Fabric.
+`retail-setup deploy --resume --adopt-pipeline-run ml-required=<job-id>` verified
+and adopted that exact run, then continued through Reporting, ontology, Data
+Agents and task-flow publication without rerunning setup or ML. The new
+deployment journal retains its final readiness failure as history. Recreate
+resumes require the destroy and workspace-deletion steps to have already
+succeeded.
+
+## Deployment readiness recovery (2026-10-08, `retail-demo`)
+
+The deployment journal and live job inventory confirm that historical setup
+and required ML completed successfully before Reporting. The initial readiness
+failure was downstream: the twins report and Operations supporting assets were
+missing, and transient connection resets prevented pipeline evidence reads.
+
+Fabric collection and exact twin-refresh status reads now retry transient
+connection errors and timeouts up to three times without extending their
+deadlines or retrying mutations. Definition/export reads also use 30-second
+HTTP timeouts and retry the accepted operation's status/result reads without
+starting another export. KQL inventory queries mappings only for
+existing expected tables, so missing tables produce specific failures instead
+of discarding readable function/view/mapping evidence. Item, notebook-binding,
+and KQL failures retain bounded evidence in the readiness report.
+
+Live verification also exposed an expired static Fabric bearer token after
+the long KQL inventory: later REST checks failed, while reacquiring a token
+with the same configured credential immediately restored HTTP 200. Fabric
+sessions now renew expiring tokens before requests, preserving the configured
+identity/tenant and never replaying a mutation.
+
+The connected twins report is now published and its DAX queries returned five
+stores, one warehouse, and two trucks. Recovery confirmed the already accepted
+refresh rather than starting another; Automatic/SSO remains unchanged.
+
+Operations publication now creates supporting tables and the bound
+`prepare-replenishment-case` notebook before validating monitoring signals.
+The live retry created the notebook and applied the table definitions, then
+correctly rejected one of 82 inventory observations older than seven days.
+The current Operations report records that failure instead of retaining an
+old workspace's report. No invalid signals were seeded, no agent was created
+or activated, and no Plan was requested. Historical data, ML pipelines,
+schedules, and the optional stream were not rerun.
+
+Final production readiness is `DEGRADED`, with all 17 required checks passing
+(22 passed, one optional failure, three optional unknowns). Remaining notices
+are the absent Operations Agent, a Silver watermark read `OperationalError`,
+and unobserved Eventhouse ingestion/checkpoint evidence. The refreshed
+readiness report records these boundaries; the original deployment journal
+is retained rather than rewriting the failed run's history.
 
 ## FabCon follow-ups: Operations Agent and Fabric Apps (2026-10-07, offline)
 

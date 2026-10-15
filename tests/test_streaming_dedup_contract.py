@@ -283,6 +283,17 @@ def test_silver_replay_uses_complete_dedupe_key_contract() -> None:
     )
 
 
+def test_replayed_events_dedupe_by_stable_payload_and_keep_earliest_timestamp() -> None:
+    code = _notebook_code(SILVER_NOTEBOOK)
+    source = ast.get_source_segment(
+        code, _function(ast.parse(code), "deduplicate_candidates")
+    )
+
+    assert source is not None
+    assert 'column not in {"balance", "event_ts", "event_date"}' in source
+    assert 'F.col("event_ts").asc()' in source
+
+
 @pytest.mark.parametrize(
     "function_name",
     [

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+from unittest.mock import Mock
 
 import pytest
+from requests import ConnectionError, HTTPError, Timeout
 
+from deploy.scripts import _retry, fabric_runtime
 from deploy.scripts.fabric_runtime import (
     FabricDefinitionError,
     FabricPaginationError,
@@ -68,6 +71,93 @@ def test_paginated_get_exhausts_token_and_uri_pages() -> None:
         "continuationToken": "token-2",
     }
     assert session.calls[2] == (next_uri, None)
+
+
+@pytest.mark.parametrize("error_type", [ConnectionError, Timeout])
+def test_paginated_get_retries_only_the_failed_page(monkeypatch, error_type):
+    waits = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+    session = Mock()
+    session.get.side_effect = [
+        _Response({"value": [{"id": "one"}], "continuationToken": "next"}),
+        error_type("connection reset"),
+        error_type("connection reset"),
+        _Response({"value": [{"id": "two"}]}),
+    ]
+    url = "https://api.fabric.microsoft.com/v1/items"
+
+    result = paginated_get(session, url, params={"type": "Notebook"})
+
+    assert result == [{"id": "one"}, {"id": "two"}]
+    assert session.get.call_count == 4
+    assert waits == [5.0, 10.0]
+    assert all(
+        call.args == (url,)
+        and call.kwargs == {"params": {"type": "Notebook", "continuationToken": "next"}}
+        for call in session.get.call_args_list[1:]
+    )
+    session.post.assert_not_called()
+
+
+def test_paginated_get_exhausted_connection_retries_propagate(monkeypatch):
+    waits = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+    session = Mock()
+    session.get.side_effect = ConnectionError("connection reset")
+
+    with pytest.raises(ConnectionError):
+        paginated_get(session, "https://api.fabric.microsoft.com/v1/items")
+
+    assert session.get.call_count == 3
+    assert waits == [5.0, 10.0]
+
+
+def test_paginated_get_does_not_retry_authorization_failure(monkeypatch):
+    waits = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+    response = Mock()
+    response.raise_for_status.side_effect = HTTPError("403 Forbidden")
+    session = Mock()
+    session.get.return_value = response
+
+    with pytest.raises(HTTPError):
+        paginated_get(session, "https://api.fabric.microsoft.com/v1/items")
+
+    session.get.assert_called_once()
+    assert waits == []
+
+
+@pytest.mark.parametrize("deadline", [3, 6])
+def test_paginated_get_network_retries_keep_the_collection_deadline(
+    monkeypatch, deadline
+):
+    clock = [0.0]
+    waits = []
+    monkeypatch.setattr(fabric_runtime.time, "monotonic", lambda: clock[0])
+
+    def sleep(seconds):
+        waits.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr(_retry.time, "sleep", sleep)
+    session = Mock()
+    session.get.side_effect = [
+        ConnectionError("connection reset"),
+        _Response({"value": [{"id": "one"}]}),
+    ]
+    url = "https://api.fabric.microsoft.com/v1/items"
+
+    if deadline == 3:
+        with pytest.raises(FabricPaginationError, match="deadline expired"):
+            paginated_get(session, url, timeout=30, deadline=deadline)
+        session.get.assert_called_once_with(url, timeout=3)
+        assert waits == [3]
+    else:
+        assert paginated_get(session, url, timeout=30, deadline=deadline) == [
+            {"id": "one"}
+        ]
+        assert [call.kwargs["timeout"] for call in session.get.call_args_list] == [6, 1]
+        assert waits == [5]
 
 
 def test_paginated_get_fails_closed_on_repeated_token() -> None:

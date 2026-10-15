@@ -26,6 +26,7 @@ from deploy.scripts._operations_definition import (
     AGENT_NAME,
     render_case_notebook,
     render_operations_definition,
+    render_operations_instructions,
 )
 from deploy.scripts._operations_scenario import (
     SCENARIO_SQL,
@@ -33,6 +34,7 @@ from deploy.scripts._operations_scenario import (
     signal_ingestion_query,
     validate_signal_readback,
 )
+from deploy.scripts._operations_ui import ensure_operations_ui_configuration
 from deploy.scripts.apply_kql import (
     build_database_script,
     execute_database_script,
@@ -286,10 +288,6 @@ def publish(
     _ensure_native_capacity(session, config, workspace_id)
     if not operations_only:
         validate_planning_measures(session, workspace_id, models[0]["id"])
-    signals = scenario_signals(
-        _source_rows(session, outputs, config, credential),
-        datetime.now(UTC),
-    )
     kusto_uri, database_name = resolve_kql_database(
         workspace_id,
         outputs["kql_database_id"],
@@ -303,13 +301,6 @@ def publish(
         ),
         credential,
     )
-    execute_database_script(
-        kusto_uri,
-        database_name,
-        signal_ingestion_query(signals),
-        credential,
-    )
-    _verify_signals(kusto_uri, database_name, credential, signals)
     action_id = ensure_native_item(
         session,
         workspace_id=workspace_id,
@@ -329,7 +320,7 @@ def publish(
         "environment": config.environment,
         "workspace_id": workspace_id,
         "observed_at": datetime.now(UTC).isoformat(),
-        "signal_count": len(signals),
+        "signal_count": None,
         "operations_agent": {"state": "PENDING", "name": AGENT_NAME},
         "action_notebook": {"id": action_id, "name": ACTION_NAME},
         "plan": {
@@ -339,14 +330,14 @@ def publish(
             )
         },
         "acceptance": (
-            "Review/generate agent playbook and Teams destination before activation. "
+            "Generate/review the playbook and Teams destination before activation. "
+            "The prepare-replenishment-case Notebook action requires human approval. "
             + (
-                "Review drafts in the Lakehouse ops.replenishment_cases table and existing "
-                "retail report using SSO. Native Planning is not selected. "
+                "Review ops.replenishment_cases and the SSO report. No Plan. "
                 if operations_only else
-                "Confirm native Plan model access, application database, scenario isolation and edit persistence. "
+                "Confirm Plan model access and application database. "
             )
-            + "Automated approval routing, writeback and ERP execution are not configured."
+            + "No approval routing, writeback, or ERP execution."
         ),
     }
     report_path = (
@@ -358,6 +349,19 @@ def publish(
     )
     write_report_atomic(report_path, report)
     try:
+        signals = scenario_signals(
+            _source_rows(session, outputs, config, credential),
+            datetime.now(UTC),
+        )
+        execute_database_script(
+            kusto_uri,
+            database_name,
+            signal_ingestion_query(signals),
+            credential,
+        )
+        _verify_signals(kusto_uri, database_name, credential, signals)
+        report["signal_count"] = len(signals)
+        write_report_atomic(report_path, report)
         agent_id = ensure_native_item(
             session,
             workspace_id=workspace_id,
@@ -367,9 +371,19 @@ def publish(
             definition=render_operations_definition(
                 workspace_id=workspace_id,
                 kql_database_id=outputs["kql_database_id"],
-                notebook_id=action_id,
                 recipient=config.operations_planning.recipient,
                 include_plan=not operations_only,
+            ),
+        )
+        ui_configuration = ensure_operations_ui_configuration(
+            credential,
+            workspace_id=workspace_id,
+            agent_id=agent_id,
+            kql_database_id=outputs["kql_database_id"],
+            kusto_uri=kusto_uri,
+            notebook_id=action_id,
+            instructions=render_operations_instructions(
+                include_plan=not operations_only
             ),
         )
     except (NativeItemError, RequestException, ValueError) as exc:
@@ -381,7 +395,13 @@ def publish(
             report["plan"]["state"] = "NOT_ATTEMPTED"
         write_report_atomic(report_path, report)
         raise
-    report["operations_agent"] = {"id": agent_id, "state": "STOPPED", "name": AGENT_NAME}
+    report["operations_agent"] = {
+        "id": agent_id,
+        "state": "STOPPED",
+        "name": AGENT_NAME,
+        "source_count": len(ui_configuration["dataSources"]),
+        "action_count": len(ui_configuration["actions"]),
+    }
     write_report_atomic(report_path, report)
     if plan_definition is not None:
         try:
@@ -411,15 +431,127 @@ def publish(
     return report
 
 
+def publish_existing_agent(
+    *,
+    repo_root: Path,
+    config: DeployConfig,
+    outputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Retry only agent publication using previously verified availability cases."""
+
+    if not config.operations_planning.enabled:
+        raise NativeItemError(
+            "Enable operations_planning.enabled in this environment first."
+        )
+    if config.operations_planning.include_plan:
+        raise NativeItemError(
+            "Agent-only recovery is available only when native Planning is excluded."
+        )
+    validate_terraform_outputs(config, outputs)
+    workspace_id = _guid(outputs["workspace_id"])
+    report_path = (
+        repo_root
+        / "deploy"
+        / ".generated"
+        / config.environment
+        / "operations-planning-report.json"
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise NativeItemError(
+            "The previous Operations report is not a JSON object."
+        )
+    if (
+        report.get("environment") != config.environment
+        or report.get("workspace_id") != workspace_id
+        or not isinstance(report.get("signal_count"), int)
+        or report["signal_count"] < 1
+    ):
+        raise NativeItemError(
+            "Agent-only recovery requires previously verified signals in the "
+            "current configured workspace."
+        )
+    credential = build_credential(config.auth_mode, tenant_id=config.tenant_id)
+    session = build_session(credential)
+    action = report.get("action_notebook", {})
+    action_id = action.get("id") if isinstance(action, dict) else None
+    notebooks = [
+        item
+        for item in list_items(session, workspace_id, "Notebook")
+        if str(item.get("id", "")) == action_id
+        and item.get("displayName") == ACTION_NAME
+    ]
+    if len(notebooks) != 1:
+        raise NativeItemError(
+            "The previously recorded replenishment action notebook is not "
+            "uniquely present in the configured workspace."
+        )
+
+    _ensure_native_capacity(session, config, workspace_id)
+    kusto_uri, _database_name = resolve_kql_database(
+        workspace_id,
+        outputs["kql_database_id"],
+        credential,
+    )
+    agent_id = ensure_native_item(
+        session,
+        workspace_id=workspace_id,
+        item_type="OperationsAgent",
+        display_name=AGENT_NAME,
+        description="Monitor bounded availability cases; recommend human-approved drafts.",
+        definition=render_operations_definition(
+            workspace_id=workspace_id,
+            kql_database_id=_guid(outputs["kql_database_id"]),
+            recipient=config.operations_planning.recipient,
+            include_plan=False,
+        ),
+    )
+    ui_configuration = ensure_operations_ui_configuration(
+        credential,
+        workspace_id=workspace_id,
+        agent_id=agent_id,
+        kql_database_id=_guid(outputs["kql_database_id"]),
+        kusto_uri=kusto_uri,
+        notebook_id=_guid(action_id),
+        instructions=render_operations_instructions(include_plan=False),
+    )
+    report["observed_at"] = datetime.now(UTC).isoformat()
+    report["operations_agent"] = {
+        "id": agent_id,
+        "state": "STOPPED",
+        "name": AGENT_NAME,
+        "source_count": len(ui_configuration["dataSources"]),
+        "action_count": len(ui_configuration["actions"]),
+    }
+    report["acceptance"] = (
+        "Generate/review the playbook and Teams destination before activation. "
+        "The prepare-replenishment-case Notebook action is configured but still "
+        "requires human approval. Review ops.replenishment_cases and the SSO "
+        "report. No Plan, approval routing, writeback, or ERP execution."
+    )
+    write_report_atomic(report_path, report)
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
+    from deploy.scripts.workspace_folders import organize_after_publish
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--environment", required=True)
     parser.add_argument("--operations-only", action="store_true")
+    parser.add_argument(
+        "--agent-only",
+        action="store_true",
+        help="Retry agent publication without reingesting existing availability signals.",
+    )
     parser.add_argument("--plan-connection-id")
     parser.add_argument("--acknowledge-plan-billing", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.agent_only and args.dry_run:
+        console.error("--agent-only cannot be combined with --dry-run.")
+        return 1
     config = load_environment(
         args.environment,
         config_path=args.repo_root / "deploy" / "config" / "deploy.yml",
@@ -444,6 +576,29 @@ def main(argv: list[str] | None = None) -> int:
         / args.environment
         / "terraform-output.json"
     )
+    if args.agent_only:
+        try:
+            report = publish_existing_agent(
+                repo_root=args.repo_root,
+                config=config,
+                outputs=outputs,
+            )
+        except (
+            OSError,
+            NativeItemError,
+            CapacityResumeError,
+            RequestException,
+            ValueError,
+        ) as exc:
+            console.error(str(exc))
+            return 1
+        console.info(
+            "Published the stopped Operations Agent using existing verified signals."
+        )
+        if not organize_after_publish(args.repo_root, args.environment):
+            return 1
+        console.detail(report["acceptance"])
+        return 0
     try:
         report = publish(
             repo_root=args.repo_root,
@@ -455,6 +610,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (NativeItemError, CapacityResumeError, ValueError) as exc:
         console.error(str(exc))
+        return 1
+    if not organize_after_publish(args.repo_root, args.environment):
         return 1
     console.info(
         f"Published stopped Operations Agent and {report['signal_count']} availability signals."

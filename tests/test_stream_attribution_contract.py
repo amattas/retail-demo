@@ -89,6 +89,13 @@ def test_slot_gains_optional_correlation_argument_defaulting_to_null() -> None:
     assert '_str(parent).alias("parent_event_id")' in slot_source
 
 
+def test_envelope_ingest_timestamp_is_stable_for_replayed_source_events() -> None:
+    slot_fn = _function(_tree(), "slot")
+    slot_source = ast.get_source_segment(_source(), slot_fn)
+    assert slot_source is not None
+    assert '_iso(ts).alias("ingest_timestamp")' in slot_source
+
+
 # ---------------------------------------------------------------------------
 # Deterministic attributed STORE/ONLINE scenarios, additive to background
 # ---------------------------------------------------------------------------

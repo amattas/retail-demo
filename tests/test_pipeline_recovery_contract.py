@@ -18,6 +18,36 @@ def test_streaming_pipeline_serializes_runs() -> None:
     assert _pipeline("streaming-data-load")["properties"]["concurrency"] == 1
 
 
+def test_expensive_deployment_pipelines_serialize_runs() -> None:
+    for name in (
+        "setup-pipeline",
+        "ml-required",
+        "ml-optional",
+        "ml-experimental",
+    ):
+        assert _pipeline(name)["properties"]["concurrency"] == 1
+
+
+def test_required_ml_retries_only_the_bounded_validator() -> None:
+    activities = {
+        activity["name"]: activity
+        for activity in _pipeline("ml-required")["properties"]["activities"]
+    }
+    validator = activities.pop("15-validate-required-ml-contract")
+
+    assert all(activity["policy"]["retry"] == 0 for activity in activities.values())
+    assert validator["policy"]["retry"] == 2
+    assert validator["policy"]["retryIntervalInSeconds"] == 120
+    assert validator["policy"]["timeout"] == "0.01:00:00"
+    assert all(
+        validator["policy"]["timeout"] < activity["policy"]["timeout"]
+        for activity in activities.values()
+    )
+    assert {
+        dependency["activity"] for dependency in validator["dependsOn"]
+    } == set(activities)
+
+
 def test_windows_ci_runs_real_non_filesystem_spark_smokes():
     workflow = yaml.safe_load(
         (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")

@@ -78,12 +78,11 @@ resource "fabric_eventhouse" "main" {
 # for all tables/scripts rather than creating a second fabric_kql_database — one
 # Eventhouse, one KQL database. The id/name are surfaced via outputs.
 
-# F64-optimized custom Spark pool for the setup run (opt-in via
-# spark_custom_pool_enabled). An F64 provides 128 base Spark vCores (64 CU x 2),
-# burstable to 384. Medium nodes are 8 vCores each, so the default 1-10 node
-# autoscale tops out at 80 vCores: strong parallelism for the one-time setup
-# while staying inside the base capacity (no bursting) and leaving headroom for
-# the Eventhouse. Executors cap at max_node_count - 1 (one node runs the driver).
+# Capacity-aware custom Spark pool for the setup run (opt-in via
+# spark_custom_pool_enabled). Live preflight derives Medium-node bounds from
+# base capacity only, reserves 25% headroom, and accounts for every concurrent
+# required-ML producer. Executors cap at max_node_count - 1 because one node
+# runs the driver.
 resource "fabric_spark_custom_pool" "setup" {
   count        = var.spark_custom_pool_enabled ? 1 : 0
   workspace_id = local.workspace_id
@@ -91,6 +90,13 @@ resource "fabric_spark_custom_pool" "setup" {
   node_family  = "MemoryOptimized"
   node_size    = var.spark_node_size
   type         = "Workspace"
+
+  lifecycle {
+    precondition {
+      condition     = var.spark_max_node_count >= var.spark_min_node_count
+      error_message = "spark_max_node_count must be greater than or equal to spark_min_node_count."
+    }
+  }
 
   auto_scale = {
     enabled        = true

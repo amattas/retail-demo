@@ -104,6 +104,17 @@ recreate preserves its prior recreate target identity only when every prior
 step through `deletion-wait` succeeded. An unfinished destructive phase refuses
 automatic resume; explicit operator review and restart are required.
 
+Pipeline gates persist one bounded evidence document immediately after a
+successful submission and before polling. The document contains only exact
+workspace/pipeline/run correlation, `Location`, status, and timestamps. A
+compatible `RUNNING` gate is resumed by polling that exact `Location`; the
+orchestrator never submits a replacement. Completed evidence is adopted,
+active evidence remains awaited, and terminal failure remains failure.
+Monitor timeout is a resumable local outcome and does not cancel or classify
+the remote Fabric run as failed. Ambiguous POST outcomes reconcile only one
+exact-pipeline run in the request window; zero or multiple candidates fail
+closed.
+
 Before retrying a pending apply, resume regenerates and checks the saved plan.
 Before retrying a pending item-publication phase, it rebuilds that phase's
 staging, including post-ontology artifacts. A succeeded build entry is not
@@ -138,8 +149,10 @@ ID rather than resolving a potentially duplicate display name.
 | `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | No |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live identifiers | No |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | No |
+| `deploy/.generated/<env>/capacity-sizing.json` | Fresh, non-secret live capacity evidence and derived custom Spark pool bounds | No |
 | `deploy/.generated/<env>/deploy-run.json` | Atomic step/status journal for the latest deploy run | No |
 | `deploy/.generated/<env>/run-history/<hashed-run-id>.json` | Prior journal archived before a different new/resumed run replaces the latest journal | No |
+| `deploy/.generated/<env>/pipeline-evidence/<step-id>.json` | Bounded exact pipeline item/run/Location/status evidence used for reattachment | No |
 | `deploy/.generated/<env>/artifact-inventory-<phase>.json` | Validated manifest/profile/count/folder inventory for one publication phase | No |
 | `deploy/.generated/<env>/readiness-report.json` | Redacted profile-aware live evidence | No |
 | `deploy/.generated/<env>/workspace/` | Staged Fabric items for every publication phase | No |
@@ -165,6 +178,23 @@ evidence, missing captures, or stale identities fail closed even when the state
 currently has no managed instances. A downgrade that would remove a
 profile-controlled Eventhouse or custom Spark pool requires explicit
 `--recreate`; absent evidence never authorizes deletion.
+
+For custom-pool profiles, live preflight derives sizing from the resolved
+capacity SKU before Terraform configuration generation. Supported SKUs are
+`F<n>` and `FTL<n>`. Base Spark capacity is 2 vCores per CU; the framework
+reserves 25%, divides the remaining vCores across the root notebook producers
+in `ml-required.DataPipeline`, and uses 8-vCore Medium nodes. Per-session
+maximum nodes are
+`floor(floor(CU * 2 * 0.75) / (producer_count * 8))`, clamped to 2–16; the
+minimum is 2. A capacity that cannot provide a driver plus executor to every
+producer fails closed. Burst capacity is excluded from the calculation.
+
+Config generation validates the evidence environment, configured capacity
+identity, SKU arithmetic, producer count, integer bounds, and deployment-run
+freshness. The journal stores the stable sizing identity. A resumed run
+regenerates and replans when sizing changes before apply; sizing drift after a
+successful apply requires a new plan and cannot be adopted by resume. Starter
+pool profiles do not require or consume capacity evidence.
 
 ## Authentication boundary
 
@@ -232,14 +262,23 @@ them in its logical inventory.
 For `standard` and `full-demo`, the orchestrator:
 
 1. stages and publishes infrastructure, notebooks, experiments, and pipelines
-   without the `Reporting` folder;
+   without the `Reports` and `Semantic Models` folders;
 2. waits for `setup-pipeline` to complete;
-3. starts `ml-required` and polls that exact run to a bounded terminal state;
+3. starts `ml-required`; its six independent producers fan out concurrently,
+   and the validator joins all six successful producer activities before the
+   pipeline can complete;
 4. stages and publishes the semantic model and report only after status
    `Completed`;
 5. runs any selected optional/experimental pipelines after Reporting;
 6. synchronizes Lakehouse SQL endpoint metadata so newly written tables become
    visible to SQL and Power BI clients.
+
+`setup-pipeline`, `ml-required`, `ml-optional`, and `ml-experimental` each
+declare `concurrency: 1` to prevent overlapping duplicate runs. The six
+required-ML producer activities retain `retry: 0`. Only
+`15-validate-required-ml-contract` has a bounded retry of two attempts at
+120-second intervals and a one-hour timeout, so transient validation failures
+do not replay successful producers.
 
 The required pipeline's final activity is
 `15-validate-required-ml-contract`. A missing, empty, schema-incompatible,
@@ -262,14 +301,33 @@ closed if any required Reporting table is unavailable.
 
 | Asset | Workspace location |
 | --- | --- |
-| Lakehouse shell and bundled KQL queryset | Workspace root |
-| Setup notebooks and `setup-pipeline` | `Setup` |
-| Core, ML, and ontology notebooks | `Notebooks` |
-| `stream-events` | `Streaming` |
-| Semantic model and report | `Reporting` |
-| Other Data Pipelines | `Pipelines` |
-| ML experiment shells | `ML` |
+| All notebooks, including setup, stream, ML and case preparation | `Notebooks` |
+| All Data Pipelines, including `setup-pipeline` | `Pipelines` |
+| Reports, including connected twins | `Reports` |
+| Semantic models | `Semantic Models` |
+| ML experiment shells | `ML Experiments` |
 | Data Agents (post-ontology only) | `Data Agents` |
+| Lakehouses | `Lakehouses` |
+| Eventhouses | `Eventhouses` |
+| Bundled KQL querysets | `KQL Querysets` |
+| Ontologies | `Ontologies` |
+| Independently movable graph models | `Graph Models` |
+| Fabric Apps | `Fabric Apps` |
+| Independently movable SQL databases | `SQL Databases` |
+| Operations Agents and Plans, when published | `Operations Agents`, `Plans` |
+
+`deploy/scripts/workspace_folders.py` owns the shared object-type policy.
+Staging uses that policy, and the final deploy step reconciles native and
+Terraform-created items against the live folder inventory. Standalone
+publishers also reconcile after success. Moves preserve item IDs and
+task-flow bindings; they do not run notebooks or change data. Only empty
+retired `Setup`, `Streaming`, `Reporting`, and `ML` folders are removed.
+
+Fabric requires managed child items to move with their parent. SQL endpoints
+therefore remain beside their Lakehouse, SQL database, or Fabric App; KQL
+databases remain beside their Eventhouse. Any additional children returned by
+the move API stay with their parent. They are reported as managed exceptions,
+not moved independently.
 
 Terraform owns Eventhouse/KQL database resources. The staging process does not
 publish `.platform`-only Eventhouse shells. The reset notebook has a physical
@@ -371,6 +429,12 @@ that is not a stable public source-control item contract.
   gates. `--yes` suppresses prompts but never skips either gate.
 - Post-Reporting optional/experimental ML failures are recorded and execution
   continues.
+- The orchestrator executes an explicit dependency graph with separate resource
+  limits: one Spark-heavy step and up to four non-Spark/API steps by default.
+  Required failures prevent descendants from starting; optional failures do
+  not cancel independent siblings. Final task-flow publication, folder
+  reconciliation, and readiness wait for every selected branch to become
+  terminal.
 - SQL endpoint metadata synchronization failures are recorded as optional
   degradation. Required-table visibility is checked again by readiness.
 - Recreate polls every visible Fabric workspace page and fails closed on timeout

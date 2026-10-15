@@ -1,5 +1,6 @@
 {
   "properties": {
+    "concurrency": 1,
     "activities": [
       {
         "name": "11-ml-journey-analysis",

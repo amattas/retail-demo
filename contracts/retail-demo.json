@@ -915,7 +915,8 @@
         "infrastructure_item_count": 5,
         "reporting_item_count": 0,
         "infrastructure_folders": [
-          "Setup"
+          "Notebooks",
+          "Lakehouses"
         ],
         "reporting_folders": []
       }
@@ -993,14 +994,15 @@
         "infrastructure_item_count": 30,
         "reporting_item_count": 2,
         "infrastructure_folders": [
-          "Setup",
           "Notebooks",
-          "Streaming",
-          "ML",
+          "Lakehouses",
+          "KQL Querysets",
+          "ML Experiments",
           "Pipelines"
         ],
         "reporting_folders": [
-          "Reporting"
+          "Reports",
+          "Semantic Models"
         ]
       }
     },
@@ -1092,14 +1094,15 @@
         "infrastructure_item_count": 40,
         "reporting_item_count": 2,
         "infrastructure_folders": [
-          "Setup",
           "Notebooks",
-          "Streaming",
-          "ML",
+          "Lakehouses",
+          "KQL Querysets",
+          "ML Experiments",
           "Pipelines"
         ],
         "reporting_folders": [
-          "Reporting"
+          "Reports",
+          "Semantic Models"
         ]
       }
     }

@@ -86,9 +86,9 @@ count.
 
 | Profile | Infrastructure folders | Reporting folders | Root-level staged items |
 | --- | --- | --- | --- |
-| `core` | `Setup` | none | Lakehouse |
-| `standard` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting` | Lakehouse, KQL queryset |
-| `full-demo` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting`; then automatically completed `Data Agents` | Lakehouse, KQL queryset |
+| `core` | `Notebooks`, `Lakehouses` | none | none |
+| `standard` | `Notebooks`, `Lakehouses`, `KQL Querysets`, `ML Experiments`, `Pipelines` | `Reports`, `Semantic Models` | none |
+| `full-demo` | `Notebooks`, `Lakehouses`, `KQL Querysets`, `ML Experiments`, `Pipelines` | `Reports`, `Semantic Models`; then automatically completed `Data Agents` | none |
 
 Eventhouse and its default KQL database are Terraform-owned and are therefore
 not duplicated as staged shell items. Every staged `.platform` description is
@@ -96,6 +96,11 @@ validated against the selected manifest asset description. Deployment writes a
 phase-specific `artifact-inventory-<phase>.json` beside the environment state;
 it records the profile, manifest version/hash, expected and actual counts,
 folders, and core/optional/preview/manual boundaries.
+
+The final organization step also places native/optional items in object-type
+folders such as `Eventhouses`, `Ontologies`, and `Fabric Apps`. Service-managed
+children remain with their parents. See the
+[folder mapping](../design/specifications/modules/deployment/framework.md#workspace-folder-mapping).
 
 <!-- manifest-contract:data-counts -->
 ## Data, event, and model inventory

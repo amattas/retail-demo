@@ -15,17 +15,18 @@ flowchart TB
     end
 
     subgraph Workspace[Fabric workspace]
-        LH[Lakehouse]
-        EH[Eventhouse]
-        KDB[KQL database]
-        Setup[Setup folder]
+        LH[Lakehouses folder]
+        EH[Eventhouses folder]
+        KDB[Managed KQL databases]
         Notebooks[Notebooks folder]
-        Streaming[Streaming folder]
         Pipelines[Pipelines folder]
-        Reporting[Reporting folder]
-        ML[ML folder]
+        Reports[Reports folder]
+        Models[Semantic Models folder]
+        ML[ML Experiments folder]
         DataAgents[Data Agents folder]
-        Queryset[KQLQueryset]
+        Queryset[KQL Querysets folder]
+        Ontologies[Ontologies folder]
+        Apps[Fabric Apps folder]
     end
 
     Config --> CLI
@@ -35,14 +36,15 @@ flowchart TB
     CLI --> PostOntology --> Workspace
     Workspace --> LH
     Workspace --> EH --> KDB
-    Workspace --> Setup
     Workspace --> Notebooks
-    Workspace --> Streaming
     Workspace --> Pipelines
-    Workspace --> Reporting
+    Workspace --> Reports
+    Workspace --> Models
     Workspace --> ML
     Workspace --> DataAgents
     Workspace --> Queryset
+    Workspace --> Ontologies
+    Workspace --> Apps
 ```
 
 ## Resource ownership
@@ -57,14 +59,23 @@ separately with the operator identity.
 
 | Location | Items |
 | --- | --- |
-| Workspace root | Lakehouse shell, bundled KQL queryset |
-| `Setup` | Rendered setup notebooks, `setup-pipeline` |
-| `Notebooks` | Selected core, ML, ontology, and utility notebooks; reset excluded |
-| `Streaming` | `stream-events` |
-| `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
-| `Reporting` | Semantic model and report |
-| `ML` | ML experiment shells |
+| `Notebooks` | All selected notebooks, including setup, live driver, ML and case preparation; reset excluded |
+| `Pipelines` | All pipelines, including `setup-pipeline` |
+| `Reports` | Main report and connected twins |
+| `Semantic Models` | Direct Lake semantic model |
+| `ML Experiments` | ML experiment shells |
 | `Data Agents` | Semantic-model and ontology agents, automatically published after ontology creation in full-demo |
+| `Lakehouses` | Lakehouse and its managed SQL endpoint |
+| `Eventhouses` | Eventhouses and their managed KQL databases |
+| `KQL Querysets` | Bundled KQL queryset |
+| `Ontologies` | Ontology and any service-managed children |
+| `Fabric Apps` | Approvals app and any service-managed backing items |
+
+The [deployment folder policy](../specifications/modules/deployment/framework.md#workspace-folder-mapping)
+also covers independently movable graph models, SQL databases, Operations
+Agents and Plans. Fabric moves child items with their parent rather than
+allowing separate child folders. These managed exceptions are recorded in
+`workspace-folder-report.json`.
 
 ## Pipeline topology
 

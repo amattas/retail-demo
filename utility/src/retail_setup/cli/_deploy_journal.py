@@ -17,6 +17,7 @@ import hashlib
 import os
 import re
 import tempfile
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -41,6 +42,7 @@ StepClassification = Literal["required", "optional"]
 _MAX_ERROR_LENGTH = 300
 _REPLACE_ATTEMPTS = 5
 _REPLACE_RETRY_SECONDS = 0.05
+_WRITE_LOCK = threading.RLock()
 
 # `Bearer <token>` credentials, wherever they show up in an exception message.
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-_.~+/]+=*")
@@ -210,6 +212,25 @@ def mark_running(journal: DeployJournal, step_id: str) -> None:
     step.started_at = _utc_now()
 
 
+def attach_evidence(
+    journal: DeployJournal,
+    step_id: str,
+    *,
+    evidence_id: str,
+    started_at: str | None = None,
+) -> None:
+    """Attach exact external evidence while a step remains resumably running."""
+
+    step = _find_step(journal, step_id)
+    try:
+        uuid.UUID(evidence_id)
+    except ValueError as exc:
+        raise ValueError("journal evidence_id must be a UUID") from exc
+    step.evidence_id = evidence_id
+    if started_at is not None:
+        step.started_at = started_at
+
+
 def mark_succeeded(
     journal: DeployJournal,
     step_id: str,
@@ -264,8 +285,11 @@ def mark_failed(
     *,
     exit_code: int | None = None,
     error: str | None = None,
+    evidence_id: str | None = None,
 ) -> None:
     step = _find_step(journal, step_id)
+    if evidence_id is not None:
+        attach_evidence(journal, step_id, evidence_id=evidence_id)
     step.status = "FAILED"
     step.exit_code = exit_code
     step.error = _redact(error)
@@ -293,15 +317,19 @@ def compute_status(journal: DeployJournal) -> RunStatus:
 
 def write(repo_root: Path, journal: DeployJournal) -> None:
     """Recompute status and atomically persist the journal (temp file + replace)."""
-    journal.status = compute_status(journal)
-    journal.updated_at = _utc_now()
-    path = journal_path(repo_root, journal.environment)
-    if path.is_file():
-        previous = read(repo_root, journal.environment)
-        if previous.run_id != journal.run_id:
-            archive_id = hashlib.sha256(previous.run_id.encode("utf-8")).hexdigest()
-            _write_atomic(path.parent / "run-history" / f"{archive_id}.json", previous.to_dict())
-    _write_atomic(path, journal.to_dict())
+    with _WRITE_LOCK:
+        journal.status = compute_status(journal)
+        journal.updated_at = _utc_now()
+        path = journal_path(repo_root, journal.environment)
+        if path.is_file():
+            previous = read(repo_root, journal.environment)
+            if previous.run_id != journal.run_id:
+                archive_id = hashlib.sha256(previous.run_id.encode("utf-8")).hexdigest()
+                _write_atomic(
+                    path.parent / "run-history" / f"{archive_id}.json",
+                    previous.to_dict(),
+                )
+        _write_atomic(path, journal.to_dict())
 
 
 def _write_atomic(path: Path, payload: dict[str, object]) -> None:

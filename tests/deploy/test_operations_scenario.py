@@ -104,21 +104,17 @@ def test_signal_readback_checks_values_not_just_existing_case_ids():
 def test_native_definitions_are_bound_stopped_and_compile():
     import json
 
-    agent = json.loads(
-        decode_definition_parts(
-            render_operations_definition(
-                workspace_id=ID,
-                kql_database_id=ID,
-                notebook_id=ID,
-            )
-        )["Configurations.json"]
+    definition = render_operations_definition(
+        workspace_id=ID,
+        kql_database_id=ID,
     )
+    parts = decode_definition_parts(definition)
+    agent = json.loads(parts["Configurations.json"])
+    assert definition["format"] == "OperationsAgentV1"
+    assert set(parts) == {"Configurations.json"}
+    assert set(agent) == {"configuration", "shouldRun"}
     assert agent["shouldRun"] is False
-    assert agent["playbook"] == {}
-    assert (
-        agent["configuration"]["actions"]["prepareCase"]["connection"]["jobArtifactId"]
-        == ID
-    )
+    assert agent["configuration"]["actions"] == {}
     notebook = json.loads(
         decode_definition_parts(
             render_case_notebook(
@@ -140,7 +136,7 @@ def test_operations_only_handoff_never_requires_native_planning():
     import json
 
     definition = render_operations_definition(
-        workspace_id=ID, kql_database_id=ID, notebook_id=ID, include_plan=False,
+        workspace_id=ID, kql_database_id=ID, include_plan=False,
     )
     agent = json.loads(decode_definition_parts(definition)["Configurations.json"])
     instructions = agent["configuration"]["instructions"]

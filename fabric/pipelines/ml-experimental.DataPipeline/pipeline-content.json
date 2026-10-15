@@ -1,5 +1,6 @@
 {
   "properties": {
+    "concurrency": 1,
     "activities": [
       {
         "name": "14-ml-dynamic-pricing",

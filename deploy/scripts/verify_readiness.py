@@ -15,6 +15,7 @@ import re
 import struct
 import tempfile
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -116,6 +117,15 @@ _MAPPING_RE = re.compile(
 
 class CheckFailed(RuntimeError):
     """A live fact was observed and did not satisfy its contract."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.evidence = evidence if evidence is not None else {}
 
 
 class EvidenceUnknown(RuntimeError):
@@ -1226,7 +1236,7 @@ class ReadinessRunner:
         except CheckFailed as exc:
             status = "FAIL"
             summary = str(exc)
-            evidence = {}
+            evidence = exc.evidence
             freshness = None
         except EvidenceNotObserved as exc:
             status = "UNKNOWN"
@@ -1294,7 +1304,8 @@ class ReadinessRunner:
         ):
             raise CheckFailed(
                 "Live workspace item inventory is missing, duplicated, "
-                "unidentified, or mismatched."
+                "unidentified, or mismatched.",
+                evidence=comparison,
             )
         summary = "Every expected live item has one matching identity."
         native_keys = {item.key for item in _native_expected_items(self.context.config)}
@@ -1376,7 +1387,8 @@ class ReadinessRunner:
                 errors.append(f"{name}: {exc}")
         if errors:
             raise CheckFailed(
-                f"Notebook definitions or Lakehouse bindings failed ({len(errors)} error(s))."
+                f"Notebook definitions or Lakehouse bindings failed ({len(errors)} error(s)).",
+                evidence={"errors": errors},
             )
         return Observation(
             "Selected notebook definitions bind to the target Lakehouse.",
@@ -1548,6 +1560,7 @@ class ReadinessRunner:
 
     def _taskflow_bindings(self) -> Observation:
         from deploy.scripts.taskflow import (
+            available_taskflow_artifacts,
             filter_portable_items,
             profile_taskflow_artifacts,
             taskflow_source_coverage_errors,
@@ -1574,7 +1587,11 @@ class ReadinessRunner:
             raise CheckFailed(
                 f"Task-flow source is incomplete ({len(coverage_errors)} error(s))."
             )
-        expected = filter_portable_items(source, required_artifacts)
+        selected_artifacts = available_taskflow_artifacts(
+            required_artifacts,
+            self.items,
+        )
+        expected = filter_portable_items(source, selected_artifacts)
         guid_to_name = {
             str(item.get("id", "")): str(item.get("displayName", ""))
             for item in self.items
@@ -1653,7 +1670,10 @@ class ReadinessRunner:
         if observed & unselected_objects:
             comparison["unselected_owned_objects"] = sorted(observed & unselected_objects)
         if comparison["missing"] or comparison["unexpected"]:
-            raise CheckFailed(f"Live KQL {attribute} inventory differs from source.")
+            raise CheckFailed(
+                f"Live KQL {attribute} inventory differs from source.",
+                evidence=comparison,
+            )
         return Observation(f"Live KQL {attribute} inventory matches source.", comparison)
 
     def _source_schedule_paths(self) -> list[Path]:
@@ -2383,11 +2403,14 @@ class FabricReadinessAdapter:
     def get_taskflow(self) -> dict[str, Any] | None:
         from deploy.scripts import taskflow
 
-        pbi = taskflow._session(
-            taskflow._token(taskflow.PBI_SCOPE, self.credential)
-        )
-        cluster = taskflow.resolve_cluster(pbi)
-        return taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+        def read() -> dict[str, Any] | None:
+            pbi = taskflow._session(
+                taskflow._token(taskflow.PBI_SCOPE, self.credential)
+            )
+            cluster = taskflow.resolve_cluster(pbi)
+            return taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+
+        return _retry_network_read(read)
 
     def get_kql_inventory(self, expected_tables: frozenset[str]) -> KqlInventory:
         tables = self._names(
@@ -2409,7 +2432,7 @@ class FabricReadinessAdapter:
             "name",
         )
         mappings: set[str] = set()
-        for table in sorted(expected_tables):
+        for table in sorted(expected_tables & tables):
             rows = self._execute_kql(
                 f".show table {table} ingestion json mappings",
                 management=True,
@@ -2515,16 +2538,17 @@ class FabricReadinessAdapter:
         union = ", ".join(sorted(expected_tables))
         rows = self._execute_kql(
             f"union withsource=table_name {union} "
-            "| summarize row_count=count(), latest=max(ingest_timestamp) "
+            "| summarize row_count=count(), "
+            "latest_ingestion=max(ingestion_time()) "
             "by table_name"
         )
         if not rows:
             return None
         latest = max(
             (
-                row.get("latest")
+                row.get("latest_ingestion")
                 for row in rows
-                if row.get("latest") is not None
+                if row.get("latest_ingestion") is not None
             ),
             default=None,
         )
@@ -2619,10 +2643,12 @@ class FabricReadinessAdapter:
 
     def _resolve_kql(self) -> tuple[str, str]:
         if self._query_uri is None or self._database_name is None:
-            self._query_uri, self._database_name = resolve_kql_database(
-                self.workspace_id,
-                str(self.outputs["kql_database_id"]),
-                self.credential,
+            self._query_uri, self._database_name = _retry_network_read(
+                lambda: resolve_kql_database(
+                    self.workspace_id,
+                    str(self.outputs["kql_database_id"]),
+                    self.credential,
+                )
             )
         return self._query_uri, self._database_name
 
@@ -2739,10 +2765,13 @@ def _connect_lakehouse_sql(
             f"Database={database};"
             "Encrypt=Yes;TrustServerCertificate=No"
         )
-        return pyodbc.connect(
-            connection,
-            attrs_before={1256: access_token},
-            timeout=60,
+        return _retry_sql_handshake(
+            lambda: pyodbc.connect(
+                connection,
+                attrs_before={1256: access_token},
+                timeout=60,
+            ),
+            pyodbc,
         )
 
     try:
@@ -2757,10 +2786,47 @@ def _connect_lakehouse_sql(
         f"Database={database};"
         "Encrypt=yes;TrustServerCertificate=no"
     )
-    return mssql_python.connect(
-        connection,
-        attrs_before={1256: access_token},
-        timeout=60,
+    return _retry_sql_handshake(
+        lambda: mssql_python.connect(
+            connection,
+            attrs_before={1256: access_token},
+            timeout=60,
+        ),
+        mssql_python,
+    )
+
+
+def _retry_network_read(read: Callable[[], Any]) -> Any:
+    """Retry an explicitly read-only call after a transient network failure."""
+
+    import requests
+
+    from deploy.scripts._retry import retry_call
+
+    return retry_call(
+        read,
+        retry_on=(requests.ConnectionError, requests.Timeout),
+        on_retry=lambda attempt, _exc: console.warn(
+            f"Read-only API request attempt {attempt}/3 hit a network error; retrying..."
+        ),
+    )
+
+
+def _retry_sql_handshake(connect: Callable[[], Any], driver_module: Any) -> Any:
+    """Retry a refused SQL connection; no query has run, so it is read-only safe."""
+
+    from deploy.scripts._retry import retry_call
+
+    operational_error = getattr(driver_module, "OperationalError", None)
+    return retry_call(
+        connect,
+        attempts=4,
+        delay=2.0,
+        backoff=2.0,
+        retry_on=(operational_error,) if operational_error else (),
+        on_retry=lambda attempt, _exc: console.warn(
+            f"SQL connection attempt {attempt}/4 failed during the handshake; retrying..."
+        ),
     )
 
 

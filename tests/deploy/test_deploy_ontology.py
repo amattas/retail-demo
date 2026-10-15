@@ -41,10 +41,17 @@ class Response:
 
 
 class FakeFabric:
-    def __init__(self, existing=None, sql_status="Success", readback_ok=True):
+    def __init__(
+        self,
+        existing=None,
+        sql_status="Success",
+        readback_ok=True,
+        update_merge_failure=False,
+    ):
         self.items = dict(existing or {})  # id -> (name, definition)
         self.sql_status = sql_status
         self.readback_ok = readback_ok
+        self.update_merge_failure = update_merge_failure
         self.calls: list[tuple[str, str]] = []
         self.created: list[str] = []
 
@@ -75,6 +82,12 @@ class FakeFabric:
             self.items[item_id] = (json["displayName"], json["definition"])
             return Response(201, {"id": item_id})
         if "/updateDefinition" in url:
+            if self.update_merge_failure:
+                return Response(
+                    400,
+                    {"errorCode": "ALMOperationBadRequest"},
+                    "TMDL objects cannot be merged because both declare the same property",
+                )
             item_id = url.split("/")[-2]
             self.items[item_id] = (self.items[item_id][0], json["definition"])
             return Response(200)
@@ -124,12 +137,14 @@ def test_creates_when_absent_and_reports_skipped_bronze_tables():
     fake = FakeFabric()
     report = _publish(fake)
     assert report["action"] == "created" and report["ontology_id"] == NEW
-    assert report["bronze_tables"] == ["receipt_created"]
+    assert report["bronze_tables"] == []
+    assert report["discovered_bronze_tables"] == ["receipt_created"]
     assert "payment_processed" in report["skipped_bronze_tables"]
-    assert len(report["entities"]) == 12 and len(report["rules"]) == 9
+    assert len(report["entities"]) == 13 and len(report["rules"]) == 9
     name, definition = fake.items[NEW]
     paths = {part["path"] for part in definition["parts"]}
-    assert name == ONTOLOGY_NAME and "tables/receipt_created.tmdl" in paths
+    assert name == ONTOLOGY_NAME
+    assert "tables/receipt_created.tmdl" not in paths
 
 
 def test_migrates_an_old_format_item_through_a_verified_staging_item():
@@ -157,6 +172,19 @@ def test_updates_a_tmdl_item_in_place():
     assert not any(method == "DELETE" for method, _ in fake.calls)
     paths = {part["path"] for part in fake.items[NEW][1]["parts"]}
     assert "tables/receipt_created.tmdl" not in paths
+
+
+def test_recreates_when_service_cannot_merge_tmdl_parts():
+    fake = FakeFabric()
+    _publish(fake)
+    fake.update_merge_failure = True
+
+    report = _publish(fake, bronze=())
+
+    assert report["action"] == "recreated"
+    methods = [method for method, _ in fake.calls]
+    assert "DELETE" in methods and "PATCH" in methods
+    assert report["ontology_id"] != NEW
 
 
 def test_incomplete_readback_fails():
