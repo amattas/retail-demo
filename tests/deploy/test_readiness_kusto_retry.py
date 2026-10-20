@@ -29,12 +29,9 @@ def _adapter(monkeypatch, results):
 
     class Client:
         def __init__(self, _connection):
-            pass
+            created.append(self)
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
+        def close(self):
             closed.append(self)
 
         def _execute(self, database, query, method):
@@ -57,9 +54,12 @@ def _adapter(monkeypatch, results):
         lambda _uri, _credential: object(),
     )
     monkeypatch.setattr(_retry.time, "sleep", waits.append)
+    created = []
     adapter = object.__new__(FabricReadinessAdapter)
     adapter.credential = object()
+    adapter._sql_connection = adapter._kusto_client = None
     adapter._resolve_kql = lambda: ("https://unit.invalid", "retail_eventhouse")
+    adapter.created_clients = created
     return adapter, calls, closed, waits
 
 
@@ -84,7 +84,9 @@ def test_transient_kusto_reads_retry_with_fresh_clients(monkeypatch, management)
     result = adapter._execute_kql(query, management=management)
 
     assert result == [{"name": "receipt_created"}]
-    assert len(calls) == len(closed) == 3
+    # Each network failure discards its client; the retry builds a fresh one.
+    assert len(calls) == len(adapter.created_clients) == 3
+    assert len(closed) == 2
     assert waits == [5.0, 10.0]
     assert all(
         call == ("retail_eventhouse", query, "management" if management else "query")
@@ -100,8 +102,17 @@ def test_exhausted_network_retries_propagate_instead_of_returning_empty_evidence
     )
     with pytest.raises(KustoNetworkError):
         adapter._execute_kql(".show tables", management=True)
-    assert len(calls) == len(closed) == 3
+    assert len(calls) == len(closed) == len(adapter.created_clients) == 3
     assert waits == [5.0, 10.0]
+
+
+def test_healthy_client_is_reused_across_reads_and_closed_once(monkeypatch):
+    adapter, calls, closed, _waits = _adapter(monkeypatch, [_response(), _response()])
+    adapter._execute_kql(".show tables", management=True)
+    adapter._execute_kql("receipt_created | take 1")
+    assert len(calls) == 2 and len(adapter.created_clients) == 1 and closed == []
+    adapter.close()
+    assert closed == adapter.created_clients
 
 
 @pytest.mark.parametrize(
@@ -111,7 +122,7 @@ def test_non_network_errors_are_not_retried(monkeypatch, error):
     adapter, calls, closed, waits = _adapter(monkeypatch, [error])
     with pytest.raises(type(error)):
         adapter._execute_kql(".show tables", management=True)
-    assert len(calls) == len(closed) == 1
+    assert len(calls) == 1
     assert waits == []
 
 
@@ -165,9 +176,15 @@ def test_taskflow_read_retries_transient_network_errors(monkeypatch):
     assert waits == [5.0]
 
 
-def test_inventory_queries_mappings_only_for_existing_expected_tables():
+@pytest.mark.parametrize("database_listing", [True, False])
+def test_inventory_maps_only_existing_expected_tables(database_listing):
     calls = []
     adapter = object.__new__(FabricReadinessAdapter)
+    adapter._resolve_kql = lambda: ("https://unit.invalid", "retail_eventhouse")
+    mappings = [
+        {"Name": "EventMapping", "Table": "receipt_created"},
+        {"Name": "OtherMapping", "Table": "unrelated_table"},
+    ]
 
     def execute(query, *, management=False):
         assert management
@@ -178,6 +195,9 @@ def test_inventory_queries_mappings_only_for_existing_expected_tables():
             return [{"name": "fn_attribution"}]
         if query == ".show materialized-views | project name=Name":
             return [{"name": "mv_store_sales_minute"}]
+        if query == ".show database ['retail_eventhouse'] ingestion json mappings":
+            # Older service versions omit the Table column: fall back per table.
+            return mappings if database_listing else [{"Name": "EventMapping"}]
         if query == ".show table receipt_created ingestion json mappings":
             return [{"Name": "EventMapping"}]
         raise ValueError("Entity ID was not found")
@@ -194,7 +214,7 @@ def test_inventory_queries_mappings_only_for_existing_expected_tables():
         materialized_views=frozenset({"mv_store_sales_minute"}),
         mappings=frozenset({"receipt_created/EventMapping"}),
     )
-    assert len(calls) == 4
+    assert len(calls) == (4 if database_listing else 5)
     assert all("ops_availability_signals" not in query for query in calls)
 
 

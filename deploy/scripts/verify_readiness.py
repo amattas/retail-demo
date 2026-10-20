@@ -14,8 +14,10 @@ import os
 import re
 import struct
 import tempfile
+import time
 from collections import Counter
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -115,6 +117,14 @@ _MAPPING_RE = re.compile(
 )
 
 
+# Item types whose definitions binding checks read.
+_DEFINITION_ITEM_TYPES = frozenset({
+    "Notebook", "SemanticModel", "Report", "DataAgent", "DataPipeline", "KQLQueryset",
+})
+# Bounded so concurrent getDefinition calls stay well under Fabric API throttling.
+_DEFINITION_FETCH_WORKERS = 8
+
+
 class CheckFailed(RuntimeError):
     """A live fact was observed and did not satisfy its contract."""
 
@@ -185,6 +195,7 @@ class CheckResult:
     summary: str
     evidence: dict[str, Any] = field(default_factory=dict)
     freshness: dict[str, Any] | None = None
+    duration_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -196,6 +207,7 @@ class CheckResult:
             "summary": self.summary,
             "evidence": bound_evidence(self.evidence),
             "freshness": bound_evidence(self.freshness),
+            "duration_seconds": self.duration_seconds,
         }
 
 
@@ -1074,6 +1086,7 @@ class ReadinessRunner:
         self.items: list[dict[str, Any]] = []
         self.item_index: dict[tuple[str, str], dict[str, Any]] = {}
         self.definitions: dict[str, dict[str, Any]] = {}
+        self._definition_errors: dict[str, Exception] = {}
         self.kql_inventory: KqlInventory | None = None
         self._kql_inventory_attempted = False
         self.pipeline_evidence: dict[str, dict[str, Any]] = {}
@@ -1109,6 +1122,7 @@ class ReadinessRunner:
         )
         required_items = [item for item in expected if item.required]
         manual_items = [item for item in expected if not item.required]
+        self._prefetch_definitions(expected)
         self._check(
             "items.required",
             "inventory",
@@ -1225,6 +1239,7 @@ class ReadinessRunner:
                 )
             )
             return
+        started = time.perf_counter()
         try:
             observation = function()
             if not isinstance(observation, Observation):
@@ -1263,6 +1278,7 @@ class ReadinessRunner:
                 summary=summary,
                 evidence=evidence,
                 freshness=freshness,
+                duration_seconds=round(time.perf_counter() - started, 1),
             )
         )
 
@@ -1359,8 +1375,39 @@ class ReadinessRunner:
         item = self._item(item_type, display_name)
         item_id = str(item.get("id", ""))
         if item_id not in self.definitions:
+            prefetched = self._definition_errors.pop(item_id, None)
+            if prefetched is not None:
+                raise prefetched
             self.definitions[item_id] = self.adapter.get_definition(item_id)
         return self.definitions[item_id]
+
+    def _prefetch_definitions(self, expected: list[Any]) -> None:
+        """Fetch expected item definitions concurrently before the binding checks.
+
+        Each getDefinition is a polled long-running Fabric operation; fetching
+        ~50 of them one at a time dominated readiness time. A failure is kept
+        and re-raised by the check that needs that definition, so results are
+        unchanged.
+        """
+        wanted = {
+            str(item.get("id", ""))
+            for item in self.items
+            if str(item.get("type", "")) in _DEFINITION_ITEM_TYPES
+            and (str(item.get("type", "")), str(item.get("displayName", "")))
+            in {(entry.item_type, entry.display_name) for entry in expected}
+        } - set(self.definitions) - {""}
+        if not wanted:
+            return
+        with ThreadPoolExecutor(_DEFINITION_FETCH_WORKERS) as pool:
+            futures = {
+                item_id: pool.submit(self.adapter.get_definition, item_id)
+                for item_id in sorted(wanted)
+            }
+            for item_id, future in futures.items():
+                try:
+                    self.definitions[item_id] = future.result()
+                except Exception as exc:  # noqa: BLE001 - re-raised by the owning check
+                    self._definition_errors[item_id] = exc
 
     def _notebook_bindings(self) -> Observation:
         errors: list[str] = []
@@ -1585,7 +1632,8 @@ class ReadinessRunner:
         )
         if coverage_errors:
             raise CheckFailed(
-                f"Task-flow source is incomplete ({len(coverage_errors)} error(s))."
+                f"Task-flow source is incomplete ({len(coverage_errors)} error(s)).",
+                evidence={"errors": coverage_errors[:50]},
             )
         selected_artifacts = available_taskflow_artifacts(
             required_artifacts,
@@ -1605,7 +1653,12 @@ class ReadinessRunner:
             actual,
         )
         if errors:
-            raise CheckFailed("Task-flow references or edges differ from the profile.")
+            raise CheckFailed(
+                f"Task-flow references or edges differ from the profile "
+                f"({len(errors)} difference(s)); redeploy the task flow with "
+                "deploy.scripts.taskflow if the workspace items are correct.",
+                evidence={"errors": errors[:50]},
+            )
         return Observation(
             "Workspace task flow contains exact selected references and edges.",
             {
@@ -2347,6 +2400,11 @@ class FabricReadinessAdapter:
         self.fabric = build_session(self.credential)
         self._query_uri: str | None = None
         self._database_name: str | None = None
+        # One Kusto client and one Lakehouse SQL connection serve every read in
+        # a run; reconnecting per query (new token, TLS, and SQL handshake)
+        # dominated the KQL and freshness checks.
+        self._kusto_client: Any = None
+        self._sql_connection: Any = None
 
     def list_items(self) -> list[dict[str, Any]]:
         from deploy.scripts.taskflow import supplement_workspace_items
@@ -2432,15 +2490,28 @@ class FabricReadinessAdapter:
             "name",
         )
         mappings: set[str] = set()
-        for table in sorted(expected_tables & tables):
-            rows = self._execute_kql(
-                f".show table {table} ingestion json mappings",
-                management=True,
-            )
+        wanted = expected_tables & tables
+        # One database-level listing instead of one command per table.
+        _, database_name = self._resolve_kql()
+        rows = self._execute_kql(
+            f".show database ['{database_name}'] ingestion json mappings",
+            management=True,
+        )
+        if rows and all("Table" in row for row in rows):
             for row in rows:
+                table = str(row.get("Table", ""))
                 name = row.get("Name") or row.get("MappingName")
-                if name:
+                if table in wanted and name:
                     mappings.add(f"{table}/{name}")
+        else:
+            for table in sorted(wanted):
+                for row in self._execute_kql(
+                    f".show table {table} ingestion json mappings",
+                    management=True,
+                ):
+                    name = row.get("Name") or row.get("MappingName")
+                    if name:
+                        mappings.add(f"{table}/{name}")
         return KqlInventory(
             tables=frozenset(tables),
             functions=frozenset(functions),
@@ -2668,13 +2739,23 @@ class FabricReadinessAdapter:
             query_uri,
             self.credential,
         )
+
         def read() -> list[dict[str, Any]]:
-            with KustoClient(kcsb) as client:
+            client = getattr(self, "_kusto_client", None)
+            if client is None:
+                client = self._kusto_client = KustoClient(kcsb)
+            try:
                 response = (
                     client.execute_mgmt(database_name, query)
                     if management
                     else client.execute(database_name, query)
                 )
+            except KustoNetworkError:
+                # Never reuse a client after a network failure; the retry
+                # (and later reads) start from a fresh connection.
+                self._kusto_client = None
+                client.close()
+                raise
             if not response.primary_results:
                 return []
             return [row.to_dict() for row in response.primary_results[0]]
@@ -2691,6 +2772,40 @@ class FabricReadinessAdapter:
         )
 
     def _execute_sql(self, query: str) -> list[dict[str, Any]]:
+        if self._sql_connection is not None:
+            try:
+                return self._run_sql(self._sql_connection, query)
+            except Exception:  # noqa: BLE001 - reconnect once below
+                self._close_sql()
+        self._sql_connection = self._open_sql()
+        return self._run_sql(self._sql_connection, query)
+
+    def _close_sql(self) -> None:
+        connection, self._sql_connection = self._sql_connection, None
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:  # noqa: BLE001 - best-effort close of a broken connection
+                pass
+
+    def close(self) -> None:
+        """Release the run's shared Lakehouse SQL and Kusto connections."""
+        self._close_sql()
+        client, self._kusto_client = self._kusto_client, None
+        if client is not None:
+            client.close()
+
+    @staticmethod
+    def _run_sql(connection: Any, query: str) -> list[dict[str, Any]]:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query)
+            columns = [str(column[0]) for column in cursor.description]
+            return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+
+    def _open_sql(self) -> Any:
         response = self.fabric.get(
             f"{FABRIC_API}/workspaces/{self.workspace_id}/lakehouses/"
             f"{self.outputs['lakehouse_id']}"
@@ -2703,19 +2818,11 @@ class FabricReadinessAdapter:
         server = str(properties.get("connectionString", "")).strip()
         if not server:
             raise EvidenceUnknown("Lakehouse SQL endpoint connection is unavailable")
-        conn = _connect_lakehouse_sql(
+        return _connect_lakehouse_sql(
             server,
             self.context.config.lakehouse.name,
             self.credential,
         )
-        with conn:
-            cursor = conn.cursor()
-            cursor.execute(query)
-            columns = [str(column[0]) for column in cursor.description]
-            return [
-                dict(zip(columns, row, strict=True))
-                for row in cursor.fetchall()
-            ]
 
     @staticmethod
     def _names(rows: list[dict[str, Any]], key: str) -> set[str]:
@@ -2979,14 +3086,18 @@ def verify_environment(
             "the post-ontology Data Agent boundary"
         )
     live_adapter = adapter or FabricReadinessAdapter(context)
-    checks = ReadinessRunner(
-        context,
-        live_adapter,
-        run_pipeline_requested=run_pipeline_requested,
-        defer_post_ontology=defer_post_ontology,
-        timeout_seconds=timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
-    ).run()
+    try:
+        checks = ReadinessRunner(
+            context,
+            live_adapter,
+            run_pipeline_requested=run_pipeline_requested,
+            defer_post_ontology=defer_post_ontology,
+            timeout_seconds=timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        ).run()
+    finally:
+        if adapter is None:
+            live_adapter.close()
     report = build_report(
         context,
         checks,
