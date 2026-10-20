@@ -65,6 +65,27 @@ reviewed plan.
 Verification passed: 277 focused sizing/config/preflight/CLI/resume tests,
 Ruff, and Terraform format/validation.
 
+## Reporting package and post-Reporting recovery (2026-10-15)
+
+Object-type staging moved the primary Report and Semantic Model into separate
+folders but left the report's `definition.pbir` path at its old sibling
+location. The staged report now rewrites `byPath` relative to the actual
+`Semantic Models` folder. Live retry published both items successfully without
+rerunning setup or required ML.
+
+The resumed dependency graph also exposed a race: SQL endpoint refresh and
+twins publication ran while optional/experimental ML could still create
+tables. SQL refresh now waits for all selected post-Reporting ML branches;
+Reporting validation follows refresh, and twins, Operations Agent, and ontology
+wait for validation. Fabric pipeline evidence now retains bounded terminal
+failure details.
+
+Live recovery succeeded for SQL endpoint synchronization (68 tables), connected
+twins, and the refreshed 51-reference/13-edge task flow. The optional ML failure
+was a real data boundary in `13-ml-delivery-prediction` (`No valid completed
+dwell records are available for training`), not a polling or retry failure.
+Focused verification passed: 107 Reporting/resume tests and Ruff.
+
 ## Latest recovery, streaming, and Agent follow-up (2026-10-14)
 
 Safe deployment recovery now records per-file fingerprints and limits exact-run

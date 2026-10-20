@@ -1548,18 +1548,26 @@ def _wire_deploy_plan(steps: list[DeployStep]) -> None:
         depend("build-reporting", "required-ml-reporting-gate")
         depend("deploy-reporting", "build-reporting")
         reporting_root = "deploy-reporting"
+        post_reporting_steps = [
+            step.step_id
+            for step in steps
+            if step.step_id.startswith("post-reporting-")
+        ]
         for step in steps:
             if step.step_id.startswith("post-reporting-"):
                 depend(step.step_id, reporting_root)
-        depend("refresh-sql-endpoint", reporting_root)
+        depend(
+            "refresh-sql-endpoint",
+            *(post_reporting_steps or [reporting_root]),
+        )
         depend("validate-reporting", "refresh-sql-endpoint")
         for branch_id in (
             "deploy-twins",
             "deploy-operations-planning",
-            "deploy-fabric-app",
             "ensure-ontology",
         ):
-            depend(branch_id, reporting_root)
+            depend(branch_id, "validate-reporting")
+        depend("deploy-fabric-app", reporting_root)
 
     taskflow_id = "deploy-post-ontology-taskflow"
     branch_terminals = [
@@ -2456,6 +2464,7 @@ def _resume_succeeded_prefix(
     current: _deploy_journal.DeployJournal,
     *,
     allow_runner_file_change: bool = False,
+    allowed_source_changes: set[str] | None = None,
 ) -> int:
     """Copy only a compatible, contiguous succeeded prefix into a new run."""
 
@@ -2485,11 +2494,27 @@ def _resume_succeeded_prefix(
                     previous.manifest.get("input_fingerprints"),
                     current.manifest.get("input_fingerprints"),
                 )
-                if changed == {"deploy/scripts/run_pipeline.py"}:
+                allowed = set(allowed_source_changes or ())
+                allowed.add("deploy/scripts/run_pipeline.py")
+                if changed == allowed:
                     continue
                 raise ValueError(
-                    "Exact-run adoption permits only a change to "
-                    "deploy/scripts/run_pipeline.py; changed inputs: "
+                    "Resume permits only these source changes: "
+                    + ", ".join(sorted(allowed))
+                    + "; changed inputs: "
+                    + (", ".join(sorted(changed)) or "(fingerprint details differ)")
+                )
+            if key == "input_fingerprint" and allowed_source_changes:
+                changed = _deploy_resume.changed_fingerprint_inputs(
+                    previous.manifest.get("input_fingerprints"),
+                    current.manifest.get("input_fingerprints"),
+                )
+                if changed == allowed_source_changes:
+                    continue
+                raise ValueError(
+                    "Resume permits only these source changes: "
+                    + ", ".join(sorted(allowed_source_changes))
+                    + "; changed inputs: "
                     + (", ".join(sorted(changed)) or "(fingerprint details differ)")
                 )
             raise ValueError(f"deploy plan changed since the journaled run ({key})")
@@ -3437,8 +3462,33 @@ def deploy(
         )
     if resume:
         adopted_run = None
+        allowed_source_changes: set[str] = set()
         try:
             assert previous_journal is not None
+            failed_step = next(
+                (
+                    step.step_id
+                    for step in previous_journal.steps
+                    if step.status == "FAILED"
+                ),
+                None,
+            )
+            if failed_step == "deploy-reporting":
+                changed = _deploy_resume.changed_fingerprint_inputs(
+                    previous_journal.manifest.get("input_fingerprints"),
+                    run_journal.manifest.get("input_fingerprints"),
+                )
+                reporting_repair_changes = {
+                    "<deployment commands>",
+                    "deploy/scripts/build_artifacts.py",
+                    "utility/src/retail_setup/cli/main.py",
+                }
+                if changed == reporting_repair_changes:
+                    allowed_source_changes = changed
+                    run_journal.manifest["resume_source_repair"] = {
+                        "failed_step": failed_step,
+                        "accepted_source_changes": sorted(changed),
+                    }
             if adopt_pipeline_run:
                 source_changes = _deploy_resume.changed_fingerprint_inputs(
                     previous_journal.manifest.get("input_fingerprints"),
@@ -3472,6 +3522,7 @@ def deploy(
                 previous_journal,
                 run_journal,
                 allow_runner_file_change=adopted_run is not None,
+                allowed_source_changes=allowed_source_changes or None,
             )
             reattached_steps = _reattach_running_pipeline_steps(
                 previous_journal,

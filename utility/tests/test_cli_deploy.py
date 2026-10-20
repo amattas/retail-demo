@@ -349,17 +349,26 @@ def test_post_reporting_plan_uses_explicit_dependencies_and_one_spark_lane():
     for step_id in (
         "post-reporting-ml-optional",
         "post-reporting-ml-experimental",
-        "ensure-ontology",
     ):
         assert by_id[step_id].resource == "spark"
         assert "deploy-reporting" in by_id[step_id].depends_on
+    assert set(by_id["refresh-sql-endpoint"].depends_on) == {
+        "post-reporting-ml-optional",
+        "post-reporting-ml-experimental",
+    }
+    assert by_id["validate-reporting"].depends_on == (
+        "refresh-sql-endpoint",
+    )
+    assert by_id["ensure-ontology"].resource == "spark"
+    assert by_id["ensure-ontology"].depends_on == ("validate-reporting",)
     for step_id in (
         "deploy-twins",
         "deploy-operations-planning",
-        "deploy-fabric-app",
     ):
         assert by_id[step_id].resource == "non-spark"
-        assert by_id[step_id].depends_on == ("deploy-reporting",)
+        assert by_id[step_id].depends_on == ("validate-reporting",)
+    assert by_id["deploy-fabric-app"].resource == "non-spark"
+    assert by_id["deploy-fabric-app"].depends_on == ("deploy-reporting",)
     taskflow_dependencies = set(
         by_id["deploy-post-ontology-taskflow"].depends_on
     )

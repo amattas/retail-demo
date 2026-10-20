@@ -439,6 +439,31 @@ def test_main_writes_exact_evidence_before_first_status_get(
     assert evidence["status_observed_at"]
 
 
+def test_terminal_failure_evidence_retains_bounded_service_reason() -> None:
+    evidence = run_pipeline._update_evidence_status(
+        {
+            "submitted_at": "2026-10-15T12:00:00+00:00",
+            "status": "Submitted",
+        },
+        {
+            "status": "Failed",
+            "failureReason": {
+                "errorCode": "2451",
+                "requestId": "11111111-1111-4111-8111-111111111111",
+                "message": "  Notebook execution failed   because no rows exist.  ",
+            },
+        },
+    )
+
+    assert evidence["failure_code"] == "2451"
+    assert evidence["failure_request_id"] == (
+        "11111111-1111-4111-8111-111111111111"
+    )
+    assert evidence["failure_message"] == (
+        "Notebook execution failed because no rows exist."
+    )
+
+
 def test_main_reattaches_without_posting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

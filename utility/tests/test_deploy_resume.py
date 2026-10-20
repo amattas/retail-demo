@@ -146,6 +146,68 @@ def test_adopted_run_rejects_drift_in_any_other_source_file():
         )
 
 
+def test_reporting_packaging_repair_allows_only_build_artifacts_change():
+    previous = _run(
+        {
+            "required-ml-reporting-gate": "SUCCEEDED",
+            "build-reporting": "SUCCEEDED",
+            "deploy-reporting": "FAILED",
+        }
+    )
+    current = _run(
+        {
+            "required-ml-reporting-gate": "PENDING",
+            "build-reporting": "PENDING",
+            "deploy-reporting": "PENDING",
+        }
+    )
+    previous.manifest["input_fingerprint"] = "old-inputs"
+    current.manifest["input_fingerprint"] = "new-inputs"
+    previous.manifest["input_fingerprints"]["files"][
+        "deploy/scripts/build_artifacts.py"
+    ] = "old"
+    current.manifest["input_fingerprints"]["files"][
+        "deploy/scripts/build_artifacts.py"
+    ] = "new"
+
+    assert cli._resume_succeeded_prefix(
+        previous,
+        current,
+        allowed_source_changes={"deploy/scripts/build_artifacts.py"},
+    ) == 1
+    assert [step.status for step in current.steps] == [
+        "SUCCEEDED",
+        "PENDING",
+        "PENDING",
+    ]
+
+
+def test_reporting_packaging_repair_rejects_additional_source_drift():
+    previous = _run({"build-reporting": "SUCCEEDED", "deploy-reporting": "FAILED"})
+    current = _run({"build-reporting": "PENDING", "deploy-reporting": "PENDING"})
+    previous.manifest["input_fingerprint"] = "old-inputs"
+    current.manifest["input_fingerprint"] = "new-inputs"
+    previous.manifest["input_fingerprints"]["files"].update(
+        {
+            "deploy/scripts/build_artifacts.py": "old-build",
+            "fabric/powerbi/retail_model.Report/definition.pbir": "old-report",
+        }
+    )
+    current.manifest["input_fingerprints"]["files"].update(
+        {
+            "deploy/scripts/build_artifacts.py": "new-build",
+            "fabric/powerbi/retail_model.Report/definition.pbir": "new-report",
+        }
+    )
+
+    with pytest.raises(ValueError, match="definition.pbir"):
+        cli._resume_succeeded_prefix(
+            previous,
+            current,
+            allowed_source_changes={"deploy/scripts/build_artifacts.py"},
+        )
+
+
 @pytest.mark.parametrize("already_marked_successful", [False, True])
 def test_adopt_completed_required_pipeline_run_verifies_exact_run(
     monkeypatch, tmp_path, already_marked_successful

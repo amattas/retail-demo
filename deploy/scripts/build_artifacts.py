@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -465,6 +466,29 @@ def stage_powerbi_items(
         if item_dir.suffix == ".Report" and report_default_date is not None:
             _set_report_default_date(destination, report_default_date)
         staged.append(destination)
+    staged_by_name = {item.name: item for item in staged}
+    for report_dir in (item for item in staged if item.suffix == ".Report"):
+        definition_path = report_dir / "definition.pbir"
+        if not definition_path.exists():
+            continue
+        definition = json.loads(definition_path.read_text(encoding="utf-8"))
+        by_path = definition.get("datasetReference", {}).get("byPath")
+        if not isinstance(by_path, dict):
+            continue
+        source_path = by_path.get("path")
+        if not isinstance(source_path, str) or not source_path:
+            raise ValueError(f"{definition_path}: dataset byPath.path is required")
+        model_name = Path(source_path).name
+        model_dir = staged_by_name.get(model_name)
+        if model_dir is None or model_dir.suffix != ".SemanticModel":
+            raise ValueError(
+                f"{definition_path}: staged semantic model {model_name!r} is missing"
+            )
+        by_path["path"] = os.path.relpath(model_dir, report_dir).replace("\\", "/")
+        definition_path.write_text(
+            json.dumps(definition, indent=2),
+            encoding="utf-8",
+        )
     return staged
 
 

@@ -195,6 +195,54 @@ def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
     assert not (output / "Reports" / "retail_model.Report" / ".pbi").exists()
 
 
+def test_stage_powerbi_items_rebinds_report_to_model_across_type_folders(
+    tmp_path: Path,
+) -> None:
+    semantic = tmp_path / "fabric" / "powerbi" / "retail_model.SemanticModel"
+    report = tmp_path / "fabric" / "powerbi" / "retail_model.Report"
+    _write_json(
+        semantic / ".platform",
+        {
+            "metadata": {"type": "SemanticModel"},
+            "config": {"logicalId": "11111111-1111-4111-8111-111111111111"},
+        },
+    )
+    _write_json(
+        report / ".platform",
+        {
+            "metadata": {"type": "Report"},
+            "config": {"logicalId": "22222222-2222-4222-8222-222222222222"},
+        },
+    )
+    _write_json(
+        report / "definition.pbir",
+        {
+            "version": "4.0",
+            "datasetReference": {
+                "byPath": {"path": "../retail_model.SemanticModel"}
+            },
+        },
+    )
+
+    output = tmp_path / "deploy" / "workspace"
+    build_artifacts.stage_powerbi_items(
+        tmp_path / "fabric" / "powerbi",
+        output,
+    )
+
+    definition = json.loads(
+        (
+            output
+            / "Reports"
+            / "retail_model.Report"
+            / "definition.pbir"
+        ).read_text(encoding="utf-8")
+    )
+    assert definition["datasetReference"]["byPath"]["path"] == (
+        "../../Semantic Models/retail_model.SemanticModel"
+    )
+
+
 def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
     tmp_path: Path,
 ) -> None:

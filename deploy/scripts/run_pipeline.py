@@ -77,6 +77,9 @@ def _write_evidence(path: Path, evidence: dict[str, object]) -> None:
         "started_at",
         "ended_at",
         "submission",
+        "failure_code",
+        "failure_message",
+        "failure_request_id",
     }
     bounded = {
         key: value
@@ -149,6 +152,16 @@ def _update_evidence_status(
         "ended_at"
     ):
         updated["ended_at"] = observed_at
+    failure = payload.get("failureReason")
+    if isinstance(failure, dict):
+        for evidence_key, payload_key, limit in (
+            ("failure_code", "errorCode", 100),
+            ("failure_message", "message", 500),
+            ("failure_request_id", "requestId", 100),
+        ):
+            value = failure.get(payload_key)
+            if value not in (None, ""):
+                updated[evidence_key] = " ".join(str(value).split())[:limit]
     return updated
 
 
