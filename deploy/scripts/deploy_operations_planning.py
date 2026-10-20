@@ -229,6 +229,11 @@ def _verify_signals(
     validate_signal_readback(signals, actual)
 
 
+def _failure_message(exc: BaseException, limit: int = 500) -> str:
+    """Bounded, single-line failure text for the operations report."""
+    return " ".join(str(exc).split())[:limit] or type(exc).__name__
+
+
 def publish(
     *,
     repo_root: Path,
@@ -390,6 +395,7 @@ def publish(
         report["operations_agent"] = {
             "name": AGENT_NAME, "state": "PUBLICATION_FAILED",
             "failure_type": type(exc).__name__,
+            "failure_message": _failure_message(exc),
         }
         if plan_definition is not None:
             report["plan"]["state"] = "NOT_ATTEMPTED"
@@ -417,6 +423,7 @@ def publish(
             report["plan"] = {
                 "state": "PUBLICATION_FAILED",
                 "failure_type": type(exc).__name__,
+                "failure_message": _failure_message(exc),
             }
             write_report_atomic(report_path, report)
             raise

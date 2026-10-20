@@ -220,6 +220,8 @@ def test_invalid_source_retains_supporting_assets_without_seeding_or_agent_creat
     assert report["signal_count"] is None
     assert report["operations_agent"]["state"] == "PUBLICATION_FAILED"
     assert report["operations_agent"]["failure_type"] == "ValueError"
+    # The report carries the actual reason, not just the exception type.
+    assert report["operations_agent"]["failure_message"]
     assert report["plan"]["state"] == "NOT_SELECTED"
 
 

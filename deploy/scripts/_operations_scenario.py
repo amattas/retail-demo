@@ -92,9 +92,13 @@ def scenario_signals(
             raise ValueError("Availability source time is missing.")
         if source_time.tzinfo is None:
             source_time = source_time.replace(tzinfo=UTC)
-        if not 0 <= (observed_at - source_time).total_seconds() <= 7 * 86400:
+        # A row's source time is that SKU's last ledger change: a slow mover can
+        # be unchanged for days while the snapshot itself is current, so per row
+        # only reject the future; snapshot freshness is checked once below.
+        if source_time > observed_at:
             raise ValueError(
-                "Availability source is stale or future-dated; refresh inputs and required ML first."
+                f"Availability source for store {store_id} product {product_id} is "
+                f"future-dated ({source_time.isoformat()} > {observed_at.isoformat()})."
             )
         forecast_time = row["forecast_as_of"]
         if isinstance(forecast_time, str):
@@ -108,9 +112,10 @@ def scenario_signals(
             raise ValueError("Availability forecast must cover seven distinct days.")
         if forecast_time.tzinfo is None:
             forecast_time = forecast_time.replace(tzinfo=UTC)
-        if not 0 <= (observed_at - forecast_time).total_seconds() <= 7 * 86400:
+        if forecast_time > observed_at:
             raise ValueError(
-                "Forecast source is stale or future-dated; refresh inputs and required ML first."
+                f"Forecast source for store {store_id} product {product_id} is "
+                f"future-dated ({forecast_time.isoformat()} > {observed_at.isoformat()})."
             )
         inventory = row["current_inventory"]
         if inventory is None:
@@ -155,6 +160,14 @@ def scenario_signals(
                 "Reservations and confirmed inbound are unverified, not assumed available.",
             }
         )
+    for label, field in (("Availability", "source_as_of"), ("Forecast", "forecast_as_of")):
+        latest = max(datetime.fromisoformat(signal[field]) for signal in result)
+        age_days = (observed_at - latest).total_seconds() / 86400
+        if age_days > 7:
+            raise ValueError(
+                f"{label} snapshot is stale: newest {field} {latest.isoformat()} is "
+                f"{age_days:.1f} days old (limit 7); refresh inputs and required ML first."
+            )
     return result
 
 

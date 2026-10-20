@@ -76,6 +76,16 @@ def test_invalid_or_stale_data_is_not_silently_seeded(changes):
         scenario_signals([source_row(**changes)], NOW)
 
 
+def test_slow_moving_sku_keeps_its_last_movement_when_the_snapshot_is_current():
+    # A slow mover's last ledger change can be older than a week while the
+    # snapshot (its newest source time) is current; only that is judged.
+    slow = source_row(product_id=17, source_as_of=NOW - timedelta(days=11))
+    signals = scenario_signals([source_row(), slow], NOW)
+    assert signals[1]["source_as_of"] == slow["source_as_of"].isoformat()
+    with pytest.raises(ValueError, match="snapshot is stale"):
+        scenario_signals([slow], NOW)
+
+
 def test_duplicate_source_and_out_of_scope_batches_are_rejected():
     with pytest.raises(ValueError, match="unique"):
         scenario_signals([source_row(), source_row()], NOW)
