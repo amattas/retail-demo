@@ -3,9 +3,15 @@
     {
       "id": "d7ce0e1e-fc0d-4749-a3a8-aec7c850017d",
       "type": "get data",
-      "name": "Load Historical Data",
-      "description": "Run setup notebooks 01 and 02 as the supported historical bootstrap path.",
+      "name": "Generate Historical Data",
+      "description": "Run setup-pipeline: seed dictionaries, validate dimensions, and generate facts in setup 03-09, with independent notebooks running in parallel and handing results to setup 10 through staged tables.",
       "items": [
+        {
+          "artifactUniqueId": "Pipeline:a53bf4eb-07ce-57ab-a1c7-255184982d62",
+          "artifactType": "Pipeline",
+          "artifactObjectId": null,
+          "artifactName": "setup-pipeline"
+        },
         {
           "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120101",
           "artifactType": "SynapseNotebook",
@@ -17,85 +23,7 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "setup-02-generate-dimensions"
-        }
-      ],
-      "loc": "-220 -80"
-    },
-    {
-      "id": "32712835-c4fe-4073-aed8-195eceb57619",
-      "type": "store data",
-      "name": "Lakehouse",
-      "description": "Historical generation and Lakehouse transformation sources.",
-      "items": [
-        {
-          "artifactUniqueId": "Lakehouse:fc9ed7b6-6723-4116-8bf1-278135865270",
-          "artifactType": "Lakehouse",
-          "artifactObjectId": "fc9ed7b6-6723-4116-8bf1-278135865270",
-          "artifactName": "retail_lakehouse"
         },
-        {
-          "artifactUniqueId": "SqlAnalyticsEndpoint:63f6eba8-57a6-42ec-a29d-3ee823d40969",
-          "artifactType": "SqlAnalyticsEndpoint",
-          "artifactObjectId": "63f6eba8-57a6-42ec-a29d-3ee823d40969",
-          "artifactName": "retail_lakehouse"
-        }
-      ],
-      "loc": "460 20"
-    },
-    {
-      "id": "17a0dbf9-0c1d-4be1-bcda-d7664e21336a",
-      "type": "get data",
-      "name": "Get Real-Time Data",
-      "description": "Run the bounded live-event driver; it writes typed synthetic events directly to Eventhouse.",
-      "items": [
-        {
-          "artifactUniqueId": "KustoEventHouse:c35327d5-3ac8-4922-8d69-493391c05984",
-          "artifactType": "KustoEventHouse",
-          "artifactObjectId": "c35327d5-3ac8-4922-8d69-493391c05984",
-          "artifactName": "retail_eventhouse"
-        },
-        {
-          "artifactUniqueId": "KustoDatabase:bc856a99-066c-4865-993a-7d188fbca851",
-          "artifactType": "KustoDatabase",
-          "artifactObjectId": "bc856a99-066c-4865-993a-7d188fbca851",
-          "artifactName": "retail_eventhouse"
-        },
-        {
-          "artifactUniqueId": "SynapseNotebook:58150da8-1265-4d24-930b-41195745f7d9",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": "stream-events"
-        },
-        {
-          "artifactUniqueId": "KQLQueryset:6dc40ab4-7dd7-4f70-a7f0-5de864120103",
-          "artifactType": "KQLQueryset",
-          "artifactObjectId": null,
-          "artifactName": "retail_querysets"
-        }
-      ],
-      "loc": "-220 120"
-    },
-    {
-      "id": "7f03b220-3a08-5eb0-8b4d-1285aa8bf446",
-      "type": "prepare data",
-      "name": "Prepare Eventhouse Shortcuts",
-      "description": "Create and verify the 18 Tables/cusn shortcuts before projecting Eventhouse events through Silver and Gold.",
-      "items": [
-        {
-          "artifactUniqueId": "SynapseNotebook:adb9c982-0630-4585-9b9e-1c5f0a149bd0",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": "01-create-bronze-shortcuts"
-        }
-      ],
-      "loc": "20 250"
-    },
-    {
-      "id": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
-      "type": "prepare data",
-      "name": "Transform Historical Data",
-      "description": "Run setup-pipeline to build the supported historical Lakehouse contract.",
-      "items": [
         {
           "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120110",
           "artifactType": "SynapseNotebook",
@@ -137,7 +65,16 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "setup-09-attribute-marketing"
-        },
+        }
+      ],
+      "loc": "-440 -100"
+    },
+    {
+      "id": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
+      "type": "prepare data",
+      "name": "Publish Historical Data",
+      "description": "Check cross-table invariants and publish the Silver contract atomically (setup-10), then build Gold aggregates (setup-11).",
+      "items": [
         {
           "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120117",
           "artifactType": "SynapseNotebook",
@@ -149,15 +86,57 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "setup-11-build-gold"
-        },
-        {
-          "artifactUniqueId": "Pipeline:a53bf4eb-07ce-57ab-a1c7-255184982d62",
-          "artifactType": "Pipeline",
-          "artifactObjectId": null,
-          "artifactName": "setup-pipeline"
         }
       ],
-      "loc": "120 -80"
+      "loc": "-180 -100"
+    },
+    {
+      "id": "17a0dbf9-0c1d-4be1-bcda-d7664e21336a",
+      "type": "get data",
+      "name": "Get Real-Time Data",
+      "description": "Run the bounded live-event driver; it writes typed synthetic events directly to Eventhouse.",
+      "items": [
+        {
+          "artifactUniqueId": "KustoEventHouse:c35327d5-3ac8-4922-8d69-493391c05984",
+          "artifactType": "KustoEventHouse",
+          "artifactObjectId": "c35327d5-3ac8-4922-8d69-493391c05984",
+          "artifactName": "retail_eventhouse"
+        },
+        {
+          "artifactUniqueId": "KustoDatabase:bc856a99-066c-4865-993a-7d188fbca851",
+          "artifactType": "KustoDatabase",
+          "artifactObjectId": "bc856a99-066c-4865-993a-7d188fbca851",
+          "artifactName": "retail_eventhouse"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:58150da8-1265-4d24-930b-41195745f7d9",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "stream-events"
+        },
+        {
+          "artifactUniqueId": "KQLQueryset:6dc40ab4-7dd7-4f70-a7f0-5de864120103",
+          "artifactType": "KQLQueryset",
+          "artifactObjectId": null,
+          "artifactName": "retail_querysets"
+        }
+      ],
+      "loc": "-700 220"
+    },
+    {
+      "id": "7f03b220-3a08-5eb0-8b4d-1285aa8bf446",
+      "type": "prepare data",
+      "name": "Prepare Eventhouse Shortcuts",
+      "description": "Create and verify the 18 Tables/cusn shortcuts before projecting Eventhouse events through Silver and Gold.",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:adb9c982-0630-4585-9b9e-1c5f0a149bd0",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "01-create-bronze-shortcuts"
+        }
+      ],
+      "loc": "-440 220"
     },
     {
       "id": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
@@ -184,13 +163,34 @@
           "artifactName": "03-streaming-to-silver"
         }
       ],
-      "loc": "120 120"
+      "loc": "-180 220"
+    },
+    {
+      "id": "32712835-c4fe-4073-aed8-195eceb57619",
+      "type": "store data",
+      "name": "Lakehouse",
+      "description": "Historical generation and Lakehouse transformation sources.",
+      "items": [
+        {
+          "artifactUniqueId": "Lakehouse:fc9ed7b6-6723-4116-8bf1-278135865270",
+          "artifactType": "Lakehouse",
+          "artifactObjectId": "fc9ed7b6-6723-4116-8bf1-278135865270",
+          "artifactName": "retail_lakehouse"
+        },
+        {
+          "artifactUniqueId": "SqlAnalyticsEndpoint:63f6eba8-57a6-42ec-a29d-3ee823d40969",
+          "artifactType": "SqlAnalyticsEndpoint",
+          "artifactObjectId": "63f6eba8-57a6-42ec-a29d-3ee823d40969",
+          "artifactName": "retail_lakehouse"
+        }
+      ],
+      "loc": "80 60"
     },
     {
       "id": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
       "type": "general",
-      "name": "General",
-      "description": "Maintain Lakehouse tables; the destructive reset notebook remains a manual action.",
+      "name": "Maintain Lakehouse",
+      "description": "Maintain Lakehouse Delta tables. The retained parquet historical-load pipeline and notebook stay available for older flows; the destructive reset notebook remains a manual action.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
@@ -223,85 +223,7 @@
           "artifactName": "90-augment-and-dedupe-receipts"
         }
       ],
-      "loc": "460 -280"
-    },
-    {
-      "id": "74c13947-61f2-4d20-ac15-2b19262e101b",
-      "type": "store data",
-      "name": "Reporting",
-      "description": "Serve the 40-table Direct Lake semantic model and reports, including connected twins when enabled.",
-      "items": [
-        {
-          "artifactUniqueId": "dataset:07e6f51e-aaac-4594-bf50-94db9c1daf89",
-          "artifactType": "dataset",
-          "artifactObjectId": null,
-          "artifactName": "retail_model"
-        },
-        {
-          "artifactUniqueId": "Report:6dc40ab4-7dd7-4f70-a7f0-5de864120107",
-          "artifactType": "Report",
-          "artifactObjectId": null,
-          "artifactName": "retail_model"
-        },
-        {
-          "artifactUniqueId": "Report:8d51c535-b796-55ed-a42f-e99c1a0c4707",
-          "artifactType": "Report",
-          "artifactObjectId": null,
-          "artifactName": "retail-twins"
-        }
-      ],
-      "loc": "800 120"
-    },
-    {
-      "id": "27806690-2ae3-5a9f-bfef-ccd523c4e819",
-      "type": "distribute data",
-      "name": "Fabric App Approvals",
-      "description": "Open the append-only Rayfin approvals app for human review; the app does not execute orders.",
-      "items": [
-        {
-          "artifactUniqueId": "AppBackend:8a850c5d-7c50-5815-a786-da9f1f57af79",
-          "artifactType": "AppBackend",
-          "artifactObjectId": null,
-          "artifactName": "retail-approvals"
-        }
-      ],
-      "loc": "1050 200"
-    },
-    {
-      "id": "a391a4ba-6f8f-56b2-8ed1-0ea17c74a3e6",
-      "type": "prepare data",
-      "name": "Operations Case Preparation",
-      "description": "Prepare a human-approved replenishment draft from existing signals; the Operations Agent is optional.",
-      "items": [
-        {
-          "artifactUniqueId": "SynapseNotebook:0fe0e22a-1e39-5932-94e3-6437df18f83c",
-          "artifactType": "SynapseNotebook",
-          "artifactObjectId": null,
-          "artifactName": "prepare-replenishment-case"
-        }
-      ],
-      "loc": "1050 380"
-    },
-    {
-      "id": "2b579fce-56a9-4b47-8602-22a334c8f273",
-      "type": "distribute data",
-      "name": "Data Agents",
-      "description": "Preview Data Agents grounded in the semantic model or operator-created ontology.",
-      "items": [
-        {
-          "artifactUniqueId": "LLMPlugin:b791fcbd-1b88-4126-9f46-d95eac202634",
-          "artifactType": "LLMPlugin",
-          "artifactObjectId": "b791fcbd-1b88-4126-9f46-d95eac202634",
-          "artifactName": "retail-semantic-model-agent"
-        },
-        {
-          "artifactUniqueId": "LLMPlugin:c1d73913-84df-4aa3-a3cb-bf16ca343553",
-          "artifactType": "LLMPlugin",
-          "artifactObjectId": null,
-          "artifactName": "retail-ontology-agent"
-        }
-      ],
-      "loc": "1140 40"
+      "loc": "80 -240"
     },
     {
       "id": "333311ac-9b2e-4cfc-898c-cb63347b6988",
@@ -394,7 +316,34 @@
           "artifactName": "10-ml-promotion-effectiveness"
         }
       ],
-      "loc": "460 320"
+      "loc": "340 60"
+    },
+    {
+      "id": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "type": "store data",
+      "name": "Reporting",
+      "description": "Serve the 40-table Direct Lake semantic model and reports, including connected twins when enabled.",
+      "items": [
+        {
+          "artifactUniqueId": "dataset:07e6f51e-aaac-4594-bf50-94db9c1daf89",
+          "artifactType": "dataset",
+          "artifactObjectId": null,
+          "artifactName": "retail_model"
+        },
+        {
+          "artifactUniqueId": "Report:6dc40ab4-7dd7-4f70-a7f0-5de864120107",
+          "artifactType": "Report",
+          "artifactObjectId": null,
+          "artifactName": "retail_model"
+        },
+        {
+          "artifactUniqueId": "Report:8d51c535-b796-55ed-a42f-e99c1a0c4707",
+          "artifactType": "Report",
+          "artifactObjectId": null,
+          "artifactName": "retail-twins"
+        }
+      ],
+      "loc": "600 60"
     },
     {
       "id": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
@@ -451,13 +400,13 @@
           "artifactName": "ml-experimental"
         }
       ],
-      "loc": "1140 300"
+      "loc": "860 -180"
     },
     {
       "id": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
       "type": "distribute data",
       "name": "Serve Ontologies",
-      "description": "The full-demo deploy publishes the TMDL ontology after Reporting; notebook 30 remains available to revalidate or recover it.",
+      "description": "The full-demo deploy publishes the TMDL ontology from the Reporting semantic model; notebook 30 remains available to revalidate it.",
       "items": [
         {
           "artifactUniqueId": "Ontology:ab4766aa-2ebf-4b76-86b6-7efe733d918d",
@@ -472,7 +421,58 @@
           "artifactName": "30-create-ontology"
         }
       ],
-      "loc": "800 -60"
+      "loc": "860 60"
+    },
+    {
+      "id": "2b579fce-56a9-4b47-8602-22a334c8f273",
+      "type": "distribute data",
+      "name": "Data Agents",
+      "description": "Preview Data Agents grounded in the semantic model or operator-created ontology.",
+      "items": [
+        {
+          "artifactUniqueId": "LLMPlugin:b791fcbd-1b88-4126-9f46-d95eac202634",
+          "artifactType": "LLMPlugin",
+          "artifactObjectId": "b791fcbd-1b88-4126-9f46-d95eac202634",
+          "artifactName": "retail-semantic-model-agent"
+        },
+        {
+          "artifactUniqueId": "LLMPlugin:c1d73913-84df-4aa3-a3cb-bf16ca343553",
+          "artifactType": "LLMPlugin",
+          "artifactObjectId": null,
+          "artifactName": "retail-ontology-agent"
+        }
+      ],
+      "loc": "1120 60"
+    },
+    {
+      "id": "a391a4ba-6f8f-56b2-8ed1-0ea17c74a3e6",
+      "type": "prepare data",
+      "name": "Operations Case Preparation",
+      "description": "Prepare a human-approved replenishment draft from availability signals derived from required ML outputs; the Operations Agent is optional.",
+      "items": [
+        {
+          "artifactUniqueId": "SynapseNotebook:0fe0e22a-1e39-5932-94e3-6437df18f83c",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "prepare-replenishment-case"
+        }
+      ],
+      "loc": "600 300"
+    },
+    {
+      "id": "27806690-2ae3-5a9f-bfef-ccd523c4e819",
+      "type": "distribute data",
+      "name": "Fabric App Approvals",
+      "description": "Review prepared replenishment proposals in the append-only Rayfin approvals app; the app does not execute orders.",
+      "items": [
+        {
+          "artifactUniqueId": "AppBackend:8a850c5d-7c50-5815-a786-da9f1f57af79",
+          "artifactType": "AppBackend",
+          "artifactObjectId": null,
+          "artifactName": "retail-approvals"
+        }
+      ],
+      "loc": "860 300"
     }
   ],
   "edges": [
@@ -500,71 +500,78 @@
     {
       "id": "-4",
       "source": "7f03b220-3a08-5eb0-8b4d-1285aa8bf446",
-      "target": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
       "fromPort": "right",
       "toPort": "left"
     },
     {
       "id": "-5",
-      "source": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
+      "source": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
       "target": "32712835-c4fe-4073-aed8-195eceb57619",
-      "fromPort": "bottom",
-      "toPort": "top"
+      "fromPort": "right",
+      "toPort": "left"
     },
     {
       "id": "-6",
+      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
+      "fromPort": "top",
+      "toPort": "bottom"
+    },
+    {
+      "id": "-7",
+      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "target": "333311ac-9b2e-4cfc-898c-cb63347b6988",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-8",
       "source": "333311ac-9b2e-4cfc-898c-cb63347b6988",
       "target": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "fromPort": "right",
       "toPort": "left"
     },
     {
-      "id": "-13",
+      "id": "-9",
       "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "target": "a9c6df7f-d5ef-49ef-a0d2-d21728b25d38",
-      "fromPort": "bottom",
+      "fromPort": "right",
       "toPort": "left"
     },
     {
-      "id": "-8",
-      "source": "32712835-c4fe-4073-aed8-195eceb57619",
-      "target": "333311ac-9b2e-4cfc-898c-cb63347b6988",
-      "fromPort": "bottom",
-      "toPort": "top"
-    },
-    {
       "id": "-10",
-      "source": "32712835-c4fe-4073-aed8-195eceb57619",
+      "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
       "target": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
       "fromPort": "right",
       "toPort": "left"
     },
     {
       "id": "-11",
-      "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
-      "target": "2b579fce-56a9-4b47-8602-22a334c8f273",
-      "fromPort": "right",
-      "toPort": "left"
-    },
-    {
-      "id": "-12",
       "source": "42bdbbc8-a08d-4b7d-9f8e-4b33f40e2e60",
       "target": "2b579fce-56a9-4b47-8602-22a334c8f273",
       "fromPort": "right",
       "toPort": "left"
     },
     {
-      "id": "-14",
+      "id": "-12",
       "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
-      "target": "27806690-2ae3-5a9f-bfef-ccd523c4e819",
-      "fromPort": "bottom",
+      "target": "2b579fce-56a9-4b47-8602-22a334c8f273",
+      "fromPort": "right",
       "toPort": "left"
     },
     {
-      "id": "-15",
-      "source": "74c13947-61f2-4d20-ac15-2b19262e101b",
+      "id": "-13",
+      "source": "333311ac-9b2e-4cfc-898c-cb63347b6988",
       "target": "a391a4ba-6f8f-56b2-8ed1-0ea17c74a3e6",
-      "fromPort": "bottom",
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "id": "-14",
+      "source": "a391a4ba-6f8f-56b2-8ed1-0ea17c74a3e6",
+      "target": "27806690-2ae3-5a9f-bfef-ccd523c4e819",
+      "fromPort": "right",
       "toPort": "left"
     }
   ],

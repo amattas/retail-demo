@@ -480,7 +480,9 @@ def taskflow_portable_errors(
     for task_id in sorted(set(expected_tasks) & set(actual_tasks)):
         expected_task = expected_tasks[task_id]
         actual_task = actual_tasks[task_id]
-        for key in ("type", "name", "description", "loc"):
+        # Canvas position ("loc") is cosmetic; moving a node in the Fabric UI
+        # after deployment must not fail readiness.
+        for key in ("type", "name", "description"):
             if expected_task.get(key, "") != actual_task.get(key, ""):
                 errors.append(f"task {task_id!r} field {key!r} differs")
         expected_items = Counter(

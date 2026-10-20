@@ -966,7 +966,7 @@ deployed `30-create-ontology` notebook to create or revalidate
 `RetailOntology_AutoGen`, waits for the item to appear, publishes both Data
 Agents, and deploys the
 source-controlled task flow. The task-flow write is read back and compared
-with all 11 tasks, 48 selected item references, and 11 edges before the command
+with all 14 tasks, 58 selected item references, and 14 edges before the command
 reports success.
 
 Use this idempotent recovery command only when that final phase was interrupted

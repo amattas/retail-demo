@@ -883,6 +883,8 @@ def test_portable_comparison_rejects_moved_items_and_changed_task_fields() -> No
     actual["tasks"][1]["items"] = actual["tasks"][0].pop("items")
     actual["tasks"][0]["items"] = []
     actual["edges"][0]["fromPort"] = "bottom"
+    # A node moved on the canvas after deployment is not a readiness failure.
+    actual["tasks"][1]["loc"] = "250 40"
 
     errors = taskflow.taskflow_portable_errors(expected, actual)
 
@@ -890,6 +892,7 @@ def test_portable_comparison_rejects_moved_items_and_changed_task_fields() -> No
     assert "task 'one' portable item references differ" in errors
     assert "task 'two' portable item references differ" in errors
     assert "task-flow edges differ" in errors
+    assert not any("'loc'" in error for error in errors)
 
 
 def test_looks_like_guid() -> None:
