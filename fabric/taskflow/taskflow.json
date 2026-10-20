@@ -97,16 +97,58 @@
       "description": "Run setup-pipeline to build the supported historical Lakehouse contract.",
       "items": [
         {
-          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120104",
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120110",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
-          "artifactName": "setup-03-generate-facts"
+          "artifactName": "setup-03-generate-sales"
         },
         {
-          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120105",
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120111",
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
-          "artifactName": "setup-04-build-gold"
+          "artifactName": "setup-04-generate-online-orders"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120112",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-05-generate-marketing"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120113",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-06-generate-returns-and-promotions"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120114",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-07-generate-store-activity"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120115",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-08-generate-inventory"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120116",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-09-attribute-marketing"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120117",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-10-publish-silver"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120118",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "setup-11-build-gold"
         },
         {
           "artifactUniqueId": "Pipeline:a53bf4eb-07ce-57ab-a1c7-255184982d62",
@@ -148,7 +190,7 @@
       "id": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
       "type": "general",
       "name": "General",
-      "description": "Maintenance and retained legacy tools. The legacy historical loader is not the supported first-run path; reset remains manual.",
+      "description": "Maintain Lakehouse tables; the destructive reset notebook remains a manual action.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
@@ -181,8 +223,7 @@
           "artifactName": "90-augment-and-dedupe-receipts"
         }
       ],
-      "loc": "460 -280",
-      "description": "Maintain Lakehouse tables; the destructive reset notebook remains a manual action."
+      "loc": "460 -280"
     },
     {
       "id": "74c13947-61f2-4d20-ac15-2b19262e101b",

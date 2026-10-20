@@ -18,22 +18,29 @@ retail-setup deploy --env alice
 ignored `utility\config\environments\<env>.yaml` generation configuration and
 `deploy\config\environments\<env>.yml` target configuration. A legacy
 `utility\config.yaml` is read only when the environment-specific generation
-file is absent. `render` writes five notebooks to `utility\out\<env>\`:
+file is absent. `render` writes twelve notebooks to `utility\out\<env>\`:
 
 - `setup-01-seed-dictionaries.ipynb`
 - `setup-02-generate-dimensions.ipynb`
-- `setup-03-generate-facts.ipynb`
-- `setup-04-build-gold.ipynb`
+- `setup-03-generate-sales.ipynb`
+- `setup-04-generate-online-orders.ipynb`
+- `setup-05-generate-marketing.ipynb`
+- `setup-06-generate-returns-and-promotions.ipynb`
+- `setup-07-generate-store-activity.ipynb`
+- `setup-08-generate-inventory.ipynb`
+- `setup-09-attribute-marketing.ipynb`
+- `setup-10-publish-silver.ipynb`
+- `setup-11-build-gold.ipynb`
 - `stream-events.ipynb`
 
-Setup 01 through 04 build the base historical Lakehouse contract. The stream
-notebook is optional and runs separately.
+Setup 01 through 11 build the base historical Lakehouse contract. In `setup-pipeline`, 03, 04, and 05 run in parallel after 02; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically, and setup 11 builds Gold.
+The stream notebook is optional and runs separately.
 
 The realism revision calibrates baskets against profile ticket targets and
 catalog prices, generates visits before purchases, and shares variable basket
 and quantity behavior with the live notebook. It intentionally changes output
 for the same seed compared with older generator code. Rebuild and render all
-five notebooks together; refreshing only a report or ML output does not
+twelve notebooks together; refreshing only a report or ML output does not
 regenerate historical data. See the data contract for calibration assumptions
 and the historical/live simulation boundary.
 

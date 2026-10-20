@@ -1,10 +1,34 @@
 """Deterministic seeding + partition grids for the generation engine."""
 
 import hashlib
+import math
 from datetime import date
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+from retail_setup.config.generation import GenerationConfig
+
+# Spark's default of 200 shuffle partitions leaves billion-row full-demo shuffles
+# (receipt lines, inventory events, BLE pings) at millions of rows per task: long
+# spilling sorts and too few tasks to occupy a large pool. Target roughly one
+# million rows of the dominant stream per partition; adaptive query execution
+# still coalesces the many small shuffles back to its advisory size.
+SHUFFLE_ROWS_PER_PARTITION = 1_000_000
+MIN_SHUFFLE_PARTITIONS = 200
+MAX_SHUFFLE_PARTITIONS = 8192
+
+
+def shuffle_partitions_for(cfg: GenerationConfig, basket_lambda: float = 12.0) -> int:
+    """Shuffle partition count sized to the configured receipt-line volume.
+
+    Rounded up to a multiple of 64 so tasks spread evenly across executors.
+    Generation output is independent of the partition count.
+    """
+    days = (cfg.end_date - cfg.start_date).days + 1
+    lines = cfg.store_count * days * cfg.transactions_per_store_day * basket_lambda
+    wanted = math.ceil(lines / SHUFFLE_ROWS_PER_PARTITION / 64) * 64
+    return max(MIN_SHUFFLE_PARTITIONS, min(MAX_SHUFFLE_PARTITIONS, wanted))
 
 
 class seeded_draws:

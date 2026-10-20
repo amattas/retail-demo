@@ -187,3 +187,44 @@ def test_starter_profile_rejects_sizing_evidence(tmp_path: Path) -> None:
             config=starter,
             repo_root=REPO_ROOT,
         )
+
+
+def test_setup_pipeline_never_outgrows_the_sized_session_concurrency() -> None:
+    """Pool sizing reserves room for the required-ML producers running at once.
+
+    The setup pipeline runs independent notebooks concurrently, each in its own
+    Spark session; its widest set of mutually independent notebooks must fit
+    the same session budget.
+    """
+    from itertools import combinations
+
+    from deploy.scripts.capacity_sizing import required_ml_producer_count
+
+    content = json.loads(
+        (
+            REPO_ROOT / "fabric" / "pipelines" / "setup-pipeline.DataPipeline"
+            / "pipeline-content.json"
+        ).read_text(encoding="utf-8")
+    )
+    parents = {
+        activity["name"]: {dep["activity"] for dep in activity["dependsOn"]}
+        for activity in content["properties"]["activities"]
+    }
+    ancestors: dict[str, set[str]] = {}
+
+    def upstream(name: str) -> set[str]:
+        if name not in ancestors:
+            ancestors[name] = set().union(
+                *({parent} | upstream(parent) for parent in parents[name])
+            ) if parents[name] else set()
+        return ancestors[name]
+
+    def independent(group: tuple[str, ...]) -> bool:
+        return all(a not in upstream(b) and b not in upstream(a) for a, b in combinations(group, 2))
+
+    width = max(
+        size for size in range(1, len(parents) + 1)
+        if any(independent(group) for group in combinations(parents, size))
+    )
+    assert width == 5
+    assert width <= required_ml_producer_count(REPO_ROOT)

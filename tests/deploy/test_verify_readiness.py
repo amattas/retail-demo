@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
 
+from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
 from deploy.scripts.verify_readiness import (
     CheckFailed,
@@ -972,14 +973,7 @@ class _CoreAdapter:
             },
         ]
         self.definitions: dict[str, dict] = {}
-        for index, name in enumerate(
-            (
-                "setup-01-seed-dictionaries",
-                "setup-02-generate-dimensions",
-                "setup-03-generate-facts",
-                "setup-04-build-gold",
-            )
-        ):
+        for index, name in enumerate(SETUP_NOTEBOOKS):
             item_id = f"notebook-{index}"
             self.items.append(
                 {"type": "Notebook", "displayName": name, "id": item_id}
@@ -1080,9 +1074,9 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
     assert report["profile"]["hash"] == "profile-hash"
     assert report["profile"]["support_status"] == "core"
     assert report["profile"]["expected_item_counts"] == {
-        "infrastructure": 5,
+        "infrastructure": 12,
         "reporting": 0,
-        "all": 5,
+        "all": 12,
     }
     assert report["profile"]["asset_boundaries"]["preview"] == []
     assert report["profile"]["asset_boundaries"]["manual"] == []

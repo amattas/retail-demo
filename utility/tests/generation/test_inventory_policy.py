@@ -155,21 +155,29 @@ def test_invalid_or_unsorted_demand_fails_explicitly(demand):
 def test_partition_adapter_uses_utc_and_isolates_sku_state():
     from datetime import timezone
 
-    from pyspark.sql import Row
+    import pyarrow as pa
 
-    from retail_setup.generation.fulfillment import _simulate_partition
+    from retail_setup.generation.fulfillment import _simulate_arrow_partition
 
-    rows = [
-        Row(store_id=1, product_id=product, receipt_id_ext=f"R-{product}", line_num=1,
-            event_ts="2024-01-01 00:00:00.000000", quantity=opening_stock(17, 1, product),
-            return_ts="2024-01-02 12:00:00.000000", return_id=f"RET-{product}")
-        for product in range(1, 4)
-    ]
-    result = list(_simulate_partition(
-        iter(rows), start_date=START, end_date=START + timedelta(days=2),
-        seed=17, capacity=100, daily_prior=1.0,
-    ))
-    for product in range(1, 4):
+    utc = pa.timestamp("us", tz="UTC")
+    products = list(range(1, 4))
+    batch = pa.RecordBatch.from_pydict({
+        "store_id": pa.array([1] * 3, pa.int64()),
+        "product_id": pa.array(products, pa.int64()),
+        "event_ts": pa.array([datetime(2024, 1, 1)] * 3, utc),
+        "receipt_id_ext": [f"R-{product}" for product in products],
+        "line_num": pa.array([1] * 3, pa.int64()),
+        "quantity": pa.array([opening_stock(17, 1, p) for p in products], pa.int64()),
+        "return_ts": pa.array([datetime(2024, 1, 2, 12)] * 3, utc),
+        "return_id": [f"RET-{product}" for product in products],
+    })
+    # Split the SKU stream across Arrow batches: state must still follow the SKU.
+    batches = [batch.slice(0, 2), batch.slice(2)]
+    result = pa.Table.from_batches(list(_simulate_arrow_partition(
+        iter(batches), start_date=START, end_date=START + timedelta(days=2),
+        seed=17, capacity=100, daily_prior=1.0, time_zone="UTC",
+    ))).to_pylist()
+    for product in products:
         events = [event for event in result if event["product_id"] == product]
         sale = next(event for event in events if event["kind"] == "SALE")
         assert sale["balance"] == 0

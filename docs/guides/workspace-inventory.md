@@ -54,9 +54,9 @@ both that constraint and Terraform's constraint in
 
 | Profile | Support | Logical assets | Groups | Pipelines | KQL scripts | Infrastructure | Reporting | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `core` | core/explicit | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
-| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 30 | 2 | 32 |
-| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
+| `core` | core/explicit | 1 | 1 | 0 | 0 | 12 | 0 | 12 |
+| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 37 | 2 | 39 |
+| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 47 | 2 | 49 |
 
 The logical asset selections are:
 

@@ -174,8 +174,15 @@ NOTEBOOK_GROUPS = {
 SETUP_NOTEBOOKS = [
     "setup-01-seed-dictionaries",
     "setup-02-generate-dimensions",
-    "setup-03-generate-facts",
-    "setup-04-build-gold",
+    "setup-03-generate-sales",
+    "setup-04-generate-online-orders",
+    "setup-05-generate-marketing",
+    "setup-06-generate-returns-and-promotions",
+    "setup-07-generate-store-activity",
+    "setup-08-generate-inventory",
+    "setup-09-attribute-marketing",
+    "setup-10-publish-silver",
+    "setup-11-build-gold",
 ]
 
 # The live streaming generator. Rendered alongside the setup notebooks (shares

@@ -78,7 +78,7 @@ Before running the verifier:
    setup, watermark, and model evidence.
 3. Confirm the configured identity can read Fabric items, definitions, job
    history, Eventhouse metadata, and the Lakehouse SQL endpoint.
-4. For `core`, run setup notebooks 01-04 in order before verification.
+4. For `core`, run setup notebooks 01-11 in order before verification.
 5. For Reporting profiles, retain the deployment journal that correlates the
    exact setup and required-ML pipeline runs.
 6. Confirm optional ML, ontology, agent, dashboard, and rule surfaces are ready
@@ -118,7 +118,7 @@ Use these signals together:
 
 | Signal | What it tells you | Where to check |
 | --- | --- | --- |
-| Historical setup run | Whether the four setup stages published a complete historical snapshot | `ag.setup_run_log` in the Lakehouse |
+| Historical setup run | Whether the setup pipeline (setup-10) published a complete historical snapshot | `ag.setup_run_log` in the Lakehouse |
 | Streaming progress | How far the Eventhouse-to-Silver transform has processed | `ag._watermarks` in the Lakehouse |
 | Live event freshness | Whether Eventhouse is receiving recent events | Eventhouse row counts and `ingest_timestamp` |
 | Gold freshness | Whether business summaries reflect the latest selected inputs | Representative maximum business time in `au` tables |

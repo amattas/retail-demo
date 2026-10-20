@@ -7,11 +7,18 @@ The supported historical bootstrap is rendered from `utility/` and runs:
 
 1. `setup-01-seed-dictionaries`
 2. `setup-02-generate-dimensions`
-3. `setup-03-generate-facts`
-4. `setup-04-build-gold`
+3. `setup-03-generate-sales`
+4. `setup-04-generate-online-orders`
+5. `setup-05-generate-marketing`
+6. `setup-06-generate-returns-and-promotions`
+7. `setup-07-generate-store-activity`
+8. `setup-08-generate-inventory`
+9. `setup-09-attribute-marketing`
+10. `setup-10-publish-silver`
+11. `setup-11-build-gold`
 
-Those notebooks write the base contract directly to Lakehouse Silver (`ag`) and
-Gold (`au`).
+In `setup-pipeline`, 03, 04, and 05 run in parallel after 02; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically, and setup 11 builds Gold. Those notebooks write the base contract directly to
+Lakehouse Silver (`ag`) and Gold (`au`).
 
 ## Retained notebooks
 

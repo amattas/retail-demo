@@ -872,7 +872,7 @@ still requires live item, binding, KQL, run, and data checks.
 
 ### Generate data
 
-For `core`, run setup notebooks 01 through 04 in order. `core` intentionally
+For `core`, run setup notebooks 01 through 11 in order. `core` intentionally
 has no automatic pipeline run.
 
 For `standard` and `full-demo`, the deploy command already waits for
@@ -995,7 +995,7 @@ result fails deployment; an optional failure or unknown result records
 deploy/.generated/<env>/readiness-report.json
 ```
 
-For `core`, run setup notebooks 01-04 manually, then run:
+For `core`, run setup notebooks 01-11 manually, then run:
 
 ```powershell
 retail-setup verify --env <env>

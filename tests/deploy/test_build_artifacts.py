@@ -332,7 +332,7 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
 
     assert result.output_dir == output
     assert result.profile == "core"
-    assert len(result.staged_items) == 5
+    assert len(result.staged_items) == len(build_artifacts.SETUP_NOTEBOOKS) + 1
     assert "setup-01-seed-dictionaries.Notebook" in result.staged_items
     assert "retail_model.SemanticModel" not in result.staged_items
     assert "retail_model.Report" not in result.staged_items
@@ -354,7 +354,7 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     ("profile_name", "expected_count"),
     # standard gained 07/10 and their MLflow experiments when
     # product_recommendations and price_elasticity became required-tier.
-    [("standard", 32), ("full-demo", 42)],
+    [("standard", 39), ("full-demo", 49)],
 )
 def test_build_workspace_stages_exact_optional_profile_inventory(
     tmp_path: Path,
@@ -863,12 +863,7 @@ def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     out_dir = tmp_path / "workspace"
     rendered = repo / "utility" / "out"
     rendered.mkdir(parents=True)
-    for name in [
-        "setup-01-seed-dictionaries",
-        "setup-02-generate-dimensions",
-        "setup-03-generate-facts",
-        "setup-04-build-gold",
-    ]:
+    for name in build_artifacts.SETUP_NOTEBOOKS:
         _write_json(
             rendered / f"{name}.ipynb",
             {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
@@ -877,8 +872,8 @@ def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     staged = build_artifacts.stage_setup_notebooks(
         repo_root=repo, output_dir=out_dir, lakehouse_name="lh"
     )
-    assert len(staged) == 4
-    item = out_dir / "setup-03-generate-facts.Notebook"
+    assert len(staged) == len(build_artifacts.SETUP_NOTEBOOKS) == 11
+    item = out_dir / "setup-03-generate-sales.Notebook"
     assert (item / ".platform").exists()
     assert (item / "notebook-content.ipynb").exists()
 

@@ -903,7 +903,7 @@
       "required_acknowledgements": [],
       "blockers": [],
       "boundaries": {
-        "runtime": "Publishes the four historical setup notebooks; the operator runs them in order after deployment.",
+        "runtime": "Publishes the eleven historical setup notebooks; the operator runs them in numbered order after deployment (03-05 and 06-08 may run concurrently).",
         "capacity": "Uses the workspace starter pool and does not provision Eventhouse or a custom Spark pool.",
         "cost": "Limits automatic deployment to the workspace, Lakehouse, and historical setup notebooks; Fabric usage still incurs tenant-specific charges.",
         "manual": "Historical notebook execution and validation remain operator actions; no schedule or live stream is enabled.",
@@ -912,7 +912,7 @@
       "reporting_gate_pipeline_ref": null,
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 5,
+        "infrastructure_item_count": 12,
         "reporting_item_count": 0,
         "infrastructure_folders": [
           "Notebooks",
@@ -991,7 +991,7 @@
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 30,
+        "infrastructure_item_count": 37,
         "reporting_item_count": 2,
         "infrastructure_folders": [
           "Notebooks",
@@ -1091,7 +1091,7 @@
         "ml-experimental.DataPipeline"
       ],
       "publication": {
-        "infrastructure_item_count": 40,
+        "infrastructure_item_count": 47,
         "reporting_item_count": 2,
         "infrastructure_folders": [
           "Notebooks",

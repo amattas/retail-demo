@@ -10,7 +10,9 @@ from pathlib import Path
 import pytest
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "notebooks" / "templates"
-DRIVERS = ["driver-02-dimensions.py", "driver-03-facts.py", "driver-04-gold.py"]
+DRIVERS = [
+    "driver-02-dimensions.py", "driver-03-stage.py", "driver-10-publish.py", "driver-11-gold.py",
+]
 
 
 def _bootstrap_cell(name: str) -> str:

@@ -1,16 +1,17 @@
 """Spark adapter for the causal SKU policy and fulfilled receipt finances."""
 
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, timezone
+from dataclasses import dataclass, fields
+from datetime import date
 from functools import partial
 from itertools import groupby
-from typing import Iterator
+from operator import attrgetter
+from typing import Any, Iterator
 
-from pyspark.sql import DataFrame, Row
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.inventory_policy import Demand, simulate_sku
+from retail_setup.generation.inventory_policy import Demand, InventoryEvent, simulate_sku
 from retail_setup.generation.receipts import _fmt
 from retail_setup.generation.returns import build_return_headers
 from retail_setup.generation.runtime import seeded_draws
@@ -37,33 +38,83 @@ class FulfillmentResult:
     events: DataFrame
 
 
-def _simulate_partition(
-    rows: Iterator[Row], *, start_date: date, end_date: date, seed: int,
-    capacity: int, daily_prior: float,
-) -> Iterator[dict]:
+_EVENT_FIELDS = tuple(field.name for field in fields(InventoryEvent))
+_EVENT_TYPES = dict(
+    (name, kind) for name, kind in (
+        column.split() for column in _EVENT_SCHEMA.replace("\n", " ").split(",")
+    )
+)
+_DEMAND_COLUMNS = (
+    "store_id", "product_id", "event_ts", "receipt_id_ext", "line_num", "quantity",
+    "return_ts", "return_id",
+)
+# Bounded output batches keep Python worker memory flat for very busy SKUs.
+_ARROW_BATCH_ROWS = 10_000
+
+
+def _arrow_event_schema(time_zone: str) -> Any:
+    import pyarrow as pa
+
+    arrow_types = {
+        "long": pa.int64(), "string": pa.string(), "timestamp": pa.timestamp("us", tz=time_zone),
+    }
+    return pa.schema([(name, arrow_types[_EVENT_TYPES[name]]) for name in _EVENT_FIELDS])
+
+
+def _simulate_arrow_partition(
+    batches: Iterator[Any], *, start_date: date, end_date: date, seed: int,
+    capacity: int, daily_prior: float, time_zone: str,
+) -> Iterator[Any]:
+    """Stream sorted (store, SKU) demand through the policy for ``mapInArrow``.
+
+    Arrow moves rows between the JVM and Python in column batches instead of
+    pickling one Row/dict per demand line and inventory event, which dominated
+    this stage. Timestamps cross the boundary as UTC instants and are handled
+    as naive UTC datetimes, exactly as the policy expects.
+    """
+    import pyarrow as pa
+
+    schema = _arrow_event_schema(time_zone)
+    naive = pa.timestamp("us")
+    values = attrgetter(*_EVENT_FIELDS)
+
+    def demand_rows() -> Iterator[tuple]:
+        for batch in batches:
+            columns = []
+            for name in _DEMAND_COLUMNS:
+                column = batch.column(batch.schema.get_field_index(name))
+                if pa.types.is_timestamp(column.type):
+                    column = column.cast(naive)
+                columns.append(column.to_pylist())
+            yield from zip(*columns)
+
+    def flush(rows: list[tuple]) -> Any:
+        return pa.RecordBatch.from_arrays(
+            [pa.array(column, type=schema.field(index).type)
+             for index, column in enumerate(zip(*rows))],
+            schema=schema,
+        )
+
+    pending: list[tuple] = []
     for (store_id, product_id), sku_rows in groupby(
-        rows, key=lambda row: (row.store_id, row.product_id),
+        demand_rows(), key=lambda row: (row[0], row[1]),
     ):
         demand = (
-            Demand(
-                datetime.fromisoformat(row.event_ts), row.receipt_id_ext,
-                row.line_num, row.quantity,
-                datetime.fromisoformat(row.return_ts) if row.return_ts else None,
-                row.return_id,
-            )
-            for row in sku_rows if row.receipt_id_ext is not None
+            Demand(event_ts, receipt_id, line_num, quantity, return_ts, return_id)
+            for _, _, event_ts, receipt_id, line_num, quantity, return_ts, return_id in sku_rows
+            if receipt_id is not None
         )
         for event in simulate_sku(
             demand, store_id=store_id, product_id=product_id,
             start_date=start_date, end_date=end_date, seed=seed,
             capacity=capacity, daily_prior=daily_prior,
         ):
-            # PySpark converts naive datetimes in the worker's OS timezone,
-            # which can differ from the UTC Spark session (notably on Windows).
-            yield {
-                name: value.replace(tzinfo=timezone.utc) if isinstance(value, datetime) else value
-                for name, value in asdict(event).items()
-            }
+            pending.append(values(event))
+            if len(pending) >= _ARROW_BATCH_ROWS:
+                yield flush(pending)
+                pending = []
+    if pending:
+        yield flush(pending)
 
 
 def _fulfilled_finances(
@@ -176,15 +227,15 @@ def resolve_fulfillment(
     ordered = demand.unionByName(seeds).repartition("store_id", "product_id").sortWithinPartitions(
         "store_id", "product_id", "event_ts", "_sort",
     )
-    for name in ("event_ts", "return_ts"):
-        ordered = ordered.withColumn(name, F.date_format(name, "yyyy-MM-dd HH:mm:ss.SSSSSS"))
     # A theoretical basket prior, not a look-ahead at generated demand.
+    spark = sales_group["fact_receipts"].sparkSession
     worker = partial(
-        _simulate_partition, start_date=cfg.start_date, end_date=cfg.end_date,
+        _simulate_arrow_partition, start_date=cfg.start_date, end_date=cfg.end_date,
         seed=cfg.seed, capacity=cfg.truck_capacity,
         daily_prior=cfg.transactions_per_store_day * 10.0 / n_products,
+        time_zone=spark.conf.get("spark.sql.session.timeZone"),
     )
-    events = sales_group["fact_receipts"].sparkSession.createDataFrame(
-        ordered.rdd.mapPartitions(worker), _EVENT_SCHEMA,
-    ).withColumn("event_date", F.to_date("event_ts")).cache()
+    events = ordered.select(*_DEMAND_COLUMNS).mapInArrow(worker, _EVENT_SCHEMA).withColumn(
+        "event_date", F.to_date("event_ts"),
+    ).cache()
     return FulfillmentResult(_fulfilled_finances(sales_group, events, dims), headers, events)

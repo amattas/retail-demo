@@ -5,7 +5,7 @@
 The deployment separates data setup, required Reporting dependencies, and
 extended ML:
 
-1. `setup-pipeline` runs setup notebooks 01 through 04.
+1. `setup-pipeline` runs setup notebooks 01 through 11.
 2. `ml-required` runs demand forecast (06), customer segmentation (08), churn
    (09), stockout (12), market-basket mining (07), and promotion/elasticity
    analysis (10) producers serially, in that order, to avoid oversubscribing

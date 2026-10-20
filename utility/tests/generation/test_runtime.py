@@ -3,8 +3,21 @@ from datetime import date
 import pytest
 from pyspark.sql import functions as F
 
+from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation import runtime
-from retail_setup.generation.runtime import derive_seed, store_day_grid
+from retail_setup.generation.runtime import derive_seed, shuffle_partitions_for, store_day_grid
+
+
+def test_shuffle_partitions_scale_with_line_volume():
+    def partitions(stores: int, end: date) -> int:
+        cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=end, store_count=stores)
+        return shuffle_partitions_for(cfg, basket_lambda=12.0)
+
+    # Small demos keep Spark's default; full demo (200 stores x 3 years, ~1B
+    # lines) gets ~1M lines per partition, in multiples of 64; cap holds.
+    assert partitions(5, date(2025, 1, 31)) == 200
+    assert partitions(200, date(2027, 12, 31)) == 1088
+    assert partitions(2000, date(2034, 12, 31)) == 8192
 
 
 def test_derive_seed_deterministic_and_distinct():

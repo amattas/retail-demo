@@ -254,8 +254,10 @@ def test_engine_public_path_uses_fulfilled_sales(spark, monkeypatch, candidate_c
     })
     seen = {}
 
+    # Stage intermediates are released when generate_all returns, so observe
+    # what each builder received while generation is running.
     def promotions(_spark, accepted):
-        seen["promotions"] = accepted["fact_receipt_lines"]
+        seen["promotion_lines"] = accepted["fact_receipt_lines"].count()
         return empty("fact_promotions"), empty("fact_promo_lines")
 
     monkeypatch.setattr(engine.promotions, "generate_promotions", promotions)
@@ -266,7 +268,7 @@ def test_engine_public_path_uses_fulfilled_sales(spark, monkeypatch, candidate_c
     monkeypatch.setattr(engine.store_activity, "generate_store_ops", lambda *_: empty("fact_store_ops"))
 
     def footfall(_spark, accepted, *_):
-        seen["footfall"] = accepted
+        seen["footfall_unfulfilled"] = accepted.filter("receipt_id_ext = 'EMPTY'").count()
         return empty("fact_foot_traffic")
 
     monkeypatch.setattr(engine.store_activity, "generate_foot_traffic", footfall)
@@ -276,7 +278,7 @@ def test_engine_public_path_uses_fulfilled_sales(spark, monkeypatch, candidate_c
     result = engine.generate_all(spark, SimpleNamespace(profile=None), cfg)
     accepted = result.tables["fact_receipts"].filter("receipt_type = 'SALE'")
     assert accepted.filter("receipt_id_ext = 'EMPTY'").count() == 0
-    assert seen["footfall"].filter("receipt_id_ext = 'EMPTY'").count() == 0
+    assert seen["footfall_unfulfilled"] == 0
     sale_txns = result.tables["fact_store_inventory_txn"].filter("txn_type = 'SALE'").count()
-    assert sale_txns == seen["promotions"].count()
+    assert sale_txns == seen["promotion_lines"]
     assert sale_txns < sales["fact_receipt_lines"].count()

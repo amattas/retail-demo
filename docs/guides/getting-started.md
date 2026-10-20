@@ -260,12 +260,20 @@ The command validates all substitutions before writing:
 
 1. `setup-01-seed-dictionaries.ipynb`
 2. `setup-02-generate-dimensions.ipynb`
-3. `setup-03-generate-facts.ipynb`
-4. `setup-04-build-gold.ipynb`
-5. `stream-events.ipynb`
+3. `setup-03-generate-sales.ipynb`
+4. `setup-04-generate-online-orders.ipynb`
+5. `setup-05-generate-marketing.ipynb`
+6. `setup-06-generate-returns-and-promotions.ipynb`
+7. `setup-07-generate-store-activity.ipynb`
+8. `setup-08-generate-inventory.ipynb`
+9. `setup-09-attribute-marketing.ipynb`
+10. `setup-10-publish-silver.ipynb`
+11. `setup-11-build-gold.ipynb`
+12. `stream-events.ipynb`
 
-Output is written to `utility/out/<env>/`. The first four notebooks are the ordered
-historical path. The stream notebook is optional and deployed separately.
+Output is written to `utility/out/<env>/`. The eleven setup notebooks are the
+historical path. In `setup-pipeline`, 03, 04, and 05 run in parallel after 02; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically, and setup 11 builds Gold.
+The stream notebook is optional and deployed separately.
 
 Rendering also records the configured history end date. During deployment, the
 artifact builder uses that date to set the Power BI report's saved date filters
@@ -314,7 +322,7 @@ Choose one path.
 
 ### Core historical path
 
-In the Fabric workspace, run setup notebooks 01 through 04 in order. This is
+In the Fabric workspace, run setup notebooks 01 through 11 in order. This is
 the smallest supported path and creates:
 
 - **Silver (`ag`)**: cleaned, typed historical data, including seven descriptive

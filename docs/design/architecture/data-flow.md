@@ -28,13 +28,23 @@ The historical range is normally derived from `months` and ends yesterday.
 flowchart LR
     D[setup-01<br/>seed dictionaries]
     M[setup-02<br/>dimensions and date]
-    F[setup-03<br/>facts and run log]
-    G[setup-04<br/>Gold]
+    S[setup-03<br/>sales and fulfillment]
+    O[setup-04<br/>online orders]
+    K[setup-05<br/>marketing]
+    R[setup-06<br/>returns and promotions]
+    A[setup-07<br/>store activity]
+    I[setup-08<br/>inventory]
+    T[setup-09<br/>attribution]
+    P[setup-10<br/>publish Silver and run log]
+    G[setup-11<br/>Gold]
     Silver[(ag Silver)]
     Gold[(au Gold)]
 
-    D --> M --> Silver
-    Silver --> F --> Silver
+    D --> M
+    M --> S & O & K
+    S --> R & A & I
+    S & O & K & R --> T
+    S & O & R & A & I & T --> P --> Silver
     Silver --> G --> Gold
 ```
 

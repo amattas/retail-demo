@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.3", "pandas>=2.0", "numpy>=1.26"]
+dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.3", "pyarrow>=14", "pandas>=2.0", "numpy>=1.26"]
 deploy = [
     "azure-identity>=1.25.3,<2",
     "azure-kusto-data>=6.0.4,<7",
@@ -24,6 +24,7 @@ deploy = [
 ]
 spark = [
     "numpy>=1.26",
+    "pyarrow>=14",
     "pyspark>=3.5.2,<4.3",
 ]  # local testing; Fabric provides Spark at runtime
 
@@ -37,8 +38,15 @@ packages = ["src/retail_setup"]
 "data/dictionaries" = "retail_setup/resources/dictionaries"
 "notebooks/setup-01-seed-dictionaries.ipynb" = "retail_setup/resources/notebooks/setup-01-seed-dictionaries.ipynb"
 "notebooks/setup-02-generate-dimensions.ipynb" = "retail_setup/resources/notebooks/setup-02-generate-dimensions.ipynb"
-"notebooks/setup-03-generate-facts.ipynb" = "retail_setup/resources/notebooks/setup-03-generate-facts.ipynb"
-"notebooks/setup-04-build-gold.ipynb" = "retail_setup/resources/notebooks/setup-04-build-gold.ipynb"
+"notebooks/setup-03-generate-sales.ipynb" = "retail_setup/resources/notebooks/setup-03-generate-sales.ipynb"
+"notebooks/setup-04-generate-online-orders.ipynb" = "retail_setup/resources/notebooks/setup-04-generate-online-orders.ipynb"
+"notebooks/setup-05-generate-marketing.ipynb" = "retail_setup/resources/notebooks/setup-05-generate-marketing.ipynb"
+"notebooks/setup-06-generate-returns-and-promotions.ipynb" = "retail_setup/resources/notebooks/setup-06-generate-returns-and-promotions.ipynb"
+"notebooks/setup-07-generate-store-activity.ipynb" = "retail_setup/resources/notebooks/setup-07-generate-store-activity.ipynb"
+"notebooks/setup-08-generate-inventory.ipynb" = "retail_setup/resources/notebooks/setup-08-generate-inventory.ipynb"
+"notebooks/setup-09-attribute-marketing.ipynb" = "retail_setup/resources/notebooks/setup-09-attribute-marketing.ipynb"
+"notebooks/setup-10-publish-silver.ipynb" = "retail_setup/resources/notebooks/setup-10-publish-silver.ipynb"
+"notebooks/setup-11-build-gold.ipynb" = "retail_setup/resources/notebooks/setup-11-build-gold.ipynb"
 "notebooks/stream-events.ipynb" = "retail_setup/resources/notebooks/stream-events.ipynb"
 
 [tool.ruff]

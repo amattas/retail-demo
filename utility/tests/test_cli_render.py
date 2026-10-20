@@ -53,8 +53,15 @@ def test_render_writes_rendered_notebooks(tmp_path):
     assert files == [
         "setup-01-seed-dictionaries.ipynb",
         "setup-02-generate-dimensions.ipynb",
-        "setup-03-generate-facts.ipynb",
-        "setup-04-build-gold.ipynb",
+        "setup-03-generate-sales.ipynb",
+        "setup-04-generate-online-orders.ipynb",
+        "setup-05-generate-marketing.ipynb",
+        "setup-06-generate-returns-and-promotions.ipynb",
+        "setup-07-generate-store-activity.ipynb",
+        "setup-08-generate-inventory.ipynb",
+        "setup-09-attribute-marketing.ipynb",
+        "setup-10-publish-silver.ipynb",
+        "setup-11-build-gold.ipynb",
     ]
     s1 = (out / "setup-01-seed-dictionaries.ipynb").read_text()
     assert "deadbeef" in s1 and "{{" not in s1

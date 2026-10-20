@@ -12,9 +12,11 @@ The system has three stages that most tasks touch:
 1. **`utility/` — `retail-setup` CLI + generation engine (the active code path).**
    A Typer CLI (`retail-setup configure | render | deploy`) plus a deterministic
    PySpark generation engine in `utility/src/retail_setup/generation/`. `render`
-   emits five workspace-specific notebooks to `utility/out/`: setup 01–04 (build
-   the historical Lakehouse contract) and `stream-events.ipynb` (optional live
-   events). Committed notebooks are **built from templates** — never hand-edit the
+   emits twelve workspace-specific notebooks to `utility/out/`: setup 01–11 (build
+   the historical Lakehouse contract; `setup-pipeline` runs them as a dependency
+   graph mirroring the engine's `STAGES`, with independent notebooks in parallel
+   and `gen__*` handoff tables between them) and `stream-events.ipynb` (optional
+   live events). Committed notebooks are **built from templates** — never hand-edit the
    generated `.ipynb`; edit `notebooks/templates/` + generation modules, then
    rebuild (see conventions).
 2. **`deploy/` — Terraform + fabric-cicd.** Stages artifacts and deploys to a

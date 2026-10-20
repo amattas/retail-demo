@@ -2,7 +2,7 @@
 
 | Pipeline | Actual scope | Committed schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04 | On demand; required before ML |
+| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; required before ML |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Disabled |
 | `daily-maintenance` | Delta maintenance | Disabled |

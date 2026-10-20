@@ -80,11 +80,14 @@ class TableTarget:
     belongs to (silver or gold). ``staging_name`` is the run-scoped staging
     identifier the backend actually writes to — it is opaque to the
     coordinator (a qualified catalog table name, a filesystem path, ...).
+    ``prestaged`` marks a staging identifier that already holds the candidate
+    (a generation handoff): the backend neither writes nor cleans it up.
     """
 
     name: str
     db: str
     staging_name: str
+    prestaged: bool = False
 
 
 @dataclass(frozen=True)

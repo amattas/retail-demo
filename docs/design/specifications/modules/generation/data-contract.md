@@ -31,7 +31,8 @@ records, and a final completion or failure record. Reusing an existing `run_id`
 is rejected so retries cannot create ambiguous duplicate history.
 
 Setup-02 generates and validates dimensions without publishing them. Setup-03
-regenerates the same deterministic dimensions with all facts and is the single
+through setup-09 regenerate the same deterministic dimensions and generate the
+facts as handoff tables. Setup-10 (`setup-10-publish-silver`) is the single
 Silver publication boundary. `write_all` stages every candidate under a
 run-scoped `<schema>_stage` schema, validates schema and row counts, captures
 existing Delta versions, then promotes. An attempted promotion failure restores
@@ -89,6 +90,56 @@ payments, promotions, attribution, sensors, and stock ledgers. Online orders,
 marketing, store activity, and Gold output retain their related contracts.
 Reusable intermediate data is cached where repeated calculations would
 otherwise recompute it.
+
+### Execution performance
+
+Generation is a dependency graph of stages (`STAGES` in
+`generation/engine.py`). Each stage names its inputs, its outputs, and the
+setup notebook that runs it:
+
+| Notebook | Stages | Waits for |
+| --- | --- | --- |
+| `setup-03-generate-sales` | candidate receipts, fulfillment plan | setup-02 |
+| `setup-04-generate-online-orders` | online orders | setup-02 |
+| `setup-05-generate-marketing` | background impressions | setup-02 |
+| `setup-06-generate-returns-and-promotions` | returns, promotions | setup-03 |
+| `setup-07-generate-store-activity` | store operations, foot traffic, BLE | setup-03 |
+| `setup-08-generate-inventory` | inventory, logistics, and stockout ledgers | setup-03 |
+| `setup-09-attribute-marketing` | last-touch attribution | setup-03 to 06 |
+| `setup-10-publish-silver` | invariants and atomic Silver publication | setup-03, 04, 06 to 09 |
+
+`setup-pipeline` draws this graph at notebook granularity (a test keeps the
+pipeline and the stage graph identical), so independent notebooks run in their
+own Spark sessions at the same time. At most five run at once, which stays
+within the session concurrency the capacity sizing reserves for required ML.
+Inside a notebook, ready stages run concurrently (up to six); a stage writes
+its own outputs one after another so related cached plans are never built
+concurrently. Completion order and the
+notebook split never change the output; a test compares the notebook path with
+single-session `generate_all` row for row.
+
+Stage outputs that a later notebook needs are written as `gen__<stage>__<output>`
+Delta tables in the Silver staging schema. Each records the generation
+fingerprint (a hash of the generation configuration) in its Delta commit, and
+loading a handoff produced for another configuration fails. Setup-10 promotes
+single-handoff facts directly from their handoffs and drops every handoff only
+after publication succeeds, so a failed publication can be retried without
+regenerating. Within a notebook, other stage frames are checkpointed under
+`Files/setup/_checkpoints/<notebook>` in the Lakehouse rather than on
+executors, so autoscaling or a lost executor cannot drop data a later step
+needs. `generate_all` (local tests) runs the whole graph in one session with
+the same checkpoints, which stay on the executors when no folder is given.
+
+Generation output never depends on Spark partitioning, so each notebook sizes
+`spark.sql.shuffle.partitions` to the configured receipt-line volume (about
+one million lines per partition, between 200 and 8,192) and lets adaptive
+execution coalesce small shuffles. Materializing each stage before dependants
+consume it also means later plans start from small leaves instead of
+re-analyzing the full upstream lineage on the driver. The inventory policy
+runs in Python workers through `mapInArrow`, which moves demand and events in
+Arrow column batches rather than pickling each row. BLE zone selection, ping
+sequencing, and zone changes are per-visit array operations, so the ping
+stream is never shuffled.
 
 ### Retail behavior and calibration
 

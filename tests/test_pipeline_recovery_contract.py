@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
+
 ROOT = Path(__file__).resolve().parents[1]
 PIPELINES = ROOT / "fabric" / "pipelines"
 LAKEHOUSE = ROOT / "fabric" / "lakehouse"
@@ -75,12 +77,7 @@ def test_windows_ci_runs_real_non_filesystem_spark_smokes():
 
 
 def test_pipeline_notebooks_expose_lakehouse_parameter_cells() -> None:
-    setup_names = {
-        "setup-01-seed-dictionaries",
-        "setup-02-generate-dimensions",
-        "setup-03-generate-facts",
-        "setup-04-build-gold",
-    }
+    setup_names = set(SETUP_NOTEBOOKS)
     notebook_names = {
         activity["name"]
         for path in PIPELINES.glob("*.DataPipeline/pipeline-content.json")

@@ -29,8 +29,8 @@ from pyspark import cloudpickle as _probe_pickle
 for _probe_name, _probe_source in _probe_json.load(_probe_sys.stdin):
     exec(compile(_probe_source, _probe_name, "exec"), globals())
 _probe_worker = partial(
-    _simulate_partition, start_date=date(2024, 1, 1), end_date=date(2024, 1, 3),
-    seed=17, capacity=25, daily_prior=1.0,
+    _simulate_arrow_partition, start_date=date(2024, 1, 1), end_date=date(2024, 1, 3),
+    seed=17, capacity=25, daily_prior=1.0, time_zone="UTC",
 )
 print(_probe_base64.b64encode(_probe_pickle.dumps(_probe_worker)).decode("ascii"))
 """],
@@ -44,8 +44,8 @@ import base64
 import importlib.abc
 import sys
 from datetime import datetime, timezone
+import pyarrow as pa
 from pyspark import cloudpickle
-from pyspark.sql import Row
 
 class BlockRetailImports(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
@@ -55,15 +55,18 @@ class BlockRetailImports(importlib.abc.MetaPathFinder):
 assert not any(name.startswith("retail_setup") for name in sys.modules)
 sys.meta_path.insert(0, BlockRetailImports())
 worker = cloudpickle.loads(base64.b64decode(sys.stdin.read()))
-rows = [
-    Row(store_id=1, product_id=1, receipt_id_ext="R1", line_num=1,
-        event_ts="2024-01-01 09:00:00.000000", quantity=3,
-        return_ts="2024-01-02 12:00:00.000000", return_id="RET1"),
-    Row(store_id=1, product_id=1, receipt_id_ext="R2", line_num=1,
-        event_ts="2024-01-01 10:00:00.000000", quantity=1000,
-        return_ts="2024-01-02 13:00:00.000000", return_id="RET2"),
-]
-events = list(worker(iter(rows)))
+utc = pa.timestamp("us", tz="UTC")
+batch = pa.RecordBatch.from_pydict({
+    "store_id": pa.array([1, 1], pa.int64()),
+    "product_id": pa.array([1, 1], pa.int64()),
+    "event_ts": pa.array([datetime(2024, 1, 1, 9), datetime(2024, 1, 1, 10)], utc),
+    "receipt_id_ext": ["R1", "R2"],
+    "line_num": pa.array([1, 1], pa.int64()),
+    "quantity": pa.array([3, 1000], pa.int64()),
+    "return_ts": pa.array([datetime(2024, 1, 2, 12), datetime(2024, 1, 2, 13)], utc),
+    "return_id": ["RET1", "RET2"],
+})
+events = pa.Table.from_batches(list(worker(iter([batch])))).to_pylist()
 assert {event["kind"] for event in events} >= {
     "INITIAL", "SALE", "LOST_SALE", "RETURN", "REORDER", "SHIPMENT",
 }

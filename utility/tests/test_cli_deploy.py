@@ -179,7 +179,7 @@ def test_dry_run_prints_full_plan_and_executes_nothing(monkeypatch, tmp_path):
     assert "build_artifacts" in out and "--profile core" in out
     assert "asset.lakehouse" in out
     assert f"Manifest: {_MANIFEST.version}" in out
-    assert "Expected staged items: 5 infrastructure + 0 Reporting = 5 total" in out
+    assert "Expected staged items: 12 infrastructure + 0 Reporting = 12 total" in out
     assert "Profile support: core" in out
     assert "reset" not in out
     assert "deploy_items" in out and "apply_kql" not in out
@@ -2467,9 +2467,9 @@ def test_yes_flag_runs_required_gates_without_prompt(monkeypatch, tmp_path):
     assert journal["manifest"]["hash"] == profile.manifest_hash
     assert journal["manifest"]["profile_support_status"] == "preview"
     assert journal["manifest"]["expected_item_counts"] == {
-        "infrastructure": 40,
+        "infrastructure": 47,
         "reporting": 2,
-        "all": 42,
+        "all": 49,
     }
     assert journal["manifest"]["asset_boundaries"]["preview"] == list(
         profile.preview_asset_ids

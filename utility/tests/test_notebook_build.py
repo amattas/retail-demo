@@ -10,8 +10,15 @@ PY = sys.executable
 NOTEBOOKS = [
     "setup-01-seed-dictionaries",
     "setup-02-generate-dimensions",
-    "setup-03-generate-facts",
-    "setup-04-build-gold",
+    "setup-03-generate-sales",
+    "setup-04-generate-online-orders",
+    "setup-05-generate-marketing",
+    "setup-06-generate-returns-and-promotions",
+    "setup-07-generate-store-activity",
+    "setup-08-generate-inventory",
+    "setup-09-attribute-marketing",
+    "setup-10-publish-silver",
+    "setup-11-build-gold",
     "stream-events",
 ]
 
@@ -42,7 +49,7 @@ def test_committed_notebooks_in_sync():
 
 
 def test_engine_cell_compiles_standalone():
-    nb = json.loads((UTILITY / "notebooks" / "setup-03-generate-facts.ipynb").read_text())
+    nb = json.loads((UTILITY / "notebooks" / "setup-03-generate-sales.ipynb").read_text())
     engine_cells = [
         c
         for c in nb["cells"]
@@ -104,22 +111,59 @@ def test_stream_template_emits_declared_eventhouse_event_types():
     assert "unknown_event" in kql_tables - declared_events
 
 
-def test_setup03_is_the_single_silver_publication_boundary():
-    dimensions = (
-        UTILITY / "notebooks" / "templates" / "driver-02-dimensions.py"
-    ).read_text()
-    facts = (
-        UTILITY / "notebooks" / "templates" / "driver-03-facts.py"
-    ).read_text()
+def test_setup10_is_the_single_silver_publication_boundary():
+    templates = UTILITY / "notebooks" / "templates"
+    dimensions = (templates / "driver-02-dimensions.py").read_text()
+    stage = (templates / "driver-03-stage.py").read_text()
+    publish = (templates / "driver-10-publish.py").read_text()
 
     assert "write_to_lakehouse(df" not in dimensions
     assert "Dimension validation complete" in dimensions
-    assert "write_all(result.tables, {}, cfg, run_id" in facts
+    # Generation notebooks only write handoffs; only setup-10 publishes Silver,
+    # and it drops the handoffs only after publication succeeds.
+    assert "write_all(" not in stage
+    assert "run_generation_notebook(" in stage
+    assert "prestaged=prestaged" in publish
+    assert publish.index("write_all(") < publish.index("store.drop_all()")
 
 
-def test_setup04_loads_every_gold_source_table():
+def test_generation_notebooks_cover_the_stage_graph():
+    from build_notebooks import STAGE_NOTEBOOK_TEXT
+
+    from retail_setup.generation.engine import STAGE_NOTEBOOKS
+
+    assert tuple(STAGE_NOTEBOOK_TEXT) == STAGE_NOTEBOOKS
+    for name in STAGE_NOTEBOOKS:
+        nb = json.loads((UTILITY / "notebooks" / f"{name}.ipynb").read_text(encoding="utf-8"))
+        src = "".join("".join(c["source"]) for c in nb["cells"])
+        assert f'SETUP_NOTEBOOK = "{name}"' in src
+        assert "__SETUP_" not in src
+
+
+def test_setup_pipeline_draws_the_stage_graph():
+    from build_notebooks import TEMPLATE_FOR
+
+    from retail_setup.generation.engine import setup_notebook_dependencies
+    from retail_setup.notebooks.inject import SETUP_NOTEBOOKS
+
+    pipeline = UTILITY.parent / "fabric" / "pipelines" / "setup-pipeline.DataPipeline"
+    content = json.loads((pipeline / "pipeline-content.json").read_text(encoding="utf-8"))
+    graph = {
+        activity["name"]: tuple(sorted(dep["activity"] for dep in activity["dependsOn"]))
+        for activity in content["properties"]["activities"]
+    }
+    assert list(graph) == SETUP_NOTEBOOKS == [n for n in TEMPLATE_FOR if n.startswith("setup-")]
+    assert graph == {
+        "setup-01-seed-dictionaries": (),
+        "setup-02-generate-dimensions": ("setup-01-seed-dictionaries",),
+        **setup_notebook_dependencies(),
+        "setup-11-build-gold": ("setup-10-publish-silver",),
+    }
+
+
+def test_setup11_loads_every_gold_source_table():
     driver_path = (
-        UTILITY / "notebooks" / "templates" / "driver-04-gold.py"
+        UTILITY / "notebooks" / "templates" / "driver-11-gold.py"
     )
     driver_tree = ast.parse(driver_path.read_text())
     sources_assignment = next(

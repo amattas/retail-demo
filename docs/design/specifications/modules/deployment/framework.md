@@ -225,7 +225,7 @@ notebook references. All profiles exclude the destructive `reset` group.
 
 | Profile | Assets | Groups | Pipelines | KQL scripts | Publication behavior |
 | --- | ---: | --- | ---: | ---: | --- |
-| `core` (explicit selection) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
+| `core` (explicit selection) | 1 | `setup` | 0 | 0 | Lakehouse shell and eleven rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
 | `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview surfaces |
 | `full-demo` (manifest default for every entry point) | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
 

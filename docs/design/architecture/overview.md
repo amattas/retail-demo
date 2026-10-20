@@ -48,8 +48,10 @@ flowchart LR
 
 ## Primary historical path
 
-`setup-01` through `setup-04` seed dictionaries, generate dimensions and facts,
-and build Gold directly in the Lakehouse. This path does not require ADLS
+`setup-01` through `setup-11` seed dictionaries, generate dimensions and facts,
+publish Silver, and build Gold directly in the Lakehouse. Fact generation is
+split by domain into notebooks that run in parallel where the stage graph
+allows. This path does not require ADLS
 parquet shortcuts or the retained historical-load notebook.
 
 ## Optional live path

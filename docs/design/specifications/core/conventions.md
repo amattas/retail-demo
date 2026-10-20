@@ -8,7 +8,7 @@ The supported repository path is:
 2. `retail-setup configure`
 3. `retail-setup render`
 4. `retail-setup deploy` or manual import
-5. setup notebooks 01 through 04
+5. setup notebooks 01 through 11
 6. optional `stream-events`
 
 ## Configuration boundaries

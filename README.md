@@ -74,9 +74,9 @@ retail-setup deploy --env alice --yes
 ```
 
 Configuration is stored in `utility\config\environments\<env>.yaml` (legacy
-`utility\config.yaml` remains a read fallback). Rendering produces five
+`utility\config.yaml` remains a read fallback). Rendering produces twelve
 workspace-specific notebooks in `utility\out\<env>\`:
-setup 01 through 04 and `stream-events.ipynb`.
+setup 01 through 11 and `stream-events.ipynb`.
 
 The guided `full-demo` path runs setup and required ML gates automatically,
 then publishes Reporting and runs isolated optional/experimental ML. An

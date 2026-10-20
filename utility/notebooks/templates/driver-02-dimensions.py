@@ -97,11 +97,8 @@ cfg = GenerationConfig(
 )
 dicts = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type)
 
-dims = generate_dimensions(spark, dicts, cfg)
-# dim_date is padded ±5 years — the semantic model's date relationships
-# need the headroom around the generated fact window.
-dims["dim_date"] = generate_dim_date(
-    spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5))
+# The same dimensions (including the ±5-year dim_date) every later notebook uses.
+dims = generate_dimension_frames(spark, dicts, cfg)
 
 for name, df in dims.items():
     n = df.count()
@@ -110,6 +107,11 @@ for name, df in dims.items():
     print(f"validated {name}: {n:,} rows")
 
 print(
-    "Dimension validation complete. setup-03 regenerates the same deterministic "
-    "dimensions and atomically publishes the complete Silver generation."
+    "Dimension validation complete. Every later setup notebook regenerates the "
+    "same deterministic dimensions; setup-10 atomically publishes the complete "
+    "Silver generation."
 )
+
+# Create the handoff schema once, before setup-03 to 05 start in parallel and
+# write their first handoff tables, so they never race to create it.
+HandoffStore(spark, cfg, lakehouse=LAKEHOUSE_NAME).ensure_schema()

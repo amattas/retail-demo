@@ -96,7 +96,7 @@ def test_core_preflight_validates_existing_queryable_sources() -> None:
     )
 
     assert report.profile.deployment_name == "core"
-    assert len(report.selected_notebooks) == 4
+    assert len(report.selected_notebooks) == 11
 
 
 def test_preflight_requires_rendered_setup_notebooks(

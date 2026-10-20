@@ -81,7 +81,7 @@ allowing separate child folders. These managed exceptions are recorded in
 
 | Pipeline | Actual scope | Schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04 | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
 | `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |

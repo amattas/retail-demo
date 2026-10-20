@@ -109,7 +109,7 @@ trained coherently on shorter history.
 writing any file. Unknown keys, missing values, or remaining tokens fail the
 operation without a partial notebook output set. It also writes
 `utility/out/<env>/render-manifest.json` with the resolved generation window.
-All five notebooks default to that environment directory. An explicit render
+All twelve notebooks default to that environment directory. An explicit render
 output override is an advanced path; normal deployment consumes the
 environment-scoped output.
 
@@ -160,7 +160,7 @@ are `amattas` and `retail-demo`. The CLI injects the ref but does not
 auto-detect a fork or automatically forward local environment overrides to
 Fabric. A fork-only commit must be fetched from the repository that owns it.
 
-The wheel includes dictionaries and all five notebook resources under
+The wheel includes dictionaries and all twelve notebook resources under
 `retail_setup/resources/`; loaders/rendering can use these outside a checkout.
 `utility/pyproject.toml` pins the build backend to `hatchling==1.27.0`.
 After generator/template work finishes, rebuild generated notebooks before
@@ -170,9 +170,18 @@ claiming the packaged/rendered artifact set is current.
 
 1. `setup-01-seed-dictionaries.ipynb`
 2. `setup-02-generate-dimensions.ipynb`
-3. `setup-03-generate-facts.ipynb`
-4. `setup-04-build-gold.ipynb`
-5. `stream-events.ipynb`
+3. `setup-03-generate-sales.ipynb`
+4. `setup-04-generate-online-orders.ipynb`
+5. `setup-05-generate-marketing.ipynb`
+6. `setup-06-generate-returns-and-promotions.ipynb`
+7. `setup-07-generate-store-activity.ipynb`
+8. `setup-08-generate-inventory.ipynb`
+9. `setup-09-attribute-marketing.ipynb`
+10. `setup-10-publish-silver.ipynb`
+11. `setup-11-build-gold.ipynb`
+12. `stream-events.ipynb`
+
+In `setup-pipeline`, 03, 04, and 05 run in parallel after 02; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically, and setup 11 builds Gold.
 
 ### Required tokens
 
@@ -207,7 +216,7 @@ loads the environment, validates the current Azure CLI tenant where applicable,
 detects an existing workspace for interactive reset, executes the deployment
 plan, and deploys the task flow where selected.
 
-`setup-pipeline` includes only setup notebooks 01 through 04. For profiles that
+`setup-pipeline` includes only setup notebooks 01 through 11. For profiles that
 publish Reporting, deploy then runs `ml-required` with terminal polling. Its
 six producers (demand forecast, customer segmentation, churn, stockout,
 market-basket mining, and promotion/elasticity analysis) feed

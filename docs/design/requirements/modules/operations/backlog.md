@@ -57,7 +57,7 @@
 - Destructive recovery must validate the live target and preserve audit context.
 - Required deployment steps, task-flow publication, setup, and the exact-run
   required ML gate fail the deploy and persist an atomic run journal.
-- Setup-03 is the single Silver publication boundary; historical Silver and
+- Setup-10 is the single Silver publication boundary; historical Silver and
   Gold candidates stage and validate before promotion, with compensating Delta
   restore/drop rollback on partial failure.
 - Streaming Gold stages all ten outputs before promotion and restores prior

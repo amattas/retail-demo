@@ -26,7 +26,7 @@ def test_render_produces_token_free_copies(tmp_path):
         assert "{{" not in src, p.name
         nb = json.loads(src)  # still valid notebooks
         assert nb["nbformat"] == 4
-    s3 = (tmp_path / "setup-03-generate-facts.ipynb").read_text()
+    s3 = (tmp_path / "setup-03-generate-sales.ipynb").read_text()
     assert '"demo_lh"' in s3 and '"hardware"' in s3
 
 

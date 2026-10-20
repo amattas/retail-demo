@@ -51,7 +51,7 @@ Standard and full-demo deployment run the read-only verification after their
 existing setup and required-ML gates. Deployment never adds
 `--run-pipeline`. A failed required check fails the deployment; optional
 readiness gaps mark the deploy journal `DEGRADED`. Core remains
-operator-executed: run setup notebooks 01-04, then invoke verification.
+operator-executed: run setup notebooks 01-11, then invoke verification.
 Full-demo verification runs only after the ontology, both Data Agents, and the
 complete task flow have been created or validated in the same deploy.
 
@@ -64,7 +64,7 @@ still fails the deployment when a required table is not queryable.
 
 | Pipeline | Current scope | Current schedule state |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04 | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Schedule file present, disabled |
 | `daily-maintenance` | Delta maintenance | Schedule file present, disabled |

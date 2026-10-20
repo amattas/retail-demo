@@ -513,12 +513,9 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         }
 
     setup = activities("setup-pipeline")
-    assert tuple(setup) == (
-        "setup-01-seed-dictionaries",
-        "setup-02-generate-dimensions",
-        "setup-03-generate-facts",
-        "setup-04-build-gold",
-    )
+    from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
+
+    assert tuple(setup) == tuple(SETUP_NOTEBOOKS)
 
     required = activities("ml-required")
     required_producers = {
